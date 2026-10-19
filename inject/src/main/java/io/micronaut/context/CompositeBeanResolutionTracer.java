@@ -17,13 +17,16 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Hands every callback to several tracers in order.
@@ -59,9 +62,37 @@ final class CompositeBeanResolutionTracer implements BeanResolutionTracer {
      * @param activation The activation
      * @param tracers The tracers to add to
      */
-    static void discover(@Nullable ClassLoader classLoader, Activation activation, List<BeanResolutionTracer> tracers) {
-        SoftServiceLoader.load(BeanResolutionTracer.class, classLoader)
-            .collectAll(tracers, tracer -> tracer.isEnabled(activation));
+    static void discover(@Nullable ClassLoader classLoader, BeanResolutionTracerProvider.Activation activation, List<BeanResolutionTracer> tracers) {
+        List<BeanResolutionTracerProvider> providers = SoftServiceLoader.load(BeanResolutionTracerProvider.class, classLoader)
+            .collectAll(provider -> provider.isEnabled(activation));
+        if (providers.isEmpty()) {
+            return;
+        }
+        // the providers may be collected in parallel: their order decides the order of the callbacks
+        List<BeanResolutionTracerProvider> ordered = new ArrayList<>(providers);
+        OrderUtil.sort(ordered);
+        for (BeanResolutionTracerProvider provider : ordered) {
+            tracers.add(provider.createTracer(activation));
+        }
+    }
+
+    /**
+     * What the activation of discovered tracers is based on.
+     *
+     * @param environmentNames The active environment names
+     * @param discoveryEnabled Whether discovery was enabled
+     */
+    record DefaultActivation(Set<String> environmentNames, boolean discoveryEnabled) implements BeanResolutionTracerProvider.Activation {
+
+        @Override
+        public Set<String> getEnvironmentNames() {
+            return environmentNames;
+        }
+
+        @Override
+        public boolean isDiscoveryEnabled() {
+            return discoveryEnabled;
+        }
     }
 
     @Override
@@ -100,7 +131,7 @@ final class CompositeBeanResolutionTracer implements BeanResolutionTracer {
     }
 
     @Override
-    public <T> void traceBeanCreated(Resolution resolution, BeanDefinition<T> beanDefinition) {
+    public void traceBeanCreated(Resolution resolution, BeanDefinition<?> beanDefinition) {
         // in reverse, so that the tracers nest like the creations they trace
         for (int i = tracers.length - 1; i >= 0; i--) {
             tracers[i].traceBeanCreated(resolution, beanDefinition);
@@ -108,7 +139,7 @@ final class CompositeBeanResolutionTracer implements BeanResolutionTracer {
     }
 
     @Override
-    public <T> void traceBeanCreationFailed(Resolution resolution, BeanDefinition<T> beanDefinition, Throwable failure) {
+    public void traceBeanCreationFailed(Resolution resolution, BeanDefinition<?> beanDefinition, Throwable failure) {
         for (int i = tracers.length - 1; i >= 0; i--) {
             tracers[i].traceBeanCreationFailed(resolution, beanDefinition, failure);
         }

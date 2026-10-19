@@ -67,9 +67,10 @@ public interface BeanContextConfiguration {
     }
 
     /**
-     * Whether the tracers of bean resolution discovered with {@link java.util.ServiceLoader} are enabled. A discovered
-     * tracer decides itself with {@link BeanResolutionTracer#isEnabled(BeanResolutionTracer.Activation)} whether it
-     * is active, by default only if they are.
+     * Whether the tracers of bean resolution discovered with {@link java.util.ServiceLoader} are enabled. The
+     * {@link BeanResolutionTracerProvider} of a discovered tracer decides with
+     * {@link BeanResolutionTracerProvider#isEnabled(BeanResolutionTracerProvider.Activation)} whether it is active, by
+     * default only if they are.
      *
      * <p>Enabled by default when the system property {@code micronaut.inject.trace.tracers} or the environment
      * variable {@code MICRONAUT_INJECT_TRACE_TRACERS} is {@code true}.</p>

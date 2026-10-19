@@ -1531,8 +1531,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             BeanDefinition<T> beanDefinition = candidate.get();
             try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
                 if (beanDefinition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                    T bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
-                    return postBeanCreated(resolutionContext, beanDefinition, beanArg, qualifier, bean);
+                    return createUnregisteredBean(resolutionContext, instantiatableBeanDefinition, beanArg, qualifier, argumentValues);
                 }
             }
         }
@@ -1571,21 +1570,36 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
     }
 
+    @SuppressWarnings("java:S1181") // A failed creation is traced whatever failed it, then rethrown
     private <T> T doCreateBeanWithArguments(BeanResolutionContext resolutionContext,
                                             BeanDefinition<T> definition,
                                             Argument<T> beanType,
                                             @Nullable Qualifier<T> qualifier,
                                             @Nullable Object... args) {
-        Map<String, Object> argumentValues = resolveArgumentValues(resolutionContext, definition, args);
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("Computed bean argument values: {}", argumentValues);
+        // the creation encloses the resolution of the arguments, which pushes the injection points of the constructor
+        AbstractBeanResolutionContext traced = traceCreation(resolutionContext, definition, beanType, qualifier);
+        T bean;
+        try {
+            Map<String, Object> argumentValues = resolveArgumentValues(resolutionContext, definition, args);
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Computed bean argument values: {}", argumentValues);
+            }
+            if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
+                bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
+                bean = postBeanCreated(resolutionContext, definition, beanType, qualifier, bean);
+            } else {
+                throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
+            }
+        } catch (RuntimeException | Error e) {
+            if (traced != null) {
+                traced.traceCreationFailed(definition, e);
+            }
+            throw e;
         }
-        if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-            T bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
-            return postBeanCreated(resolutionContext, definition, beanType, qualifier, bean);
-        } else {
-            throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
+        if (traced != null) {
+            traced.traceCreationEnd(definition);
         }
+        return bean;
     }
 
     @Nullable
@@ -2186,8 +2200,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             BeanDefinition<T> candidate = concreteCandidate.get();
             try (BeanResolutionContext context = newResolutionContext(candidate, resolutionContext)) {
                 if (candidate instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                    T bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
-                    return postBeanCreated(context, candidate, Argument.of(beanType), qualifier, bean);
+                    return createUnregisteredBean(context, instantiatableBeanDefinition, Argument.of(beanType), qualifier, Collections.emptyMap());
                 } else {
                     throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                 }
@@ -4363,23 +4376,73 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             resolutionContext = resolutionContext.copy();
         }
         try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
-            AbstractBeanResolutionContext traced = context instanceof AbstractBeanResolutionContext abstractContext ? abstractContext : null;
-            BeanResolutionTracer tracer = traced == null ? null : traced.getTracer();
-            TracedResolution resolution = traced == null ? null : traced.getTracedResolution();
-            if (tracer == null || resolution == null) {
+            AbstractBeanResolutionContext traced = traceCreation(context, definition, beanType, qualifier);
+            if (traced == null) {
                 return createRegistrationInContext(context, beanType, qualifier, definition, dependent, customizeNull, ownLifecycle);
             }
-            tracer.traceBeanCreation(resolution, definition, resolveCreatedBeanType(beanType, qualifier));
             BeanRegistration<T> registration;
             try {
                 registration = createRegistrationInContext(context, beanType, qualifier, definition, dependent, customizeNull, ownLifecycle);
             } catch (RuntimeException | Error e) {
-                tracer.traceBeanCreationFailed(resolution, definition, e);
+                traced.traceCreationFailed(definition, e);
                 throw e;
             }
-            tracer.traceBeanCreated(resolution, definition);
+            traced.traceCreationEnd(definition);
             return registration;
         }
+    }
+
+    /**
+     * Starts tracing the creation of a bean, if the context is traced.
+     *
+     * @param context The resolution context of the creation
+     * @param definition The definition of the bean
+     * @param beanType The type the bean is created for
+     * @param qualifier The qualifier the bean is created for
+     * @return The traced context, which the caller ends the creation with, or null when it is not traced
+     */
+    private static <T> @Nullable AbstractBeanResolutionContext traceCreation(BeanResolutionContext context,
+                                                                            BeanDefinition<T> definition,
+                                                                            Argument<T> beanType,
+                                                                            @Nullable Qualifier<T> qualifier) {
+        if (context instanceof AbstractBeanResolutionContext traced && traced.isTraced()) {
+            traced.traceCreationStart(definition, resolveCreatedBeanType(beanType, qualifier));
+            return traced;
+        }
+        return null;
+    }
+
+    /**
+     * Creates a bean outside a registration, tracing its creation if the context is traced.
+     *
+     * @param context The resolution context of the creation
+     * @param factory The definition of the bean
+     * @param beanType The type the bean is created for
+     * @param qualifier The qualifier the bean is created for
+     * @param argumentValues The values of the arguments supplied
+     * @return The bean
+     */
+    @SuppressWarnings("java:S1181") // A failed creation is traced whatever failed it, then rethrown
+    private <T> T createUnregisteredBean(BeanResolutionContext context,
+                                         InstantiatableBeanDefinition<T> factory,
+                                         Argument<T> beanType,
+                                         @Nullable Qualifier<T> qualifier,
+                                         @Nullable Map<String, Object> argumentValues) {
+        AbstractBeanResolutionContext traced = traceCreation(context, factory, beanType, qualifier);
+        T bean;
+        try {
+            bean = resolveByBeanFactory(context, factory, qualifier, argumentValues);
+            bean = postBeanCreated(context, factory, beanType, qualifier, bean);
+        } catch (RuntimeException | Error e) {
+            if (traced != null) {
+                traced.traceCreationFailed(factory, e);
+            }
+            throw e;
+        }
+        if (traced != null) {
+            traced.traceCreationEnd(factory);
+        }
+        return bean;
     }
 
     private static <T> Argument<T> resolveCreatedBeanType(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
@@ -6237,7 +6300,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     private void initializeTracers() {
         List<BeanResolutionTracer> tracers = new ArrayList<>(beanContextConfiguration.getBeanResolutionTracers());
-        BeanResolutionTracer.Activation activation = new BeanResolutionTracer.Activation(
+        BeanResolutionTracerProvider.Activation activation = new CompositeBeanResolutionTracer.DefaultActivation(
             getTracerEnvironmentNames(),
             beanContextConfiguration.isBeanResolutionTracerDiscoveryEnabled()
         );

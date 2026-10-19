@@ -3,14 +3,17 @@ package io.micronaut.inject.tracer
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.BeanResolutionTraceMode
+import io.micronaut.context.BeanResolutionTracer
 import io.micronaut.context.exceptions.BeanInstantiationException
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
 class BeanResolutionTracerSpec extends Specification {
 
     void cleanup() {
-        DiscoveredTracer.ACTIVATED.clear()
+        DiscoveredTracerProvider.CREATED.clear()
+        DiscoveredTracerProvider.CREATED_BY.clear()
     }
 
     void "a registered tracer receives paired creation and injection callbacks for constructor, field and prototype beans"() {
@@ -50,8 +53,41 @@ create TracedTyre
   inject CONSTRUCTOR TracedTyre.<init>(wheel)
     create TracedWheel <- TracedTyre
       create TracedWheelFactory <- TracedWheel
-      inject CONSTRUCTOR TracedWheel.front(spark)
+      inject FACTORY_METHOD TracedWheel.front(spark)
         create TracedSpark <- TracedWheel'''
+        tracer.violations.isEmpty()
+
+        cleanup:
+        context.close()
+    }
+
+    void "beans created with createBean are traced, with the qualifiers of their injection points"() {
+        given:
+        def tracer = new RecordingTracer()
+        def context = builder().beanResolutionTracer(tracer).start()
+
+        when:
+        context.createBean(TracedGarage)
+
+        then:
+        tracer.eventsAsText() == '''\
+create TracedGarage
+  inject CONSTRUCTOR TracedGarage.<init>(rear) @Named('rear')
+    create TracedWheel <- TracedGarage
+      create TracedWheelFactory <- TracedWheel
+      inject FACTORY_METHOD TracedWheel.rear(spark)
+        create TracedSpark <- TracedWheel'''
+        tracer.violations.isEmpty()
+
+        when: "a bean is created with arguments, which are resolved within its creation"
+        def front = context.getBean(TracedWheel, Qualifiers.byName("front"))
+        tracer.events.clear()
+        context.createBean(TracedGarage, (Object) front)
+
+        then:
+        tracer.eventsAsText() == '''\
+create TracedGarage
+  inject CONSTRUCTOR TracedGarage.<init>(rear) @Named('rear')'''
         tracer.violations.isEmpty()
 
         cleanup:
@@ -90,6 +126,28 @@ failed TracedBroken: BeanInstantiationException'''
         context.close()
     }
 
+    void "a tracer failing to trace a failed creation does not hide the failure"() {
+        given:
+        def tracer = new RecordingTracer() {
+            @Override
+            void traceBeanCreationFailed(BeanResolutionTracer.Resolution resolution, BeanDefinition<?> beanDefinition, Throwable failure) {
+                throw new IllegalStateException("Tracer failed")
+            }
+        }
+        def context = builder().beanResolutionTracer(tracer).start()
+
+        when:
+        context.getBean(TracedBroken)
+
+        then:
+        def e = thrown(BeanInstantiationException)
+        e.message.contains('Bad spark')
+        e.suppressed*.message.contains('Tracer failed')
+
+        cleanup:
+        context.close()
+    }
+
     void "several registered tracers receive every callback"() {
         given:
         def first = new RecordingTracer()
@@ -109,12 +167,12 @@ failed TracedBroken: BeanInstantiationException'''
         context.close()
     }
 
-    void "a tracer discovered with ServiceLoader is only active when discovery is enabled or it enables itself"() {
+    void "a tracer discovered with ServiceLoader is only active when discovery is enabled or its provider enables it"() {
         when: "discovery is not enabled"
         def context = builder().start()
 
         then:
-        DiscoveredTracer.ACTIVATED.isEmpty()
+        DiscoveredTracerProvider.CREATED.isEmpty()
         context.customTracer == null
 
         when: "discovery is enabled"
@@ -122,20 +180,19 @@ failed TracedBroken: BeanInstantiationException'''
         context = builder().beanResolutionTracerDiscovery(true).start()
         context.getBean(TracedEngine)
 
-        then:
-        DiscoveredTracer.ACTIVATED.size() == 1
-        DiscoveredTracer.ACTIVATED.first().events.first() == 'create TracedEngine'
-        DiscoveredTracer.ACTIVATED.first().violations.isEmpty()
+        then: "the tracers are created in the order of their providers"
+        DiscoveredTracerProvider.CREATED_BY == ['FirstDiscoveredTracerProvider', 'DiscoveredTracerProvider']
+        DiscoveredTracerProvider.CREATED.every { it.events.first() == 'create TracedEngine' && it.violations.isEmpty() }
 
-        when: "the tracer activates itself for an environment"
+        when: "the provider activates the tracer for an environment"
         context.close()
-        DiscoveredTracer.ACTIVATED.clear()
-        context = builder().environments(DiscoveredTracer.ENVIRONMENT).start()
+        cleanup()
+        context = builder().environments(DiscoveredTracerProvider.ENVIRONMENT).start()
         context.getBean(TracedEngine)
 
         then:
-        DiscoveredTracer.ACTIVATED.size() == 1
-        DiscoveredTracer.ACTIVATED.first().events.first() == 'create TracedEngine'
+        DiscoveredTracerProvider.CREATED.size() == 2
+        DiscoveredTracerProvider.CREATED.first().events.first() == 'create TracedEngine'
 
         cleanup:
         context.close()

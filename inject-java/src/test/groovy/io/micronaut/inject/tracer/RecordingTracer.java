@@ -47,18 +47,21 @@ public class RecordingTracer implements BeanResolutionTracer {
     }
 
     @Override
-    public <T> void traceBeanCreated(Resolution resolution, BeanDefinition<T> beanDefinition) {
+    public void traceBeanCreated(Resolution resolution, BeanDefinition<?> beanDefinition) {
         end(null, beanDefinition);
     }
 
     @Override
-    public <T> void traceBeanCreationFailed(Resolution resolution, BeanDefinition<T> beanDefinition, Throwable failure) {
+    public void traceBeanCreationFailed(Resolution resolution, BeanDefinition<?> beanDefinition, Throwable failure) {
         end("failed " + beanDefinition.getBeanType().getSimpleName() + ": " + failure.getClass().getSimpleName(), beanDefinition);
     }
 
     @Override
     public void traceInjectBean(Resolution resolution, Injection injection) {
         String label = "inject " + injection.getKind() + " " + injection.getDeclaringBean().getBeanType().getSimpleName() + "." + injection.getMemberName() + "(" + injection.getArgument().getName() + ")";
+        if (injection.getQualifier() != null) {
+            label += " " + injection.getQualifier();
+        }
         if (resolution.getInjectionPath().get(resolution.getInjectionPath().size() - 1) != injection) {
             violations.add(label + " is not the innermost injection");
         }

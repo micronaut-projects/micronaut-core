@@ -305,12 +305,12 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
     @Override
-    public <T> void traceBeanCreated(Resolution resolution, BeanDefinition<T> beanDefinition) {
+    public void traceBeanCreated(Resolution resolution, BeanDefinition<?> beanDefinition) {
         traceCreationEnd(TracedResolution.resolutionContext(resolution), beanDefinition, "✅ Created ");
     }
 
     @Override
-    public <T> void traceBeanCreationFailed(Resolution resolution, BeanDefinition<T> beanDefinition, Throwable failure) {
+    public void traceBeanCreationFailed(Resolution resolution, BeanDefinition<?> beanDefinition, Throwable failure) {
         traceCreationEnd(TracedResolution.resolutionContext(resolution), beanDefinition, "❌ Failed to create ");
     }
 

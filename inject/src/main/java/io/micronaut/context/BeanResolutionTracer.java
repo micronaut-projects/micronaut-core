@@ -23,22 +23,24 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Receives callbacks as the bean context creates beans and resolves their injection points, for example to log the
  * resolution or to record it as spans of a trace.
  *
- * <p>A tracer is registered with {@link ApplicationContextBuilder#beanResolutionTracer(BeanResolutionTracer)} or
- * discovered with {@link java.util.ServiceLoader} from {@code META-INF/services/io.micronaut.context.BeanResolutionTracer}.
- * Tracers exist before any bean does and therefore cannot be beans themselves. A discovered tracer is only active
- * when {@link #isEnabled(Activation)} returns {@code true}, which by default it does only if discovery was enabled
- * with {@link ApplicationContextBuilder#beanResolutionTracerDiscovery(boolean)}, the system property
- * {@code micronaut.inject.trace.tracers} or the environment variable
- * {@code MICRONAUT_INJECT_TRACE_TRACERS}. All active tracers, together with the tracer of the
- * {@link BeanResolutionTraceMode}, receive every callback, in the order they were registered with the tracer of
- * the mode first and the discovered tracers last. The class patterns of the {@link BeanResolutionTraceConfiguration}
- * only restrict the tracer of the mode.</p>
+ * <p>A tracer is registered with {@link ApplicationContextBuilder#beanResolutionTracer(BeanResolutionTracer)}, or
+ * created by a {@link BeanResolutionTracerProvider} discovered with {@link java.util.ServiceLoader}. Tracers exist
+ * before any bean does and therefore cannot be beans themselves. All active tracers, together with the tracer of the
+ * {@link BeanResolutionTraceMode}, receive every callback: the tracer of the mode first, then the registered tracers
+ * in the order they were registered, then the discovered tracers in the order of their providers. The class
+ * patterns of the {@link BeanResolutionTraceConfiguration} only restrict the tracer of the mode.</p>
+ *
+ * <h2>What is traced</h2>
+ *
+ * <p>The creation of every bean is traced, whether it is created to be resolved, for an injection point, or with
+ * one of the {@code createBean} methods of the {@link BeanContext}. The creation of a bean encloses the resolution
+ * of its injection points: the parameters of its constructor or factory method, its injected fields and methods,
+ * the beans named by its annotations and the events of its event listeners.</p>
  *
  * <h2>Threading and ordering</h2>
  *
@@ -65,8 +67,9 @@ import java.util.Set;
  * </ul>
  *
  * <p>Callbacks run on the path that resolves every bean, so they should be fast. A tracer must not throw: an
- * exception thrown by a callback propagates to, and fails, the resolution being traced. A callback must not create
- * beans either.</p>
+ * exception thrown by a callback propagates to, and fails, the resolution being traced, except one thrown by
+ * {@link #traceBeanCreationFailed(Resolution, BeanDefinition, Throwable)}, which is added as suppressed to the
+ * failure of the creation. A callback must not create beans either.</p>
  *
  * @since 5.3.0
  */
@@ -74,22 +77,9 @@ import java.util.Set;
 public interface BeanResolutionTracer {
 
     /**
-     * Decides whether a tracer discovered with {@link java.util.ServiceLoader} is active for a context. It is
-     * invoked once each time the context starts, before any bean is created. Tracers registered with the
-     * {@link ApplicationContextBuilder} are always active.
+     * Tracing the starting configuration of the context. Only invoked by an {@link ApplicationContext}, which has an
+     * environment, when it is configured.
      *
-     * <p>A tracer meant for development only can activate itself only for the matching environments, for example
-     * {@code activation.discoveryEnabled() || activation.environmentNames().contains(Environment.DEVELOPMENT)}.</p>
-     *
-     * @param activation The activation
-     * @return Whether the tracer is active, by default whether discovery was enabled
-     */
-    default boolean isEnabled(Activation activation) {
-        return activation.discoveryEnabled();
-    }
-
-    /**
-     * Tracing the starting configuration of the context.
      * @param environment The environment.
      * @param beanReferences The loaded bean references
      * @param disabledBeans The disabled beans
@@ -104,10 +94,12 @@ public interface BeanResolutionTracer {
     /**
      * Start tracing the creation of a bean.
      *
-     * <p>Invoked for every bean created, including the beans created while another bean is created. The
-     * {@link Resolution#getInjectionPath() injection path} is empty for a bean created on its own and otherwise ends
-     * with the injection point the bean is created for. The {@link Resolution#getBeansInCreation() beans in creation}
-     * do not include the bean yet.</p>
+     * <p>The {@link Resolution#getInjectionPath() injection path} is empty for a bean created on its own, and
+     * otherwise ends with the innermost injection point being resolved. That is the injection point the bean is
+     * created for, except for the factory of a bean produced by a factory: the lookup of the factory is not an
+     * injection point, so the path of the factory ends with the injection point the produced bean is created for, if
+     * any.
+     * The {@link Resolution#getBeansInCreation() beans in creation} do not include the bean yet.</p>
      *
      * @param resolution The resolution in progress
      * @param beanDefinition The bean definition
@@ -180,11 +172,10 @@ public interface BeanResolutionTracer {
      *
      * @param resolution The resolution in progress
      * @param beanDefinition The bean definition
-     * @param <T> The bean type
      */
-    <T> void traceBeanCreated(
+    void traceBeanCreated(
         Resolution resolution,
-        BeanDefinition<T> beanDefinition);
+        BeanDefinition<?> beanDefinition);
 
     /**
      * Trace when the creation of a bean failed. Pairs with the preceding
@@ -194,11 +185,10 @@ public interface BeanResolutionTracer {
      * @param resolution The resolution in progress
      * @param beanDefinition The bean definition
      * @param failure The failure, which is rethrown after the callback
-     * @param <T> The bean type
      */
-    default <T> void traceBeanCreationFailed(
+    default void traceBeanCreationFailed(
         Resolution resolution,
-        BeanDefinition<T> beanDefinition,
+        BeanDefinition<?> beanDefinition,
         Throwable failure) {
         // no-op
     }
@@ -238,18 +228,13 @@ public interface BeanResolutionTracer {
     }
 
     /**
-     * What a discovered tracer can base its activation on.
-     *
-     * @param environmentNames The active environment names of the context, empty for a context without an environment
-     * @param discoveryEnabled Whether discovered tracers were enabled explicitly
-     */
-    @Experimental
-    record Activation(Set<String> environmentNames, boolean discoveryEnabled) {
-    }
-
-    /**
      * A read-only view of a bean resolution in progress, passed to the callbacks of a tracer. It reflects the
      * resolution at the time of the callback and must only be used during the callback.
+     *
+     * <p>The identity of a resolution is not stable: the callbacks of a single creation may receive different
+     * instances, as the context copies a resolution in progress, for example to create a scoped bean. A tracer links
+     * a creation to the creation it is nested in with {@link #getBeansInCreation()} or its own per thread stack, not
+     * with the identity of the resolution.</p>
      */
     @Experimental
     interface Resolution {
@@ -278,8 +263,8 @@ public interface BeanResolutionTracer {
     }
 
     /**
-     * An injection point being resolved: a constructor or method parameter, a field, a bean named by an annotation
-     * or the event of an event listener. The same instance is passed to
+     * An injection point being resolved: a parameter of a constructor, a factory method or an injected method, a
+     * field, a bean named by an annotation or the event of an event listener. The same instance is passed to
      * {@link #traceInjectBean(Resolution, Injection)} and {@link #traceInjectComplete(Resolution, Injection)}.
      */
     @Experimental
@@ -306,15 +291,26 @@ public interface BeanResolutionTracer {
         Argument<?> getArgument();
 
         /**
+         * The qualifier the injection point declares, such as {@code @Named}, computed when it is asked for.
+         *
+         * @return The qualifier, or {@code null} for none
+         */
+        @Nullable Qualifier<?> getQualifier();
+
+        /**
          * The kinds of injection points.
          */
         enum Kind {
             /**
-             * A parameter of a constructor, or of the factory method of a bean.
+             * A parameter of a constructor.
              */
             CONSTRUCTOR,
             /**
-             * A parameter of an injected method.
+             * A parameter of the factory method that produces a bean.
+             */
+            FACTORY_METHOD,
+            /**
+             * A parameter of an injected method, a setter included.
              */
             METHOD,
             /**

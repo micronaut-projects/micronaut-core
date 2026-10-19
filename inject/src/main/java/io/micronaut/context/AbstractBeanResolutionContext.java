@@ -41,6 +41,7 @@ import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.*;
 
 import io.micronaut.inject.proxy.InterceptedBean;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -65,6 +66,12 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /** What the tracer sees of this context, or null when it is not traced. */
     @Nullable
     private final TracedResolution tracedResolution;
+    /** The segment pushed for the bean this context was started for, which is not traced as an injection point. */
+    @Nullable
+    private Segment<?, ?> rootBeanSegment;
+    /** The definitions of the beans whose traced creation is in progress, the innermost first. */
+    @Nullable
+    private Deque<BeanDefinition<?>> tracedCreations;
     @Nullable
     private Map<CharSequence, Object> attributes;
     @Nullable
@@ -185,22 +192,80 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * @return The injection points being resolved to trace, from the outermost to the innermost
      */
+    boolean isTraced() {
+        return tracer != null;
+    }
+
+    /**
+     * Traces the start of the creation of a bean, if this context is traced.
+     *
+     * @param definition The definition of the bean
+     * @param beanType The type the bean is created for
+     */
+    void traceCreationStart(BeanDefinition<?> definition, Argument<?> beanType) {
+        if (tracer != null) {
+            tracer.traceBeanCreation(traced(), definition, beanType);
+            if (tracedCreations == null) {
+                tracedCreations = new ArrayDeque<>();
+            }
+            // after the callback, which sees the beans the bean is created for
+            tracedCreations.push(definition);
+        }
+    }
+
+    /**
+     * Traces the end of the creation of a bean, if this context is traced.
+     *
+     * @param definition The definition of the bean
+     */
+    void traceCreationEnd(BeanDefinition<?> definition) {
+        if (tracer != null) {
+            endTracedCreation();
+            tracer.traceBeanCreated(traced(), definition);
+        }
+    }
+
+    /**
+     * Traces the failure of the creation of a bean, if this context is traced. A failure of the tracer is added to the
+     * failure of the creation, which is the one the caller sees.
+     *
+     * @param definition The definition of the bean
+     * @param failure The failure of the creation
+     */
+    @SuppressWarnings("java:S1181") // a failing tracer must not hide the failure of the creation, whatever it is
+    void traceCreationFailed(BeanDefinition<?> definition, Throwable failure) {
+        if (tracer != null) {
+            endTracedCreation();
+            try {
+                tracer.traceBeanCreationFailed(traced(), definition, failure);
+            } catch (RuntimeException | Error tracerFailure) {
+                if (tracerFailure != failure) {
+                    failure.addSuppressed(tracerFailure);
+                }
+            }
+        }
+    }
+
+    private void endTracedCreation() {
+        if (tracedCreations != null) {
+            tracedCreations.poll();
+        }
+    }
+
     List<BeanResolutionTracer.Injection> getTracedInjections() {
         return path instanceof DefaultPath defaultPath ? defaultPath.tracedInjections() : List.of();
     }
 
     /**
-     * @return The definitions of the beans this context is creating, from the outermost to the innermost
+     * @return The definitions of the beans whose traced creation is in progress in this context, from the outermost
+     * to the innermost
      */
     List<BeanDefinition<?>> getBeansInCreation() {
-        if (creationState == null) {
+        if (tracedCreations == null || tracedCreations.isEmpty()) {
             return List.of();
         }
-        ArrayList<BeanDefinition<?>> beans = new ArrayList<>();
-        for (BeanCreationState state = creationState; state != null; state = state.parent) {
-            beans.add(state.definition);
-        }
-        Collections.reverse(beans);
+        List<BeanDefinition<?>> beans = new ArrayList<>(tracedCreations.size());
+        tracedCreations.descendingIterator().forEachRemaining(beans::add);
         return Collections.unmodifiableList(beans);
     }
 
@@ -626,8 +691,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      */
     public void copyStateFrom(AbstractBeanResolutionContext context) {
         path.addAll(context.path);
-        if (path instanceof DefaultPath copiedPath && context.path instanceof DefaultPath originalPath) {
-            copiedPath.rootBeanSegment = originalPath.rootBeanSegment;
+        rootBeanSegment = context.rootBeanSegment;
+        if (context.tracedCreations != null) {
+            tracedCreations = new ArrayDeque<>(context.tracedCreations);
         }
         qualifier = context.qualifier;
         if (context.attributes != null) {
@@ -1009,9 +1075,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public static final String RIGHT_ARROW_EMOJI = " ↪️  ";
         private static final String CIRCULAR_ERROR_MSG = "Circular dependency detected";
 
-        /** The segment pushed for the bean the path was started for, which is not traced as an injection point. */
-        @Nullable
-        transient Segment<?, ?> rootBeanSegment;
         /** Whether the segment of the bean the path is started for is being pushed. */
         private boolean creatingRootBean;
 
@@ -1159,9 +1222,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     ConstructorSegment constructorSegment = new ConstructorArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments);
                     detectCircularDependency(declaringType, argument, constructorSegment);
                 } else {
-                    MethodArgumentSegment methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, null);
-                    // the parameter of the factory method that constructs the bean
-                    methodSegment.kind = BeanResolutionTracer.Injection.Kind.CONSTRUCTOR;
+                    // a parameter of the factory method that produces the bean
+                    MethodArgumentSegment methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, null,
+                        BeanResolutionTracer.Injection.Kind.FACTORY_METHOD);
                     if (contains(methodSegment)) {
                         push(methodSegment);
                         throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
@@ -1195,10 +1258,10 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
          * @return The segment as an injection point to trace, or null if it is not one
          */
         private BeanResolutionTracer.@Nullable Injection tracedInjection(@Nullable Segment<?, ?> segment) {
-            if (creatingRootBean || segment == rootBeanSegment || segment instanceof FactorySegment) {
-                // the factory lookup a dependency graph records is not an injection point either
+            if (creatingRootBean || segment == rootBeanSegment) {
                 return null;
             }
+            // the factory lookup a dependency graph records is not an injection point
             return segment instanceof BeanResolutionTracer.Injection injection ? injection : null;
         }
 
@@ -1435,7 +1498,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a constructor.
      */
-    public static class ConstructorSegment extends AbstractSegment<Object, Object> implements ArgumentInjectionPoint<Object, Object> {
+    public static class ConstructorSegment extends AbstractSegment<Object, Object> implements ArgumentInjectionPoint<Object, Object>, BeanResolutionTracer.Injection {
 
         private static final String ANN_ADAPTER = "io.micronaut.aop.Adapter";
         private final String methodName;
@@ -1538,7 +1601,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * {@link ConstructorInjectionPoint}, as for a constructor argument.
      */
     public static final class MethodArgumentSegment extends MethodSegment<Object, Object> implements ArgumentInjectionPoint<Object, Object> {
-        BeanResolutionTracer.Injection.Kind kind = BeanResolutionTracer.Injection.Kind.METHOD;
+        private final BeanResolutionTracer.Injection.Kind kind;
         @Nullable
         private CallableInjectionPoint<Object> outer;
 
@@ -1557,8 +1620,19 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                                      Argument<Object> argument,
                                      Argument<Object>[] arguments,
                                      @Nullable CallableInjectionPoint<Object> outer) {
+            this(declaringType, qualifier, methodName, argument, arguments, outer, BeanResolutionTracer.Injection.Kind.METHOD);
+        }
+
+        MethodArgumentSegment(BeanDefinition<Object> declaringType,
+                              @Nullable Qualifier<Object> qualifier,
+                              String methodName,
+                              Argument<Object> argument,
+                              Argument<Object>[] arguments,
+                              @Nullable CallableInjectionPoint<Object> outer,
+                              BeanResolutionTracer.Injection.Kind kind) {
             super(declaringType, qualifier, methodName, argument, arguments);
             this.outer = outer;
+            this.kind = kind;
         }
 
         /**
@@ -1642,7 +1716,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * @param <B> The bean type
      * @param <T> The event type
      */
-    public static class EventListenerSegment<B, T> extends AbstractSegment<B, T> implements CallableInjectionPoint<B> {
+    public static class EventListenerSegment<B, T> extends AbstractSegment<B, T> implements CallableInjectionPoint<B>, BeanResolutionTracer.Injection {
         /**
          * @param declaringClass The declaring class
          * @param eventType      The argument
@@ -1690,7 +1764,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a method.
      */
-    public static class MethodSegment<B, T> extends AbstractSegment<B, T> implements CallableInjectionPoint<B> {
+    public static class MethodSegment<B, T> extends AbstractSegment<B, T> implements CallableInjectionPoint<B>, BeanResolutionTracer.Injection {
 
         private final Argument<Object>[] arguments;
 
@@ -1765,7 +1839,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * @param <B> The declaring bean type
      * @param <T> The field type
      */
-    public static final class FieldSegment<B, T> extends AbstractSegment<B, T> implements FieldInjectionPoint<B, T>, ArgumentInjectionPoint<B, T> {
+    public static final class FieldSegment<B, T> extends AbstractSegment<B, T> implements FieldInjectionPoint<B, T>, ArgumentInjectionPoint<B, T>, BeanResolutionTracer.Injection {
 
         /**
          * @param declaringClass The declaring class
@@ -1849,7 +1923,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      *
      * @since 3.3.0
      */
-    public static final class AnnotationSegment<B> extends AbstractSegment<B, B> implements InjectionPoint<B> {
+    public static final class AnnotationSegment<B> extends AbstractSegment<B, B> implements InjectionPoint<B>, BeanResolutionTracer.Injection {
 
         /**
          * @param beanDefinition The bean definition
@@ -1915,12 +1989,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
-        public BeanResolutionTracer.Injection.Kind getKind() {
-            // never traced: the lookup is pushed and popped without the callbacks of an injection point
-            return BeanResolutionTracer.Injection.Kind.CONSTRUCTOR;
-        }
-
-        @Override
         public InjectionPoint<Object> getInjectionPoint() {
             return this;
         }
@@ -1945,7 +2013,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * Abstract class for a Segment.
      */
-    protected abstract static class AbstractSegment<B, T> implements Segment<B, T>, Named, BeanResolutionTracer.Injection {
+    protected abstract static class AbstractSegment<B, T> implements Segment<B, T>, Named {
 
         /**
          * The separator between a type and its member when printing to user.
@@ -2002,9 +2070,18 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             return name;
         }
 
-        @Override
+        /**
+         * @return The name of the member that declares the injection point
+         */
         public String getMemberName() {
             return getName();
+        }
+
+        /**
+         * @return The qualifier the injection point declares, or {@code null} for none
+         */
+        public @Nullable Qualifier<?> getQualifier() {
+            return Qualifiers.forArgument(argument);
         }
 
         @Override
@@ -2012,7 +2089,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             return declaringComponent;
         }
 
-        @Override
+        /**
+         * @return The bean that declares the injection point
+         */
         public BeanDefinition<B> getDeclaringBean() {
             return getDeclaringType();
         }
