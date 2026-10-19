@@ -968,6 +968,51 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.finishAndReleaseAll()
     }
 
+    def 'truncated compressed request is a decompression error'(ChannelHandler compressor, CharSequence contentEncoding) {
+        given:
+        Throwable failure = null
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                Flux.from(body.toByteArrayPublisher()).subscribe({ }, { failure = it })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                failure = cause
+            }
+        })
+        def ch = new EmbeddedChannel(handler)
+        def compChannel = new EmbeddedChannel(compressor)
+        byte[] uncompressed = new byte[1024]
+        ThreadLocalRandom.current().nextBytes(uncompressed)
+        compChannel.writeOutbound(Unpooled.copiedBuffer(uncompressed))
+        compChannel.finish()
+        CompositeByteBuf compressed = Unpooled.compositeBuffer()
+        ByteBuf part
+        while ((part = compChannel.readOutbound()) != null) {
+            compressed.addComponent(true, part)
+        }
+
+        when:
+        def requestMessage = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        requestMessage.headers().set(HttpHeaderNames.CONTENT_ENCODING, contentEncoding)
+        ch.writeOneInbound(requestMessage)
+        ch.writeOneInbound(new DefaultLastHttpContent(compressed.retainedSlice(0, compressed.readableBytes() - 4)))
+        compressed.release()
+
+        then:
+        failure instanceof DecompressionException
+
+        cleanup:
+        ch.finishAndReleaseAll()
+
+        where:
+        contentEncoding          | compressor
+        HttpHeaderValues.GZIP    | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB)
+    }
+
     def 'decompression limit applies across concatenated gzip members'() {
         given:
         Throwable failure = null
