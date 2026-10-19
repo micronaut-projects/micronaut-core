@@ -626,7 +626,7 @@ public class ConnectionManager {
                     SslContext sslContext = buildWebsocketSslContext(requestKey);
                     if (sslContext != null) {
                         try {
-                            ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
+                            addSslHandler(ch.pipeline(), null, sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort()));
                         } finally {
                             ReferenceCountUtil.release(sslContext);
                         }
@@ -768,6 +768,13 @@ public class ConnectionManager {
             engine.setSSLParameters(params);
         }
         return sslHandler;
+    }
+
+    private void addSslHandler(ChannelPipeline pipeline, @Nullable String name, SslHandler sslHandler) {
+        pipeline.addLast(name, configureSslHandler(sslHandler));
+        if (configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.getHostnameVerifier() != null) {
+            pipeline.addLast(new HostnameVerifierHandler(acsc.getHostnameVerifier(), sslHandler.engine()));
+        }
     }
 
     /**
@@ -1047,7 +1054,7 @@ public class ConnectionManager {
             SslContext sslContext = this.sslContext.get();
             if (sslContext != null) {
                 try {
-                    ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)));
+                    addSslHandler(ch.pipeline(), ChannelPipelineCustomizer.HANDLER_SSL, sslContext.newHandler(ch.alloc(), host, port));
                 } finally {
                     ReferenceCountUtil.release(sslContext);
                 }
