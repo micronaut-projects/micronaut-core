@@ -275,6 +275,97 @@ def _reads(name, statements):
     return False
 
 
+# the kinds a key or element compares as: Python holds 1.0 == 1 == True across them
+_SCALAR_KINDS = (LONG, DOUBLE, BOOLEAN)
+# the kinds that may hold a number of any type
+_LOOSE_KINDS = (OBJECT, "java.lang.Number", "java.io.Serializable", "java.lang.Comparable")
+
+
+def _equality_kind(type_name):
+    """The kind a value of the type compares as in a dict or set: a long, a double, a boolean, or the erased type."""
+    erased = _erased(type_name)
+    if erased in ("boolean", "java.lang.Boolean"):
+        return BOOLEAN
+    return JAVA_NUMBERS.get(erased, erased)
+
+
+def _numbers_mix(first, second):
+    """Whether values of the two kinds may be equal numbers Java tells apart: two kinds of number, or a number and a type that may hold any."""
+    return ((first != second and first in _SCALAR_KINDS and second in _SCALAR_KINDS)
+            or (first in _SCALAR_KINDS and second in _LOOSE_KINDS)
+            or (first in _LOOSE_KINDS and (second in _SCALAR_KINDS or second in _LOOSE_KINDS)))
+
+
+# the methods of a collection that only read it: calling one in a loop over the collection leaves its iterator valid
+_READING_METHODS = frozenset(("get", "size", "isEmpty", "contains", "containsKey", "containsValue", "indexOf",
+                              "lastIndexOf", "index", "count", "copy", "keys", "values", "items", "equals", "hashCode",
+                              "toString"))
+
+
+def _same_collection(node, iterable):
+    """Whether the node names the collection a loop iterates: the same local or parameter, or the same property of self."""
+    if isinstance(iterable, ast.Name):
+        return isinstance(node, ast.Name) and node.id == iterable.id
+    return (isinstance(node, ast.Attribute) and node.attr == iterable.attr
+            and isinstance(node.value, ast.Name) and node.value.id == "self")
+
+
+def _may_change_iterated(iterable, statements):
+    """
+    Whether the loop body may change the collection the loop iterates. Python goes on iterating a list
+    the body appends to, while the Java iterator throws ConcurrentModificationException; so any use of
+    the collection but a read (an item, len(), a membership test, a comparison, a reading method, a
+    nested loop over it) counts as a change: a call it is passed to, an alias, a store or delete of an
+    item, an augmented assignment. For a property of self, a call on self or self passed on may change
+    it too.
+    """
+    parents = {}
+    for statement in statements:
+        for node in ast.walk(statement):
+            for child in ast.iter_child_nodes(node):
+                parents[id(child)] = node
+    for statement in statements:
+        for node in ast.walk(statement):
+            if _same_collection(node, iterable):
+                if not _reads_only(node, parents):
+                    return True
+            elif (isinstance(iterable, ast.Attribute) and isinstance(node, ast.Name) and node.id == "self"
+                  and not _reads_other_property(node, parents)):
+                return True
+    return False
+
+
+def _reads_only(node, parents):
+    """Whether the use of the iterated collection only reads it."""
+    parent = parents.get(id(node))
+    if isinstance(node.ctx, ast.Store):
+        # rebinding the name (or the property) leaves the object the loop iterates as it is
+        return isinstance(parent, ast.Assign) and any(target is node for target in parent.targets)
+    if not isinstance(node.ctx, ast.Load) or parent is None:
+        return False
+    if isinstance(parent, ast.Subscript):
+        return parent.value is node and isinstance(parent.ctx, ast.Load)
+    if isinstance(parent, ast.Compare):
+        return True
+    if isinstance(parent, ast.For):
+        return parent.iter is node
+    if isinstance(parent, ast.Call):
+        return isinstance(parent.func, ast.Name) and parent.func.id == "len" and len(parent.args) == 1 and not parent.keywords
+    if isinstance(parent, ast.Attribute):
+        call = parents.get(id(parent))
+        return parent.attr in _READING_METHODS and isinstance(call, ast.Call) and call.func is parent
+    return False
+
+
+def _reads_other_property(node, parents):
+    """Whether a use of self in a loop over a property of self only reads another property: no call, no store, self not passed on."""
+    parent = parents.get(id(node))
+    if not isinstance(parent, ast.Attribute) or not isinstance(parent.ctx, ast.Load):
+        return False
+    call = parents.get(id(parent))
+    return parent.value is node and not (isinstance(call, ast.Call) and call.func is parent)
+
+
 def _pure_operand(node):
     """Whether evaluating the expression twice is what Python does once: a name, a literal or an attribute read of one."""
     if isinstance(node, (ast.Name, ast.Constant)):
@@ -804,6 +895,10 @@ class Lowering:
                 self.locals[variable] = LONG
                 return ForRange(loop, variable, start, stop, step, Body(self._block(node.body)), *self._exits(loop))
             return self._loop(node, build)[0]
+        if ((isinstance(iterable, ast.Name) or (isinstance(iterable, ast.Attribute) and isinstance(iterable.value, ast.Name) and iterable.value.id == "self"))
+                and _may_change_iterated(iterable, node.body)):
+            spelled = iterable.id if isinstance(iterable, ast.Name) else f"self.{iterable.attr}"
+            self._refuse("unsupported-statement", f"the loop body may change the [{spelled}] it iterates, which Python goes on iterating while the Java iterator throws ConcurrentModificationException", node)
         collection = self._expression(iterable)
         collection_type = collection.type()
         if self.checker.facts.isAssignable(_erased(collection_type), "java.util.Map"):
@@ -1060,7 +1155,9 @@ class Lowering:
         if kind == MAP:
             if len(arguments) != 2:
                 self._refuse("unknown-type", "the keys and values of the dict have no static type", node)
-            key = self._boxed(self._coerce(self._expression(target.slice), self._boxed_as(arguments[0], node, "a key"), target.slice), node)
+            sought = self._expression(target.slice)
+            self._exact_key(sought.type(), arguments[0], node, "storing a key")
+            key = self._boxed(self._coerce(sought, self._boxed_as(arguments[0], node, "a key"), target.slice), node)
             self.helper_calls += 1
             return Eval(Helper("setItem", [container, key, self._boxed(self._coerce(value, self._boxed_as(arguments[1], node, "storing a value"), node), node)], VOID))
         self._refuse("unsupported-statement", f"assigning an element of a [{kind}] has no static lowering", node)
@@ -1147,6 +1244,8 @@ class Lowering:
         element_type = self._join([element.type() for element in elements], node, "elements")
         if isinstance(node, ast.Tuple) and any(element.type() == NONE for element in elements):
             self._refuse("unsupported-expression", "a tuple holding None has no static lowering", node)
+        if isinstance(node, ast.Set):
+            self._exact_keys([element.type() for element in elements], node, "a set literal")
         helper = "list" if isinstance(node, ast.List) else "tuple" if isinstance(node, ast.Tuple) else "set"
         base = SET if isinstance(node, ast.Set) else LIST
         result_type = f"{base}<{element_type}>" if element_type is not None else base
@@ -1169,6 +1268,7 @@ class Lowering:
                 value_types.append(arguments[1] if len(arguments) == 2 else OBJECT)
             else:
                 self._refuse("unsupported-expression", f"unpacking a [{_erased(value.type())}] into a dict has no static lowering", node)
+        self._exact_keys(key_types, node, "the keys of a dict literal")
         key_type = self._join(key_types, node, "keys")
         value_type = self._join(value_types, node, "values")
         result_type = f"{MAP}<{key_type},{value_type}>" if key_type is not None and value_type is not None else MAP
@@ -1207,9 +1307,34 @@ class Lowering:
         if kind == MAP:
             if len(arguments) != 2:
                 self._refuse("unknown-type", "the keys and values of the dict have no static type", node)
-            key = self._boxed(self._coerce(self._expression(node.slice), self._boxed_as(arguments[0], node, "a key"), node.slice), node)
+            sought = self._expression(node.slice)
+            self._exact_key(sought.type(), arguments[0], node, "looking up a key")
+            key = self._boxed(self._coerce(sought, self._boxed_as(arguments[0], node, "a key"), node.slice), node)
             return Cast(Helper("item", [container, key], OBJECT), JAVA_NUMBERS.get(arguments[1], arguments[1]))
         self._refuse("unsupported-expression", f"indexing a [{kind}] has no static lowering", node)
+
+    def _exact_key(self, sought_type, element_type, node, what):
+        """
+        Refuse a key or element sought in, or stored into, a dict or set where Python's numeric equality
+        decides: Python holds 1.0 == 1 == True, which the boxed Java values do not. A number sought among
+        numbers of another type, or where either side may be a number of any type, is refused.
+        """
+        sought = _equality_kind(sought_type)
+        element = _equality_kind(element_type) if element_type is not None else OBJECT
+        if _numbers_mix(sought, element):
+            self._refuse("unsupported-expression", f"{what} of a [{sought}] among [{element}] values has no static lowering: Python compares numbers across their types", node)
+
+    def _exact_keys(self, types, node, what):
+        """Refuse the keys of a dict literal or the elements of a set literal that Python's numeric equality may merge."""
+        kinds = []
+        for type_name in types:
+            kind = _equality_kind(type_name)
+            if kind != NONE and kind not in kinds:
+                kinds.append(kind)
+        for i, first in enumerate(kinds):
+            for second in kinds[i + 1:]:
+                if _numbers_mix(first, second):
+                    self._refuse("unsupported-expression", f"{what} of [{first}] and [{second}] values have no static lowering: Python compares numbers across their types", node)
 
     def _membership(self, op, left, right, node):
         """``x in container`` for strings, lists, sets and dicts."""
@@ -1222,13 +1347,7 @@ class Lowering:
         if elements and kind != STRING:
             self._boxed_as(elements[0], node, "a membership test")
         if kind != STRING:
-            # Python holds 1.0 == 1 == True, which the boxed Java values do not: a number sought among
-            # numbers of another type, or where either side may be a number of any type, is refused
-            sought = JAVA_NUMBERS.get(_erased(left.type()), _erased(left.type()))
-            element = JAVA_NUMBERS.get(_erased(elements[0]), _erased(elements[0])) if elements else OBJECT
-            scalar, loose = (LONG, DOUBLE, BOOLEAN), (OBJECT, "java.lang.Number", "java.io.Serializable", "java.lang.Comparable")
-            if (sought != element and sought in scalar and element in scalar) or (sought in scalar and element in loose) or (sought in loose and (element in scalar or element in loose)):
-                self._refuse("unsupported-expression", f"a membership test of a [{sought}] among [{element}] values has no static lowering: Python compares numbers across their types", node)
+            self._exact_key(left.type(), elements[0] if elements else None, node, "a membership test")
         self.helper_calls += 1
         test = Helper("contains", [right, self._boxed(left, node)], BOOLEAN)
         return Unary("not", test, BOOLEAN) if isinstance(op, ast.NotIn) else test
@@ -1272,6 +1391,8 @@ class Lowering:
             if kind not in (LIST, SET, "java.util.Collection", "java.lang.Iterable"):
                 self._refuse("unsupported-expression", f"{name}() of a [{kind}] has no static lowering", node)
             element_type = _arguments(value.type())[0] if _arguments(value.type()) else OBJECT
+            if name == "set" and _equality_kind(element_type) in _LOOSE_KINDS:
+                self._refuse("unsupported-expression", f"set() of [{_equality_kind(element_type)}] values has no static lowering: Python compares numbers across their types", node)
             self.helper_calls += 1
             return Helper("copyOf" + ("Set" if name == "set" else "List"), [value], f"{SET if name == 'set' else LIST}<{element_type}>")
         if name in ("min", "max") and len(arguments) >= 2:
@@ -1327,6 +1448,7 @@ class Lowering:
             return None
         if kind == SET and len(type_arguments) == 1:
             if name == "add" and len(arguments) == 1:
+                self._exact_key(arguments[0].type(), type_arguments[0], node, "adding an element")
                 self.helper_calls += 1
                 return Helper("add", [receiver, self._boxed(self._coerce(arguments[0], self._boxed_as(type_arguments[0], node, "adding"), node), node)], NONE)
             return None
@@ -1335,6 +1457,7 @@ class Lowering:
             if name == "get" and 1 <= len(arguments) <= 2:
                 if len(arguments) == 1 and JAVA_NUMBERS.get(value_type, value_type) in (LONG, DOUBLE, BOOLEAN):
                     self._refuse("python-builtin-not-lowered", f"dict.get without a default may answer None, which a [{value_type}] cannot hold", node)
+                self._exact_key(arguments[0].type(), key_type, node, "looking up a key")
                 key = self._boxed(self._coerce(arguments[0], self._boxed_as(key_type, node, "a key"), node), node)
                 default = self._boxed(self._coerce(arguments[1], self._boxed_as(value_type, node, "a default"), node), node) if len(arguments) == 2 else Const(None, OBJECT)
                 self.helper_calls += 1
@@ -1708,7 +1831,8 @@ class Lowering:
             read = PythonMember(receiver, node.attr, stub_type)
         else:
             self._refuse("unsupported-expression", f"reading [{node.attr}] of [{model.name}], which is not an attribute, has no static lowering", node)
-        used = JAVA_NUMBERS.get(stub_type, stub_type)
+        # an attribute that may be None stays boxed, a primitive is widened
+        used = JAVA_PRIMITIVE_NUMBERS.get(stub_type, stub_type)
         return Cast(read, used) if used != stub_type else read
 
     def _python_receiver_call(self, model, receiver_node, name, node):
@@ -1762,7 +1886,8 @@ class Lowering:
             lowered_arguments = [self._expression(argument) for argument in node.args]
             self.bridge_calls += 1
             call = InvokePython(self._expression(receiver_node), name, [self._boxed(argument, node) for argument in lowered_arguments], return_type)
-        used = JAVA_NUMBERS.get(return_type, return_type)
+        # a boxed result may be null, which Python sees as None: it stays boxed, a primitive is widened
+        used = JAVA_PRIMITIVE_NUMBERS.get(return_type, return_type)
         return Cast(call, used) if used != return_type else call
 
     def _python_construction(self, class_def, node):
