@@ -178,7 +178,8 @@ def _reads(name, statements):
 
 # the methods of a collection that only read it: calling one in a loop over the collection leaves its iterator valid
 _READING_METHODS = frozenset(("get", "size", "isEmpty", "contains", "containsKey", "containsValue", "indexOf",
-                              "lastIndexOf", "index", "count", "copy", "equals", "hashCode", "toString"))
+                              "lastIndexOf", "index", "count", "copy", "keys", "values", "items", "equals", "hashCode",
+                              "toString"))
 
 
 def _same_collection(node, iterable):
