@@ -15,6 +15,8 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.convert.ConversionContext;
+
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.body.ByteBody;
@@ -69,6 +71,23 @@ class MutableByteBodyHttpResponseTest {
         response.header("X-A", "1").header("X-A", "2");
         response.setAttribute("attr", "value");
         return new TrackingResponse<>(response, bytes("hello"));
+    }
+
+    @Test
+    void bodyIsAnsweredByTheOriginalUntilTheBytesAreReplaced() {
+        TrackingResponse<Object> original = new TrackingResponse<>(HttpResponse.ok("converted"), bytes("hello"));
+        MutableByteBodyHttpResponse<?> mutable = MutableByteBodyHttpResponse.of(original);
+        assertEquals("converted", mutable.getBody().orElseThrow());
+        assertEquals("converted", mutable.getBody(String.class).orElseThrow());
+        assertEquals("converted", mutable.getBody(Argument.STRING).orElseThrow());
+        assertEquals("converted", mutable.getBody(ConversionContext.of(Argument.STRING)).orElseThrow());
+
+        mutable.body("replaced");
+        assertEquals("replaced", mutable.getBody().orElseThrow());
+        assertEquals("replaced", mutable.getBody(String.class).orElseThrow());
+        assertEquals("replaced", mutable.getBody(Argument.STRING).orElseThrow());
+        assertEquals("replaced", mutable.getBody(ConversionContext.of(Argument.STRING)).orElseThrow());
+        assertEquals(1, original.closed);
     }
 
     @Test

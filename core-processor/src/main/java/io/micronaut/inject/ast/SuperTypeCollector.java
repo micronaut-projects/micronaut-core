@@ -44,6 +44,12 @@ import java.util.stream.Stream;
 @Internal
 public final class SuperTypeCollector {
 
+    /**
+     * The super types every array has besides the arrays of the super types of its component, in the order an
+     * array lists them.
+     */
+    private static final List<Class<?>> ARRAY_SUPER_TYPES = List.of(Object.class, Cloneable.class, Serializable.class);
+
     private SuperTypeCollector() {
     }
 
@@ -94,22 +100,27 @@ public final class SuperTypeCollector {
         List<ClassElement> result = new ArrayList<>();
         result.add(type);
         if (type.isArray()) {
-            // An array of S is an array of every super type of S (JLS 4.10.3), then Object, Cloneable and Serializable
-            // as the language gives every array (JLS 10.8); a primitive array has only those
+            // The direct super types of T[] are S[] for each direct super type S of T, then Object, Cloneable and
+            // Serializable (JLS 4.10.3). An array of N dimensions of C is so an array of N dimensions of each super
+            // type of C and, its component arrays being arrays, an array of k dimensions of Object, Cloneable and
+            // Serializable for k from N - 1 down to 1, then those three; a primitive C has no super types of its own
             ClassElement component = type;
             int dimensions = 0;
             while (component.isArray()) {
                 component = component.fromArray();
                 dimensions++;
             }
+            Set<String> seen = new HashSet<>();
+            seen.add(key(type));
             if (!component.isPrimitive()) {
                 List<ClassElement> componentSuperTypes = collect(component, component.getTypeArguments(), directSuperTypes, declaration);
                 for (int i = 1; i < componentSuperTypes.size(); i++) {
-                    ClassElement array = componentSuperTypes.get(i);
-                    for (int j = 0; j < dimensions; j++) {
-                        array = array.toArray();
-                    }
-                    result.add(array);
+                    addOnce(arrayOf(componentSuperTypes.get(i), dimensions), seen, result);
+                }
+            }
+            for (int arrayDimensions = dimensions - 1; arrayDimensions > 0; arrayDimensions--) {
+                for (Class<?> arrayType : ARRAY_SUPER_TYPES) {
+                    addOnce(arrayOf(ClassElement.of(arrayType), arrayDimensions), seen, result);
                 }
             }
             result.add(ClassElement.of(Cloneable.class));
@@ -125,6 +136,20 @@ public final class SuperTypeCollector {
         }
         result.add(ClassElement.of(Object.class));
         return result;
+    }
+
+    private static ClassElement arrayOf(ClassElement type, int dimensions) {
+        ClassElement array = type;
+        for (int i = 0; i < dimensions; i++) {
+            array = array.toArray();
+        }
+        return array;
+    }
+
+    private static void addOnce(ClassElement type, Set<String> seen, List<ClassElement> result) {
+        if (seen.add(key(type))) {
+            result.add(type);
+        }
     }
 
     private static boolean isObject(ClassElement type) {

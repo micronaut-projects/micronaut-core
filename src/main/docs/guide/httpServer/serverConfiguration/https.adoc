@@ -148,3 +148,20 @@ Start Micronaut, and the application will run on `https://localhost:8443` using 
 Keeping HTTPS certificates up-to-date after expiry can be a challenge. A great solution to this is https://en.wikipedia.org/wiki/Automated_Certificate_Management_Environment[Automated Certificate Management Environment] (ACME) and the https://micronaut-projects.github.io/micronaut-acme/latest/guide/index.html[Micronaut ACME Module] which provides support for automatically refreshing certificates from a certificate authority.
 
 If the use of a certificate authority is not possible, and you need to manually update certificates from disk then you should use the <<certificates, file-based certificate provider>>. As long as the underlying file system supports file watching, the provider will automatically recognize an updated key or certificate file.
+
+== Serving with a Provided SSLContext
+
+When the key and trust material are managed elsewhere, the server can serve with a ready `javax.net.ssl.SSLContext` bean instead. Name the bean with `context-name`; the client authentication mode, protocols and ciphers still apply, and ALPN is negotiated for HTTP/2:
+
+.Provided SSLContext Configuration Example
+[configuration]
+----
+micronaut:
+  server:
+    ssl:
+      enabled: true
+      context-name: mtls
+      client-authentication: need
+----
+
+A context set programmatically with `ServerSslConfiguration.setSslContext(..)` takes precedence over `context-name`. A provided context cannot be used for HTTP/3.

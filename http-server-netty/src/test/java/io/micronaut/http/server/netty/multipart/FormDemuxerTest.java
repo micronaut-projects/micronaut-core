@@ -25,6 +25,8 @@ import io.netty.contrib.multipart.FormDecoderException;
 import io.netty.contrib.multipart.PostBodyDecoder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -462,6 +464,87 @@ public class FormDemuxerTest {
 
         assertBadRequest(data.error);
         assertBadRequest(fields.error);
+    }
+
+    @Test
+    public void parseErrorOfUndecodedContent() {
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        undecoded(streamingBody.rootBody()).fields().subscribe(fields.noBackpressure());
+
+        write(streamingBody.sharedBuffer(), "foo=ba");
+
+        RawFormField field = fields.queue.remove();
+        assertEquals("foo", field.metadata().name());
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+        assertEquals("ba", data.queue.poll());
+
+        // an escape split between two inputs is validated whole
+        write(streamingBody.sharedBuffer(), "%r");
+        write(streamingBody.sharedBuffer(), "r");
+
+        assertBadRequest(data.error);
+        assertBadRequest(fields.error);
+    }
+
+    @Test
+    public void undecodedContentKeepsTheEscapes() {
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        undecoded(streamingBody.rootBody()).fields().subscribe(fields.noBackpressure());
+
+        write(streamingBody.sharedBuffer(), "n%61me=a%2");
+        write(streamingBody.sharedBuffer(), "Fb+c&");
+
+        RawFormField field = fields.queue.remove();
+        assertEquals("name", field.metadata().name());
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+        assertEquals("a%2Fb+c", String.join("", data.queue));
+        assertTrue(data.complete);
+
+        streamingBody.sharedBuffer().complete();
+        assertNull(fields.queue.poll());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true,v=a%", "true,v=a%2", "false,v=a%", "false,v=a%2"})
+    public void aTruncatedEscapeAtTheEndOfTheInput(boolean decode, String input) {
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        new FormDemuxer(PostBodyDecoder.builder()
+            .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE, DecoderQuirk.REFUSE_SHORT_PERCENT_DECODE)
+            .forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED,
+            streamingBody.rootBody(), decode ? FormDemuxer.Content.DECODED : FormDemuxer.Content.UNDECODED_VALIDATED).fields().subscribe(fields.noBackpressure());
+
+        // the decoder waits on the rest of the escape until the end of the input
+        write(streamingBody.sharedBuffer(), input);
+        RawFormField field = fields.queue.remove();
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+
+        streamingBody.sharedBuffer().complete();
+
+        assertBadRequest(data.error);
+        assertBadRequest(fields.error);
+    }
+
+    @Test
+    public void undecodedContentOfADecoderThatRefusesNoEscapeIsNotValidated() {
+        Queue<RawFormField> fields = toQueue(new FormDemuxer(PostBodyDecoder.builder().forUrlEncodedData(), null, StandardCharsets.UTF_8, channel,
+            BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, byteBodyFactory.copyOf("foo=%rr", StandardCharsets.UTF_8), FormDemuxer.Content.UNDECODED).fields());
+
+        RawFormField field = fields.remove();
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+        assertEquals("%rr", data.queue.poll());
+        assertTrue(data.complete);
+    }
+
+    private FormDemuxer undecoded(ByteBody body) {
+        return new FormDemuxer(PostBodyDecoder.builder()
+            .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE, DecoderQuirk.REFUSE_SHORT_PERCENT_DECODE)
+            .forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, body, FormDemuxer.Content.UNDECODED_VALIDATED);
     }
 
     @Test

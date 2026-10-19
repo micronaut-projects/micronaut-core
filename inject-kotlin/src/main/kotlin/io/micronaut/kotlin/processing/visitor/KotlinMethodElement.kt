@@ -91,6 +91,9 @@ internal open class KotlinMethodElement(
 
     override fun isAbstract(): Boolean = declaration.isAbstract
 
+    @OptIn(KspExperimental::class)
+    override fun resolveThrownTypes() = visitorContext.resolver.getJvmCheckedException(declaration)
+
     override fun isPublic(): Boolean = declaration.isPublic()
 
     override fun isProtected(): Boolean = declaration.isProtected()
@@ -101,6 +104,9 @@ internal open class KotlinMethodElement(
         declaration.functionKind != FunctionKind.MEMBER && declaration.functionKind != FunctionKind.STATIC
 
     override fun isSuspend() = declaration.modifiers.contains(Modifier.SUSPEND)
+
+    // Only a vararg parameter that comes last compiles to a JVM varargs method
+    override fun isVarArgs() = declaration.parameters.lastOrNull()?.isVararg == true
 
     /**
      * The methods this method overrides as a member of its owning type, as javac reports them: the methods it
