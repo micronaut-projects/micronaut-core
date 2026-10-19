@@ -21,9 +21,11 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -32,6 +34,7 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.regex.Pattern;
 
 /**
  * The Python semantics a statically compiled function body needs where Java's differ: the string
@@ -52,6 +55,9 @@ public final class PythonStatic {
     public static final String COMPILED_MEMBER = "__micronaut_compiled__";
 
     private static final ConcurrentHashMap<String, LongAdder> ENTRIES = new ConcurrentHashMap<>();
+    // the literals Python's int() and float() parse in base 10, after the digits are made ASCII
+    private static final Pattern PYTHON_INT = Pattern.compile("[+-]?[0-9](_?[0-9])*");
+    private static final Pattern PYTHON_FLOAT = Pattern.compile("[+-]?([0-9](_?[0-9])*(\\.([0-9](_?[0-9])*)?)?|\\.[0-9](_?[0-9])*)([eE][+-]?[0-9](_?[0-9])*)?");
 
     private PythonStatic() {
     }
@@ -400,11 +406,16 @@ public final class PythonStatic {
     /**
      * @param value An element of a collection, boxed by the host boundary
      * @return The value as a Python int
-     * @throws ClassCastException When the element is not a number, as Python raises TypeError
+     * @throws ClassCastException When the element is not an int (a float, say, which the compiled body
+     * cannot keep as Python would), so that the body fails rather than truncates it
+     * @throws ArithmeticException When the element is an int that does not fit a long
      */
     public static long toLong(@Nullable Object value) {
-        if (value instanceof Number number) {
-            return number.longValue();
+        if (value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte) {
+            return ((Number) value).longValue();
+        }
+        if (value instanceof BigInteger big) {
+            return big.longValueExact();
         }
         if (value instanceof Boolean bool) {
             return bool.booleanValue() ? 1 : 0;
@@ -414,12 +425,15 @@ public final class PythonStatic {
 
     /**
      * @param value An element of a collection, boxed by the host boundary
-     * @return The value as a Python float
-     * @throws ClassCastException When the element is not a number, as Python raises TypeError
+     * @return The value as a Python float; a bool is 1.0 or 0.0, as Python's arithmetic takes it
+     * @throws ClassCastException When the element is not a number
      */
     public static double toDouble(@Nullable Object value) {
         if (value instanceof Number number) {
             return number.doubleValue();
+        }
+        if (value instanceof Boolean bool) {
+            return bool.booleanValue() ? 1.0 : 0.0;
         }
         throw new ClassCastException("not a float: " + str(value));
     }
@@ -535,11 +549,11 @@ public final class PythonStatic {
     /**
      * @param elements The elements
      * @param <T> The element type the caller expects
-     * @return A Python tuple: an immutable list of the elements
+     * @return A Python tuple: an immutable list of the elements, None among them
      */
     @SuppressWarnings("unchecked")
     public static <T> List<T> tuple(Object... elements) {
-        return (List<T>) List.of(elements);
+        return (List<T>) Collections.unmodifiableList(Arrays.asList(elements.clone()));
     }
 
     /**
@@ -673,8 +687,8 @@ public final class PythonStatic {
      * @return {@code map[key]}
      * @throws NoSuchElementException When the key is absent, as Python raises KeyError
      */
-    public static Object item(Map<?, ?> map, @Nullable Object key) {
-        if (!map.containsKey(key)) {
+    public static @Nullable Object item(Map<?, ?> map, @Nullable Object key) {
+        if (!containsKey(map, key)) {
             throw new NoSuchElementException("KeyError: " + str(key));
         }
         return map.get(key);
@@ -687,7 +701,7 @@ public final class PythonStatic {
      * @return {@code map.get(key, default)}
      */
     public static @Nullable Object get(Map<?, ?> map, @Nullable Object key, @Nullable Object defaultValue) {
-        return map.containsKey(key) ? map.get(key) : defaultValue;
+        return containsKey(map, key) ? map.get(key) : defaultValue;
     }
 
     /**
@@ -722,12 +736,32 @@ public final class PythonStatic {
             return element != null && text.toString().contains(element.toString());
         }
         if (container instanceof Collection<?> collection) {
-            return collection.contains(element);
+            try {
+                return collection.contains(element);
+            } catch (NullPointerException e) {
+                // an immutable Java collection refuses to look for null: it holds none, so None is not in it
+                if (element == null) {
+                    return false;
+                }
+                throw e;
+            }
         }
         if (container instanceof Map<?, ?> map) {
-            return map.containsKey(element);
+            return containsKey(map, element);
         }
         throw new ClassCastException("argument of type " + typeName(container) + " is not iterable");
+    }
+
+    private static boolean containsKey(Map<?, ?> map, @Nullable Object key) {
+        try {
+            return map.containsKey(key);
+        } catch (NullPointerException e) {
+            // an immutable Java map refuses to look for a null key: it holds none
+            if (key == null) {
+                return false;
+            }
+            throw e;
+        }
     }
 
     /**
@@ -887,14 +921,22 @@ public final class PythonStatic {
             }
             return (long) d;
         }
+        if (value instanceof BigInteger big) {
+            return big.longValueExact();
+        }
         if (value instanceof Number number) {
             return number.longValue();
         }
         if (value instanceof CharSequence text) {
+            String digits = asciiDigits(text.toString().strip());
+            if (!PYTHON_INT.matcher(digits).matches()) {
+                throw new IllegalArgumentException("invalid literal for int() with base 10: '" + text + "'");
+            }
             try {
-                return Long.parseLong(text.toString().strip());
+                return Long.parseLong(digits.replace("_", ""));
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("invalid literal for int() with base 10: '" + text + "'", e);
+                // the literal is an int, one no long holds: an int a compiled body cannot represent
+                throw new ArithmeticException("int('" + text + "') is outside the range of a long");
             }
         }
         throw new ClassCastException("int() argument must be a string or a number, not " + typeName(value));
@@ -916,16 +958,43 @@ public final class PythonStatic {
             String trimmed = text.toString().strip();
             try {
                 return switch (trimmed.toLowerCase(java.util.Locale.ROOT)) {
-                    case "inf", "+inf", "infinity" -> Double.POSITIVE_INFINITY;
+                    case "inf", "+inf", "infinity", "+infinity" -> Double.POSITIVE_INFINITY;
                     case "-inf", "-infinity" -> Double.NEGATIVE_INFINITY;
                     case "nan", "+nan", "-nan" -> Double.NaN;
-                    default -> Double.parseDouble(trimmed);
+                    default -> parseFloat(trimmed);
                 };
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException("could not convert string to float: '" + text + "'", e);
             }
         }
         throw new ClassCastException("float() argument must be a string or a number, not " + typeName(value));
+    }
+
+    /**
+     * A float literal as Python's float() reads it: digits with single underscores between them, no
+     * Java suffix ({@code 1d}, {@code 2f}) and no hexadecimal form, which Double.parseDouble accepts.
+     */
+    private static double parseFloat(String text) {
+        String digits = asciiDigits(text);
+        if (!PYTHON_FLOAT.matcher(digits).matches()) {
+            throw new NumberFormatException(text);
+        }
+        return Double.parseDouble(digits.replace("_", ""));
+    }
+
+    /**
+     * The text with every Unicode decimal digit, which Python's int() and float() accept, as its ASCII digit.
+     */
+    private static String asciiDigits(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        text.codePoints().forEach(codePoint -> {
+            if (codePoint > 0x7f && Character.isDigit(codePoint)) {
+                out.append((char) ('0' + Character.digit(codePoint, 10)));
+            } else {
+                out.appendCodePoint(codePoint);
+            }
+        });
+        return out.toString();
     }
 
     /**
