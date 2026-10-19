@@ -20,7 +20,9 @@ function of the compilation as Java ``StaticCompilationDecision`` values:
   without a lowering, is ``SKIPPED`` with those reasons.
 
 An explicit ``@CompileStatic`` that cannot be honoured is reported as a warning (an error when the
-planner is strict); mode ``all`` never warns, since skipping is the expected common case there.
+planner is strict): a function-level switch warns whenever its function is not compiled, a class- or
+module-level one for each method of its scope that is ``SKIPPED``, except in mode ``all``, where
+skipping is the expected common case.
 """
 import ast
 
