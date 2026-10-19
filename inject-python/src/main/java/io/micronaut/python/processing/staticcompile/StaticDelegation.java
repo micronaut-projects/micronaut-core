@@ -50,9 +50,12 @@ import java.util.Set;
 @Internal
 public final class StaticDelegation {
 
+    private static final String INT = "int";
+    private static final String SHORT = "short";
+    private static final String BYTE = "byte";
     // the Python kind a Java parameter takes an argument of unchanged, '?' when None is taken too
     private static final Map<String, String> KINDS = Map.ofEntries(
-        Map.entry("int", "int"), Map.entry("long", "long"), Map.entry("short", "short"), Map.entry("byte", "byte"),
+        Map.entry(INT, INT), Map.entry(Ir.LONG, Ir.LONG), Map.entry(SHORT, SHORT), Map.entry(BYTE, BYTE),
         Map.entry(Ir.DOUBLE, "float"), Map.entry(Ir.BOOLEAN, "bool"), Map.entry(Ir.STRING, "str"),
         Map.entry("java.lang.Integer", "?int"), Map.entry("java.lang.Long", "?long"), Map.entry("java.lang.Short", "?short"),
         Map.entry("java.lang.Byte", "?byte"), Map.entry("java.lang.Double", "?float"), Map.entry("java.lang.Boolean", "?bool")
@@ -61,7 +64,7 @@ public final class StaticDelegation {
     private static final Set<String> PURE_HELPERS = Set.of("str", "divide", "floorDiv", "floorMod", "compare", "concat", "box", "truthy", "assertion", "group");
     private static final Set<String> PROMOTING_HELPERS = Set.of("power");
     private static final Set<String> PROMOTING_LONG_OPS = Set.of("+", "-", "*", "//", "**");
-    private static final Set<String> NARROW_TYPES = Set.of("int", "short", "byte", "java.lang.Integer", "java.lang.Short", "java.lang.Byte");
+    private static final Set<String> NARROW_TYPES = Set.of(INT, SHORT, BYTE, "java.lang.Integer", "java.lang.Short", "java.lang.Byte");
     private static final String JAVA_KIND = "java:";
 
     private StaticDelegation() {
