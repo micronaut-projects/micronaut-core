@@ -166,7 +166,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         }
         if (target instanceof StaticAdviceTarget advised) {
             // the generated class runs the chain of an introduced method in Java when called from Java
-            advised.bindStaticAdvice(new StaticAdvice<>(proxyDefinition, staticallyIntercepted, () -> target));
+            advised.bindStaticAdvice(StaticAdvice.introduction(proxyDefinition, staticallyIntercepted, () -> target));
         }
         return target;
     }
