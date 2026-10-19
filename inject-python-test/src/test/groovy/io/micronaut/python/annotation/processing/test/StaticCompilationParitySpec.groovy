@@ -54,6 +54,56 @@ class Coded(Exception):
         self.code = code
 
 
+MODULE_RATE = 2
+
+
+def module_rated(n: int) -> int:
+    return n * MODULE_RATE
+
+
+def set_module_rate(rate: int) -> None:
+    global MODULE_RATE
+    MODULE_RATE = rate
+
+
+def module_dup(n: int) -> int:
+    return n + 1
+
+
+def module_dup(n: int) -> int:
+    return n + 2
+
+
+def module_wrap(fn):
+    def wrapped(n):
+        return fn(n) + 1000
+    return wrapped
+
+
+@module_wrap
+def module_wrapped(n: int) -> int:
+    return n
+
+
+class Scaler:
+    def run(self, n: int) -> int:
+        return self.scale(n)
+
+    @staticmethod
+    def scale(n: int) -> int:
+        return n * 3
+
+
+class QuadScaler(Scaler):
+    @staticmethod
+    def scale(n: int) -> int:
+        return n * 4
+
+
+def module_shadow(module_twice: Scaler, n: int) -> int:
+    return module_twice(n)
+
+
 @Singleton
 class Calc:
     rate: float = 1.5
@@ -374,6 +424,15 @@ class Calc:
     def twice(n: int) -> int:
         return n * 2
 
+    def rebound(self, n: int) -> str:
+        set_module_rate(5)
+        rated = module_rated(n)
+        set_module_rate(2)
+        return str(rated) + "|" + str(module_shadow(lambda x: x + 100, n)) + "|" + str(self.calls_rebound(n))
+
+    def calls_rebound(self, n: int) -> int:
+        return module_dup(n) + module_wrapped(n) + QuadScaler().run(n)
+
     def via_python(self, n: int) -> str:
         return ",".join(sorted([str(module_twice(n)), str(Calc.twice(n))], key=lambda s: s))
 
@@ -490,6 +549,7 @@ class Bag:
                 results[m]['pair'] = pair.has_partner()
                 results[m]['built'] = pair.built()
                 results[m]['via_python'] = calc.via_python(4)
+                results[m]['rebound'] = calc.rebound(3)
                 results[m]['words'] = calc.words(new ArrayList<>(['a', 'skip', 'b']))
                 results[m]['keyed'] = calc.keyed(new LinkedHashMap<>([bb: 2, a: 1]))
                 results[m]['edge'] = calc.edge(0)
@@ -512,6 +572,9 @@ class Bag:
                     assert !compiled.containsAll(['Calc.python_rejecting', 'Calc.python_catching', 'Calc.python_catching_coded']), 'the lambdas keep the Python raisers and catchers in Python'
                     def misordered = decisions.find { it.qualifiedName() == 'Calc.misordered' }
                     assert misordered.reasons()*.rule() == ['unsupported-statement'] && misordered.reasons()[0].message().contains('[python.Rejected] follows one for [java.lang.RuntimeException] that already catches it'), misordered.toString()
+                    // what may be rebound or overridden while the program runs is not bound at compile time
+                    assert !compiled.any { it in ['module_rated', 'module_dup', 'module_shadow', 'Scaler.run', 'Calc.calls_rebound'] }, decisions.toString()
+                    assert compiled.contains('module_wrapped'), 'the decorated function compiles; its wrapper calls it, and it delegates to its static Java method'
                     assert compiled.containsAll((CASES*.get(0).unique() - ['misordered', 'python_catching', 'python_catching_coded']).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.twice', 'module_twice', 'module_upper', 'module_lengths', 'module_any']), decisions.toString()
                 }
             } finally {
@@ -527,6 +590,7 @@ class Bag:
         results[StaticCompilationMode.OFF][["host", "not a url"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["entry", "k", 3].toString()] == "k=3"
         results[StaticCompilationMode.OFF]['pair'] == true
+        results[StaticCompilationMode.OFF]['rebound'] == '15|103|1020'
         results[StaticCompilationMode.OFF]['built'] == 'xy'
         results[StaticCompilationMode.OFF][["formed", "f"].toString()] == 'f402'
         results[StaticCompilationMode.OFF][["picked", 0, "fb"].toString()] == 'fb'

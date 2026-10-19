@@ -257,6 +257,10 @@ class StaticPlanner:
             if any(decorator.annotationName() == MICRONAUT_TEST for decorator in module.decorators):
                 reasons.append(("class-not-eligible", "the functions of a test module are its tests", span))
                 return reasons
+            if sum(1 for other, _ in module.functions if other.name() == function_def.name()) > 1:
+                # the generated class holds one static method of the name, and the Python callers delegating by it could reach the other body
+                reasons.append(("unsupported-statement", f"the module defines [{function_def.name()}] more than once; only one static Java method of the name can be generated", span))
+                return reasons
         else:
             if id(class_def) not in self._ineligibility:
                 self._ineligibility[id(class_def)] = self._class_ineligibility(class_def, class_node)
