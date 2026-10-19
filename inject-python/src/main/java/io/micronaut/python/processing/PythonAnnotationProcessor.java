@@ -59,6 +59,7 @@ import javax.lang.model.element.TypeElement;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -287,6 +288,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private Consumer<StaticCompilationDecision> staticDecisionCallback;
     // the sources whose bytecode is compiled once the static compilation plan has rewritten their runtime trees
     private final List<PendingBytecode> pendingBytecode = new ArrayList<>();
+    // the static compilation report directories written by this compilation, so elements sharing one keep each other's decisions
+    private final Set<Path> reportDirectories = new HashSet<>();
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
     private ClassLoader classLoader;
     private boolean compilePythonBytecode;
@@ -906,7 +909,28 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     }
                 }
             }
-            StaticCompilationReport.write(configuration.reportDirectory(), configuration.mode(), plan.decisions(), plannedSources);
+            boolean incremental = plannedSources != null;
+            Path reportDirectory = configuration.reportDirectory().toAbsolutePath().normalize();
+            if (!reportDirectories.add(reportDirectory) && plannedSources == null) {
+                // an earlier element of this compilation wrote to the same directory: keep its decisions
+                plannedSources = new HashSet<>();
+                for (PythonAstParser.TransformResult transformResult : transformedList) {
+                    plannedSources.add(PythonAstParser.sourcePathOf(transformResult.originalSource()));
+                }
+                for (StaticCompilationDecision decision : plan.decisions()) {
+                    if (decision.sourcePath() != null) {
+                        plannedSources.add(decision.sourcePath());
+                    }
+                }
+            }
+            try {
+                StaticCompilationReport.write(reportDirectory, configuration.mode(), plan.decisions(), plannedSources, incremental);
+            } catch (UncheckedIOException e) {
+                IOException cause = e.getCause();
+                throw new ProcessingException(originatingElement, "Cannot write the static compilation report to the directory ["
+                    + reportDirectory + "] given by the option " + StaticCompilationMode.REPORT_OPTION + ": "
+                    + (cause.getMessage() != null ? cause.getMessage() : cause.toString()));
+            }
         }
         reportDiagnostics(plan.diagnostics(), transformedList, element, originatingElement);
     }
