@@ -14,8 +14,20 @@ dependencies {
     compileOnly(projects.micronautManagement)
     // the embedded Groovy compiler exists when the project's own Groovy is on the launch classpath
     compileOnly(libs.managed.groovy)
+    // the embedded Kotlin compiler exists when the Kotlin Build Tools API and its implementation are on the launch
+    // classpath, and runs KSP when the KSP implementation is too; the build plugin puts them there at the project's versions
+    compileOnly(libs.managed.kotlin.build.tools.api)
+    compileOnly(libs.managed.ksp.api)
+    compileOnly(libs.ksp.commonDeps)
+    compileOnly(libs.ksp.aaEmbeddable)
+    // the embedded Python compiler exists when the Pyronaut compiler is on the launch classpath
+    compileOnly(projects.micronautInjectPython)
+    // the built-in test runner exists when the project's JUnit Platform launcher is on the launch classpath
+    compileOnly(libs.junit.platform.launcher)
     // attaches the agent to a JVM launched without -javaagent, when the project puts it on the classpath
     compileOnly(libs.bytebuddy.agent)
+    // the native macOS watch service, when micronaut-runtime-osx is on the development runtime classpath
+    compileOnly(libs.managed.methvin.directoryWatcher)
 
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautHttp)
@@ -25,6 +37,13 @@ dependencies {
     testCompileOnly(projects.micronautManagement)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
+    testImplementation(libs.junit.platform.launcher)
+    testImplementation(projects.micronautRuntimeOsx)
+    testImplementation(libs.managed.kotlin.build.tools.impl)
+    testImplementation(libs.managed.kotlin.stdlib)
+    testImplementation(libs.ksp.aaEmbeddable)
+    testImplementation(libs.managed.ksp.api)
+    testImplementation(projects.micronautInjectKotlin)
     // the compile-error page
     testImplementation(projects.micronautHttpServer)
     testAnnotationProcessor(projects.micronautInjectJava)
@@ -69,7 +88,23 @@ noReflection {
     allowIn("io.micronaut.dev.compile.GroovySourceCompiler", "CLASS_NAMES")
     allowIn("io.micronaut.dev.compile.GroovySourceCompiler", "CLASS_LOADING")
     allowIn("io.micronaut.dev.compile.GroovyCompilation", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.compile.KotlinSourceCompiler", "CLASS_NAMES")
+    allowIn("io.micronaut.dev.compile.KotlinSourceCompiler", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.compile.KotlinCompilation", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.compile.KotlinCompilation", "SERVICE_LOADING")
+    allowIn("io.micronaut.dev.compile.KspCompilation", "CLASS_NAMES")
+    allowIn("io.micronaut.dev.compile.KspCompilation", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.compile.KspCompilation", "SERVICE_LOADING")
+    allowIn("io.micronaut.dev.compile.PythonSourceCompiler", "CLASS_NAMES")
+    allowIn("io.micronaut.dev.compile.PythonSourceCompiler", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.test.JUnitPlatformTestRunner", "CLASS_NAMES")
+    allowIn("io.micronaut.dev.test.JUnitPlatformTestRunner", "CLASS_LOADING")
+    // the selected test classes are loaded through the generation's loader and handed to the engines
+    allowIn("io.micronaut.dev.test.JUnitPlatformExecution", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.test.TestEventListeners", "SERVICE_LOADING")
+    allowIn("io.micronaut.dev.TestSession", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.agent.DynamicAttach", "CLASS_LOADING")
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
+    allowIn("io.micronaut.dev.DevWatchService", "CLASS_LOADING")
 }

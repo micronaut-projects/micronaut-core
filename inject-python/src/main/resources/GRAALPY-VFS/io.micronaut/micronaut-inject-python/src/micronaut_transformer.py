@@ -331,7 +331,8 @@ class MicronautTransformer(ast.NodeTransformer):
     """
 
     def __init__(self, callback_get_class_element, callback_get_class_elements, strip_java_interface_bases=False,
-                 package_name='', source_root='', python_source_dirs=None, facades: FacadeRegistry | None = None, source_path=None, source_text=None, caches=None):
+                 package_name='', source_root='', python_source_dirs=None, facades: FacadeRegistry | None = None, source_path=None, source_text=None, caches=None,
+                 callback_is_dependency_python_module=None):
         """
         Initialize the transformer.
 
@@ -345,12 +346,14 @@ class MicronautTransformer(ast.NodeTransformer):
             facades: The curated modules (facades) the module may import, or None
             source_path: The path of the module, for the location of its diagnostics
             source_text: The text of the module, for the column conversion of its diagnostics
+            callback_is_dependency_python_module: Whether a dependency provides the module's Python VFS source
         """
         self.callback_get_class_element = callback_get_class_element
         self.callback_get_class_elements = callback_get_class_elements
         # the lookups shared by the modules of one compilation: the annotation functions of the
         # modules they import, the files their imports name, the nested types of the annotations
         self._caches = caches if caches is not None else {}
+        self.callback_is_dependency_python_module = callback_is_dependency_python_module
         self.strip_java_interface_bases = strip_java_interface_bases
         self.package_name = package_name or ''
         self.source_root = source_root or ''
@@ -1079,12 +1082,15 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
 
     def _is_python_module(self, module_name: str) -> bool:
         """
-        Whether the module is importable in the compiler's Python environment, as the standard library is.
+        Whether the module is a dependency's Python VFS source or is importable in the compiler's
+        Python environment, as the standard library is.
         The ``java`` namespace is never a Python module: GraalPy's ``java`` import hook finds a spec for any
         ``java.*`` name, whether or not such a package exists.
         """
         if module_name.split('.')[0] == 'java':
             return False
+        if self.callback_is_dependency_python_module is not None and self.callback_is_dependency_python_module(module_name):
+            return True
         try:
             return importlib.util.find_spec(module_name) is not None
         except Exception:

@@ -59,11 +59,13 @@ def pythonTestProjects = [
         ":micronaut-inject-python-test",
         ":micronaut-context-python",
         ":micronaut-context-python-netty",
+        ":test-suite-dev-python",
         ":test-suite-python-corpus"
 ]
 // Projects whose tests all run in the first Python CI job instead of being split across the jobs: the
 // corpus is one test class
 def pythonUnshardedProjects = [
+        ":test-suite-dev-python",
         ":test-suite-python-corpus"
 ]
 def pythonProjects = pythonTestProjects + [":test-suite-python"]

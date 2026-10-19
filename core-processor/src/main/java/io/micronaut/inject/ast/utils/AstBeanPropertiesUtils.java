@@ -97,7 +97,7 @@ public final class AstBeanPropertiesUtils {
             // Records include everything
             boolean isIntrospectedPropertyMethod = isIntrospectedPropertyMethod(methodElement);
             boolean isExcludedMethod = (methodElement.isStatic() && !configuration.isAllowStaticProperties()) ||
-                (!excludeElementsInRole && isMethodInRole(methodElement));
+                (!excludeElementsInRole && isMethodInRole(methodElement, configuration.isIncludeInjected()));
             if (isExcludedMethod) {
                 if (isIntrospectedPropertyMethod) {
                     failInvalidIntrospectedProperty(
@@ -191,7 +191,7 @@ public final class AstBeanPropertiesUtils {
         for (FieldElement fieldElement : fieldSupplier.get()) {
             boolean isIntrospectedPropertyField = isIntrospectedPropertyField(fieldElement);
             boolean isExcludedField = (fieldElement.isStatic() && !configuration.isAllowStaticProperties()) ||
-                (!excludeElementsInRole && isFieldInRole(fieldElement));
+                (!excludeElementsInRole && !configuration.isIncludeInjected() && isFieldInRole(fieldElement));
             if (isExcludedField) {
                 if (isIntrospectedPropertyField) {
                     failInvalidIntrospectedProperty(
@@ -652,8 +652,8 @@ public final class AstBeanPropertiesUtils {
             || fieldElement.hasStereotype(Property.class);
     }
 
-    private static boolean isMethodInRole(MethodElement methodElement) {
-        return methodElement.hasDeclaredAnnotation(AnnotationUtil.INJECT)
+    private static boolean isMethodInRole(MethodElement methodElement, boolean includeInjected) {
+        return (!includeInjected && methodElement.hasDeclaredAnnotation(AnnotationUtil.INJECT))
             || methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)
             || methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT);
     }

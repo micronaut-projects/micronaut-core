@@ -44,6 +44,37 @@ class Hello:
         }
     }
 
+    void "test the snake_case names of a facade's annotations apply the annotations"() {
+        expect:
+        buildClassElement('''
+from facadetest import http, inject
+from facadetest.http import get, post
+
+@inject.singleton
+@http.controller("/hello")
+class Hello:
+    @get("/{name}")
+    @inject.executable
+    def hello(self, name: str) -> http.HttpResponse[str]:
+        return http.ok(name)
+
+    @post("/")
+    @http.Status(http.CREATED)
+    def create(self, name: str) -> str:
+        return name
+''') { ClassElement element ->
+            assert element.hasAnnotation(AnnotationUtil.SINGLETON)
+            assert element.stringValue(Controller).get() == "/hello"
+            MethodElement hello = method(element, "hello")
+            assert hello.stringValue(Get).get() == "/{name}"
+            assert hello.hasAnnotation(Executable)
+            MethodElement create = method(element, "create")
+            assert create.hasAnnotation(Post)
+            assert create.enumValue(Status, HttpStatus).get() == HttpStatus.CREATED
+            element
+        }
+    }
+
     void "test a facade imported as a module resolves its members"() {
         expect:
         buildClassElement('''
