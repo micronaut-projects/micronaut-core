@@ -362,10 +362,12 @@ public final class TypeFacts {
 
     private static MethodSignature signature(MethodElement method) {
         List<String> parameterTypes = new ArrayList<>();
+        List<String> erasedParameterTypes = new ArrayList<>();
         for (ParameterElement parameter : method.getParameters()) {
             // the generic type is the declared one with the type arguments of a parameterized
             // receiver substituted; a type variable left unbound reads as its erasure
             parameterTypes.add(typeName(parameter.getGenericType()));
+            erasedParameterTypes.add(erasure(parameter.getType()));
         }
         List<String> checkedExceptions = new ArrayList<>();
         for (ClassElement thrown : method.getThrownTypes()) {
@@ -373,7 +375,24 @@ public final class TypeFacts {
                 checkedExceptions.add(thrown.getName());
             }
         }
-        return new MethodSignature(parameterTypes, method.isVarArgs(), method.isStatic(), typeName(method.getGenericReturnType()), !checkedExceptions.isEmpty(), typeArguments(method.getGenericReturnType()), checkedExceptions, method.isDefault());
+        return new MethodSignature(parameterTypes, method.isVarArgs(), method.isStatic(), typeName(method.getGenericReturnType()), !checkedExceptions.isEmpty(), typeArguments(method.getGenericReturnType()),
+            checkedExceptions, method.isDefault(), erasedParameterTypes, erasure(method.getReturnType()));
+    }
+
+    /**
+     * The erasure of a declared type, which the method's descriptor names: a type variable is its
+     * first bound, erased in turn, or {@code Object}.
+     */
+    private static String erasure(ClassElement type) {
+        String dimensions = "[]".repeat(type.getArrayDimensions());
+        if (type instanceof GenericPlaceholderElement placeholder) {
+            List<? extends ClassElement> bounds = placeholder.getBounds();
+            return (bounds.isEmpty() ? Object.class.getName() : erasure(bounds.get(0))) + dimensions;
+        }
+        if (type.isTypeVariable() || type.isGenericPlaceholder() || type.isWildcard()) {
+            return Object.class.getName() + dimensions;
+        }
+        return type.getName() + dimensions;
     }
 
     /**
@@ -546,13 +565,37 @@ public final class TypeFacts {
      *                       an argument is a type variable
      * @param checkedExceptions The qualified names of the checked exceptions the method declares
      * @param isDefault      Whether the method is a default method of an interface
+     * @param erasedParameterTypes The erasures of the declared parameter types, which the method's
+     *                       descriptor names: {@code Object} for a {@code T} the receiver binds to a
+     *                       type of {@code parameterTypes}
+     * @param erasedReturnType The erasure of the declared return type, which the method's descriptor
+     *                       names
      */
-    public record MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments, List<String> checkedExceptions, boolean isDefault) {
+    public record MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments,
+                                  List<String> checkedExceptions, boolean isDefault, List<String> erasedParameterTypes, String erasedReturnType) {
 
         public MethodSignature {
             parameterTypes = List.copyOf(parameterTypes);
             returnTypeArguments = returnTypeArguments == null ? List.of() : List.copyOf(returnTypeArguments);
             checkedExceptions = checkedExceptions == null ? List.of() : List.copyOf(checkedExceptions);
+            erasedParameterTypes = List.copyOf(erasedParameterTypes);
+        }
+
+        /**
+         * A signature whose declared types are the types it names.
+         *
+         * @param parameterTypes The parameter types
+         * @param varargs        Whether the last parameter takes the remaining arguments
+         * @param isStatic       Whether the method is static
+         * @param returnType     The return type
+         * @param throwsChecked  Whether the method declares a checked exception
+         * @param returnTypeArguments The type arguments of the return type
+         * @param checkedExceptions The qualified names of the checked exceptions the method declares
+         * @param isDefault      Whether the method is a default method of an interface
+         */
+        public MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments,
+                               List<String> checkedExceptions, boolean isDefault) {
+            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, returnTypeArguments, checkedExceptions, isDefault, parameterTypes, returnType);
         }
 
         /**

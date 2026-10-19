@@ -21,16 +21,20 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
+import java.util.AbstractList;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.RandomAccess;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
@@ -176,7 +180,153 @@ public final class PythonStatic {
         if (value instanceof Double || value instanceof Float) {
             return str(((Number) value).doubleValue());
         }
+        if (value instanceof Collection<?> || value instanceof Map<?, ?> || value instanceof Object[]) {
+            return repr(value);
+        }
         return String.valueOf(value);
+    }
+
+    /**
+     * @param value A value
+     * @return {@code repr(value)} for the values a compiled body renders: a string quoted as Python
+     * quotes it, a list, tuple, set or dict with its elements rendered the same way, and {@code str(value)} otherwise
+     */
+    public static String repr(@Nullable Object value) {
+        return repr(value, null);
+    }
+
+    /**
+     * @param value  A value
+     * @param active The containers being rendered, or {@code null} before the first one: a container reached
+     *               again within itself renders as Python's recursion marker, {@code [...]} or {@code {...}}
+     */
+    private static String repr(@Nullable Object value, @Nullable Set<Object> active) {
+        if (value instanceof String string) {
+            return quote(string);
+        }
+        if (value instanceof Map<?, ?> map) {
+            if (active != null && active.contains(map)) {
+                return "{...}";
+            }
+            Set<Object> entered = enter(active, map);
+            try {
+                StringBuilder out = new StringBuilder("{");
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    if (out.length() > 1) {
+                        out.append(", ");
+                    }
+                    out.append(repr(entry.getKey(), entered)).append(": ").append(repr(entry.getValue(), entered));
+                }
+                return out.append('}').toString();
+            } finally {
+                entered.remove(map);
+            }
+        }
+        if (value instanceof java.util.Set<?> set) {
+            if (set.isEmpty()) {
+                return "set()";
+            }
+            return join(set, "{", "}", active);
+        }
+        if (value instanceof Tuple tuple) {
+            if (active != null && active.contains(tuple)) {
+                return "(...)";
+            }
+            if (tuple.size() == 1) {
+                Set<Object> entered = enter(active, tuple);
+                try {
+                    return "(" + repr(tuple.get(0), entered) + ",)";
+                } finally {
+                    entered.remove(tuple);
+                }
+            }
+            return join(tuple, "(", ")", active);
+        }
+        if (value instanceof Collection<?> collection) {
+            return join(collection, "[", "]", active);
+        }
+        if (value instanceof Object[] array) {
+            return join(java.util.Arrays.asList(array), "[", "]", active);
+        }
+        return str(value);
+    }
+
+    private static Set<Object> enter(@Nullable Set<Object> active, Object container) {
+        Set<Object> entered = active != null ? active : Collections.newSetFromMap(new IdentityHashMap<>());
+        entered.add(container);
+        return entered;
+    }
+
+    private static String join(Iterable<?> elements, String open, String close, @Nullable Set<Object> active) {
+        if (active != null && active.contains(elements)) {
+            return open + "..." + close;
+        }
+        Set<Object> entered = enter(active, elements);
+        try {
+            StringBuilder out = new StringBuilder(open);
+            boolean first = true;
+            for (Object element : elements) {
+                if (!first) {
+                    out.append(", ");
+                }
+                out.append(repr(element, entered));
+                first = false;
+            }
+            return out.append(close).toString();
+        } finally {
+            entered.remove(elements);
+        }
+    }
+
+    /**
+     * A string as Python's repr spells it: single quotes unless the string contains a single quote and
+     * no double quote, backslash escapes for the quote, the backslash, {@code \\n}, {@code \\r} and {@code \\t},
+     * and {@code \\xhh}, {@code \\uhhhh} or {@code \\Uhhhhhhhh} for every other character
+     * {@code str.isprintable()} rejects.
+     */
+    private static String quote(String string) {
+        char quote = string.indexOf('\'') >= 0 && string.indexOf('"') < 0 ? '"' : '\'';
+        StringBuilder out = new StringBuilder().append(quote);
+        int i = 0;
+        while (i < string.length()) {
+            int c = string.codePointAt(i);
+            i += Character.charCount(c);
+            switch (c) {
+                case '\\' -> out.append("\\\\");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (c == quote) {
+                        out.append('\\').append((char) c);
+                    } else if (isPrintable(c)) {
+                        out.appendCodePoint(c);
+                    } else if (c <= 0xff) {
+                        out.append(String.format("\\x%02x", c));
+                    } else if (c <= 0xffff) {
+                        out.append(String.format("\\u%04x", c));
+                    } else {
+                        out.append(String.format("\\U%08x", c));
+                    }
+                }
+            }
+        }
+        return out.append(quote).toString();
+    }
+
+    /**
+     * Python's {@code str.isprintable} for one character: the ASCII space, and no other separator, control,
+     * format, surrogate, private-use or unassigned character.
+     */
+    private static boolean isPrintable(int codePoint) {
+        if (codePoint < 0x7f) {
+            return codePoint >= 0x20;
+        }
+        return switch (Character.getType(codePoint)) {
+            case Character.CONTROL, Character.FORMAT, Character.SURROGATE, Character.PRIVATE_USE, Character.UNASSIGNED,
+                 Character.LINE_SEPARATOR, Character.PARAGRAPH_SEPARATOR, Character.SPACE_SEPARATOR -> false;
+            default -> true;
+        };
     }
 
     /**
@@ -400,6 +550,44 @@ public final class PythonStatic {
     }
 
     /**
+     * The result of a Python method a compiled body calls whose return hint is a primitive
+     * ({@code int}, {@code float} or {@code bool}). Return hints are trusted, and checked for
+     * None: a None the primitive cannot hold fails as a TypeError naming the method and its hint,
+     * not as the NullPointerException of the conversion.
+     *
+     * @param result The result of the call
+     * @param method The method, as {@code Class.method}
+     * @param hint   The Python name of the hinted type
+     * @return The result, which is not None
+     * @throws IllegalStateException When the result is None, as a TypeError
+     */
+    public static org.graalvm.polyglot.Value returned(org.graalvm.polyglot.Value result, String method, String hint) {
+        if (result.isNull()) {
+            throw new PythonError(TYPE_ERROR, method + "() returned None but is hinted to return " + hint);
+        }
+        return result;
+    }
+
+    /**
+     * An attribute of a Python object a compiled body reads whose hint is a primitive
+     * ({@code int}, {@code float} or {@code bool}): a property's getter, a hinted class attribute or
+     * an attribute {@code __init__} assigns. The hint is trusted, and checked for None as
+     * {@link #returned(org.graalvm.polyglot.Value, String, String)} checks a result.
+     *
+     * @param value     The value of the attribute
+     * @param attribute The attribute, as {@code Class.attribute}
+     * @param hint      The Python name of the hinted type
+     * @return The value, which is not None
+     * @throws IllegalStateException When the value is None, as a TypeError
+     */
+    public static org.graalvm.polyglot.Value hinted(org.graalvm.polyglot.Value value, String attribute, String hint) {
+        if (value.isNull()) {
+            throw new PythonError(TYPE_ERROR, attribute + " is None but is hinted as " + hint);
+        }
+        return value;
+    }
+
+    /**
      * Binds a Python object to the compiled bodies of one class of its MRO: the rewritten methods
      * of that class run the Java bodies for the object from then on, see {@code apply_delegation}.
      * The binding is kept outside the object, weakly, so a copy of the object is not bound and
@@ -596,6 +784,7 @@ public final class PythonStatic {
     public static <T> Set<T> copyOfSet(Iterable<? extends T> values) {
         Set<T> set = new LinkedHashSet<>();
         for (T value : values) {
+            requireHashable(value);
             set.add(value);
         }
         return set;
@@ -632,6 +821,7 @@ public final class PythonStatic {
      * @return The dict
      */
     public static <K, V> Map<K, V> put(Map<K, V> map, K key, V value) {
+        requireHashable(key);
         map.put(key, value);
         return map;
     }
@@ -639,11 +829,21 @@ public final class PythonStatic {
     /**
      * @param elements The elements
      * @param <T> The element type the caller expects
-     * @return A Python tuple: an immutable list of the elements, None among them
+     * @return A Python tuple: an immutable list of the elements, None among them, that {@link #repr(Object)} renders as a tuple
      */
     @SuppressWarnings("unchecked")
     public static <T> List<T> tuple(Object... elements) {
-        return (List<T>) Collections.unmodifiableList(Arrays.asList(elements.clone()));
+        return (List<T>) new Tuple(elements.clone());
+    }
+
+    /**
+     * @param values The values, a Java collection or any other iterable
+     * @param <T> The element type
+     * @return A Python tuple of the values: {@code tuple(values)}
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> List<T> copyOfTuple(Iterable<? extends T> values) {
+        return (List<T>) new Tuple(copyOfList(values).toArray());
     }
 
     /**
@@ -653,6 +853,9 @@ public final class PythonStatic {
      */
     @SuppressWarnings("unchecked")
     public static <T> Set<T> set(Object... elements) {
+        for (Object element : elements) {
+            requireHashable(element);
+        }
         return (Set<T>) new LinkedHashSet<>(Arrays.asList(elements));
     }
 
@@ -666,6 +869,7 @@ public final class PythonStatic {
     public static <K, V> Map<K, V> map(Object... keysAndValues) {
         Map<Object, Object> map = new LinkedHashMap<>();
         for (int i = 0; i + 1 < keysAndValues.length; i += 2) {
+            requireHashable(keysAndValues[i]);
             map.put(keysAndValues[i], keysAndValues[i + 1]);
         }
         return (Map<K, V>) map;
@@ -721,6 +925,7 @@ public final class PythonStatic {
      */
     @SuppressWarnings("unchecked")
     public static @Nullable Object add(Set<?> set, @Nullable Object value) {
+        requireHashable(value);
         ((Set<Object>) set).add(value);
         return null;
     }
@@ -749,6 +954,9 @@ public final class PythonStatic {
      */
     @SuppressWarnings("unchecked")
     public static <T> T copy(T value) {
+        if (value instanceof Tuple) {
+            return value;
+        }
         if (value instanceof List<?> list) {
             return (T) new ArrayList<>(list);
         }
@@ -768,6 +976,7 @@ public final class PythonStatic {
      */
     @SuppressWarnings("unchecked")
     public static void setItem(Map<?, ?> map, @Nullable Object key, @Nullable Object value) {
+        requireHashable(key);
         ((Map<Object, Object>) map).put(key, value);
     }
 
@@ -778,6 +987,7 @@ public final class PythonStatic {
      * @throws NoSuchElementException When the key is absent, as Python raises KeyError
      */
     public static @Nullable Object item(Map<?, ?> map, @Nullable Object key) {
+        requireHashable(key);
         if (!containsKey(map, key)) {
             throw new NoSuchElementException("KeyError: " + str(key));
         }
@@ -791,6 +1001,7 @@ public final class PythonStatic {
      * @return {@code map.get(key, default)}
      */
     public static @Nullable Object get(Map<?, ?> map, @Nullable Object key, @Nullable Object defaultValue) {
+        requireHashable(key);
         return containsKey(map, key) ? map.get(key) : defaultValue;
     }
 
@@ -825,18 +1036,28 @@ public final class PythonStatic {
         if (container instanceof CharSequence text) {
             return element != null && text.toString().contains(element.toString());
         }
-        if (container instanceof Collection<?> collection) {
+        if (container instanceof Set<?> set) {
+            requireHashable(element);
             try {
-                return collection.contains(element);
+                return set.contains(element);
             } catch (NullPointerException e) {
-                // an immutable Java collection refuses to look for null: it holds none, so None is not in it
+                // an immutable Java set refuses to look for null: it holds none, so None is not in it
                 if (element == null) {
                     return false;
                 }
                 throw e;
             }
         }
+        if (container instanceof Collection<?> collection) {
+            for (Object candidate : collection) {
+                if (same(candidate, element)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         if (container instanceof Map<?, ?> map) {
+            requireHashable(element);
             return containsKey(map, element);
         }
         throw new ClassCastException("argument of type " + typeName(container) + " is not iterable");
@@ -851,6 +1072,57 @@ public final class PythonStatic {
                 return false;
             }
             throw e;
+        }
+    }
+
+    /**
+     * Python's {@code ==} as far as Java's {@code equals} differs from it on the values of a compiled body:
+     * a tuple equals no list and a list no tuple, also as elements of lists, tuples and dict values.
+     */
+    private static boolean same(@Nullable Object left, @Nullable Object right) {
+        if (left == right) {
+            return true;
+        }
+        if (left instanceof List<?> leftList && right instanceof List<?> rightList) {
+            if ((left instanceof Tuple) != (right instanceof Tuple) || leftList.size() != rightList.size()) {
+                return false;
+            }
+            java.util.Iterator<?> rightElements = rightList.iterator();
+            for (Object leftElement : leftList) {
+                if (!same(leftElement, rightElements.next())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (left instanceof Map<?, ?> leftMap && right instanceof Map<?, ?> rightMap) {
+            if (leftMap.size() != rightMap.size()) {
+                return false;
+            }
+            for (Map.Entry<?, ?> entry : leftMap.entrySet()) {
+                if (!containsKey(rightMap, entry.getKey()) || !same(entry.getValue(), rightMap.get(entry.getKey()))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return Objects.equals(left, right);
+    }
+
+    /**
+     * Requires a dict key or a set element Python can hash: a list, set or dict cannot be one (nor a tuple
+     * holding one), which keeps a list from finding the key of an equal tuple.
+     *
+     * @param key A dict key or a set element
+     * @throws ClassCastException For a list, set or dict, as Python raises TypeError
+     */
+    private static void requireHashable(@Nullable Object key) {
+        if (key instanceof Tuple tuple) {
+            for (Object element : tuple) {
+                requireHashable(element);
+            }
+        } else if (key instanceof Collection<?> || key instanceof Map<?, ?>) {
+            throw new ClassCastException("unhashable type: '" + typeName(key) + "'");
         }
     }
 
@@ -924,10 +1196,34 @@ public final class PythonStatic {
 
     /**
      * @param text A string
-     * @return {@code text.strip()}: the string without leading and trailing whitespace
+     * @return {@code text.strip()}: the string without leading and trailing whitespace, as Python classifies it
      */
     public static String strip(String text) {
-        return text.strip();
+        int start = 0;
+        int end = text.length();
+        while (start < end) {
+            int codePoint = text.codePointAt(start);
+            if (!isSpace(codePoint)) {
+                break;
+            }
+            start += Character.charCount(codePoint);
+        }
+        while (end > start) {
+            int codePoint = text.codePointBefore(end);
+            if (!isSpace(codePoint)) {
+                break;
+            }
+            end -= Character.charCount(codePoint);
+        }
+        return start == 0 && end == text.length() ? text : text.substring(start, end);
+    }
+
+    /**
+     * Python's {@code str.isspace} for one character: the Unicode separators (including the no-break spaces Java's
+     * {@link Character#isWhitespace(int)} leaves out), the ASCII controls Python counts, and the next line.
+     */
+    private static boolean isSpace(int codePoint) {
+        return Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint) || codePoint == 0x85;
     }
 
     /**
@@ -938,10 +1234,22 @@ public final class PythonStatic {
     @SuppressWarnings("unchecked")
     public static <T> List<T> split(String text) {
         List<Object> parts = new ArrayList<>();
-        for (String part : text.strip().split("\\s+")) {
-            if (!part.isEmpty()) {
-                parts.add(part);
+        int start = -1;
+        int i = 0;
+        while (i < text.length()) {
+            int codePoint = text.codePointAt(i);
+            if (isSpace(codePoint)) {
+                if (start >= 0) {
+                    parts.add(text.substring(start, i));
+                    start = -1;
+                }
+            } else if (start < 0) {
+                start = i;
             }
+            i += Character.charCount(codePoint);
+        }
+        if (start >= 0) {
+            parts.add(text.substring(start));
         }
         return (List<T>) parts;
     }
@@ -1005,11 +1313,7 @@ public final class PythonStatic {
             return bool.booleanValue() ? 1 : 0;
         }
         if (value instanceof Double || value instanceof Float) {
-            double d = ((Number) value).doubleValue();
-            if (Double.isNaN(d) || Double.isInfinite(d)) {
-                throw new IllegalArgumentException("cannot convert float " + str(d) + " to integer");
-            }
-            return (long) d;
+            return toInt(((Number) value).doubleValue());
         }
         if (value instanceof BigInteger big) {
             return big.longValueExact();
@@ -1018,7 +1322,7 @@ public final class PythonStatic {
             return number.longValue();
         }
         if (value instanceof CharSequence text) {
-            String digits = asciiDigits(text.toString().strip());
+            String digits = asciiDigits(strip(text.toString()));
             if (!PYTHON_INT.matcher(digits).matches()) {
                 throw new IllegalArgumentException("invalid literal for int() with base 10: '" + text + "'");
             }
@@ -1030,6 +1334,26 @@ public final class PythonStatic {
             }
         }
         throw new ClassCastException("int() argument must be a string or a number, not " + typeName(value));
+    }
+
+    /**
+     * @param value A float
+     * @return {@code int(value)}: the float truncated towards zero
+     * @throws IllegalArgumentException On a NaN, as Python raises ValueError
+     * @throws ArithmeticException On an infinity or a value outside the range of a long, where Python would
+     * raise OverflowError or answer an integer no long holds
+     */
+    public static long toInt(double value) {
+        if (Double.isNaN(value)) {
+            throw new IllegalArgumentException("cannot convert float NaN to integer");
+        }
+        if (Double.isInfinite(value)) {
+            throw new ArithmeticException("cannot convert float infinity to integer");
+        }
+        if (value >= 0x1p63 || value < -0x1p63) {
+            throw new ArithmeticException("int(" + str(value) + ") is outside the range of a long");
+        }
+        return (long) value;
     }
 
     /**
@@ -1045,7 +1369,7 @@ public final class PythonStatic {
             return number.doubleValue();
         }
         if (value instanceof CharSequence text) {
-            String trimmed = text.toString().strip();
+            String trimmed = strip(text.toString());
             try {
                 return switch (trimmed.toLowerCase(java.util.Locale.ROOT)) {
                     case "inf", "+inf", "infinity", "+infinity" -> Double.POSITIVE_INFINITY;
@@ -1120,6 +1444,30 @@ public final class PythonStatic {
             return number.doubleValue() != 0;
         }
         return true;
+    }
+
+    /**
+     * A Python tuple: an immutable list whose rendering keeps the parentheses. Java's {@code equals} holds it
+     * equal to any list of the same elements, as the List contract requires; the helpers of a compiled body
+     * compare as Python does instead, where a tuple equals no list ({@link #same}), and take no list as a
+     * dict key or a set element ({@link #requireHashable}).
+     */
+    private static final class Tuple extends AbstractList<Object> implements RandomAccess {
+        private final Object[] elements;
+
+        private Tuple(Object[] elements) {
+            this.elements = elements;
+        }
+
+        @Override
+        public Object get(int index) {
+            return elements[index];
+        }
+
+        @Override
+        public int size() {
+            return elements.length;
+        }
     }
 
     /**

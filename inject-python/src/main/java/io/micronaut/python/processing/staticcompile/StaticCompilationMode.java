@@ -23,6 +23,11 @@ import java.util.Locale;
 /**
  * How much of a compilation's Python code is compiled to Java in the generated stubs.
  *
+ * <p>Static compilation assumes the whole application is compiled at once: it is not meant for
+ * libraries, and a subclass defined outside the compilation (in another module or library, inside
+ * a function, or at runtime) that overrides a compiled method is not seen by Java callers, which
+ * run the compiled body of the base.</p>
+ *
  * @author Graeme Rocher
  * @since 5.3.0
  */
