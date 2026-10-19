@@ -6,6 +6,7 @@ import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
 import io.micronaut.inject.ast.ElementQuery
 
 
@@ -328,6 +329,38 @@ private class Hidden<T> : java.util.function.Supplier<T> {
         expect:
         hidden.type == classLoader.loadClass('test.Hidden')
         strings(hidden.genericInterfaces) == ['Supplier<T>']
+    }
+
+    void "recording a type reports the super types the record leaves out, as the record lists them"() {
+        given: "a visitor that records the imported classes a second time and keeps what the API returned"
+        def classLoader = buildClassLoader('probe.Reported', '''
+package probe
+
+import io.micronaut.core.annotation.TypeHierarchyImport
+
+@TypeHierarchyImport(classes = [java.util.ArrayList::class, java.lang.StringBuilder::class, java.util.jar.JarEntry::class])
+class Reported
+''')
+        def arrayList = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.ArrayList', 'probe')]
+        def stringBuilder = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe')]
+        def jarEntry = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.jar.JarEntry', 'probe')]
+
+        expect: "a class whose closure the record names in full"
+        arrayList.className == TypeHierarchies.recordClassName('java.util.ArrayList', 'probe')
+        arrayList.omittedSuperTypeNames == []
+        arrayList.complete
+        record(classLoader, 'java.util.ArrayList').omittedSuperTypeNames == []
+
+        and: "a class with a package-private superclass"
+        stringBuilder.className == TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe')
+        stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
+        !stringBuilder.complete
+        stringBuilder.omittedSuperTypeNames == record(classLoader, 'java.lang.StringBuilder').omittedSuperTypeNames
+
+        and: "a class with a package-private ancestor of a third package"
+        jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
+        !jarEntry.complete
+        jarEntry.omittedSuperTypeNames == record(classLoader, 'java.util.jar.JarEntry').omittedSuperTypeNames
     }
 
     void "a JDK class with a package-private ancestor is recorded in the package of the origin"() {

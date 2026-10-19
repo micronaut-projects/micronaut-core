@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.PathVariables;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Map;
@@ -45,16 +46,53 @@ import java.util.Set;
 public class MatchedPathVariables implements PathVariables {
 
     private final Map<String, Object> values;
+    private final @Nullable Map<String, Object> rawValues;
     private final ConversionService conversionService;
+    // the decoded variables of the raw view, whose exceptions it fails with
+    private final @Nullable MatchedPathVariables decoded;
+    private @Nullable MatchedPathVariables raw;
 
     /**
+     * Variables whose values are their raw values, e.g. of a source that does not decode them.
+     *
      * @param values            The variable values, viewed read-only: the map of the match is
      *                          shared with the other arguments bound from it
      * @param conversionService The conversion service of the route
      */
     public MatchedPathVariables(Map<String, Object> values, ConversionService conversionService) {
+        this(values, values, conversionService);
+    }
+
+    /**
+     * @param values            The decoded variable values, viewed read-only
+     * @param rawValues         The values as they appear in the path, not percent-decoded, viewed read-only,
+     *                          or {@code null} if the source does not have them: {@link #raw()} then fails
+     * @param conversionService The conversion service of the route
+     */
+    public MatchedPathVariables(Map<String, Object> values, @Nullable Map<String, Object> rawValues, ConversionService conversionService) {
         this.values = Collections.unmodifiableMap(values);
+        if (rawValues == null) {
+            this.rawValues = null;
+        } else {
+            this.rawValues = rawValues == values ? this.values : Collections.unmodifiableMap(rawValues);
+        }
         this.conversionService = conversionService;
+        this.decoded = null;
+    }
+
+    /**
+     * The raw view of variables, see {@link #rawView(Map)}: its values are the raw values, and it
+     * fails like the decoded variables.
+     *
+     * @param decoded   The decoded variables
+     * @param rawValues Their raw values
+     */
+    protected MatchedPathVariables(MatchedPathVariables decoded, Map<String, Object> rawValues) {
+        this.values = rawValues;
+        this.rawValues = rawValues;
+        this.conversionService = decoded.conversionService;
+        this.decoded = decoded;
+        this.raw = this;
     }
 
     /**
@@ -69,6 +107,39 @@ public class MatchedPathVariables implements PathVariables {
      */
     public final ConversionService conversionService() {
         return conversionService;
+    }
+
+    /**
+     * @return The values as they appear in the path, not percent-decoded, read-only, or
+     * {@code null} if the source does not have them
+     */
+    public final @Nullable Map<String, Object> rawValues() {
+        return rawValues;
+    }
+
+    @Override
+    public final PathVariables raw() {
+        MatchedPathVariables view = raw;
+        if (view == null) {
+            Map<String, Object> raws = rawValues;
+            if (raws == null) {
+                throw new UnsupportedOperationException("The raw values of the path variables are not available");
+            }
+            view = rawView(raws);
+            raw = view;
+        }
+        return view;
+    }
+
+    /**
+     * The raw view of these variables: a subclass that carries more of the route, e.g. its
+     * target, keeps it in the view.
+     *
+     * @param rawValues The raw values, read-only
+     * @return The view, created with {@link #MatchedPathVariables(MatchedPathVariables, Map)}
+     */
+    protected MatchedPathVariables rawView(Map<String, Object> rawValues) {
+        return new MatchedPathVariables(this, rawValues);
     }
 
     @Override
@@ -108,6 +179,9 @@ public class MatchedPathVariables implements PathVariables {
      * @return The exception
      */
     protected RuntimeException unsatisfied(String name, Argument<?> argument) {
+        if (decoded != null) {
+            return decoded.unsatisfied(name, argument);
+        }
         return new UnsatisfiedArgumentException(argument, "Required PathVariable [" + name + "] not specified");
     }
 
@@ -119,6 +193,9 @@ public class MatchedPathVariables implements PathVariables {
      * @return The exception
      */
     protected RuntimeException unconvertible(Argument<?> argument) {
+        if (decoded != null) {
+            return decoded.unconvertible(argument);
+        }
         return new UnsatisfiedArgumentException(argument);
     }
 

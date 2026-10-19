@@ -102,6 +102,10 @@ public class ColonRouteTemplateEngine implements RouteTemplateParser {
                 if (open > 1 && part.endsWith(")")) {
                     // :name(regex): a variable of one segment constrained by a regular expression
                     segments.add(new Segment(part.substring(1, open), true, Pattern.compile(part.substring(open + 1, part.length() - 1))));
+                } else if (part.endsWith("?")) {
+                    // :name?: an optional variable of the last segment, absent from the captures
+                    // of a path without it, as a template of another language may leave it out
+                    segments.add(new Segment(part.substring(1, part.length() - 1), true, null, true));
                 } else {
                     segments.add(new Segment(part.substring(1), true, null));
                 }
@@ -117,7 +121,10 @@ public class ColonRouteTemplateEngine implements RouteTemplateParser {
         return id;
     }
 
-    private record Segment(String text, boolean variable, @Nullable Pattern pattern) {
+    private record Segment(String text, boolean variable, @Nullable Pattern pattern, boolean optional) {
+        Segment(String text, boolean variable, @Nullable Pattern pattern) {
+            this(text, variable, pattern, false);
+        }
     }
 
     private record Parsed(ColonRouteTemplateEngine language, String expression, List<Segment> segments) implements RouteTemplate {
@@ -126,7 +133,9 @@ public class ColonRouteTemplateEngine implements RouteTemplateParser {
         public @Nullable RouteCaptures match(String rawPath) {
             String normalized = UriTemplateMatcher.normalizeForMatching(language.matchingPath(rawPath));
             String[] parts = normalized.isEmpty() || "/".equals(normalized) ? new String[0] : normalized.substring(1).split("/", -1);
-            if (parts.length != segments.size()) {
+            boolean lastOptional = !segments.isEmpty() && segments.get(segments.size() - 1).optional;
+            boolean absent = lastOptional && parts.length == segments.size() - 1;
+            if (parts.length != segments.size() && !absent) {
                 return null;
             }
             List<@Nullable String> values = new ArrayList<>();
@@ -140,6 +149,9 @@ public class ColonRouteTemplateEngine implements RouteTemplateParser {
                 } else if (!segment.text.equals(parts[i])) {
                     return null;
                 }
+            }
+            if (absent) {
+                values.add(null);
             }
             return RouteCaptures.copyOf(normalized, variables(), values);
         }
@@ -162,7 +174,7 @@ public class ColonRouteTemplateEngine implements RouteTemplateParser {
             List<RouteTemplateVariable> variables = new ArrayList<>();
             for (Segment segment : segments) {
                 if (segment.variable) {
-                    variables.add(RouteTemplateVariable.of(segment.text, false, RouteTemplateVariable.Location.PATH, false, segment.pattern != null));
+                    variables.add(RouteTemplateVariable.of(segment.text, segment.optional, RouteTemplateVariable.Location.PATH, false, segment.pattern != null));
                 }
             }
             return List.copyOf(variables);
