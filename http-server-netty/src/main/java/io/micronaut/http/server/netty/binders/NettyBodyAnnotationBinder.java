@@ -41,6 +41,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
+import io.micronaut.http.exceptions.HttpException;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -80,7 +81,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
     @Override
     protected BindingResult<T> bindBodyPart(ArgumentConversionContext<T> context, HttpRequest<?> source, String bodyComponent) {
-        if (source instanceof FormCapableHttpRequest<?> nhr && nhr.hasFormBody()) {
+        // the request itself, or e.g. the mutable view of the request that a filter continued with
+        FormCapableHttpRequest<?> nhr = source instanceof FormCapableHttpRequest<?> formRequest ? formRequest : NettyHttpRequest.findBodyRequest(source);
+        if (nhr != null && nhr.hasFormBody()) {
             // skipClaimed=true because for unmatched binding, both this binder and PartUploadAnnotationBinder can be called on the same parameter
             return NettyPartUploadAnnotationBinder.bindPart(conversionService, context, formFactory.get(), nhr, bodyComponent, true);
         } else {
@@ -90,7 +93,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
     @Override
     protected BindingResult<ConvertibleValues<?>> bindFullBodyConvertibleValues(HttpRequest<?> source) {
-        if (!(source instanceof NettyHttpRequest<?> nhr)) {
+        // the request itself, or e.g. the mutable view of the request that a filter continued with
+        NettyHttpRequest<?> nhr = NettyHttpRequest.findBodyRequest(source);
+        if (nhr == null) {
             return super.bindFullBodyConvertibleValues(source);
         }
         BindingResult<ConvertibleValues<?>> existing = nhr.convertibleBody;
@@ -106,7 +111,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
     @Override
     public BindingResult<T> bindFullBody(ArgumentConversionContext<T> context, HttpRequest<?> source) {
-        if (!(source instanceof NettyHttpRequest<?> nhr)) {
+        // the request itself, or e.g. the mutable view of the request that a filter continued with
+        NettyHttpRequest<?> nhr = NettyHttpRequest.findBodyRequest(source);
+        if (nhr == null) {
             return super.bindFullBody(context, source);
         }
         if (nhr.byteBody().expectedLength().orElse(-1) == 0) {
@@ -187,9 +194,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         return converted;
     }
 
-    private static <T> List<T> toListNow(Flux<T> flux) {
-        var sub = new Subscriber<T>() {
-            final List<T> list = new ArrayList<>();
+    private static List<RawFormField> toListNow(Flux<RawFormField> flux) {
+        var sub = new Subscriber<RawFormField>() {
+            final List<RawFormField> list = new ArrayList<>();
             boolean complete = false;
             @Nullable
             Throwable error = null;
@@ -200,7 +207,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             }
 
             @Override
-            public void onNext(T t) {
+            public void onNext(RawFormField t) {
                 list.add(t);
             }
 
@@ -218,6 +225,17 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         flux.subscribe(sub);
         if (!sub.complete) {
             throw new IllegalStateException("Flux did not finish immediately");
+        }
+        if (sub.error != null) {
+            // the fields read before the failure are not bound
+            for (RawFormField field : sub.list) {
+                field.close();
+            }
+        }
+        if (sub.error instanceof HttpException e) {
+            // a malformed form, e.g. a multipart body without its closing boundary, or a form
+            // over a limit: answered with its status
+            throw e;
         }
         if (sub.error != null) {
             throw new IllegalStateException("Failed to load form fields", sub.error);

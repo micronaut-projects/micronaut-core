@@ -7,7 +7,7 @@ from micronaut.context.annotation import Requires
 from .BackendClient import BackendClient
 
 
-# A Python bean with async methods, awaited by the async controllers below from their event-loop contexts.
+# A Python bean with async methods, awaited by the async controllers below.
 # None of its methods is bridged to Java.
 @Requires(property="spec.name", value="PythonAsyncioSpec")
 @Singleton

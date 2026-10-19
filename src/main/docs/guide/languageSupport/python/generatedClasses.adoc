@@ -82,7 +82,11 @@ tasks.named("compileTestPython") {
 }
 ----
 
-A JPA or Hibernate entity written in Python needs the hint or the option: without them the class is found by the entity scan, which reads the annotation metadata, but Hibernate rejects the generated class as not annotated with `@Entity`. The same holds for any library that reads annotations from the class reflectively, such as JAXB or Jackson used without the Micronaut introspection module. Each class whose annotations are left off the generated source because neither names it is reported once as a compiler note naming the option; Bean Validation constraints, which Micronaut Validation reads from the annotation metadata, are left off without a note.
+A JPA or Hibernate entity written in Python needs the hint or the option: without them the class is found by the entity scan, which reads the annotation metadata, but Hibernate rejects the generated class as not annotated with `@Entity`. The same holds for any library that reads annotations from the class reflectively, such as JAXB or Jackson used without the Micronaut introspection module.
+
+=== Reporting the Classes That Were Left Off
+
+The compiler says nothing about the classes whose annotations it leaves off: most applications read no annotation reflectively, so a note per class is noise. When a reflection-based framework does not see an annotation, `-Amicronaut.python.reflection.warnings=true` - or the system property of that name of the compiler JVM - has the compiler report each such class once as a note listing the annotations it left off and naming the option that copies them. Bean Validation constraints, which Micronaut Validation reads from the annotation metadata, are left off without a note even then.
 
 === What Is Always Copied
 

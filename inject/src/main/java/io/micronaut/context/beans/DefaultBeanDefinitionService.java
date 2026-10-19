@@ -192,6 +192,11 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         Class<?> beanType = reference.getBeanType();
         boolean beanTypeIndexAdded = false;
         Set<Class<?>> exposedTypes = reference.getExposedTypes();
+        if (exposedTypes.isEmpty() && reference instanceof RuntimeBeanDefinition<?>) {
+            // Without restricted exposed types the bean is a candidate for its whole hierarchy,
+            // including index entries already created by earlier lookups
+            exposedTypes = ReflectionUtils.getAllClassesInHierarchy(beanType);
+        }
         for (Class<?> exposedType : exposedTypes) {
             resolveTypeIndex(exposedType).add(producer);
             if (beanType.equals(exposedType)) {
@@ -810,9 +815,11 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         /**
          * Whether the bean is explicitly indexed by the requested type. A bean annotated with
          * {@code @Indexed(Marker.class)} is enumerable by {@code Marker} even when it does not implement it.
+         * A bean that implements the type but does not expose it (for example {@code @Bean(typed = ...)})
+         * is deliberately hidden from that type and is not enumerable by it.
          *
          * @param beanType The requested bean type
-         * @return True if the bean declares an index for exactly the requested type
+         * @return True if the bean declares an index for exactly the requested type and does not implement it
          */
         private boolean isIndexedBy(Argument<?> beanType) {
             BeanDefinitionReference<?> ref = reference;
@@ -822,7 +829,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             Class<?> type = beanType.getType();
             for (Class<?> indexedType : ref.getIndexes()) {
                 if (indexedType == type) {
-                    return true;
+                    return !type.isAssignableFrom(ref.getBeanType());
                 }
             }
             return false;

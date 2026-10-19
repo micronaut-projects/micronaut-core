@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -90,15 +91,16 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
     }
 
     public static List<ClassElement> collectInjectableElements(AnnotationMetadata element, VisitorContext context) {
-        List<ClassElement> beanElements = new ArrayList<>();
         AnnotationValue<Import> annotation = element.getAnnotation(Import.class);
         if (annotation == null) {
-            return beanElements;
+            return new ArrayList<>();
         }
+        // a type named in classes can be found again in packages, and is imported once
+        Map<String, ClassElement> beanElements = new LinkedHashMap<>();
         final String[] classNames = annotation.stringValues("classes");
         if (ArrayUtils.isNotEmpty(classNames)) {
             for (String className : classNames) {
-                context.getClassElement(className).ifPresent(beanElements::add);
+                context.getClassElement(className).ifPresent(classElement -> beanElements.putIfAbsent(classElement.getName(), classElement));
             }
         }
 
@@ -122,12 +124,12 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
                             .getClassElements(aPackage, annotationSet.toArray(EMPTY_STRING_ARRAY));
                 for (ClassElement classElement : classElements) {
                     if (!classElement.isAbstract()) {
-                        beanElements.add(classElement);
+                        beanElements.putIfAbsent(classElement.getName(), classElement);
                     }
                 }
             }
         }
-        return beanElements;
+        return new ArrayList<>(beanElements.values());
     }
 
     @Override

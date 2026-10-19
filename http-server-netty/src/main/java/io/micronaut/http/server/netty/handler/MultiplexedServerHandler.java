@@ -103,6 +103,11 @@ abstract class MultiplexedServerHandler {
         private Object attachment;
 
         private boolean requestAccepted;
+        /**
+         * Whether the headers of the response were handed to the connection, even if writing them
+         * failed: no other headers may follow them.
+         */
+        private boolean headersWritten;
         private boolean finished;
         private boolean reset;
         private boolean closed;
@@ -391,11 +396,11 @@ abstract class MultiplexedServerHandler {
                 upstream.allowDiscard();
                 upstream.disregardBackpressure();
                 return;
-            } else if (reset) {
-                // connection closed?
+            } else if (reset || headersWritten) {
+                // connection closed, or a response whose write failed after its headers
                 upstream.allowDiscard();
                 upstream.disregardBackpressure();
-                finish();
+                abortWrittenResponse();
                 return;
             }
 
@@ -403,6 +408,7 @@ abstract class MultiplexedServerHandler {
 
             prepareCompression(response, contentLength);
 
+            headersWritten = true;
             writeHeaders(response, false, requiredCtx().voidPromise());
             upstream.start();
         }
@@ -428,32 +434,75 @@ abstract class MultiplexedServerHandler {
                 requiredCtx().executor().execute(() -> writeFull(response, finalContent));
                 return;
             }
-
-            boolean empty = !content.isReadable();
-
-            if (!empty) {
-                prepareCompression(response, content.readableBytes());
-            }
-
-            if (compressionSession != null) {
-                compressionSession.push(content);
-                compressionSession.finish();
-                compressionSession.fixContentLength(response);
-                content = compressionSession.poll();
-                empty = content == null;
-            }
-
-            writeHeaders(response, empty, empty ? endPromise(response) : requiredCtx().voidPromise());
-            if (!empty) {
-                // bypass writeDataCompressing
-                writeData0(Objects.requireNonNull(content), true, endPromise(response));
-            } else if (content != null) {
+            if (headersWritten) {
+                // the write of the response failed after its headers: a second HEADERS frame
+                // would be read as trailers
                 content.release();
+                abortWrittenResponse();
+                return;
+            }
+
+            // the content that is not handed to the compression or the connection yet
+            ByteBuf owned = content;
+            try {
+                boolean empty = !content.isReadable();
+
+                if (!empty) {
+                    prepareCompression(response, content.readableBytes());
+                }
+
+                if (compressionSession != null) {
+                    owned = null;
+                    compressionSession.push(content);
+                    compressionSession.finish();
+                    compressionSession.fixContentLength(response);
+                    content = compressionSession.poll();
+                    owned = content;
+                    empty = content == null;
+                }
+
+                headersWritten = true;
+                writeHeaders(response, empty, empty ? endPromise(response) : requiredCtx().voidPromise());
+                owned = null;
+                if (!empty) {
+                    // bypass writeDataCompressing
+                    writeData0(Objects.requireNonNull(content), true, endPromise(response));
+                } else if (content != null) {
+                    content.release();
+                }
+            } catch (Throwable t) {
+                if (owned != null) {
+                    owned.release();
+                }
+                throw t;
             }
             if (!finish()) {
                 throw new IllegalStateException("Response already written");
             }
             flush();
+        }
+
+        @Override
+        public final void abort() {
+            if (!requiredCtx().executor().inEventLoop()) {
+                requiredCtx().executor().execute(this::abort);
+                return;
+            }
+            if (!finished) {
+                abortWrittenResponse();
+            }
+        }
+
+        /**
+         * Reset the stream of a response that cannot be completed, and finish it.
+         */
+        private void abortWrittenResponse() {
+            if (!reset) {
+                reset(new IllegalStateException("The response could not be written"));
+            }
+            if (finish()) {
+                flush();
+            }
         }
 
         private ChannelPromise endPromise(HttpResponse response) {
@@ -570,9 +619,20 @@ abstract class MultiplexedServerHandler {
                 }
 
                 if (sendContinue) {
-                    writeHeaders(PipeliningServerHandler.ContinueOutboundHandler.CONTINUE_11, false, requiredCtx().voidPromise());
                     sendContinue = false;
+                    writeContinue();
                 }
+            }
+
+            /**
+             * Write the interim {@code 100 Continue} response and flush it. The body may be
+             * subscribed to after the inbound read has completed (e.g. after an async step), in
+             * which case no read-complete flush follows. {@link #flush()} still holds the flush
+             * back while reading, so the in-read case is coalesced as before.
+             */
+            private void writeContinue() {
+                writeHeaders(PipeliningServerHandler.ContinueOutboundHandler.CONTINUE_11, false, requiredCtx().voidPromise());
+                flush();
             }
 
             @Override

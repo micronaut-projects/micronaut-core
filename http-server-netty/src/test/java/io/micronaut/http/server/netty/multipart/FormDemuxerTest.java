@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -11,6 +12,7 @@ import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -46,11 +48,11 @@ public class FormDemuxerTest {
     }
 
     private FormDemuxer createUrlEncoded(ByteBody body) {
-        return new FormDemuxer(PostBodyDecoder.builder().forUrlEncodedData(), channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, body);
+        return new FormDemuxer(PostBodyDecoder.builder().forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, body);
     }
 
     private FormDemuxer createMultipart(ByteBody body, String boundary) {
-        return new FormDemuxer(PostBodyDecoder.builder().forMultipartBoundary(boundary), channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, body);
+        return new FormDemuxer(PostBodyDecoder.builder().forMultipartBoundary(boundary), boundary, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, body);
     }
 
     private static <T> Queue<T> toQueue(Flux<T> flux) {
@@ -62,6 +64,12 @@ public class FormDemuxerTest {
 
     private void write(BaseSharedBuffer dst, String msg) {
         dst.add(byteBodyFactory.readBufferFactory().copyOf(msg, StandardCharsets.UTF_8));
+    }
+
+    private static void assertBadRequest(Throwable error) {
+        HttpStatusException e = assertInstanceOf(HttpStatusException.class, error);
+        assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());
+        assertInstanceOf(FormDecoderException.class, e.getCause());
     }
 
     private static QueueSubscriber<String> content(ByteBody body) {
@@ -122,6 +130,104 @@ public class FormDemuxerTest {
         assertEquals("file", field.metadata().name());
         assertEquals(MediaType.of("application/pdf"), field.metadata().mediaType());
         content(field.byteBody()).noBackpressure();
+    }
+
+    @Test
+    public void multipartCloseDelimiterSplitAcrossWrites() {
+        String boundary = "b-b";
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        new FormDemuxer(PostBodyDecoder.builder().forMultipartBoundary(boundary), boundary, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody())
+            .fields().subscribe(fields.noBackpressure());
+
+        // the content repeats parts of the delimiter, and every byte arrives on its own
+        String body = "--" + boundary + "\r\n"
+            + "Content-Disposition: form-data; name=\"a\"\r\n"
+            + "\r\n"
+            + "x\r\n-b-b--\r\n--b-\r\n"
+            + "--" + boundary + "--\r\nepilogue";
+        for (char c : body.toCharArray()) {
+            write(streamingBody.sharedBuffer(), String.valueOf(c));
+        }
+        RawFormField field = fields.queue.remove();
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+        streamingBody.sharedBuffer().complete();
+
+        assertEquals("x\r\n-b-b--\r\n--b-", String.join("", data.queue));
+        assertNull(fields.error);
+        assertTrue(fields.complete);
+    }
+
+    @Test
+    public void multipartWithoutCloseDelimiter() {
+        String boundary = "b-b";
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        new FormDemuxer(PostBodyDecoder.builder().forMultipartBoundary(boundary), boundary, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody())
+            .fields().subscribe(fields.noBackpressure());
+
+        write(streamingBody.sharedBuffer(), "--" + boundary + "\r\n"
+            + "Content-Disposition: form-data; name=\"a\"\r\n"
+            + "\r\n"
+            + "x\r\n"
+            + "--" + boundary + "\r\n");
+        RawFormField field = fields.queue.remove();
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+        streamingBody.sharedBuffer().complete();
+
+        assertEquals("x", String.join("", data.queue));
+        HttpStatusException error = assertInstanceOf(HttpStatusException.class, fields.error);
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatus());
+    }
+
+    @Test
+    public void multipartLfOnlyCloseDelimiterSplitAcrossWrites() {
+        String boundary = "b-b";
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        createMultipart(streamingBody.rootBody(), boundary).fields().subscribe(fields.noBackpressure());
+
+        // the decoder accepts lines that end with a bare LF, and so must the close delimiter
+        String body = "--" + boundary + "\n"
+            + "Content-Disposition: form-data; name=\"a\"\n"
+            + "\n"
+            + "x\n-\n--b-\n"
+            + "--" + boundary + "--";
+        for (char c : body.toCharArray()) {
+            write(streamingBody.sharedBuffer(), String.valueOf(c));
+        }
+        RawFormField field = fields.queue.remove();
+        QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
+        streamingBody.sharedBuffer().complete();
+
+        assertEquals("x\n-\n--b-", String.join("", data.queue));
+        assertNull(fields.error);
+        assertTrue(fields.complete);
+    }
+
+    @Test
+    public void multipartCloseDelimiterInTheCharsetOfTheDecoder() {
+        // the decoder encodes the boundary with its charset, so a boundary outside of ASCII must
+        // be matched in the same encoding
+        String boundary = "b\u00e9b";
+        QueueSubscriber<RawFormField> subscriber = new QueueSubscriber<>();
+        new FormDemuxer(PostBodyDecoder.builder().charset(StandardCharsets.UTF_8).forMultipartBoundary(boundary), boundary, StandardCharsets.UTF_8, channel,
+            BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED,
+            byteBodyFactory.copyOf("--" + boundary + "\r\n"
+                + "Content-Disposition: form-data; name=\"a\"\r\n"
+                + "\r\n"
+                + "x\r\n"
+                + "--" + boundary + "--\r\n", StandardCharsets.UTF_8))
+            .fields().subscribe(subscriber.noBackpressure());
+
+        RawFormField field = subscriber.queue.remove();
+        assertEquals("a", field.metadata().name());
+        field.close();
+        assertNull(subscriber.error);
+        assertTrue(subscriber.complete);
     }
 
     @Test
@@ -286,7 +392,7 @@ public class FormDemuxerTest {
         assertEquals("ba", data.queue.poll());
 
         assertTrue(data.complete);
-        assertInstanceOf(FormDecoderException.class, fields.error);
+        assertBadRequest(fields.error);
     }
 
     @Test
@@ -296,7 +402,7 @@ public class FormDemuxerTest {
         QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
         new FormDemuxer(PostBodyDecoder.builder()
             .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE)
-            .forUrlEncodedData(), channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody()).fields().subscribe(fields.noBackpressure());
+            .forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody()).fields().subscribe(fields.noBackpressure());
 
         write(streamingBody.sharedBuffer(), "foo=ba");
 
@@ -307,8 +413,8 @@ public class FormDemuxerTest {
 
         write(streamingBody.sharedBuffer(), "%rr");
 
-        assertInstanceOf(FormDecoderException.class, data.error);
-        assertInstanceOf(FormDecoderException.class, fields.error);
+        assertBadRequest(data.error);
+        assertBadRequest(fields.error);
     }
 
     @Test
@@ -318,7 +424,7 @@ public class FormDemuxerTest {
         QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
         new FormDemuxer(PostBodyDecoder.builder()
             .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE)
-            .forUrlEncodedData(), channel, new BodySizeLimits(Long.MAX_VALUE, 6), BodySizeLimits.UNLIMITED, streamingBody.rootBody())
+            .forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, new BodySizeLimits(Long.MAX_VALUE, 6), BodySizeLimits.UNLIMITED, streamingBody.rootBody())
             .fields().subscribe(fields.noBackpressure());
 
         // note: the 'ba' that arrives before the field's subscriber does is charged once by BaseSharedBuffer and, from the
@@ -357,7 +463,7 @@ public class FormDemuxerTest {
         QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
         new FormDemuxer(PostBodyDecoder.builder()
             .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE)
-            .forUrlEncodedData(), channel, BodySizeLimits.UNLIMITED, new BodySizeLimits(Long.MAX_VALUE, 6), streamingBody.rootBody())
+            .forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, new BodySizeLimits(Long.MAX_VALUE, 6), streamingBody.rootBody())
             .fields().subscribe(fields.noBackpressure());
 
         // note: the 'ba' that arrives before the field's subscriber does is charged once by BaseSharedBuffer and, from the
@@ -391,7 +497,7 @@ public class FormDemuxerTest {
         QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
         new FormDemuxer(PostBodyDecoder.builder()
             .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE)
-            .forUrlEncodedData(), channel, BodySizeLimits.UNLIMITED, new BodySizeLimits(Long.MAX_VALUE, 12), streamingBody.rootBody())
+            .forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, new BodySizeLimits(Long.MAX_VALUE, 12), streamingBody.rootBody())
             .fields().subscribe(fields.noBackpressure());
 
         // foo=666666 (6 bytes of content) split across two writes, so the field is devolved to streaming

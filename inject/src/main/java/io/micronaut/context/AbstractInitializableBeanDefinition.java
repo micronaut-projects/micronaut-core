@@ -2372,11 +2372,14 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                 if (value.isPresent()) {
                     return value.get();
                 } else {
+                    Optional<?> defaultValue = argumentAnnotationMetadata.getValue(Bindable.class, "defaultValue", argument);
+                    if (defaultValue.isPresent()) {
+                        return defaultValue.get();
+                    }
                     if (argument.isDeclaredNullable()) {
                         return null;
                     }
-                    return argumentAnnotationMetadata.getValue(Bindable.class, "defaultValue", argument)
-                            .orElseThrow(() -> DependencyInjectionException.missingProperty(resolutionContext, conversionContext, valString));
+                    throw DependencyInjectionException.missingProperty(resolutionContext, conversionContext, valString);
                 }
             }
         }
@@ -2667,7 +2670,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         Optional<?> expressionValue =
             argument.getAnnotationMetadata()
                 .getValue(Value.class, t);
-        return expressionValue.orElse(null);
+        Object value = expressionValue.orElse(null);
+        return argument.isOptional() ? Optional.ofNullable(value) : value;
     }
 
     @Internal

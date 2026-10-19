@@ -455,14 +455,22 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
      * hints are lossy ({@code int} for a boxed {@code Integer} id, {@code list[T]} for {@code Iterable<T>}) while
      * the generated stub implements the Java signature, and the bean definition has to dispatch to that one.
      *
+     * <p>A class may reach the same inherited method through more than one interface -- a repository
+     * implementing both {@code CrudRepository} and {@code PageableRepository} adopts {@code findById} twice.
+     * The second pass compares the inherited return type against the one already adopted, finds them equal
+     * and asks for no change, so {@code null} must leave the adopted type alone rather than reset the method
+     * to its Python return type.
+     *
      * @param newParameters The parameters
-     * @param newReturnType The return type, or {@code null} to keep the declared one
+     * @param newReturnType The return type, or {@code null} to keep the one already in effect
      * @return The copy
      */
     public MethodElement withInheritedSignature(ParameterElement[] newParameters, @Nullable ClassElement newReturnType) {
         PythonMethodElement methodElement = (PythonMethodElement) makeCopy();
         methodElement.signatureParameters = newParameters.clone();
-        methodElement.signatureReturnType = newReturnType;
+        if (newReturnType != null) {
+            methodElement.signatureReturnType = newReturnType;
+        }
         return methodElement;
     }
 

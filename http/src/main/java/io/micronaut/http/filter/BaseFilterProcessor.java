@@ -99,6 +99,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
                                     String str = imm.toString(StandardCharsets.UTF_8);
                                     return () -> Optional.of((T) str);
                                 } else {
+                                    imm.close();
                                     return ArgumentBinder.BindingResult.unsatisfied();
                                 }
                             });

@@ -21,6 +21,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Operators;
 import reactor.core.publisher.Sinks;
 
 import java.util.Objects;
@@ -50,6 +51,7 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     @Nullable
     private Subscriber<? super T> subscriber = null;
     private boolean subscriberWaiting = false;
+    private boolean forwarded = false;
 
     CancellableMonoSink(@Nullable BlockHint blockHint) {
         this.blockHint = blockHint;
@@ -66,25 +68,34 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
         lock.lock();
         try {
             if (this.subscriber != null) {
-                s.onError(new IllegalStateException("Only one subscriber allowed"));
+                Operators.error(s, new IllegalStateException("Only one subscriber allowed"));
+                return;
             }
             subscriber = s;
             subscriber.onSubscribe(this);
+            tryForward();
         } finally {
             lock.unlock();
         }
     }
 
     private void tryForward() {
-        if (subscriberWaiting && complete && !cancelled) {
-            Objects.requireNonNull(subscriber);
-            if (failure == null) {
-                if (value != EMPTY && value != null) {
-                    subscriber.onNext(value);
-                }
-                subscriber.onComplete();
-            } else {
-                subscriber.onError(failure);
+        if (subscriber == null || !complete || cancelled || forwarded) {
+            return;
+        }
+        Subscriber<? super T> s = subscriber;
+        if (failure != null) {
+            forwarded = true;
+            s.onError(failure);
+        } else if (value == EMPTY || value == null) {
+            forwarded = true;
+            s.onComplete();
+        } else if (subscriberWaiting) {
+            // only the value needs demand, terminal signals are delivered without it
+            forwarded = true;
+            s.onNext(value);
+            if (!cancelled) {
+                s.onComplete();
             }
         }
     }
@@ -169,7 +180,13 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     public void request(long n) {
         lock.lock();
         try {
-            if (n > 0 && !subscriberWaiting) {
+            if (n <= 0) {
+                if (!cancelled && !forwarded) {
+                    complete = true;
+                    cancelled = true;
+                    Objects.requireNonNull(subscriber).onError(new IllegalArgumentException("Spec. Rule 3.9 - Cannot request a non strictly positive number: " + n));
+                }
+            } else if (!subscriberWaiting) {
                 subscriberWaiting = true;
                 tryForward();
             }

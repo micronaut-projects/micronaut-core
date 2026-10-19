@@ -350,6 +350,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             } else {
                 Argument<?> bodyArgument = this.getBodyArgument();
                 Object data;
+                ByteBuf content = null;
 
                 if (WebSocketFrame.class.isAssignableFrom(bodyArgument.getType())) {
                     data = msg.retain();
@@ -372,7 +373,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         return;
                     }
 
-                    ByteBuf content;
                     CompositeByteBuf buffer = frameBuffer.getAndSet(null);
                     if (buffer == null) {
                         content = msgContent;
@@ -382,32 +382,38 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     }
 
                     data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
-                    content.release();
+                    if (data != null) {
+                        content.release();
+                        content = null;
+                    }
                 }
 
-                if (data == null) {
+                if (data == null && content != null) {
+                    // the complete payload: a single frame or the assembled fragments
+                    ByteBuf payload = content;
                     MediaType mediaType;
                     try {
                         mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
                     } catch (IllegalArgumentException e) {
+                        payload.release();
                         exceptionCaught(ctx, e);
                         return;
                     }
                     try {
                         data = mediaTypeCodecRegistry.findCodec(mediaType)
-                            .map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())))
+                            .map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(payload)))
                             .orElse(null);
                     } catch (CodecException e) {
+                        payload.release();
                         messageProcessingException(ctx, e);
                         return;
                     }
-                    if (data == null) {
-                        MessageBodyReader<?> reader = messageBodyHandlerRegistry.findReader(bodyArgument, mediaType)
-                            .orElse(null);
-                        if (reader != null) {
-                            ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content().retain());
-                            data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
-                        }
+                    MessageBodyReader<?> reader = data == null ? messageBodyHandlerRegistry.findReader(bodyArgument, mediaType).orElse(null) : null;
+                    if (reader == null) {
+                        payload.release();
+                    } else {
+                        ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(payload);
+                        data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
                     }
                 }
 

@@ -58,7 +58,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     @Nullable
     private final ApplicationEventPublisher eventPublisher;
     private final ScheduledExecutorService executorService;
-    private final Map<ExecutableMethod, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
+    private final Map<CircuitKey, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
     private final DefaultRetryRunner retryRunner;
 
     /**
@@ -104,8 +104,8 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             boolean wrapException = circuitBreakerPolicy.isThrowWrappedException();
             PolicyRetryStateBuilder retryStateBuilder = new PolicyRetryStateBuilder(circuitBreakerPolicy.asRetryPolicy());
             retryState = circuitContexts.computeIfAbsent(
-                context.getExecutableMethod(),
-                method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher, wrapException)
+                new CircuitKey(context.getTarget().getClass(), context.getExecutableMethod()),
+                key -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher, wrapException)
             );
         } else {
             retryState = (MutableRetryState) annotationRetryStateBuilder.build();
@@ -174,5 +174,16 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      */
     protected void sleep(long delayMillis) throws InterruptedException {
         Thread.sleep(delayMillis);
+    }
+
+    /**
+     * The key of a circuit. Executable methods of different beans compare equal when the method is
+     * inherited from a common superclass, so the class of the intercepted target keeps the circuits,
+     * and the configuration they were created with, of such beans apart.
+     *
+     * @param targetType The class of the intercepted target
+     * @param method     The intercepted method
+     */
+    private record CircuitKey(Class<?> targetType, ExecutableMethod<?, ?> method) {
     }
 }

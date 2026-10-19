@@ -248,6 +248,8 @@ final class NettyHttpClient implements
     private final ConversionService conversionService;
     @Nullable
     private final ExecutorService blockingExecutor;
+    @Nullable
+    private final LifecycleListener lifecycleListener;
 
     NettyHttpClient(NettyHttpClientBuilder builder) {
         this.loadBalancer = builder.loadBalancer;
@@ -281,6 +283,7 @@ final class NettyHttpClient implements
         this.requestBinderRegistry = builder.requestBinderRegistry == null ? new DefaultRequestBinderRegistry(conversionService) : builder.requestBinderRegistry;
         this.informationalServiceId = builder.informationalServiceId;
         this.blockingExecutor = builder.blockingExecutor;
+        this.lifecycleListener = builder.lifecycleListener;
 
         this.connectionManager = new ConnectionManager(log, configuration, builder);
     }
@@ -333,6 +336,9 @@ final class NettyHttpClient implements
         if (!isRunning()) {
             connectionManager.start();
         }
+        if (lifecycleListener != null) {
+            lifecycleListener.onStart(this);
+        }
         return this;
     }
 
@@ -345,6 +351,9 @@ final class NettyHttpClient implements
     public HttpClient stop() {
         if (isRunning()) {
             connectionManager.shutdown();
+        }
+        if (lifecycleListener != null) {
+            lifecycleListener.onStop(this);
         }
         return this;
     }
@@ -1355,11 +1364,10 @@ final class NettyHttpClient implements
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         ExecutionFlow<HttpResponse<?>> mono;
         try {
-            mono = sendRequestWithRedirects(
+            mono = sendRawExchange(
                 propagatedContext,
                 blockedThread == null ? null : new BlockHint(blockedThread, null),
-                new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body),
-                (req, resp) -> ExecutionFlow.just(resp)
+                new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body)
             );
         } catch (RuntimeException | Error e) {
             body.close();
@@ -1367,6 +1375,27 @@ final class NettyHttpClient implements
         }
         // doFinally: a cancelled exchange closes the body too, e.g. one that waits for a connection
         return toMono(mono, propagatedContext).doFinally(signal -> body.close());
+    }
+
+    /**
+     * Send a raw request. A relative request URI is resolved against the URL of this client
+     * first, like the URI of any other request.
+     *
+     * @param propagatedContext The propagated context
+     * @param blockHint         The block hint, if any
+     * @param rawRequest        The raw request
+     * @return The response flow
+     */
+    private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable BlockHint blockHint, MutableHttpRequest<?> rawRequest) {
+        if (rawRequest.getUri().getScheme() != null) {
+            return sendRequestWithRedirects(propagatedContext, blockHint, rawRequest, (req, resp) -> ExecutionFlow.just(resp));
+        }
+        return resolveRequestURI(rawRequest).flatMap(uri -> sendRequestWithRedirects(
+            propagatedContext,
+            blockHint,
+            rawRequest.uri(uri),
+            (req, resp) -> ExecutionFlow.just(resp)
+        ));
     }
 
     private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
@@ -2161,5 +2190,25 @@ final class NettyHttpClient implements
         String name;
         @Nullable
         Duration retry;
+    }
+
+    /**
+     * Notified whenever a client is started or stopped, so that the owner of the client can
+     * track the clients that are running.
+     */
+    interface LifecycleListener {
+        /**
+         * Called after {@link #start()}.
+         *
+         * @param client The client
+         */
+        void onStart(NettyHttpClient client);
+
+        /**
+         * Called after {@link #stop()}, including when the client is closed.
+         *
+         * @param client The client
+         */
+        void onStop(NettyHttpClient client);
     }
 }

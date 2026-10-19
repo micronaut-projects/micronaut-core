@@ -43,7 +43,7 @@ import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.visitor.TypeElementQuery
 import io.micronaut.inject.visitor.TypeElementVisitor
-import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.inject.visitor.util.ProcessorOptionsSystemProperties
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessor
 
 internal open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnvironment) :
@@ -69,19 +69,9 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         // set supported options as system properties to keep compatibility
-        // in particular for micronaut-openapi
-        environment.options.entries.stream()
-            .filter { (key) ->
-                key.startsWith(
-                    VisitorContext.MICRONAUT_BASE_OPTION_NAME
-                )
-            }
-            .forEach { (key, value) ->
-                System.setProperty(
-                    key,
-                    value
-                )
-            }
+        // in particular for micronaut-openapi, they are restored once the processing is over
+        ProcessorOptionsSystemProperties.apply(environment, environment.options)
+        ProcessorOptionsSystemProperties.acquire(this)
 
         if (typeElementVisitors == null) {
             typeElementVisitors = findTypeElementVisitors()
@@ -173,23 +163,27 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     }
 
     override fun finish() {
-        for (loadedVisitor in loadedVisitors) {
-            visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
-            try {
-                loadedVisitor.visitor.finish(visitorContext)
-            } catch (e: ProcessingException) {
-                BeanDefinitionProcessor.handleProcessingException(environment, e)
-            } catch (e: Throwable) {
-                environment.logger.error("Error finalizing type visitor  [${loadedVisitor.visitor}]: ${e.message}")
-                environment.logger.exception(e)
+        try {
+            for (loadedVisitor in loadedVisitors) {
+                visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
+                try {
+                    loadedVisitor.visitor.finish(visitorContext)
+                } catch (e: ProcessingException) {
+                    BeanDefinitionProcessor.handleProcessingException(environment, e)
+                } catch (e: Throwable) {
+                    environment.logger.error("Error finalizing type visitor  [${loadedVisitor.visitor}]: ${e.message}")
+                    environment.logger.exception(e)
+                }
             }
+            processed.clear()
+            visitorContext.finish()
+        } finally {
+            ProcessorOptionsSystemProperties.release(this)
         }
-        processed.clear()
-        visitorContext.finish()
     }
 
     override fun onError() {
-        // do nothing
+        ProcessorOptionsSystemProperties.release(this)
     }
 
     private fun start() {

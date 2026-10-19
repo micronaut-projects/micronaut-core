@@ -180,7 +180,7 @@ The try-with-resources pattern exists primarily for legacy integrations that req
 
 To opt into scoped-value mode globally (default: `thread-local`), set `micronaut.propagation`:
 
-[source,yaml]
+[configuration]
 ----
 micronaut:
   propagation: scoped-value

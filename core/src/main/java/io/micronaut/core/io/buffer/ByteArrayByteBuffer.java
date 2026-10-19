@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * A {@link ByteBuffer} implementation that is backed by a byte array.
@@ -33,7 +34,7 @@ import java.util.Arrays;
 @Experimental
 public final class ByteArrayByteBuffer implements ByteBuffer<byte[]> {
 
-    private final byte[] underlyingBytes;
+    private byte[] underlyingBytes;
     private int readerIndex;
     private int writerIndex;
 
@@ -206,12 +207,42 @@ public final class ByteArrayByteBuffer implements ByteBuffer<byte[]> {
 
     @Override
     public OutputStream toOutputStream() {
-        throw new IllegalStateException("Not implemented");
+        return new OutputStream() {
+            @Override
+            public void write(int b) {
+                ensureWritable(1);
+                underlyingBytes[writerIndex++] = (byte) b;
+            }
+
+            @Override
+            public void write(byte[] b, int off, int len) {
+                Objects.checkFromIndexSize(off, len, b.length);
+                ensureWritable(len);
+                System.arraycopy(b, off, underlyingBytes, writerIndex, len);
+                writerIndex += len;
+            }
+        };
+    }
+
+    /**
+     * Grows the backing array so that {@code length} more bytes fit after the writer index.
+     * The array keeps its exact size otherwise, because its length marks the end of the readable bytes.
+     *
+     * @param length The number of bytes to write
+     */
+    private void ensureWritable(int length) {
+        int required = writerIndex + length;
+        if (required < 0) {
+            throw new OutOfMemoryError("Required buffer size is too large");
+        }
+        if (required > underlyingBytes.length) {
+            underlyingBytes = Arrays.copyOf(underlyingBytes, required);
+        }
     }
 
     @Override
     public byte[] toByteArray() {
-        return Arrays.copyOfRange(underlyingBytes, readerIndex, readableBytes());
+        return Arrays.copyOfRange(underlyingBytes, readerIndex, underlyingBytes.length);
     }
 
     @Override

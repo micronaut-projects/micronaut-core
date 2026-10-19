@@ -22,7 +22,7 @@ snippet::micronaut.docs.asyncio.streaming.TickClient[tags="client", indent=0, ti
 
 <1> A JSON stream of a Python dataclass type.
 
-A publisher error is raised from `__anext__` as a `MicronautJavaException` (or the `OSError` subclass used for networking failures) whose `java_exception` attribute is the Java cause. Task cancellation, a timeout and request cancellation while an iteration is pending cancel the subscription. Overlapping `__anext__` calls on one iterator are refused, and a publisher that emits more items than were requested is cancelled and the iteration fails, so memory stays bounded.
+A publisher error is raised from `__anext__` as the Java exception itself (or as the `OSError` subclass used for networking failures, whose `java_exception` attribute is the Java cause). Task cancellation, a timeout and request cancellation while an iteration is pending cancel the subscription. Overlapping `__anext__` calls on one iterator are refused, and a publisher that emits more items than were requested is cancelled and the iteration fails, so memory stays bounded.
 
 Awaiting a `Publisher` directly, as described above, keeps its meaning: one item is requested, the await completes with it and the subscription is cancelled. `as_async_iterable` is the way to consume every item.
 

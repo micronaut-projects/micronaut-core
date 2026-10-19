@@ -57,10 +57,8 @@ def pythonTestProjects = [
         ":micronaut-context-python",
         ":micronaut-context-python-netty"
 ]
-// Too few test classes to split across the jobs: the first job runs them all
-def pythonUnshardedProjects = [
-        ":micronaut-context-python-netty"
-]
+// Projects whose tests all run in the first Python CI job instead of being split across the jobs
+def pythonUnshardedProjects = []
 def pythonProjects = pythonTestProjects + [":test-suite-python"]
 
 if (System.getenv("SONAR_TOKEN") != null) {
@@ -127,6 +125,30 @@ subprojects { project ->
         }
     }
 }
+// A Python test runs its guest code too briefly for Truffle's compiled code to pay off, and every
+// GraalPy engine a test creates compiles its code again: with runtime compilation on, the Truffle
+// and host compiler threads used two thirds of the CPU of a Python test JVM. The host code runs
+// with C2, which compiles far less eagerly than the Graal JIT.
+subprojects { project ->
+    if (project.path in pythonProjects) {
+        project.tasks.withType(Test).configureEach {
+            jvmArgs(
+                    "-XX:+UnlockExperimentalVMOptions",
+                    "-XX:-UseJVMCICompiler",
+                    // with compilation off a fifth of the CPU went to G1
+                    "-XX:+UseParallelGC",
+                    // Truffle's interpreter-only runtime: unlike polyglot.engine.Compilation=false it exists on
+                    // every GraalVM, including one whose Truffle version doesn't match GraalPy's
+                    "-Dtruffle.TruffleRuntime=com.oracle.truffle.api.impl.DefaultTruffleRuntime",
+                    "-Dpolyglot.engine.WarnInterpreterOnly=false"
+            )
+        }
+    }
+}
 tasks.matching { it.name == "pythonCheck" }.configureEach {
     dependsOn pythonTestProjects.collect { "${it}:check" }
+}
+// The benchmarks have no tests: the Java CI already compiles them
+if (providers.gradleProperty("python-ci").isPresent()) {
+    gradle.startParameter.excludedTaskNames.add(":benchmarks:check")
 }

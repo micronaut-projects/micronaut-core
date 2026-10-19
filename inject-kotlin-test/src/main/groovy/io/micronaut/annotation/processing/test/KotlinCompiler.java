@@ -72,29 +72,30 @@ import java.util.stream.Stream;
  */
 public class KotlinCompiler {
 
+    /**
+     * The classpath of the test JVM without the Kotlin compiler and KSP: the compiled sources never
+     * reference them, and they are most of the classpath every compilation indexes.
+     */
+    private static final List<File> SOURCE_CLASSPATH = Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
+        .filter(path -> !path.isEmpty())
+        .map(File::new)
+        .filter(file -> !file.getName().startsWith("kotlin-compiler-embeddable-")
+            && !file.getName().startsWith("symbol-processing-aa-embeddable-"))
+        .toList();
+
     private static String jvmDefaultMode = "enable";
 
-    private static KotlinCompilation newKotlinCompilation() {
-        KotlinCompilation compilation = new KotlinCompilation();
-        compilation.setJvmDefault(jvmDefaultMode);
-        compilation.setInheritClassPath(true);
-        compilation.setLanguageVersion("2.0");
-        compilation.setKotlincArguments(Arrays.asList("-Xsuppress-version-warnings", "-Xannotation-default-target=first-only"));
-        Ksp2Kt.useKsp2(compilation);
-        return compilation;
-    }
-
-    private static KotlinCompilation newKspCompilation(KotlinCompilation sourceCompilation) {
+    private static KotlinCompilation newKspCompilation() {
         KotlinCompilation compilation = new KotlinCompilation();
         compilation.setJvmDefault(jvmDefaultMode);
         Ksp2Kt.useKsp2(compilation);
-        compilation.setInheritClassPath(true);
         compilation.setLanguageVersion("2.0");
         compilation.setKotlincArguments(Arrays.asList("-Xsuppress-version-warnings", "-Xannotation-default-target=first-only"));
-        compilation.setClasspaths(Arrays.asList(
-            new File(compilation.getWorkingDir(), "ksp/classes"),
-            new File(compilation.getWorkingDir(), "ksp/sources/resources"),
-            sourceCompilation.getClassesDir()));
+        List<File> classpath = new ArrayList<>();
+        classpath.add(new File(compilation.getWorkingDir(), "ksp/classes"));
+        classpath.add(new File(compilation.getWorkingDir(), "ksp/sources/resources"));
+        classpath.addAll(SOURCE_CLASSPATH);
+        compilation.setClasspaths(classpath);
         return compilation;
     }
 
@@ -144,14 +145,14 @@ public class KotlinCompiler {
             List<URL> classpath = new ArrayList<>();
             classpath.add(sourcesCompileResult.getOutputDirectory().toURI().toURL());
             classpath.add(kspCompileResult.getOutputDirectory().toURI().toURL());
-            classpath.addAll(kspCompilation.component1().getClasspaths().stream().flatMap(f -> {
+            classpath.addAll(kspCompilation.component1().getClasspaths().stream().filter(f -> !SOURCE_CLASSPATH.contains(f)).flatMap(f -> {
                 try {
                     return Stream.of(f.toURI().toURL());
                 } catch (MalformedURLException e) {
                     return Stream.empty();
                 }
             }).toList());
-            classpath.addAll(sourcesCompilation.component1().getClasspaths().stream().flatMap(f -> {
+            classpath.addAll(sourcesCompilation.component1().getClasspaths().stream().filter(f -> !SOURCE_CLASSPATH.contains(f)).flatMap(f -> {
                 try {
                     return Stream.of(f.toURI().toURL());
                 } catch (MalformedURLException e) {
@@ -181,40 +182,18 @@ public class KotlinCompiler {
     }
 
     /**
-     * Compile Kotlin source files both directly and through KSP.
+     * Compile Kotlin source files through KSP.
+     *
+     * <p>The KSP compilation compiles the sources together with what the processors generate, so
+     * the sources are compiled once and both elements of the returned pair hold that compilation.</p>
      *
      * @param sources Kotlin sources to compile
      * @param classElements consumer for compiled class elements
      * @param extraSymbolProcessorProviders additional KSP processors
-     * @return the direct and KSP compilation results
+     * @return the KSP compilation result, twice
      */
     public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compile(List<SourceFile> sources, Consumer<ClassElement> classElements, List<SymbolProcessorProvider> extraSymbolProcessorProviders) {
-        KotlinCompilation kotlinCompilation = newKotlinCompilation();
-        KotlinCompilation kspCompilation = newKspCompilation(kotlinCompilation);
-        try {
-            Files.deleteIfExists(kotlinCompilation.getWorkingDir().toPath());
-        } catch (IOException e) {
-            // ignore
-        }
-        kotlinCompilation.setSources(sources);
-        JvmCompilationResult result = kotlinCompilation.compile();
-        if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
-            throw new RuntimeException(result.getMessages());
-        }
-
-        kspCompilation.setSources(kotlinCompilation.getSources());
-        ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements);
-        List<SymbolProcessorProvider> symbolProcessorProviders = new ArrayList<>();
-        symbolProcessorProviders.add(classElementTypeElementSymbolProcessorProvider);
-        symbolProcessorProviders.add(new BeanDefinitionProcessorProvider());
-        symbolProcessorProviders.addAll(extraSymbolProcessorProviders);
-        KspKt.setSymbolProcessorProviders(kspCompilation, symbolProcessorProviders);
-        JvmCompilationResult kspResult = kspCompilation.compile();
-        if (kspResult.getExitCode() != KotlinCompilation.ExitCode.OK) {
-            throw new RuntimeException(kspResult.getMessages());
-        }
-
-        return new Pair<>(new Pair<>(kotlinCompilation, result), new Pair<>(kspCompilation, kspResult));
+        return compileWithKsp(sources, classElements, extraSymbolProcessorProviders);
     }
 
     public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileJava(String name, @Language("java") String clazz, Consumer<ClassElement> classElements) {
@@ -222,20 +201,21 @@ public class KotlinCompiler {
     }
 
     public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileJava(String name, @Language("java") String clazz, Consumer<ClassElement> classElements, List<SymbolProcessorProvider> extraSymbolProcessorProviders) {
-        KotlinCompilation kotlinCompilation = newKotlinCompilation();
-        KotlinCompilation kspCompilation = newKspCompilation(kotlinCompilation);
+        return compileWithKsp(
+            Collections.singletonList(SourceFile.Companion.java(name + ".java", clazz, true)),
+            classElements,
+            extraSymbolProcessorProviders
+        );
+    }
+
+    private static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileWithKsp(List<SourceFile> sources, Consumer<ClassElement> classElements, List<SymbolProcessorProvider> extraSymbolProcessorProviders) {
+        KotlinCompilation kspCompilation = newKspCompilation();
         try {
-            Files.deleteIfExists(kotlinCompilation.getWorkingDir().toPath());
+            Files.deleteIfExists(kspCompilation.getWorkingDir().toPath());
         } catch (IOException e) {
             // ignore
         }
-        kotlinCompilation.setSources(Collections.singletonList(SourceFile.Companion.java(name + ".java", clazz, true)));
-        JvmCompilationResult result = kotlinCompilation.compile();
-        if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
-            throw new RuntimeException(result.getMessages());
-        }
-
-        kspCompilation.setSources(kotlinCompilation.getSources());
+        kspCompilation.setSources(sources);
         ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements);
         List<SymbolProcessorProvider> symbolProcessorProviders = new ArrayList<>();
         symbolProcessorProviders.add(classElementTypeElementSymbolProcessorProvider);
@@ -246,8 +226,8 @@ public class KotlinCompiler {
         if (kspResult.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(kspResult.getMessages());
         }
-
-        return new Pair<>(new Pair<>(kotlinCompilation, result), new Pair<>(kspCompilation, kspResult));
+        Pair<KotlinCompilation, JvmCompilationResult> compilation = new Pair<>(kspCompilation, kspResult);
+        return new Pair<>(compilation, compilation);
     }
 
     public static BeanIntrospection<?> buildBeanIntrospection(String name, @Language("kotlin") String clazz) {

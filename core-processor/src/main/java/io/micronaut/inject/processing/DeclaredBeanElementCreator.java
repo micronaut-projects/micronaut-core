@@ -720,6 +720,10 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
             proxyAnnotationMetadata,
             interfaceToAdapt
         );
+        // The proxy name is synthetic and the adapted interface usually comes from a library, so neither ties the
+        // adapter to a source file. Incremental processors drop outputs that originate from no source file.
+        aopProxyWriter.addOriginatingElement(classElement);
+        aopProxyWriter.addOriginatingElement(sourceMethod.getDeclaringType());
         additionalBuilders.add(aopProxyWriter);
 
         aopProxyWriter.implementInterface(interfaceToAdapt);

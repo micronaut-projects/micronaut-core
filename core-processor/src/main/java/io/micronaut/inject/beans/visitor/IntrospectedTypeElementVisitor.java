@@ -88,6 +88,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
      */
     private static final String ANN_PYTHON_CLASS = "io.micronaut.context.python.annotation.PythonClass";
 
+    /**
+     * The types this visitor is done with during this compilation: their introspection is written, or
+     * is generated elsewhere. A type is recorded only once that is true, so a visit that does not get
+     * that far, because the type was postponed to the next round, is repeated in that round.
+     */
     private final Set<String> processed = new HashSet<>();
     /**
      * The introspections written during this compilation, keyed by the generated introspection class
@@ -130,7 +135,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
      * the runtime annotations of the Python class ({@code @Entity}, ...) for reflection-based frameworks, and
      * such an annotation may carry the {@link Introspected} stereotype: the introspection is not generated a
      * second time from the Java class. A Java class is never skipped, so that a class recompiled next to a
-     * stale introspection of it on the classpath gets a fresh one.
+     * stale introspection of it on the classpath gets a fresh one. The Java round spares the generated class
+     * only the visitors selected by an annotation; this visitor visits every class, as it also introspects the
+     * generated class the Python compiler annotates with {@link Introspected} itself, so it checks here.
      *
      * @param element The class element
      * @param context The visitor context
@@ -147,16 +154,16 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     /**
-     * Claims the introspection about to be written by the given writer.
+     * Whether the introspection the given writer writes was already written during this compilation.
      *
      * @param beanClassElement The introspected type
      * @param writer           The writer
      * @return {@code true} if the very same introspection was already written during this compilation
      * and should not be written again
      */
-    private boolean isAlreadyWritten(ClassElement beanClassElement, BeanIntrospectionWriter writer) {
+    private boolean isWritten(ClassElement beanClassElement, BeanIntrospectionWriter writer) {
         String introspectionName = writer.getIntrospectionName();
-        String previous = writtenIntrospections.putIfAbsent(introspectionName, beanClassElement.getName());
+        String previous = writtenIntrospections.get(introspectionName);
         if (previous == null) {
             return false;
         }
@@ -413,8 +420,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             try (OutputStream outputStream = visitorContext.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
                 outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
             }
-        } catch (ElementPostponedToNextRoundException ignore) {
-            // Ignore, next round will redo
+        } catch (ElementPostponedToNextRoundException e) {
+            // not a failure: writeIntrospection decides what a refused output means
+            throw e;
         } catch (IOException e) {
             // raise a compile error
             String message = e.getMessage();
@@ -520,13 +528,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 builderType.getEnclosedElements(builderMethodQuery)
                     .forEach(builderWriter::visitBeanMethod);
 
-                processed.add(classToBuild.getName());
-                if (isAlreadyWritten(builderType, builderWriter)) {
-                    return;
-                }
-                for (OutputObjectDef outputObjectDef : builderWriter.build()) {
-                    write(outputObjectDef, context);
-                }
+                writeIntrospection(builderType, builderWriter, context);
             } else {
                 context.fail("No build method found in builder: " + builderType.getName(), classToBuild);
             }
@@ -556,10 +558,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 BeanIntrospectionWriter writer,
                                 boolean describeConstructors,
                                 VisitorContext context) {
-        if (isAlreadyWritten(ce, writer)) {
-            processed.add(ce.getName());
-            return;
-        }
         List<PropertyElement> beanProperties = ce.getBeanProperties(propertyElementQuery).stream()
             .filter(p -> !p.isExcluded())
             .toList();
@@ -621,10 +619,58 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
         addExecutableMethods(ce, writer, beanProperties);
 
-        processed.add(ce.getName());
-        for (OutputObjectDef outputObjectDef : writer.build()) {
-            write(outputObjectDef, context);
+        if (writeIntrospection(ce, writer, context)) {
+            processed.add(ce.getName());
         }
+    }
+
+    /**
+     * Writes an introspection unless it was already written during this compilation, and records it
+     * as written once its class is. The introspection class is written first: when the visitor
+     * context refuses it because its originating type was postponed to the next round, by this
+     * visitor or by another, nothing has been written or recorded, and the visit of that type in the
+     * next round writes it. The classes of its evaluated expressions follow. They originate from the
+     * introspected type, which for an introspection written on behalf of an importing type is not the
+     * introspection's originating type; one the visitor context refuses is not written, as before.
+     *
+     * @param beanClassElement The introspected type
+     * @param writer           The writer
+     * @param context          The visitor context
+     * @return {@code true} if the introspection is written, in this visit or an earlier one
+     */
+    private boolean writeIntrospection(ClassElement beanClassElement,
+                                       BeanIntrospectionWriter writer,
+                                       VisitorContext context) {
+        if (isWritten(beanClassElement, writer)) {
+            return true;
+        }
+        String introspectionName = writer.getIntrospectionName();
+        List<OutputObjectDef> outputs;
+        try {
+            outputs = writer.build();
+        } catch (ElementPostponedToNextRoundException e) {
+            return false;
+        }
+        for (OutputObjectDef output : outputs) {
+            if (output.objectDef().getName().equals(introspectionName)) {
+                try {
+                    write(output, context);
+                } catch (ElementPostponedToNextRoundException e) {
+                    return false;
+                }
+                writtenIntrospections.put(introspectionName, beanClassElement.getName());
+            }
+        }
+        for (OutputObjectDef output : outputs) {
+            if (!output.objectDef().getName().equals(introspectionName)) {
+                try {
+                    write(output, context);
+                } catch (ElementPostponedToNextRoundException e) {
+                    // not written, as before: see this method's javadoc
+                }
+            }
+        }
+        return true;
     }
 
     private AnnotationMetadata mergeAnnotations(AnnotationMetadata annotationMetadata) {
