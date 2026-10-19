@@ -206,6 +206,76 @@ def _numbers_mix(first, second):
             or (first in _LOOSE_KINDS and (second in _SCALAR_KINDS or second in _LOOSE_KINDS)))
 
 
+# the methods of a collection that only read it: calling one in a loop over the collection leaves its iterator valid
+_READING_METHODS = frozenset(("get", "size", "isEmpty", "contains", "containsKey", "containsValue", "indexOf",
+                              "lastIndexOf", "index", "count", "copy", "keys", "values", "items", "equals", "hashCode",
+                              "toString"))
+
+
+def _same_collection(node, iterable):
+    """Whether the node names the collection a loop iterates: the same local or parameter, or the same property of self."""
+    if isinstance(iterable, ast.Name):
+        return isinstance(node, ast.Name) and node.id == iterable.id
+    return (isinstance(node, ast.Attribute) and node.attr == iterable.attr
+            and isinstance(node.value, ast.Name) and node.value.id == "self")
+
+
+def _may_change_iterated(iterable, statements):
+    """
+    Whether the loop body may change the collection the loop iterates. Python goes on iterating a list
+    the body appends to, while the Java iterator throws ConcurrentModificationException; so any use of
+    the collection but a read (an item, len(), a membership test, a comparison, a reading method, a
+    nested loop over it) counts as a change: a call it is passed to, an alias, a store or delete of an
+    item, an augmented assignment. For a property of self, a call on self or self passed on may change
+    it too.
+    """
+    parents = {}
+    for statement in statements:
+        for node in ast.walk(statement):
+            for child in ast.iter_child_nodes(node):
+                parents[id(child)] = node
+    for statement in statements:
+        for node in ast.walk(statement):
+            if _same_collection(node, iterable):
+                if not _reads_only(node, parents):
+                    return True
+            elif (isinstance(iterable, ast.Attribute) and isinstance(node, ast.Name) and node.id == "self"
+                  and not _reads_other_property(node, parents)):
+                return True
+    return False
+
+
+def _reads_only(node, parents):
+    """Whether the use of the iterated collection only reads it."""
+    parent = parents.get(id(node))
+    if isinstance(node.ctx, ast.Store):
+        # rebinding the name (or the property) leaves the object the loop iterates as it is
+        return isinstance(parent, ast.Assign) and any(target is node for target in parent.targets)
+    if not isinstance(node.ctx, ast.Load) or parent is None:
+        return False
+    if isinstance(parent, ast.Subscript):
+        return parent.value is node and isinstance(parent.ctx, ast.Load)
+    if isinstance(parent, ast.Compare):
+        return True
+    if isinstance(parent, ast.For):
+        return parent.iter is node
+    if isinstance(parent, ast.Call):
+        return isinstance(parent.func, ast.Name) and parent.func.id == "len" and len(parent.args) == 1 and not parent.keywords
+    if isinstance(parent, ast.Attribute):
+        call = parents.get(id(parent))
+        return parent.attr in _READING_METHODS and isinstance(call, ast.Call) and call.func is parent
+    return False
+
+
+def _reads_other_property(node, parents):
+    """Whether a use of self in a loop over a property of self only reads another property: no call, no store, self not passed on."""
+    parent = parents.get(id(node))
+    if not isinstance(parent, ast.Attribute) or not isinstance(parent.ctx, ast.Load):
+        return False
+    call = parents.get(id(parent))
+    return parent.value is node and not (isinstance(call, ast.Call) and call.func is parent)
+
+
 def _pure_operand(node):
     """Whether evaluating the expression twice is what Python does once: a name, a literal or an attribute read of one."""
     if isinstance(node, (ast.Name, ast.Constant)):
@@ -710,6 +780,10 @@ class Lowering:
                 self.locals[variable] = LONG
                 return ForRange(loop, variable, start, stop, step, Body(self._block(node.body)), *self._exits(loop))
             return self._loop(node, build)[0]
+        if ((isinstance(iterable, ast.Name) or (isinstance(iterable, ast.Attribute) and isinstance(iterable.value, ast.Name) and iterable.value.id == "self"))
+                and _may_change_iterated(iterable, node.body)):
+            spelled = iterable.id if isinstance(iterable, ast.Name) else f"self.{iterable.attr}"
+            self._refuse("unsupported-statement", f"the loop body may change the [{spelled}] it iterates, which Python goes on iterating while the Java iterator throws ConcurrentModificationException", node)
         collection = self._expression(iterable)
         collection_type = collection.type()
         if self.checker.facts.isAssignable(_erased(collection_type), "java.util.Map"):
