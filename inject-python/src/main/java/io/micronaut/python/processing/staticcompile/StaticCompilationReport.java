@@ -24,11 +24,10 @@ import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.UncheckedIOException;
-import java.io.Writer;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -100,7 +99,6 @@ public final class StaticCompilationReport {
                 .name("record").value("plan")
                 .name("mode").value(mode.optionValue())
                 .name("coverage").value(plannedSources == null ? "full" : "incremental")
-                .name("written").value(Instant.now().toString())
                 .endObject().toString());
             for (StaticCompilationDecision decision : all) {
                 lines.add(decision.toJson());
@@ -162,9 +160,21 @@ public final class StaticCompilationReport {
         for (int i = 0; i < decisions.size(); i++) {
             decisions.get(i).writeTo(properties, "decision." + i + '.');
         }
-        try (Writer writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
-            properties.store(writer, "The decisions of the last static compilation, read back by an incremental build");
+        StringWriter stored = new StringWriter();
+        properties.store(stored, "The decisions of the last static compilation, read back by an incremental build");
+        // Properties.store writes the date as a second comment line: without it the file is the same for the same decisions
+        String[] lines = stored.toString().split("\\R", -1);
+        StringBuilder content = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            if (i == 1 && lines[i].startsWith("#")) {
+                continue;
+            }
+            content.append(lines[i]);
+            if (i < lines.length - 1) {
+                content.append('\n');
+            }
         }
+        Files.writeString(file, content, StandardCharsets.UTF_8);
     }
 
     /**

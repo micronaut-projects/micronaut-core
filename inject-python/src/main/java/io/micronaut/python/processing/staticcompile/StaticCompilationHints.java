@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * What an author can change so that a function the planner refused is compiled: one suggestion
@@ -35,6 +36,15 @@ import java.util.Map;
 public final class StaticCompilationHints {
 
     private static final Map<String, String> HINTS = new LinkedHashMap<>();
+    /**
+     * The rules of the type checker, whose problems in a body are reasons of its decision too.
+     */
+    private static final Set<String> CHECKER_RULES = Set.of(
+        "abstract-instantiation", "argument-type", "decorator-member-type", "decorator-positional", "decorator-target",
+        "no-matching-overload", "not-an-annotation", "python-arity", "static-access", "unknown-attribute",
+        "unknown-constructor", "unknown-decorator-member", "unknown-method", "unknown-python-member");
+    private static final String CHECKER_HINT = "The type checker finds a problem in the body (a member, a constructor or an overload that does not exist, "
+        + "or arguments that do not fit). Fix it as the message says: the function is compiled once the checker accepts it.";
 
     static {
         HINTS.put("class-not-eligible", "Static compilation needs an ordinary generated Java class, which a test module, an enum, a protocol, an interface, "
@@ -81,6 +91,7 @@ public final class StaticCompilationHints {
         HINTS.put("truthiness-of-java-object", "Test the value explicitly, with x is not None, len(x) > 0, x.isEmpty() or a boolean method, instead of if x:.");
         HINTS.put("python-exception", "Raise and catch Java exceptions (from java.lang import IllegalArgumentException) or an exception class of the compilation extending Exception; "
             + "replace a bare except with an except of the Java exception or of the class raised.");
+        CHECKER_RULES.forEach(rule -> HINTS.put(rule, CHECKER_HINT));
     }
 
     private StaticCompilationHints() {
@@ -121,9 +132,19 @@ public final class StaticCompilationHints {
                 }
                 break;
             case "unknown-type":
-                if (text.contains("third-party")) {
-                    return "The value comes from a third-party Python module, whose members have no static type. Call a Java library instead, "
-                        + "or keep this function in Python and compile the functions that call it.";
+                if (text.contains("Python module outside the compilation")) {
+                    return "The value comes from a Python module outside the compilation (a third-party library or the standard library), whose members have no static type. "
+                        + "Call a Java library instead, or keep this function in Python and compile the functions that call it.";
+                }
+                if (text.contains("has no return hint")) {
+                    return "Hint the return of the property.";
+                }
+                if (text.contains("has no hinted type")) {
+                    return "Hint the attribute: declare it as a hinted class attribute, or assign it in __init__ from a hinted parameter or a Java call.";
+                }
+                if (text.contains("may be rebound")) {
+                    return "Bind the constant once, in a statement of the module body, and never rebind it (no global declaration of it in a function); "
+                        + "a value that changes while the program runs is passed as a parameter or read from an attribute.";
                 }
                 if (text.contains("does not return a value on every path")) {
                     return "Return a value on every path: add a return at the end of the function, or to the branch that falls through.";
@@ -141,8 +162,64 @@ public final class StaticCompilationHints {
                 if (text.contains("cycle")) {
                     return "Break the cycle of calls between the functions, or keep one of them in Python.";
                 }
+                if (text.contains("may be rebound")) {
+                    return "Define the function once, in the module body, and do not rebind its name (no second def, no f = wrap(f), no global declaration of it): "
+                        + "a call of a name the running program may rebind stays in Python.";
+                }
+                if (text.contains("has a decorator")) {
+                    return "A decorator may replace the function with a wrapper, which a compiled call would skip. Remove the decorator, "
+                        + "or call a plain function the decorated one delegates to.";
+                }
                 if (text.contains("resolves to no Java field")) {
                     return "The attribute names no Java field or property of the class. Assign it in __init__ from a hinted parameter or a Java call.";
+                }
+                break;
+            case "sibling-call":
+                if (text.contains("with keyword arguments")) {
+                    return "Pass the arguments positionally: the stub declares no Java method a call with keyword arguments fills, "
+                        + "or give the method a hinted signature without defaults so that it declares one.";
+                }
+                if (text.contains("calling a Python class of the compilation")) {
+                    return "Construct the class with its own name (Cart(...)) or call a method on an object of it: a class of the compilation held in a value is not called statically.";
+                }
+                if (text.contains("advised method")) {
+                    return "Give the advised method a Java layout (named positional parameters, each hinted, no *args, **kwargs or keyword-only parameters), "
+                        + "so that the call runs its interceptors through the generated class.";
+                }
+                if (text.contains("subclass of the compilation may override")) {
+                    return "Call the static method on its class (Scaler.scale(n)) when the class's own one is meant, or keep the call in Python: "
+                        + "self.scale(n) runs the override of a subclass.";
+                }
+                if (text.contains("class method")) {
+                    return "Make the class method a @staticmethod or an instance method: a class method takes the class and is only bridged.";
+                }
+                if (text.contains("async or generator")) {
+                    return "Call a plain synchronous method instead: an async or generator method runs in Python.";
+                }
+                break;
+            case "unsupported-statement":
+                if (text.contains("assigned on some paths only")) {
+                    return "Assign the local before the branch, or on every path before it is read: Python raises UnboundLocalError on the path that skips the assignment.";
+                }
+                if (text.contains("frozen dataclass")) {
+                    return "Create a new object instead of assigning an attribute of a frozen dataclass (dataclasses.replace in Python, or the constructor), "
+                        + "or make the dataclass mutable.";
+                }
+                if (text.contains("already catches it")) {
+                    return "Put the clause for the subclass before the clause for its base: Java refuses a catch that an earlier one already covers.";
+                }
+                if (text.contains("more than once")) {
+                    return "Define the function once: rename one of the definitions.";
+                }
+                break;
+            case "python-exception":
+                if (text.contains("would catch [")) {
+                    return "Catch the exception classes of the compilation by name before a clause for RuntimeException, Exception or Throwable, "
+                        + "or catch a narrower Java exception: the Java catch would also catch the Python exception classes, which Python lets through.";
+                }
+                if (text.contains("would not catch [")) {
+                    return "Make the base the clause names the first base of the subclass, or catch the subclass by name too: "
+                        + "the generated class of a subclass extends its first base only.";
                 }
                 break;
             case "python-builtin-not-lowered":
@@ -156,6 +233,13 @@ public final class StaticCompilationHints {
                 }
                 if (text.contains("type arguments")) {
                     return "Hint the return with the raw type: the generated class of a subclass extends the raw base.";
+                }
+                if (text.contains("a comprehension after an evaluation") || text.contains("evaluated lazily or repeatedly")) {
+                    return "Assign the comprehension to a local in a statement of its own, before the statement that uses it, "
+                        + "when evaluating it first gives the same result.";
+                }
+                if (text.contains("a Java method or field returns")) {
+                    return "Pass the message through a str the body builds (an f-string, str(), a literal), or test the Java value for None first.";
                 }
                 break;
             default:

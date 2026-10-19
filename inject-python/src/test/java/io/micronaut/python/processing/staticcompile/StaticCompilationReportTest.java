@@ -88,7 +88,7 @@ class StaticCompilationReportTest {
 
         assertEquals(List.of("shop.Pricing.total", "shop.Orders.place"), all.stream().map(StaticCompilationDecision::qualifiedName).toList());
         List<String> lines = Files.readAllLines(directory.resolve(StaticCompilationReport.DECISIONS_FILE));
-        assertTrue(lines.get(0).startsWith("{\"record\":\"plan\",\"mode\":\"all\",\"coverage\":\"incremental\",\"written\":\"20"), lines.get(0));
+        assertEquals("{\"record\":\"plan\",\"mode\":\"all\",\"coverage\":\"incremental\"}", lines.get(0));
         assertEquals(3, lines.size());
         assertEquals(all, StaticCompilationReport.readState(directory.resolve(StaticCompilationReport.STATE_FILE)));
         String summary = Files.readString(directory.resolve(StaticCompilationReport.SUMMARY_FILE));

@@ -114,7 +114,7 @@ class PyronautCompilerStaticCompilationTest {
         assertTrue(diagnostics.get(0).message().startsWith("[PricingService.describe] cannot be compiled statically: [varargs-signature]"), diagnostics.get(0).message());
 
         List<String> lines = Files.readAllLines(directory.resolve(StaticCompilationReport.DECISIONS_FILE));
-        assertTrue(lines.get(0).startsWith("{\"record\":\"plan\",\"mode\":\"all\",\"coverage\":\"full\",\"written\":\""), lines.get(0));
+        assertEquals("{\"record\":\"plan\",\"mode\":\"all\",\"coverage\":\"full\"}", lines.get(0));
         assertEquals(decisions.size() + 1, lines.size());
         assertTrue(lines.get(1).startsWith("{\"record\":\"decision\",\"name\":\"PricingService.__init__\""), lines.get(1));
         String summary = Files.readString(directory.resolve(StaticCompilationReport.SUMMARY_FILE));
@@ -178,6 +178,46 @@ class PyronautCompilerStaticCompilationTest {
         RuntimeException exception = assertThrows(RuntimeException.class, compiler::buildClassLoader);
 
         assertTrue(exception.getMessage().contains("[python:compile-static] [PricingService.describe] cannot be compiled statically"), exception.getMessage());
+    }
+
+    @Test
+    void theExperimentalNoteIsGivenOnlyWhenSomethingCompiles() {
+        // in mode off, a module mentioning CompileStatic records its functions, the switched off one EXCLUDED
+        String off = """
+            from jakarta.inject import Singleton
+            from micronaut.context.python.annotation import CompileStatic
+
+            @Singleton
+            class Service:
+                @CompileStatic(False)
+                def legacy(self, value: int) -> int:
+                    return value
+            """;
+        String on = off.replace("@CompileStatic(False)", "@CompileStatic");
+        for (String source : List.of(off, on)) {
+            List<StaticCompilationDecision> decisions = new ArrayList<>();
+            ByteArrayOutputStream console = new ByteArrayOutputStream();
+            PrintStream err = System.err;
+            System.setErr(new PrintStream(console, true, StandardCharsets.UTF_8));
+            try {
+                PyronautCompiler.builder()
+                    .pythonCode(source)
+                    .staticCompilationDecisionCallback(decisions::add)
+                    .build()
+                    .buildClassLoader();
+            } finally {
+                System.setErr(err);
+            }
+            String output = console.toString(StandardCharsets.UTF_8);
+            Outcome outcome = decisions.stream().filter(decision -> decision.qualifiedName().equals("Service.legacy")).findFirst().orElseThrow().outcome();
+            if (source.equals(off)) {
+                assertEquals(Outcome.EXCLUDED, outcome);
+                assertTrue(!output.contains("Static compilation of Python is experimental"), output);
+            } else {
+                assertEquals(Outcome.COMPILED, outcome);
+                assertTrue(output.contains("Static compilation of Python is experimental and in use (switched on by CompileStatic)"), output);
+            }
+        }
     }
 
     @Test

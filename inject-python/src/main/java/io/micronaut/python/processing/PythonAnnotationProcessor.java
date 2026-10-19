@@ -900,7 +900,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         if (!planned && plan.diagnostics().isEmpty()) {
             return;
         }
-        if (planned && !experimentalNoteGiven) {
+        // in mode off a CompileStatic text records every function, EXCLUDED: the note is for a compilation that compiles
+        boolean compiles = configuration.mode() != StaticCompilationMode.OFF
+            || plan.decisions().stream().anyMatch(decision -> decision.outcome() == StaticCompilationDecision.Outcome.COMPILED);
+        if (compiles && !experimentalNoteGiven) {
             // once per compilation, whatever the number of rounds and applications
             experimentalNoteGiven = true;
             note("Static compilation of Python is experimental and in use (%s): the compiled bodies run as Java, with Python semantics reproduced by the compiler. %s; @CompileStatic(False) keeps a function in Python.",

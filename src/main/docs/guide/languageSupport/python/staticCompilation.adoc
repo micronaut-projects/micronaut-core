@@ -1,6 +1,6 @@
 The compiler can compile the body of a Python method to Java, inside the generated class the method is bridged on, when the type checker proves that every call, attribute read and operation in it resolves to a known target. A Java caller of such a method, which is every HTTP route, every injected service and every executable method, runs Java instead of entering the Python runtime to run the method; the body itself still crosses into Python where it must (an attribute of a class whose state lives in Python, a `@property`, a sibling the generated class cannot call directly), and the report counts those crossings. Python callers of an object the generated class created run the same Java body, so there is one implementation of the method, not two.
 
-WARNING: Static compilation is experimental and off by default. It changes how a Python body runs, not what it does: the compiler reproduces Python's semantics for the subset it compiles and refuses the rest, but a compiled body is Java, and a difference in behaviour is a bug to report. A compilation with static compilation in use prints one note saying so, naming the mode and the report; `@CompileStatic(False)` keeps a function in Python.
+WARNING: Static compilation is experimental and off by default. It changes how a Python body runs, not what it does: the compiler reproduces Python's semantics for the subset it compiles and refuses the rest, but a compiled body is Java, and a difference in behaviour is a bug to report. A compilation with static compilation in use (a mode other than `off`, or a `CompileStatic` that compiles a function) prints one note saying so, naming the mode and the report; `@CompileStatic(False)` keeps a function in Python.
 
 Static compilation builds on <<typeChecking, type checking>>: the checker's inference decides what is statically dispatched, whether or not its diagnostics are reported. A body the checker flags is a body that will not compile.
 
@@ -213,8 +213,8 @@ One record per candidate method, delivered to the builder callback as `StaticCom
 COMPILED      shop.OrderController.summary  shop/OrderController.py:11:5
               statements 8 · java calls 4 · bridge calls 1 · helpers 2
 SKIPPED       shop.PricingService.describe  shop/PricingService.py:19:5
-              [unknown-type] shop/PricingService.py:20:16  [inflect] is a third-party Python module; its members have no static type
-              fix: The value comes from a third-party Python module, whose members have no static type. Call a Java library instead, or keep this function in Python and compile the functions that call it.
+              [unknown-type] shop/PricingService.py:20:16  [inflect] is a Python module outside the compilation (a third-party library or the standard library); its members have no static type
+              fix: The value comes from a Python module outside the compilation (a third-party library or the standard library), whose members have no static type. Call a Java library instead, or keep this function in Python and compile the functions that call it.
 EXCLUDED      shop.LegacyAdapter.convert  shop/LegacyAdapter.py:8:5
 
 COMPILED      1
@@ -226,7 +226,7 @@ unknown-type                     1
 
 The outcomes are `COMPILED`, `SKIPPED` (a candidate with reasons), `CANDIDATE` (a body that would compile, in mode `off`), `EXCLUDED` (switched off by a decorator) and `NOT_CANDIDATE`. The totals per reason at the end put the most common blocker one glance away.
 
-`decisions.jsonl` is the input of a build tool's own rendering of the report: its first record is the plan (`mode`, `coverage`, `written`), every other one a decision with its `name`, `source`, `line`, `column`, `outcome`, `scope`, `reasons` (`rule`, `message`, `location`, `hint`) and `stats`. Pyronaut renders it as a page in the design of its test report.
+`decisions.jsonl` is the input of a build tool's own rendering of the report: its first record is the plan (`mode`, `coverage`), with no timestamp, so the report is the same for the same decisions and a build cache can reuse it; every other one a decision with its `name`, `source`, `line`, `column`, `outcome`, `scope`, `reasons` (`rule`, `message`, `location`, `hint`) and `stats`. Pyronaut renders it as a page in the design of its test report.
 
 == Running the Existing Tests with Compilation On
 

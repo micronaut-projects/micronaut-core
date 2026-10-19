@@ -1027,6 +1027,34 @@ class Lowering:
             self._refuse("python-exception", f"an except clause for [{caught.name}] would catch [{', '.join(reaching)}] in Java, which Python lets through: the generated class of an exception class extending Exception is a RuntimeException", handler)
         return caught.name, None
 
+    def _outside_module(self, node):
+        """
+        Refuses a value reached from a Python module outside the compilation (inflect.engine().plural(x),
+        a function imported from one): its members have no static type. Returns for anything else.
+        """
+        root = node
+        while isinstance(root, (ast.Attribute, ast.Call, ast.Subscript)):
+            root = root.func if isinstance(root, ast.Call) else root.value
+        if not isinstance(root, ast.Name) or root.id in self.bound or root.id in self.locals:
+            return
+        typed = self._typed(root)
+        if typed is not None and typed.kind != MODULE:
+            return
+        statement = module_scope(self.module).stable(root.id)
+        if not isinstance(statement, (ast.Import, ast.ImportFrom)):
+            return
+        visitor = getattr(self.module, "visitor", None)
+        if root.id in getattr(visitor, "imported_source_files", {}):
+            return  # a module of the compilation
+        module = next((alias.name for alias in statement.names if (alias.asname or alias.name.split(".")[0]) == root.id), root.id)
+        if isinstance(statement, ast.ImportFrom):
+            module = "." * statement.level + (statement.module or "")
+            if statement.level:
+                return  # a relative import names a module of the application
+        if module.split(".")[0] in ("java", "javax", "jakarta", "io", "micronaut", "org", "com"):
+            return  # a Java package
+        self._refuse("unknown-type", f"[{module}] is a Python module outside the compilation (a third-party library or the standard library); its members have no static type", root)
+
     def _java_value(self, expression):
         """
         Whether a lowered value is read from Java code as it is (the result of a method, a field), which
@@ -1749,6 +1777,7 @@ class Lowering:
             model = classes.by_qualified.get(_erased(value.type()))
             if model is not None:
                 return self._python_attribute(model, value, node)
+        self._outside_module(node.value)
         self._refuse("dynamic-call", f"the attribute [{node.attr}] resolves to no Java field or property of self", node)
 
     def _is_accessor(self, name):
@@ -1844,6 +1873,7 @@ class Lowering:
                     return module_call
             if isinstance(function, ast.Name) and function.id in ("len", "int", "float", "bool", "abs", "min", "max", "isinstance", "range", "print", "sorted", "reversed", "enumerate", "zip", "sum", "any", "all", "round") and self._builtin(function.id):
                 self._refuse("python-builtin-not-lowered", f"the builtin [{function.id}] has no static lowering yet", node)
+            self._outside_module(function)
             self._refuse("dynamic-call", "the call resolves to no Java method or constructor", node)
         kind, owner, name, matching, static = target
         if node.keywords:
