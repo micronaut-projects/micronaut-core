@@ -137,6 +137,76 @@ class Caller:
         context?.close()
     }
 
+    void "a python caller catches the python exception class a java body raises, unless the body calls java code too"() {
+        given:
+        PythonStatic.resetEntries()
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from java.util import Objects
+from micronaut.context.python.annotation import CompileStatic
+
+
+class Rejected(Exception):
+    pass
+
+
+def rejecting(key: str) -> str:
+    if key == "":
+        raise Rejected("empty")
+    return key
+
+
+@Singleton
+class Calc:
+    def checked(self, key: str) -> str:
+        return rejecting(key)
+
+    def mixed(self, key: str) -> str:
+        return rejecting(key) if Objects.nonNull("java") else key
+
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def __init__(self, calc: Calc):
+        self.calc = calc
+
+    def through_checked(self, key: str) -> str:
+        try:
+            return self.calc.checked(key)
+        except Rejected as rejected:
+            return f"rejected: {rejected}"
+
+    def through_mixed(self, key: str) -> str:
+        try:
+            return self.calc.mixed(key)
+        except Rejected as rejected:
+            return f"rejected: {rejected}"
+''')
+        def caller = getBean(context, 'python.Caller')
+
+        expect:
+        decisions.find { it.qualifiedName() == 'Calc.checked' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
+        decisions.find { it.qualifiedName() == 'Calc.mixed' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
+
+        when: "the Java body calls only the compilation"
+        def checked = caller.through_checked('')
+
+        then: "it ran, and its Java exception reached the Python caller as the Python exception it carries"
+        checked == 'rejected: empty'
+        PythonStatic.entries('python.Calc#checked') == 1
+
+        when: "the Java body calls Java code too, where a Python exception would cross as the Java class"
+        def mixed = caller.through_mixed('')
+
+        then: "the Python caller runs the Python body"
+        mixed == 'rejected: empty'
+        PythonStatic.entries('python.Calc#mixed') == 0
+
+        cleanup:
+        context?.close()
+    }
+
     void "a subclass object delegates its inherited compiled methods too"() {
         given:
         PythonStatic.resetEntries()

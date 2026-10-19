@@ -33,9 +33,13 @@ class StaticDelegationTest {
     }
 
     private static Ir.CompiledBody body(String className, boolean staticMethod, boolean moduleLevel, List<String> types, String returnType, Ir.Statement... statements) {
+        return body(className, staticMethod, moduleLevel, Ir.ExceptionCrossing.UNTRANSLATED, types, returnType, statements);
+    }
+
+    private static Ir.CompiledBody body(String className, boolean staticMethod, boolean moduleLevel, Ir.ExceptionCrossing exceptions, List<String> types, String returnType, Ir.Statement... statements) {
         List<String> names = IntStream.range(0, types.size()).mapToObj(i -> "p" + i).toList();
         return new Ir.CompiledBody(className, "run", names, types, returnType, new Ir.Body(List.of(statements)),
-            SourceSpan.at("app/calc.py", 3, 5), new StaticCompilationDecision.Stats(statements.length, 0, 0, 0), false, false, staticMethod, moduleLevel);
+            SourceSpan.at("app/calc.py", 3, 5), new StaticCompilationDecision.Stats(statements.length, 0, 0, 0), false, false, staticMethod, moduleLevel, exceptions);
     }
 
     private static Ir.Expression param(String type) {
@@ -101,5 +105,19 @@ class StaticDelegationTest {
         assertEquals("Outer$Calc#run#owner=app.Outer$Calc#kinds=long#once", StaticDelegation.target(body(List.of(Ir.LONG), Ir.LONG, new Ir.Return(call))));
         Ir.Expression negated = new Ir.Unary("-", call, Ir.LONG);
         assertNull(StaticDelegation.target(body(List.of(Ir.LONG), Ir.LONG, new Ir.Return(negated))));
+    }
+
+    @Test
+    void theJavaExceptionOfAPythonExceptionClassReachesThePythonCallerAsTheBodyAllows() {
+        Ir.Statement write = new Ir.PutSelf("label", Ir.STRING, param(Ir.STRING), false);
+        // only the compilation throws it: the rewritten function raises the Python exception it carries
+        assertEquals("Outer$Calc#run#owner=app.Outer$Calc#kinds=str#once#python-exceptions",
+            StaticDelegation.target(body("app.Outer$Calc", false, false, Ir.ExceptionCrossing.TRANSLATED, List.of(Ir.STRING), Ir.VOID, write)));
+        // it may have crossed Java code, or come from the compilation: the Python callers keep the Python body
+        assertNull(StaticDelegation.target(body("app.Outer$Calc", false, false, Ir.ExceptionCrossing.PYTHON_BODY, List.of(Ir.STRING), Ir.VOID, write)));
+        // a static body is run again in Python when it fails: there is nothing to translate
+        Ir.Statement returned = new Ir.Return(new Ir.Const(null, Ir.NONE));
+        assertEquals("#run#static=app.Module#kinds=str#retry",
+            StaticDelegation.target(body("app.Module", true, true, Ir.ExceptionCrossing.TRANSLATED, List.of(Ir.STRING), OBJECT, returned)));
     }
 }

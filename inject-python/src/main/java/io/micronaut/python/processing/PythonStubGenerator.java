@@ -2230,23 +2230,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     return pythonInstanceConstructorBody(model, isAbstractIntroNoArg, aThis, methodParameters);
                 }
             })));
-            if (!isJunit5Test && element instanceof AbstractPythonClassElement pythonClass && pythonClass.extendsPythonException() && pythonClass.getNativeType().constructor() == null) {
-                // Exception(*args) in Python, for a class extending Exception or a Python class that does: a
-                // message constructor for Java callers and for the compiled bodies that raise the class,
-                // creating the Python exception with the message as its argument; a null message is no
-                // message, Exception() (whose Java getMessage() is null), not Exception(None)
-                builder.addMethod(MethodDef.constructor()
-                    .addModifiers(Modifier.PUBLIC)
-                    .addParameter(ParameterDef.of("message", TypeDef.STRING))
-                    .build((aThis, methodParameters) -> {
-                        ExpressionDef message = methodParameters.get(0);
-                        ExpressionDef classReference = pythonClassReference(element, pythonClassReference);
-                        ExpressionDef withoutMessage = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE, List.of(classReference));
-                        ExpressionDef withMessage = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE, List.of(classReference, message.cast(TypeDef.OBJECT)));
-                        return invokeValueConstructor(aThis, message.isNull().doIfElse(withoutMessage, withMessage));
-                    })
-                );
-            }
         }
 
     }
@@ -4993,6 +4976,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
 
             @Override
+            public ExpressionDef pythonClassReference(String type) {
+                return compiledPythonClassReference(context, type);
+            }
+
+            @Override
             public StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor) {
                 throw new IllegalStateException("A module-level function has no self to write [" + property + "] of");
             }
@@ -5088,6 +5076,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
 
             @Override
+            public ExpressionDef pythonClassReference(String type) {
+                return members.pythonClassReference(type);
+            }
+
+            @Override
             public StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor) {
                 FieldDef field = accessor ? null : model.propertyFields().get(property);
                 return field != null ? aThis.field(field).assign(value) : members.write(property, type, value, accessor);
@@ -5123,6 +5116,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
 
             @Override
+            public ExpressionDef pythonClassReference(String type) {
+                return compiledPythonClassReference(model.context(), type);
+            }
+
+            @Override
             public ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct) {
                 if (direct && stub != null) {
                     return stub.invoke(name, parameterTypes, type, arguments);
@@ -5135,6 +5133,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 return self.invoke(PUT_MEMBER, TypeDef.VOID, ExpressionDef.constant(property), value);
             }
         };
+    }
+
+    /**
+     * The {@code PythonClassReference} of a Python class of the compilation a compiled body creates an
+     * object of (an exception it raises), by the name of its generated class.
+     */
+    private static ExpressionDef compiledPythonClassReference(VisitorContext context, String type) {
+        ClassElement element = context.getClassElement(type)
+            .orElseThrow(() -> new IllegalStateException("A compiled body creates an object of [" + type + "], which is no class of the compilation"));
+        return pythonClassReferenceExpression(element);
     }
 
     /**

@@ -1,5 +1,6 @@
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.context.python.PythonStatic
 import io.micronaut.python.compiler.PyronautCompiler
 import io.micronaut.python.processing.staticcompile.StaticCompilationDecision
 import io.micronaut.python.processing.staticcompile.StaticCompilationMode
@@ -16,7 +17,9 @@ class StaticCompilationParitySpec extends AbstractPythonTypeElementSpec {
 
     @Override
     protected void configureCompiler(PyronautCompiler.Builder compilerBuilder) {
-        compilerBuilder.staticCompilation(mode).staticCompilationDecisionCallback { decisions << it }
+        compilerBuilder.staticCompilation(mode)
+            .options(["-A${StaticCompilationMode.TRACE_OPTION}=true".toString()])
+            .staticCompilationDecisionCallback { decisions << it }
     }
 
     static final String SOURCE = '''
@@ -50,6 +53,10 @@ class Rejected(Exception):
     """A Python exception class: generated as a RuntimeException, raised and caught as one by compiled bodies."""
 
 
+class Invalid(ValueError):
+    """A class extending another builtin exception: generated as a RuntimeException too."""
+
+
 class Coded(Exception):
     def __init__(self, code: int):
         super().__init__(f"code {code}")
@@ -64,6 +71,12 @@ def module_rejecting(n: int) -> int:
     if n < 0:
         raise Rejected(f"module {n}")
     return n
+
+
+def module_named(key: str) -> str:
+    if key == "":
+        raise Rejected("module empty")
+    return key
 
 
 MODULE_RATE = 2
@@ -216,6 +229,49 @@ class Calc:
             return str(check(self.coded(n)))
         except Coded as coded:
             return f"{coded} {coded.code} {coded.args}"
+
+    def invalid(self, key: str) -> int:
+        if key == "":
+            raise Invalid(key, None, 1.5, True)
+        return len(key)
+
+    def caught_invalid(self, key: str) -> int:
+        try:
+            return self.invalid(key)
+        except Invalid:
+            return -1
+
+    def reraised(self, n: int) -> int:
+        try:
+            return self.rejecting(n)
+        except Rejected as rejected:
+            raise rejected
+
+    def delegated_rejecting(self, key: str) -> str:
+        return module_named(key)
+
+    def python_catching_once(self, key: str) -> str:
+        check = lambda v: v
+        try:
+            return check(self.delegated_rejecting(key))
+        except Rejected as rejected:
+            return "rejected: " + str(rejected)
+
+    def mixed_crossing(self, key: str) -> str:
+        return module_named(key) if Objects.nonNull("java") else key
+
+    def python_catching_mixed(self, key: str) -> str:
+        check = lambda v: v
+        try:
+            return check(self.mixed_crossing(key))
+        except Rejected as rejected:
+            return "rejected: " + str(rejected)
+
+    def java_in_try(self, n: int) -> int:
+        try:
+            return module_rejecting(n) if Objects.nonNull("java") else n
+        except Rejected:
+            return -1
 
     def total(self, quantity: int, unit_price: float) -> float:
         subtotal = quantity * unit_price
@@ -665,6 +721,12 @@ class Bag:
         ["raises_returned", 3], ["raises_returned", -1],
         ["python_catching_delegated", 3], ["python_catching_delegated", -1],
         ["java_message", 3], ["java_message", -1],
+        ["invalid", "ab"], ["invalid", ""], ["caught_invalid", "ab"], ["caught_invalid", ""],
+        ["reraised", 3], ["reraised", -1],
+        ["python_catching_once", "a"], ["python_catching_once", ""],
+        ["mixed_crossing", "a"], ["mixed_crossing", ""],
+        ["python_catching_mixed", "a"], ["python_catching_mixed", ""],
+        ["java_in_try", 3], ["java_in_try", -1],
         ["boxed_none", "no.such.property"], ["boxed_none", "micronaut.static.parity"],
         ["boxed_local", "no.such.property"], ["boxed_local", "micronaut.static.parity"],
         ["boxed_branch", "no.such.property"], ["boxed_branch", "micronaut.static.parity"],
@@ -720,10 +782,19 @@ class Bag:
                 results[m]['rejected'] = raisedBy { calc.rejecting(-1) }
                 results[m]['coded-thrown'] = raisedBy { calc.coded(-2) }
                 results[m]['coded-sub-thrown'] = raisedBy { calc.coded_sub(-2) }
-                // the message constructor Java code calls: a null message is no message, as for a Java exception
-                def rejected = calc.getClass().classLoader.loadClass('python.Rejected').getConstructor(String)
-                results[m]['messages'] = [rejected.newInstance((String) null).message, rejected.newInstance('m').message]
                 results[m]['returned-thrown'] = raisedBy { calc.raises_returned(-1) }
+                results[m]['invalid-thrown'] = raisedBy { calc.invalid('') }
+                results[m]['reraised-thrown'] = raisedBy { calc.reraised(-1) }
+                results[m]['java-message-thrown'] = raisedBy { calc.java_message(-1) }
+                PythonStatic.resetEntries()
+                results[m]['once'] = calc.python_catching_once('')
+                results[m]['mixed'] = calc.python_catching_mixed('')
+                if (m == StaticCompilationMode.ALL) {
+                    // a Python caller runs the Java body calling only the compilation, which raises the Python exception
+                    // the Java one carries; a body calling Java code too keeps the Python body for Python callers
+                    assert PythonStatic.entries('python.Calc#delegated_rejecting') == 1
+                    assert PythonStatic.entries('python.Calc#mixed_crossing') == 0
+                }
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
                     assert !compiled.contains('Calc.via_python'), 'the lambda keeps via_python in Python, where module_twice delegates to its static Java method'
@@ -733,12 +804,16 @@ class Bag:
                         def refused = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
                         assert refused.reasons()*.rule() == ['python-exception'] && refused.reasons()[0].message().contains('an except clause for [java.lang.RuntimeException] would catch ['), refused.toString()
                     }
-                    def javaMessage = decisions.find { it.qualifiedName() == 'Calc.java_message' }
-                    assert javaMessage.reasons()*.rule() == ['unsupported-expression'] && javaMessage.reasons()[0].message().contains('a str a Java method or field returns'), javaMessage.toString()
+                    // a Python exception that crossed the Java call is the Java class in Python, which the clause would not catch
+                    def javaInTry = decisions.find { it.qualifiedName() == 'Calc.java_in_try' }
+                    assert javaInTry.reasons()*.rule() == ['python-exception'] && javaInTry.reasons()[0].message().contains('the Java call [java.util.Objects.nonNull] of the try block'), javaInTry.toString()
+                    // a value of a Python exception class has no Java layout: only a raise constructing it compiles
+                    def returned = decisions.find { it.qualifiedName() == 'Calc.raises_returned' }
+                    assert returned.reasons()*.rule() == ['python-exception'] && returned.reasons()[0].message().contains('that the raise statement does not construct'), returned.toString()
                     // what may be rebound or overridden while the program runs is not bound at compile time
                     assert !compiled.any { it in ['module_rated', 'module_dup', 'module_shadow', 'Scaler.run', 'Calc.calls_rebound'] }, decisions.toString()
                     assert compiled.contains('module_wrapped'), 'the decorated function compiles; its wrapper calls it, and it delegates to its static Java method'
-                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet() - ['misordered', 'ordered', 'java_catching', 'java_message', 'python_catching', 'python_catching_coded', 'python_catching_delegated']).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.twice', 'module_twice', 'module_upper', 'module_lengths', 'module_any']), decisions.toString()
+                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet() - ['misordered', 'ordered', 'java_catching', 'java_in_try', 'raises_returned', 'python_catching', 'python_catching_coded', 'python_catching_delegated', 'python_catching_once', 'python_catching_mixed']).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.twice', 'module_twice', 'module_upper', 'module_lengths', 'module_any']), decisions.toString()
                     REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
@@ -815,7 +890,14 @@ class Bag:
         results[StaticCompilationMode.OFF]['rejected'] == 'python.Rejected: negative -1'
         results[StaticCompilationMode.OFF]['coded-thrown'] == 'python.Coded: code -2'
         results[StaticCompilationMode.OFF]['coded-sub-thrown'] == 'python.CodedSub: code -2'
-        results[StaticCompilationMode.OFF]['messages'] == [null, 'm']
+        results[StaticCompilationMode.OFF][["invalid", ""].toString()] == 'raised'
+        results[StaticCompilationMode.OFF][["caught_invalid", ""].toString()] == -1
+        results[StaticCompilationMode.OFF]['invalid-thrown'] == "python.Invalid: ('', None, 1.5, True)"
+        results[StaticCompilationMode.OFF]['reraised-thrown'] == 'python.Rejected: negative -1'
+        results[StaticCompilationMode.OFF]['java-message-thrown'] == 'python.Rejected: java'
+        results[StaticCompilationMode.OFF]['once'] == 'rejected: module empty'
+        results[StaticCompilationMode.OFF]['mixed'] == 'rejected: module empty'
+        results[StaticCompilationMode.OFF][["java_in_try", -1].toString()] == -1
         results[StaticCompilationMode.OFF]['returned-thrown'] == 'python.Rejected: made -1'
         results[StaticCompilationMode.OFF][["collatz", 27].toString()] == 111
         results[StaticCompilationMode.OFF][["safe_host", "not a url"].toString()].startsWith('bad: ')
