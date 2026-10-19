@@ -29,10 +29,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -166,5 +168,76 @@ class PyronautCompilerStaticCompilationTest {
         RuntimeException exception = assertThrows(RuntimeException.class, compiler::buildClassLoader);
 
         assertTrue(exception.getMessage().contains("Unknown value [fast] of the option micronaut.python.compile.static"), exception.getMessage());
+    }
+
+    @Test
+    void anUnwritableReportDirectoryFailsTheBuildNamingIt(@TempDir Path directory) throws IOException {
+        Path notADirectory = Files.writeString(directory.resolve("report"), "a file");
+        PyronautCompiler compiler = PyronautCompiler.builder()
+            .pythonCode(SOURCE)
+            .staticCompilation(StaticCompilationMode.ALL)
+            .staticCompilationReport(notADirectory.toFile())
+            .build();
+        RuntimeException exception = assertThrows(RuntimeException.class, compiler::buildClassLoader);
+
+        assertTrue(exception.getMessage().contains("Cannot write the static compilation report to the directory [" + notADirectory.toAbsolutePath().normalize() + "]"), exception.getMessage());
+        assertFalse(exception.getMessage().contains("Failed Trace"), exception.getMessage());
+    }
+
+    @Test
+    void anIncrementalBuildKeepsTheDecisionsOfUnchangedSourcesAndDropsRemovedFunctions(@TempDir Path directory) throws IOException {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = Files.createDirectories(directory.resolve("classes"));
+        Path cache = directory.resolve("incremental");
+        Path report = directory.resolve("report");
+        Path orders = Files.writeString(python.resolve("orders.py"), """
+            class Orders:
+                def place(self, quantity: int) -> int:
+                    return quantity
+
+                def cancel(self, quantity: int) -> int:
+                    return -quantity
+            """);
+        Files.writeString(python.resolve("pricing.py"), """
+            class Pricing:
+                def total(self, quantity: int) -> int:
+                    return quantity * 2
+            """);
+        compileIncrementally(python, java, output, cache, report);
+        assertEquals(List.of("Orders.place", "Orders.cancel", "Pricing.total"), reportedNames(report));
+
+        Files.writeString(orders, """
+            class Orders:
+                def place(self, quantity: int) -> int:
+                    return quantity + 1
+            """);
+        compileIncrementally(python, java, output, cache, report);
+
+        List<String> lines = Files.readAllLines(report.resolve(StaticCompilationReport.DECISIONS_FILE));
+        assertEquals("{\"record\":\"plan\",\"mode\":\"all\",\"coverage\":\"incremental\"}", lines.get(0));
+        // the incremental build may plan more than the changed source; it never keeps a removed function
+        assertEquals(Set.of("Pricing.total", "Orders.place"), Set.copyOf(reportedNames(report)));
+        assertEquals(2, reportedNames(report).size());
+    }
+
+    private static void compileIncrementally(Path python, Path java, Path output, Path cache, Path report) {
+        PyronautCompiler.builder()
+            .pythonSrc(python.toString())
+            .javaSrc(java.toString())
+            .targetDir(output.toFile())
+            .incremental(true)
+            .incrementalCacheDirectory(cache.toFile())
+            .staticCompilation(StaticCompilationMode.ALL)
+            .staticCompilationReport(report.toFile())
+            .build()
+            .compile();
+    }
+
+    private static List<String> reportedNames(Path report) {
+        return StaticCompilationReport.readState(report.resolve(StaticCompilationReport.STATE_FILE)).stream()
+            .map(StaticCompilationDecision::qualifiedName)
+            .filter(name -> !name.endsWith(".__init__"))
+            .toList();
     }
 }
