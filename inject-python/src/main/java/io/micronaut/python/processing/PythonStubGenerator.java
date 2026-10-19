@@ -4990,32 +4990,44 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * How a static method of a pooled module's generated class reaches what it needs: nothing of the
      * module, whose injected beans live in the instance Micronaut creates, and no Python object.
+     *
+     * @param context The visitor context
+     * @return The access of a compiled static method of a pooled module
      */
-    static StaticBodyGenerator.SelfAccess pooledStaticAccess() {
-        return pooledScriptAccess((field, type) -> {
+    static StaticBodyGenerator.SelfAccess pooledStaticAccess(VisitorContext context) {
+        return pooledScriptAccess(context, (field, type) -> {
             throw new IllegalStateException("A static method of a pooled module has no instance holding the injected [" + field + "]");
         });
     }
 
     /**
+     * @param context The visitor context
      * @param aThis The instance of the pooled module's generated class, holding its injected attributes
      * @return The access of a compiled instance method of a pooled module
      */
-    static StaticBodyGenerator.SelfAccess pooledScriptAccess(VariableDef.This aThis) {
-        return pooledScriptAccess(aThis::field);
+    static StaticBodyGenerator.SelfAccess pooledScriptAccess(VisitorContext context, VariableDef.This aThis) {
+        return pooledScriptAccess(context, aThis::field);
     }
 
     /**
      * The access of a compiled body of a module served by a context pool: the planner compiles
-     * such a body only when it reaches no Python object, so nothing here is ever called.
+     * such a body only when it reaches no Python object, so nothing here is ever called but the
+     * creation of an exception it raises, which runs as a generated constructor does.
      *
+     * @param context  The visitor context
      * @param injected The read of an injected attribute of the module, by its field name and type
      */
-    private static StaticBodyGenerator.SelfAccess pooledScriptAccess(BiFunction<String, TypeDef, ExpressionDef> injected) {
+    private static StaticBodyGenerator.SelfAccess pooledScriptAccess(VisitorContext context, BiFunction<String, TypeDef, ExpressionDef> injected) {
         return new StaticBodyGenerator.SelfAccess() {
             @Override
             public ExpressionDef injected(String field, TypeDef type) {
                 return injected.apply(field, type);
+            }
+
+            @Override
+            public ExpressionDef pythonClassReference(String type) {
+                // an exception a body raises is created as a generated constructor creates its Python object
+                return compiledPythonClassReference(context, type);
             }
 
             @Override
