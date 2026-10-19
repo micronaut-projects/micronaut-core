@@ -4735,7 +4735,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * The interceptor chain of a compiled advised method: when the instance is the proxy of the
      * bean, the advice it binds runs the interceptors and calls the method on the target bean,
-     * which runs the body; the target itself binds no advice and runs the body directly.
+     * which runs the body; the target itself binds no advice and runs the body directly. What the
+     * chain returns is converted to the return type as the bridge converts a Python result, since
+     * an interceptor may answer with a value of another type (a Python int is a {@code Long}).
      */
     private static StatementDef adviceChain(VariableDef.This aThis, String methodName, List<String> parameterTypeNames, List<VariableDef.MethodParameter> methodParameters, TypeDef returnType) {
         VariableDef.Field advice = aThis.field(STATIC_ADVICE_FIELD, STATIC_ADVICE);
@@ -4748,15 +4750,26 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             ExpressionDef.constant(methodName), TypeDef.STRING.array().instantiate(parameterTypes), TypeDef.OBJECT.array().instantiate(arguments));
         StatementDef intercepted = TypeDef.VOID.equals(returnType)
             ? StatementDef.multi((StatementDef) proceed, new StatementDef.Return(null))
-            : proceed.cast(returnType).returning();
+            : STATIC_ADVICE.invokeStatic("result", TypeDef.OBJECT, proceed, ExpressionDef.constant(erased(erasedTypeName(returnType, Map.of()))))
+                .cast(returnType).returning();
         return advice.isNonNull().doIf(intercepted);
     }
 
     /**
-     * Declares the advice of a class with compiled advised methods: a field the proxy binds and
-     * the binding method. A class whose Java superclass is a generated class with advised methods
-     * inherits both.
+     * Whether the chain of an introduced method can answer for the bridge: its return type is one
+     * whose conversion from what an interceptor returns is the bridge's (void, a primitive or its box,
+     * a string or an object). An introduced method returning another type keeps its bridge.
      */
+    private static boolean introducedReturnConverts(TypeDef returnType) {
+        String name = erased(erasedTypeName(returnType, Map.of()));
+        return switch (name) {
+            case "void", "boolean", "byte", "short", "int", "long", "float", "double",
+                 "java.lang.Boolean", "java.lang.Byte", "java.lang.Short", "java.lang.Integer", "java.lang.Long",
+                 "java.lang.Float", "java.lang.Double", "java.lang.String", "java.lang.Object" -> true;
+            default -> false;
+        };
+    }
+
     /**
      * A Java type name as the IR spells it, without type arguments and with nested types dotted.
      */
@@ -4786,12 +4799,29 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     /**
      * Whether the abstract methods of an introduction class run their chain in the generated class:
-     * the class is an abstract introduction bean and static compilation is on.
+     * the class is an abstract introduction bean and static compilation switches one of its abstract
+     * methods on (a {@code CompileStatic} scope, or mode {@code all} without one excluding it).
      */
     private static boolean staticIntroduction(ClassElement element, @Nullable StaticCompilationPlan plan) {
-        return plan != null && plan.active() && element.isAbstract() && element.hasStereotype(Introduction.class);
+        if (plan == null || !element.isAbstract() || !element.hasStereotype(Introduction.class)
+            || !(element instanceof AbstractPythonClassElement pythonClass)) {
+            return false;
+        }
+        io.micronaut.python.processing.model.ClassDef classDef = pythonClass.getNativeType();
+        String sourcePath = classDef.span() == null ? null : classDef.span().path();
+        for (FunctionDef function : classDef.functions()) {
+            if ((function.isAbstract() || function.hasPlaceholderBody()) && plan.switchedOn(sourcePath, classDef.name() + "." + function.name())) {
+                return true;
+            }
+        }
+        return false;
     }
 
+    /**
+     * Declares the advice of a class with compiled advised methods, or of an introduction class
+     * whose abstract methods run their chain in Java: a field the proxy binds and the binding
+     * method. A class whose Java superclass is a generated class with advised methods inherits both.
+     */
     private static void declareStaticAdvice(ClassStubModel model) {
         StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
         if (plan == null || !(advisesCompiled(plan, model.element().getName()) || staticIntroduction(model.element(), plan)) || inheritsStaticAdvice(model, plan)) {
@@ -5313,7 +5343,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 StaticBodyGenerator.generate(compiledBody, methodParameters, model != null ? selfAccess(model, aThis) : scriptSelfAccess(visitorContext, aThis), trace))));
             return;
         }
-        if (methodElement.isAbstract() && staticIntroduction(bridgeOwner, staticCompilationPlan(visitorContext))) {
+        if (methodElement.isAbstract() && introducedReturnConverts(methodSourceReturnType) && staticIntroduction(bridgeOwner, staticCompilationPlan(visitorContext))) {
             // the abstract method of an introduction: the proxy binds the introduction's chain, which runs in Java
             List<String> parameterTypes = new ArrayList<>();
             for (ParameterDef parameterDef : parameterDefs) {
