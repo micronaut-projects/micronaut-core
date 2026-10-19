@@ -34,6 +34,7 @@ Reason = java.type("io.micronaut.python.processing.staticcompile.StaticCompilati
 Stats = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Stats")
 
 MODE_OFF = "off"
+# decides exactly as MODE_OFF does; the processor runs the planner for it over every compilation and always writes the report
 MODE_ANNOTATED = "annotated"
 MODE_ALL = "all"
 MODES = (MODE_OFF, MODE_ANNOTATED, MODE_ALL)
@@ -97,8 +98,12 @@ class StaticPlanner:
     def plan(self, checker, visitor_context=None):
         """
         Decide every function recorded by the type checker; returns the decisions. The checker's
-        facts are created from the visitor context when its own check did not run.
+        facts are created from the visitor context when its own check did not run. Every plan starts
+        afresh: the decisions and diagnostics of an earlier plan are dropped, so a planner that
+        outlives one compilation element never reports a decision twice.
         """
+        self.decisions = []
+        self.diagnostics = []
         if getattr(checker, "facts", None) is None and visitor_context is not None:
             checker.facts = TypeFacts(visitor_context)
             checker.python_classes = PythonClasses(checker)

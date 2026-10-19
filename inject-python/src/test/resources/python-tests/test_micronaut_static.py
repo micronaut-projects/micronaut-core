@@ -299,6 +299,20 @@ class WarningTest(unittest.TestCase):
         self.assertEqual(["[Legacy.slow] cannot be compiled statically: [varargs-signature] parameter [*values] collects the positional arguments"],
                          [diagnostic.message() for diagnostic in planner.diagnostics])
 
+    def test_planning_again_reports_every_decision_and_warning_once(self):
+        checker = TypeChecker("off", [])
+        visitor = MicronautAstVisitor(Callback(), "pkg", "module.py", None, None, source_path="module.py", source_text=SOURCE, type_checker=checker)
+        visitor.visit(ast.parse(SOURCE))
+        planner = StaticPlanner(MODE_ANNOTATED, NAMES)
+        first = [decision.qualifiedName() for decision in planner.plan(checker)]
+        first_diagnostics = [diagnostic.message() for diagnostic in planner.diagnostics]
+        # a second compilation element planned by the same planner
+        second = [decision.qualifiedName() for decision in planner.plan(checker)]
+        self.assertEqual(first, second)
+        self.assertEqual(len(set(second)), len(second), second)
+        self.assertEqual(first_diagnostics, [diagnostic.message() for diagnostic in planner.diagnostics])
+        self.assertEqual(2, len(planner.diagnostics))
+
 
 if __name__ == "__main__":
     unittest.main()
