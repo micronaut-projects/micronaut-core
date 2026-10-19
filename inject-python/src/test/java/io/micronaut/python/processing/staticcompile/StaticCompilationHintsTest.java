@@ -114,6 +114,10 @@ class StaticCompilationHintsTest {
             .startsWith("Catch a narrower Java exception"));
         assertTrue(StaticCompilationHints.hint("unsupported-statement", "the except clause for the checked exception [java.io.IOException] has no Java call of the try block that declares it")
             .startsWith("Raise and catch unchecked Java exceptions"));
+        assertTrue(StaticCompilationHints.hint("python-exception", "parameter [error] is a [Rejected], a Python exception class; a value of it has no Java layout")
+            .startsWith("Keep the value of a Python exception class in Python"));
+        assertTrue(StaticCompilationHints.hint("overridden-method", "[IntHolder] overrides the method with a signature its generated class cannot declare in Java; the bridge of this class dispatches to the Python object for both")
+            .startsWith("Give the override the signature"));
     }
 
     @Test

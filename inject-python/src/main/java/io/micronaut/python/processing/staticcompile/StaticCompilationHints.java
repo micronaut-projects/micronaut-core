@@ -60,6 +60,8 @@ public final class StaticCompilationHints {
         HINTS.put("abstract-method", "Nothing to change: an abstract method has no body. Its implementations are compiled on their own, and a call of it runs the implementation of the object.");
         HINTS.put("overriding-java-method", "Spell the Java signature in the hints: hint each parameter with the Java parameter type, or a subtype of it the body reads the parameter as, "
             + "and leave the return unhinted, hint it object, or hint a type the Java method returns.");
+        HINTS.put("overridden-method", "Give the override the signature of the method it overrides (the same parameter and return types, in the same order), "
+            + "so that its generated class overrides the Java method; or keep the method in Python: the bridge dispatches to the override on the Python object.");
         HINTS.put("intercepted-method", "An advised concrete method of an introduction class runs its interceptor chain on the Python object. "
             + "Move the logic into a separate bean the method calls: the bean's methods compile.");
         HINTS.put("varargs-signature", "Replace *args, **kwargs and keyword-only parameters with named positional parameters, each with a type hint; "
@@ -228,6 +230,10 @@ public final class StaticCompilationHints {
                 if (text.contains("where Python raises an exception of its own")) {
                     return "Catch a narrower Java exception: a compiled body throws this one where Python raises its own exception "
                         + "(ZeroDivisionError, ValueError, ...), which the clause does not catch in Python.";
+                }
+                if (text.contains("a Python exception class")) {
+                    return "Keep the value of a Python exception class in Python: pass or return its message or the data it carries instead, "
+                        + "or use a Java exception for a value a compiled body hands on.";
                 }
                 if (text.contains("would not catch [")) {
                     return "Make the base the clause names the first base of the subclass, or catch the subclass by name too: "
