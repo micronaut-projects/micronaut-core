@@ -51,7 +51,9 @@ class UserService:
         ...
 ----
 
-A class extending a Python exception class of the compilation extends its generated class. The static compiler (see the static compilation documentation) raises and catches such classes in the Java bodies it generates.
+A null message given to that constructor from Java is no message: the Python exception is created without arguments, and the Java `getMessage()` is null, as for a Java exception. A class extending a Python exception class of the compilation extends its generated class, as long as that class is its first base: the generated class extends one class only, so for `class E(Exception, Mixin)` or `class E(Other, Base)` it extends `RuntimeException` or the generated class of `Other`, and Java code does not see the other bases.
+
+Only the builtin `Exception` itself gets the message constructor and is raised and caught by the static compiler (see the static compilation documentation): a class extending another builtin exception (`ValueError`, `LookupError`, `KeyError`, `RuntimeError`, ...) is generated with `RuntimeException` as its Java base too, so Micronaut exception handlers match it, but compiled bodies do not raise or catch it and stay in Python (`python-exception`).
 
 Once an exception has crossed into Java it is the generated Java class. Python code that calls back into Java, for example through an intercepted method, therefore catches the Java class rather than the Python class:
 

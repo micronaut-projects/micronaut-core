@@ -1005,15 +1005,58 @@ class Lowering:
             self._refuse("python-exception", f"[{name}] is not an exception class: it extends neither Exception nor a Java Throwable", node)
         return model
 
-    def _caught_type(self, handler):
-        """The Java type an except clause catches, with the model when it is an exception class of the compilation."""
+    def _caught_type(self, handler, earlier):
+        """
+        The Java type an except clause catches, with the model when it is an exception class of the
+        compilation; refused when the Java catch would catch what the Python clause does not, given
+        the clauses before it.
+        """
         caught = self._typed(handler.type)
         if caught is not None and caught.kind == PY_REF:
             model = self._throwable_model(caught, handler)
+            # Python catches a subclass through any of its bases, Java through the one its generated class extends
+            missed = [other.name for other in self.checker.python_classes.all()
+                      if other is not model and other.is_throwable() and other.is_subclass_of(model) and not other.extends(model)]
+            if missed:
+                self._refuse("python-exception", f"an except clause for [{model.name}] would not catch [{', '.join(sorted(missed))}] in Java: a Python subclass through a base its generated class does not extend", handler)
             return self._generated_class(model, handler), model
         if caught is None or caught.kind != JAVA_REF or not self.checker.facts.isAssignable(caught.name, "java.lang.Throwable"):
             self._refuse("python-exception", "an except clause naming anything but a Java exception type or an exception class of the compilation has no static lowering", handler)
+        reaching = self._python_exceptions_reaching(caught.name, earlier)
+        if reaching:
+            self._refuse("python-exception", f"an except clause for [{caught.name}] would catch [{', '.join(reaching)}] in Java, which Python lets through: the generated class of an exception class extending Exception is a RuntimeException", handler)
         return caught.name, None
+
+    def _java_value(self, expression):
+        """
+        Whether a lowered value is read from Java code as it is (the result of a method, a field), which
+        may be null where a Python value hinted str is not None: the accessors and the compiled
+        methods of the generated classes of the compilation hand out what the Python hints say.
+        """
+        while expression.getClass().getSimpleName() == "Cast":
+            expression = expression.operand()
+        kind = expression.getClass().getSimpleName()
+        compilation = set(self.checker.python_classes.by_qualified) if getattr(self.checker, "python_classes", None) is not None else set()
+        if self.planner is not None:
+            compilation |= {body.className() for body in self.planner.bodies}
+        if kind in ("InvokeJava", "StaticField"):
+            return _erased(expression.owner()) not in compilation
+        if kind == "Field":
+            return _erased(expression.receiver().type()) not in compilation
+        return False
+
+    def _python_exceptions_reaching(self, java_type, earlier):
+        """
+        The exception classes of the compilation extending the Python Exception that a Java catch of
+        the Java type would catch, their generated classes extending RuntimeException, and that no
+        earlier clause catches first. Python does not catch them there: they are no Java objects.
+        """
+        classes = getattr(self.checker, "python_classes", None)
+        if classes is None or not self.checker.facts.isAssignable("java.lang.RuntimeException", java_type):
+            return []
+        caught_before = [model for _, model in earlier if model is not None]
+        return sorted(model.name for model in classes.all()
+                      if model.extends_python_exception() and not any(model.extends(before) for before in caught_before))
 
     def _already_caught(self, later, earlier):
         """Whether an except clause for `earlier` catches everything the later clause names, which Java refuses."""
@@ -1048,7 +1091,7 @@ class Lowering:
         for handler in node.handlers:
             if handler.type is None:
                 self._refuse("python-exception", "a bare except clause catches Python exceptions", handler)
-            caught = self._caught_type(handler)
+            caught = self._caught_type(handler, caught_types)
             if handler.name is not None and (handler.name in self.locals or handler.name in self.parameters):
                 self._refuse("unsupported-statement", f"the exception variable [{handler.name}] is already a local or a parameter", handler)
             for earlier in caught_types:
@@ -2138,6 +2181,9 @@ class Lowering:
                 arguments = [self._expression(argument) for argument in node.args]
                 if arguments and _erased(arguments[0].type()) != STRING:
                     self._refuse("unsupported-expression", f"constructing [{model.name}] with a [{arguments[0].type()}] has no static lowering: the generated exception class takes a str message", node)
+                if arguments and self._java_value(arguments[0]):
+                    # the message constructor takes a Java null as no message (Exception()), Python would pass None (Exception(None))
+                    self._refuse("unsupported-expression", f"constructing [{model.name}] with a str a Java method or field returns has no static lowering: the generated exception class takes a null message as no message, where Python passes None", node)
                 self.java_calls += 1
                 return NewJava(owner, [STRING] * len(arguments), arguments)
             if node.args or node.keywords:

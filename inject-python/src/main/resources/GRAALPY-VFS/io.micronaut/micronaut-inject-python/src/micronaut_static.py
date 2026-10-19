@@ -763,7 +763,11 @@ def _guarded_return(temporary, result):
                 __mn_p = _mn_python_exception(__mn_e)
                 if __mn_p is None:
                     raise
-                raise __mn_p from __mn_p.__cause__
+            raise __mn_p
+
+    The Python exception is raised after the handler, so it keeps its own cause and context: inside
+    the handler Python would chain the Java exception as its context, and ``raise ... from`` would
+    suppress the context of the caller's own handler.
     """
     caught = temporary + "_e"
     found = temporary + "_p"
@@ -780,13 +784,12 @@ def _guarded_return(temporary, result):
                 body=[ast.Raise(exc=None, cause=None)],
                 orelse=[],
             ),
-            ast.Raise(exc=ast.Name(id=found, ctx=ast.Load()), cause=ast.Attribute(value=ast.Name(id=found, ctx=ast.Load()), attr="__cause__", ctx=ast.Load())),
         ],
     )
     attempt = ast.Try(body=[ast.Return(value=result)], handlers=[handler], orelse=[], finalbody=[])
     return ast.If(
         test=ast.Compare(left=ast.Name(id=temporary, ctx=ast.Load()), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
-        body=[attempt],
+        body=[attempt, ast.Raise(exc=ast.Name(id=found, ctx=ast.Load()), cause=None)],
         orelse=[],
     )
 

@@ -95,10 +95,11 @@ public EmailAlreadyUsed() {
     this(PythonContextRuntime.newInstance(EmailAlreadyUsed.__PYTHON_CLASS_REFERENCE));
   }
 ''')
-        // Exception(*args): the message constructor creates the Python exception with the message as its argument
+        // Exception(*args): the message constructor creates the Python exception with the message as its argument, a null
+        // message as Exception(), whose Java message is null, not Exception(None)
         assertGeneratedSourceContains(pythonCode, '''
 public EmailAlreadyUsed(String message) {
-    this(PythonContextRuntime.newInstance(EmailAlreadyUsed.__PYTHON_CLASS_REFERENCE, (Object) message));
+    this(message == null ? PythonContextRuntime.newInstance(EmailAlreadyUsed.__PYTHON_CLASS_REFERENCE) : PythonContextRuntime.newInstance(EmailAlreadyUsed.__PYTHON_CLASS_REFERENCE, (Object) message));
   }
 ''')
         // the arguments of super().__init__(...) stay the args of the Python exception; the Java message is str(exception)
@@ -117,7 +118,7 @@ public Coded(int code, String detail) {
         assertGeneratedSourceContains(pythonCode, 'public class Narrow extends EmailAlreadyUsed')
         assertGeneratedSourceContains(pythonCode, '''
 public Narrow(String message) {
-    this(PythonContextRuntime.newInstance(Narrow.__PYTHON_CLASS_REFERENCE, (Object) message));
+    this(message == null ? PythonContextRuntime.newInstance(Narrow.__PYTHON_CLASS_REFERENCE) : PythonContextRuntime.newInstance(Narrow.__PYTHON_CLASS_REFERENCE, (Object) message));
   }
 ''')
     }

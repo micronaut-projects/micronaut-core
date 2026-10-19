@@ -917,12 +917,13 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
                 }
                 continue;
             }
+            if (isPythonException(base)) {
+                // before the Java type: the type resolver maps a builtin exception base to RuntimeException too
+                return true;
+            }
             ClassElement javaSuper = toJavaType(base).orElse(null);
             if (javaSuper != null && !javaSuper.isInterface()) {
                 return false;
-            }
-            if (isPythonException(base)) {
-                return true;
             }
         }
         return false;

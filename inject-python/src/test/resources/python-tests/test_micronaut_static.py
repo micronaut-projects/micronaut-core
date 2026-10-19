@@ -1401,6 +1401,86 @@ class ExceptionClassTest(unittest.TestCase):
             self.assertIn(message, decision.reasons()[0].message(), name)
 
 
+HIERARCHY = '''
+from jakarta.inject import Singleton
+
+
+class Base(Exception):
+    pass
+
+
+class Mixin:
+    pass
+
+
+class Other(Exception):
+    pass
+
+
+class Mixed(Other, Base):
+    """A Python subclass of Base whose generated class extends the one of Other, not the one of Base."""
+
+
+class Leading(Exception, Mixin):
+    pass
+
+
+class Invalid(ValueError):
+    pass
+
+
+class Plain:
+    pass
+
+
+@Singleton
+class Gate:
+    def catches_base(self, n: int) -> int:
+        try:
+            return n
+        except Base:
+            return -1
+
+    def raises_invalid(self, n: int) -> int:
+        raise Invalid("x")
+
+    def raises_leading(self, n: int) -> int:
+        raise Leading("x")
+'''
+
+
+class ExceptionHierarchyTest(unittest.TestCase):
+    """The generated class of an exception class extends the first base that resolves, which compiled catches follow."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.decisions, cls.planner = plan(HIERARCHY, MODE_ALL, facts=FakeFacts())
+
+    def test_the_superclass_is_the_one_the_generated_class_extends(self):
+        classes = self.planner.checker.python_classes
+        mixed, leading, base, other = (classes.by_qualified[f"pkg.{name}"] for name in ("Mixed", "Leading", "Base", "Other"))
+        self.assertIs(other, mixed.superclass())
+        self.assertTrue(mixed.is_subclass_of(base))
+        self.assertFalse(mixed.extends(base))
+        self.assertTrue(mixed.extends_python_exception())
+        self.assertIsNone(leading.superclass())  # Exception comes first: the generated class extends RuntimeException, Mixin is a Python base only
+        self.assertTrue(leading.extends_python_exception())
+        self.assertEqual("java.lang.RuntimeException", leading.throwable_base())
+        self.assertFalse(classes.by_qualified["pkg.Plain"].is_throwable())
+
+    def test_a_clause_a_python_subclass_reaches_through_another_base_is_refused(self):
+        decision = self.decisions["Gate.catches_base"]
+        self.assertEqual("SKIPPED", decision.outcome().name())
+        self.assertEqual(["python-exception"], rules(decision))
+        self.assertIn("would not catch [Mixed] in Java", decision.reasons()[0].message())
+
+    def test_only_classes_extending_exception_are_raised(self):
+        decision = self.decisions["Gate.raises_invalid"]
+        self.assertEqual(("SKIPPED", ["python-exception"]), (decision.outcome().name(), rules(decision)))
+        self.assertIn("[Invalid] is not an exception class", decision.reasons()[0].message())
+        self.assertEqual("COMPILED", self.decisions["Gate.raises_leading"].outcome().name(), rules(self.decisions["Gate.raises_leading"]))
+
+
 ADVISED = '''
 from jakarta.inject import Singleton
 
@@ -1774,7 +1854,7 @@ class Calc:
         # the Java exception of a compiled body reaches the Python caller as the Python exception it carries
         self.assertIn("except BaseException as __mn_java_e:", source)
         self.assertIn("__mn_java_p = _mn_python_exception(__mn_java_e)", source)
-        self.assertIn("raise __mn_java_p from __mn_java_p.__cause__", source)
+        self.assertNotIn(" from ", source)  # the Python exception keeps its own cause and context
         self.assertIn("def _mn_python_exception(error):", source)
         self.assertEqual("_mn_python_exception", tree.body[2].name)  # the helpers precede the class
         calc = next(node for node in tree.body if isinstance(node, ast.ClassDef))
@@ -1841,6 +1921,51 @@ class Calc:
         # once found, the static Java method runs, its collection converted for the Python caller
         namespace["_mn_static_classes"]["pkg.Missing"] = Generated
         self.assertEqual([300], namespace["helper"](3))
+
+    def test_the_python_exception_of_a_java_body_keeps_its_cause_and_context(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse("def helper(n: int) -> int:\n    return n\n")
+        apply_delegation(tree, ["#helper#static=pkg.Module"])
+        namespace = {}
+        exec(compile(tree, "raised.py", "exec"), namespace)
+
+        class Carrier(Exception):
+            """A Java exception carrying the Python exception it was created from."""
+
+            def __init__(self, carried):
+                super().__init__()
+                self.carried = carried
+
+            def asPolyglotValue(self):
+                return self.carried
+
+        cause = KeyError("cause")
+
+        class Generated:
+            @staticmethod
+            def helper(n):
+                carried = ValueError(f"boom {n}")
+                if n > 1:
+                    carried.__cause__ = cause
+                raise Carrier(carried)
+
+        namespace["_mn_static_classes"]["pkg.Module"] = Generated
+        with self.assertRaises(ValueError) as raised:
+            namespace["helper"](1)
+        self.assertEqual("boom 1", str(raised.exception))
+        self.assertIsNone(raised.exception.__context__)  # not the Java exception it crossed in
+        self.assertFalse(raised.exception.__suppress_context__)
+        with self.assertRaises(ValueError) as raised:
+            namespace["helper"](2)
+        self.assertIs(cause, raised.exception.__cause__)
+        handled = IndexError("handled")
+        try:
+            try:
+                raise handled
+            except IndexError:
+                namespace["helper"](1)
+        except ValueError as error:
+            self.assertIs(handled, error.__context__)  # raised while the caller handles another exception, as in Python
 
     def test_the_temporary_of_the_rewrite_never_shadows_a_name_of_the_function(self):
         from micronaut_static import apply_delegation

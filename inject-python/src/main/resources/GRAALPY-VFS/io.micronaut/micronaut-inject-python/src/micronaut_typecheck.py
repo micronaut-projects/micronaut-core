@@ -1594,10 +1594,26 @@ class PythonClassModel:
 
     def superclass(self):
         """
-        The base the generated class extends: the first resolved base (a PythonClassModel or a Java
-        TypeDescription), or None when the class extends the Python Exception or nothing.
+        The base the generated class extends, as the stub generator picks it: the first base that
+        resolves (a PythonClassModel or a Java TypeDescription), or None when that is the Python
+        Exception (the generated class extends RuntimeException) or there is none. For
+        ``class E(Exception, Mixin)`` it is None: Mixin is a Python base of E only.
         """
-        return next((base for base in self.bases if base is not None), None)
+        bases = self.bases
+        if self._python_exception:
+            return None
+        return next((base for base in bases if base is not None), None)
+
+    def extends_python_exception(self, seen=None):
+        """Whether the generated class extends RuntimeException for the Python Exception, directly or through the generated classes of Python bases."""
+        seen = seen or set()
+        if self.qualified in seen:
+            return False
+        seen.add(self.qualified)
+        superclass = self.superclass()
+        if self._python_exception:
+            return True
+        return isinstance(superclass, PythonClassModel) and superclass.extends_python_exception(seen)
 
     def is_throwable(self, seen=None):
         """

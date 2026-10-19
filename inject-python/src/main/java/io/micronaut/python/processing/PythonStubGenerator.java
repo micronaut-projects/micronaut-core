@@ -2231,15 +2231,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             if (!isJunit5Test && element instanceof AbstractPythonClassElement pythonClass && pythonClass.extendsPythonException() && pythonClass.getNativeType().constructor() == null) {
                 // Exception(*args) in Python, for a class extending Exception or a Python class that does: a
                 // message constructor for Java callers and for the compiled bodies that raise the class,
-                // creating the Python exception with the message as its argument
+                // creating the Python exception with the message as its argument; a null message is no
+                // message, Exception() (whose Java getMessage() is null), not Exception(None)
                 builder.addMethod(MethodDef.constructor()
                     .addModifiers(Modifier.PUBLIC)
                     .addParameter(ParameterDef.of("message", TypeDef.STRING))
-                    .build((aThis, methodParameters) -> invokeValueConstructor(aThis, PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                        NEW_INSTANCE,
-                        POLYGLOT_VALUE,
-                        List.of(pythonClassReference(element, pythonClassReference), methodParameters.get(0).cast(TypeDef.OBJECT))
-                    )))
+                    .build((aThis, methodParameters) -> {
+                        ExpressionDef message = methodParameters.get(0);
+                        ExpressionDef classReference = pythonClassReference(element, pythonClassReference);
+                        ExpressionDef withoutMessage = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE, List.of(classReference));
+                        ExpressionDef withMessage = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE, List.of(classReference, message.cast(TypeDef.OBJECT)));
+                        return invokeValueConstructor(aThis, message.isNull().doIfElse(withoutMessage, withMessage));
+                    })
                 );
             }
         }
