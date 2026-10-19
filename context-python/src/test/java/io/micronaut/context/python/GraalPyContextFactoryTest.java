@@ -217,10 +217,26 @@ final class GraalPyContextFactoryTest {
 
     @Test
     void javaInstancesOfferReadOnlyPropertiesAndSnakeCaseMethods() {
-        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+        PythonJavaInstanceMembersProvider provider = () -> List.of(
+            new PythonJavaInstanceMembersProvider.Entry(InstanceMembers.class, List.of(
+                new PythonJavaInstanceMembersProvider.Member("port", "getPort", true),
+                new PythonJavaInstanceMembersProvider.Member("name", "getName", true),
+                new PythonJavaInstanceMembersProvider.Member("ready", "isReady", true),
+                new PythonJavaInstanceMembersProvider.Member("http_status", "getHTTPStatus", true),
+                new PythonJavaInstanceMembersProvider.Member("get_http_status", "getHTTPStatus", false),
+                new PythonJavaInstanceMembersProvider.Member("with_value", "withValue", false),
+                new PythonJavaInstanceMembersProvider.Member("literal_name", "getLiteralName", true),
+                new PythonJavaInstanceMembersProvider.Member("literal_value", "literalValue", false),
+                new PythonJavaInstanceMembersProvider.Member("failure", "getFailure", true)
+            )),
+            new PythonJavaInstanceMembersProvider.Entry(io.micronaut.http.MutableHttpRequest.class, List.of(
+                new PythonJavaInstanceMembersProvider.Member("basic_auth", "basicAuth", false)
+            ))
+        );
+        try (ApplicationContext applicationContext = ApplicationContext.builder().singletons(provider).properties(Map.of(
             "micronaut.python.pool.enabled", true,
             "micronaut.python.pool.size", 1
-        ))) {
+        )).start()) {
             Context context = applicationContext.getBean(Context.class);
             context.getBindings(PYTHON).putMember("members", new InstanceMembers());
             context.getBindings(PYTHON).putMember("request", HttpRequest.GET("/"));
@@ -321,6 +337,7 @@ final class GraalPyContextFactoryTest {
         }
 
         public void getVoid() {
+            // Intentionally empty: a zero-argument void method is not a property getter.
         }
 
         public static String getStaticValue() {

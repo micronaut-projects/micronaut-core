@@ -18,6 +18,57 @@ package io.micronaut.python.compiler;
 import java.util.StringJoiner;
 
 public final class InstanceAliasFixture {
+    private String name = "Ada";
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String withValue(String value) {
+        return "text:" + value;
+    }
+
+    public String withValue(int value) {
+        return "number:" + value;
+    }
+
+    public void getVoid() {
+        // A zero-argument void method must not become a property.
+    }
+
+    public String getWrong(int value) {
+        return "wrong:" + value;
+    }
+
+    public Middle middle() {
+        return new Middle();
+    }
+
+    public static final class Middle {
+        public Leaf leaf() {
+            return new Leaf();
+        }
+    }
+
+    public static final class Leaf {
+        public String getValue() {
+            return "deep";
+        }
+    }
+
+    public String getHTTP2Status() {
+        return "HTTP2";
+    }
+
+    @SuppressWarnings("java:S100")
+    public String with__Value() {
+        return "underscores";
+    }
+
     public StringJoiner getHTTPStatus() {
         return new StringJoiner(",");
     }

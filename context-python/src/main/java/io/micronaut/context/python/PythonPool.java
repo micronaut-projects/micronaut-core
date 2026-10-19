@@ -955,11 +955,13 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         assert Thread.currentThread() == creatingContext;
 
         try {
-            return GraalPyContextFactory.buildContext(
+            return GraalPyContextFactory.buildContextWithInstanceMembers(
                 hostAccess,
                 engine,
                 applicationContext.getClassLoader(),
-                contextConfiguration
+                contextConfiguration,
+                GraalPyContextFactory.APPLICATION_MAIN,
+                applicationContext.getBeansOfType(PythonJavaInstanceMembersProvider.class)
             );
         } catch (IOException e) {
             throw new ApplicationStartupException("Failed to create Python context: " + e.getMessage(), e);

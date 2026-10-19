@@ -447,6 +447,8 @@ final class PyronautCompilerIncrementalTest {
 
         compilePython(python, java, output, cache);
         Set<String> providerOutputs = functionalInterfaceProviderOutputs(output);
+        Set<String> instanceOutputs = javaInstanceMembersProviderOutputs(output);
+        assertTrue(instanceOutputs.stream().anyMatch(path -> path.endsWith("$Definition.class")));
         assertTrue(providerOutputs.stream().anyMatch(path -> path.endsWith("$Definition.class")));
         assertTrue(providerOutputs.stream().anyMatch(path -> path.startsWith(
             "META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/"
@@ -454,6 +456,7 @@ final class PyronautCompilerIncrementalTest {
         Properties state = state(cache);
         assertEquals("true", state.getProperty("processor.compatible"));
         assertTrue(decodeStateList(state.getProperty("python.aggregating.outputs")).containsAll(providerOutputs));
+        assertTrue(decodeStateList(state.getProperty("python.aggregating.outputs")).containsAll(instanceOutputs));
         assertTrue(decodeStateList(state.getProperty("shared.outputs")).stream()
             .noneMatch(path -> path.contains("$PythonFunctionalInterfaces$")));
 
@@ -464,6 +467,7 @@ final class PyronautCompilerIncrementalTest {
 
         assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(betaBean));
         assertEquals(providerOutputs, functionalInterfaceProviderOutputs(output));
+        assertEquals(instanceOutputs, javaInstanceMembersProviderOutputs(output));
         assertEquals("true", state(cache).getProperty("processor.compatible"));
     }
 
@@ -485,6 +489,8 @@ final class PyronautCompilerIncrementalTest {
 
         compilePython(python, java, output, cache);
         Set<String> previousOutputs = functionalInterfaceProviderOutputs(output);
+        Set<String> previousInstances = javaInstanceMembersProviderOutputs(output);
+        assertFalse(previousInstances.isEmpty());
         assertFalse(previousOutputs.isEmpty());
 
         Files.writeString(alpha, """
@@ -500,6 +506,9 @@ final class PyronautCompilerIncrementalTest {
         Set<String> currentOutputs = functionalInterfaceProviderOutputs(output);
         assertFalse(currentOutputs.isEmpty());
         assertTrue(currentOutputs.stream().noneMatch(previousOutputs::contains));
+        Set<String> currentInstances = javaInstanceMembersProviderOutputs(output);
+        assertFalse(currentInstances.isEmpty());
+        assertTrue(currentInstances.stream().noneMatch(previousInstances::contains));
         assertEquals(1, currentOutputs.stream().filter(path -> path.endsWith(".java")).count());
         Properties state = state(cache);
         assertEquals("true", state.getProperty("processor.compatible"));
@@ -2005,10 +2014,18 @@ final class PyronautCompilerIncrementalTest {
         }
     }
 
+    private static Set<String> javaInstanceMembersProviderOutputs(Path output) throws Exception {
+        return providerOutputs(output, "PythonJavaInstanceMembers$");
+    }
+
     private static Set<String> functionalInterfaceProviderOutputs(Path output) throws Exception {
+        return providerOutputs(output, "$PythonFunctionalInterfaces$");
+    }
+
+    private static Set<String> providerOutputs(Path output, String prefix) throws Exception {
         try (var paths = Files.walk(output)) {
             return paths.filter(Files::isRegularFile)
-                .filter(path -> path.getFileName().toString().contains("$PythonFunctionalInterfaces$"))
+                .filter(path -> path.getFileName().toString().contains(prefix))
                 .map(path -> output.relativize(path).toString().replace('\\', '/'))
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
         }

@@ -117,6 +117,7 @@ class TypeChecker:
         self._modules = {}
         self.diagnostics = []
         self._java_instance_aliases = {}
+        self._java_alias_types = set()
 
     # ---------------------------------------------------------------- pass one
 
@@ -188,6 +189,7 @@ class TypeChecker:
         Run the checks over the checked definitions and return the diagnostics found, as Java
         PythonDiagnostic values.
         """
+        self._java_alias_types.clear()
         self.facts = TypeFacts(visitor_context)
         self.python_classes = PythonClasses(self)
         for unit in self.units():
@@ -856,7 +858,7 @@ def _java_getter_property(name, signature):
 
 
 def _java_instance_aliases(description):
-    """The same unambiguous instance method/getter names PythonHostMembers exposes at run time."""
+    """The same unambiguous member names registered by the Java API provider generator."""
     aliases, ambiguous = {}, set()
 
     def add(name, target):
@@ -1202,7 +1204,10 @@ class JavaReceiverRules:
         aliases = self.checker._java_instance_aliases
         if description.name() not in aliases:
             aliases[description.name()] = _java_instance_aliases(description)
-        return aliases[description.name()].get(name)
+        alias = aliases[description.name()].get(name)
+        if alias is not None:
+            self.checker._java_alias_types.add(description.name())
+        return alias
 
     def call(self, node):
         function = node.func

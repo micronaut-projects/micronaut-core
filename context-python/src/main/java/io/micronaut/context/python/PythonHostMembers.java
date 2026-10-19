@@ -27,17 +27,12 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Members of Java objects that GraalPy host interop does not expose: snake_case instance methods,
- * read-only getter properties, and the public methods a public class inherits from a non-public
+ * Members of Java objects that GraalPy host interop does not expose: the public methods a public class inherits from a non-public
  * superclass.
  * <p>
  * GraalPy only exposes a method whose declaring class is public, so the methods
@@ -63,98 +58,7 @@ public final class PythonHostMembers {
         }
     };
 
-    private static final ClassValue<Map<String, Alias>> INSTANCE_ALIASES = new ClassValue<>() {
-        @Override
-        protected Map<String, Alias> computeValue(Class<?> type) {
-            return instanceAliases(type);
-        }
-    };
-
     private PythonHostMembers() {
-    }
-
-    /**
-     * The original name of an unambiguous snake_case alias of an instance method. The caller reads
-     * that member through host interop, retaining its overload selection and conversions.
-     *
-     * @param receiver The Java instance
-     * @param name The Python member name
-     * @return The Java method name, or {@code null}
-     */
-    @UsedByGeneratedCode
-    public static @Nullable String methodAlias(Object receiver, String name) {
-        Alias alias = INSTANCE_ALIASES.get(receiver.getClass()).get(name);
-        return alias != null && !alias.property() ? alias.name() : null;
-    }
-
-    /**
-     * The original name of an unambiguous, public zero-argument instance getter exposed as a
-     * read-only Python property.
-     *
-     * @param receiver The Java instance
-     * @param name The Python property name
-     * @return The getter name, or {@code null}
-     */
-    @UsedByGeneratedCode
-    public static @Nullable String propertyGetter(Object receiver, String name) {
-        Alias alias = INSTANCE_ALIASES.get(receiver.getClass()).get(name);
-        return alias != null && alias.property() ? alias.name() : null;
-    }
-
-    private static Map<String, Alias> instanceAliases(Class<?> type) {
-        Map<String, Alias> aliases = new HashMap<>();
-        Set<String> ambiguous = new HashSet<>();
-        Set<String> staticNames = new HashSet<>();
-        Method[] methods = type.getMethods();
-        for (Method method : methods) {
-            if (Modifier.isStatic(method.getModifiers())) {
-                staticNames.add(method.getName());
-            }
-        }
-        for (Method method : methods) {
-            if (Modifier.isStatic(method.getModifiers()) || method.isBridge() || method.isSynthetic()) {
-                continue;
-            }
-            String name = method.getName();
-            String snakeName = snakeCase(name);
-            // A bound host member may include static overloads: leave mixed groups to their original name.
-            if (!snakeName.equals(name) && !staticNames.contains(name)) {
-                addAlias(aliases, ambiguous, snakeName, new Alias(name, false));
-            }
-            String property = getterProperty(method);
-            if (property != null) {
-                addAlias(aliases, ambiguous, property, new Alias(name, true));
-            }
-        }
-        ambiguous.forEach(aliases::remove);
-        return Map.copyOf(aliases);
-    }
-
-    private static @Nullable String getterProperty(Method method) {
-        String name = method.getName();
-        if (method.getParameterCount() != 0 || method.getReturnType() == void.class || name.equals("getClass")) {
-            return null;
-        }
-        int prefix = 0;
-        if (name.startsWith("get")) {
-            prefix = 3;
-        } else if (name.startsWith("is") && (method.getReturnType() == boolean.class || method.getReturnType() == Boolean.class)) {
-            prefix = 2;
-        }
-        return prefix > 0 && name.length() > prefix && Character.isUpperCase(name.charAt(prefix))
-            ? snakeCase(name.substring(prefix)) : null;
-    }
-
-    private static void addAlias(Map<String, Alias> aliases, Set<String> ambiguous, String name, Alias alias) {
-        Alias previous = aliases.putIfAbsent(name, alias);
-        if (previous != null && !previous.equals(alias)) {
-            ambiguous.add(name);
-        }
-    }
-
-    private static String snakeCase(String name) {
-        return name.replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2")
-            .replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase(Locale.ROOT);
     }
 
     /**
@@ -244,6 +148,4 @@ public final class PythonHostMembers {
         return methods;
     }
 
-    private record Alias(String name, boolean property) {
-    }
 }

@@ -650,6 +650,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 try (var _ = CompilationProfiler.span(profiler, "python.functional-interfaces")) {
                     generateFunctionalInterfaceProvider(allImports, processingEnvironment, originatingElement);
                 }
+                try (var _ = CompilationProfiler.span(profiler, "python.java-instance-members")) {
+                    generateJavaInstanceMembersProvider(allImports, processingEnvironment, originatingElement);
+                }
             }
             CompilationProfiler.increment(profiler, "python.unique-decorators", allDecorators.size());
 
@@ -1198,7 +1201,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
     }
 
-    private static String contentHash(String content) {
+    static String contentHash(String content) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(content.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest, 0, 8);
@@ -1406,8 +1409,30 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     /**
-     * Generates the provider of the functional interfaces found in the Java types the Python sources
-     * reference (see {@link PythonFunctionalInterfaceProviderGenerator}).
+     * Generates the compile-time member registrations for referenced Java APIs.
+     */
+    private void generateJavaInstanceMembersProvider(Map<String, List<Map<String, String>>> javaClassImports,
+                                                      PythonProcessingEnvironment processingEnvironment,
+                                                      ClassElement originatingElement) {
+        PythonJavaInstanceMembersProviderGenerator generator = new PythonJavaInstanceMembersProviderGenerator(javaVisitorContext);
+        parser.javaInstanceAliasTypes().forEach(generator::referenceAliasReceiver);
+        for (List<Map<String, String>> imports : javaClassImports.values()) {
+            for (Map<String, String> importInfo : imports) {
+                String className = importInfo.get("class_name");
+                if (className != null) {
+                    generator.referenceImport(className);
+                }
+            }
+        }
+        if (processingEnvironment.environment() != null) {
+            processingEnvironment.classes().values().forEach(generator::referencePythonType);
+            processingEnvironment.scripts().values().forEach(generator::referencePythonType);
+        }
+        generator.generate(originatingElement);
+    }
+
+    /**
+     * Generates the provider of the functional interfaces found in referenced Java types.
      */
     private void generateFunctionalInterfaceProvider(Map<String, List<Map<String, String>>> javaClassImports,
                                                      PythonProcessingEnvironment processingEnvironment,

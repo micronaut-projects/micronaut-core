@@ -102,6 +102,7 @@ public final class PythonAstParser {
         """, "micronaut-typecheck-init.py").cached(true).buildLiteral();
     private static final Source TYPE_CHECK_SOURCE = Source.newBuilder(PYTHON, """
         diagnostics = [] if type_checker is None else type_checker.check(visitor_context)
+        java_instance_alias_types = [] if type_checker is None else sorted(type_checker._java_alias_types)
         """, "micronaut-typecheck-driver.py").cached(true).buildLiteral();
     private final Context context;
     private final Value runtimeAstCompiler;
@@ -432,6 +433,15 @@ public final class PythonAstParser {
         context.eval(TYPE_CHECK_SOURCE);
         Value diagnostics = bindings.getMember("diagnostics");
         return diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class));
+    }
+
+    /** The Java receiver types whose aliases the checker accepted, including deeper call chains. */
+    @SuppressWarnings("unchecked")
+    List<String> javaInstanceAliasTypes() {
+        Value bindings = context.getBindings(PYTHON);
+        Value checker = bindings.getMember("type_checker");
+        Value types = bindings.getMember("java_instance_alias_types");
+        return checker == null || checker.isNull() || types == null ? List.of() : List.copyOf(types.as(List.class));
     }
 
     private TransformArtifacts artifacts(TransformResult transformResult) {

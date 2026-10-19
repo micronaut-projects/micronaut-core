@@ -45,7 +45,11 @@ The underscore is only dropped when the remaining name is a Python keyword and t
 
 == Java instance members
 
-Java instances also expose unambiguous snake_case method names and read-only getter properties:
+The compiler registers unambiguous snake_case method names and read-only getter properties for
+public Java APIs referenced by imports, Java bases, or type hints, and for their method return types
+one level deep. It also registers Java receiver types whose aliases the type checker resolves in
+checked code, including deeper call chains. The registration applies to concrete implementations
+of those APIs; types reached only dynamically need an explicit import or type hint:
 
 [source,python]
 ----

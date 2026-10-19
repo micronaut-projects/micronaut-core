@@ -46,6 +46,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -112,7 +113,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * awaitable, whichever Java call returned it (see {@link PythonAsyncioRuntime#awaitJava}).
      */
     private static final Source JAVA_OBJECT_MEMBERS_SOURCE = Source.newBuilder(PYTHON, """
-        def __micronaut_register_java_object_members():
+        def __micronaut_register_java_object_members(instance_members):
             import keyword
             import java
             from polyglot import register_interop_type
@@ -131,10 +132,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                         member = host_members.inheritedMember(self, name)
                         if member is not None:
                             return member
-                        alias = host_members.methodAlias(self, name)
+                        alias = instance_members.methodAlias(self, name)
                         if alias is not None:
                             return getattr(self, alias)
-                        getter = host_members.propertyGetter(self, name)
+                        getter = instance_members.propertyGetter(self, name)
                         if getter is not None:
                             return getattr(self, getter)()
                     raise AttributeError(f"foreign object has no attribute '{name}'")
@@ -165,8 +166,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 except (KeyError, ImportError, TypeError):
                     pass  # absent, or excluded by graalpy.context.host-class-lookup
 
-        __micronaut_register_java_object_members()
-        del __micronaut_register_java_object_members
+        __micronaut_register_java_object_members
         """, "micronaut-java-object-members.py").cached(true).buildLiteral();
     /**
      * Installs the Python view of the generated Java wrappers ({@link ValueCoercible}). A wrapper a
@@ -253,8 +253,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      *
      * @param context The context
      */
-    static void registerJavaObjectMembers(Context context) {
-        context.eval(JAVA_OBJECT_MEMBERS_SOURCE);
+    static void registerJavaObjectMembers(Context context, Collection<PythonJavaInstanceMembersProvider> providers) {
+        context.eval(JAVA_OBJECT_MEMBERS_SOURCE).executeVoid(new PythonJavaInstanceMembers(providers));
     }
 
     /**
@@ -286,7 +286,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             var classLoader = applicationContext.getClassLoader();
             LOG.debug("Building Primary GraalPy context");
             long now = System.currentTimeMillis();
-            var context = buildContext(hostAccess, engine, classLoader, contextConfiguration);
+            var context = buildContextWithInstanceMembers(hostAccess, engine, classLoader, contextConfiguration,
+                APPLICATION_MAIN, applicationContext.getBeansOfType(PythonJavaInstanceMembersProvider.class));
 
             // Make context available to bridge classes
             runtime.set(PythonContextRuntime.setContext(context, classLoader));
@@ -393,6 +394,16 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                                 ClassLoader classLoader,
                                 GraalPyContextConfiguration contextConfiguration,
                                 String applicationMain) throws IOException {
+        return buildContextWithInstanceMembers(hostAccess, engine, classLoader, contextConfiguration, applicationMain,
+            SoftServiceLoader.load(PythonJavaInstanceMembersProvider.class, classLoader).collectAll());
+    }
+
+    static Context buildContextWithInstanceMembers(HostAccess hostAccess,
+                                                   Engine engine,
+                                                   ClassLoader classLoader,
+                                                   GraalPyContextConfiguration contextConfiguration,
+                                                   String applicationMain,
+                                                   Collection<PythonJavaInstanceMembersProvider> providers) throws IOException {
         System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
         System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
         long now = System.currentTimeMillis();
@@ -457,7 +468,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             // the public methods GraalPy does not expose because a non-public superclass declares them, and
             // their exceptions to `except Exception`
             now = System.currentTimeMillis();
-            registerJavaObjectMembers(context);
+            registerJavaObjectMembers(context, providers);
             LOG.debug("GraalPy Java object members registered in {}ms", System.currentTimeMillis() - now);
             // Before the application modules import: the Java packages, types and annotations they import
             // are served by the finder of the runtime module, from the manifests the compiler wrote
