@@ -24,6 +24,7 @@ from jakarta.inject import Singleton
 from java.lang import Math, StringBuilder
 from java.lang import IllegalArgumentException
 from java.net import URL, MalformedURLException
+from java.time import DateTimeException
 from java.util import AbstractMap, Objects
 
 @Singleton
@@ -253,13 +254,13 @@ class Calc:
     def guarded(self, n: int) -> int:
         try:
             value = self.risky(n)
-        except IllegalArgumentException:
+        except DateTimeException:  # an IllegalArgumentException handler would catch what compiled helpers throw: refused
             return -1
         return value + 1
 
     def risky(self, n: int) -> int:
         if n == 0:
-            raise IllegalArgumentException("zero")
+            raise DateTimeException("zero")
         return n * 2
 
     def edge(self, broken0: int) -> int:

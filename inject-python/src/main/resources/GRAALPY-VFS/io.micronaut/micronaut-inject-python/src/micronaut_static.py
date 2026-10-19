@@ -463,6 +463,16 @@ def _temporary(function):
     return name
 
 
+def _delegate_method(temporary, name):
+    """
+    The method of the Java delegate: an attribute read, or getattr for a private __name, which
+    Python would mangle to _Class__name inside the class body, a name the Java delegate does not have.
+    """
+    if name.startswith("__") and not name.endswith("__"):
+        return ast.Call(func=ast.Name(id="getattr", ctx=ast.Load()), args=[ast.Name(id=temporary, ctx=ast.Load()), ast.Constant(value=name)], keywords=[])
+    return ast.Attribute(value=ast.Name(id=temporary, ctx=ast.Load()), attr=name, ctx=ast.Load())
+
+
 def _delegation(function, conversion=None):
     args = function.args
     receiver = (list(args.posonlyargs) + list(args.args))[0].arg
@@ -478,7 +488,7 @@ def _delegation(function, conversion=None):
         ),
     )
     result = ast.Call(
-        func=ast.Attribute(value=ast.Name(id=temporary, ctx=ast.Load()), attr=function.name, ctx=ast.Load()),
+        func=_delegate_method(temporary, function.name),
         args=[ast.Name(id=name, ctx=ast.Load()) for name in names],
         keywords=[],
     )
@@ -491,7 +501,7 @@ def _delegation(function, conversion=None):
         result = ast.Call(
             func=ast.Lambda(args=ast.arguments(posonlyargs=[], args=[ast.arg(arg="__mn_m")], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]), body=result),
             args=[ast.Call(
-                func=ast.Attribute(value=ast.Name(id=temporary, ctx=ast.Load()), attr=function.name, ctx=ast.Load()),
+                func=_delegate_method(temporary, function.name),
                 args=[ast.Name(id=name, ctx=ast.Load()) for name in names],
                 keywords=[],
             )],

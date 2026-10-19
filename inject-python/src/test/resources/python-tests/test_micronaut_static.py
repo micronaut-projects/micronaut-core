@@ -870,6 +870,78 @@ class Calc:
         self.assertIn("return __mn_java_1.marked()", source)
         compile(tree, "delegated.py", "exec")
 
+    def test_a_private_method_delegates_by_the_name_the_java_delegate_has(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class Calc:
+    def __helper(self, n: int) -> int:
+        return n
+''')
+        self.assertEqual(1, apply_delegation(tree, ["Calc#__helper"]))
+        source = ast.unparse(tree)
+        # an attribute read would be mangled to _Calc__helper inside the class body
+        self.assertIn("return getattr(__mn_java, '__helper')(n)", source)
+
+
+SIBLINGS = '''
+from jakarta.inject import Singleton
+
+
+@Singleton
+class Base:
+    def __secret(self, n: int) -> int:
+        return n
+
+    def helper(self, n: int) -> int:
+        return n + 1
+
+    def kept(self, n: int) -> int:
+        return n
+
+    def run(self, n: int) -> int:
+        return self.__secret(n) + self.helper(n) + self.kept(n)
+
+    def checked(self, n: int) -> bool:
+        return self.helper(n) is None
+
+    def counted(self) -> int:
+        return self.__count
+
+
+class Inheriting(Base):
+    pass
+
+
+class Overriding(Inheriting):
+    def helper(self, n: int) -> int:
+        return n * 2
+'''
+
+
+class SiblingTest(unittest.TestCase):
+    def setUp(self):
+        self.decisions, self.planner = plan(SIBLINGS, MODE_ALL, facts=FakeFacts())
+        self.bodies = {(body.className().split(".")[-1], body.methodName()): body for body in self.planner.bodies}
+        decision = self.decisions["Base.run"]
+        self.assertEqual("COMPILED", decision.outcome().name(), [(r.rule(), r.message()) for r in decision.reasons()])
+
+    def test_a_private_method_is_invoked_by_its_mangled_name(self):
+        run = self.bodies[("Base", "run")]
+        total = _uncast(list(run.body().statements())[0].value())
+        secret = _uncast(_uncast(total.left()).left())
+        self.assertEqual("_Base__secret", secret.name())
+        self.assertEqual("python", secret.dispatch())
+
+    def test_only_a_subclass_that_overrides_a_method_sends_it_through_python(self):
+        run = self.bodies[("Base", "run")]
+        total = _uncast(list(run.body().statements())[0].value())
+        self.assertEqual("python", _uncast(_uncast(total.left()).right()).dispatch())  # Overriding.helper, a grandchild's
+        self.assertEqual("java", _uncast(total.right()).dispatch())  # inherited by every subclass, overridden by none
+
+    def test_a_none_test_of_a_sibling_result_and_a_mangled_attribute_are_refused(self):
+        self.assertEqual(["unsupported-expression"], rules(self.decisions["Base.checked"]))
+        self.assertEqual(["unsupported-expression"], rules(self.decisions["Base.counted"]))
+
 
 if __name__ == "__main__":
     unittest.main()

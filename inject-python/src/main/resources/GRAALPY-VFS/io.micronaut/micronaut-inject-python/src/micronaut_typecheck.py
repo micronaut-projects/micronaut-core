@@ -1666,6 +1666,23 @@ class PythonClassModel:
     def subclass_defines(self, name):
         return any(subclass.find(name) is not None for subclass in self.subclasses)
 
+    def subclass_overrides(self, name):
+        """
+        Whether a subclass of the compilation resolves the member to another definition than this
+        class does: its own, or one of a base this class does not have. A subclass that only
+        inherits the member does not; one whose lookup the checker cannot follow may.
+        """
+        mine = self.find(name)
+        for subclass in self.subclasses:
+            if subclass.is_lookup_dynamic() or subclass.metaclass:
+                return True
+            found = subclass.find(name)
+            if found is None:
+                continue
+            if mine is None or found[0] != mine[0] or (len(found) > 1 and len(mine) > 1 and found[1] is not mine[1]):
+                return True
+        return False
+
     def member_names(self, seen=None):
         seen = seen or set()
         if self.qualified in seen:

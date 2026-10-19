@@ -155,6 +155,14 @@ def _assigned_names(statements):
     return names
 
 
+def _mangled(class_name, name):
+    """The name Python stores a private attribute of a class under: __name in class C is _C__name."""
+    if not name.startswith("__") or name.endswith("__"):
+        return name
+    stripped = class_name.lstrip("_")
+    return f"_{stripped}{name}" if stripped else name
+
+
 def _decorated_with(function_node, names):
     for decorator in function_node.decorator_list:
         target = decorator.func if isinstance(decorator, ast.Call) else decorator
@@ -1193,6 +1201,9 @@ class Lowering:
         """The Java type of a property of self, from the hint of the attribute or property."""
         if self.class_model is None:
             self._refuse("unknown-self-attribute", f"self.{name} has no known type", node)
+        if _mangled(self.class_model.name.split(".")[-1], name) != name:
+            # Python stores self.__name as _Class__name, which the stub's accessors do not know
+            self._refuse("unsupported-expression", f"the private attribute [{name}] is name-mangled; reading or writing it has no static lowering", node)
         found = self.class_model.find(name)
         if found is None:
             self._refuse("unknown-self-attribute", f"[{self.class_model.name}] has no attribute [{name}]", node)
@@ -1290,6 +1301,10 @@ class Lowering:
         if found[0] != "method":
             self._refuse("sibling-call", f"calling [{name}], which is not a method of the class, has no static lowering", node)
         function_def, function_node = found[1], found[2]
+        python_name = _mangled(self.class_model.name.split(".")[-1], name)
+        if python_name != name and name not in self.class_model.methods:
+            # Python looks up self.__name as _Class__name of the calling class, which a base's __name is not
+            self._refuse("sibling-call", f"the private method [{name}] is not a method of [{self.class_model.name}]: Python mangles the call to [{python_name}]", node)
         if function_node is None or function_def.isStatic() or _decorated_with(function_node, ("staticmethod", "classmethod")):
             self._refuse("sibling-call", f"calling the static or class method [{name}] has no static lowering yet", node)
         if function_def.isAsync() or function_def.isGenerator():
@@ -1309,7 +1324,7 @@ class Lowering:
             return_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
         lowered_arguments = [self._expression(argument) for argument in node.args]
         parameters = [argument for argument in function_def.arguments().arguments() if argument.name() not in ("self", "cls")]
-        declares = (not name.startswith("_") and not self.advised(function_def) and not self.class_model.subclass_defines(name)
+        declares = (not name.startswith("_") and not self.advised(function_def) and not self.class_model.subclass_overrides(name)
                     and len(parameters) == len(lowered_arguments)
                     and all(argument.typeAnnotation() is not None and not argument.variadic() for argument in parameters)
                     and function_node.args.vararg is None and not function_node.args.kwonlyargs and function_node.args.kwarg is None)
@@ -1323,7 +1338,8 @@ class Lowering:
             call = Cast(call, return_type) if declared != return_type else call
         else:
             self.bridge_calls += 1
-            call = InvokeSibling(name, [], [self._boxed(argument, node) for argument in lowered_arguments], return_type, "python")
+            # a private method is invoked by the name Python mangled it to
+            call = InvokeSibling(python_name, [], [self._boxed(argument, node) for argument in lowered_arguments], return_type, "python")
         used = JAVA_NUMBERS.get(return_type, return_type)
         return Cast(call, used) if used != return_type else call
 
@@ -1407,6 +1423,9 @@ class Lowering:
         if isinstance(op, (ast.Is, ast.IsNot)):
             if isinstance(right_node, ast.Constant) and right_node.value is None:
                 if left.type() in (LONG, DOUBLE, BOOLEAN):
+                    if not _pure_operand(node.left):
+                        # the constant would drop the call, and a method of the class may return None despite its hint
+                        self._refuse("unsupported-expression", "comparing the int, float or bool result of a call with None has no static lowering", node)
                     return Const(isinstance(op, ast.IsNot), BOOLEAN)
                 return Compare("is None" if isinstance(op, ast.Is) else "is not None", left, None)
             self._refuse("unsupported-expression", "identity comparison with anything but None has no static lowering", node)
@@ -1430,6 +1449,8 @@ class Lowering:
             if NONE in (left_type, right_type):
                 other = right if left_type == NONE else left
                 if other.type() in (LONG, DOUBLE, BOOLEAN):
+                    if not _pure_operand(right_node if left_type == NONE else node.left):
+                        self._refuse("unsupported-expression", "comparing the int, float or bool result of a call with None has no static lowering", node)
                     return Const(symbol == "!=", BOOLEAN)
                 return Compare("is None" if symbol == "==" else "is not None", other, None)
             description = self.checker.facts.describe(left_type) if left_type == right_type else None
