@@ -30,6 +30,7 @@ import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
 import io.micronaut.python.processing.staticcompile.Ir;
 import io.micronaut.python.processing.staticcompile.StaticCompilationConfiguration;
 import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
+import io.micronaut.python.processing.staticcompile.StaticDelegation;
 import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
 import io.micronaut.python.processing.util.PythonJavaTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
@@ -38,6 +39,7 @@ import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.model.DecoratorDef;
 import io.micronaut.python.processing.model.ScriptDef;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
@@ -66,7 +68,8 @@ public final class PythonAstParser {
     /**
      * A system property naming a file: when set, the Truffle CPU sampler profiles the Python side
      * of the pipeline and writes a histogram of the Python functions to the file when the context
-     * closes. A development aid for the benchmarks; off otherwise.
+     * closes. A development aid for the benchmarks; off otherwise, and ignored with a warning when
+     * the Truffle tools ({@code org.graalvm.polyglot:tools}) are not on the class path.
      */
     public static final String CPU_SAMPLER_PROPERTY = "micronaut.python.cpusampler";
 
@@ -199,7 +202,7 @@ public final class PythonAstParser {
             .hostClassLoader(classLoader)
             .allowHostClassLookup(name -> name.startsWith("io.micronaut"));
         String samplerOutput = System.getProperty(CPU_SAMPLER_PROPERTY);
-        if (samplerOutput != null && !samplerOutput.isEmpty()) {
+        if (samplerOutput != null && !samplerOutput.isEmpty() && CpuSampler.AVAILABLE) {
             builder.option("cpusampler", "true")
                 .option("cpusampler.Output", "histogram")
                 .option("cpusampler.OutputFile", samplerOutput);
@@ -858,11 +861,12 @@ public final class PythonAstParser {
             long started = PipelineTimings.start();
             try {
                 result = context.eval(TRANSFORM_SOURCE);
-                PipelineTimings.stop(PipelineTimings.TRANSFORM, started);
             } catch (Exception e) {
                 StringWriter stack = new StringWriter();
                 e.printStackTrace(new PrintWriter(stack));
                 throw new ProcessingException(null, "Error processing Python source [" + source.getName() + "]: " + e.getMessage() + System.lineSeparator() + stack, e);
+            } finally {
+                PipelineTimings.stop(PipelineTimings.TRANSFORM, started);
             }
             Map map = result.as(Map.class);
             // The transformed source is only read by tests and error reports; the processor visits the
@@ -907,7 +911,10 @@ public final class PythonAstParser {
     /**
      * Rewrites the compiled functions of the runtime tree of a source to delegate to their Java
      * bodies when the Python object is bound to its stub, keeping the original body as the
-     * fallback for objects created in Python. A rewritten tree needs runtime bytecode.
+     * fallback for objects created in Python, and for the calls whose Python result the Java body
+     * would not give (see {@link StaticDelegation}). Only the bodies declared in this source are
+     * delegated to: a body without a location is not, since nothing ties it to a source. A
+     * rewritten tree needs runtime bytecode.
      *
      * @param transformResult The transformed source
      * @param plan            The static compilation plan
@@ -919,8 +926,12 @@ public final class PythonAstParser {
         String sourcePath = sourcePathOf(transformResult.originalSource());
         List<String> targets = new ArrayList<>();
         for (Ir.CompiledBody body : plan.bodies().values()) {
-            // the bodies declared in this source: a class of the same simple name in another package has its own
-            if (body.span() != null && !body.span().path().equals(sourcePath)) {
+            // the bodies declared in this source: a class of the same simple name in another source has its own
+            if (body.span() == null || !body.span().path().equals(sourcePath)) {
+                continue;
+            }
+            String target = StaticDelegation.target(body);
+            if (target == null) {
                 continue;
             }
             // a collection the Java body returns becomes a Python one for a Python caller
@@ -930,10 +941,7 @@ public final class PythonAstParser {
                 case "java.util.Map" -> "#dict";
                 default -> "";
             };
-            // a static method or a module-level function is called on its generated class
-            String owner = body.moduleLevel() ? "" : body.className().substring(body.className().lastIndexOf('.') + 1);
-            String dispatch = body.staticMethod() ? "#static=" + body.className() : "";
-            targets.add(owner + "#" + body.methodName() + dispatch + conversion);
+            targets.add(target + conversion);
         }
         if (targets.isEmpty()) {
             return 0;
@@ -1263,6 +1271,28 @@ public final class PythonAstParser {
             } catch (IOException e) {
                 throw new ProcessingException(null, "Unable to create transformed source for " + originalSource, e);
             }
+        }
+    }
+
+    /**
+     * Whether the Truffle CPU sampler can be enabled: its options are unknown to a context built
+     * without the Truffle tools on the class path, which would fail the compilation. Asked once,
+     * and only when {@link #CPU_SAMPLER_PROPERTY} is set.
+     */
+    private static final class CpuSampler {
+        static final boolean AVAILABLE = isAvailable();
+
+        private static boolean isAvailable() {
+            boolean available;
+            try (Engine engine = Engine.newBuilder().option("engine.WarnInterpreterOnly", "false").build()) {
+                available = engine.getInstruments().containsKey("cpusampler");
+            }
+            if (!available) {
+                System.getLogger(PythonAstParser.class.getName()).log(System.Logger.Level.WARNING,
+                    "The system property " + CPU_SAMPLER_PROPERTY + " is ignored: the Truffle CPU sampler "
+                        + "(org.graalvm.polyglot:tools) is not on the class path");
+            }
+            return available;
         }
     }
 }

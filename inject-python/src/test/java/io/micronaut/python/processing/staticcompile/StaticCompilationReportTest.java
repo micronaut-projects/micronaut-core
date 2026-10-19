@@ -97,4 +97,69 @@ class StaticCompilationReportTest {
         assertTrue(summary.contains("CANDIDATE     2\n"), summary);
         assertTrue(summary.contains("EXCLUDED      0\n"), summary);
     }
+
+    @Test
+    void anIncrementalBuildDropsTheFunctionsRemovedFromAPlannedSource(@TempDir Path directory) {
+        StaticCompilationReport.write(directory, StaticCompilationMode.ALL, List.of(
+            decision("shop.Orders.place", "src/shop/orders.py", 8, Outcome.CANDIDATE),
+            decision("shop.Orders.cancel", "src/shop/orders.py", 20, Outcome.CANDIDATE),
+            decision("shop.Pricing.total", "src/shop/pricing.py", 14, Outcome.CANDIDATE)
+        ), null);
+
+        // cancel was removed from orders.py, the only source this build planned
+        List<StaticCompilationDecision> all = StaticCompilationReport.write(directory, StaticCompilationMode.ALL, List.of(
+            decision("shop.Orders.place", "src/shop/orders.py", 8, Outcome.SKIPPED, new Reason("unhinted-return", "no return hint", null))
+        ), Set.of("src/shop/orders.py"));
+
+        assertEquals(List.of("shop.Pricing.total", "shop.Orders.place"), all.stream().map(StaticCompilationDecision::qualifiedName).toList());
+        assertEquals(Outcome.SKIPPED, all.get(1).outcome());
+        assertEquals(all, StaticCompilationReport.readState(directory.resolve(StaticCompilationReport.STATE_FILE)));
+    }
+
+    @Test
+    void plannedSourcesMatchTheRetainedDecisionsWhateverThePathForm(@TempDir Path directory) throws IOException {
+        Path sources = Files.createDirectories(directory.resolve("real/src"));
+        Path orders = Files.writeString(sources.resolve("orders.py"), "");
+        Path pricing = Files.writeString(sources.resolve("pricing.py"), "");
+        Path legacy = Files.writeString(sources.resolve("legacy.py"), "");
+        Path link = directory.resolve("link");
+        boolean linked;
+        try {
+            Files.createSymbolicLink(link, directory.resolve("real"));
+            linked = true;
+        } catch (IOException | UnsupportedOperationException e) {
+            linked = false;
+        }
+        // the decisions record the sources as the parser saw them: through the link, or relative and not normalized
+        String ordersAsParsed = linked ? link.resolve("src/orders.py").toString() : sources.resolve("../src/orders.py").toString();
+        String legacyAsParsed = linked ? link.resolve("src/legacy.py").toString() : sources.resolve("./legacy.py").toString();
+        Path report = directory.resolve("report");
+        StaticCompilationReport.write(report, StaticCompilationMode.ALL, List.of(
+            decision("Orders.place", ordersAsParsed, 8, Outcome.CANDIDATE),
+            decision("Pricing.total", pricing.toString(), 14, Outcome.CANDIDATE),
+            decision("Legacy.run", legacyAsParsed, 3, Outcome.CANDIDATE)
+        ), null);
+        Files.delete(legacy);
+
+        // an incremental build names the affected sources by their real paths, a deleted one included
+        List<StaticCompilationDecision> all = StaticCompilationReport.write(report, StaticCompilationMode.ALL, List.of(
+            decision("Orders.place", ordersAsParsed, 8, Outcome.SKIPPED)
+        ), Set.of(orders.toRealPath().toString(), sources.toRealPath().resolve("legacy.py").toString()));
+
+        assertEquals(List.of("Pricing.total", "Orders.place"), all.stream().map(StaticCompilationDecision::qualifiedName).toList());
+        assertEquals(StaticCompilationReport.sourceKey(orders.toString()), StaticCompilationReport.sourceKey(ordersAsParsed));
+    }
+
+    @Test
+    void aFullWriteSharingTheDirectoryKeepsTheOtherSourcesAndSaysFull(@TempDir Path directory) throws IOException {
+        StaticCompilationReport.write(directory, StaticCompilationMode.ALL, List.of(
+            decision("first.Service.run", "src/first/service.py", 4, Outcome.CANDIDATE)
+        ), null);
+        List<StaticCompilationDecision> all = StaticCompilationReport.write(directory, StaticCompilationMode.ALL, List.of(
+            decision("second.Service.run", "src/second/service.py", 4, Outcome.CANDIDATE)
+        ), Set.of("src/second/service.py"), false);
+
+        assertEquals(List.of("first.Service.run", "second.Service.run"), all.stream().map(StaticCompilationDecision::qualifiedName).toList());
+        assertEquals("{\"record\":\"plan\",\"mode\":\"all\",\"coverage\":\"full\"}", Files.readAllLines(directory.resolve(StaticCompilationReport.DECISIONS_FILE)).get(0));
+    }
 }

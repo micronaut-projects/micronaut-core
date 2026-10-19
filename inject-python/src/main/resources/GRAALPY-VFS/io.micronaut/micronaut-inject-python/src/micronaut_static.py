@@ -20,7 +20,9 @@ function of the compilation as Java ``StaticCompilationDecision`` values:
   without a lowering, is ``SKIPPED`` with those reasons.
 
 An explicit ``@CompileStatic`` that cannot be honoured is reported as a warning (an error when the
-planner is strict); mode ``all`` never warns, since skipping is the expected common case there.
+planner is strict): a function-level switch warns whenever its function is not compiled, a class- or
+module-level one for each method of its scope that is ``SKIPPED``, except in mode ``all``, where
+skipping is the expected common case.
 """
 import ast
 
@@ -39,6 +41,7 @@ ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
 MICRONAUT_TEST = "io.micronaut.test.extensions.junit5.annotation.MicronautTest"
 
 MODE_OFF = "off"
+# decides exactly as MODE_OFF does; the processor runs the planner for it over every compilation and always writes the report
 MODE_ANNOTATED = "annotated"
 MODE_ALL = "all"
 MODES = (MODE_OFF, MODE_ANNOTATED, MODE_ALL)
@@ -107,8 +110,14 @@ class StaticPlanner:
     def plan(self, checker, visitor_context=None):
         """
         Decide every function recorded by the type checker; returns the decisions. The checker's
-        facts are created from the visitor context when its own check did not run.
+        facts are created from the visitor context when its own check did not run. Every plan starts
+        afresh: the decisions and diagnostics of an earlier plan are dropped, so a planner that
+        outlives one compilation element never reports a decision twice.
         """
+        self.decisions = []
+        self.diagnostics = []
+        self._decided = {}
+        self._bodies = {}
         if getattr(checker, "facts", None) is None and visitor_context is not None:
             checker.facts = TypeFacts(visitor_context)
             checker.python_classes = PythonClasses(checker)
@@ -192,9 +201,9 @@ class StaticPlanner:
         body, reasons = self._lower(module, class_def, function_def, node, java_layout)
         if body is None:
             return self._record(qualified, span, "SKIPPED", scope, reasons, statements, explicit=scope != "MODE")
-        if class_def is None and not module.decorators and body.stats().bridgeCalls() > 0:
-            # a module without a module-level annotation is served by a context pool: a body of its
-            # generated class runs outside any Python context, so it cannot reach a Python object
+        if class_def is None and body.stats().bridgeCalls() > 0 and self._pooled_module(module):
+            # a module served by a context pool: a body of its generated class runs outside any
+            # Python context, so it cannot reach a Python object
             reason = ("pooled-module", "the module is served by a context pool; a body reaching a Python object has no context to reach it in", span)
             return self._record(qualified, span, "SKIPPED", scope, [reason], statements, explicit=scope != "MODE")
         if class_def is None and body.staticMethod() and not _generates_class(getattr(module, "script", None)):
@@ -261,6 +270,10 @@ class StaticPlanner:
                 # the generated class holds one static method of the name, and the Python callers delegating by it could reach the other body
                 reasons.append(("unsupported-statement", f"the module defines [{function_def.name()}] more than once; only one static Java method of the name can be generated", span))
                 return reasons
+            advice = self._advice(None, function_def, module.decorators)
+            if advice is not None:
+                # the generated class of a module binds no compiled advice: a compiled body would run without its chain
+                reasons.append(("intercepted-method", f"the function is advised by [{advice}]; the generated class of a module does not run the interceptor chain of a compiled body; not compiled yet", span))
         else:
             if id(class_def) not in self._ineligibility:
                 self._ineligibility[id(class_def)] = self._class_ineligibility(class_def, class_node)
@@ -299,18 +312,19 @@ class StaticPlanner:
                 return True
         return False
 
-    def _advice(self, class_def, function_def):
+    def _advice(self, class_def, function_def, module_decorators=()):
         """
-        The annotation advising the method, or None: an around or introduction binding on the method
-        or its class, or a validation constraint on a parameter or the return, which validates the
-        call. The Java method of an advised method runs the interceptor chain its proxy binds before
+        The annotation advising the method, or None: an around or introduction binding on the method,
+        its class or, for a module-level function, its module, or a validation constraint on a
+        parameter or the return, which validates the call. The Java method of an advised method runs the interceptor chain its proxy binds before
         the body; a Python caller reaches the chain on the Python object, which runs the body through
         the delegate.
         """
         facts = getattr(self.checker, "facts", None)
         if facts is None:
             return None
-        for decorator in list(function_def.decorators()) + (list(class_def.decorators()) if class_def is not None else []):
+        enclosing = list(class_def.decorators()) if class_def is not None else list(module_decorators or ())
+        for decorator in list(function_def.decorators()) + enclosing:
             description = self._annotation(facts, decorator)
             if description is not None and description.interceptorBinding():
                 return decorator.annotationName().rsplit(".", 1)[-1]
@@ -323,6 +337,23 @@ class StaticPlanner:
             if description is not None and description.validationConstraint():
                 return decorator.annotationName().rsplit(".", 1)[-1]
         return None
+
+    def _pooled_module(self, module):
+        """
+        Whether the generated class of the module is served by a context pool, as the script element
+        decides: unless a module-level annotation declares a scope (``@ContextPooled`` itself being
+        one that pools). A module-level annotation that is no scope (``@Controller``, ``@Requires``)
+        keeps the module pooled; an annotation without facts counts as no scope, so the planner errs
+        on the side of the refusal.
+        """
+        facts = getattr(self.checker, "facts", None)
+        for decorator in module.decorators or ():
+            if decorator.annotationName().rsplit(".", 1)[-1] == POOLED_DECORATOR:
+                return True
+            description = self._annotation(facts, decorator) if facts is not None else None
+            if description is not None and description.scope():
+                return False
+        return True
 
     def _bridged(self, function_def):
         """Whether the stub generator gives a module-level function a Java method: a decorator of an executable kind."""
@@ -583,7 +614,8 @@ def _generates_class(script):
     return script is not None and (len(script.functions()) > 0 or len(script.attributes()) > 0 or len(script.decorators()) > 0)
 
 
-# the attribute holding the delegate of the stub on its Python object (PythonStatic.COMPILED_MEMBER)
+# the class attribute through which the rewritten methods of a class reach the Java bodies of its bound
+# objects (PythonStatic.COMPILED_MEMBER): None until an object of the class is bound
 JAVA_INSTANCE_MEMBER = "__micronaut_compiled__"
 
 
@@ -592,58 +624,104 @@ def apply_delegation(tree, targets):
     Rewrite the compiled functions of a runtime module tree so that, on an object bound to its
     Java stub, the Java body runs instead of the Python one::
 
-        def total(self, quantity, unit_price):
-            __mn_java = self.__dict__.get('__micronaut_compiled__')
-            if __mn_java is not None:
-                return __mn_java.total(quantity, unit_price)
-            ...the original body, for objects created in Python...
+        class Calc:
+            __micronaut_compiled__ = None
+
+            def total(self, quantity, unit_price):
+                __mn_java = __class__.__micronaut_compiled__
+                if __mn_java is not None:
+                    __mn_java_p = None
+                    try:
+                        __mn_java = __mn_java.call(self, 'app.Calc', 'total', (quantity, unit_price), ('int', 'float'), True)
+                    except BaseException as __mn_java_e:
+                        __mn_java_p = _mn_python_exception(__mn_java_e)
+                        if __mn_java_p is None:
+                            raise
+                    if __mn_java_p is not None:
+                        raise __mn_java_p
+                    if __mn_java is not None:
+                        return __mn_java[0]
+                ...the original body, for objects created in Python...
+
+    The rewritten function names the class it is defined in (``__class__``) and the generated
+    class of that class, so ``super().total()`` from a subclass runs the base's Java body, not the
+    override. The binding of an object lives outside it, in the registry the class attribute
+    holds once an object of the class is bound (``micronaut_runtime``): a copy of the object is
+    not bound and runs the Python body on its own attributes. The registry runs the Java body only
+    when every argument has the exact Python type and range of its Java parameter, and runs the
+    Python body when a body that may be run again fails, see ``StaticDelegation``.
 
     The Java body of a compiled function raises the generated Java class of an exception class of
     the compilation, which the Python caller catches as the Python class: the prologue raises the
     Python exception the Java one carries (see ``_mn_python_exception``), and any other exception
-    as it is.
+    as it is. The Python exception is raised after the handler, so it keeps its own cause and
+    context: inside the handler Python would chain the Java exception as its context.
 
-    ``targets`` are ``Class#method`` strings, a nested class as ``Outer$Inner``, with ``#list``,
-    ``#set`` or ``#dict`` appended when the Java body returns a collection, which a Python caller
-    receives as a Python one. A static method carries ``#static=<the generated class>``, and a
-    module-level function an empty class part: they delegate to the static Java method of the
-    generated class, looked up once per module::
+    ``targets`` are ``Class#method#owner=<generated class>#kinds=<kind,...>#retry`` (``#once``
+    for a body that is not run again) strings, a nested class as ``Outer$Inner``; a target without
+    its kinds is not delegated. ``#list``, ``#set`` or ``#dict`` is appended when the Java body
+    returns a collection, which a Python caller receives as a Python one.
+
+    A static method carries ``#static=<the generated class>`` in place of the owner, and a
+    module-level function an empty class part: they call the static Java method of the generated
+    class, looked up once per module, under the same checks of the arguments. Without a bound
+    object a failure cannot reach the caller as Python's exception, so only a body that may be run
+    again (``#retry``) delegates, and the Python body runs when it fails, raising its own
+    exceptions::
 
         def user_public(user):
-            __mn_java = _mn_static_class('app.Mappers')
+            __mn_java = _mn_static_call('app.Mappers', 'user_public', (user,), ('java:app.User',))
             if __mn_java is not None:
-                return __mn_java.user_public(user)
-            ...the original body, when the generated class is not on the class path...
+                return __mn_java[0]
+            ...the original body, when the class is not on the class path, or the call cannot or did not run...
 
     Returns how many functions were rewritten.
     """
     wanted = {}
     for target in targets:
         class_name, method, *rest = target.split("#")
-        static_class = next((part[len("static="):] for part in rest if part.startswith("static=")), None)
-        conversion = next((part for part in rest if part in ("list", "set", "dict")), None)
-        wanted.setdefault(class_name, {})[method] = (conversion, static_class)
+        options = dict(part.split("=", 1) if "=" in part else (part, True) for part in rest)
+        if "kinds" not in options:
+            continue
+        kinds = tuple(kind for kind in options["kinds"].split(",") if kind)
+        conversion = next((name for name in ("list", "set", "dict") if name in options), None)
+        static_class = options.get("static")
+        if static_class is not None and "retry" not in options:
+            continue  # a static body that cannot be run again keeps the Python body, see above
+        wanted.setdefault(class_name, {})[method] = (options.get("owner", class_name), kinds, "retry" in options, conversion, static_class)
     count = 0
     for class_node, path in _classes(tree):
         methods = wanted.get("$".join(path))
         if not methods:
             continue
+        rewritten = 0
         for statement in class_node.body:
             if isinstance(statement, ast.FunctionDef) and statement.name in methods and not _delegates(statement):
-                conversion, static_class = methods[statement.name]
+                owner, kinds, retry, conversion, static_class = methods[statement.name]
                 if static_class is not None:
-                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, conversion)
-                else:
-                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, conversion)
+                    if not _takes_exactly(statement, kinds):
+                        continue
+                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion)
+                    ast.fix_missing_locations(statement)
+                    count += 1
+                    continue
+                if not _receives_self(statement, kinds):
+                    continue
+                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, owner, kinds, retry, conversion)
                 ast.fix_missing_locations(statement)
-                count += 1
+                rewritten += 1
+        if rewritten and not _declares_member(class_node):
+            member = ast.Assign(targets=[ast.Name(id=JAVA_INSTANCE_MEMBER, ctx=ast.Store())], value=ast.Constant(value=None))
+            _locate([member], class_node.lineno, class_node.col_offset)
+            class_node.body.insert(_docstring_offset(class_node), member)
+        count += rewritten
     functions = wanted.get("")
     if functions:
         for statement in tree.body:
             if isinstance(statement, ast.FunctionDef) and statement.name in functions and not _delegates(statement):
-                conversion, static_class = functions[statement.name]
-                if static_class is not None:
-                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, conversion)
+                _, kinds, _, conversion, static_class = functions[statement.name]
+                if static_class is not None and _takes_exactly(statement, kinds):
+                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion)
                     ast.fix_missing_locations(statement)
                     count += 1
     if count and not any(isinstance(statement, ast.FunctionDef) and statement.name == STATIC_LOOKUP for statement in tree.body):
@@ -661,9 +739,12 @@ def apply_delegation(tree, targets):
 
 
 # the helpers of the rewritten functions, added once to a module with a rewritten function: the lookup of
-# the generated class a static Java method belongs to, cached per module, and the Python exception a Java
-# exception carries
+# the generated class a static Java method belongs to, cached per module; the call of the static Java
+# method, only when every argument has the exact Python type and range of its Java parameter
+# (micronaut_runtime), else, or when the Java body fails, None, so the Python body runs; and the Python
+# exception a Java exception carries
 STATIC_LOOKUP = "_mn_static_class"
+STATIC_CALL = "_mn_static_call"
 PYTHON_EXCEPTION = "_mn_python_exception"
 HELPERS_SOURCE = """
 _mn_static_classes = {}
@@ -679,6 +760,23 @@ def _mn_static_class(name):
             found = None
         _mn_static_classes[name] = found
     return found
+
+
+def _mn_static_call(name, method, arguments, kinds):
+    found = _mn_static_class(name)
+    if found is None:
+        return None
+    try:
+        from micronaut_runtime import _micronaut_fits as fits
+    except Exception:
+        return None
+    for argument, kind in zip(arguments, kinds):
+        if not fits(argument, kind):
+            return None
+    try:
+        return (getattr(found, method)(*arguments),)
+    except Exception:
+        return None
 
 
 def _mn_python_exception(error):
@@ -714,56 +812,80 @@ def _docstring_offset(function):
 DELEGATE_LOCAL = "__mn_java"
 
 
+def _declares_member(class_node):
+    return any(isinstance(statement, ast.Assign) and any(isinstance(target, ast.Name) and target.id == JAVA_INSTANCE_MEMBER for target in statement.targets)
+               for statement in class_node.body)
+
+
+def _receives_self(function, kinds):
+    """Whether the function takes the object and exactly the parameters the Java body does, positionally."""
+    args = function.args
+    positional = list(args.posonlyargs) + list(args.args)
+    return bool(positional) and len(positional) - 1 == len(kinds) and args.vararg is None and args.kwarg is None and not args.kwonlyargs
+
+
 def _delegates(function):
-    """Whether the function is already rewritten: its first statement reads the delegate of the object, or looks the generated class up."""
+    """Whether the function is already rewritten: its first statement reads the registry of its class, or calls the static Java method."""
     body = function.body
     first = body[_docstring_offset(function)] if len(body) > _docstring_offset(function) else None
-    if not (isinstance(first, ast.Assign) and isinstance(first.value, ast.Call)):
+    if not isinstance(first, ast.Assign):
         return False
-    call = first.value
-    if isinstance(call.func, ast.Name) and call.func.id == STATIC_LOOKUP:
+    value = first.value
+    if isinstance(value, ast.Call) and isinstance(value.func, ast.Name) and value.func.id == STATIC_CALL:
         return True
-    return (isinstance(call.func, ast.Attribute) and call.func.attr == "get" and len(call.args) == 1
-            and isinstance(call.args[0], ast.Constant) and call.args[0].value == JAVA_INSTANCE_MEMBER)
+    return (isinstance(value, ast.Attribute) and value.attr == JAVA_INSTANCE_MEMBER
+            and isinstance(value.value, ast.Name) and value.value.id == "__class__")
 
 
-def _static_delegation(function, static_class, conversion=None):
-    """The prologue of a static method or a module-level function: the static Java method of the generated class, when it is loadable."""
+def _takes_exactly(function, kinds):
+    """Whether a static method or a module-level function takes exactly the parameters the Java body does, positionally."""
+    args = function.args
+    positional = list(args.posonlyargs) + list(args.args)
+    return len(positional) == len(kinds) and args.vararg is None and args.kwarg is None and not args.kwonlyargs
+
+
+def _static_delegation(function, static_class, kinds, conversion=None):
+    """The prologue of a static method or a module-level function: the static Java method of the generated class, when it is loadable and the arguments fit it."""
     args = function.args
     names = [argument.arg for argument in list(args.posonlyargs) + list(args.args)]
-    line, column = function.lineno, function.col_offset
     temporary = _temporary(function)
-    lookup = ast.Assign(
+    call = ast.Assign(
         targets=[ast.Name(id=temporary, ctx=ast.Store())],
-        value=ast.Call(func=ast.Name(id=STATIC_LOOKUP, ctx=ast.Load()), args=[ast.Constant(value=static_class)], keywords=[]),
+        value=ast.Call(
+            func=ast.Name(id=STATIC_CALL, ctx=ast.Load()),
+            args=[
+                ast.Constant(value=static_class),
+                ast.Constant(value=function.name),
+                ast.Tuple(elts=[ast.Name(id=name, ctx=ast.Load()) for name in names], ctx=ast.Load()),
+                ast.Tuple(elts=[ast.Constant(value=kind) for kind in kinds], ctx=ast.Load()),
+            ],
+            keywords=[],
+        ),
     )
-    result = ast.Call(
-        func=ast.Attribute(value=ast.Name(id=temporary, ctx=ast.Load()), attr=function.name, ctx=ast.Load()),
-        args=[ast.Name(id=name, ctx=ast.Load()) for name in names],
-        keywords=[],
+    result = _converted(ast.Subscript(value=ast.Name(id=temporary, ctx=ast.Load()), slice=ast.Constant(value=0), ctx=ast.Load()), conversion)
+    guard = ast.If(
+        test=ast.Compare(left=ast.Name(id=temporary, ctx=ast.Load()), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
+        body=[ast.Return(value=result)],
+        orelse=[],
     )
-    result = _converted(result, conversion, temporary, function.name, names)
-    statements = [lookup, _guarded_return(temporary, result)]
-    for statement in ast.walk(ast.Module(body=statements, type_ignores=[])):
-        if isinstance(statement, (ast.stmt, ast.expr)):
-            statement.lineno = statement.end_lineno = line
-            statement.col_offset = statement.end_col_offset = column
+    statements = [call, guard]
+    _locate(statements, function.lineno, function.col_offset)
     return statements
 
 
-def _guarded_return(temporary, result):
+def _translating(temporary, call):
     """
-    ``if <temporary> is not None: return <result>``, raising the Python exception a Java exception of
-    the call carries::
+    The call of the Java body, raising the Python exception a Java exception of the call carries::
 
-        if __mn_java is not None:
-            try:
-                return __mn_java.total(quantity, unit_price)
-            except BaseException as __mn_e:
-                __mn_p = _mn_python_exception(__mn_e)
-                if __mn_p is None:
-                    raise
-            raise __mn_p
+        __mn_java_p = None
+        try:
+            __mn_java = __mn_java.call(...)
+        except BaseException as __mn_java_e:
+            __mn_java_p = _mn_python_exception(__mn_java_e)
+            if __mn_java_p is None:
+                raise
+        if __mn_java_p is not None:
+            raise __mn_java_p
 
     The Python exception is raised after the handler, so it keeps its own cause and context: inside
     the handler Python would chain the Java exception as its context, and ``raise ... from`` would
@@ -786,16 +908,19 @@ def _guarded_return(temporary, result):
             ),
         ],
     )
-    attempt = ast.Try(body=[ast.Return(value=result)], handlers=[handler], orelse=[], finalbody=[])
-    return ast.If(
-        test=ast.Compare(left=ast.Name(id=temporary, ctx=ast.Load()), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
-        body=[attempt, ast.Raise(exc=ast.Name(id=found, ctx=ast.Load()), cause=None)],
-        orelse=[],
-    )
+    return [
+        ast.Assign(targets=[ast.Name(id=found, ctx=ast.Store())], value=ast.Constant(value=None)),
+        ast.Try(body=[call], handlers=[handler], orelse=[], finalbody=[]),
+        ast.If(
+            test=ast.Compare(left=ast.Name(id=found, ctx=ast.Load()), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
+            body=[ast.Raise(exc=ast.Name(id=found, ctx=ast.Load()), cause=None)],
+            orelse=[],
+        ),
+    ]
 
 
-def _converted(result, conversion, temporary, name, names):
-    """The call of the Java method with its collection result converted for the Python caller."""
+def _converted(result, conversion):
+    """The result of a Java method with its collection converted for the Python caller."""
     if conversion in ("list", "set"):
         return ast.Call(func=ast.Name(id=conversion, ctx=ast.Load()), args=[result], keywords=[])
     if conversion == "dict":
@@ -822,45 +947,56 @@ def _temporary(function):
     return name
 
 
-def _delegation(function, conversion=None):
+def _locate(statements, line, column):
+    for statement in statements:
+        for node in ast.walk(statement):
+            if isinstance(node, (ast.stmt, ast.expr)):
+                node.lineno = node.end_lineno = line
+                node.col_offset = node.end_col_offset = column
+
+
+def _delegation(function, owner, kinds, retry, conversion=None):
     args = function.args
-    receiver = (list(args.posonlyargs) + list(args.args))[0].arg
-    names = [argument.arg for argument in list(args.posonlyargs) + list(args.args)][1:]
-    line, column = function.lineno, function.col_offset
+    positional = list(args.posonlyargs) + list(args.args)
+    receiver = positional[0].arg
+    names = [argument.arg for argument in positional[1:]]
     temporary = _temporary(function)
+
+    def load(name):
+        return ast.Name(id=name, ctx=ast.Load())
+
     lookup = ast.Assign(
         targets=[ast.Name(id=temporary, ctx=ast.Store())],
+        value=ast.Attribute(value=load("__class__"), attr=JAVA_INSTANCE_MEMBER, ctx=ast.Load()),
+    )
+    call = ast.Assign(
+        targets=[ast.Name(id=temporary, ctx=ast.Store())],
         value=ast.Call(
-            func=ast.Attribute(value=ast.Attribute(value=ast.Name(id=receiver, ctx=ast.Load()), attr="__dict__", ctx=ast.Load()), attr="get", ctx=ast.Load()),
-            args=[ast.Constant(value=JAVA_INSTANCE_MEMBER)],
+            func=ast.Attribute(value=load(temporary), attr="call", ctx=ast.Load()),
+            args=[
+                load(receiver),
+                ast.Constant(value=owner),
+                ast.Constant(value=function.name),
+                ast.Tuple(elts=[load(name) for name in names], ctx=ast.Load()),
+                ast.Tuple(elts=[ast.Constant(value=kind) for kind in kinds], ctx=ast.Load()),
+                ast.Constant(value=retry),
+            ],
             keywords=[],
         ),
     )
-    result = ast.Call(
-        func=ast.Attribute(value=ast.Name(id=temporary, ctx=ast.Load()), attr=function.name, ctx=ast.Load()),
-        args=[ast.Name(id=name, ctx=ast.Load()) for name in names],
-        keywords=[],
+    result = _converted(ast.Subscript(value=load(temporary), slice=ast.Constant(value=0), ctx=ast.Load()), conversion)
+    returned = ast.If(
+        test=ast.Compare(left=load(temporary), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
+        body=[ast.Return(value=result)],
+        orelse=[],
     )
-    if conversion in ("list", "set"):
-        result = ast.Call(func=ast.Name(id=conversion, ctx=ast.Load()), args=[result], keywords=[])
-    elif conversion == "dict":
-        # dict((k, m.get(k)) for k in m.keySet()): a Java map read through its interop members
-        result = ast.parse("dict((__mn_k, __mn_m.get(__mn_k)) for __mn_k in __mn_m.keySet())").body[0].value
-        result.args[0].generators[0].iter.func.value = _result_holder()
-        result = ast.Call(
-            func=ast.Lambda(args=ast.arguments(posonlyargs=[], args=[ast.arg(arg="__mn_m")], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]), body=result),
-            args=[ast.Call(
-                func=ast.Attribute(value=ast.Name(id=temporary, ctx=ast.Load()), attr=function.name, ctx=ast.Load()),
-                args=[ast.Name(id=name, ctx=ast.Load()) for name in names],
-                keywords=[],
-            )],
-            keywords=[],
-        )
-    statements = [lookup, _guarded_return(temporary, result)]
-    for statement in ast.walk(ast.Module(body=statements, type_ignores=[])):
-        if isinstance(statement, (ast.stmt, ast.expr)):
-            statement.lineno = statement.end_lineno = line
-            statement.col_offset = statement.end_col_offset = column
+    guard = ast.If(
+        test=ast.Compare(left=load(temporary), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
+        body=_translating(temporary, call) + [returned],
+        orelse=[],
+    )
+    statements = [lookup, guard]
+    _locate(statements, function.lineno, function.col_offset)
     return statements
 
 

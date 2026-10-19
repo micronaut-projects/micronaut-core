@@ -17,7 +17,6 @@ package io.micronaut.context.python.aop;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * A generated class with compiled advised methods: the proxy of the bean binds the advice the
@@ -27,7 +26,6 @@ import org.jspecify.annotations.NullMarked;
  */
 @Experimental
 @Internal
-@NullMarked
 public interface StaticAdviceTarget {
 
     /**
