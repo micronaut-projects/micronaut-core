@@ -190,4 +190,41 @@ public interface PathVariables extends NamedValues {
     default <T> Optional<List<T>> findList(String name, Class<T> type) {
         return find(name, Argument.listOf(type));
     }
+
+    /**
+     * The variables with their values as they appear in the path of the request, not
+     * percent-decoded, e.g. {@code a%2Fb} for {@code a/b}, {@code +} that is not a space, and the
+     * percent-encoded bytes of a non-ASCII value: what a framework needs for a variable it must
+     * not decode, e.g. a JAX-RS {@code @Encoded} path parameter. The variables of the prefixes of
+     * the locator routes of a located route are raw as well. The accessors convert the raw values
+     * like the decoded ones, and the raw variables of the raw variables are themselves.
+     *
+     * <pre>{@code
+     * @Get("/files/{name}")
+     * String file(PathVariables pathVariables) {
+     *     return pathVariables.raw().getString("name"); // "a%2Fb" for /files/a%2Fb
+     * }
+     * }</pre>
+     *
+     * @return The raw variables
+     * @throws UnsupportedOperationException if the source of the variables does not have their raw
+     * values, e.g. a route match of another router
+     * @since 5.3.0
+     */
+    default PathVariables raw() {
+        throw new UnsupportedOperationException("The raw values of the path variables are not available");
+    }
+
+    /**
+     * The value of a required variable as it appears in the path, not percent-decoded, see
+     * {@link #raw()}.
+     *
+     * @param name The name of the variable
+     * @return The raw value
+     * @throws RuntimeException if the variable has no value, answered with 400
+     * @since 5.3.0
+     */
+    default String rawString(String name) {
+        return raw().getString(name);
+    }
 }

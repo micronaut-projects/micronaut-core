@@ -161,15 +161,6 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return copy;
     }
 
-    /**
-     * Whether the class extends the Python builtin {@code Exception}, directly or through a Python base.
-     *
-     * @return {@code true} for a Python exception class, whose generated class is a {@link RuntimeException}
-     */
-    public boolean extendsPythonException() {
-        return false;
-    }
-
     protected final @Nullable ClassElement findPythonClass(TypeRef typeRef) {
         Map<String, ClassElement> classes = environment.classes();
         ClassElement classElement = classes.get(typeRef.name());
@@ -886,16 +877,9 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     }
 
     private static boolean isStaticProperty(PropertyElement property) {
-        // Check if the property is backed by a static field
-        return property.getField()
-            .map(field -> {
-                if (field instanceof PythonFieldElement pythonField) {
-                    AttributeDef attrDef = pythonField.getNativeType();
-                    return attrDef.isStatic();
-                }
-                return false;
-            })
-            .orElse(false);
+        Optional<FieldElement> field = property instanceof PythonPropertyElement pythonProperty
+            ? pythonProperty.getAttributeField() : property.getField();
+        return field.map(FieldElement::isStatic).orElse(false);
     }
 
     private final class PythonEnclosedElementsQuery extends EnclosedElementsQuery<ClassDef, ElementDef> {

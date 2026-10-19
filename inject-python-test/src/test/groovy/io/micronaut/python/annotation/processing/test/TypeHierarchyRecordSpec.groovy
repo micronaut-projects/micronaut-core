@@ -19,6 +19,10 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
+import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.MethodElement
 import io.micronaut.python.compiler.PyronautCompiler
 
 
@@ -134,5 +138,125 @@ class Diamond(Left[str], Right[str]):
         then: "the interfaces List adds in later JDKs aside"
         strings(closure) - ['SequencedCollection<Integer>'] == ['ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>',
                                                                  'Iterable<Integer>', 'List<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Object']
+    }
+
+    void "recording a type reports the super types the record leaves out, as the record lists them"() {
+        given: "a visitor that records the imported classes a second time and keeps what the API returned"
+        def classLoader = compile('''
+from java.lang import StringBuilder
+from java.util import ArrayList
+from java.util.jar import JarEntry
+from micronaut.core.annotation import TypeHierarchyImport
+
+@TypeHierarchyImport(classes=[ArrayList, StringBuilder, JarEntry])
+class Reported:
+    pass
+''')
+        def arrayList = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.ArrayList', 'python')]
+        def stringBuilder = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.lang.StringBuilder', 'python')]
+        def jarEntry = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.jar.JarEntry', 'python')]
+
+        expect: "a class whose closure the record names in full"
+        arrayList.className == TypeHierarchies.recordClassName('java.util.ArrayList', 'python')
+        arrayList.omittedSuperTypeNames == []
+        arrayList.complete
+        record(classLoader, 'java.util.ArrayList', 'python').omittedSuperTypeNames == []
+
+        and: "a class with a package-private superclass"
+        stringBuilder.className == TypeHierarchies.recordClassName('java.lang.StringBuilder', 'python')
+        stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
+        !stringBuilder.complete
+        stringBuilder.omittedSuperTypeNames == record(classLoader, 'java.lang.StringBuilder', 'python').omittedSuperTypeNames
+
+        and: "a class with a package-private ancestor of a third package"
+        jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
+        !jarEntry.complete
+        jarEntry.omittedSuperTypeNames == record(classLoader, 'java.util.jar.JarEntry', 'python').omittedSuperTypeNames
+    }
+
+    void "a JDK class with a package-private ancestor is recorded in the package of the origin"() {
+        given:
+        def classLoader = compile('''
+from java.lang import StringBuilder
+from java.util import ArrayList
+from java.util.jar import JarEntry
+from micronaut.core.annotation import TypeHierarchyImport
+
+@TypeHierarchyImport(classes=[StringBuilder, ArrayList, JarEntry])
+class Hierarchies:
+    pass
+''')
+        def stringBuilder = record(classLoader, 'java.lang.StringBuilder', 'python')
+        def jarEntry = record(classLoader, 'java.util.jar.JarEntry', 'python')
+
+        expect: "AbstractStringBuilder is left out by name, the interfaces above it are kept"
+        record(classLoader, 'java.util.ArrayList', 'python').type == ArrayList
+        stringBuilder.type == StringBuilder
+        stringBuilder.genericSuperclass.empty
+        stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
+        !strings(stringBuilder.superTypes).contains('AbstractStringBuilder')
+        strings(stringBuilder.superTypes).containsAll(['Appendable', 'CharSequence', 'Comparable<StringBuilder>', 'Serializable'])
+        strings(stringBuilder.superTypes).last() == 'Object'
+
+        and: "an ancestor of a third package is left out the same way"
+        jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
+        strings(jarEntry.superTypes) == ['ZipEntry', 'Cloneable', 'Object']
+    }
+
+    void "a multidimensional array has the super types of the arrays it is an array of"() {
+        given: "Python has no array types, so the arrays are made from the elements of a Python class and of what its methods return"
+        Map<String, List<String>> closures = buildClassElement('''
+from java.util.function import Supplier
+
+class Matrix(Supplier[str]):
+    def get(self) -> str:
+        return "matrix"
+
+    def size(self) -> int:
+        return 0
+''', 'Matrix') { ClassElement matrix ->
+            ClassElement string = method(matrix, 'get').genericReturnType
+            ClassElement size = method(matrix, 'size').genericReturnType
+            [matrix  : elementStrings(matrix),
+             matrices: elementStrings(matrix.toArray().toArray()),
+             string  : elementStrings(string),
+             strings : elementStrings(string.toArray().toArray()),
+             size    : elementStrings(size),
+             sizes   : elementStrings(size.toArray().toArray())]
+        }
+
+        expect: "Matrix[][] is an array of the super types of Matrix, then of those Matrix[] has as an array"
+        closures.matrix == ['Matrix', 'Supplier<String>', 'Object']
+        closures.matrices == ['Matrix[][]', 'Supplier<String>[][]', 'Object[][]', 'Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+
+        and: "String[][] the same way"
+        closures.string.last() == 'Object'
+        closures.string.contains('Comparable<String>')
+        closures.strings == ['String[][]'] + closures.string.tail().collect { it + '[][]' } +
+            ['Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+
+        and: "an array of arrays of a primitive has the super types of an array of a primitive as an array"
+        closures.size == ['int']
+        closures.sizes == ['int[][]', 'Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+    }
+
+    private static MethodElement method(ClassElement owner, String name) {
+        owner.getEnclosedElements(ElementQuery.ALL_METHODS).find { it.name == name }
+    }
+
+    /**
+     * The super types of an element by simple name, arguments and dimensions, as the strings of a record read.
+     */
+    private static List<String> elementStrings(ClassElement type) {
+        type.getAllSuperTypes().collect { elementString(it) }
+    }
+
+    private static String elementString(ClassElement type) {
+        String name = type.name.substring(type.name.lastIndexOf('.') + 1)
+        String dimensions = "[]" * type.arrayDimensions
+        if (type.rawType || type.typeArguments.isEmpty()) {
+            return name + dimensions
+        }
+        return name + "<" + type.typeArguments.values().collect { elementString(it) }.join(", ") + ">" + dimensions
     }
 }

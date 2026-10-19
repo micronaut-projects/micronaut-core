@@ -38,7 +38,10 @@ import java.util.Set;
  *     Python promotes, gives Python's result, and any other failure Python's exception;</li>
  *     <li>a body with side effects cannot be run again: it delegates only when it has no operation
  *     that Java raises on where Python promotes, and the failures Python raises as exceptions of
- *     its own (a division by zero, an assertion, + on None) reach the caller as those exceptions.</li>
+ *     its own (a division by zero, an assertion, + on None) reach the caller as those exceptions;</li>
+ *     <li>the Java exception of a Python exception class reaches the caller as the Python exception it
+ *     carries when it can only come from the compilation, as it is when it can only have crossed Java
+ *     code, and a body where it may be either keeps the Python body (see {@link Ir.ExceptionCrossing}).</li>
  * </ul>
  *
  * Any other compiled method keeps the Python body for Python callers; Java callers run the Java
@@ -71,6 +74,8 @@ public final class StaticDelegation {
      * The delegation target of a compiled body, as {@code apply_delegation} reads it:
      * {@code Class#method#owner=<generated class>#kinds=<kind,...>#retry} (or {@code #once} for a
      * body that is not run again), or {@code null} when its Python callers keep the Python body.
+     * {@code #python-exceptions} is appended when the rewritten function raises the Python exception a
+     * Java exception of the body carries (see {@link Ir.ExceptionCrossing#TRANSLATED}).
      * A static method, or a module-level function with an empty class part, names the generated
      * class whose static Java method it calls: {@code Class#method#static=<generated class>#kinds=<kind,...>#retry}.
      * It has no bound object through which a failure could reach the Python caller as Python's
@@ -88,6 +93,9 @@ public final class StaticDelegation {
             }
             kinds.add(kind);
         }
+        if (body.exceptions() == Ir.ExceptionCrossing.PYTHON_BODY) {
+            return null;
+        }
         Analysis analysis = new Analysis();
         analysis.visit(body.body());
         if (analysis.sideEffects && analysis.promotes) {
@@ -104,7 +112,8 @@ public final class StaticDelegation {
         return className.substring(className.lastIndexOf('.') + 1) + "#" + body.methodName()
             + "#owner=" + className
             + "#kinds=" + String.join(",", kinds)
-            + (analysis.sideEffects ? "#once" : "#retry");
+            + (analysis.sideEffects ? "#once" : "#retry")
+            + (body.exceptions() == Ir.ExceptionCrossing.TRANSLATED ? "#python-exceptions" : "");
     }
 
     /**

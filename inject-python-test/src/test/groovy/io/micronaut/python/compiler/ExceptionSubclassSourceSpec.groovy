@@ -67,14 +67,14 @@ public OutOfStockException() {
 ''')
     }
 
-    void "a Python exception class is generated as a RuntimeException whose message is the str of the exception"() {
+    void "a Python exception class is generated as a RuntimeException wrapping the Python exception"() {
         given:
         def pythonCode = '''
 class EmailAlreadyUsed(Exception):
     """Raised when an email address is already registered."""
 
 
-class Coded(Exception):
+class Coded(ValueError):
     def __init__(self, code: int, detail: str):
         super().__init__(code, detail)
         self.code = code
@@ -85,6 +85,8 @@ class Narrow(EmailAlreadyUsed):
 '''
 
         expect:
+        // the Value constructor wraps a Python exception reaching Java, raised in Python or by a compiled body:
+        // the Java message is str(exception)
         assertGeneratedSourceContains(pythonCode, 'public class EmailAlreadyUsed extends RuntimeException implements ValueCoercible')
         assertGeneratedSourceContains(pythonCode, '''
 public EmailAlreadyUsed(Value value) {
@@ -95,32 +97,20 @@ public EmailAlreadyUsed() {
     this(PythonContextRuntime.newInstance(EmailAlreadyUsed.__PYTHON_CLASS_REFERENCE));
   }
 ''')
-        // Exception(*args): the message constructor creates the Python exception with the message as its argument, a null
-        // message as Exception(), whose Java message is null, not Exception(None)
-        assertGeneratedSourceContains(pythonCode, '''
-public EmailAlreadyUsed(String message) {
-    this(message == null ? PythonContextRuntime.newInstance(EmailAlreadyUsed.__PYTHON_CLASS_REFERENCE) : PythonContextRuntime.newInstance(EmailAlreadyUsed.__PYTHON_CLASS_REFERENCE, (Object) message));
-  }
-''')
-        // the arguments of super().__init__(...) stay the args of the Python exception; the Java message is str(exception)
+        // Exception(*args) has no Java constructor of its own: a compiled raise calls the Python class
+        assertGeneratedSourceDoesNotContain(pythonCode, 'public EmailAlreadyUsed(String message)')
+        // any builtin exception extending Exception is a RuntimeException; the arguments of super().__init__(...)
+        // stay the args of the Python exception
         assertGeneratedSourceContains(pythonCode, 'public class Coded extends RuntimeException implements ValueCoercible')
-        assertGeneratedSourceContains(pythonCode, '''
-public Coded(Value value) {
-    super(PythonExceptions.message(value));
-''')
         assertGeneratedSourceContains(pythonCode, '''
 public Coded(int code, String detail) {
     this(PythonContextRuntime.newInstance(Coded.__PYTHON_CLASS_REFERENCE, (Object) code, (Object) detail));
   }
 ''')
-        assertGeneratedSourceDoesNotContain(pythonCode, 'public Coded(String message)')
-        // a subclass extends the generated class of its Python base, and takes a message like it
+        // a subclass extends the generated class of its Python base, and wraps a Python exception the same way
         assertGeneratedSourceContains(pythonCode, 'public class Narrow extends EmailAlreadyUsed')
-        assertGeneratedSourceContains(pythonCode, '''
-public Narrow(String message) {
-    this(message == null ? PythonContextRuntime.newInstance(Narrow.__PYTHON_CLASS_REFERENCE) : PythonContextRuntime.newInstance(Narrow.__PYTHON_CLASS_REFERENCE, (Object) message));
-  }
-''')
+        assertGeneratedSourceContains(pythonCode, 'public Narrow(Value value)')
+        assertGeneratedSourceDoesNotContain(pythonCode, 'public Narrow(String message)')
     }
 
     void "a super constructor call that matches no Java constructor fails compilation"() {

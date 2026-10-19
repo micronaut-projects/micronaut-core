@@ -1424,11 +1424,24 @@ class JavaReceiverRules:
 
 # Python bases that add no members of their own; any other base the checker cannot see makes a class open
 TRANSPARENT_BASES = {"object", "abc.ABC", "ABC", "typing.Protocol", "Protocol", "typing.Generic", "Generic", "Generic[...]"}
-# the Python exception base: the generated class of a class extending it is a RuntimeException
+# the Python exception base whose members are those of BaseException
 PYTHON_EXCEPTION_BASES = {"Exception", "builtins.Exception"}
 # the members every exception inherits from BaseException, of no type the checker knows
 EXCEPTION_ATTRIBUTES = {"args", "__traceback__", "__cause__", "__context__", "__suppress_context__", "__notes__"}
 EXCEPTION_METHODS = {"with_traceback", "add_note"}
+
+
+def _native_exception(base):
+    """
+    Whether a base is a builtin exception class extending Exception (Exception, ValueError, KeyError...),
+    as the processor marks it (TypeRef.nativeException): the generated class of a class extending it
+    first is a RuntimeException, whose Java message is the str() of the Python exception. A local
+    class named like a builtin is none.
+    """
+    native = getattr(base, "nativeException", None)
+    if native is not None:
+        return bool(native())
+    return base.name() in PYTHON_EXCEPTION_BASES
 
 
 def _self_attributes(class_node):
@@ -1570,8 +1583,9 @@ class PythonClassModel:
     def bases(self):
         """
         The resolved bases: PythonClassModel, a Java TypeDescription, or None for an unknown base.
-        The Python Exception base is not among them: the class is an exception class (see is_throwable),
-        with the members of Exception unknown to the checker.
+        A builtin exception base is not among them: the class is an exception class (see is_throwable),
+        with the members of BaseException; a builtin exception other than Exception adds members of its
+        own (the errno of an OSError, the value of a StopIteration), which leave the class open (None).
         """
         if self._bases is None:
             self._bases = []
@@ -1579,10 +1593,12 @@ class PythonClassModel:
                 name = base.name()
                 if name in TRANSPARENT_BASES:
                     continue
-                if name in PYTHON_EXCEPTION_BASES and name not in self.classes.by_qualified:
+                if _native_exception(base) and name not in self.classes.by_qualified:
                     # the generated class extends the first base that resolves, as for a Java base
                     if not any(base is not None for base in self._bases):
                         self._python_exception = True
+                    if name not in PYTHON_EXCEPTION_BASES:
+                        self._bases.append(None)
                     continue
                 model = self.classes.by_qualified.get(name)
                 if model is not None:
@@ -1595,9 +1611,10 @@ class PythonClassModel:
     def superclass(self):
         """
         The base the generated class extends, as the stub generator picks it: the first base that
-        resolves (a PythonClassModel or a Java TypeDescription), or None when that is the Python
-        Exception (the generated class extends RuntimeException) or there is none. For
-        ``class E(Exception, Mixin)`` it is None: Mixin is a Python base of E only.
+        resolves (a PythonClassModel or a Java TypeDescription), or None when that is a builtin
+        exception (the generated class extends RuntimeException) or there is none. For
+        ``class E(Exception, Mixin)`` or ``class E(ValueError, Mixin)`` it is None: Mixin is a
+        Python base of E only.
         """
         bases = self.bases
         if self._python_exception:
@@ -1605,7 +1622,7 @@ class PythonClassModel:
         return next((base for base in bases if base is not None), None)
 
     def extends_python_exception(self, seen=None):
-        """Whether the generated class extends RuntimeException for the Python Exception, directly or through the generated classes of Python bases."""
+        """Whether the generated class extends RuntimeException for a builtin exception (Exception, ValueError...), directly or through the generated classes of Python bases."""
         seen = seen or set()
         if self.qualified in seen:
             return False
@@ -1617,8 +1634,8 @@ class PythonClassModel:
 
     def is_throwable(self, seen=None):
         """
-        Whether the generated class of the class is a Throwable: the class extends the Python
-        Exception, a Python class that does, or a Java Throwable. For the Python Exception it is a
+        Whether the generated class of the class is a Throwable: the class extends a builtin
+        exception, a Python class that does, or a Java Throwable. For a builtin exception it is a
         RuntimeException whose Java message is the str() of the Python exception.
         """
         seen = seen or set()

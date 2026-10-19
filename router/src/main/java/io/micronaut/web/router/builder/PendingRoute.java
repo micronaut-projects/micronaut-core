@@ -22,6 +22,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteArguments;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -53,7 +54,7 @@ final class PendingRoute {
     /**
      * The URI template of a route of {@code GET} only, which may be a WebSocket route, or {@code null}.
      */
-    private final @Nullable String getTemplate;
+    private final @Nullable Supplier<@Nullable String> getTemplate;
     private final List<Consumer<HandlerRoutes>> settings = new ArrayList<>();
     /**
      * The first setting of the route about its bodies, e.g. {@code produces}, which a WebSocket
@@ -79,10 +80,11 @@ final class PendingRoute {
      * @param builder     The builder that declared the route
      * @param routes      Adds the routes of the handler
      * @param description Describes the route for the messages, e.g. {@code GET /items/{id} declared by ItemRoutes}
-     * @param getTemplate The URI template of a route of {@code GET} only, or {@code null}
+     * @param getTemplate Gives the URI template of a route of {@code GET} only, {@code null} if its
+     *                    template is of another language; or {@code null} for another route
      */
     PendingRoute(AbstractHttpRouteBuilder builder, Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes,
-                 String description, @Nullable String getTemplate) {
+                 String description, @Nullable Supplier<@Nullable String> getTemplate) {
         this.builder = builder;
         this.routes = routes;
         this.description = description;
@@ -105,11 +107,17 @@ final class PendingRoute {
             throw new IllegalStateException("The route " + description
                 + " is a located route: a WebSocket route is a route of an HttpRoutes bean");
         }
-        String template = getTemplate;
-        if (template == null) {
+        Supplier<@Nullable String> source = getTemplate;
+        if (source == null) {
             drop();
             throw new IllegalStateException("The route " + description
                 + " is not a WebSocket route: a WebSocket route is a GET route, e.g. GET(uri).webSocket(...)");
+        }
+        String template = source.get();
+        if (template == null) {
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is not a WebSocket route: a WebSocket route has a URI template, not a template of another language");
         }
         String setting = bodySetting;
         if (setting != null) {
@@ -290,6 +298,10 @@ final class PendingRoute {
 
     void order(int order) {
         addSetting(added -> added.order(order));
+    }
+
+    void selectedBy(@Nullable RouteMatchSelector selector) {
+        addSetting(added -> added.selectedBy(selector));
     }
 
     void where(RequestCondition condition) {

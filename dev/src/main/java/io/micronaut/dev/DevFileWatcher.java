@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * The {@link FileWatcher} bean of one application context in development mode: a view of the one watcher the
@@ -48,6 +49,7 @@ final class DevFileWatcher implements FileWatcher, LifeCycle<DevFileWatcher> {
 
     private final FileWatcher watcher;
     private final Map<Path, FileWatcherRegistration> pinned;
+    private final Predicate<Path> runtimeTrees;
     private final ClassLoader classLoader;
     private final Set<FileWatcherRegistration> registrations = ConcurrentHashMap.newKeySet();
     private volatile boolean running = true;
@@ -55,12 +57,27 @@ final class DevFileWatcher implements FileWatcher, LifeCycle<DevFileWatcher> {
     /**
      * @param watcher The process's watcher
      * @param pinned The directories outside the roots registered for the process, shared by the views of every context
+     * @param runtimeTrees Whether the runtime watches a directory and every directory below it for the process
      * @param classLoader The class loader of the context the view belongs to
      */
-    DevFileWatcher(FileWatcher watcher, Map<Path, FileWatcherRegistration> pinned, ClassLoader classLoader) {
+    DevFileWatcher(FileWatcher watcher, Map<Path, FileWatcherRegistration> pinned, Predicate<Path> runtimeTrees, ClassLoader classLoader) {
         this.watcher = watcher;
         this.pinned = pinned;
+        this.runtimeTrees = runtimeTrees;
         this.classLoader = classLoader;
+    }
+
+    /**
+     * Whether a runtime watches a directory and every directory below it for the life of the process: whether it lies
+     * under one of the runtime's roots, all watched recursively but the build tool trigger's directory.
+     *
+     * @param runtime The runtime
+     * @return The test, of an absolute, normalized directory
+     */
+    static Predicate<Path> runtimeTrees(DevRuntime runtime) {
+        Path trigger = runtime.manifest().buildToolTrigger();
+        Path triggerDirectory = trigger == null ? null : trigger.toAbsolutePath().normalize().getParent();
+        return directory -> runtime.watchedRoots().stream().anyMatch(root -> directory.startsWith(root) && !root.equals(triggerDirectory));
     }
 
     @Override
@@ -90,13 +107,33 @@ final class DevFileWatcher implements FileWatcher, LifeCycle<DevFileWatcher> {
      * directory from the native macOS service, which would leave the next generation deaf to the directory it watches;
      * kept, every generation's registration reuses the key of the first. The pin is recursive whatever the request
      * asked for, so that a later recursive registration of the directory, or of one below it, finds every key in place.
+     *
+     * <p>Only a recursive registration spares the pin: the runtime's non-recursive watch of the build tool's trigger
+     * directory covers that directory and its entries but registers nothing below them, so a context's registration
+     * there would own the keys of the tree below and cancel them when the context stops.</p>
      */
     private void pin(Path root) {
         Path absolute = root.toAbsolutePath().normalize();
-        if (watcher.isWatching(absolute)) {
+        if (watchedRecursively(absolute)) {
             return;
         }
         pinned.computeIfAbsent(absolute, directory -> watcher.directory(directory).watch(batch -> { }));
+    }
+
+    /**
+     * Whether a registration for the life of the process covers the directory and every directory below it: one of
+     * the runtime's recursive roots, or a pin, which is recursive.
+     */
+    private boolean watchedRecursively(Path directory) {
+        if (runtimeTrees.test(directory)) {
+            return true;
+        }
+        for (Path pinnedRoot : pinned.keySet()) {
+            if (directory.startsWith(pinnedRoot)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

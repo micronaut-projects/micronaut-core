@@ -43,7 +43,9 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.service.ServiceIndex;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
@@ -83,6 +85,9 @@ import static io.micronaut.context.env.Environment.BOOTSTRAP_NAME_PROPERTY;
  */
 @Internal
 final class DefaultApplicationContext extends DefaultBeanContext implements ConfigurableApplicationContext, PropertyResolverDelegate {
+
+    // Read by name, so that an application without a service index does not load the class
+    private static final String SERVICE_INDEX = "io.micronaut.core.io.service.ServiceIndex";
 
     private final ApplicationContextConfiguration configuration;
     private final Environment environment;
@@ -290,8 +295,15 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
     @Override
     public synchronized ApplicationContext start() {
-        environment.start();
-        return (ApplicationContext) super.start();
+        try {
+            environment.start();
+            return (ApplicationContext) super.start();
+        } finally {
+            // The lookups do not log whether they use a service index: the first one can come before logging is configured
+            if (StaticOptimizations.SetOnce.find(SERVICE_INDEX) != null) {
+                ServiceIndex.logCheck();
+            }
+        }
     }
 
     /**
@@ -761,6 +773,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         private final ApplicationContextConfiguration bootstrapConfiguration;
         private final ApplicationContext parentContext;
         private final List<ApplicationContext> bootstrapContexts = new ArrayList<>();
+        private volatile Set<String> configurationFiles = Set.of(); // NOSONAR java:S3077 published whole; the set is immutable
 
         private BootstrapPropertySourcesLocator(ApplicationContextConfiguration bootstrapConfiguration, ApplicationContext parentContext) {
             this.bootstrapConfiguration = bootstrapConfiguration;
@@ -797,7 +810,13 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                 // Lower priority than bootstrap property sources
                 bootstrapPropertySources.add(new BootstrapPropertySource(propertySource));
             }
+            configurationFiles = bootstrapContext.getEnvironment().getConfigurationFiles();
             return bootstrapPropertySources;
+        }
+
+        @Override
+        public Set<String> getConfigurationFiles() {
+            return configurationFiles;
         }
 
         @Override

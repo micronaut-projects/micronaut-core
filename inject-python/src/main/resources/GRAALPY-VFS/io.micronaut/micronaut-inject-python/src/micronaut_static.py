@@ -712,11 +712,15 @@ def apply_delegation(tree, targets):
     when every argument has the exact Python type and range of its Java parameter, and runs the
     Python body when a body that may be run again fails, see ``StaticDelegation``.
 
-    The Java body of a compiled function raises the generated Java class of an exception class of
-    the compilation, which the Python caller catches as the Python class: the prologue raises the
-    Python exception the Java one carries (see ``_mn_python_exception``), and any other exception
-    as it is. The Python exception is raised after the handler, so it keeps its own cause and
-    context: inside the handler Python would chain the Java exception as its context.
+    A Python exception raised by the compilation (a compiled ``raise``, the Python code a compiled
+    body calls) reaches the Java body as the generated Java class of its exception class, which a
+    Python caller of the Python body would catch as the Python class. A target carrying
+    ``#python-exceptions`` (the body calls no Java code outside the compilation, see
+    ``Ir.ExceptionCrossing``) has the prologue above: it raises the Python exception the Java one
+    carries (see ``_mn_python_exception``), and any other exception as it is. The Python exception
+    is raised after the handler, so it keeps its own cause and context: inside the handler Python
+    would chain the Java exception as its context. Without it the call is made as is, and a Java
+    exception reaches the caller as the Java exception, as one that crossed Java code does in Python.
 
     ``targets`` are ``Class#method#owner=<generated class>#kinds=<kind,...>#retry`` (``#once``
     for a body that is not run again) strings, a nested class as ``Outer$Inner``; a target without
@@ -749,7 +753,7 @@ def apply_delegation(tree, targets):
         static_class = options.get("static")
         if static_class is not None and "retry" not in options:
             continue  # a static body that cannot be run again keeps the Python body, see above
-        wanted.setdefault(class_name, {})[method] = (options.get("owner", class_name), kinds, "retry" in options, conversion, static_class)
+        wanted.setdefault(class_name, {})[method] = (options.get("owner", class_name), kinds, "retry" in options, conversion, static_class, "python-exceptions" in options)
     count = 0
     for class_node, path in _classes(tree):
         methods = wanted.get("$".join(path))
@@ -758,7 +762,7 @@ def apply_delegation(tree, targets):
         rewritten = 0
         for statement in class_node.body:
             if isinstance(statement, ast.FunctionDef) and statement.name in methods and not _delegates(statement):
-                owner, kinds, retry, conversion, static_class = methods[statement.name]
+                owner, kinds, retry, conversion, static_class, translated = methods[statement.name]
                 if static_class is not None:
                     if not _takes_exactly(statement, kinds):
                         continue
@@ -768,7 +772,7 @@ def apply_delegation(tree, targets):
                     continue
                 if not _receives_self(statement, kinds):
                     continue
-                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, owner, kinds, retry, conversion)
+                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, owner, kinds, retry, conversion, translated)
                 ast.fix_missing_locations(statement)
                 rewritten += 1
         if rewritten and not _declares_member(class_node):
@@ -780,7 +784,7 @@ def apply_delegation(tree, targets):
     if functions:
         for statement in tree.body:
             if isinstance(statement, ast.FunctionDef) and statement.name in functions and not _delegates(statement):
-                _, kinds, _, conversion, static_class = functions[statement.name]
+                _, kinds, _, conversion, static_class, _ = functions[statement.name]
                 if static_class is not None and _takes_exactly(statement, kinds):
                     statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion)
                     ast.fix_missing_locations(statement)
@@ -1016,7 +1020,7 @@ def _locate(statements, line, column):
                 node.col_offset = node.end_col_offset = column
 
 
-def _delegation(function, owner, kinds, retry, conversion=None):
+def _delegation(function, owner, kinds, retry, conversion=None, translated=False):
     args = function.args
     positional = list(args.posonlyargs) + list(args.args)
     receiver = positional[0].arg
@@ -1053,7 +1057,7 @@ def _delegation(function, owner, kinds, retry, conversion=None):
     )
     guard = ast.If(
         test=ast.Compare(left=load(temporary), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
-        body=_translating(temporary, call) + [returned],
+        body=(_translating(temporary, call) if translated else [call]) + [returned],
         orelse=[],
     )
     statements = [lookup, guard]
