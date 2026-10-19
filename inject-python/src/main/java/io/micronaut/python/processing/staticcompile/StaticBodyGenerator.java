@@ -185,7 +185,7 @@ public final class StaticBodyGenerator {
                 call.arguments().forEach(a -> collectNames(a, names));
             }
             case Ir.PythonMember member -> collectNames(member.receiver(), names);
-            case Ir.ModuleAttribute ignored -> {
+            case Ir.ModuleAttribute _ -> {
                 // a field of the script: no local names
             }
             case Ir.NewJava construction -> construction.arguments().forEach(a -> collectNames(a, names));
