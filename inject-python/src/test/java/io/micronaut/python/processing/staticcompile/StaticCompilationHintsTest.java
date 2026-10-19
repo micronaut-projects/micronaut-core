@@ -104,6 +104,16 @@ class StaticCompilationHintsTest {
             StaticCompilationHints.hint("python-builtin-not-lowered", "dict.get without a default may answer None, which a [long] cannot hold"));
         assertTrue(StaticCompilationHints.hint("unsupported-expression", "an Optional hint has no static lowering yet").startsWith("Replace Optional[T]"));
         assertTrue(StaticCompilationHints.hint("unsupported-expression", "a Lambda node has no static lowering").startsWith("Rewrite with the compiled expressions"));
+        // the refusals of the Java iterators and of Python's numeric equality in dicts and sets
+        assertTrue(StaticCompilationHints.hint("unsupported-statement", "the loop body may change the [xs] it iterates, which Python goes on iterating while the Java iterator throws ConcurrentModificationException")
+            .startsWith("Iterate over a copy"));
+        String numbers = StaticCompilationHints.hint("unsupported-expression", "looking up a key of a [java.lang.Long] among [java.lang.Object] values has no static lowering: Python compares numbers across their types");
+        assertTrue(numbers.startsWith("Give the keys or elements one type of number"), numbers);
+        assertEquals(numbers, StaticCompilationHints.hint("unsupported-expression", "a membership test of a [java.lang.Long] among [java.lang.Double] values has no static lowering: Python compares numbers across their types"));
+        assertTrue(StaticCompilationHints.hint("python-exception", "the except clause for [java.lang.ArithmeticException] catches the [java.lang.ArithmeticException] a compiled body throws where Python raises an exception of its own")
+            .startsWith("Catch a narrower Java exception"));
+        assertTrue(StaticCompilationHints.hint("unsupported-statement", "the except clause for the checked exception [java.io.IOException] has no Java call of the try block that declares it")
+            .startsWith("Raise and catch unchecked Java exceptions"));
     }
 
     @Test

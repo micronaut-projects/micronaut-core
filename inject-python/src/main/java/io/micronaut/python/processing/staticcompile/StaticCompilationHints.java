@@ -49,9 +49,9 @@ public final class StaticCompilationHints {
     static {
         HINTS.put("class-not-eligible", "Static compilation needs an ordinary generated Java class, which a test module, an enum, a protocol, an interface, "
             + "a class served by a context pool or a class declaring __slots__ or __getattr__ does not have. Move the logic into a plain class or a module-level function.");
-        HINTS.put("pooled-module", "The module has no module-level annotation, so the runtime serves it from a pool of Python contexts and its generated class runs without one. "
+        HINTS.put("pooled-module", "The module declares no scope, so the runtime serves it from a pool of Python contexts and its generated class runs without one. "
             + "Keep the function to Java calls and the generated classes of the compilation, pass the bean it needs as a parameter, "
-            + "or give the module a module-level annotation so it is served as one object.");
+            + "or give the module a scope (a module-level @Singleton) so it is served as one object.");
         HINTS.put("static-method", "A @classmethod takes the class and is only bridged. Make it a @staticmethod, which compiles into the static Java method the stub declares, or an instance method.");
         HINTS.put("async-function", "An async function runs on the Python event loop and is never compiled. Move the synchronous work into a plain method the async function calls: that method compiles.");
         HINTS.put("generator-function", "A generator keeps its frame alive between calls. Build a list in a loop and return it instead of yielding.");
@@ -211,11 +211,23 @@ public final class StaticCompilationHints {
                 if (text.contains("more than once")) {
                     return "Define the function once: rename one of the definitions.";
                 }
+                if (text.contains("ConcurrentModificationException")) {
+                    return "Iterate over a copy (for x in list(xs)) when the body changes the collection, or collect the changes and apply them after the loop: "
+                        + "Python goes on iterating a list the body changes, where the Java iterator fails.";
+                }
+                if (text.contains("checked exception")) {
+                    return "Raise and catch unchecked Java exceptions, or catch a checked one only around the Java call that declares it: "
+                        + "javac refuses a checked exception a body throws undeclared, and a catch of one its try block cannot throw.";
+                }
                 break;
             case "python-exception":
                 if (text.contains("would catch [")) {
                     return "Catch the exception classes of the compilation by name before a clause for RuntimeException, Exception or Throwable, "
                         + "or catch a narrower Java exception: the Java catch would also catch the Python exception classes, which Python lets through.";
+                }
+                if (text.contains("where Python raises an exception of its own")) {
+                    return "Catch a narrower Java exception: a compiled body throws this one where Python raises its own exception "
+                        + "(ZeroDivisionError, ValueError, ...), which the clause does not catch in Python.";
                 }
                 if (text.contains("would not catch [")) {
                     return "Make the base the clause names the first base of the subclass, or catch the subclass by name too: "
@@ -237,6 +249,17 @@ public final class StaticCompilationHints {
                 if (text.contains("a comprehension after an evaluation") || text.contains("evaluated lazily or repeatedly")) {
                     return "Assign the comprehension to a local in a statement of its own, before the statement that uses it, "
                         + "when evaluating it first gives the same result.";
+                }
+                if (text.contains("Python compares numbers across their types")) {
+                    return "Give the keys or elements one type of number (hint the dict or set and convert with int() or float()), or use str keys: "
+                        + "Python holds 1 == 1.0 == True in a dict or set, which Java tells apart.";
+                }
+                if (text.contains("boxes a Python number as an Integer or a Double")) {
+                    return "Copy the Java collection of Longs, Shorts, Bytes or Floats into a Python one first, or keep the function in Python: "
+                        + "a compiled body looks a Python int up as an Integer, which such a collection does not hold.";
+                }
+                if (text.contains("result of a call with None")) {
+                    return "Hint the return of the method T | None when it may return None, or drop the test for None of a method that never returns it.";
                 }
                 if (text.contains("a Java method or field returns")) {
                     return "Pass the message through a str the body builds (an f-string, str(), a literal), or test the Java value for None first.";

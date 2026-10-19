@@ -1597,6 +1597,14 @@ class Gate:
     def keyed(self, n: int) -> int:
         return self._helper(n=n)
 
+    def grown(self, xs: list[int]) -> int:
+        for x in xs:
+            xs.append(x)
+        return 0
+
+    def flagged(self, names: dict[int, str]) -> str:
+        return names[True]
+
     def _helper(self, n: int) -> int:
         return n
 
@@ -1628,6 +1636,8 @@ class HintTest(unittest.TestCase):
             "Gate.keyed": ("sibling-call", "with keyword arguments", "Pass the arguments positionally"),
             "Gate.ordered": ("unsupported-statement", "already catches it", "Put the clause for the subclass before"),
             "Base.run": ("sibling-call", "a subclass of the compilation may override it", "Call the static method on its class"),
+            "Gate.grown": ("unsupported-statement", "ConcurrentModificationException", "Iterate over a copy"),
+            "Gate.flagged": ("unsupported-expression", "Python compares numbers across their types", "Give the keys or elements one type of number"),
         }
         for name, (rule, message, hint) in expectations.items():
             decision = self.decisions[name]

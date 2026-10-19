@@ -107,7 +107,7 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 
 |`pooled-module`
 |The function belongs to a module that declares no scope (a module-level `@Controller` or `@Requires` is no scope), which the runtime serves from a pool of Python contexts, and its body reaches a Python object (an attribute of a class of the compilation, a method the generated class does not declare), which no context is leased for. A pooled route that only calls Java and the generated classes of the compilation is compiled and runs without leasing a context at all.
-|Keep the function to Java calls and the generated classes of the compilation, pass the bean it needs as a parameter, or give the module a module-level annotation so it is served as one object.
+|Keep the function to Java calls and the generated classes of the compilation, pass the bean it needs as a parameter, or give the module a scope (a module-level `@Singleton`) so it is served as one object.
 
 |`special-method`, `async-function`, `generator-function`, `static-method`, `abstract-method`
 |The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, a class method (a `@staticmethod` is compiled, into the static Java method the stub declares for it), or an abstract method or one whose body is a placeholder (`...`): a call of it runs the implementation of the object.
@@ -215,7 +215,7 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 
 Not compiled: generator expressions outside `any` and `all`, nested comprehensions with several `for` clauses, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, class methods, and `Optional` hints; nor the `else` clause of a `for`, `while` or `try` statement, unpacking in a `for` target (`for k, v in ...`) or in an assignment (`a, b = ...`), a chained assignment (`a = b = 0`) and a bare `except:`.
 
-Refused as well, where the Java code would behave differently: a `for` loop whose body may change the collection it iterates (appending to it, storing or deleting an item, passing it to a call; Python goes on iterating, the Java iterator throws `ConcurrentModificationException`), and a lookup, store or membership test of a dict or set, or a dict or set literal, where Python's numeric equality decides (`1`, `1.0` and `True` are one key in Python and three in Java): a numeric or `bool` key among keys of another or of any type.
+Refused as well, where the Java code would behave differently: a `for` loop whose body may change the collection it iterates (appending to it, storing or deleting an item, passing it to a call; Python goes on iterating, the Java iterator throws `ConcurrentModificationException`), and a lookup, store or membership test of a dict or set, or a dict or set literal or comprehension, where Python's numeric equality decides (`1`, `1.0` and `True` are one key in Python and three in Java): a numeric or `bool` key among keys of another or of any type.
 
 [[staticCompilationOneImplementation]]
 == One Implementation
