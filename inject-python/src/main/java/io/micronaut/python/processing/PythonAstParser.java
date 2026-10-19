@@ -142,11 +142,19 @@ public final class PythonAstParser {
         // across compilations, but an engine pins every context created on it until that context is
         // closed, and the optimizing runtime keeps compiled code per engine: the compile-time test
         // suite, which creates hundreds of parsers in one JVM, ran out of heap on GraalVM CE.
-        this.importMappings = PythonImportMappings.load(classLoader != null ? classLoader : PythonAstParser.class.getClassLoader());
-        this.context = buildTolerantly(classLoader, incremental);
+        ClassLoader effectiveClassLoader = classLoader != null ? classLoader : PythonAstParser.class.getClassLoader();
+        this.importMappings = PythonImportMappings.load(effectiveClassLoader);
+        this.context = buildTolerantly(effectiveClassLoader, incremental);
         context.initialize(PYTHON);
         context.eval(COMPILE_RUNTIME_AST_SOURCE);
-        runtimeAstCompiler = context.getBindings(PYTHON).getMember("_mn_compile_runtime_ast");
+        Value bindings = context.getBindings(PYTHON);
+        // Dependency application sources are not mounted in the processor's Python environment.
+        bindings.putMember("callback_is_dependency_python_module", (Function<String, Boolean>) name -> {
+            String resource = "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + name.replace('.', '/');
+            return effectiveClassLoader.getResource(resource + ".py") != null
+                || effectiveClassLoader.getResource(resource + "/__init__.py") != null;
+        });
+        runtimeAstCompiler = bindings.getMember("_mn_compile_runtime_ast");
     }
 
     /**
@@ -951,12 +959,19 @@ public final class PythonAstParser {
             facade_rewriter = FacadeImportRewriter(facades) if facades is not None else None
             if facade_rewriter is not None:
                 tree = facade_rewriter.rewrite(tree)
-            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, False, package_name, source_root, python_source_dirs=python_source_dirs, source_path=source_path, source_text=src)
+            transformer = MicronautTransformer(
+                callback_get_class_element, callback_get_class_elements, False, package_name, source_root,
+                python_source_dirs=python_source_dirs, source_path=source_path, source_text=src,
+                callback_is_dependency_python_module=callback_is_dependency_python_module
+            )
             transformed_tree = transformer.visit(tree)
             # The diagnostic runtime source is only read by tests and error reports, so it is
             # produced on demand instead of costing a parse, a transformer pass and an unparse per file.
             def diagnostic_runtime_code(source=src, package_name=package_name, source_root=source_root):
-                diagnostic_runtime_transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, True, package_name, source_root)
+                diagnostic_runtime_transformer = MicronautTransformer(
+                    callback_get_class_element, callback_get_class_elements, True, package_name, source_root,
+                    callback_is_dependency_python_module=callback_is_dependency_python_module
+                )
                 return unparse(diagnostic_runtime_transformer.visit(ast.parse(source)))
             executable_runtime_tree = ast.parse(src)
             # Transformers mutate in place, so a pristine parse (cheaper than a deep copy) is kept for

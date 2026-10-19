@@ -775,8 +775,10 @@ public interface ClassElement extends TypedElement {
      * {@code Box}, where {@code Box} implements {@code View} of its variable, lists a {@code View} without type
      * arguments, and answers {@code true} to {@link #isRawType()}. An array of a type is an array of each super type of
      * that type (JLS 4.10.3), {@code List<String>[]} listing {@code Collection<String>[]} and {@code Object[]},
-     * and then {@code Cloneable}, {@code Serializable} and {@code Object}, which every array has (JLS 10.8); a
-     * primitive has none.</p>
+     * and then {@code Cloneable}, {@code Serializable} and {@code Object}, which every array has (JLS 10.8). An
+     * array of arrays is also an array of the super types its component arrays have as arrays:
+     * {@code String[][]} and {@code int[][]} list {@code Object[]}, {@code Cloneable[]} and
+     * {@code Serializable[]} before those three. A primitive has none.</p>
      *
      * <p>No language reports {@code Object}, {@code Cloneable} or {@code Serializable} as a super type element, so
      * they are listed as {@link #of(Class)} answers them: by name and assignability, without their members.</p>

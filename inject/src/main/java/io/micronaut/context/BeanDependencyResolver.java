@@ -153,6 +153,32 @@ public interface BeanDependencyResolver {
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type);
 
     /**
+     * Resolves the registration of an exact definition as the given type at a point of the owner, with the same
+     * ownership rules as {@link #getBeanRegistration(BeanDefinition, Argument)}: a newly created dependent is owned
+     * by the owner of this resolver and destroyed with it.
+     *
+     * <p>The lookup point is pushed onto the resolution path before the definition is resolved, so a bean the
+     * resolution creates sees it as the point it is created for: an injected {@link io.micronaut.inject.InjectionPoint}
+     * is the one of the lookup point, and the dependency graph records the owner's bean as receiving the created
+     * bean there. This is for an object injected at a point of the owner, such as a provider, that creates a bean on
+     * behalf of that point later: it keeps the segment it was itself resolved at, from
+     * {@link BeanResolutionContext.Path#currentSegment()}, and passes it, or a segment of its own that
+     * narrows it, here. Each call resolves on a path of its own, so calls may be concurrent.</p>
+     *
+     * @param definition The bean definition
+     * @param type The type to resolve the definition as, including generic arguments; the definition may be of a
+     *             subtype of it
+     * @param lookupPoint The segment the resolution is made at, whose declaring type is the owner's definition
+     * @param <T> The bean type
+     * @return The registration
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the type
+     * @throws IllegalStateException if destruction or context shutdown has begun
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                BeanResolutionContext.Segment<?, ?> lookupPoint);
+
+    /**
      * Destroys and forgets a registration this resolver owns, before its owner is destroyed. A shared registration
      * is never destroyed. Registration identity, rather than equality of bean definitions or instances, identifies
      * ownership.

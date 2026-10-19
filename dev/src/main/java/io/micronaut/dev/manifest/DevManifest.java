@@ -85,7 +85,18 @@ public final class DevManifest {
      */
     public static final String MANIFEST_PROPERTY = PREFIX + "manifest";
 
+    private static final String TEST = "test.";
+    private static final String MAIN_CLASS = "main-class";
+    private static final String COMPILE_CLASSPATH = "compile-classpath";
+    private static final String PROCESSOR_PATH = "processor-path";
+    private static final String SOURCES = "sources.";
+    private static final String RESOURCES = "resources.";
+    private static final String COMPILE = "compile.";
+    private static final String AFFECTED = "affected";
+
     private final Path directory;
+    private final Properties properties;
+    private final DevMode mode;
     private final String mainClass;
     private final Path projectDir;
     private final DevReloadStrategy strategy;
@@ -108,18 +119,25 @@ public final class DevManifest {
     private final List<String> retain;
     private final boolean retainAnnotated;
     private final LiveReload liveReload;
+    private final List<SourceRoot> testSourceRoots;
+    private final List<ResourceRoot> testResourceRoots;
+    private final TestSettings testSettings;
 
     private DevManifest(Path directory, Properties properties) {
         this.directory = directory;
-        this.mainClass = require(properties, "main-class");
+        this.properties = new Properties();
+        this.properties.putAll(properties);
+        this.mode = DevMode.valueOf(properties.getProperty(PREFIX + "mode", "run").trim().toUpperCase(Locale.ROOT));
+        // a test run has no application main
+        this.mainClass = mode == DevMode.TEST ? properties.getProperty(PREFIX + MAIN_CLASS, "").trim() : require(properties, MAIN_CLASS);
         this.projectDir = path(directory, properties.getProperty(PREFIX + "project-dir", "."));
         this.strategy = DevReloadStrategy.valueOf(properties.getProperty(PREFIX + "strategy", "auto").trim().toUpperCase(Locale.ROOT));
         this.runtimeClasspath = paths(directory, properties.getProperty(PREFIX + "runtime-classpath", ""));
-        this.reloadableRoots = paths(directory, require(properties, "reloadable"));
-        this.compileClasspath = paths(directory, properties.getProperty(PREFIX + "compile-classpath", ""));
-        this.processorPath = paths(directory, properties.getProperty(PREFIX + "processor-path", ""));
+        List<Path> reloadable = paths(directory, require(properties, "reloadable"));
+        this.compileClasspath = paths(directory, properties.getProperty(PREFIX + COMPILE_CLASSPATH, ""));
+        this.processorPath = paths(directory, properties.getProperty(PREFIX + PROCESSOR_PATH, ""));
         this.sourceRoots = sourceRoots(directory, properties);
-        this.resourceRoots = resourceRoots(directory, properties);
+        List<ResourceRoot> resources = resourceRoots(directory, properties);
         this.compileMode = CompileMode.of(properties.getProperty(PREFIX + "compile.mode", "embedded"))
             .orElseThrow(() -> new IllegalArgumentException("Unknown compile mode " + properties.getProperty(PREFIX + "compile.mode")));
         this.compileModes = perKind(properties, "mode", value -> CompileMode.of(value).orElseThrow(() -> new IllegalArgumentException("Unknown compile mode " + value)));
@@ -135,6 +153,50 @@ public final class DevManifest {
         this.liveReload = new LiveReload(
             Integer.parseInt(properties.getProperty(PREFIX + "livereload.port", "35729").trim()),
             Boolean.parseBoolean(properties.getProperty(PREFIX + "livereload.inject-script", "true"))
+        );
+        this.testSourceRoots = sourceRoots(directory, properties, TEST + SOURCES);
+        this.testResourceRoots = resourceRoots(directory, properties, TEST + RESOURCES);
+        if (mode == DevMode.TEST) {
+            // the tests load from the generation as the classes under test do, ahead of them as on a build's test
+            // classpath, so a test class may shadow an application class; their resources come first too
+            List<Path> withTests = new ArrayList<>();
+            for (SourceRoot root : testSourceRoots) {
+                Path output = testClassOutput(directory, properties, classOutputs, reloadable, root.kind());
+                if (!withTests.contains(output)) {
+                    withTests.add(output);
+                }
+            }
+            for (Path root : reloadable) {
+                if (!withTests.contains(root)) {
+                    withTests.add(root);
+                }
+            }
+            this.reloadableRoots = Collections.unmodifiableList(withTests);
+            List<ResourceRoot> withTestResources = new ArrayList<>(testResourceRoots);
+            withTestResources.addAll(resources);
+            this.resourceRoots = Collections.unmodifiableList(withTestResources);
+        } else {
+            this.reloadableRoots = reloadable;
+            this.resourceRoots = resources;
+        }
+        Map<String, String> parameters = new LinkedHashMap<>();
+        for (String name : properties.stringPropertyNames()) {
+            if (name.startsWith(PREFIX + TEST + "parameters.")) {
+                parameters.put(name.substring((PREFIX + TEST + "parameters.").length()), properties.getProperty(name).trim());
+            }
+        }
+        String selection = properties.getProperty(PREFIX + TEST + "selection", AFFECTED).trim().toLowerCase(Locale.ROOT);
+        if (!selection.equals(AFFECTED) && !selection.equals("all")) {
+            throw new IllegalArgumentException("Unknown test selection " + selection + ": affected or all");
+        }
+        this.testSettings = new TestSettings(
+            properties.getProperty(PREFIX + TEST + "runner", "junit-platform").trim(),
+            selection.equals(AFFECTED),
+            Boolean.parseBoolean(properties.getProperty(PREFIX + TEST + "initial-run", "true")),
+            Boolean.parseBoolean(properties.getProperty(PREFIX + TEST + "once", "false")),
+            path(directory, properties.getProperty(PREFIX + TEST + "reports", "build/micronaut-dev/test-results")),
+            options(directory, properties.getProperty(PREFIX + TEST + "filter", "")),
+            parameters
         );
     }
 
@@ -348,6 +410,115 @@ public final class DevManifest {
         return liveReload;
     }
 
+    /**
+     * @return Whether the runtime runs the application or its tests
+     */
+    public DevMode mode() {
+        return mode;
+    }
+
+    /**
+     * The test source roots, compiled into the test class outputs against the main ones.
+     *
+     * @return The roots, from {@code micronaut.dev.test.sources.<kind>}
+     */
+    public List<SourceRoot> testSourceRoots() {
+        return testSourceRoots;
+    }
+
+    /**
+     * The test resource roots, read live ahead of the main ones in test mode.
+     *
+     * @return The roots, from {@code micronaut.dev.test.resources.<kind>}
+     */
+    public List<ResourceRoot> testResourceRoots() {
+        return testResourceRoots;
+    }
+
+    /**
+     * @return How test mode runs the tests
+     */
+    public TestSettings testSettings() {
+        return testSettings;
+    }
+
+    /**
+     * The class output of a test language: {@code micronaut.dev.test.compile.<kind>.output}, or else {@code <output>-test}
+     * beside the application's output of that language.
+     *
+     * @param kind The language
+     * @return The directory
+     */
+    public Path testClassOutput(SourceKind kind) {
+        return testClassOutput(directory, properties, classOutputs, reloadableRoots, kind);
+    }
+
+    private static Path testClassOutput(Path directory, Properties properties, Map<SourceKind, Path> classOutputs, List<Path> reloadable, SourceKind kind) {
+        String output = properties.getProperty(PREFIX + TEST + COMPILE + kind.name().toLowerCase(Locale.ROOT) + ".output");
+        if (output != null && !output.isBlank()) {
+            return path(directory, output);
+        }
+        Path main = classOutputs.get(kind);
+        if (main == null) {
+            if (reloadable.isEmpty()) {
+                throw new IllegalStateException("No class output for " + kind + " tests and no reloadable root");
+            }
+            main = reloadable.getFirst();
+        }
+        return main.resolveSibling(main.getFileName() + "-test");
+    }
+
+    /**
+     * The tests seen as a manifest of their own, so that they compile as the application does: its source roots are
+     * the test roots, its class outputs, generated sources and options are those of {@code micronaut.dev.test.compile.<kind>.*},
+     * its compile classpath is {@code micronaut.dev.test.compile-classpath}, or else the application's, with the
+     * application's class outputs added, and its processor path is {@code micronaut.dev.test.processor-path}, or else
+     * the application's. A test language without an output of its own writes to {@code <output>-test} beside the
+     * application's.
+     *
+     * @return The manifest of the tests
+     */
+    public DevManifest testView() {
+        Properties view = new Properties();
+        for (String name : properties.stringPropertyNames()) {
+            String key = name.substring(name.startsWith(PREFIX) ? PREFIX.length() : 0);
+            boolean application = key.startsWith(SOURCES) || key.startsWith(RESOURCES) || key.equals(COMPILE_CLASSPATH)
+                || key.equals(PROCESSOR_PATH) || (key.startsWith(COMPILE) && key.indexOf('.', COMPILE.length()) > 0);
+            if (name.startsWith(PREFIX) && !application && !key.startsWith(TEST)) {
+                view.setProperty(name, properties.getProperty(name));
+            }
+        }
+        for (String name : properties.stringPropertyNames()) {
+            if (name.startsWith(PREFIX + TEST + SOURCES) || name.startsWith(PREFIX + TEST + RESOURCES) || name.startsWith(PREFIX + TEST + COMPILE)) {
+                view.setProperty(PREFIX + name.substring((PREFIX + TEST).length()), properties.getProperty(name));
+            }
+        }
+        List<String> classpath = new ArrayList<>();
+        String testClasspath = properties.getProperty(PREFIX + TEST + COMPILE_CLASSPATH);
+        for (Path entry : testClasspath != null ? paths(directory, testClasspath) : compileClasspath) {
+            classpath.add(entry.toString());
+        }
+        for (SourceRoot root : sourceRoots) {
+            String output = classOutput(root.kind()).toString();
+            if (!classpath.contains(output)) {
+                classpath.add(output);
+            }
+        }
+        view.setProperty(PREFIX + COMPILE_CLASSPATH, String.join(java.io.File.pathSeparator, classpath));
+        String testProcessors = properties.getProperty(PREFIX + TEST + PROCESSOR_PATH);
+        List<String> processors = new ArrayList<>();
+        for (Path entry : testProcessors != null ? paths(directory, testProcessors) : processorPath) {
+            processors.add(entry.toString());
+        }
+        view.setProperty(PREFIX + PROCESSOR_PATH, String.join(java.io.File.pathSeparator, processors));
+        for (SourceRoot root : testSourceRoots) {
+            view.setProperty(PREFIX + COMPILE + root.kind().name().toLowerCase(Locale.ROOT) + ".output", testClassOutput(root.kind()).toString());
+        }
+        view.setProperty(PREFIX + "mode", DevMode.RUN.name().toLowerCase(Locale.ROOT));
+        view.setProperty(PREFIX + MAIN_CLASS, mainClass.isEmpty() ? "tests" : mainClass);
+        return new DevManifest(directory, view);
+    }
+
     private static String require(Properties properties, String key) {
         String value = properties.getProperty(PREFIX + key);
         if (value == null || value.isBlank()) {
@@ -419,10 +590,14 @@ public final class DevManifest {
     }
 
     private static List<SourceRoot> sourceRoots(Path directory, Properties properties) {
+        return sourceRoots(directory, properties, SOURCES);
+    }
+
+    private static List<SourceRoot> sourceRoots(Path directory, Properties properties, String prefix) {
         List<SourceRoot> roots = new ArrayList<>();
         for (String name : properties.stringPropertyNames()) {
-            if (name.startsWith(PREFIX + "sources.")) {
-                String kindName = name.substring((PREFIX + "sources.").length());
+            if (name.startsWith(PREFIX + prefix)) {
+                String kindName = name.substring((PREFIX + prefix).length());
                 SourceKind kind = SourceKind.of(kindName).orElseThrow(() -> new IllegalArgumentException("Unknown source kind in " + name));
                 for (Path path : paths(directory, properties.getProperty(name))) {
                     roots.add(new SourceRoot(kind, path));
@@ -433,10 +608,14 @@ public final class DevManifest {
     }
 
     private static List<ResourceRoot> resourceRoots(Path directory, Properties properties) {
+        return resourceRoots(directory, properties, RESOURCES);
+    }
+
+    private static List<ResourceRoot> resourceRoots(Path directory, Properties properties, String prefix) {
         List<ResourceRoot> roots = new ArrayList<>();
         for (String name : properties.stringPropertyNames()) {
-            if (name.startsWith(PREFIX + "resources.")) {
-                String kindName = name.substring((PREFIX + "resources.").length()).toUpperCase(Locale.ROOT);
+            if (name.startsWith(PREFIX + prefix)) {
+                String kindName = name.substring((PREFIX + prefix).length()).toUpperCase(Locale.ROOT);
                 ResourceKind kind;
                 try {
                     kind = ResourceKind.valueOf(kindName);
@@ -454,7 +633,7 @@ public final class DevManifest {
     private static <V> Map<SourceKind, V> perKind(Properties properties, String suffix, java.util.function.Function<String, V> parser) {
         Map<SourceKind, V> values = new EnumMap<>(SourceKind.class);
         for (SourceKind kind : SourceKind.values()) {
-            String value = properties.getProperty(PREFIX + "compile." + kind.name().toLowerCase(Locale.ROOT) + "." + suffix);
+            String value = properties.getProperty(PREFIX + COMPILE + kind.name().toLowerCase(Locale.ROOT) + "." + suffix);
             if (value != null && !value.isBlank()) {
                 values.put(kind, parser.apply(value));
             }
