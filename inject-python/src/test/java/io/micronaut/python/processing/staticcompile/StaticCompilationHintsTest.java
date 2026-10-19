@@ -116,6 +116,19 @@ class StaticCompilationHintsTest {
             .startsWith("Raise and catch unchecked Java exceptions"));
         assertTrue(StaticCompilationHints.hint("python-exception", "parameter [error] is a [Rejected], a Python exception class; a value of it has no Java layout")
             .startsWith("Keep the value of a Python exception class in Python"));
+        // the refusals of the compiled raise and catch of the exception classes of the compilation
+        assertTrue(StaticCompilationHints.hint("python-exception", "an except clause for [Rejected] would catch the [app.Rejected] the Java call [java.util.Objects.nonNull] of the try block throws, which Python lets through: a Python exception that crossed Java code is the Java class in Python")
+            .startsWith("Move the Java call out of the try block"));
+        String context = StaticCompilationHints.hint("python-exception", "raising [Coded] inside an except or finally block has no static lowering: Python chains the exception being handled as its context");
+        assertTrue(context.startsWith("Raise the exception after the try statement"), context);
+        assertEquals(context, StaticCompilationHints.hint("python-exception", "raising [rejected] again outside the except clause that caught it has no static lowering: Python would chain the exception handled there as its context"));
+        assertTrue(StaticCompilationHints.hint("python-exception", "[Outer.Nested] is a nested class: the runtime does not wrap a Python exception of it in its generated class")
+            .startsWith("Define the exception class at the top level"));
+        String arguments = StaticCompilationHints.hint("python-exception", "constructing [Rejected] with a [java.util.List] has no static lowering: only a str, an int, a float, a bool or None reaches the Python class as the value Python passes");
+        assertTrue(arguments.startsWith("Pass the exception class str, int, float, bool or None values"), arguments);
+        assertEquals(arguments, StaticCompilationHints.hint("python-exception", "constructing [Coded] with keyword arguments has no static lowering: a compiled raise calls the Python class with positional arguments"));
+        assertTrue(StaticCompilationHints.hint("python-exception", "raising a [Rejected] that the raise statement does not construct, nor an except clause around it catch, has no static lowering: a value of a Python exception class has no Java layout")
+            .startsWith("Keep the value of a Python exception class in Python"));
         assertTrue(StaticCompilationHints.hint("overridden-method", "[IntHolder] overrides the method with a signature its generated class cannot declare in Java; the bridge of this class dispatches to the Python object for both")
             .startsWith("Give the override the signature"));
     }

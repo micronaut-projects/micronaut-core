@@ -91,8 +91,9 @@ public final class StaticCompilationHints {
             + "an overflow of +, - and * raises ArithmeticException.");
         HINTS.put("equality-on-object", "Compare identifying fields (a.id == b.id), use `is` for identity, or call a.equals(b) explicitly: == between two Java objects has no static lowering.");
         HINTS.put("truthiness-of-java-object", "Test the value explicitly, with x is not None, len(x) > 0, x.isEmpty() or a boolean method, instead of if x:.");
-        HINTS.put("python-exception", "Raise and catch Java exceptions (from java.lang import IllegalArgumentException) or an exception class of the compilation extending Exception; "
-            + "replace a bare except with an except of the Java exception or of the class raised.");
+        HINTS.put("python-exception", "Raise and catch Java exceptions (from java.lang import IllegalArgumentException) or an exception class of the compilation "
+            + "extending a builtin exception (Exception, ValueError, ...), defined at the top level of its module; replace a bare except with an except of the Java "
+            + "exception or of the class raised.");
         CHECKER_RULES.forEach(rule -> HINTS.put(rule, CHECKER_HINT));
     }
 
@@ -223,6 +224,22 @@ public final class StaticCompilationHints {
                 }
                 break;
             case "python-exception":
+                if (text.contains("the Java call [")) {
+                    return "Move the Java call out of the try block, or keep the method in Python: an exception of the class that crossed Java code "
+                        + "(a Java method calling back into Python) is the generated Java class in Python, which the clause does not catch there.";
+                }
+                if (text.contains("inside an except or finally block") || text.contains("again outside the except clause")) {
+                    return "Raise the exception after the try statement (note the failure in a local and raise when it is set), or raise the caught "
+                        + "exception again only in its own except clause: Python chains the exception being handled as the context of the new one.";
+                }
+                if (text.contains("is a nested class")) {
+                    return "Define the exception class at the top level of its module: the runtime finds the generated class of a Python exception "
+                        + "by the name of its class, which a nested class does not give.";
+                }
+                if (text.contains("with keyword arguments") || text.contains("starred argument") || text.contains("only a str, an int, a float, a bool or None")) {
+                    return "Pass the exception class str, int, float, bool or None values, positionally: a compiled raise hands them to the Python class "
+                        + "as the values Python passes; build a message from anything else with an f-string.";
+                }
                 if (text.contains("would catch [")) {
                     return "Catch the exception classes of the compilation by name before a clause for RuntimeException, Exception or Throwable, "
                         + "or catch a narrower Java exception: the Java catch would also catch the Python exception classes, which Python lets through.";
