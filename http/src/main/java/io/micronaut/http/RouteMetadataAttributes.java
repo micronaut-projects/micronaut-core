@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
 import org.jspecify.annotations.Nullable;
 
@@ -97,6 +98,42 @@ public final class RouteMetadataAttributes implements MutableConvertibleValues<O
             return Optional.ofNullable(getMetadata(holder, key));
         }
         return attributes == null ? Optional.empty() : Optional.ofNullable(attributes.getValue(key));
+    }
+
+    /**
+     * Read an attribute of a message that stores the route metadata in the holder. A value that
+     * is already an instance of the required type is returned as is, without creating the
+     * attribute map of the message: a raw type has no type arguments to convert, and a converted
+     * copy (of a map or a collection, for example) would lose changes made to the returned value.
+     *
+     * @param message    The message
+     * @param attributes The attribute map of the message, or {@code null} if not created yet
+     * @param name       The attribute name
+     * @param type       The required type
+     * @param <M>        The message type
+     * @param <T>        The required type
+     * @return The value
+     */
+    @SuppressWarnings("unchecked")
+    public static <M extends HttpMessage<?> & RouteMetadataHolder, T> Optional<T> getAttribute(M message, @Nullable ConvertibleValues<Object> attributes, @Nullable CharSequence name, Class<T> type) {
+        if (StringUtils.isEmpty(name)) {
+            return Optional.empty();
+        }
+        String key = name.toString();
+        Object value;
+        if (isMetadataKey(key)) {
+            value = getMetadata(message, key);
+        } else {
+            // answered without creating the attribute map
+            value = attributes == null ? null : attributes.getValue(key);
+        }
+        if (value == null) {
+            return Optional.empty();
+        }
+        if ((type.isPrimitive() ? ReflectionUtils.getWrapperType(type) : type).isInstance(value)) {
+            return Optional.of((T) value);
+        }
+        return message.getAttributes().get(key, type);
     }
 
     /**

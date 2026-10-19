@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.web.router.AcceptedMediaTypes;
 
 import java.util.Collection;
 import java.util.List;
@@ -255,8 +256,24 @@ public final class RequestPredicates {
             if (accepted.isEmpty()) {
                 return true;
             }
+            if (AcceptedMediaTypes.hasRejected(accepted)) {
+                return acceptable(accepted);
+            }
             for (MediaType acceptedType : accepted) {
                 if (compatible(acceptedType)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * With accepted types of the quality 0: one of the types, with its parameters, or ranges,
+         * has an acceptable intersection with the accepted types.
+         */
+        private boolean acceptable(Collection<MediaType> accepted) {
+            for (MediaType candidate : types) {
+                if (AcceptedMediaTypes.intersects(candidate, accepted)) {
                     return true;
                 }
             }

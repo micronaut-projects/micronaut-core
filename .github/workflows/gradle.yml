@@ -18,6 +18,7 @@ on:
       # stacked PRs target each other's branches
       - 'python/**'
       - 'python-*'
+      - 'stack/**'
     types: [opened, synchronize, reopened, ready_for_review]
 # A new push to a pull request cancels its older run, freeing the shared runner
 # pool. Pushes to branches get a group of their own and are never cancelled:

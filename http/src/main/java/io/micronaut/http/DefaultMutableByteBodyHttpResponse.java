@@ -16,7 +16,9 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.cookie.Cookie;
@@ -98,9 +100,29 @@ final class DefaultMutableByteBodyHttpResponse<B> implements MutableByteBodyHttp
         return delegate.getAttributes();
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public Optional<B> getBody() {
+        if (!bytesReplaced) {
+            // e.g. the body a client already converted from the bytes
+            return (Optional<B>) original.getBody();
+        }
         return delegate.getBody();
+    }
+
+    @Override
+    public <T> Optional<T> getBody(Class<T> type) {
+        return bytesReplaced ? delegate.getBody(type) : original.getBody(type);
+    }
+
+    @Override
+    public <T> Optional<T> getBody(Argument<T> type) {
+        return bytesReplaced ? delegate.getBody(type) : original.getBody(type);
+    }
+
+    @Override
+    public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
+        return bytesReplaced ? delegate.getBody(conversionContext) : original.getBody(conversionContext);
     }
 
     @Override

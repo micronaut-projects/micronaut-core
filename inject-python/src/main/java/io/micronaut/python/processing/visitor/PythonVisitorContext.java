@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.visitor;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -365,6 +366,21 @@ public final class PythonVisitorContext implements VisitorContext {
     }
 
     private ClassElement toDecoratorClassElement(DecoratorDef decoratorDef) {
+        return new PythonAnnotationElement(annotationClassDef(decoratorDef), processingEnvironment);
+    }
+
+    /**
+     * The class definition of the annotation type a Python decorator declares, as the annotation element answers
+     * it: a function for each member, whose annotations are the member's. The definition is derived from the
+     * decorator alone, so two derivations are equal, and the annotation metadata of a member element is keyed by
+     * it (see {@link io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory}).
+     *
+     * @param decoratorDef The decorator
+     * @return The class definition
+     * @since 5.3.0
+     */
+    @Internal
+    public ClassDef annotationClassDef(DecoratorDef decoratorDef) {
         String annotationName = decoratorDef.annotationName();
         int packageIndex = annotationName.lastIndexOf('.');
         String packageName = packageIndex > -1 ? annotationName.substring(0, packageIndex) : "";
@@ -401,7 +417,7 @@ public final class PythonVisitorContext implements VisitorContext {
             List.of(),
             null
         );
-        return new PythonAnnotationElement(annotationDef, processingEnvironment);
+        return annotationDef;
     }
 
     @Override
