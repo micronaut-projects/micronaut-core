@@ -130,7 +130,7 @@ final class ResponseCallbacks {
             try {
                 callback.run();
             } catch (Throwable e) {
-                LOG.warn("A request abandonment callback failed", e);
+                LOG.warn("A request abandonment callback failed: {}", e.getMessage(), e);
             }
         }));
         return () -> {
@@ -267,7 +267,7 @@ final class ResponseCallbacks {
             try {
                 callback.accept(reported);
             } catch (Throwable e) {
-                LOG.warn("A response completion callback failed", e);
+                LOG.warn("A response completion callback failed: {}", e.getMessage(), e);
             }
         }
     }

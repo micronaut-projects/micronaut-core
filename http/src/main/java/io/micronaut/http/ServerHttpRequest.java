@@ -59,9 +59,17 @@ public interface ServerHttpRequest<B> extends HttpRequest<B> {
      * with the default error response, the failure of writing the response, or a
      * {@link io.micronaut.http.exceptions.ConnectionClosedException} if the client went away.
      * The callback does not cancel or wait for the work of the route.
-     * <p>The callback runs once, usually on the event loop, so it must not block. Unlike a
-     * listener of {@code HttpRequestTerminatedEvent}, it costs nothing for the requests that do
-     * not register one.
+     * <p>The callback runs once. Unlike a listener of {@code HttpRequestTerminatedEvent}, it costs
+     * nothing for the requests that do not register one.
+     *
+     * <p><b>Threading.</b> The callback runs on the Netty event loop of the connection, directly
+     * after the final write completes, the client went away, or the request was cleaned up. If the
+     * response is done while the callback is being registered, it can run on the registering
+     * thread instead. The event loop also serves the other requests and connections assigned to
+     * it, so the callback must not block: no blocking IO (e.g. JDBC, blocking HTTP calls, file
+     * IO) and no long CPU-intensive work, which would delay every other connection of that event
+     * loop. Non-blocking work, e.g. completing a future, counting a metric or logging, is fine;
+     * hand anything else to an executor, e.g. the {@code TaskExecutors.BLOCKING} executor.
      *
      * <p>Register before the response is handed to the connection, e.g. in the route, a filter
      * before it continues, or a response filter: once the final write of the response was issued
@@ -74,6 +82,7 @@ public interface ServerHttpRequest<B> extends HttpRequest<B> {
      * response was already issued, so the callback will not run
      * @since 5.3.0
      */
+    @Experimental
     default boolean whenResponseCompleted(Consumer<@Nullable Throwable> callback) {
         return false;
     }
@@ -82,8 +91,14 @@ public interface ServerHttpRequest<B> extends HttpRequest<B> {
      * Run a callback when the client abandons this request before its response is written: the
      * client closed the HTTP/1.1 connection, or reset the HTTP/2 stream of the request. This lets
      * a route that answers asynchronously stop its work, e.g. cancel a pending
-     * {@link java.util.concurrent.CompletableFuture}. The callback runs at most once, usually on
-     * the event loop, so it must not block. It is removed when the response is done.
+     * {@link java.util.concurrent.CompletableFuture}. The callback runs at most once. It is
+     * removed when the response is done.
+     *
+     * <p><b>Threading.</b> The callback runs on the Netty event loop of the connection, when the
+     * close of the connection or the reset of the stream is seen, or on the registering thread if
+     * the request was abandoned already. As for {@link #whenResponseCompleted}, it must not block
+     * the event loop: cancelling a future or setting a flag is fine; blocking IO or long
+     * CPU-intensive work belongs on an executor.
      *
      * <p>Like {@link #whenResponseCompleted}, register before the response is handed to the
      * connection: a callback registered after the final write was issued without a registration
@@ -94,6 +109,7 @@ public interface ServerHttpRequest<B> extends HttpRequest<B> {
      * away, or the final write of the response was already issued
      * @since 5.3.0
      */
+    @Experimental
     default @Nullable Runnable whenAbandoned(Runnable callback) {
         return null;
     }

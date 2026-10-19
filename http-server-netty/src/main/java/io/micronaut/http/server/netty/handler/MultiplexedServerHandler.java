@@ -599,7 +599,7 @@ abstract class MultiplexedServerHandler {
                         writeFull(response, finalContent);
                     } catch (Throwable t) {
                         // no caller to answer a fallback response: give up on the response
-                        LOG.warn("Failed to write the response", t);
+                        LOG.warn("Failed to write the response: {}", t.getMessage(), t);
                         requestHandler.responseFailed(attachment, t);
                         abortWrittenResponse();
                     }
@@ -1060,7 +1060,7 @@ abstract class MultiplexedServerHandler {
                     } catch (Throwable t) {
                         // e.g. trailers that cannot be converted: the writer still reports the
                         // response as written, which cleans up the request
-                        LOG.warn("Failed to end the streamed response", t);
+                        LOG.warn("Failed to end the streamed response: {}", t.getMessage(), t);
                         requestHandler.responseFailed(attachment, t);
                         reset(t);
                     }

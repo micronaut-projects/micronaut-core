@@ -37,7 +37,11 @@ snippet::io.micronaut.docs.server.callbacks.ReportRoutes[tags="imports,clazz", i
 <1> `whenAbandoned` runs when the client closes the HTTP/1.1 connection or resets the HTTP/2 stream before the response is written. It does not cancel anything itself: here the route cancels its pending work.
 <2> `whenResponseCompleted` runs once the response is done: with `null` when it was written, or with the failure: an error that no error route or exception handler handled, a failure of writing the response, or a api:http.exceptions.ConnectionClosedException[] when the client went away.
 
-Register the callbacks before the response is handed to the connection, in the route, in a filter, or in a response filter. A registration after that is refused: `whenResponseCompleted` returns `false` and `whenAbandoned` returns `null`. They also do so on a server that does not support them. The callbacks usually run on the event loop of the connection, so they must not block.
+Register the callbacks before the response is handed to the connection, in the route, in a filter, or in a response filter. A registration after that is refused: `whenResponseCompleted` returns `false` and `whenAbandoned` returns `null`. They also do so on a server that does not support them.
+
+The callbacks run on the Netty event loop of the connection, which also serves other connections. They must not block: completing or cancelling a future, counting a metric or logging is fine, but blocking IO (for example JDBC or a blocking HTTP call) and long CPU-intensive work must be handed to an executor, for example the `TaskExecutors.BLOCKING` executor, or they delay every other connection on that event loop.
+
+NOTE: Both methods are experimental, and may change in a later release.
 
 The following example defines a api:context.event.ApplicationEventListener[] that listens for api:runtime.server.event.ServerStartupEvent[]:
 
