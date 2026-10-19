@@ -18,6 +18,7 @@ package io.micronaut.context.python;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
@@ -99,6 +100,21 @@ public final class PythonStatic {
      */
     public static void resetEntries() {
         ENTRIES.clear();
+    }
+
+    /**
+     * The Java exception a compiled {@code raise} of a Python exception class throws: the one the
+     * runtime creates when the Python exception reaches Java code, the generated class of its
+     * exception class created through its {@code Value} constructor (a failure of that constructor
+     * reported as an {@link IllegalStateException}, as for a Python raise).
+     *
+     * @param generatedClass The generated class of the exception class
+     * @param exception      The Python exception, created by its class
+     * @return The Java exception to throw
+     */
+    @UsedByGeneratedCode
+    public static RuntimeException raised(Class<?> generatedClass, Value exception) {
+        return GraalPyExceptionHandler.raised(generatedClass, exception);
     }
 
     /**

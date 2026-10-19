@@ -377,9 +377,9 @@ public sealed interface Ir {
      * An exception of a Python exception class of the compilation, created as Python creates it:
      * the Python class called with the arguments, the Python exception wrapped in the generated Java
      * class through its {@code Value} constructor, as the runtime wraps a Python exception that
-     * reaches Java code.
+     * reaches Java code. Its Java value is the {@code RuntimeException} a {@code raise} throws.
      *
-     * @param type      The generated class, a Throwable
+     * @param type      The generated class, a RuntimeException
      * @param arguments The arguments of the Python class, boxed
      */
     record NewPythonException(String type, List<Expression> arguments) implements Expression {

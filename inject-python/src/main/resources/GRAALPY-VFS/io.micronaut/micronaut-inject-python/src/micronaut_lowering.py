@@ -1255,8 +1255,9 @@ class Lowering:
             # Python chains the exception being handled as the context (__context__) of the new one, which
             # the Java exception does not carry, nor its Java cause for a Java one
             self._refuse("python-exception", f"raising [{model.name}] inside an except or finally block has no static lowering: Python chains the exception being handled as its context", node)
-        if not self._unchecked(model.throwable_base() or "java.lang.Throwable"):
-            self._refuse("unsupported-statement", f"raising [{model.name}], whose generated class is a checked exception, has no static lowering", node)
+        if not self.checker.facts.isAssignable(model.throwable_base() or "java.lang.Throwable", "java.lang.RuntimeException"):
+            # the runtime wraps a Python exception in a generated RuntimeException; javac refuses an undeclared checked one
+            self._refuse("unsupported-statement", f"raising [{model.name}], whose generated class is no RuntimeException, has no static lowering", node)
         lowered = []
         for argument in arguments:
             if isinstance(argument, ast.Starred):
