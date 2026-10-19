@@ -127,4 +127,27 @@ class InfoSourceFormatsSpec extends Specification {
         cleanup:
         context.close()
     }
+
+    void "source helpers accept omitted prefix and extension"(String path, String prefix, String extension, String branch) {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        def resolver = context.getBean(io.micronaut.core.io.ResourceResolver)
+        def source = new GitInfoSource(resolver, 'git.properties')
+
+        expect:
+        source.retrievePropertySource(path, prefix, extension, resolver, context.environment.propertySourceLoaders)
+            .orElseThrow().get('git.branch') == branch
+
+        cleanup:
+        context.close()
+
+        where:
+        path                       | prefix       | extension     | branch
+        'classpath:git.json'        | null         | null          | 'main'
+        'git.json'                  | 'classpath:' | null          | 'main'
+        'classpath:git.json'        | null         | '.properties' | 'main'
+        'classpath:git.yml'         | null         | null          | 'yaml-branch'
+        'classpath:git'             | null         | null          | 'master'
+        'classpath:git.properties'  | null         | '.properties' | 'master'
+    }
 }

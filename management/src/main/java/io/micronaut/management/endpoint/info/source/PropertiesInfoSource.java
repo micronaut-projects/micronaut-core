@@ -23,6 +23,7 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.management.endpoint.info.InfoSource;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
@@ -45,12 +46,12 @@ public interface PropertiesInfoSource extends InfoSource {
      * {@link PropertySource} from a properties file. </p>
      *
      * @param path The path to the properties file
-     * @param prefix prefix for resolving the file (used if not included in {@code path})
-     * @param extension file extension (used if not included in {@code path})
+     * @param prefix prefix for resolving the file (used if not included in {@code path}), or {@code null} to add no prefix
+     * @param extension file extension (used if not included in {@code path}), or {@code null} to use the path unchanged
      * @param resourceResolver Instance of {@link ResourceResolver} to resolve the file location
      * @return An {@link Optional} of {@link PropertySource} containing the values from the properties file
      */
-    default Optional<PropertySource> retrievePropertiesPropertySource(String path, String prefix, String extension, ResourceResolver resourceResolver) {
+    default Optional<PropertySource> retrievePropertiesPropertySource(String path, @Nullable String prefix, @Nullable String extension, ResourceResolver resourceResolver) {
         StringBuilder pathBuilder = new StringBuilder();
 
         if ((prefix != null) && !path.startsWith(prefix)) {
@@ -86,15 +87,15 @@ public interface PropertiesInfoSource extends InfoSource {
      * {@link Optional} is returned.</p>
      *
      * @param path The path to the file
-     * @param prefix prefix for resolving the file (used if not included in {@code path})
-     * @param extension file extension, including the leading dot, of the default properties format
+     * @param prefix prefix for resolving the file (used if not included in {@code path}), or {@code null} to add no prefix
+     * @param extension file extension, including the leading dot, of the default properties format, or {@code null}
      * @param resourceResolver Instance of {@link ResourceResolver} to resolve the file location
      * @param propertySourceLoaders The loaders that may read the file, typically
      *                              {@link io.micronaut.context.env.Environment#getPropertySourceLoaders()}
      * @return An {@link Optional} of {@link PropertySource} containing the values from the file
      * @since 5.3.0
      */
-    default Optional<PropertySource> retrievePropertySource(String path, String prefix, String extension, ResourceResolver resourceResolver, Collection<PropertySourceLoader> propertySourceLoaders) {
+    default Optional<PropertySource> retrievePropertySource(String path, @Nullable String prefix, @Nullable String extension, ResourceResolver resourceResolver, Collection<PropertySourceLoader> propertySourceLoaders) {
         String fileExtension = NameUtils.extension(path);
         if (fileExtension.isEmpty() || (extension != null && path.endsWith(extension))) {
             return retrievePropertiesPropertySource(path, prefix, extension, resourceResolver);
