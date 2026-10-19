@@ -109,16 +109,21 @@ final class PythonStaticTest {
         assertEquals("a", PythonStatic.item(byPair, PythonStatic.tuple(1L, 2L)));
         assertTrue(PythonStatic.contains(pairs, PythonStatic.tuple(1L, 2L)));
         // Python raises TypeError: unhashable type: 'list', where Java would find the equal tuple
-        assertThrows(ClassCastException.class, () -> PythonStatic.item(byPair, PythonStatic.list(1L, 2L)));
-        assertThrows(ClassCastException.class, () -> PythonStatic.get(byPair, PythonStatic.list(1L, 2L), "b"));
-        assertThrows(ClassCastException.class, () -> PythonStatic.contains(byPair, PythonStatic.list(1L, 2L)));
-        assertThrows(ClassCastException.class, () -> PythonStatic.contains(pairs, PythonStatic.list(1L, 2L)));
-        assertThrows(ClassCastException.class, () -> PythonStatic.add(pairs, PythonStatic.list(1L, 2L)));
-        assertThrows(ClassCastException.class, () -> PythonStatic.setItem(byPair, PythonStatic.list(1L, 2L), "c"));
-        assertThrows(ClassCastException.class, () -> PythonStatic.map(PythonStatic.list(1L), "a"));
-        assertThrows(ClassCastException.class, () -> PythonStatic.set(PythonStatic.set(1L)));
-        assertThrows(ClassCastException.class, () -> PythonStatic.copyOfSet(List.of(PythonStatic.list(1L))));
-        assertThrows(ClassCastException.class, () -> PythonStatic.set(PythonStatic.tuple(PythonStatic.list(1L))));
+        var pair = PythonStatic.list(1L, 2L);
+        var single = PythonStatic.list(1L);
+        var nestedSet = PythonStatic.set(1L);
+        var listOfLists = List.of(PythonStatic.list(1L));
+        var tupleOfList = PythonStatic.tuple(PythonStatic.list(1L));
+        assertThrows(ClassCastException.class, () -> PythonStatic.item(byPair, pair));
+        assertThrows(ClassCastException.class, () -> PythonStatic.get(byPair, pair, "b"));
+        assertThrows(ClassCastException.class, () -> PythonStatic.contains(byPair, pair));
+        assertThrows(ClassCastException.class, () -> PythonStatic.contains(pairs, pair));
+        assertThrows(ClassCastException.class, () -> PythonStatic.add(pairs, pair));
+        assertThrows(ClassCastException.class, () -> PythonStatic.setItem(byPair, pair, "c"));
+        assertThrows(ClassCastException.class, () -> PythonStatic.map(single, "a"));
+        assertThrows(ClassCastException.class, () -> PythonStatic.set(nestedSet));
+        assertThrows(ClassCastException.class, () -> PythonStatic.copyOfSet(listOfLists));
+        assertThrows(ClassCastException.class, () -> PythonStatic.set(tupleOfList));
         assertEquals(1, pairs.size());
         assertEquals(1, byPair.size());
     }
