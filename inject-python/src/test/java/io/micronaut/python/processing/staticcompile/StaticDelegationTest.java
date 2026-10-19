@@ -48,12 +48,12 @@ class StaticDelegationTest {
 
     @Test
     void aBodyWithSideEffectsDelegatesOnlyWithoutOperationsThatPromote() {
-        Ir.Statement write = new Ir.PutSelf("label", Ir.STRING, param(Ir.STRING));
+        Ir.Statement write = new Ir.PutSelf("label", Ir.STRING, param(Ir.STRING), false);
         assertEquals("Outer$Calc#run#owner=app.Outer$Calc#kinds=str#once", StaticDelegation.target(body(List.of(Ir.STRING), Ir.VOID, write)));
-        Ir.Statement count = new Ir.PutSelf("count", "int", new Ir.Cast(new Ir.Binary("+", param("int"), new Ir.Const(1L, Ir.LONG), Ir.LONG), "int"));
+        Ir.Statement count = new Ir.PutSelf("count", "int", new Ir.Cast(new Ir.Binary("+", param("int"), new Ir.Const(1L, Ir.LONG), Ir.LONG), "int"), false);
         assertNull(StaticDelegation.target(body(List.of("int"), Ir.VOID, count)));
         // a division only raises where Python raises: the ZeroDivisionError reaches the caller
-        Ir.Statement ratio = new Ir.PutSelf("ratio", Ir.DOUBLE, new Ir.Binary("/", param("int"), new Ir.Const(2L, Ir.LONG), Ir.DOUBLE));
+        Ir.Statement ratio = new Ir.PutSelf("ratio", Ir.DOUBLE, new Ir.Binary("/", param("int"), new Ir.Const(2L, Ir.LONG), Ir.DOUBLE), false);
         assertEquals("Outer$Calc#run#owner=app.Outer$Calc#kinds=int#once", StaticDelegation.target(body(List.of("int"), Ir.VOID, ratio)));
     }
 
