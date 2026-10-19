@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -378,11 +379,16 @@ public final class PythonStatic {
     /**
      * @param value An element of a collection, boxed by the host boundary
      * @return The value as a Python int
-     * @throws ClassCastException When the element is not a number, as Python raises TypeError
+     * @throws ClassCastException When the element is not an int (a float, say, which the compiled body
+     * cannot keep as Python would), so that the body fails rather than truncates it
+     * @throws ArithmeticException When the element is an int that does not fit a long
      */
     public static long toLong(@Nullable Object value) {
-        if (value instanceof Number number) {
-            return number.longValue();
+        if (value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte) {
+            return ((Number) value).longValue();
+        }
+        if (value instanceof BigInteger big) {
+            return big.longValueExact();
         }
         if (value instanceof Boolean bool) {
             return bool.booleanValue() ? 1 : 0;
@@ -392,12 +398,15 @@ public final class PythonStatic {
 
     /**
      * @param value An element of a collection, boxed by the host boundary
-     * @return The value as a Python float
-     * @throws ClassCastException When the element is not a number, as Python raises TypeError
+     * @return The value as a Python float; a bool is 1.0 or 0.0, as Python's arithmetic takes it
+     * @throws ClassCastException When the element is not a number
      */
     public static double toDouble(@Nullable Object value) {
         if (value instanceof Number number) {
             return number.doubleValue();
+        }
+        if (value instanceof Boolean bool) {
+            return bool.booleanValue() ? 1.0 : 0.0;
         }
         throw new ClassCastException("not a float: " + str(value));
     }

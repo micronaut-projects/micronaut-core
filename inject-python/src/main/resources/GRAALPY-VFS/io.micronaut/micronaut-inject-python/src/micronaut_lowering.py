@@ -64,6 +64,14 @@ JAVA_STRINGS = {"java.lang.String"}  # a CharSequence is a Java value, not a Pyt
 BINARY_OPS = {ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/", ast.FloorDiv: "//", ast.Mod: "%", ast.Pow: "**"}
 COMPARE_OPS = {ast.Lt: "<", ast.LtE: "<=", ast.Gt: ">", ast.GtE: ">=", ast.Eq: "==", ast.NotEq: "!="}
 DEFAULTS = {LONG: 0, DOUBLE: 0.0, BOOLEAN: False}
+# the Java exceptions a compiled body throws where Python raises an exception of its own (a ValueError,
+# a TypeError, a ZeroDivisionError, an AttributeError, ...): its runtime checks and helpers, casts,
+# unboxing and calls on None. An except clause that catches one of them would catch, compiled, what the
+# Python body lets pass
+SYNTHESIZED_EXCEPTIONS = ("java.lang.ArithmeticException", "java.lang.ClassCastException", "java.lang.IllegalArgumentException",
+                          "java.lang.IllegalStateException", "java.lang.IndexOutOfBoundsException", "java.lang.NullPointerException",
+                          "java.lang.UnsupportedOperationException", "java.util.NoSuchElementException",
+                          "java.util.ConcurrentModificationException")
 
 
 # how well a parameter type fits an argument type: lower is more specific, as Java ranks overloads
@@ -223,6 +231,7 @@ class Lowering:
         self.bridge_calls = 0
         self.helper_calls = 0
         self.checked = False      # a call declares a checked exception
+        self.thrown = []          # per enclosing try block, the checked exceptions its Java calls declare
 
     # ---------------------------------------------------------------- entry
 
@@ -599,7 +608,14 @@ class Lowering:
         exception = self._expression(node.exc)
         if not self.checker.facts.isAssignable(_erased(exception.type()), "java.lang.Throwable"):
             self._refuse("python-exception", f"raising a [{_erased(exception.type())}] is not raising a Java exception", node)
+        if not self._unchecked(_erased(exception.type())):
+            # Java requires a throws clause the stub does not declare
+            self._refuse("unsupported-statement", f"raising the checked exception [{_erased(exception.type())}] has no static lowering", node)
         return Throw(exception)
+
+    def _unchecked(self, exception_type):
+        """Whether a Java exception type is unchecked: a RuntimeException or an Error."""
+        return self.checker.facts.isAssignable(exception_type, "java.lang.RuntimeException") or self.checker.facts.isAssignable(exception_type, "java.lang.Error")
 
     def _try(self, node):
         if node.orelse:
@@ -615,8 +631,13 @@ class Lowering:
                 if name not in self.locals and name not in self.parameters and _assigned_on_every_path(node.body, name) and _reads(name, self._statements_after(node)):
                     self._declare_before(name, node)
         declared_before = set(self.locals)
-        body = Body(self._block(node.body))
+        self.thrown.append(set())
+        try:
+            body = Body(self._block(node.body))
+        finally:
+            thrown = self.thrown.pop()
         self._end_scope(node, declared_before, later, "the try block")
+        uncaught = set(thrown)
         catches = []
         for handler in node.handlers:
             if handler.type is None:
@@ -629,6 +650,13 @@ class Lowering:
             for earlier in catches:
                 if self.checker.facts.isAssignable(caught.name, earlier.type()):
                     self._refuse("unsupported-statement", f"the except clause for [{caught.name}] follows one for [{earlier.type()}] that already catches it", handler)
+            for synthesized in SYNTHESIZED_EXCEPTIONS:
+                if self.checker.facts.isAssignable(synthesized, caught.name):
+                    self._refuse("python-exception", f"the except clause for [{caught.name}] catches the [{synthesized}] a compiled body throws where Python raises an exception of its own", handler)
+            if not self._unchecked(caught.name) and not any(self.checker.facts.isAssignable(declared, caught.name) or self.checker.facts.isAssignable(caught.name, declared) for declared in thrown):
+                # javac refuses a catch of a checked exception the try block cannot throw
+                self._refuse("unsupported-statement", f"the except clause for the checked exception [{caught.name}] has no Java call of the try block that declares it", handler)
+            uncaught = {declared for declared in uncaught if not self.checker.facts.isAssignable(declared, caught.name)}
             if handler.name is not None:
                 self.locals[handler.name] = caught.name
             declared_before = set(self.locals)
@@ -643,6 +671,9 @@ class Lowering:
             declared_before = set(self.locals)
             finally_body = Body(self._block(node.finalbody))
             self._end_scope(node, declared_before, [], "the finally block")
+        if self.thrown:
+            # what the handlers do not catch, an enclosing try block's Java calls throw
+            self.thrown[-1].update(uncaught)
         return Try(body, catches, finally_body)
 
     def _declare_before(self, name, node):
@@ -862,6 +893,8 @@ class Lowering:
             self._refuse("unsupported-expression", "a call of a varargs method has no static lowering yet", node)
         if signature.throwsChecked():
             self.checked = True
+            if self.thrown:
+                self.thrown[-1].update(signature.checkedExceptions())
         arguments = [self._coerce(argument, parameter_type, argument_node)
                      for argument, parameter_type, argument_node in zip(lowered_arguments, parameter_types, node.args)]
         self.java_calls += 1
