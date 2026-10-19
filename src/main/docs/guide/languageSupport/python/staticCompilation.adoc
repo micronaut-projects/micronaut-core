@@ -198,7 +198,7 @@ The Python object of a compiled class still exists: the generated class creates 
 
 A Python caller runs the Java body only when it gets what the Python body would give it:
 
-* every argument has the exact Python type of its Java parameter and fits its range: an `int` within the range of the Java integer (a `bool` is not taken for an `int`, nor an `int` for a `float`), a `float`, a `bool`, a `str`, or `None` for a parameter that may be `None`;
+* every argument has the exact Python type of its Java parameter and fits its range: an `int` within the range of the Java integer (a `bool` is not taken for an `int`, nor an `int` for a `float`), a `float`, a `bool`, a `str`, `None` for a parameter that may be `None`, or a Java object of the class of a parameter that takes one (an `Object` parameter takes any Java object, but no Python value, which the boundary would convert);
 * a body without side effects (no write to `self`, no Java call) runs again in Python when the Java body fails, so an `int` that outgrows a `long`, which Python promotes, gives Python's result, and any other failure Python's exception;
 * a body with side effects is not run twice: it runs as Java only when none of its operations can overflow where Python would promote.
 
