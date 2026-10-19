@@ -39,6 +39,7 @@ Reason = java.type("io.micronaut.python.processing.staticcompile.StaticCompilati
 Stats = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Stats")
 
 MODE_OFF = "off"
+# decides exactly as MODE_OFF does; the processor runs the planner for it over every compilation and always writes the report
 MODE_ANNOTATED = "annotated"
 MODE_ALL = "all"
 MODES = (MODE_OFF, MODE_ANNOTATED, MODE_ALL)
@@ -103,8 +104,12 @@ class StaticPlanner:
     def plan(self, checker, visitor_context=None):
         """
         Decide every function recorded by the type checker; returns the decisions. The checker's
-        facts are created from the visitor context when its own check did not run.
+        facts are created from the visitor context when its own check did not run. Every plan starts
+        afresh: the decisions and diagnostics of an earlier plan are dropped, so a planner that
+        outlives one compilation element never reports a decision twice.
         """
+        self.decisions = []
+        self.diagnostics = []
         if getattr(checker, "facts", None) is None and visitor_context is not None:
             checker.facts = TypeFacts(visitor_context)
             checker.python_classes = PythonClasses(checker)
@@ -456,7 +461,8 @@ def _decorator_name(decorator):
     return None
 
 
-# the attribute holding the delegate of the stub on its Python object (PythonStatic.COMPILED_MEMBER)
+# the class attribute through which the rewritten methods of a class reach the Java bodies of its bound
+# objects (PythonStatic.COMPILED_MEMBER): None until an object of the class is bound
 JAVA_INSTANCE_MEMBER = "__micronaut_compiled__"
 
 
@@ -465,30 +471,59 @@ def apply_delegation(tree, targets):
     Rewrite the compiled functions of a runtime module tree so that, on an object bound to its
     Java stub, the Java body runs instead of the Python one::
 
-        def total(self, quantity, unit_price):
-            __mn_java = self.__dict__.get('__micronaut_compiled__')
-            if __mn_java is not None:
-                return __mn_java.total(quantity, unit_price)
-            ...the original body, for objects created in Python...
+        class Calc:
+            __micronaut_compiled__ = None
 
-    ``targets`` are ``Class#method`` strings, a nested class as ``Outer$Inner``, with ``#list``,
-    ``#set`` or ``#dict`` appended when the Java body returns a collection, which a Python caller
-    receives as a Python one. Returns how many functions were rewritten.
+            def total(self, quantity, unit_price):
+                __mn_java = __class__.__micronaut_compiled__
+                if __mn_java is not None:
+                    __mn_java = __mn_java.call(self, 'app.Calc', 'total', (quantity, unit_price), ('int', 'float'), True)
+                    if __mn_java is not None:
+                        return __mn_java[0]
+                ...the original body, for objects created in Python...
+
+    The rewritten function names the class it is defined in (``__class__``) and the generated
+    class of that class, so ``super().total()`` from a subclass runs the base's Java body, not the
+    override. The binding of an object lives outside it, in the registry the class attribute
+    holds once an object of the class is bound (``micronaut_runtime``): a copy of the object is
+    not bound and runs the Python body on its own attributes. The registry runs the Java body only
+    when every argument has the exact Python type and range of its Java parameter, and runs the
+    Python body when a body that may be run again fails, see ``StaticDelegation``.
+
+    ``targets`` are ``Class#method#owner=<generated class>#kinds=<kind,...>#retry`` (``#once``
+    for a body that is not run again) strings, a nested class as ``Outer$Inner``; a target without
+    its kinds is not delegated. ``#list``, ``#set`` or ``#dict`` is appended when the Java body
+    returns a collection, which a Python caller receives as a Python one. Returns how many
+    functions were rewritten.
     """
     wanted = {}
     for target in targets:
-        class_name, method, *conversion = target.split("#")
-        wanted.setdefault(class_name, {})[method] = conversion[0] if conversion else None
+        class_name, method, *rest = target.split("#")
+        options = dict(part.split("=", 1) if "=" in part else (part, True) for part in rest)
+        if "kinds" not in options:
+            continue
+        kinds = tuple(kind for kind in options["kinds"].split(",") if kind)
+        conversion = next((name for name in ("list", "set", "dict") if name in options), None)
+        wanted.setdefault(class_name, {})[method] = (options.get("owner", class_name), kinds, "retry" in options, conversion)
     count = 0
     for class_node, path in _classes(tree):
         methods = wanted.get("$".join(path))
         if not methods:
             continue
+        rewritten = 0
         for statement in class_node.body:
             if isinstance(statement, ast.FunctionDef) and statement.name in methods and not _delegates(statement):
-                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, methods[statement.name])
+                owner, kinds, retry, conversion = methods[statement.name]
+                if not _receives_self(statement, kinds):
+                    continue
+                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, owner, kinds, retry, conversion)
                 ast.fix_missing_locations(statement)
-                count += 1
+                rewritten += 1
+        if rewritten and not _declares_member(class_node):
+            member = ast.Assign(targets=[ast.Name(id=JAVA_INSTANCE_MEMBER, ctx=ast.Store())], value=ast.Constant(value=None))
+            _locate([member], class_node.lineno, class_node.col_offset)
+            class_node.body.insert(_docstring_offset(class_node), member)
+        count += rewritten
     return count
 
 
@@ -512,13 +547,24 @@ def _docstring_offset(function):
 DELEGATE_LOCAL = "__mn_java"
 
 
+def _declares_member(class_node):
+    return any(isinstance(statement, ast.Assign) and any(isinstance(target, ast.Name) and target.id == JAVA_INSTANCE_MEMBER for target in statement.targets)
+               for statement in class_node.body)
+
+
+def _receives_self(function, kinds):
+    """Whether the function takes the object and exactly the parameters the Java body does, positionally."""
+    args = function.args
+    positional = list(args.posonlyargs) + list(args.args)
+    return bool(positional) and len(positional) - 1 == len(kinds) and args.vararg is None and args.kwarg is None and not args.kwonlyargs
+
+
 def _delegates(function):
-    """Whether the function is already rewritten: its first statement reads the delegate of the object."""
+    """Whether the function is already rewritten: its first statement reads the registry of its class."""
     body = function.body
     first = body[_docstring_offset(function)] if len(body) > _docstring_offset(function) else None
-    return (isinstance(first, ast.Assign) and isinstance(first.value, ast.Call) and isinstance(first.value.func, ast.Attribute)
-            and first.value.func.attr == "get" and len(first.value.args) == 1
-            and isinstance(first.value.args[0], ast.Constant) and first.value.args[0].value == JAVA_INSTANCE_MEMBER)
+    return (isinstance(first, ast.Assign) and isinstance(first.value, ast.Attribute) and first.value.attr == JAVA_INSTANCE_MEMBER
+            and isinstance(first.value.value, ast.Name) and first.value.value.id == "__class__")
 
 
 def _temporary(function):
@@ -533,51 +579,67 @@ def _temporary(function):
     return name
 
 
-def _delegation(function, conversion=None):
+def _locate(statements, line, column):
+    for statement in statements:
+        for node in ast.walk(statement):
+            if isinstance(node, (ast.stmt, ast.expr)):
+                node.lineno = node.end_lineno = line
+                node.col_offset = node.end_col_offset = column
+
+
+def _delegation(function, owner, kinds, retry, conversion=None):
     args = function.args
-    receiver = (list(args.posonlyargs) + list(args.args))[0].arg
-    names = [argument.arg for argument in list(args.posonlyargs) + list(args.args)][1:]
-    line, column = function.lineno, function.col_offset
+    positional = list(args.posonlyargs) + list(args.args)
+    receiver = positional[0].arg
+    names = [argument.arg for argument in positional[1:]]
     temporary = _temporary(function)
+
+    def load(name):
+        return ast.Name(id=name, ctx=ast.Load())
+
     lookup = ast.Assign(
         targets=[ast.Name(id=temporary, ctx=ast.Store())],
+        value=ast.Attribute(value=load("__class__"), attr=JAVA_INSTANCE_MEMBER, ctx=ast.Load()),
+    )
+    call = ast.Assign(
+        targets=[ast.Name(id=temporary, ctx=ast.Store())],
         value=ast.Call(
-            func=ast.Attribute(value=ast.Attribute(value=ast.Name(id=receiver, ctx=ast.Load()), attr="__dict__", ctx=ast.Load()), attr="get", ctx=ast.Load()),
-            args=[ast.Constant(value=JAVA_INSTANCE_MEMBER)],
+            func=ast.Attribute(value=load(temporary), attr="call", ctx=ast.Load()),
+            args=[
+                load(receiver),
+                ast.Constant(value=owner),
+                ast.Constant(value=function.name),
+                ast.Tuple(elts=[load(name) for name in names], ctx=ast.Load()),
+                ast.Tuple(elts=[ast.Constant(value=kind) for kind in kinds], ctx=ast.Load()),
+                ast.Constant(value=retry),
+            ],
             keywords=[],
         ),
     )
-    result = ast.Call(
-        func=ast.Attribute(value=ast.Name(id=temporary, ctx=ast.Load()), attr=function.name, ctx=ast.Load()),
-        args=[ast.Name(id=name, ctx=ast.Load()) for name in names],
-        keywords=[],
-    )
+    result = ast.Subscript(value=load(temporary), slice=ast.Constant(value=0), ctx=ast.Load())
     if conversion in ("list", "set"):
         result = ast.Call(func=ast.Name(id=conversion, ctx=ast.Load()), args=[result], keywords=[])
     elif conversion == "dict":
         # dict((k, m.get(k)) for k in m.keySet()): a Java map read through its interop members
-        result = ast.parse("dict((__mn_k, __mn_m.get(__mn_k)) for __mn_k in __mn_m.keySet())").body[0].value
-        result.args[0].generators[0].iter.func.value = _result_holder()
+        converted = ast.parse("dict((__mn_k, __mn_m.get(__mn_k)) for __mn_k in __mn_m.keySet())").body[0].value
+        converted.args[0].generators[0].iter.func.value = _result_holder()
         result = ast.Call(
-            func=ast.Lambda(args=ast.arguments(posonlyargs=[], args=[ast.arg(arg="__mn_m")], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]), body=result),
-            args=[ast.Call(
-                func=ast.Attribute(value=ast.Name(id=temporary, ctx=ast.Load()), attr=function.name, ctx=ast.Load()),
-                args=[ast.Name(id=name, ctx=ast.Load()) for name in names],
-                keywords=[],
-            )],
+            func=ast.Lambda(args=ast.arguments(posonlyargs=[], args=[ast.arg(arg="__mn_m")], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]), body=converted),
+            args=[result],
             keywords=[],
         )
-    call = ast.Return(value=result)
+    returned = ast.If(
+        test=ast.Compare(left=load(temporary), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
+        body=[ast.Return(value=result)],
+        orelse=[],
+    )
     guard = ast.If(
-        test=ast.Compare(left=ast.Name(id=temporary, ctx=ast.Load()), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
-        body=[call],
+        test=ast.Compare(left=load(temporary), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
+        body=[call, returned],
         orelse=[],
     )
     statements = [lookup, guard]
-    for statement in ast.walk(ast.Module(body=statements, type_ignores=[])):
-        if isinstance(statement, (ast.stmt, ast.expr)):
-            statement.lineno = statement.end_lineno = line
-            statement.col_offset = statement.end_col_offset = column
+    _locate(statements, function.lineno, function.col_offset)
     return statements
 
 
