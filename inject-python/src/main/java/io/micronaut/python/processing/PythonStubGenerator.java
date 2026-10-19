@@ -5246,7 +5246,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             // the Python object, under a name none of the Python parameters has
             String selfName = COMPILED_SELF;
             while (body.parameterNames().contains(selfName)) {
-                selfName = "_" + selfName;
+                selfName = "_".concat(selfName);
             }
             method.addParameter(ParameterDef.of(selfName, POLYGLOT_VALUE));
             for (int i = 0; i < body.parameterNames().size(); i++) {

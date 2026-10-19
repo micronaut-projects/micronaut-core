@@ -129,7 +129,9 @@ public final class StaticDelegation {
 
         void visit(@Nullable Ir node) {
             switch (node) {
-                case null -> { }
+                case null -> {
+                    // an absent node (an if without an else) does nothing
+                }
                 case Ir.Body body -> visit(body.statements());
                 case Ir.Local local -> visit(local.value());
                 case Ir.Assign assign -> visit(assign.value());
@@ -140,11 +142,9 @@ public final class StaticDelegation {
                 }
                 case Ir.Return ret -> visit(ret.value());
                 case Ir.Eval eval -> visit(eval.expression());
-                case Ir.Const constant -> { }
-                case Ir.Param param -> { }
-                case Ir.LocalRef ref -> { }
-                case Ir.SelfProperty property -> { }
-                case Ir.StaticField field -> { }
+                case Ir.Const _, Ir.Param _, Ir.LocalRef _, Ir.SelfProperty _, Ir.StaticField _ -> {
+                    // reading a value has no side effect and cannot overflow
+                }
                 case Ir.Field field -> visit(field.receiver());
                 case Ir.Binary binary -> {
                     promotes |= Ir.LONG.equals(binary.type()) && PROMOTING_LONG_OPS.contains(binary.op());
