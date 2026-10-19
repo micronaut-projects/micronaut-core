@@ -93,7 +93,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * resolve: the trailing-underscore aliases of members named after a Python keyword
      * ({@code builder.from_(...)} for {@code Builder.from(...)}, {@code spec.and_(other)} for
      * {@code Specification.and(other)}), and the public methods a class inherits from a non-public
-     * superclass (see {@link PythonHostMembers}).
+     * superclass (see {@link PythonHostMembers}), snake_case instance methods and read-only getter
+     * properties.
      * <p>
      * The compiler rewrites keyword aliases only on names it can resolve statically (imported Java
      * classes and {@code java.type(...)} aliases). Objects that Java returns at runtime are plain GraalPy
@@ -130,6 +131,12 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                         member = host_members.inheritedMember(self, name)
                         if member is not None:
                             return member
+                        alias = host_members.methodAlias(self, name)
+                        if alias is not None:
+                            return getattr(self, alias)
+                        getter = host_members.propertyGetter(self, name)
+                        if getter is not None:
+                            return getattr(self, getter)()
                     raise AttributeError(f"foreign object has no attribute '{name}'")
 
             register_interop_type(java.type('java.lang.Object'), MicronautJavaObject)

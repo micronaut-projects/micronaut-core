@@ -16,6 +16,7 @@ unchecked.
 """
 import ast
 import keyword
+import re
 import java
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
@@ -115,6 +116,7 @@ class TypeChecker:
         self.scope = TypeCheckScope(mode, annotation_names)
         self._modules = {}
         self.diagnostics = []
+        self._java_instance_aliases = {}
 
     # ---------------------------------------------------------------- pass one
 
@@ -839,6 +841,45 @@ def _assigned_names(statements):
     return names
 
 
+def _snake_case(name):
+    words = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", words).lower()
+
+
+def _java_getter_property(name, signature):
+    if len(signature.parameterTypes()) != 0 or signature.returnType() == "void" or name == "getClass":
+        return None
+    prefix = 3 if name.startswith("get") else 0
+    if name.startswith("is") and signature.returnType() in ("boolean", "java.lang.Boolean"):
+        prefix = 2
+    return _snake_case(name[prefix:]) if prefix and len(name) > prefix and name[prefix].isupper() else None
+
+
+def _java_instance_aliases(description):
+    """The same unambiguous instance method/getter names PythonHostMembers exposes at run time."""
+    aliases, ambiguous = {}, set()
+
+    def add(name, target):
+        previous = aliases.setdefault(name, target)
+        if previous != target:
+            ambiguous.add(name)
+
+    for name in description.methods().keySet():
+        signatures = list(description.methods().get(name))
+        instance = [signature for signature in signatures if not signature.isStatic()]
+        if not instance:
+            continue
+        snake = _snake_case(name)
+        # The original bound member includes its static overloads, so mixed groups get no alias.
+        if snake != name and len(instance) == len(signatures):
+            add(snake, ("method", name))
+        for signature in instance:
+            property_name = _java_getter_property(name, signature)
+            if property_name is not None:
+                add(property_name, ("property", name))
+    return {name: target for name, target in aliases.items() if name not in ambiguous}
+
+
 class JavaReceiverRules:
     """
     The checks of calls, attribute reads and constructions whose receiver is a Java type: the member
@@ -1128,6 +1169,13 @@ class JavaReceiverRules:
             return Typed(JAVA, description.name())
         if receiver.kind == JAVA_REF and self.facts.describe(f"{description.name()}${member}") is not None:
             return Typed(JAVA_REF, f"{description.name()}${member}")
+        alias = self._instance_alias(receiver, description, member)
+        if alias is not None:
+            kind, target = alias
+            if kind == "method":
+                return Typed(CALLABLE, target) if not calling else None
+            return self._return_type([signature for signature in methods.get(target)
+                                      if not signature.isStatic() and len(signature.parameterTypes()) == 0])
         if description.open() or receiver.open:
             return None  # a hidden supertype or the actual implementation may contribute the member
         candidates = list(methods.keySet()) + list(fields.keySet()) + list(nested.keySet())
@@ -1144,6 +1192,17 @@ class JavaReceiverRules:
                          f"Java type [{description.name()}] has no member named [{member}]{_did_you_mean(suggestions)}",
                          node, suggestions)
         return None
+
+    def _instance_alias(self, receiver, description, name):
+        if receiver.kind != JAVA or description.pythonDefined():
+            return None
+        if (description.methods().containsKey(name) or description.fields().containsKey(name)
+                or description.nestedTypes().containsKey(name) or description.enumConstants().contains(name)):
+            return None
+        aliases = self.checker._java_instance_aliases
+        if description.name() not in aliases:
+            aliases[description.name()] = _java_instance_aliases(description)
+        return aliases[description.name()].get(name)
 
     def call(self, node):
         function = node.func
@@ -1184,6 +1243,12 @@ class JavaReceiverRules:
             return None
         member = name[:-1] if name.endswith("_") and keyword.iskeyword(name[:-1]) else name
         methods = description.methods()
+        alias = self._instance_alias(receiver, description, member)
+        if alias is not None:
+            kind, target = alias
+            if kind == "property":
+                return None  # calling the value returned by a getter, rather than the getter itself
+            member = target
         if member in OBJECT_METHODS and not methods.containsKey(member):
             return None
         if description.anEnum() and not methods.containsKey(member):
