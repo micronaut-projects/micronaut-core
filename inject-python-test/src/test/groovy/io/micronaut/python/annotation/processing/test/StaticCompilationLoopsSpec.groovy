@@ -28,6 +28,9 @@ from java.time import DateTimeException
 
 @Singleton
 class Loops:
+    def __init__(self):
+        self.items: list[int] = [1, 2]
+
     def reassigned(self, n: int) -> int:
         total = 0
         for i in range(n):
@@ -110,6 +113,81 @@ class Loops:
         for x in xs:
             total += x
         return total
+
+    def appends(self, xs: list[int]) -> int:
+        count = 0
+        for x in xs:
+            if x < 3:
+                xs.append(x + 10)
+            count += 1
+        return count
+
+    def run_appends(self) -> int:
+        return self.appends([1, 2])
+
+    def clears(self, xs: list[int]) -> int:
+        count = 0
+        for x in xs:
+            xs.clear()
+            count += 1
+        return count
+
+    def stores(self, xs: list[int]) -> int:
+        total = 0
+        for x in xs:
+            xs[0] = x
+            total += x
+        return total
+
+    def deletes(self, xs: list[int]) -> int:
+        count = 0
+        for x in xs:
+            if x == 1:
+                del xs[0]
+            count += 1
+        return count
+
+    def augments(self, xs: list[int]) -> int:
+        count = 0
+        for x in xs:
+            if x < 3:
+                xs += [x + 10]
+            count += 1
+        return count
+
+    def aliases(self, xs: list[int]) -> int:
+        count = 0
+        for x in xs:
+            ys = xs
+            count += x
+        return count
+
+    def passes(self, xs: list[int]) -> int:
+        count = 0
+        for x in xs:
+            count += self.grow(xs, x)
+        return count
+
+    def grow(self, xs: list[int], x: int) -> int:
+        if x < 3:
+            xs.append(x + 10)
+        return 1
+
+    def grows_items(self) -> int:
+        count = 0
+        for x in self.items:
+            if x < 3:
+                self.items.append(x + 10)
+            count += 1
+        return count
+
+    def pairs(self, xs: list[int]) -> int:
+        count = 0
+        for x in xs:
+            for y in xs:
+                if x < y:
+                    count += 1
+        return count
 '''
 
     void "compiled loops and handlers agree with the Python bodies, and the constructs that cannot are refused"() {
@@ -137,6 +215,16 @@ class Loops:
                     raised          : invoke { loops.catches_raised(2) },
                     raised_zero     : invoke { loops.catches_raised(0) },
                     floats          : invoke { loops.floats(new ArrayList<>([true, 0.5d, 2])) },
+                    appends         : invoke { loops.appends(new ArrayList<>([1, 2])) },
+                    run_appends     : invoke { loops.run_appends() },
+                    clears          : invoke { loops.clears(new ArrayList<>([1, 2])) },
+                    stores          : invoke { loops.stores(new ArrayList<>([1, 2])) },
+                    deletes         : invoke { loops.deletes(new ArrayList<>([1, 2, 3])) },
+                    augments        : invoke { loops.augments(new ArrayList<>([1, 2])) },
+                    aliases         : invoke { loops.aliases(new ArrayList<>([1, 2])) },
+                    passes          : invoke { loops.passes(new ArrayList<>([1, 2])) },
+                    grows_items     : invoke { loops.grows_items() },
+                    pairs           : invoke { loops.pairs(new ArrayList<>([1, 2, 3])) },
                 ]
                 if (m == StaticCompilationMode.ALL) {
                     decisions.each { compiled[it.qualifiedName()] = it }
@@ -158,6 +246,9 @@ class Loops:
         results[StaticCompilationMode.OFF].division == 'raised'   // Python raises ZeroDivisionError
         results[StaticCompilationMode.OFF].raised_zero == -1
         results[StaticCompilationMode.OFF].floats == 3.5d
+        results[StaticCompilationMode.OFF].run_appends == 4      // Python goes on over the elements the body appends
+        results[StaticCompilationMode.OFF].grows_items == 4
+        results[StaticCompilationMode.OFF].pairs == 3
 
         and: "a range loop assigning its variable, a handler of a checked exception a Java call declares, and a loop unboxing elements are compiled"
         ['reassigned', 'skipped', 'catches_declared', 'ints', 'floats'].every { outcome(compiled, it) == StaticCompilationDecision.Outcome.COMPILED }
@@ -172,6 +263,15 @@ class Loops:
         rule(compiled, 'catches_division') == 'python-exception'
         rule(compiled, 'catches_runtime') == 'python-exception'
         outcome(compiled, 'catches_raised') == StaticCompilationDecision.Outcome.COMPILED
+
+        and: "a loop whose body may change the collection it iterates is refused: the Java iterator would throw ConcurrentModificationException"
+        def changing = ['appends', 'clears', 'stores', 'deletes', 'augments', 'aliases', 'passes', 'grows_items']
+        changing.collectEntries { [it, rule(compiled, it)] } == changing.collectEntries { [it, 'unsupported-statement'] }
+        // the planner refuses a del statement before the loop is lowered
+        (changing - 'deletes').findAll { !compiled["Loops.$it".toString()].reasons()[0].message().contains('ConcurrentModificationException') } == []
+
+        and: "a loop that only reads it, in a nested loop and a comparison, is compiled"
+        outcome(compiled, 'pairs') == StaticCompilationDecision.Outcome.COMPILED
     }
 
     void "a float element of a list hinted list[int] fails the compiled body rather than being truncated"() {

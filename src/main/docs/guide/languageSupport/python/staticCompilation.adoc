@@ -191,6 +191,8 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 
 Not compiled: comprehensions, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, calls of module-level functions, and `Optional` hints; nor the `else` clause of a `for`, `while` or `try` statement, unpacking in a `for` target (`for k, v in ...`) or in an assignment (`a, b = ...`), a chained assignment (`a = b = 0`) and a bare `except:`.
 
+Refused as well, where the Java code would behave differently: a `for` loop whose body may change the collection it iterates (appending to it, storing or deleting an item, passing it to a call; Python goes on iterating, the Java iterator throws `ConcurrentModificationException`), and a lookup, store or membership test of a dict or set, or a dict or set literal, where Python's numeric equality decides (`1`, `1.0` and `True` are one key in Python and three in Java): a numeric or `bool` key among keys of another or of any type.
+
 [[staticCompilationOneImplementation]]
 == One Implementation
 
