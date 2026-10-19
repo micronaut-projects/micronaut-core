@@ -116,6 +116,8 @@ class StaticPlanner:
         """
         self.decisions = []
         self.diagnostics = []
+        self._decided = {}
+        self._bodies = {}
         if getattr(checker, "facts", None) is None and visitor_context is not None:
             checker.facts = TypeFacts(visitor_context)
             checker.python_classes = PythonClasses(checker)
