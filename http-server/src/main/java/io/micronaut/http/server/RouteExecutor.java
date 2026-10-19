@@ -348,6 +348,27 @@ public final class RouteExecutor {
         return MediaType.ALL_TYPE.equals(first) ? MediaType.APPLICATION_JSON_TYPE : first;
     }
 
+    /**
+     * The acceptable response types of a request with accepted types of the quality {@code 0}, in
+     * the order of the negotiation: the first is {@link #resolveDefaultResponseContentType}, the
+     * others are the alternatives when the body cannot be written in it.
+     *
+     * @param request    The request
+     * @param finalRoute The route
+     * @return The acceptable types, empty when none is acceptable, or {@code null} when the
+     * request has no rejected type or a route selector negotiated the type
+     */
+    @Nullable List<MediaType> acceptableResponseContentTypes(HttpRequest<?> request, RouteInfo<?> finalRoute) {
+        Collection<MediaType> accepted = request.accept();
+        if (!AcceptedMediaTypes.hasRejected(accepted)
+            || finalRoute instanceof DefaultUrlRouteInfo<?, ?> uriRoute && uriRoute.hasRouteMatchSelector() && selectedMediaType(request) != null) {
+            return null;
+        }
+        List<MediaType> producesList = finalRoute.getProduces();
+        List<MediaType> produces = producesList.isEmpty() ? List.of(MediaType.APPLICATION_JSON_TYPE) : producesList;
+        return AcceptedMediaTypes.negotiateAll(produces, finalRoute.producesAll(), accepted);
+    }
+
     private static @Nullable MediaType selectedMediaType(HttpRequest<?> request) {
         RouteMatch<?> match = RouteAttributes.getRouteMatch(request).orElse(null);
         return match instanceof UriRouteMatch<?, ?> uriMatch ? uriMatch.getSelectedMediaType().orElse(null) : null;
