@@ -5,6 +5,9 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
+import io.micronaut.inject.ast.ElementQuery
 
 
 import static io.micronaut.inject.test.hierarchy.TypeStrings.string
@@ -126,6 +129,69 @@ class Payload<T> : Supplier<Array<T>> {
         then:
         strings(closure) == ['Payload<String>', 'Supplier<String[]>', 'Object']
         closure[1].typeParameters[0].type == String[]
+    }
+
+    void "a multidimensional array has the super types of the arrays it is an array of, and a record argument keeps its dimensions"() {
+        given:
+        def source = '''
+package test
+
+import io.micronaut.core.annotation.TypeHierarchyImport
+import java.util.function.Function
+
+@TypeHierarchyImport
+abstract class Matrix<T> : Function<Array<Array<T>>, Array<IntArray>> {
+    var string: String? = null
+    var strings: Array<Array<String>>? = null
+    var ints: Array<IntArray>? = null
+}
+'''
+        Map<String, List<String>> fields = [:]
+        buildClassElement('test.Matrix', source) { ClassElement matrix ->
+            ['string', 'strings', 'ints'].each { fields[it] = elementStrings(fieldType(matrix, it)) }
+        }
+        def string = fields.string
+        def hierarchy = record(buildClassLoader('test.Matrix', source), 'test.Matrix')
+
+        expect: "String[][] is an array of the super types of String, then of those String[] has as an array"
+        string.last() == 'Object'
+        string.contains('Comparable<String>')
+        fields.strings == ['String[][]'] + string.tail().collect { it + '[][]' } +
+            ['Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+
+        and: "int[][] is an array of the super types of int[]"
+        fields.ints == ['int[][]', 'Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+
+        when:
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, String))
+        def ofArrays = hierarchy.getTypeClosure(Argument.of(hierarchy.type, String[]))
+
+        then:
+        strings(hierarchy.genericInterfaces) == ['Function<T[][], int[][]>']
+        strings(closure) == ['Matrix<String>', 'Function<String[][], int[][]>', 'Object']
+        closure[1].typeParameters*.type == [String[][], int[][]]
+        strings(ofArrays) == ['Matrix<String[]>', 'Function<String[][][], int[][]>', 'Object']
+        ofArrays[1].typeParameters*.type == [String[][][], int[][]]
+    }
+
+    private static ClassElement fieldType(ClassElement owner, String name) {
+        owner.getEnclosedElements(ElementQuery.ALL_FIELDS).find { it.name == name }.genericType
+    }
+
+    /**
+     * The super types of an element by simple name, arguments and dimensions, as the strings of a record read.
+     */
+    private static List<String> elementStrings(ClassElement type) {
+        type.getAllSuperTypes().collect { elementString(it) }
+    }
+
+    private static String elementString(ClassElement type) {
+        String name = type.name.substring(type.name.lastIndexOf('.') + 1)
+        String dimensions = "[]" * type.arrayDimensions
+        if (type.rawType || type.typeArguments.isEmpty()) {
+            return name + dimensions
+        }
+        return name + "<" + type.typeArguments.values().collect { elementString(it) }.join(", ") + ">" + dimensions
     }
 
     void "type-use annotations on the arguments of the super types are kept and follow a substituted variable"() {
@@ -263,6 +329,67 @@ private class Hidden<T> : java.util.function.Supplier<T> {
         expect:
         hidden.type == classLoader.loadClass('test.Hidden')
         strings(hidden.genericInterfaces) == ['Supplier<T>']
+    }
+
+    void "recording a type reports the super types the record leaves out, as the record lists them"() {
+        given: "a visitor that records the imported classes a second time and keeps what the API returned"
+        def classLoader = buildClassLoader('probe.Reported', '''
+package probe
+
+import io.micronaut.core.annotation.TypeHierarchyImport
+
+@TypeHierarchyImport(classes = [java.util.ArrayList::class, java.lang.StringBuilder::class, java.util.jar.JarEntry::class])
+class Reported
+''')
+        def arrayList = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.ArrayList', 'probe')]
+        def stringBuilder = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe')]
+        def jarEntry = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.jar.JarEntry', 'probe')]
+
+        expect: "a class whose closure the record names in full"
+        arrayList.className == TypeHierarchies.recordClassName('java.util.ArrayList', 'probe')
+        arrayList.omittedSuperTypeNames == []
+        arrayList.complete
+        record(classLoader, 'java.util.ArrayList').omittedSuperTypeNames == []
+
+        and: "a class with a package-private superclass"
+        stringBuilder.className == TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe')
+        stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
+        !stringBuilder.complete
+        stringBuilder.omittedSuperTypeNames == record(classLoader, 'java.lang.StringBuilder').omittedSuperTypeNames
+
+        and: "a class with a package-private ancestor of a third package"
+        jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
+        !jarEntry.complete
+        jarEntry.omittedSuperTypeNames == record(classLoader, 'java.util.jar.JarEntry').omittedSuperTypeNames
+    }
+
+    void "a JDK class with a package-private ancestor is recorded in the package of the origin"() {
+        given:
+        def classLoader = buildClassLoader('probe.Hierarchies', '''
+package probe
+
+import io.micronaut.core.annotation.TypeHierarchyImport
+
+@TypeHierarchyImport(classes = [java.lang.StringBuilder::class, java.util.ArrayList::class, java.util.jar.JarEntry::class])
+class Hierarchies
+''')
+        def stringBuilder = record(classLoader, 'java.lang.StringBuilder')
+        def jarEntry = record(classLoader, 'java.util.jar.JarEntry')
+
+        expect: "AbstractStringBuilder is left out by name, the interfaces above it are kept"
+        classLoader.loadClass(TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe'))
+        record(classLoader, 'java.util.ArrayList').type == ArrayList
+        stringBuilder.type == StringBuilder
+        stringBuilder.genericSuperclass.empty
+        stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
+        !strings(stringBuilder.superTypes).contains('AbstractStringBuilder')
+        strings(stringBuilder.superTypes).containsAll(['Appendable', 'CharSequence', 'Comparable<StringBuilder>', 'Serializable'])
+        strings(stringBuilder.superTypes).last() == 'Object'
+
+        and: "an ancestor of a third package is left out the same way"
+        classLoader.loadClass(TypeHierarchies.recordClassName('java.util.jar.JarEntry', 'probe'))
+        jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
+        strings(jarEntry.superTypes) as Set == ['ZipEntry', 'Cloneable', 'Object'] as Set
     }
 
     void "the same type is recorded once"() {

@@ -52,6 +52,10 @@ import java.util.regex.Pattern;
  *                          same module instead of merging with them
  * @param requiredArtifact  The coordinates of the artifact providing the first source, named in the error
  *                          reported when the module is imported without it, or {@code null}
+ * @param snakeCaseAliases  Whether each annotation this contribution exports is also exported under its snake_case
+ *                          name ({@code Serdeable} as {@code serdeable}, {@code ConfigurationProperties} as
+ *                          {@code configuration_properties}), when that name is free: see
+ *                          {@link PythonImportMappings} for when it is not
  * @author Graeme Rocher
  * @since 5.3.0
  */
@@ -65,7 +69,8 @@ public record PythonModuleMapping(
     ClashPolicy clashPolicy,
     Set<String> exclude,
     boolean replaces,
-    @Nullable String requiredArtifact) {
+    @Nullable String requiredArtifact,
+    boolean snakeCaseAliases) {
 
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_]\\w*");
     private static final String BINARY_NAME = "binaryName";
@@ -82,6 +87,7 @@ public record PythonModuleMapping(
      * @param exclude           The excluded names
      * @param replaces          Whether the contribution replaces those of lower precedence
      * @param requiredArtifact  The artifact providing the first source
+     * @param snakeCaseAliases  Whether the annotations are also exported under their snake_case names
      */
     public PythonModuleMapping {
         Objects.requireNonNull(module, "module");
@@ -248,6 +254,7 @@ public record PythonModuleMapping(
         private final Set<String> exclude = new LinkedHashSet<>();
         private boolean replaces;
         private @Nullable String requiredArtifact;
+        private boolean snakeCaseAliases = true;
 
         private Builder(String module) {
             this.module = module;
@@ -403,10 +410,23 @@ public record PythonModuleMapping(
         }
 
         /**
+         * Whether each annotation the module exports is also exported under its snake_case name, so that
+         * {@code @serde.serdeable} applies {@code Serdeable}; on by default. One alias is left out with
+         * {@link #exclude(String...)}.
+         * @param snakeCaseAliases Whether to export the snake_case names
+         * @return This builder
+         */
+        public Builder snakeCaseAliases(boolean snakeCaseAliases) {
+            this.snakeCaseAliases = snakeCaseAliases;
+            return this;
+        }
+
+        /**
          * @return The mapping
          */
         public PythonModuleMapping build() {
-            return new PythonModuleMapping(module, documentation, sources, prefer, preferredPackages, clashPolicy, exclude, replaces, requiredArtifact);
+            return new PythonModuleMapping(module, documentation, sources, prefer, preferredPackages, clashPolicy, exclude, replaces,
+                requiredArtifact, snakeCaseAliases);
         }
     }
 }
