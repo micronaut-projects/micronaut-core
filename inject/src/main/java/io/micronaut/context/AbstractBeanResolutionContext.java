@@ -1498,6 +1498,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a constructor.
      */
+    @SuppressWarnings("java:S2160") // segments are equal by declaring type, qualifier, name and argument, which detects circular dependencies
     public static class ConstructorSegment extends AbstractSegment<Object, Object> implements ArgumentInjectionPoint<Object, Object>, BeanResolutionTracer.Injection {
 
         private static final String ANN_ADAPTER = "io.micronaut.aop.Adapter";
@@ -1764,6 +1765,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents a method.
      */
+    @SuppressWarnings("java:S2160") // segments are equal by declaring type, qualifier, name and argument, which detects circular dependencies
     public static class MethodSegment<B, T> extends AbstractSegment<B, T> implements CallableInjectionPoint<B>, BeanResolutionTracer.Injection {
 
         private final Argument<Object>[] arguments;
