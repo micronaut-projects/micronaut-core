@@ -49,6 +49,28 @@ class RetainAnnotationTest {
     }
 
     @Test
+    void anAnnotatedBeanIsReleasedWhenTheConfigurationItNamesChanges() throws Exception {
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest("")), new String[0]);
+        try {
+            AnnotatedPool pool = runtime.context().orElseThrow().getBean(AnnotatedPool.class);
+            runtime.restart();
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+            assertSame(pool, second.getBean(AnnotatedPool.class));
+
+            // the pool injects my.pool.url, so its edit restarts; my.pool is what the annotation says releases it
+            Files.writeString(project.resolve("src/main/resources/application.properties"), "my.pool.url=b\n");
+            ApplicationContext third = runtime.awaitGeneration(3, Duration.ofMinutes(2));
+            AnnotatedPool recreated = third.getBean(AnnotatedPool.class);
+            assertNotSame(pool, recreated);
+            assertEquals("b", recreated.url);
+            assertEquals(2, AnnotatedPool.CREATED.get());
+            assertEquals(1, AnnotatedPool.DESTROYED.get());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
     void annotationRetentionCanBeTurnedOff() throws Exception {
         DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest("micronaut.dev.retain-annotated=false\n")), new String[0]);
         try {

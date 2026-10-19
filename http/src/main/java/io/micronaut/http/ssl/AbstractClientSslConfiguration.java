@@ -23,7 +23,15 @@ package io.micronaut.http.ssl;
  */
 public abstract class AbstractClientSslConfiguration extends SslConfiguration {
 
+    /**
+     * The default endpoint identification value.
+     *
+     * @since 5.3.0
+     */
+    public static final boolean DEFAULT_ENDPOINT_IDENTIFICATION = true;
+
     private boolean insecureTrustAllCertificates;
+    private boolean endpointIdentification = DEFAULT_ENDPOINT_IDENTIFICATION;
 
     /**
      * @return Whether the client should disable checking of the remote SSL certificate. Only applies if no trust store
@@ -43,5 +51,27 @@ public abstract class AbstractClientSslConfiguration extends SslConfiguration {
      */
     public void setInsecureTrustAllCertificates(boolean insecureTrustAllCertificates) {
         this.insecureTrustAllCertificates = insecureTrustAllCertificates;
+    }
+
+    /**
+     * @return Whether the client checks that the server certificate matches the host name (HTTPS endpoint
+     * identification). Default value ({@value #DEFAULT_ENDPOINT_IDENTIFICATION}).
+     * @since 5.3.0
+     */
+    public boolean isEndpointIdentification() {
+        return endpointIdentification;
+    }
+
+    /**
+     * Whether the client checks that the server certificate matches the host name (HTTPS endpoint identification).
+     * Disable it to verify the host name some other way, for example with a {@link javax.net.ssl.HostnameVerifier}
+     * after the handshake. <b>Note: Without any host name check the connection is open to man-in-the-middle
+     * attacks.</b> Default value ({@value #DEFAULT_ENDPOINT_IDENTIFICATION}).
+     *
+     * @param endpointIdentification Whether to check the host name of the server certificate
+     * @since 5.3.0
+     */
+    public void setEndpointIdentification(boolean endpointIdentification) {
+        this.endpointIdentification = endpointIdentification;
     }
 }
