@@ -60,8 +60,8 @@ public final class PythonStatic {
     // the repetitions are possessive: a digit run never needs to give a digit back, and possessive
     // repetition keeps a very long literal from overflowing the stack of the backtracking matcher
     private static final Pattern PYTHON_INT = Pattern.compile("[+-]?\\d(?:_?\\d)*+");
-    // a float literal is its mantissa and an optional exponent (an int literal), matched apart
-    private static final Pattern PYTHON_MANTISSA = Pattern.compile("[+-]?(?:\\d(?:_?\\d)*+(?:\\.(?:\\d(?:_?\\d)*+)?)?|\\.\\d(?:_?\\d)*+)");
+    // the digits of a float literal on either side of its point, which the float parse checks apart
+    private static final Pattern PYTHON_DIGITS = Pattern.compile("\\d(?:_?\\d)*+");
     private static final String ZERO_DIVISION_ERROR = "ZeroDivisionError";
     private static final String TYPE_ERROR = "TypeError";
     private static final String ASSERTION_ERROR = "AssertionError";
@@ -1058,11 +1058,25 @@ public final class PythonStatic {
         String digits = asciiDigits(text);
         int exponent = Math.max(digits.indexOf('e'), digits.indexOf('E'));
         String mantissa = exponent < 0 ? digits : digits.substring(0, exponent);
-        if (!PYTHON_MANTISSA.matcher(mantissa).matches()
+        if (!isPythonMantissa(mantissa)
             || exponent >= 0 && !PYTHON_INT.matcher(digits.substring(exponent + 1)).matches()) {
             throw new NumberFormatException(text);
         }
         return Double.parseDouble(digits.replace("_", ""));
+    }
+
+    /**
+     * Whether the text is the mantissa of a Python float literal: an optional sign, then digits, a
+     * point or both, with digits on at least one side of the point.
+     */
+    private static boolean isPythonMantissa(String text) {
+        String unsigned = text.startsWith("+") || text.startsWith("-") ? text.substring(1) : text;
+        int point = unsigned.indexOf('.');
+        String whole = point < 0 ? unsigned : unsigned.substring(0, point);
+        String fraction = point < 0 ? "" : unsigned.substring(point + 1);
+        return !(whole.isEmpty() && fraction.isEmpty())
+            && (whole.isEmpty() || PYTHON_DIGITS.matcher(whole).matches())
+            && (fraction.isEmpty() || PYTHON_DIGITS.matcher(fraction).matches());
     }
 
     /**
