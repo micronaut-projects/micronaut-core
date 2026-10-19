@@ -5213,7 +5213,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     private static String pythonHint(TypeDef type) {
         return switch (type instanceof TypeDef.Primitive primitive ? primitive.name() : "") {
-            case DOUBLE_TYPE, FLOAT_TYPE -> "float";
+            case DOUBLE_TYPE, FLOAT_TYPE -> FLOAT_TYPE;
             case BOOLEAN_TYPE -> "bool";
             case "char" -> "str";
             default -> "int";
