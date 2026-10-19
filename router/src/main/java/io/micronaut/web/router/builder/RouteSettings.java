@@ -23,6 +23,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -63,6 +64,8 @@ public final class RouteSettings {
     private boolean nonBlocking;
     private @Nullable Integer port;
     private @Nullable Integer order;
+    private @Nullable RouteMatchSelector selector;
+    private boolean selectorSet;
     private RouteAssembly.@Nullable RouteFilters groupFilters;
     private RouteAssembly.@Nullable RouteGroup group;
     private @Nullable AnnotationMetadataProvider element;
@@ -98,6 +101,8 @@ public final class RouteSettings {
         this.nonBlocking = other.nonBlocking;
         this.port = other.port;
         this.order = other.order;
+        this.selector = other.selector;
+        this.selectorSet = other.selectorSet;
         this.groupFilters = other.groupFilters;
         this.group = other.group;
         this.element = other.element;
@@ -215,6 +220,15 @@ public final class RouteSettings {
      */
     public void order(int order) {
         this.order = order;
+    }
+
+    /**
+     * @param selector The route selector of the route, or {@code null} for none, overriding the one of its groups
+     * @see RouteSpec#selectedBy(RouteMatchSelector)
+     */
+    public void selectedBy(@Nullable RouteMatchSelector selector) {
+        this.selector = selector;
+        this.selectorSet = true;
     }
 
     /**
@@ -344,6 +358,20 @@ public final class RouteSettings {
      */
     public @Nullable Integer getPort() {
         return port;
+    }
+
+    /**
+     * @return Whether the route sets its route selector, see {@link #getSelector()}
+     */
+    public boolean isSelectorSet() {
+        return selectorSet;
+    }
+
+    /**
+     * @return The route selector the route sets, or {@code null}
+     */
+    public @Nullable RouteMatchSelector getSelector() {
+        return selector;
     }
 
     /**

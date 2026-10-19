@@ -62,6 +62,25 @@ public interface Router {
     <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request);
 
     /**
+     * Find any {@link RouteMatch} regardless of HTTP method, among the candidates a filter
+     * accepts: the filter applies before a route selector selects among the matches of a method,
+     * so that a route that the filter rejects, e.g. a route of another version, does not hide a
+     * route that it accepts. A {@link io.micronaut.web.router.filter.FilteredRouter} passes its
+     * {@link io.micronaut.web.router.filter.RouteMatchFilter} here, so that the routes of a
+     * located target are filtered first too.
+     *
+     * @param request The request
+     * @param filter  The filter of the candidate matches
+     * @param <T>     The target type
+     * @param <R>     The return type
+     * @return The matches that the filter accepts
+     * @since 5.3.0
+     */
+    default <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        return this.<T, R>findAny(request).stream().filter(filter).toList();
+    }
+
+    /**
      * @return The exposed ports.
      */
     Set<Integer> getExposedPorts();

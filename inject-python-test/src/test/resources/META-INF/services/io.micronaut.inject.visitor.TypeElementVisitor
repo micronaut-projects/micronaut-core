@@ -27,3 +27,5 @@ io.micronaut.python.annotation.processing.test.ProduceBeansSpec$ProducerModuleVi
 io.micronaut.python.annotation.processing.test.bridge.PublicMethodCallerVisitor
 io.micronaut.python.annotation.processing.test.visitorintegration.OptionsRecordingVisitor
 io.micronaut.python.annotation.processing.test.annotate.SubclassMemberAnnotationMutationSpec$MarkingVisitor
+io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
+io.micronaut.python.annotation.processing.test.qualifiers.NonBindingMemberAnnotatedByVisitorSpec$NonBindingMarkingVisitor

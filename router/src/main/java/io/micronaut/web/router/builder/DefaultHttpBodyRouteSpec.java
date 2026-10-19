@@ -22,6 +22,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -124,6 +125,12 @@ final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements Http
     @Override
     public HttpBodyRouteSpec<B> order(int order) {
         route.order(order);
+        return this;
+    }
+
+    @Override
+    public HttpBodyRouteSpec<B> selectedBy(@Nullable RouteMatchSelector selector) {
+        route.selectedBy(selector);
         return this;
     }
 

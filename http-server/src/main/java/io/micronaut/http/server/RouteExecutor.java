@@ -65,7 +65,9 @@ import io.micronaut.inject.MethodReference;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.web.router.AcceptedMediaTypes;
 import io.micronaut.web.router.DefaultRouteInfo;
+import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.GroupErrorRoutes;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
@@ -90,6 +92,7 @@ import reactor.util.context.ContextView;
 
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -295,9 +298,21 @@ public final class RouteExecutor {
      * @return The default content type declared on the route
      */
     public MediaType resolveDefaultResponseContentType(@Nullable HttpRequest<?> request, RouteInfo<?> finalRoute) {
+        if (request != null && finalRoute instanceof DefaultUrlRouteInfo<?, ?> uriRoute && uriRoute.hasRouteMatchSelector()) {
+            // the media type the route selector of the kind of the template of the route negotiated
+            MediaType selected = selectedMediaType(request);
+            if (selected != null) {
+                return selected;
+            }
+        }
         final List<MediaType> producesList = finalRoute.getProduces();
+        Collection<MediaType> accepted = request != null ? request.accept() : List.of();
+        if (AcceptedMediaTypes.hasRejected(accepted)) {
+            // an accepted type of the quality 0 is not acceptable, RFC 9110 12.4.2
+            return acceptableResponseContentType(finalRoute, producesList, accepted);
+        }
         if (request != null) {
-            final Iterator<MediaType> i = request.accept().iterator();
+            final Iterator<MediaType> i = accepted.iterator();
             if (i.hasNext()) {
                 final MediaType mt = i.next();
                 if (producesList.contains(mt)) {
@@ -314,6 +329,28 @@ public final class RouteExecutor {
             defaultResponseMediaType = MediaType.APPLICATION_JSON_TYPE;
         }
         return MediaType.ALL_TYPE.equals(defaultResponseMediaType) ? MediaType.APPLICATION_JSON_TYPE : defaultResponseMediaType;
+    }
+
+    /**
+     * @param finalRoute   The route
+     * @param producesList The types the route produces
+     * @param accepted     The accepted types, some of the quality 0
+     * @return The negotiated type, else, when no type is acceptable, which routing excludes for the
+     * routes of a request (an error route answers anyway), the first produced type
+     */
+    private static MediaType acceptableResponseContentType(RouteInfo<?> finalRoute, List<MediaType> producesList, Collection<MediaType> accepted) {
+        List<MediaType> produces = producesList.isEmpty() ? List.of(MediaType.APPLICATION_JSON_TYPE) : producesList;
+        MediaType negotiated = AcceptedMediaTypes.negotiate(produces, finalRoute.producesAll(), accepted);
+        if (negotiated != null) {
+            return negotiated;
+        }
+        MediaType first = produces.get(0);
+        return MediaType.ALL_TYPE.equals(first) ? MediaType.APPLICATION_JSON_TYPE : first;
+    }
+
+    private static @Nullable MediaType selectedMediaType(HttpRequest<?> request) {
+        RouteMatch<?> match = RouteAttributes.getRouteMatch(request).orElse(null);
+        return match instanceof UriRouteMatch<?, ?> uriMatch ? uriMatch.getSelectedMediaType().orElse(null) : null;
     }
 
     private MutableHttpResponse<?> notFoundErrorResponse(HttpRequest<?> request) {
