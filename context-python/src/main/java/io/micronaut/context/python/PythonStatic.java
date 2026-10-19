@@ -62,8 +62,10 @@ public final class PythonStatic {
 
     private static final ConcurrentHashMap<String, LongAdder> ENTRIES = new ConcurrentHashMap<>();
     // the literals Python's int() and float() parse in base 10, after the digits are made ASCII
-    private static final Pattern PYTHON_INT = Pattern.compile("[+-]?[0-9](_?[0-9])*");
-    private static final Pattern PYTHON_FLOAT = Pattern.compile("[+-]?([0-9](_?[0-9])*(\\.([0-9](_?[0-9])*)?)?|\\.[0-9](_?[0-9])*)([eE][+-]?[0-9](_?[0-9])*)?");
+    // the repetitions are possessive: a digit run never needs to give a digit back, and possessive
+    // repetition keeps a very long literal from overflowing the stack of the backtracking matcher
+    private static final Pattern PYTHON_INT = Pattern.compile("[+-]?[0-9](?:_?[0-9])*+");
+    private static final Pattern PYTHON_FLOAT = Pattern.compile("[+-]?(?:[0-9](?:_?[0-9])*+(?:\\.(?:[0-9](?:_?[0-9])*+)?)?|\\.[0-9](?:_?[0-9])*+)(?:[eE][+-]?[0-9](?:_?[0-9])*+)?");
     private static final String ZERO_DIVISION_ERROR = "ZeroDivisionError";
     private static final String TYPE_ERROR = "TypeError";
     private static final String ASSERTION_ERROR = "AssertionError";
