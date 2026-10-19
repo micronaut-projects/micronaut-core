@@ -1481,6 +1481,18 @@ public final class PythonStatic {
             this.elements = elements;
         }
 
+        // a tuple equals any list of equal elements, as a Java list does; the helpers that compare as
+        // Python does (contains, the keys of a dict) tell a tuple from a list themselves, see same()
+        @Override
+        public boolean equals(@Nullable Object o) {
+            return super.equals(o);
+        }
+
+        @Override
+        public int hashCode() {
+            return super.hashCode();
+        }
+
         @Override
         public Object get(int index) {
             return elements[index];
