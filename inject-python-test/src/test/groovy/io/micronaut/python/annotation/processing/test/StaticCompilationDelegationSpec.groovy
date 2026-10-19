@@ -265,4 +265,205 @@ class Caller:
         cleanup:
         context?.close()
     }
+
+    void "super() from a subclass runs the base's compiled body, not the override"() {
+        given:
+        PythonStatic.resetEntries()
+        def context = buildContext('''
+from jakarta.inject import Singleton
+
+class Base:
+    def m(self, n: int) -> int:
+        return n + 1
+
+@Singleton
+class Sub(Base):
+    def m(self, n: int) -> int:
+        return n * 10
+
+    def via_super(self, n: int):
+        return super().m(n)
+
+@Singleton
+class Caller:
+    def __init__(self, sub: Sub):
+        self.sub = sub
+
+    def run(self) -> str:
+        return f"{self.sub.m(2)} {self.sub.via_super(2)}"
+''')
+        def caller = getBean(context, 'python.Caller')
+        def sub = getBean(context, 'python.Sub')
+
+        expect:
+        decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName().containsAll(['Base.m', 'Sub.m'])
+        decisions.find { it.qualifiedName() == 'Sub.via_super' }.outcome() != StaticCompilationDecision.Outcome.COMPILED
+
+        when:
+        def fromPython = caller.run()
+        def fromJava = sub.via_super(5)
+
+        then: "each rewritten method ran the body of its own class"
+        fromPython == '20 3'
+        fromJava == 6
+        PythonStatic.entries('python.Sub#m') == 1
+        PythonStatic.entries('python.Base#m') == 2
+
+        cleanup:
+        context?.close()
+    }
+
+    void "python callers see python exceptions and ints from compiled bodies"() {
+        given:
+        PythonStatic.resetEntries()
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from java.lang import System
+from java.net import MalformedURLException, URL
+
+@Singleton
+class Calc:
+    last: float = 0.0
+    note: str = ""
+
+    def ratio(self, a: int, b: int) -> float:
+        return a / b
+
+    def record(self, a: int, b: int) -> float:
+        self.last = a / b
+        return self.last
+
+    def checked(self, n: int) -> int:
+        assert n > 0, "positive"
+        return n
+
+    def noted(self, n: int) -> None:
+        assert n > 0, "noted positive"
+        self.note = "ok"
+
+    def prop(self, name: str) -> str:
+        return System.getProperty(name) + "!"
+
+    def host(self, spec: str) -> str:
+        return URL(spec).getHost()
+
+    def add(self, a: int, b: int) -> int:
+        return a + b
+
+    def floor(self, a: int, b: int) -> int:
+        return a // b
+
+@Singleton
+class Caller:
+    def __init__(self, calc: Calc):
+        self.calc = calc
+
+    def run(self) -> str:
+        out = []
+        try:
+            self.calc.ratio(1, 0)
+        except ZeroDivisionError:
+            out.append("ratio")
+        try:
+            self.calc.record(1, 0)
+        except ZeroDivisionError as error:
+            out.append(f"record {error}")
+        try:
+            self.calc.checked(0)
+        except AssertionError as error:
+            out.append(f"checked {error}")
+        try:
+            self.calc.noted(0)
+        except AssertionError as error:
+            out.append(f"noted {error}")
+        try:
+            self.calc.prop("micronaut.no.such.property")
+        except TypeError:
+            out.append("prop")
+        try:
+            self.calc.host("not a url")
+        except MalformedURLException:
+            out.append("host")
+        out.append(str(self.calc.add(2 ** 62, 2 ** 62)))
+        out.append(str(self.calc.add(2 ** 30, 2 ** 30)))
+        out.append(str(self.calc.add(2 ** 70, 1)))
+        out.append(str(self.calc.add(True, 1)))
+        out.append(str(self.calc.add(1, 2)))
+        out.append(str(self.calc.floor(-7, 2)))
+        return ",".join(out)
+''')
+        def caller = getBean(context, 'python.Caller')
+
+        expect:
+        decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
+            .containsAll(['Calc.ratio', 'Calc.record', 'Calc.checked', 'Calc.noted', 'Calc.prop', 'Calc.host', 'Calc.add', 'Calc.floor'])
+
+        when:
+        def result = caller.run()
+
+        then: "the Python exception, or the Python body where Java would raise on a promoted int"
+        result == 'ratio,record division by zero,checked positive,noted noted positive,prop,host,9223372036854775808,2147483648,1180591620717411303425,2,3,-4'
+
+        and: "the bodies without side effects ran as Java first, those with side effects raised the Python exception themselves"
+        PythonStatic.entries('python.Calc#ratio') == 1
+        PythonStatic.entries('python.Calc#record') == 1
+        PythonStatic.entries('python.Calc#noted') == 1
+        PythonStatic.entries('python.Calc#prop') == 1
+        // the checked exception of the Java call reaches the Python caller as itself
+        PythonStatic.entries('python.Calc#host') == 1
+        // only the ints a Java int holds reach the Java body: 2**30 + 2**30 outgrows it there, and Python answers
+        PythonStatic.entries('python.Calc#add') == 2
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a copied object is not bound: its compiled methods run on its own attributes"() {
+        given:
+        PythonStatic.resetEntries()
+        def context = buildContext('''
+import copy
+from jakarta.inject import Singleton
+
+@Singleton
+class Counter:
+    label: str = "base"
+
+    def __init__(self):
+        self.label = "orig"
+
+    def describe(self, suffix: str) -> str:
+        return self.label + suffix
+
+    def rename(self, name: str) -> None:
+        self.label = name
+
+@Singleton
+class Copier:
+    def __init__(self, counter: Counter):
+        self.counter = counter
+
+    def run(self) -> str:
+        twin = copy.copy(self.counter)
+        twin.rename("twin")
+        deep = copy.deepcopy(self.counter)
+        return " ".join([self.counter.describe("!"), twin.describe("?"), deep.describe("#"),
+                         str(sorted(vars(self.counter))), str(sorted(vars(twin)))])
+''')
+        def copier = getBean(context, 'python.Copier')
+
+        expect:
+        decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName().containsAll(['Counter.describe', 'Counter.rename'])
+
+        when:
+        def result = copier.run()
+
+        then: "the copies keep their own state and run the Python bodies, nothing is stored on the objects"
+        result == "orig! twin? orig# ['label'] ['label']"
+        PythonStatic.entries('python.Counter#describe') == 1
+        PythonStatic.entries('python.Counter#rename') == 0
+
+        cleanup:
+        context?.close()
+    }
 }
