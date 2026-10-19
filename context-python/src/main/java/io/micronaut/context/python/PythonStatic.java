@@ -948,7 +948,7 @@ public final class PythonStatic {
      * @return {@code map[key]}
      * @throws NoSuchElementException When the key is absent, as Python raises KeyError
      */
-    public static Object item(Map<?, ?> map, @Nullable Object key) {
+    public static @Nullable Object item(Map<?, ?> map, @Nullable Object key) {
         requireHashable(key);
         if (!containsKey(map, key)) {
             throw new NoSuchElementException("KeyError: " + str(key));
