@@ -46,15 +46,17 @@ class StaticAdviceTest {
     void anIntroductionRefusesACallItsInterceptorsDoNotAnswerInsteadOfCallingItself() {
         Object proxy = new Object();
         RuntimeProxyDefinition<Object> withoutEntry = proxyDefinition(List.of());
+        var unansweredAdvice = StaticAdvice.introduction(withoutEntry, List.of(), () -> proxy);
         IllegalStateException unanswered = assertThrows(IllegalStateException.class, () ->
-            StaticAdvice.introduction(withoutEntry, List.of(), () -> proxy).proceed("count", new String[0], new Object[0]));
+            unansweredAdvice.proceed("count", new String[0], new Object[0]));
         assertTrue(unanswered.getMessage().contains("[count]") && unanswered.getMessage().contains("no introduction interceptor answers it"), unanswered.getMessage());
 
         @SuppressWarnings("unchecked")
         RuntimeProxyDefinition.InterceptedMethod<Object> concrete = new RuntimeProxyDefinition.InterceptedMethod<>(executableMethod("label", false), new Interceptor[0]);
         RuntimeProxyDefinition<Object> withConcrete = proxyDefinition(List.of(concrete));
+        var concreteAdvice = StaticAdvice.introduction(withConcrete, List.of(concrete), () -> proxy);
         IllegalStateException notAbstract = assertThrows(IllegalStateException.class, () ->
-            StaticAdvice.introduction(withConcrete, List.of(concrete), () -> proxy).proceed("label", new String[0], new Object[0]));
+            concreteAdvice.proceed("label", new String[0], new Object[0]));
         assertTrue(notAbstract.getMessage().contains("[label]") && notAbstract.getMessage().contains("not abstract"), notAbstract.getMessage());
     }
 
