@@ -115,7 +115,8 @@ public final class StaticCompilationReport {
                     planned.add(sourceKey(plannedSource));
                 }
                 for (StaticCompilationDecision retained : readState(directory.resolve(STATE_FILE))) {
-                    if (retained.sourcePath() == null || !planned.contains(sourceKey(retained.sourcePath()))) {
+                    String retainedSource = retained.sourcePath();
+                    if (retainedSource == null || !planned.contains(sourceKey(retainedSource))) {
                         all.add(retained);
                     }
                 }
