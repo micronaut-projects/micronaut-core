@@ -120,7 +120,6 @@ class ClientHostnameVerifierSpec extends Specification {
     }
 
     private HttpClient client(HttpVersion version, HostnameVerifier verifier) {
-        // tag::hostnameVerifier[]
         def configuration = new DefaultHttpClientConfiguration()
         configuration.httpVersion = version
         def ssl = new ClientSslConfiguration()
@@ -130,7 +129,6 @@ class ClientHostnameVerifierSpec extends Specification {
         ssl.hostnameVerifier = verifier
         configuration.sslConfiguration = ssl
         return HttpClient.create(new URL("https://localhost:$server.port"), configuration)
-        // end::hostnameVerifier[]
     }
 
     private static SSLContext sslContext(SelfSignedCertificate cert, boolean server) {
