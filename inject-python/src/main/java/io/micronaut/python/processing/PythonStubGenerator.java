@@ -4781,7 +4781,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 if (TypeDef.VOID.equals(type) || type instanceof TypeDef.Primitive) {
                     // converted by one call on the result: the invocation is evaluated once
                     ExpressionDef result = PYTHON_INVOCATION.invokeStatic(INVOKE_PYTHON_METHOD, POLYGLOT_VALUE, self, ExpressionDef.constant(name), pythonArguments);
-                    return TypeDef.VOID.equals(type) ? result : convertPythonValue(model, result, typeName, type, Optional.empty());
+                    return TypeDef.VOID.equals(type) ? result : convertPythonValue(model, hintedReturn(result, model.element().getSimpleName() + "." + name, type), typeName, type, Optional.empty());
                 }
                 // a reference conversion reads its value more than once (a null check first): the
                 // result is handed to a converter, so the method is invoked once
@@ -4801,6 +4801,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 return self.invoke(PUT_MEMBER, TypeDef.VOID, ExpressionDef.constant(property), value);
             }
         };
+    }
+
+    /**
+     * The result of a Python method a compiled body calls, whose return hint is the primitive
+     * {@code type}: the hint is trusted, and a None result fails as a TypeError naming the method
+     * and its hint, see {@code PythonStatic.returned}.
+     */
+    private static ExpressionDef hintedReturn(ExpressionDef result, String method, TypeDef type) {
+        String hint = switch (type instanceof TypeDef.Primitive primitive ? primitive.name() : "") {
+            case DOUBLE_TYPE, FLOAT_TYPE -> "float";
+            case BOOLEAN_TYPE -> "bool";
+            case "char" -> "str";
+            default -> "int";
+        };
+        return PYTHON_STATIC.invokeStatic("returned", POLYGLOT_VALUE, result, ExpressionDef.constant(method), ExpressionDef.constant(hint));
     }
 
     /**
