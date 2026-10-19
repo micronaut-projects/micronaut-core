@@ -363,6 +363,7 @@ public final class PythonStatic {
      * @return The sign of {@code left - right}, as -1.0, 0.0 or 1.0, or NaN when {@code right} is
      * NaN, so that comparing the result with 0.0 answers every comparison as Python does
      */
+    @SuppressWarnings("java:S2111") // the exact value of the double is wanted; BigDecimal.valueOf reads its shortest decimal string
     public static double compare(long left, double right) {
         if (Double.isNaN(right)) {
             return Double.NaN;
