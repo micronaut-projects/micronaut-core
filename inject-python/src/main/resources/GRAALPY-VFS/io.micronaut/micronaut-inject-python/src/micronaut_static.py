@@ -242,14 +242,43 @@ class StaticPlanner:
         if model is None:
             return None
         name = function_def.name()
-        own = _signature_shape(function_def)
+        own_node = model.methods[name][1] if name in model.methods else None
+        own = self._signature_shape(model, function_def, own_node)
         for subclass in model.subclasses:
             found = subclass.find(name)
             if found is None or found[0] != "method" or found[1] is function_def:
                 continue
-            if _signature_shape(found[1]) != own:
+            if self._signature_shape(subclass, found[1], found[2]) != own:
                 return subclass.name
         return None
+
+    def _signature_shape(self, model, function_def, node):
+        """
+        What a Java override must repeat of the method the generated class of the class declares: the
+        types the parameter hints and the return hint denote, as the stub declares them, and which
+        parameters take the remaining arguments; not the parameter names, nor how a hint spells its
+        type (List[int] and list[int] are one type). A hint that denotes no type the checker knows
+        counts as spelled, which can only keep a base method dynamic.
+        """
+        bindings = None
+        if getattr(self.checker, "facts", None) is not None and node is not None:
+            unit = CheckUnit(model.module.source_path, function_def.name(), function_def, node, model.class_def, None, model.module)
+            bindings = Bindings(self.checker, unit)
+
+        def denoted(hint):
+            if hint is None:
+                return None
+            if hint.name() == "None":
+                return ("void",)
+            typed = bindings.of_hint(hint) if bindings is not None else None
+            return _typed_shape(typed) if typed is not None else ("hint", hint.name())
+
+        return_def = function_def.returnType()
+        parameters = tuple(
+            (denoted(argument.typeAnnotation()), bool(argument.variadic()))
+            for argument in function_def.arguments().arguments() if argument.name() not in ("self", "cls")
+        )
+        return (denoted(return_def.typeAnnotation() if return_def is not None else None), parameters)
 
     def _introduced(self, class_def, function_def):
         """Whether the method or its class carries an introduction binding."""
@@ -505,15 +534,12 @@ if hasattr(ast, "TryStar"):
     _NAMES[ast.TryStar] = "a try statement with except*"
 
 
-def _signature_shape(function_def):
-    """The hints a Java override must repeat: the return hint and the parameter hints, as spelled."""
-    return_def = function_def.returnType()
-    return_hint = return_def.typeAnnotation() if return_def is not None else None
-    parameters = tuple(
-        (argument.name(), argument.typeAnnotation().name() if argument.typeAnnotation() is not None else None, bool(argument.variadic()))
-        for argument in function_def.arguments().arguments() if argument.name() not in ("self", "cls")
-    )
-    return (return_hint.name() if return_hint is not None else None, parameters)
+def _typed_shape(typed):
+    """A type the checker inferred, as a comparable value: its kind, its name, whether it may be None and its type arguments."""
+    if typed is None:
+        return None
+    name = typed.name if isinstance(typed.name, str) else typed.name.qualifiedName()
+    return (typed.kind, name, bool(typed.nullable), tuple(_typed_shape(argument) for argument in typed.args))
 
 
 def _unpacks_items(node):

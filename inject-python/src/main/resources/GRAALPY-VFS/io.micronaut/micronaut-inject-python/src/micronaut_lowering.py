@@ -115,12 +115,6 @@ def _abstract_class(class_def):
             or any(function.isAbstract() for function in class_def.functions()))
 
 
-def _is_reference(type_name):
-    """Whether a Java type name is a reference type other than String and Object: a type a type variable may have resolved to."""
-    erased = _erased(type_name)
-    return erased not in (VOID, STRING, OBJECT, LONG, DOUBLE, BOOLEAN, NONE) and erased not in JAVA_NUMBERS and erased not in ("int", "short", "byte", "float", "char")
-
-
 def _plain_receiver(node):
     """Whether the receiver is a name or a chain of attributes of a name, whose evaluation a static call can skip."""
     while isinstance(node, ast.Attribute):
@@ -140,6 +134,21 @@ def _erased(type_name):
     """A Java type name without the type arguments the lowering carries in it."""
     index = type_name.find("<")
     return type_name if index < 0 else type_name[:index]
+
+
+def _descriptor_parameter_types(signature):
+    """
+    The parameter types a call of the Java method names in its descriptor: a parameter declared with a type
+    variable is its erasure (Object for the T of an Optional[Foo]), the others as the signature spells them.
+    """
+    resolved = list(signature.parameterTypes())
+    erased = list(signature.erasedParameterTypes())
+    return [declared if declared != _erased(type_name) else type_name for type_name, declared in zip(resolved, erased)]
+
+
+def _descriptor_return_type(signature):
+    """The erasure of the declared return type of the Java method, which a call names in its descriptor."""
+    return signature.erasedReturnType()
 
 
 def _arguments(type_name):
@@ -1438,7 +1447,7 @@ class Lowering:
                      for argument, parameter_type, argument_node in zip(lowered_arguments, parameter_types, node.args)]
         self.java_calls += 1
         if kind == "constructor":
-            return NewJava(owner, parameter_types, arguments)
+            return NewJava(owner, _descriptor_parameter_types(signature), arguments)
         receiver = None if static else self._expression(function.value)
         if receiver is not None and receiver.type() in (LONG, DOUBLE, BOOLEAN):
             self._refuse("unsupported-expression", "a call on a Python value has no static lowering", node)
@@ -1447,13 +1456,19 @@ class Lowering:
         if type_arguments:
             # the elements of a returned collection keep their static type: for title in repository.titles()
             return_type = f"{return_type}<{','.join(type_arguments)}>"
-        receiver_typed = self._typed(function.value) if receiver is not None else None
-        if receiver_typed is not None and getattr(receiver_typed, "args", ()) and _is_reference(return_type):
-            # the receiver is a parameterized Java type (BeanRegistration[Foo], Map[str, V]) whose method may
-            # return a type variable: the signature carries the type the checker resolved it to, while the
-            # generated receiver is erased, so the call returns an Object the body casts to that type
-            return Cast(InvokeJava(receiver, owner, name, parameter_types, arguments, OBJECT), return_type)
-        call = InvokeJava(receiver, owner, name, parameter_types, arguments, return_type)
+        erased_return = _descriptor_return_type(signature)
+        if erased_return != VOID and erased_return != _erased(return_type):
+            # the declared return type is a type variable (T bean() of a BeanRegistration[Foo]): the
+            # signature carries the type the receiver binds it to, while the method returns the variable's
+            # erasure, which the body casts to that type
+            call = InvokeJava(receiver, owner, name, _descriptor_parameter_types(signature), arguments, erased_return)
+            used = JAVA_NUMBERS.get(return_type, return_type)
+            if erased_return == OBJECT:
+                # from an Object, the cast unboxes a number as the host boundary converts it
+                return Cast(call, used)
+            resolved = Cast(call, return_type)
+            return Cast(resolved, used) if used != return_type else resolved
+        call = InvokeJava(receiver, owner, name, _descriptor_parameter_types(signature), arguments, return_type)
         if _erased(return_type) == OBJECT:
             # a type variable of a raw receiver returns as Object; the checker may still know the type
             inferred = stub_type_name(self._typed(node))

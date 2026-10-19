@@ -1158,7 +1158,7 @@ class Calc:
 
 
 OVERRIDES = '''
-from typing import TypeVar, Generic
+from typing import TypeVar, Generic, List, Optional
 
 T = TypeVar("T")
 
@@ -1175,6 +1175,15 @@ class Holder(Generic[T]):
     def ratio(self, scale: int) -> int:
         return scale
 
+    def named(self, count: int) -> int:
+        return count
+
+    def listed(self, values: List[int]) -> int:
+        return len(values)
+
+    def maybe(self, count: int) -> int:
+        return count
+
 class IntHolder(Holder[int]):
     def value(self) -> int:
         return 42
@@ -1187,6 +1196,15 @@ class IntHolder(Holder[int]):
 
     def ratio(self, scale: int, offset: int = 0) -> int:
         return scale + offset
+
+    def named(self, total: int) -> int:
+        return total + 1
+
+    def listed(self, values: list[int]) -> int:
+        return len(values) + 1
+
+    def maybe(self, count: Optional[int]) -> int:
+        return 0 if count is None else count
 '''
 
 
@@ -1210,6 +1228,15 @@ class OverriddenMethodTest(unittest.TestCase):
     def test_an_override_repeating_the_signature_leaves_the_base_method_compilable(self):
         self.assertEqual("COMPILED", self.decisions["Holder.label"].outcome().name())
         self.assertEqual("COMPILED", self.decisions["IntHolder.label"].outcome().name())
+
+    def test_parameter_names_and_the_spelling_of_a_hint_are_no_part_of_the_signature(self):
+        # a renamed parameter, or List[int] for list[int], declares the same Java method: an override
+        for name in ("Holder.named", "Holder.listed"):
+            self.assertNotIn("overridden-method", rules(self.decisions[name]), name)
+            self.assertEqual("COMPILED", self.decisions[name].outcome().name(), (name, rules(self.decisions[name])))
+
+    def test_an_override_taking_none_as_well_keeps_the_base_method_dynamic(self):
+        self.assertIn("overridden-method", rules(self.decisions["Holder.maybe"]))
 
     def test_the_override_itself_is_judged_on_its_own_signature(self):
         self.assertNotIn("overridden-method", rules(self.decisions["IntHolder.describe"]))

@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.RandomAccess;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -265,13 +266,17 @@ public final class PythonStatic {
 
     /**
      * A string as Python's repr spells it: single quotes unless the string contains a single quote and
-     * no double quote, backslash escapes for the quote, the backslash and the control characters.
+     * no double quote, backslash escapes for the quote, the backslash, {@code \\n}, {@code \\r} and {@code \\t},
+     * and {@code \\xhh}, {@code \\uhhhh} or {@code \\Uhhhhhhhh} for every other character
+     * {@code str.isprintable()} rejects.
      */
     private static String quote(String string) {
         char quote = string.indexOf('\'') >= 0 && string.indexOf('"') < 0 ? '"' : '\'';
         StringBuilder out = new StringBuilder().append(quote);
-        for (int i = 0; i < string.length(); i++) {
-            char c = string.charAt(i);
+        int i = 0;
+        while (i < string.length()) {
+            int c = string.codePointAt(i);
+            i += Character.charCount(c);
             switch (c) {
                 case '\\' -> out.append("\\\\");
                 case '\n' -> out.append("\\n");
@@ -279,16 +284,35 @@ public final class PythonStatic {
                 case '\t' -> out.append("\\t");
                 default -> {
                     if (c == quote) {
-                        out.append('\\').append(c);
-                    } else if (c < 0x20 || c == 0x7f) {
-                        out.append(String.format("\\x%02x", (int) c));
+                        out.append('\\').append((char) c);
+                    } else if (isPrintable(c)) {
+                        out.appendCodePoint(c);
+                    } else if (c <= 0xff) {
+                        out.append(String.format("\\x%02x", c));
+                    } else if (c <= 0xffff) {
+                        out.append(String.format("\\u%04x", c));
                     } else {
-                        out.append(c);
+                        out.append(String.format("\\U%08x", c));
                     }
                 }
             }
         }
         return out.append(quote).toString();
+    }
+
+    /**
+     * Python's {@code str.isprintable} for one character: the ASCII space, and no other separator, control,
+     * format, surrogate, private-use or unassigned character.
+     */
+    private static boolean isPrintable(int codePoint) {
+        if (codePoint < 0x7f) {
+            return codePoint >= 0x20;
+        }
+        return switch (Character.getType(codePoint)) {
+            case Character.CONTROL, Character.FORMAT, Character.SURROGATE, Character.PRIVATE_USE, Character.UNASSIGNED,
+                 Character.LINE_SEPARATOR, Character.PARAGRAPH_SEPARATOR, Character.SPACE_SEPARATOR -> false;
+            default -> true;
+        };
     }
 
     /**
@@ -619,6 +643,7 @@ public final class PythonStatic {
     public static <T> Set<T> copyOfSet(Iterable<? extends T> values) {
         Set<T> set = new LinkedHashSet<>();
         for (T value : values) {
+            requireHashable(value);
             set.add(value);
         }
         return set;
@@ -655,6 +680,7 @@ public final class PythonStatic {
      * @return The dict
      */
     public static <K, V> Map<K, V> put(Map<K, V> map, K key, V value) {
+        requireHashable(key);
         map.put(key, value);
         return map;
     }
@@ -686,6 +712,9 @@ public final class PythonStatic {
      */
     @SuppressWarnings("unchecked")
     public static <T> Set<T> set(Object... elements) {
+        for (Object element : elements) {
+            requireHashable(element);
+        }
         return (Set<T>) new LinkedHashSet<>(Arrays.asList(elements));
     }
 
@@ -699,6 +728,7 @@ public final class PythonStatic {
     public static <K, V> Map<K, V> map(Object... keysAndValues) {
         Map<Object, Object> map = new LinkedHashMap<>();
         for (int i = 0; i + 1 < keysAndValues.length; i += 2) {
+            requireHashable(keysAndValues[i]);
             map.put(keysAndValues[i], keysAndValues[i + 1]);
         }
         return (Map<K, V>) map;
@@ -754,6 +784,7 @@ public final class PythonStatic {
      */
     @SuppressWarnings("unchecked")
     public static @Nullable Object add(Set<?> set, @Nullable Object value) {
+        requireHashable(value);
         ((Set<Object>) set).add(value);
         return null;
     }
@@ -804,6 +835,7 @@ public final class PythonStatic {
      */
     @SuppressWarnings("unchecked")
     public static void setItem(Map<?, ?> map, @Nullable Object key, @Nullable Object value) {
+        requireHashable(key);
         ((Map<Object, Object>) map).put(key, value);
     }
 
@@ -814,6 +846,7 @@ public final class PythonStatic {
      * @throws NoSuchElementException When the key is absent, as Python raises KeyError
      */
     public static Object item(Map<?, ?> map, @Nullable Object key) {
+        requireHashable(key);
         if (!map.containsKey(key)) {
             throw new NoSuchElementException("KeyError: " + str(key));
         }
@@ -827,6 +860,7 @@ public final class PythonStatic {
      * @return {@code map.get(key, default)}
      */
     public static @Nullable Object get(Map<?, ?> map, @Nullable Object key, @Nullable Object defaultValue) {
+        requireHashable(key);
         return map.containsKey(key) ? map.get(key) : defaultValue;
     }
 
@@ -861,13 +895,74 @@ public final class PythonStatic {
         if (container instanceof CharSequence text) {
             return element != null && text.toString().contains(element.toString());
         }
+        if (container instanceof Set<?> set) {
+            requireHashable(element);
+            return set.contains(element);
+        }
         if (container instanceof Collection<?> collection) {
-            return collection.contains(element);
+            for (Object candidate : collection) {
+                if (same(candidate, element)) {
+                    return true;
+                }
+            }
+            return false;
         }
         if (container instanceof Map<?, ?> map) {
+            requireHashable(element);
             return map.containsKey(element);
         }
         throw new ClassCastException("argument of type " + typeName(container) + " is not iterable");
+    }
+
+    /**
+     * Python's {@code ==} as far as Java's {@code equals} differs from it on the values of a compiled body:
+     * a tuple equals no list and a list no tuple, also as elements of lists, tuples and dict values.
+     */
+    private static boolean same(@Nullable Object left, @Nullable Object right) {
+        if (left == right) {
+            return true;
+        }
+        if (left instanceof List<?> leftList && right instanceof List<?> rightList) {
+            if ((left instanceof Tuple) != (right instanceof Tuple) || leftList.size() != rightList.size()) {
+                return false;
+            }
+            java.util.Iterator<?> rightElements = rightList.iterator();
+            for (Object leftElement : leftList) {
+                if (!same(leftElement, rightElements.next())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (left instanceof Map<?, ?> leftMap && right instanceof Map<?, ?> rightMap) {
+            if (leftMap.size() != rightMap.size()) {
+                return false;
+            }
+            for (Map.Entry<?, ?> entry : leftMap.entrySet()) {
+                if (!rightMap.containsKey(entry.getKey()) || !same(entry.getValue(), rightMap.get(entry.getKey()))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return Objects.equals(left, right);
+    }
+
+    /**
+     * Requires a dict key or a set element Python can hash: a list, set or dict cannot be one (nor a tuple
+     * holding one), which keeps a list from finding the key of an equal tuple.
+     *
+     * @param key A dict key or a set element
+     * @throws ClassCastException For a list, set or dict, as Python raises TypeError
+     */
+    private static void requireHashable(@Nullable Object key) {
+        if (key instanceof Tuple tuple) {
+            for (Object element : tuple) {
+                requireHashable(element);
+            }
+        } else if (key instanceof Collection<?> || key instanceof Map<?, ?>) {
+            throw new ClassCastException("unhashable type: '" + typeName(key) + "'");
+        }
     }
 
     /**
@@ -1156,8 +1251,10 @@ public final class PythonStatic {
     }
 
     /**
-     * A Python tuple: an immutable list whose rendering keeps the parentheses. Equal to any list of the same
-     * elements, as the List contract requires; a compiled body never compares a tuple with a list.
+     * A Python tuple: an immutable list whose rendering keeps the parentheses. Java's {@code equals} holds it
+     * equal to any list of the same elements, as the List contract requires; the helpers of a compiled body
+     * compare as Python does instead, where a tuple equals no list ({@link #same}), and take no list as a
+     * dict key or a set element ({@link #requireHashable}).
      */
     private static final class Tuple extends AbstractList<Object> implements RandomAccess {
         private final Object[] elements;

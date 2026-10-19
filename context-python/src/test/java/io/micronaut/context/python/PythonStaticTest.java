@@ -19,10 +19,13 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The helpers of compiled bodies answer what Python answers where Java would differ.
@@ -78,6 +81,54 @@ final class PythonStaticTest {
         assertEquals("[[1, [...]], [1, [...]]]", PythonStatic.repr(twice));
         List<Object> shared = PythonStatic.list(1L);
         assertEquals("[[1], [1]]", PythonStatic.repr(PythonStatic.list(shared, shared)));
+    }
+
+    @Test
+    void aTupleEqualsNoList() {
+        List<Object> pair = PythonStatic.tuple(1L, 2L);
+        List<Object> list = PythonStatic.list(1L, 2L);
+        // (1, 2) in [[1, 2]] and [1, 2] in [(1, 2)] are False in Python
+        assertFalse(PythonStatic.contains(PythonStatic.list(list), pair));
+        assertFalse(PythonStatic.contains(PythonStatic.list(pair), list));
+        assertTrue(PythonStatic.contains(PythonStatic.list(pair), PythonStatic.tuple(1L, 2L)));
+        assertTrue(PythonStatic.contains(PythonStatic.list(list), PythonStatic.list(1L, 2L)));
+        // nested: ([1],) in [((1,),)] is False, and so is a dict holding a tuple for one holding a list
+        assertFalse(PythonStatic.contains(PythonStatic.list(PythonStatic.tuple(PythonStatic.tuple(1L))), PythonStatic.tuple(PythonStatic.list(1L))));
+        assertFalse(PythonStatic.contains(PythonStatic.list(PythonStatic.map("k", pair)), PythonStatic.map("k", list)));
+        assertTrue(PythonStatic.contains(PythonStatic.list(PythonStatic.map("k", pair)), PythonStatic.map("k", PythonStatic.tuple(1L, 2L))));
+        assertTrue(PythonStatic.contains(PythonStatic.list("a", 1L), 1L));
+        assertFalse(PythonStatic.contains(PythonStatic.list("a", 1L), "b"));
+    }
+
+    @Test
+    void aListIsNoDictKeyNorSetElement() {
+        Map<Object, Object> byPair = PythonStatic.map(PythonStatic.tuple(1L, 2L), "a");
+        Set<Object> pairs = PythonStatic.set(PythonStatic.tuple(1L, 2L));
+        assertEquals("a", PythonStatic.item(byPair, PythonStatic.tuple(1L, 2L)));
+        assertTrue(PythonStatic.contains(pairs, PythonStatic.tuple(1L, 2L)));
+        // Python raises TypeError: unhashable type: 'list', where Java would find the equal tuple
+        assertThrows(ClassCastException.class, () -> PythonStatic.item(byPair, PythonStatic.list(1L, 2L)));
+        assertThrows(ClassCastException.class, () -> PythonStatic.get(byPair, PythonStatic.list(1L, 2L), "b"));
+        assertThrows(ClassCastException.class, () -> PythonStatic.contains(byPair, PythonStatic.list(1L, 2L)));
+        assertThrows(ClassCastException.class, () -> PythonStatic.contains(pairs, PythonStatic.list(1L, 2L)));
+        assertThrows(ClassCastException.class, () -> PythonStatic.add(pairs, PythonStatic.list(1L, 2L)));
+        assertThrows(ClassCastException.class, () -> PythonStatic.setItem(byPair, PythonStatic.list(1L, 2L), "c"));
+        assertThrows(ClassCastException.class, () -> PythonStatic.map(PythonStatic.list(1L), "a"));
+        assertThrows(ClassCastException.class, () -> PythonStatic.set(PythonStatic.set(1L)));
+        assertThrows(ClassCastException.class, () -> PythonStatic.copyOfSet(List.of(PythonStatic.list(1L))));
+        assertThrows(ClassCastException.class, () -> PythonStatic.set(PythonStatic.tuple(PythonStatic.list(1L))));
+        assertEquals(1, pairs.size());
+        assertEquals(1, byPair.size());
+    }
+
+    @Test
+    void stringsAreQuotedAsReprQuotesThem() {
+        // repr('a\x85\xa0​\U000e0001é😀 \x7f\x00　 \ud800') in Python 3.13
+        assertEquals("'a\\x85\\xa0\\u200b\\ue000\\U000e0001é😀\\u2028\\x7f\\x00\\u3000 \\ud800'",
+            PythonStatic.repr("a\u0085 ​󠀁é😀 \u007f\u0000　 \uD800"));
+        assertEquals("'it\\'s \"x\"'", PythonStatic.repr("it's \"x\""));
+        assertEquals("\"it's\"", PythonStatic.repr("it's"));
+        assertEquals("'\\\\ \\n\\r\\t'", PythonStatic.repr("\\ \n\r\t"));
     }
 
     @Test
