@@ -593,6 +593,36 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
+     * Close the connection after the last response was written. When the request body has not
+     * been received in full, closing the socket with unread bytes makes the transport reset the
+     * connection, and the client may see the reset instead of the response. In that case only
+     * the output is shut down, and the rest of the body is read and dropped before the
+     * connection is closed, within {@link #LINGER_IDLE_MILLIS} of the last read,
+     * {@link #LINGER_MAX_MILLIS} and {@link #LINGER_MAX_BYTES}.
+     */
+    private void closeAfterResponse() {
+        ChannelHandlerContext context = requiredCtx();
+        if (inboundHandler == baseInboundHandler || removed
+            || !(context.channel() instanceof DuplexChannel channel) || !channel.isActive()) {
+            context.close();
+            return;
+        }
+        // fail or release what the reader of the body did not take
+        inboundHandler.discard();
+        LingeringInboundHandler lingering = new LingeringInboundHandler(context);
+        inboundHandler = lingering;
+        lingering.scheduleTimeout(LINGER_IDLE_MILLIS);
+        channel.closeFuture().addListener(f -> lingering.cancelTimeout());
+        SslHandler ssl = context.pipeline().get(SslHandler.class);
+        if (ssl == null) {
+            channel.shutdownOutput();
+        } else {
+            ssl.closeOutbound().addListener(f -> channel.shutdownOutput());
+        }
+        refreshNeedMore();
+    }
+
+    /**
      * An inbound handler is responsible for all incoming messages.
      */
     private abstract static class InboundHandler {
@@ -1079,36 +1109,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             dispose();
             delegate.discard();
         }
-    }
-
-    /**
-     * Close the connection after the last response was written. When the request body has not
-     * been received in full, closing the socket with unread bytes makes the transport reset the
-     * connection, and the client may see the reset instead of the response. In that case only
-     * the output is shut down, and the rest of the body is read and dropped before the
-     * connection is closed, within {@link #LINGER_IDLE_MILLIS} of the last read,
-     * {@link #LINGER_MAX_MILLIS} and {@link #LINGER_MAX_BYTES}.
-     */
-    private void closeAfterResponse() {
-        ChannelHandlerContext context = requiredCtx();
-        if (inboundHandler == baseInboundHandler || removed
-            || !(context.channel() instanceof DuplexChannel channel) || !channel.isActive()) {
-            context.close();
-            return;
-        }
-        // fail or release what the reader of the body did not take
-        inboundHandler.discard();
-        LingeringInboundHandler lingering = new LingeringInboundHandler(context);
-        inboundHandler = lingering;
-        lingering.scheduleTimeout(LINGER_IDLE_MILLIS);
-        channel.closeFuture().addListener(f -> lingering.cancelTimeout());
-        SslHandler ssl = context.pipeline().get(SslHandler.class);
-        if (ssl == null) {
-            channel.shutdownOutput();
-        } else {
-            ssl.closeOutbound().addListener(f -> channel.shutdownOutput());
-        }
-        refreshNeedMore();
     }
 
     /**
