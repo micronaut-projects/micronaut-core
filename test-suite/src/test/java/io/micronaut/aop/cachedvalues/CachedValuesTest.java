@@ -72,18 +72,19 @@ class CachedValuesTest {
     }
 
     @Test
-    void aPlanReadingAPropertyPlaceholderIsComputedForEveryCallAndFollowsTheEnvironment() {
+    void aPlanReadingAPropertyPlaceholderIsKeptUntilThePropertiesChange() {
         PlannedBean bean = context.getBean(PlannedBean.class);
         PlanInterceptor interceptor = context.getBean(PlanInterceptor.class);
 
         assertEquals("first", bean.placeholder());
         assertEquals("first", bean.placeholder());
-        assertEquals(2, interceptor.computed.get());
+        assertEquals(1, interceptor.computed.get());
 
         context.getEnvironment().addPropertySource(PropertySource.of("override", Map.of("cached.plan.value", "second"), Ordered.HIGHEST_PRECEDENCE));
 
         assertEquals("second", bean.placeholder());
-        assertEquals(3, interceptor.computed.get());
+        assertEquals("second", bean.placeholder());
+        assertEquals(2, interceptor.computed.get());
     }
 
     @Test
@@ -136,12 +137,13 @@ class CachedValuesTest {
     }
 
     @Test
-    void anAnnotationReadingAPropertyPlaceholderIsNotKept() {
+    void anAnnotationReadingAPropertyPlaceholderIsKeptUntilThePropertiesChange() {
         ExecutableMethod<PlainBean, Object> method = method("placeholderAnnotated");
 
         Sample sample = method.getCachedAnnotation(Sample.class);
         assertNotNull(sample);
         assertEquals("from-environment", sample.name());
+        assertSame(sample, method.getCachedAnnotation(Sample.class));
 
         context.getEnvironment().addPropertySource(PropertySource.of("override", Map.of("cached.sample.name", "changed"), Ordered.HIGHEST_PRECEDENCE));
 
