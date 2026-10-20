@@ -60,6 +60,17 @@ public interface RequestHandler {
     }
 
     /**
+     * Called before {@link #responseWritten(Object)} when the body of the response failed while
+     * it was written, so that the response ends abruptly.
+     *
+     * @param attachment Object passed to {@link OutboundAccess#attachment(Object)}
+     * @param cause      The failure of the body
+     * @since 5.3.0
+     */
+    default void responseFailed(@Nullable Object attachment, Throwable cause) {
+    }
+
+    /**
      * Called when the handler is removed.
      */
     default void removed() {
