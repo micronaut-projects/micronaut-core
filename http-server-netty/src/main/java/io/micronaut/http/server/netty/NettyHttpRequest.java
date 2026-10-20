@@ -997,7 +997,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         PostBodyDecoder.Builder builder = PostBodyDecoder.builder()
             .charset(charset)
             .maxFields(nhsc.getFormMaxFields())
-            .enableQuirks(nhsc.getFormDecoderQuirks().toArray(new DecoderQuirk[0]))
+            .enableQuirks(nhsc.getEffectiveFormDecoderQuirks().toArray(new DecoderQuirk[0]))
             .undecodedLimit(undecodedLimit > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) undecodedLimit);
 
         FormType formType = parseFormType();
@@ -1017,7 +1017,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             new BodySizeLimits(nhsc.getFieldMaxBytes(), nhsc.getFieldMaxBufferedBytes()),
             new BodySizeLimits(nhsc.getFormMaxBytes(), nhsc.getFormMaxBufferedBytes()),
             byteBody,
-            content(decodeContent, nhsc.getFormDecoderQuirks())
+            content(decodeContent, nhsc.getEffectiveFormDecoderQuirks())
         ).fields();
     }
 

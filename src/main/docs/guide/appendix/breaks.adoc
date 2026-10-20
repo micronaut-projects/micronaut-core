@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== URL-encoded forms with a malformed percent escape are rejected (5.3)
+
+The Netty server previously decoded a malformed percent escape in an `application/x-www-form-urlencoded` body leniently: a body such as `g=%2` or `g=%GG` was accepted and the route answered as if the escape were text. Since Micronaut 5.3 such a body is a client error and is answered with `400 Bad Request`, for every reader of the form: a `@Body` or `FormData` argument, the `form()` of a functional route, `AsyncRequestBody.form()`, and the raw values of the form. An escape split between two chunks of the body is still decoded. To restore the lenient decoding, set `micronaut.server.netty.form-lenient-percent-decoding` to `true`.
+
 === Buffered JSON stream responses require a list type (5.3)
 
 The JDK HTTP client now uses the shared JSON stream message body reader. For an `application/x-json-stream` response, `retrieve(request, Book.class)` no longer returns only the first JSON value. Retrieve `Argument.listOf(Book.class)` to read the complete stream, or use `jsonStream(request, Book.class)` to consume individual values as they arrive.
