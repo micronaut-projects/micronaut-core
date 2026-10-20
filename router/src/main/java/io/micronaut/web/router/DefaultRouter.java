@@ -382,16 +382,18 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private static <T, R> List<UriRouteMatch<T, R>> byMediaTypes(HttpRequest<?> request, List<UriRouteMatch<T, R>> uriRoutes) {
         final Collection<MediaType> acceptedProducedTypes = request.accept();
         if (CollectionUtils.isNotEmpty(acceptedProducedTypes)) {
-            // take the highest priority accepted type
-            final MediaType mediaType = acceptedProducedTypes.iterator().next();
-            var mostSpecific = new ArrayList<UriRouteMatch<T, R>>(uriRoutes.size());
-            for (UriRouteMatch<T, R> routeMatch : uriRoutes) {
-                if (routeMatch.getRouteInfo().explicitlyProduces(mediaType)) {
-                    mostSpecific.add(routeMatch);
+            // take the highest priority accepted type, a type of the quality 0 is not acceptable
+            final MediaType mediaType = preferredAcceptedType(acceptedProducedTypes);
+            if (mediaType != null) {
+                var mostSpecific = new ArrayList<UriRouteMatch<T, R>>(uriRoutes.size());
+                for (UriRouteMatch<T, R> routeMatch : uriRoutes) {
+                    if (routeMatch.getRouteInfo().explicitlyProduces(mediaType)) {
+                        mostSpecific.add(routeMatch);
+                    }
                 }
-            }
-            if (!mostSpecific.isEmpty()) {
-                uriRoutes = mostSpecific;
+                if (!mostSpecific.isEmpty()) {
+                    uriRoutes = mostSpecific;
+                }
             }
         }
         boolean permitsBody = request.getMethod().permitsRequestBody();
@@ -413,6 +415,15 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             uriRoutes = explicitlyConsumedRoutes.isEmpty() ? consumesRoutes : explicitlyConsumedRoutes;
         }
         return uriRoutes;
+    }
+
+    private static @Nullable MediaType preferredAcceptedType(Collection<MediaType> acceptedTypes) {
+        for (MediaType acceptedType : acceptedTypes) {
+            if (!AcceptedMediaTypes.isRejected(acceptedType)) {
+                return acceptedType;
+            }
+        }
+        return null;
     }
 
     /**

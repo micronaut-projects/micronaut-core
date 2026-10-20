@@ -42,6 +42,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.cert.Certificate;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * The mutable copy of a server request that a filter method is given, see
@@ -245,6 +246,16 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
     }
 
     @Override
+    public boolean whenResponseCompleted(Consumer<@Nullable Throwable> callback) {
+        return request.whenResponseCompleted(callback);
+    }
+
+    @Override
+    public @Nullable Runnable whenAbandoned(Runnable callback) {
+        return request.whenAbandoned(callback);
+    }
+
+    @Override
     public String toString() {
         return getMethodName() + " " + getUri();
     }
@@ -267,6 +278,16 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
         @Override
         public Publisher<RawFormField> getRawFormFields() {
             return form().getRawFormFields();
+        }
+
+        @Override
+        public Publisher<RawFormField> getRawFormFields(ByteBody byteBody) {
+            return form().getRawFormFields(byteBody);
+        }
+
+        @Override
+        public Publisher<RawFormField> getEncodedFormFields(ByteBody byteBody) {
+            return form().getEncodedFormFields(byteBody);
         }
 
         @Override

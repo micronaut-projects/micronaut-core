@@ -92,10 +92,11 @@ public final class TestPathFirstColonRouteTemplateEngine extends TestColonRouteT
         if (consuming.isEmpty()) {
             return List.of(Selection.unsupportedMediaType(path.get(0)));
         }
-        // an accepted type of quality 0 is not acceptable
+        // an accepted type of quality 0 is not acceptable, nor one with the parameter "reject", which
+        // only this selector reads: the types are compatible for the router
         List<MediaType> accepted = new ArrayList<>();
         for (MediaType type : request.accept()) {
-            if (type.getQualityAsNumber().signum() > 0) {
+            if (type.getQualityAsNumber().signum() > 0 && type.getParameters().get("reject").isEmpty()) {
                 accepted.add(type);
             }
         }

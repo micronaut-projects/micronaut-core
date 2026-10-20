@@ -30,6 +30,7 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.inject.visitor.TypeHierarchyRecord;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
@@ -50,13 +51,14 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
  * Writes the record of the generic hierarchy of a type, a {@link TypeHierarchy} found at run time with
- * {@link TypeHierarchies}. See {@link VisitorContext#importTypeHierarchy(ClassElement, Element...)}.
+ * {@link TypeHierarchies}. See {@link VisitorContext#recordTypeHierarchy(ClassElement, Element...)}.
  *
  * <p>A record is a class with a constructor and nothing else, which passes the type, its variables, its direct super
  * types and {@link ClassElement#getAllSuperTypes() all its super types}, built with the argument factories from class
@@ -64,8 +66,8 @@ import java.util.function.Predicate;
  * a type that is itself not public is recorded in its own package, the one package that can name it. A super type that
  * the record cannot name, a class that is not public and of another package than the record or one whose arguments
  * name such a class, is left out of the recorded closure with the types above it kept, and is recorded by the name of
- * its class instead ({@link TypeHierarchy#getOmittedSuperTypeNames()}); a type whose variables are bounded by such a
- * class is refused.</p>
+ * its class instead ({@link TypeHierarchy#getOmittedSuperTypeNames()}), and the names are reported to the caller as
+ * well; a type whose variables are bounded by such a class is refused.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -83,60 +85,98 @@ public final class TypeHierarchyWriter {
     }
 
     /**
-     * The name of the record of a type, see {@link TypeHierarchies#recordClassName(String, String)}.
+     * Writes the record of a type, and reports what it says and leaves out. A type recorded several times into the
+     * same package is written once: a compiler that refuses a second write of the same class is taken at its word.
+     * A type recorded from several packages is written into each, see {@link TypeHierarchies#find(String, ClassLoader)}.
      *
-     * @param type                The type
+     * @param type                The type, a declaration
+     * @param context             The visitor context
      * @param originatingElements The originating elements, at least one
-     * @return The name of the record
+     * @return The record
+     * @throws ProcessingException if no record can describe the type, or the record cannot be written
      */
-    public static String recordClassName(ClassElement type, Element... originatingElements) {
-        if (originatingElements.length == 0) {
-            throw new IllegalArgumentException("The hierarchy of [" + type.getName() + "] cannot be recorded without an originating element");
+    public static TypeHierarchyRecord write(ClassElement type, VisitorContext context, Element... originatingElements) {
+        Element origin = origin(type, originatingElements);
+        Plan plan = plan(type, origin);
+        if (plan.refusal != null) {
+            throw new ProcessingException(origin, plan.refusal);
         }
-        return TypeHierarchies.recordClassName(type.getName(), recordPackage(type, originatingElements[0]));
+        return write(type, plan, context, originatingElements);
     }
 
     /**
-     * Writes the record of a type. A type recorded several times into the same package is written once: a
-     * compiler that refuses a second write of the same class is taken at its word. A type recorded from several
-     * packages is written into each, see {@link TypeHierarchies#find(String, ClassLoader)}.
+     * Writes the record of a type as {@link #write(ClassElement, VisitorContext, Element...)} does, unless no record
+     * can describe the type, which is then not written.
      *
-     * @param type                The type
-     * @param recordName          The name of the record, from {@link #recordClassName(ClassElement, Element...)}
+     * @param type                The type, a declaration
      * @param context             The visitor context
      * @param originatingElements The originating elements, at least one
+     * @return The record, or empty when no record can describe the type
+     * @throws ProcessingException if the record cannot be written
      */
-    public static void write(ClassElement type, String recordName, VisitorContext context, Element... originatingElements) {
+    public static Optional<TypeHierarchyRecord> writeIfRecordable(ClassElement type, VisitorContext context, Element... originatingElements) {
+        Element origin = origin(type, originatingElements);
+        Plan plan = plan(type, origin);
+        if (plan.refusal != null) {
+            return Optional.empty();
+        }
+        return Optional.of(write(type, plan, context, originatingElements));
+    }
+
+    private static String cannotBeRecorded(ClassElement type, String reason) {
+        return "The hierarchy of [" + type.getName() + "] cannot be recorded: " + reason;
+    }
+
+    private static Element origin(ClassElement type, Element... originatingElements) {
+        if (originatingElements.length == 0) {
+            throw new IllegalArgumentException(cannotBeRecorded(type, "no originating element was given"));
+        }
+        return originatingElements[0];
+    }
+
+    private static TypeHierarchyRecord write(ClassElement type, Plan plan, VisitorContext context, Element... originatingElements) {
         Element origin = originatingElements[0];
-        ClassDef classDef = build(type, recordName, origin);
+        Built built = build(type, plan);
+        TypeHierarchyRecord record = TypeHierarchyRecord.of(plan.recordName, built.omittedSuperTypeNames);
         // the class first: a compiler that refuses to write a class twice says so here, before the service entry
-        try (OutputStream outputStream = context.visitClass(recordName, originatingElements)) {
-            outputStream.write(ByteCodeWriterUtils.writeByteCode(classDef, context));
+        try (OutputStream outputStream = context.visitClass(plan.recordName, originatingElements)) {
+            outputStream.write(ByteCodeWriterUtils.writeByteCode(built.classDef, context));
         } catch (IOException e) {
             if (e instanceof FileAlreadyExistsException || ALREADY_WRITTEN.contains(e.getClass().getName())) {
                 // recorded before in this compilation, from another origin or in an earlier round: the record is the
                 // same, and a compiler that does not refuse the second write has overwritten it with the same bytes
-                return;
+                return record;
             }
-            throw new ProcessingException(origin, "Failed to write the type hierarchy record of [" + type.getName() + "]: " + e.getMessage(), e);
+            throw new ProcessingException(origin, cannotBeRecorded(type, "the record could not be written: " + e.getMessage()), e);
         }
-        context.visitServiceDescriptor(TypeHierarchy.class, recordName, origin);
+        context.visitServiceDescriptor(TypeHierarchy.class, plan.recordName, origin);
+        return record;
     }
 
-    private static ClassDef build(ClassElement type, String recordName, Element origin) {
-        refuseInnerClassesOfGenericClasses(type, origin);
-        String recordPackage = recordName.substring(0, Math.max(0, recordName.lastIndexOf('.')));
-        ClassTypeDef recordType = ClassTypeDef.of(recordName);
+    private static Plan plan(ClassElement type, Element origin) {
+        String recordPackage = recordPackage(type, origin);
+        if (recordPackage == null) {
+            return new Plan("", "", cannotBeRecorded(type, "the type is not public, and a record cannot be written into a package of the JDK"));
+        }
+        String recordName = TypeHierarchies.recordClassName(type.getName(), recordPackage);
+        for (GenericPlaceholderElement variable : type.getDeclaredGenericPlaceholders()) {
+            if (!isNameableFrom(variable, recordPackage)) {
+                return new Plan(recordPackage, recordName, cannotBeRecorded(type, "the bounds of its variable "
+                    + variable.getVariableName() + " name a type that is not public and not of the package " + recordPackage));
+            }
+        }
+        return new Plan(recordPackage, recordName, innerClassOfGenericClassRefusal(type));
+    }
+
+    private static Built build(ClassElement type, Plan plan) {
+        String recordPackage = plan.recordPackage;
+        ClassTypeDef recordType = ClassTypeDef.of(plan.recordName);
         Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
         Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(recordType, loadTypeMethods);
         MutableAnnotationMetadata defaults = new MutableAnnotationMetadata();
 
         List<ExpressionDef> variables = new ArrayList<>();
         for (GenericPlaceholderElement variable : type.getDeclaredGenericPlaceholders()) {
-            if (!isNameableFrom(variable, recordPackage)) {
-                throw new ProcessingException(origin, "The hierarchy of [" + type.getName() + "] cannot be recorded: the bounds of its variable "
-                    + variable.getVariableName() + " name a type that is not public and not of the package " + recordPackage);
-            }
             variables.add(argument(defaults, type, recordType, variable.getVariableName(), variable, loadClassValueExpressionFn));
         }
         ExpressionDef superclass = type.getSuperType()
@@ -166,7 +206,7 @@ public final class TypeHierarchyWriter {
         ExpressionDef inaccessible = omittedSuperTypeNames.isEmpty() ? ExpressionDef.nullValue()
             : TypeDef.STRING.array().instantiate(omittedSuperTypeNames.stream().<ExpressionDef>map(ExpressionDef::constant).toList());
 
-        ClassDef.ClassDefBuilder builder = ClassDef.builder(recordName)
+        ClassDef.ClassDefBuilder builder = ClassDef.builder(plan.recordName)
             .synthetic()
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
             .superclass(ClassTypeDef.of(GeneratedTypeHierarchy.class))
@@ -181,15 +221,17 @@ public final class TypeHierarchyWriter {
                     inaccessible
                 ))));
         loadTypeMethods.values().forEach(builder::addMethod);
-        return builder.build();
+        return new Built(builder.build(), List.copyOf(omittedSuperTypeNames));
     }
 
     /**
-     * Refuses a type that is, or has a super type that is, an inner class of a generic class, {@code Outer<T>.Inner}:
-     * the arguments of the enclosing class bind the variables of the inner one, and a record keeps the arguments of
-     * the class alone, so it would leave those variables unbound.
+     * Why a type that is, or has a super type that is, an inner class of a generic class, {@code Outer<T>.Inner}, is
+     * refused: the arguments of the enclosing class bind the variables of the inner one, and a record keeps the
+     * arguments of the class alone, so it would leave those variables unbound.
+     *
+     * @return The refusal, or null when the type has no such super type
      */
-    private static void refuseInnerClassesOfGenericClasses(ClassElement type, Element origin) {
+    private static @Nullable String innerClassOfGenericClassRefusal(ClassElement type) {
         List<ClassElement> types = new ArrayList<>();
         types.add(type);
         types.addAll(type.getAllSuperTypes());
@@ -197,10 +239,10 @@ public final class TypeHierarchyWriter {
             ClassElement genericOwner = genericOwner(aType);
             if (genericOwner != null) {
                 String which = aType.getName().equals(type.getName()) ? "it" : "its super type [" + aType.getName() + "]";
-                throw new ProcessingException(origin, "The hierarchy of [" + type.getName() + "] cannot be recorded: " + which
-                    + " is an inner class of the generic class [" + genericOwner.getName() + "], whose type arguments a record does not keep");
+                return cannotBeRecorded(type, which + " is an inner class of the generic class [" + genericOwner.getName() + "], whose type arguments a record does not keep");
             }
         }
+        return null;
     }
 
     private static @Nullable ClassElement genericOwner(ClassElement type) {
@@ -244,15 +286,17 @@ public final class TypeHierarchyWriter {
      * into a package no compilation can write into. Only a type that is itself not public is recorded in its own
      * package, the one package that can name it, and a type of a package of the JDK that is not public cannot be
      * recorded.
+     *
+     * @return The package, or null for a type of the JDK that is not public
      */
-    private static String recordPackage(ClassElement type, Element origin) {
+    private static @Nullable String recordPackage(ClassElement type, Element origin) {
         String typePackage = type.getPackageName();
         String originPackage = packageOf(origin);
         if (typePackage.equals(originPackage) || isPublic(type, new HashSet<>())) {
             return originPackage;
         }
         if (typePackage.startsWith("java.")) {
-            throw new ProcessingException(origin, "The hierarchy of [" + type.getName() + "] cannot be recorded: the type is not public, and a record cannot be written into a package of the JDK");
+            return null;
         }
         return typePackage;
     }
@@ -274,8 +318,12 @@ public final class TypeHierarchyWriter {
     /**
      * Whether every class a type names, itself, its type arguments and the bounds of its variables and wildcards, can
      * be named from a package: it is public, or of that package.
+     *
+     * @param element     The type
+     * @param packageName The package
+     * @return Whether a class of the package can name the type
      */
-    private static boolean isNameableFrom(ClassElement element, String packageName) {
+    static boolean isNameableFrom(ClassElement element, String packageName) {
         // a non-public class is nameable from its own package only
         return !namesNonPublicTypeMatching(element, aClass -> !aClass.getPackageName().equals(packageName), new HashSet<>(), 0);
     }
@@ -334,5 +382,25 @@ public final class TypeHierarchyWriter {
             }
         }
         return true;
+    }
+
+    /**
+     * Where the record of a type goes, see {@link TypeHierarchies#recordClassName(String, String)}, or why no record
+     * can describe the type.
+     *
+     * @param recordPackage The package the record is written into
+     * @param recordName    The name of the record
+     * @param refusal       Why no record can describe the type, or null
+     */
+    private record Plan(String recordPackage, String recordName, @Nullable String refusal) {
+    }
+
+    /**
+     * The built record.
+     *
+     * @param classDef              The class of the record
+     * @param omittedSuperTypeNames The names of the super types left out of it, in the order of the closure
+     */
+    private record Built(ClassDef classDef, List<String> omittedSuperTypeNames) {
     }
 }

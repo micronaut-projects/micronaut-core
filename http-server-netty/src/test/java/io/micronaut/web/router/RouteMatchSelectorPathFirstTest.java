@@ -164,8 +164,8 @@ class RouteMatchSelectorPathFirstTest {
 
     @Test
     void theRejectionOfTheSelectorOfTheCandidatesWinsOverTheTypesOfOtherSelectors() throws Exception {
-        // the route of the other selector cannot consume JSON; the selector of the candidate rejects q=0
-        assertEquals(406, send("POST", "/mx/fixed", Map.of("Content-Type", "application/json", "Accept", "text/plain;q=0")).statusCode());
+        // the route of the other selector cannot consume JSON; the selector of the candidate rejects the accepted type
+        assertEquals(406, send("POST", "/mx/fixed", Map.of("Content-Type", "application/json", "Accept", "text/plain;reject=true")).statusCode());
     }
 
     @Test

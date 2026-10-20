@@ -174,21 +174,33 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
      */
     private CompletableFuture<@Nullable Object> invokeFnAsync(@Nullable Object body, String functionName, Argument<?> valueType) {
         return CompletionStagePublishers.compose(functionDefinition(functionName), def -> {
-            FunctionInvoker<Object, Publisher<Object>> functionInvoker = functionInvokerChooser.<Object, Publisher<Object>>choose(def)
+            FunctionInvoker functionInvoker = functionInvokerChooser.choose(def)
                 .orElseThrow(() -> new FunctionNotFoundException(def.getName()));
+            // an invoker that only returns publishers is adapted by the default invokeAsync;
+            // a stage-less invoker, like a mock that only stubs invoke, is called through its publisher
             @SuppressWarnings("unchecked")
-            Argument<Publisher<Object>> publisherType = (Argument<Publisher<Object>>) (Argument<?>) Argument.of(Publisher.class, valueType);
-            Publisher<Object> result = Objects.requireNonNull(
-                functionInvoker.invoke(def, body, publisherType),
-                "The function invoker returned no publisher"
+            CompletionStage<@Nullable Object> result = CompletionStagePublishers.orElse(
+                (CompletionStage<@Nullable Object>) functionInvoker.invokeAsync(def, body, valueType),
+                () -> invokePublisher(functionInvoker, def, body, valueType)
             );
-            return CompletionStagePublishers.map(CompletionStagePublishers.first(result, null), value -> {
-                if (value == null) {
+            return CompletionStagePublishers.map(result, value -> {
+                if (value == null && !valueType.isVoid() && valueType.getType() != Void.class) {
                     throw new FunctionNotFoundException(functionName);
                 }
                 return value;
             });
         });
+    }
+
+    @SuppressWarnings("unchecked")
+    private static CompletionStage<@Nullable Object> invokePublisher(FunctionInvoker functionInvoker, FunctionDefinition def,
+                                                                      @Nullable Object body, Argument<?> valueType) {
+        Argument<Publisher<Object>> publisherType = (Argument<Publisher<Object>>) (Argument<?>) Argument.of(Publisher.class, valueType);
+        Publisher<Object> result = Objects.requireNonNull(
+            (Publisher<Object>) functionInvoker.invoke(def, body, publisherType),
+            "The function invoker returned no publisher"
+        );
+        return CompletionStagePublishers.first(result, null);
     }
 
     /**

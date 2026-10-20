@@ -720,6 +720,7 @@ public class RequestLifecycle {
     private ExecutionFlow<HttpResponse<?>> createDefaultErrorResponseFlow(HttpRequest<?> httpRequest,
                                                                           Throwable cause,
                                                                           PropagatedContext propagatedContext) {
+        onUnhandledError(cause);
         return propagatedContext.propagate(() -> ExecutionFlow.just(routeExecutor.createDefaultErrorResponse(httpRequest, cause)));
     }
 
@@ -795,6 +796,19 @@ public class RequestLifecycle {
         return onStatusError(request, cause, rejected.getDeclaringType(), propagatedContext);
     }
 
+    /**
+     * Called when an error is answered with the default error response because no error route
+     * or exception handler handled it. The request may have been replaced by a filter, so the
+     * server reports the failure to the request it received, see
+     * {@link io.micronaut.http.ServerHttpRequest#whenResponseCompleted}.
+     *
+     * @param cause The error
+     * @since 5.3.0
+     */
+    protected void onUnhandledError(Throwable cause) {
+        // nothing to report by default
+    }
+
     final ExecutionFlow<HttpResponse<?>> onRouteMiss(HttpRequest<?> httpRequest, PropagatedContext propagatedContext) {
         HttpMethod httpMethod = httpRequest.getMethod();
         String requestMethodName = httpRequest.getMethodName();
@@ -804,14 +818,13 @@ public class RequestLifecycle {
             LOG.debug("No matching route: {} {}", httpMethod, httpRequest.getUri());
         }
 
-        // if there is no route present try to locate a route that matches a different HTTP method.
-        // The route of a WebSocket only matches an upgrade request, see ServerWebSocketProcessor:
-        // the request is taken as one during the lookup, so that it also finds the WebSocket at its path
         // the rejection of a route selector, as the router decided it while it routed the request
         DefaultUriRouteMatch<?, ?> rejected = RouteRejections.get(httpRequest);
         if (rejected != null) {
             return onRejection(httpRequest, rejected, propagatedContext);
         }
+        // if there is no route present try to locate a route that matches a different HTTP method,
+        // with the WebSocket of the path, see findAnyRoutes
         final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = findAnyRoutes(httpRequest);
         final Collection<MediaType> acceptedTypes = httpRequest.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);

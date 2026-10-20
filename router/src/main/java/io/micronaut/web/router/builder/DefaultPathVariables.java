@@ -47,7 +47,19 @@ public final class DefaultPathVariables extends RoutePathVariables {
      */
     public DefaultPathVariables(Map<String, Object> values, ConversionService conversionService,
                                 @Nullable Object resolvedTarget, @Nullable MediaType selectedMediaType) {
-        super(values, conversionService);
+        this(values, values, conversionService, resolvedTarget, selectedMediaType);
+    }
+
+    /**
+     * @param values            The decoded variable values, viewed read-only
+     * @param rawValues         The values as they appear in the path, not percent-decoded, viewed read-only
+     * @param conversionService The conversion service of the route
+     * @param resolvedTarget    The target a {@code DynamicRouteTarget} resolved for the route, or {@code null}
+     * @param selectedMediaType The media type of the response a route selector negotiated, or {@code null}
+     */
+    public DefaultPathVariables(Map<String, Object> values, Map<String, Object> rawValues, ConversionService conversionService,
+                                @Nullable Object resolvedTarget, @Nullable MediaType selectedMediaType) {
+        super(values, rawValues, conversionService);
         this.resolvedTarget = resolvedTarget;
         this.selectedMediaType = selectedMediaType;
     }
@@ -67,6 +79,24 @@ public final class DefaultPathVariables extends RoutePathVariables {
      */
     public DefaultPathVariables(Map<String, Object> values, ConversionService conversionService) {
         this(values, conversionService, null);
+    }
+
+    private DefaultPathVariables(DefaultPathVariables decoded, Map<String, Object> rawValues) {
+        super(decoded, rawValues);
+        this.resolvedTarget = decoded.resolvedTarget;
+        this.selectedMediaType = decoded.selectedMediaType;
+    }
+
+    /**
+     * The raw view keeps the target and the negotiated media type of the route, which
+     * {@code LocatedRoutes.locatedTarget} and {@code RouteMatchSelector.selectedMediaType} read.
+     *
+     * @param rawValues The raw values
+     * @return The view
+     */
+    @Override
+    protected DefaultPathVariables rawView(Map<String, Object> rawValues) {
+        return new DefaultPathVariables(this, rawValues);
     }
 
     /**

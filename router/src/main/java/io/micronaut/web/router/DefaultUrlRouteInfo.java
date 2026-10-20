@@ -564,7 +564,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     /**
-     * @return Whether the route has constraints on its path variables, see {@link #acceptsVariables(Map)}
+     * @return Whether the route has constraints on its path variables, see {@link #acceptsVariables(Map, Map)}
      */
     boolean isConstrained() {
         return !constraints.isEmpty();
@@ -574,11 +574,12 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * Whether the path variables of a match of this route pass its constraints, viewed as the
      * {@link PathVariables} the handler gets. A constraint that throws rejects them.
      *
-     * @param variables The variable values of the match
+     * @param variables    The variable values of the match
+     * @param rawVariables The values as they appear in the path, not percent-decoded
      * @return Whether all the constraints accept them
      */
-    boolean acceptsVariables(Map<String, Object> variables) {
-        PathVariables pathVariables = new DefaultPathVariables(variables, conversionService);
+    boolean acceptsVariables(Map<String, Object> variables, Map<String, Object> rawVariables) {
+        PathVariables pathVariables = new DefaultPathVariables(variables, rawVariables, conversionService, null, null);
         for (Predicate<? super PathVariables> constraint : constraints) {
             try {
                 if (!constraint.test(pathVariables)) {
@@ -691,8 +692,16 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         if (routeMatchSelector == null) {
             return super.doesProduce(acceptableTypes);
         }
-        if (producesMediaTypesContainsAll || acceptableTypes == null || acceptableTypes.isEmpty()) {
+        if (acceptableTypes == null || acceptableTypes.isEmpty()) {
             return true;
+        }
+        boolean hasRejected = AcceptedMediaTypes.hasRejected(acceptableTypes);
+        if (producesMediaTypesContainsAll) {
+            // the selector negotiates the type: no default type is substituted for the wildcard
+            return !hasRejected || anyAcceptable(producesMediaTypes, acceptableTypes);
+        }
+        if (hasRejected) {
+            return anyAcceptable(producesMediaTypes, acceptableTypes);
         }
         for (MediaType acceptableType : acceptableTypes) {
             if (anyCompatible(producesMediaTypes, acceptableType)) {
@@ -711,7 +720,25 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         if (routeMatchSelector == null) {
             return super.doesProduce(acceptableType);
         }
+        if (acceptableType != null && AcceptedMediaTypes.isRejected(acceptableType)) {
+            return false;
+        }
         return producesMediaTypesContainsAll || acceptableType == null || anyCompatible(producesMediaTypes, acceptableType);
+    }
+
+    /**
+     * @param types         The types of a route
+     * @param acceptedTypes The accepted types, some of the quality {@code 0}
+     * @return Whether a type of the route, with its parameters, is acceptable, or a produced
+     * range covers a concrete acceptable accepted type
+     */
+    private static boolean anyAcceptable(List<MediaType> types, Collection<MediaType> acceptedTypes) {
+        for (MediaType type : types) {
+            if (AcceptedMediaTypes.intersects(type, acceptedTypes)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
