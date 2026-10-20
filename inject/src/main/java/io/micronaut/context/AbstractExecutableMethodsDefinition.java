@@ -486,7 +486,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private PropertySourcePropertyResolver properties;
 
         @Override
-        @SuppressWarnings({"unchecked", "NullAway"}) // V is nullable when the factory returns null
+        @SuppressWarnings({"unchecked", "NullAway", "java:S2637"}) // V is nullable when the factory returns null
         public <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
             AnnotationMetadata metadata = annotationMetadata;
             long revision = revision();

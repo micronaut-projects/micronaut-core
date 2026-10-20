@@ -39,7 +39,7 @@ record RetryPlan(@Nullable AnnotationValue<Retryable> retry,
                  @Nullable AnnotationValue<CircuitBreaker> circuitBreaker,
                  @Nullable RetryPolicy policy) {
 
-    private static final String NAME = "name";
+    private static final String MEMBER_NAME = "name";
     private static final String PREDICATE = "predicate";
 
     static RetryPlan of(ExecutableMethod<?, ?> method) {
@@ -47,7 +47,7 @@ record RetryPlan(@Nullable AnnotationValue<Retryable> retry,
         if (retry == null) {
             return new RetryPlan(null, "", false, null, null);
         }
-        String name = retry.stringValue(NAME).orElse("");
+        String name = retry.stringValue(MEMBER_NAME).orElse("");
         boolean isCircuitBreaker = method.hasStereotype(CircuitBreaker.class);
         AnnotationValue<CircuitBreaker> circuitBreaker = isCircuitBreaker ? method.getAnnotation(CircuitBreaker.class) : null;
         RetryPolicy policy = null;
