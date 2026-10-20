@@ -33,7 +33,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -557,7 +556,10 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         List<AnnotationValue<T>> list = new ArrayList<>();
         Set<AnnotationValue<T>> uniqueValues = null;
         for (AnnotationMetadata am : hierarchy) {
-            for (AnnotationValue<T> value : am.getAnnotationValuesByType(annotationType)) {
+            // An index loop: the layers' lists are random access, and their iterators were allocated on every call
+            List<AnnotationValue<T>> values = am.getAnnotationValuesByType(annotationType);
+            for (int i = 0, n = values.size(); i < n; i++) {
+                AnnotationValue<T> value = values.get(i);
                 if (list.isEmpty()) {
                     list.add(value);
                     continue;
@@ -588,7 +590,9 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         List<AnnotationValue<T>> list = new ArrayList<>();
         Set<AnnotationValue<T>> uniqueValues = null;
         for (AnnotationMetadata am : hierarchy) {
-            for (AnnotationValue<T> value : fn.apply(am, annotationType)) {
+            List<AnnotationValue<T>> values = fn.apply(am, annotationType);
+            for (int i = 0, n = values.size(); i < n; i++) {
+                AnnotationValue<T> value = values.get(i);
                 if (list.isEmpty()) {
                     list.add(value);
                     continue;
