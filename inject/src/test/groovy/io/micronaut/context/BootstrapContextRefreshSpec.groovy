@@ -9,6 +9,8 @@ import jakarta.annotation.PreDestroy
 import jakarta.inject.Singleton
 import spock.lang.Specification
 
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
 
 class BootstrapContextRefreshSpec extends Specification {
@@ -19,7 +21,7 @@ class BootstrapContextRefreshSpec extends Specification {
         CountingLocator.remoteValue = null
     }
 
-    void "a refresh closes the bootstrap context it replaces, and closing the context closes the last one"() {
+    void "a refresh reuses the bootstrap context, and closing the context closes it"() {
         given:
         ApplicationContext ctx = startContext()
 
@@ -30,10 +32,10 @@ class BootstrapContextRefreshSpec extends Specification {
         when:
         5.times { ctx.environment.refresh() }
 
-        then: "each refresh reads it with a new bootstrap context and closes the previous one"
-        CountingLocator.created() == 6
+        then: "each refresh reads it again with the same bootstrap context, whose beans are not destroyed"
+        CountingLocator.created() == 1
         CountingLocator.running() == 1
-        !CountingLocator.instances.last().destroyed
+        CountingLocator.instances[0].reads == 6
 
         when:
         ctx.close()
@@ -42,7 +44,55 @@ class BootstrapContextRefreshSpec extends Specification {
         CountingLocator.running() == 0
     }
 
-    void "a refresh that fails to read the bootstrap configuration closes the bootstrap context it created: #failureType.simpleName"() {
+    void "many refreshes leave one bootstrap context running"() {
+        given:
+        ApplicationContext ctx = startContext()
+
+        when:
+        200.times { ctx.environment.refresh() }
+
+        then: "5.0.0 to 5.2.15 left 201 bootstrap contexts running here"
+        CountingLocator.created() == 1
+        CountingLocator.running() == 1
+        CountingLocator.instances[0].reads == 201
+
+        when:
+        ctx.close()
+
+        then:
+        CountingLocator.running() == 0
+    }
+
+    void "a refresh reads the bootstrap configuration again with the bootstrap context it reuses"() {
+        given: "a bootstrap configuration file"
+        Path configDir = Files.createTempDirectory("bootstrap-context-refresh-")
+        Path bootstrapFile = configDir.resolve("bootstrap.yml")
+        bootstrapFile.toFile().text = "app.bootstrap-value: one"
+        ApplicationContext ctx = ApplicationContext.builder()
+                .properties(['spec.name': 'BootstrapContextRefreshSpec'])
+                .overrideConfigLocations("file:" + configDir)
+                .bootstrapEnvironment(true)
+                .start()
+
+        expect:
+        ctx.getProperty('app.bootstrap-value', String).get() == 'one'
+
+        when:
+        bootstrapFile.toFile().text = "app.bootstrap-value: two"
+        ctx.environment.refresh()
+
+        then:
+        ctx.getProperty('app.bootstrap-value', String).get() == 'two'
+        CountingLocator.created() == 1
+        CountingLocator.running() == 1
+
+        cleanup:
+        ctx.close()
+        Files.deleteIfExists(bootstrapFile)
+        Files.deleteIfExists(configDir)
+    }
+
+    void "a refresh that fails to read the bootstrap configuration keeps the bootstrap context: #failureType.simpleName"() {
         given:
         ApplicationContext ctx = startContext()
 
@@ -50,11 +100,10 @@ class BootstrapContextRefreshSpec extends Specification {
         CountingLocator.failure = failure
         ctx.environment.refresh()
 
-        then: "the bootstrap context of the start, whose property sources stay, is still running"
+        then: "the bootstrap context of the start is still running"
         thrown(failureType)
-        CountingLocator.created() == 2
-        !CountingLocator.instances[0].destroyed
-        CountingLocator.instances[1].destroyed
+        CountingLocator.created() == 1
+        CountingLocator.running() == 1
 
         when:
         ctx.close()
@@ -79,7 +128,7 @@ class BootstrapContextRefreshSpec extends Specification {
         expect:
         ctx.getProperty('app.remote', String).get() == 'one'
 
-        when: "the bootstrap configuration changes, and the refresh fails to read it"
+        when: "the distributed configuration changes, and the refresh fails to read it"
         CountingLocator.remoteValue = 'two'
         CountingLocator.failure = failure
         ctx.environment.refresh()
@@ -92,7 +141,7 @@ class BootstrapContextRefreshSpec extends Specification {
         CountingLocator.failure = null
         ctx.environment.refresh()
 
-        then: "it reads the bootstrap configuration again, with one bootstrap context running"
+        then: "it reads the distributed configuration again, with one bootstrap context running"
         ctx.getProperty('app.remote', String).get() == 'two'
         CountingLocator.running() == 1
 
@@ -103,6 +152,27 @@ class BootstrapContextRefreshSpec extends Specification {
         failure                                    | failureType
         new IllegalStateException("cannot be read") | IllegalStateException
         new IOException("cannot be read")           | IOException
+    }
+
+    void "a start after a stop reads the bootstrap configuration with a new bootstrap context"() {
+        given:
+        ApplicationContext ctx = startContext()
+
+        when:
+        ctx.stop()
+
+        then:
+        CountingLocator.running() == 0
+
+        when:
+        ctx.start()
+
+        then:
+        CountingLocator.created() == 2
+        CountingLocator.running() == 1
+
+        cleanup:
+        ctx.close()
     }
 
     void "a refresh keeps the order of the builder properties"() {
@@ -148,6 +218,7 @@ class BootstrapContextRefreshSpec extends Specification {
         static volatile String remoteValue
 
         volatile boolean destroyed
+        volatile int reads
 
         CountingLocator() {
             instances.add(this)
@@ -168,6 +239,7 @@ class BootstrapContextRefreshSpec extends Specification {
 
         @Override
         Iterable<PropertySource> findPropertySources(Environment environment) {
+            reads++
             if (failure != null) {
                 throw failure
             }
