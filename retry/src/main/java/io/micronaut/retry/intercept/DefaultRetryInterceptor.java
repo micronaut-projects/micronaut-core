@@ -242,13 +242,13 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                     RetryEventEmitter retryEventEmitter = (state, exception) -> publishRetryEvent(context, state, exception);
                     Publisher<Object> publisher;
                     if (windowedCircuit == null) {
-                        publisher = retryRunner.executePublisher(supplier, retryState, context.toString(), retryEventEmitter);
+                        publisher = retryRunner.executePublisher(supplier, retryState, context, retryEventEmitter);
                     } else {
                         CircuitBreakerRetry circuit = windowedCircuit;
                         publisher = Flux.defer(() -> {
                             MutableRetryState invocation = circuit.newInvocation();
                             invocation.open();
-                            return retryRunner.executePublisher(supplier, invocation, context.toString(), retryEventEmitter);
+                            return retryRunner.executePublisher(supplier, invocation, context, retryEventEmitter);
                         });
                     }
                     return interceptedMethod.handleResult(publisher);
@@ -258,7 +258,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                         retryRunner.executeCompletionStage(
                             () -> interceptedMethod.interceptResultAsCompletionStage(this),
                             retryState,
-                            context.toString(),
+                            context,
                             (state, exception) -> publishRetryEvent(context, state, exception)
                         )
                     );
@@ -267,7 +267,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                     return retryRunner.executeSync(
                         () -> (Object) interceptedMethod.interceptResult(this),
                         retryState,
-                        context.toString(),
+                        context,
                         (state, exception) -> publishRetryEvent(context, state, exception)
                     );
                 }
