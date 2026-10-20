@@ -18,6 +18,7 @@ package io.micronaut.aop.cached;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.client.annotation.Client;
 
 /**
@@ -36,4 +37,7 @@ public interface BenchClient {
     @Get("/versioned")
     @Version("2")
     String versioned();
+
+    @Get("/search")
+    String search(@QueryValue String q, @QueryValue int page, @QueryValue int size, @Header("X-Token") String token);
 }

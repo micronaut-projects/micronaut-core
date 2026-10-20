@@ -86,4 +86,9 @@ public class IntroducedCallBenchmark {
     public String clientCallVersioned() {
         return client.versioned();
     }
+
+    @Benchmark
+    public String clientCallWithArguments() {
+        return client.search("micronaut", 2, 20, "t");
+    }
 }
