@@ -32,8 +32,9 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.util.HttpDateHeader;
+import io.micronaut.web.router.builder.ValueMatcher;
+import io.micronaut.web.router.direct.DirectExchange;
 import io.micronaut.web.router.direct.DirectMatch;
-import io.micronaut.web.router.direct.DirectRequest;
 import io.micronaut.web.router.direct.DirectRouteLookup;
 import io.micronaut.web.router.direct.InvalidDirectRequestException;
 import io.micronaut.web.router.uri.UriUtil;
@@ -42,6 +43,7 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -64,8 +66,10 @@ import java.net.SocketAddress;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -201,6 +205,9 @@ final class NettyDirectRoutes {
                 // started, on its executor if it has one
                 case DirectMatch.Async async -> pending = async.respondAsync(RESPONSES);
                 case DirectMatch.Sync sync -> direct = sync.respond(RESPONSES);
+                case DirectMatch.Handler handler -> {
+                    return answerHandled(handler, directRequest, request, body, outboundAccess);
+                }
             }
         } catch (Throwable e) {
             // an Error too: the request is answered
@@ -221,7 +228,7 @@ final class NettyDirectRoutes {
         body.close();
         if (direct instanceof PreparedDirectResponse prepared) {
             // the value of the route, validated and buffered once
-            write(request, prepared.head(), prepared.content(), outboundAccess);
+            write(request, prepared.head(), prepared.content(), outboundAccess, true);
             return true;
         }
         ByteBuf content;
@@ -241,7 +248,47 @@ final class NettyDirectRoutes {
             writeServerError(outboundAccess);
             return true;
         }
-        write(request, head, content, outboundAccess);
+        write(request, head, content, outboundAccess, true);
+        return true;
+    }
+
+    /**
+     * Answer a request a route that answers by commands matched: its handler checks the request
+     * and writes the response on the exchange, which is the request the lookup read.
+     *
+     * @return Whether the route answered the request
+     */
+    private boolean answerHandled(DirectMatch.Handler handler,
+                                  NettyDirectRequest exchange,
+                                  HttpRequest request,
+                                  CloseableByteBody body,
+                                  OutboundAccess outboundAccess) {
+        boolean answered;
+        try {
+            answered = handler.handle(exchange);
+        } catch (Throwable e) {
+            // whatever it wrote: an Error too
+            LOG.error("The direct route of {} {} failed: {}", request.method(), request.uri(), e.getMessage(), e);
+            body.close();
+            writeServerError(outboundAccess);
+            return true;
+        }
+        if (!answered) {
+            // declined: the body is untouched
+            return false;
+        }
+        body.close();
+        HttpResponse head;
+        ByteBuf content;
+        try {
+            head = exchange.head();
+            content = exchange.content();
+        } catch (Throwable e) {
+            LOG.error("The direct route of {} {} failed to write its response: {}", request.method(), request.uri(), e.getMessage(), e);
+            writeServerError(outboundAccess);
+            return true;
+        }
+        write(request, head, content, outboundAccess, false);
         return true;
     }
 
@@ -329,7 +376,7 @@ final class NettyDirectRoutes {
             }
             writeServerError(outboundAccess);
         } else if (prepared != null) {
-            write(request, prepared.head(), prepared.content(), outboundAccess);
+            write(request, prepared.head(), prepared.content(), outboundAccess, true);
         } else {
             writeServerError(outboundAccess);
         }
@@ -372,13 +419,16 @@ final class NettyDirectRoutes {
 
     /**
      * Write a response, on the event loop.
+     *
+     * @param date Whether the server adds the {@code Date} header: not to the response of a
+     *             handler, which writes it itself
      */
-    private void write(HttpRequest request, HttpResponse head, ByteBuf content, OutboundAccess outboundAccess) {
+    private void write(HttpRequest request, HttpResponse head, ByteBuf content, OutboundAccess outboundAccess, boolean date) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Direct response {} - {} {}", head.status().code(), request.method(), request.uri());
         }
         HttpHeaders headers = head.headers();
-        addConfiguredHeaders(headers);
+        addConfiguredHeaders(headers, date);
         // the framing of the body: the Content-Length of the body is set by the outbound handler
         headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
         boolean headRequest = HttpMethod.HEAD.equals(request.method());
@@ -406,7 +456,7 @@ final class NettyDirectRoutes {
 
     private void writeServerError(OutboundAccess outboundAccess) {
         DefaultHttpResponse error = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
-        addConfiguredHeaders(error.headers());
+        addConfiguredHeaders(error.headers(), true);
         error.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
         outboundAccess.write(error, NettyByteBodyFactory.empty());
     }
@@ -415,9 +465,11 @@ final class NettyDirectRoutes {
      * Add the headers the server is configured to add to every response, like the ordinary
      * responses get them: the {@code Date} header, formatted at most once per second, and the
      * {@code Server} header, unless the route set them.
+     *
+     * @param date Whether to add the {@code Date} header
      */
-    private void addConfiguredHeaders(HttpHeaders headers) {
-        if (dateHeader && !headers.contains(HttpHeaderNames.DATE)) {
+    private void addConfiguredHeaders(HttpHeaders headers, boolean date) {
+        if (date && dateHeader && !headers.contains(HttpHeaderNames.DATE)) {
             headers.set(HttpHeaderNames.DATE, date());
         }
         CharSequence server = serverHeader;
@@ -587,12 +639,19 @@ final class NettyDirectRoutes {
      * content type of the request, or the default charset of the server, and the limits of the
      * server.
      */
-    private static final class NettyDirectRequest implements DirectRequest {
+    private static final class NettyDirectRequest implements DirectExchange {
         private final ChannelHandlerContext ctx;
         private final HttpRequest request;
         private final NettyHttpServerConfiguration configuration;
         private @Nullable String target;
         private @Nullable Map<String, List<String>> query;
+        /**
+         * The response a handler writes on the exchange: its status, its headers, created on
+         * the first one, and its body, a {@code byte[]} or a text encoded when it is written.
+         */
+        private int status = 200;
+        private @Nullable HttpHeaders responseHeaders;
+        private @Nullable Object responseBody;
 
         NettyDirectRequest(ChannelHandlerContext ctx, HttpRequest request, NettyHttpServerConfiguration configuration) {
             this.ctx = ctx;
@@ -651,6 +710,79 @@ final class NettyDirectRoutes {
         @Override
         public List<String> headers(String name) {
             return request.headers().getAll(name);
+        }
+
+        @Override
+        public @Nullable String header(String name) {
+            // no list
+            return request.headers().get(name);
+        }
+
+        @Override
+        public boolean checkHeader(CharSequence name, ValueMatcher matcher) {
+            Iterator<? extends CharSequence> values = request.headers().valueCharSequenceIterator(name);
+            if (!values.hasNext()) {
+                // e.g. a negated matcher accepts an absent header
+                return matcher.matches(null);
+            }
+            while (values.hasNext()) {
+                if (matcher.matches(values.next())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public DirectExchange writeStatus(int status) {
+            this.status = status;
+            return this;
+        }
+
+        @Override
+        public DirectExchange writeHeader(CharSequence name, CharSequence value) {
+            HttpHeaders headers = responseHeaders;
+            if (headers == null) {
+                headers = new DefaultHttpHeaders();
+                responseHeaders = headers;
+            }
+            headers.add(name, value);
+            return this;
+        }
+
+        @Override
+        public DirectExchange writeBody(byte[] body) {
+            responseBody = Objects.requireNonNull(body, "body");
+            return this;
+        }
+
+        @Override
+        public DirectExchange writeBody(CharSequence body) {
+            responseBody = Objects.requireNonNull(body, "body");
+            return this;
+        }
+
+        /**
+         * @return The head of the response the handler wrote
+         */
+        HttpResponse head() {
+            HttpHeaders headers = responseHeaders;
+            return new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(status),
+                headers == null ? new DefaultHttpHeaders() : headers);
+        }
+
+        /**
+         * @return The body of the response the handler wrote: an array wrapped, a text encoded
+         */
+        ByteBuf content() {
+            Object body = responseBody;
+            if (body == null) {
+                return Unpooled.EMPTY_BUFFER;
+            }
+            if (body instanceof byte[] bytes) {
+                return Unpooled.wrappedBuffer(bytes);
+            }
+            return ByteBufUtil.writeUtf8(ctx.alloc(), (CharSequence) body);
         }
 
         @Override

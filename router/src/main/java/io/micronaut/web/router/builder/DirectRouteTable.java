@@ -81,6 +81,10 @@ final class DirectRouteTable implements DirectRouteLookup {
     private static final Logger LOG = LoggerFactory.getLogger(DirectRouteTable.class);
     private static final Route[] NONE = new Route[0];
     /**
+     * The path variables of a route without any.
+     */
+    private static final PathVariables NO_VARIABLES = new DefaultPathVariables(Map.of(), ConversionService.SHARED);
+    /**
      * The match of a request that routes match equally well: answered with {@code 400}, like the
      * router does.
      */
@@ -353,6 +357,11 @@ final class DirectRouteTable implements DirectRouteLookup {
          */
         final DirectMatch.@Nullable Sync constant;
         /**
+         * The match of a route that answers by commands and has no path variables, allocated
+         * once, or {@code null}.
+         */
+        final DirectMatch.@Nullable Handler handlerMatch;
+        /**
          * Releases a response completed after the response of the route was cancelled.
          */
         final Consumer<HttpResponse<?>> discard;
@@ -377,6 +386,8 @@ final class DirectRouteTable implements DirectRouteLookup {
             this.async = declaration.isAsync();
             // a value is never on an executor, see DefaultDirectRouteSpec#respond(HttpResponse)
             this.constant = declaration.constant;
+            DirectHandler handler = declaration.handler;
+            this.handlerMatch = handler == null || variableCount > 0 ? null : exchange -> handler.handle(exchange, NO_VARIABLES);
             this.discard = discard;
             this.implicitHead = false;
         }
@@ -394,6 +405,7 @@ final class DirectRouteTable implements DirectRouteLookup {
             this.executor = get.executor;
             this.async = get.async;
             this.constant = get.constant;
+            this.handlerMatch = get.handlerMatch;
             this.discard = get.discard;
             this.implicitHead = true;
         }
@@ -451,6 +463,15 @@ final class DirectRouteTable implements DirectRouteLookup {
             DirectMatch.Sync value = constant;
             if (value != null) {
                 return value;
+            }
+            DirectHandler handler = declaration.handler;
+            if (handler != null) {
+                DirectMatch.Handler once = handlerMatch;
+                if (once != null) {
+                    return once;
+                }
+                PathVariables pathVariables = variables != null ? variables : new DefaultPathVariables(match.getVariableValues(), conversionService);
+                return (DirectMatch.Handler) exchange -> handler.handle(exchange, pathVariables);
             }
             return async
                 ? new AsyncMatch(this, request, match, variables, conversionService)

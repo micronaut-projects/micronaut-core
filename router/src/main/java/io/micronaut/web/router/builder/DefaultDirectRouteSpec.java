@@ -120,19 +120,32 @@ final class DefaultDirectRouteSpec implements DirectRouteSpec {
                 + "which is copied on the thread that received the request: remove executeOn(\"" + executorName + "\"), "
                 + "or compose the response on the executor with respond(Function)");
         }
-        end(builder.constant(checked), null, null);
+        end(builder.constant(checked), null, null, null);
     }
 
     @Override
     public void respond(Function<? super DirectContext, ? extends @Nullable HttpResponse<?>> response) {
         Function<? super DirectContext, ? extends @Nullable HttpResponse<?>> checked = terminal(response);
-        end(null, checked::apply, null);
+        end(null, checked::apply, null, null);
     }
 
     @Override
     public void respondAsync(Function<? super DirectContext, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> response) {
         Function<? super DirectContext, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> checked = terminal(response);
-        end(null, null, checked::apply);
+        end(null, null, checked::apply, null);
+    }
+
+    @Override
+    public void handle(DirectHandler handler) {
+        DirectHandler checked = terminal(handler);
+        if (executorName != null) {
+            ended = true;
+            builder.dropPending(this);
+            throw new IllegalStateException("The direct route " + description + " answers by commands on the exchange of the request, "
+                + "on the thread that received it: remove executeOn(\"" + executorName + "\"), "
+                + "or compose the response on the executor with respond(Function)");
+        }
+        end(null, null, null, checked);
     }
 
     /**
@@ -151,11 +164,13 @@ final class DefaultDirectRouteSpec implements DirectRouteSpec {
 
     private void end(DirectMatch.@Nullable Sync constant,
                      @Nullable Function<DirectContext, ? extends @Nullable HttpResponse<?>> response,
-                     @Nullable Function<DirectContext, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> asyncResponse) {
+                     @Nullable Function<DirectContext, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> asyncResponse,
+                     @Nullable DirectHandler handler) {
         ended = true;
         List<DirectRouteDeclaration> routes = new ArrayList<>(methods.size());
         for (HttpMethod method : methods) {
             DirectRouteDeclaration route = new DirectRouteDeclaration(method.name(), uriTemplate, constant, response, asyncResponse);
+            route.handler = handler;
             route.conditions.addAll(conditions);
             route.constraints.addAll(constraints);
             route.order = order;
@@ -169,7 +184,7 @@ final class DefaultDirectRouteSpec implements DirectRouteSpec {
     private void checkPending() {
         if (ended) {
             throw new IllegalStateException("The direct route " + description
-                + " was already ended: give its settings before its one terminal, respond or respondAsync");
+                + " was already ended: give its settings before its one terminal, respond, respondAsync or handle");
         }
     }
 

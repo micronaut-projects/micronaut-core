@@ -62,7 +62,7 @@ public class DirectRouteBenchmark {
 
     @State(Scope.Thread)
     public static class Holder {
-        @Param({"RAW_NETTY", "DIRECT_CONSTANT", "DIRECT_CONDITIONAL", "DIRECT_FUNCTION", "DIRECT_FUNCTION_TEXT", "DIRECT_JSON", "ORDINARY"})
+        @Param({"RAW_NETTY", "DIRECT_CONSTANT", "DIRECT_CONDITIONAL", "DIRECT_HANDLER", "DIRECT_HANDLER_CONDITIONAL", "DIRECT_HANDLER_TEXT", "DIRECT_FUNCTION", "DIRECT_FUNCTION_TEXT", "DIRECT_JSON", "ORDINARY"})
         Variant variant = Variant.DIRECT_FUNCTION;
 
         AutoCloseable ctx;
@@ -120,6 +120,9 @@ public class DirectRouteBenchmark {
         RAW_NETTY("/plaintext"),
         DIRECT_CONSTANT("/constant"),
         DIRECT_CONDITIONAL("/conditional"),
+        DIRECT_HANDLER("/handler"),
+        DIRECT_HANDLER_CONDITIONAL("/handler-conditional"),
+        DIRECT_HANDLER_TEXT("/handler-text"),
         DIRECT_FUNCTION("/plaintext"),
         DIRECT_FUNCTION_TEXT("/text"),
         DIRECT_JSON("/json"),
@@ -157,6 +160,9 @@ public class DirectRouteBenchmark {
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Routes implements HttpRoutes, HttpDirectRoutes {
+        private static final AsciiString VERSION = AsciiString.cached("\"v1\"");
+        private static final ValueMatcher CURRENT = ValueMatcher.entityTag("\"v1\"");
+
         @Override
         public void routes(DirectRouteBuilder builder) {
             builder.GET("/constant").respond(HttpResponse.ok(HELLO).contentType(MediaType.TEXT_PLAIN_TYPE));
@@ -166,6 +172,14 @@ public class DirectRouteBenchmark {
                 .order(-1)
                 .respond(HttpResponse.notModified().header(HttpHeaders.ETAG, "\"v1\""));
             builder.GET("/conditional", HttpResponse.ok(HELLO).contentType(MediaType.TEXT_PLAIN_TYPE).header(HttpHeaders.ETAG, "\"v1\""));
+            // commands on the exchange: no request, no response object
+            builder.GET("/handler").handle((exchange, variables) ->
+                exchange.writeHeader(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.TEXT_PLAIN).writeBody(HELLO).end());
+            builder.GET("/handler-conditional").handle((exchange, variables) -> exchange.checkHeader(HttpHeaderNames.IF_NONE_MATCH, CURRENT)
+                ? exchange.writeStatus(304).writeHeader(HttpHeaderNames.ETAG, VERSION).end()
+                : exchange.writeHeader(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.TEXT_PLAIN).writeHeader(HttpHeaderNames.ETAG, VERSION).writeBody(HELLO).end());
+            builder.GET("/handler-text").handle((exchange, variables) ->
+                exchange.writeHeader(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.TEXT_PLAIN).writeBody("Hello, World!").end());
             builder.GET("/plaintext").respond(direct -> HttpResponse.ok(HELLO).contentType(MediaType.TEXT_PLAIN_TYPE));
             builder.GET("/text").respond(direct -> HttpResponse.ok("Hello, World!").contentType(MediaType.TEXT_PLAIN_TYPE));
             builder.GET("/json").respond(direct -> HttpResponse.ok(new Message("Hello, World!")));

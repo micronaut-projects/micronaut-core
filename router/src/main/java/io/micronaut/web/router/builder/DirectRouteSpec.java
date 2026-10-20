@@ -130,4 +130,15 @@ public sealed interface DirectRouteSpec extends MatchSpec<DirectRouteSpec>, Exec
      * @throws IllegalStateException if the route was already ended
      */
     void respondAsync(Function<? super DirectContext, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> response);
+
+    /**
+     * End the route with a handler that answers each request by commands on its exchange: it
+     * checks the request, e.g. a header, and writes the status, the headers and the body of the
+     * response, without a request or a response object. The handler runs on the thread that
+     * received the request; a route with a handler does not run on an executor.
+     *
+     * @param handler Answers a request, or declines it with {@code false}
+     * @throws IllegalStateException if the route was already ended, or runs on an executor
+     */
+    void handle(DirectHandler handler);
 }
