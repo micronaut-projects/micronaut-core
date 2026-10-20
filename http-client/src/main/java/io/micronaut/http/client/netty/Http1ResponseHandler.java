@@ -737,8 +737,10 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         /**
          * Called when the body passed to {@link #complete(HttpResponse, CloseableByteBody)}
-         * fails before its last piece, e.g. the connection closed or the read timed out. The
-         * failure is then passed to the body, and {@link #finish} is called.
+         * fails before its last piece, e.g. the connection closed, the read timed out or the
+         * content could not be decoded. The failure is then passed to the body, and
+         * {@link #finish} is called. The rest of the body is not read, so the connection must not
+         * be returned to the connection pool.
          *
          * @param ctx   The handler context
          * @param cause The failure

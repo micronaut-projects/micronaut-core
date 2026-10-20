@@ -615,6 +615,9 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
 
     @Override
     public void bodyFailed(ChannelHandlerContext ctx, Throwable cause) {
+        // the rest of the body was not read, or can no longer be read, e.g. after an invalid chunk
+        // or content that cannot be decompressed: the connection cannot be reused
+        poolHandle.taint();
         // the body fails for its consumer, which maps and decorates the cause
         reportOnce(NettyHttpClient.failureOutcome(cause));
     }

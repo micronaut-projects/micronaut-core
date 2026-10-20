@@ -238,6 +238,30 @@ class ClientExchangeLifecycleTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+        // not a chunk size
+        "Transfer-Encoding: chunked\r\n\r\n5\r\nhello\r\nZZ\r\n",
+        // a gzip header, then a deflate block of the reserved type 3
+        "Content-Encoding: gzip\r\nTransfer-Encoding: chunked\r\n\r\nb\r\n\u001f\u008b\b\0\0\0\0\0\0\u0003\u00ff\r\n"
+    })
+    void aBodyThatCannotBeDecodedClosesTheConnection(String response) throws Exception {
+        try (Upstream upstream = new Upstream();
+             Client client = new Client(upstream, Map.of())) {
+            CompletableFuture<HttpResponse<?>> pending = Mono.<HttpResponse<?>>from(client.client.exchange(HttpRequest.GET("/broken"), String.class)).toFuture();
+            Connection connection = upstream.connection(0);
+            connection.awaitReceived("\r\n\r\n");
+            connection.write("HTTP/1.1 200 OK\r\n" + response);
+            Assertions.assertThrows(ExecutionException.class, () -> pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            Assertions.assertTrue(connection.awaitClosed(), "The client kept the connection of the broken response open");
+
+            CompletableFuture<HttpResponse<?>> next = client.raw(HttpRequest.GET("/next"), null);
+            upstream.connection(1).awaitReceived("\r\n\r\n");
+            upstream.connection(1).write(OK);
+            assertResponse(next, 200, "ok");
+        }
+    }
+
     @Test
     void aReadTimeoutIsReportedAsTimeout() throws Exception {
         try (Upstream upstream = new Upstream();
