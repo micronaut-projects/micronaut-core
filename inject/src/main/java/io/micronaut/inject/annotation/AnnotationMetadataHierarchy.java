@@ -277,14 +277,10 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public <T extends Annotation> @Nullable AnnotationValue<T> getAnnotation(String annotation) {
-        // A layer that is default metadata checks whether the annotation is repeatable on every miss: check once
-        boolean repeatable = isRepeatableInAnyLayer(annotation);
+        // Each layer checks the repeatable registry only when it misses, so checking it up front costs more than it saves
         AnnotationValue<T> existing = null;
         for (AnnotationMetadata annotationMetadata : hierarchy) {
-            AnnotationValue<T> value = !repeatable && annotationMetadata instanceof DefaultAnnotationMetadata defaultAnnotationMetadata
-                ? defaultAnnotationMetadata.getNonRepeatableAnnotation(annotation)
-                : annotationMetadata.getAnnotation(annotation);
-            existing = mergeValue(annotation, existing, value);
+            existing = mergeValue(annotation, existing, annotationMetadata.getAnnotation(annotation));
         }
         return existing;
     }
@@ -1117,23 +1113,6 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      * @param annotation      The annotation name
      * @return Whether a layer considers the annotation repeatable
      */
-    private boolean isRepeatableInAnyLayer(String annotation) {
-        boolean registryChecked = false;
-        for (AnnotationMetadata metadata : hierarchy) {
-            if (metadata.getClass() == DefaultAnnotationMetadata.class) {
-                if (!registryChecked) {
-                    if (AnnotationMetadataSupport.getRepeatableAnnotation(annotation) != null) {
-                        return true;
-                    }
-                    registryChecked = true;
-                }
-            } else if (metadata.isRepeatableAnnotation(annotation)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /**
      * {@link #findRepeatableAnnotation(Class)} without an {@link java.util.Optional} per layer, asking the shared
      * registry once for all the layers that are exactly {@link DefaultAnnotationMetadata}.
