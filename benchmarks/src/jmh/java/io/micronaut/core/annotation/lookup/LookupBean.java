@@ -17,6 +17,7 @@ package io.micronaut.core.annotation.lookup;
 
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.version.annotation.Version;
+import io.micronaut.http.annotation.QueryValue;
 import jakarta.inject.Singleton;
 
 @Singleton
@@ -26,5 +27,9 @@ public class LookupBean {
     @Executable
     @Version("2")
     public void versioned() {
+    }
+
+    @Executable
+    public void query(@QueryValue String q) {
     }
 }

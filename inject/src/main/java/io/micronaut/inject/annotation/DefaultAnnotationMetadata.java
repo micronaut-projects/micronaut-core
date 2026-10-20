@@ -84,7 +84,16 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Nullable
     Map<String, List<String>> annotationsByStereotype;
 
-    private final Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
+    /**
+     * The shared cache of the metadata that has not cached values by type yet: never written to, and of the same type
+     * as the caches so that reading them stays monomorphic.
+     */
+    private static final ConcurrentHashMap<String, List> NO_CACHED_VALUES = new ConcurrentHashMap<>(1);
+
+    // Created on the first cached lookup: most metadata never resolves values by type. The field is only replaced
+    // by a new ConcurrentHashMap, volatile publishes it
+    @SuppressWarnings("java:S3077")
+    private volatile ConcurrentHashMap<String, List> annotationValuesByType = NO_CACHED_VALUES;
 
     private final boolean hasPropertyExpressions;
     private final boolean hasEvaluatedExpressions;
@@ -1006,7 +1015,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             if (results == null) {
                 results = List.of();
             }
-            annotationValuesByType.put(annotationTypeName, results);
+            ConcurrentHashMap<String, List> cache = annotationValuesByType;
+            if (cache == NO_CACHED_VALUES) {
+                // A concurrent first lookup can replace the map and drop this entry, which is then resolved again
+                cache = new ConcurrentHashMap<>(2);
+                annotationValuesByType = cache;
+            }
+            cache.put(annotationTypeName, results);
         }
         return results;
     }
@@ -1307,24 +1322,42 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("Duplicates")
     @Override
     public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
+        return Optional.ofNullable(getAnnotation(annotation));
+    }
+
+    @SuppressWarnings("Duplicates")
+    @Override
+    public <T extends Annotation> @Nullable AnnotationValue<T> getAnnotation(String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         if (allAnnotations == null || StringUtils.isEmpty(annotation)) {
-            return Optional.empty();
+            return null;
         }
         Map<CharSequence, Object> values = allAnnotations.get(annotation);
         if (values != null) {
-            return Optional.of(newAnnotationValue(annotation, values));
+            return newAnnotationValue(annotation, values);
         }
         if (allStereotypes != null) {
             values = allStereotypes.get(annotation);
             if (values != null) {
-                return Optional.of(newAnnotationValue(annotation, values));
+                return newAnnotationValue(annotation, values);
             }
         }
         if (findRepeatableAnnotationContainerInternal(annotation) == null) {
-            return Optional.empty();
+            return null;
         }
-        return firstRepeatedValue(getAnnotationValuesByName(annotation));
+        List<AnnotationValue<T>> repeated = getAnnotationValuesByName(annotation);
+        return repeated.isEmpty() ? null : repeated.get(0);
+    }
+
+    @Override
+    public <T extends Annotation> @Nullable AnnotationValue<T> getAnnotation(Class<T> annotationClass) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        // As findAnnotation(Class), without creating an Optional to unwrap
+        if (isRepeatableAnnotation(annotationClass)) {
+            List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
+            return values.isEmpty() ? null : values.get(0);
+        }
+        return getAnnotation(annotationClass.getName());
     }
 
     @SuppressWarnings("Duplicates")
