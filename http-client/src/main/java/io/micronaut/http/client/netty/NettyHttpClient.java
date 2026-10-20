@@ -1703,6 +1703,10 @@ final class NettyHttpClient implements
             headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
             if (length.getAsLong() != 0 || permitsRequestBody(nettyRequest.method())) {
                 headers.set(HttpHeaderNames.CONTENT_LENGTH, length.getAsLong());
+            } else {
+                // no body is sent, so a length among the request headers is stale, e.g. that of
+                // a relayed body that is not sent again after a redirect
+                headers.remove(HttpHeaderNames.CONTENT_LENGTH);
             }
         } else {
             headers.remove(HttpHeaderNames.CONTENT_LENGTH);
