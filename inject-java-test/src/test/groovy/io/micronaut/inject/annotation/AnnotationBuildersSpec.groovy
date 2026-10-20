@@ -429,6 +429,35 @@ class Holder {
         e.message.contains("The annotation [visitortest.Exposed] cannot have a builder: the type visitortest.Level is not public")
     }
 
+    def "two annotations whose names flatten to the same builder name cannot have builders next to the same owner"() {
+        when:
+        buildClassLoader("collision.Holder", '''
+package collision;
+
+import io.micronaut.core.annotation.RegisterAnnotations;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@RegisterAnnotations({Holder.A_B.class, Holder.A.B.class})
+public class Holder {
+
+    @Retention(RetentionPolicy.RUNTIME)
+    public @interface A_B {
+    }
+
+    public static class A {
+        @Retention(RetentionPolicy.RUNTIME)
+        public @interface B {
+        }
+    }
+}
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("The annotation [collision.Holder\$A\$B] cannot have a builder next to collision.Holder: its name flattens to the same builder name as the annotation [collision.Holder\$A_B], which has one there")
+    }
+
     def "a registration needs an originating element"() {
         when:
         buildClassLoader("noorigin.Holder", '''

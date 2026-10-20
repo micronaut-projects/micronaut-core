@@ -29,7 +29,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -44,7 +44,8 @@ import java.util.WeakHashMap;
  * written once per owner and annotation type in the compilation, however many times it is registered. The builder
  * of an annotation type needs the builders of the annotation types of its members, which are registered with it,
  * for the same owner. The builders are written when they are registered, so that no element of the compiler is
- * kept after its round; only the names of the written builders are kept.</p>
+ * kept after its round; only the names of the written builders, and of the annotation types they were written for,
+ * are kept.</p>
  *
  * <p>A compilation is identified by an object of the compiler that every visitor context of the compilation
  * shares, such as the element utilities of javac or the compilation unit of Groovy, so that the processors of a
@@ -61,9 +62,9 @@ public final class AnnotationBuilderRegistrations {
     private static final Set<String> ALREADY_WRITTEN = Set.of("javax.annotation.processing.FilerException", "kotlin.io.FileAlreadyExistsException");
 
     /**
-     * The names of the written builders.
+     * The names of the annotation types by the names of their written builders.
      */
-    private final Set<String> builders = new HashSet<>();
+    private final Map<String, String> builders = new HashMap<>();
 
     private AnnotationBuilderRegistrations() {
     }
@@ -149,7 +150,15 @@ public final class AnnotationBuilderRegistrations {
     private void write(String holderName, ClassElement annotationType, VisitorContext context, Element... originatingElements) {
         String annotationName = annotationType.getName();
         String builderName = holderName + "$" + AnnotationBuilderRegistry.mangle(annotationName) + AnnotationBuilderRegistry.BUILDER_SUFFIX;
-        if (!builders.add(builderName)) {
+        String written = builders.putIfAbsent(builderName, annotationName);
+        if (written != null) {
+            if (!written.equals(annotationName)) {
+                // the name of an annotation type is flattened in the name of its builder: Holder$A_B and Holder$A$B
+                // both become Holder_A_B, so the builders of both would be the same class
+                throw new ProcessingException(originatingElements[0], "The annotation [" + annotationName
+                    + "] cannot have a builder next to " + holderName + ": its name flattens to the same builder name as the annotation ["
+                    + written + "], which has one there. Register one of them from another type or package.");
+            }
             return;
         }
         try {
