@@ -106,10 +106,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
     private static final String DECOMPRESSOR_HANDLER = "decompressor";
     /**
-     * How long the rest of a request body is read after a response that closes the connection,
-     * see {@link #closeAfterResponse()}.
+     * How long the connection waits for more of the rest of a request body after a response
+     * that closes the connection, see {@link #closeAfterResponse()}. Each read restarts the
+     * wait, so a client that is still sending the body is not reset.
      */
-    private static final long LINGER_MILLIS = 5_000;
+    private static final long LINGER_IDLE_MILLIS = 5_000;
+    /**
+     * How long the rest of a request body is read at most after a response that closes the
+     * connection, see {@link #closeAfterResponse()}.
+     */
+    private static final long LINGER_MAX_MILLIS = 30_000;
     /**
      * How much of the rest of a request body is read after a response that closes the
      * connection, see {@link #closeAfterResponse()}.
@@ -1080,7 +1086,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * been received in full, closing the socket with unread bytes makes the transport reset the
      * connection, and the client may see the reset instead of the response. In that case only
      * the output is shut down, and the rest of the body is read and dropped before the
-     * connection is closed, within {@link #LINGER_MILLIS} and {@link #LINGER_MAX_BYTES}.
+     * connection is closed, within {@link #LINGER_IDLE_MILLIS} of the last read,
+     * {@link #LINGER_MAX_MILLIS} and {@link #LINGER_MAX_BYTES}.
      */
     private void closeAfterResponse() {
         ChannelHandlerContext context = requiredCtx();
@@ -1091,11 +1098,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
         // fail or release what the reader of the body did not take
         inboundHandler.discard();
-        inboundHandler = new LingeringInboundHandler();
-        ScheduledFuture<?> timeout = context.executor().schedule(() -> {
-            context.close();
-        }, LINGER_MILLIS, TimeUnit.MILLISECONDS);
-        channel.closeFuture().addListener(f -> timeout.cancel(false));
+        LingeringInboundHandler lingering = new LingeringInboundHandler(context);
+        inboundHandler = lingering;
+        lingering.scheduleTimeout(LINGER_IDLE_MILLIS);
+        channel.closeFuture().addListener(f -> lingering.cancelTimeout());
         SslHandler ssl = context.pipeline().get(SslHandler.class);
         if (ssl == null) {
             channel.shutdownOutput();
@@ -1110,10 +1116,44 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * connection, and closes the connection when the body ended.
      */
     private final class LingeringInboundHandler extends InboundHandler {
+        private final ChannelHandlerContext context;
+        private final long start = System.nanoTime();
+        private long lastRead = start;
         private long dropped;
+        private @Nullable ScheduledFuture<?> timeout;
+        private boolean closed;
+
+        LingeringInboundHandler(ChannelHandlerContext context) {
+            this.context = context;
+        }
+
+        void scheduleTimeout(long delayMillis) {
+            if (!closed) {
+                timeout = context.executor().schedule(this::checkTimeout, delayMillis, TimeUnit.MILLISECONDS);
+            }
+        }
+
+        void cancelTimeout() {
+            closed = true;
+            if (timeout != null) {
+                timeout.cancel(false);
+            }
+        }
+
+        private void checkTimeout() {
+            long now = System.nanoTime();
+            long idleLeft = LINGER_IDLE_MILLIS - TimeUnit.NANOSECONDS.toMillis(now - lastRead);
+            long totalLeft = LINGER_MAX_MILLIS - TimeUnit.NANOSECONDS.toMillis(now - start);
+            if (idleLeft <= 0 || totalLeft <= 0) {
+                context.close();
+            } else {
+                scheduleTimeout(Math.min(idleLeft, totalLeft));
+            }
+        }
 
         @Override
         void read(Object message) {
+            lastRead = System.nanoTime();
             if (message instanceof HttpContent content) {
                 dropped += content.content().readableBytes();
             }
