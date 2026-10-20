@@ -478,13 +478,15 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
-        List<String> list = new ArrayList<>();
+        List<String> list = null;
         Set<String> uniqueNames = null;
         for (AnnotationMetadata am : hierarchy) {
             List<String> names = am.getAnnotationNamesByStereotype(stereotype);
             for (int i = 0, n = names.size(); i < n; i++) {
                 String name = names.get(i);
-                if (list.isEmpty()) {
+                if (list == null) {
+                    // Sized for the first layer with results: a single result does not need the default capacity
+                    list = new ArrayList<>(n);
                     list.add(name);
                     continue;
                 }
@@ -498,18 +500,20 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                 }
             }
         }
-        return list;
+        return list != null ? list : new ArrayList<>();
     }
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
-        List<AnnotationValue<T>> list = new ArrayList<>();
+        List<AnnotationValue<T>> list = null;
         Set<AnnotationValue<T>> uniqueValues = null;
         for (AnnotationMetadata am : hierarchy) {
             List<AnnotationValue<T>> values = am.getAnnotationValuesByStereotype(stereotype);
             for (int i = 0, n = values.size(); i < n; i++) {
                 AnnotationValue<T> value = values.get(i);
-                if (list.isEmpty()) {
+                if (list == null) {
+                    // Sized for the first layer with results: a single result does not need the default capacity
+                    list = new ArrayList<>(n);
                     list.add(value);
                     continue;
                 }
@@ -523,7 +527,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                 }
             }
         }
-        return list;
+        return list != null ? list : new ArrayList<>();
     }
 
     @Override
@@ -592,14 +596,16 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
-        List<AnnotationValue<T>> list = new ArrayList<>();
+        List<AnnotationValue<T>> list = null;
         Set<AnnotationValue<T>> uniqueValues = null;
         for (AnnotationMetadata am : hierarchy) {
             // An index loop: the layers' lists are random access, and their iterators were allocated on every call
             List<AnnotationValue<T>> values = am.getAnnotationValuesByType(annotationType);
             for (int i = 0, n = values.size(); i < n; i++) {
                 AnnotationValue<T> value = values.get(i);
-                if (list.isEmpty()) {
+                if (list == null) {
+                    // Sized for the first layer with results: a single result does not need the default capacity
+                    list = new ArrayList<>(n);
                     list.add(value);
                     continue;
                 }
@@ -613,7 +619,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                 }
             }
         }
-        return list;
+        return list != null ? list : new ArrayList<>();
     }
 
     @Override
@@ -626,13 +632,15 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     private <T extends Annotation, V> List<AnnotationValue<T>> mergeAnnotationValues(V annotationType,
                                                                                      BiFunction<AnnotationMetadata, V, List<AnnotationValue<T>>> fn) {
-        List<AnnotationValue<T>> list = new ArrayList<>();
+        List<AnnotationValue<T>> list = null;
         Set<AnnotationValue<T>> uniqueValues = null;
         for (AnnotationMetadata am : hierarchy) {
             List<AnnotationValue<T>> values = fn.apply(am, annotationType);
             for (int i = 0, n = values.size(); i < n; i++) {
                 AnnotationValue<T> value = values.get(i);
-                if (list.isEmpty()) {
+                if (list == null) {
+                    // Sized for the first layer with results: a single result does not need the default capacity
+                    list = new ArrayList<>(n);
                     list.add(value);
                     continue;
                 }
@@ -646,7 +654,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                 }
             }
         }
-        return list.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(list);
+        return list == null ? Collections.emptyList() : Collections.unmodifiableList(list);
     }
 
 
