@@ -2589,7 +2589,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return resolved;
     }
 
-    private static Map<String, ClassElement> resolvedInterfaceMethodTypeArguments(ClassElement anInterface, MethodElement method) {
+    static Map<String, ClassElement> resolvedInterfaceMethodTypeArguments(ClassElement anInterface, MethodElement method) {
         ClassElement declaringType = method.getDeclaringType();
         Map<String, ClassElement> inheritedTypeArguments = resolveInheritedInterfaceTypeArguments(anInterface, declaringType.getName(), new HashSet<>());
         if (!inheritedTypeArguments.isEmpty()) {
@@ -2765,7 +2765,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return sourceSignatureType(anInterface, false, Map.of());
     }
 
-    private static TypeDef sourceSignatureType(
+    static TypeDef sourceSignatureType(
         ClassElement anInterface,
         boolean typeArgument,
         Map<String, ClassElement> signatureTypeArguments
@@ -3528,13 +3528,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return sourceSignatureType(genericReturnType);
     }
 
-    static TypeDef sourceMethodReturnType(MethodElement methodElement, boolean isJunit5Test) {
-        if (isJunit5Test) {
-            return TypeDef.Primitive.VOID;
-        }
-        return sourceSignatureType(methodElement.getGenericReturnType());
-    }
-
     static void addMethodTypeVariables(MethodElement methodElement, MethodDef.MethodDefBuilder methodBuilder) {
         addMethodTypeVariables(methodElement, methodBuilder, Map.of());
     }
@@ -3582,7 +3575,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * {@code L} bounded by a list of the variable {@code A}) would print as that variable's
      * bound. A plain class type named like the variable prints as the variable.
      */
-    private static TypeDef typeVariableReferencesAsClassNames(TypeDef typeDef) {
+    static TypeDef typeVariableReferencesAsClassNames(TypeDef typeDef) {
         return switch (typeDef) {
             case TypeDef.TypeVariable typeVariable -> ClassTypeDef.of(typeVariable.name());
             case ClassTypeDef.Parameterized parameterized -> TypeDef.parameterized(
@@ -3602,7 +3595,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return elements.isEmpty() ? null : elements.getFirst();
     }
 
-    private static Map<String, ClassElement> withoutDeclaredMethodTypeVariables(
+    static Map<String, ClassElement> withoutDeclaredMethodTypeVariables(
         Map<String, ClassElement> signatureTypeArguments,
         MethodElement signatureMethod
     ) {
