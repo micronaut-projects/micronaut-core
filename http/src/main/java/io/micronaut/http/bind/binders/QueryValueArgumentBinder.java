@@ -31,6 +31,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 
 import java.util.Collections;
@@ -50,6 +51,16 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
     // Neither annotation is repeatable: the name lookups skip the repeatable container resolution of the class lookups
     private static final String QUERY_VALUE = QueryValue.class.getName();
     private static final String FORMAT = Format.class.getName();
+    private static final Object NOT_RESOLVED = new Object();
+    private static final Object NO_INTROSPECTION = new Object();
+
+    private final boolean specific;
+    /**
+     * The introspection of the argument type of a specific binder, resolved on the first POJO binding:
+     * {@link #NOT_RESOLVED}, {@link #NO_INTROSPECTION} or the introspection.
+     */
+    @SuppressWarnings("java:S3077") // holds immutable values: volatile only publishes them
+    private volatile Object introspection = NOT_RESOLVED;
 
     /**
      * Constructor.
@@ -58,6 +69,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
      */
     public QueryValueArgumentBinder(ConversionService conversionService) {
         super(conversionService);
+        this.specific = false;
     }
 
     /**
@@ -68,6 +80,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
      */
     public QueryValueArgumentBinder(ConversionService conversionService, Argument<T> argument) {
         super(conversionService, argument);
+        this.specific = true;
     }
 
     @Override
@@ -131,11 +144,9 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
         // If we need to bind all request params to command object
         // checks if the variable is defined with modifier char *, e.g. ?pojo*
         String parameterName = resolvedParameterName(argument);
-        boolean bindAll = BasicHttpAttributes.getRouteMatchInfo(source)
-            .map(umi -> {
-                UriMatchVariable uriMatchVariable = umi.getVariableMap().get(parameterName);
-                return uriMatchVariable != null && uriMatchVariable.isExploded();
-            }).orElse(false);
+        UriMatchInfo uriMatchInfo = BasicHttpAttributes.getRouteMatchInfo(source).orElse(null);
+        UriMatchVariable uriMatchVariable = uriMatchInfo != null ? uriMatchInfo.getVariableMap().get(parameterName) : null;
+        boolean bindAll = uriMatchVariable != null && uriMatchVariable.isExploded();
 
         if (bindAll) {
             Object value;
@@ -156,7 +167,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
     private BindingResult<T> bindPojo(ArgumentConversionContext<T> context,
                                       ConvertibleMultiValues<String> parameters,
                                       Argument<T> argument) {
-        Optional<BeanIntrospection<T>> introspectionOpt = BeanIntrospector.SHARED.findIntrospection(argument.getType());
+        Optional<BeanIntrospection<T>> introspectionOpt = findIntrospection(argument);
         if (introspectionOpt.isEmpty()) {
             // If bindPojo couldn't bind, propagate error from bindSimple if exists
             if (context.hasErrors()) {
@@ -251,4 +262,26 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
     protected String getParameterName(Argument<T> argument) {
         return argument.getAnnotationMetadata().stringValue(QueryValue.class).orElse(argument.getName());
     }
+
+    /**
+     * Finds the introspection of the argument type. A specific binder looks it up once: the introspections do not
+     * change, and the lookup is most of the cost of binding a missing simple value.
+     *
+     * @param argument The argument
+     * @return The introspection
+     */
+    @SuppressWarnings("unchecked")
+    private Optional<BeanIntrospection<T>> findIntrospection(Argument<T> argument) {
+        if (!specific) {
+            return BeanIntrospector.SHARED.findIntrospection(argument.getType());
+        }
+        Object resolved = introspection;
+        if (resolved == NOT_RESOLVED) {
+            Optional<BeanIntrospection<T>> found = BeanIntrospector.SHARED.findIntrospection(argument.getType());
+            resolved = found.isPresent() ? found.get() : NO_INTROSPECTION;
+            introspection = resolved;
+        }
+        return resolved == NO_INTROSPECTION ? Optional.empty() : Optional.of((BeanIntrospection<T>) resolved);
+    }
+
 }

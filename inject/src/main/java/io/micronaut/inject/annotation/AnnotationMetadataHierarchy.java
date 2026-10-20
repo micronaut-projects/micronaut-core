@@ -289,11 +289,21 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     public <T extends Annotation> @Nullable AnnotationValue<T> getAnnotation(Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         // As findAnnotation(Class), without creating an Optional to unwrap
-        if (isRepeatableAnnotation(annotationClass)) {
+        String annotation = annotationClass.getName();
+        if (isRepeatableInAnyLayer(annotationClass, annotation)) {
             List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
             return values.isEmpty() ? null : values.get(0);
         }
-        return getAnnotation(annotationClass.getName());
+        // No layer considers the annotation repeatable, so the layers that are exactly default metadata do not have to
+        // check again; a subclass keeps answering through its getAnnotation(String)
+        AnnotationValue<T> existing = null;
+        for (AnnotationMetadata annotationMetadata : hierarchy) {
+            AnnotationValue<T> value = annotationMetadata.getClass() == DefaultAnnotationMetadata.class
+                ? ((DefaultAnnotationMetadata) annotationMetadata).getNonRepeatableAnnotation(annotation)
+                : annotationMetadata.getAnnotation(annotation);
+            existing = mergeValue(annotation, existing, value);
+        }
+        return existing;
     }
 
     @Nullable
@@ -1056,6 +1066,31 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             }
         }
         return true;
+    }
+
+    /**
+     * {@link #isRepeatableAnnotation(Class)}, asking the shared registry once for all the layers that are exactly
+     * {@link DefaultAnnotationMetadata}, since that is all such a layer asks.
+     *
+     * @param annotationClass The annotation
+     * @param annotation      The annotation name
+     * @return Whether a layer considers the annotation repeatable
+     */
+    private boolean isRepeatableInAnyLayer(Class<? extends Annotation> annotationClass, String annotation) {
+        boolean registryChecked = false;
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.getClass() == DefaultAnnotationMetadata.class) {
+                if (!registryChecked) {
+                    if (AnnotationMetadataSupport.getRepeatableAnnotation(annotation) != null) {
+                        return true;
+                    }
+                    registryChecked = true;
+                }
+            } else if (metadata.isRepeatableAnnotation(annotationClass)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

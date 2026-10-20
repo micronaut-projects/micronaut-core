@@ -1146,6 +1146,30 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
+    public boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
+        if (annotation != null) {
+            String repeatableAnnotationContainer = findRepeatableAnnotationContainerInternal(annotation.getName());
+            if (repeatableAnnotationContainer != null) {
+                return hasAnnotation(repeatableAnnotationContainer);
+            }
+            return hasAnnotation(annotation.getName());
+        }
+        return false;
+    }
+
+    @Override
+    public boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
+        if (stereotype != null) {
+            String repeatableAnnotationContainer = findRepeatableAnnotationContainerInternal(stereotype.getName());
+            if (repeatableAnnotationContainer != null) {
+                return hasDeclaredStereotype(repeatableAnnotationContainer);
+            }
+            return hasDeclaredStereotype(stereotype.getName());
+        }
+        return false;
+    }
+
+    @Override
     public boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
             String repeatableAnnotationContainer = findRepeatableAnnotationContainerInternal(annotation.getName());
@@ -1347,6 +1371,26 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         }
         List<AnnotationValue<T>> repeated = getAnnotationValuesByName(annotation);
         return repeated.isEmpty() ? null : repeated.get(0);
+    }
+
+    /**
+     * The annotation value, for an annotation known not to be repeatable: {@link #getAnnotation(String)} without
+     * the repeatable container lookup.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return The annotation value or {@code null}
+     */
+    @Nullable
+    <T extends Annotation> AnnotationValue<T> getNonRepeatableAnnotation(String annotation) {
+        if (allAnnotations == null) {
+            return null;
+        }
+        Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (values == null && allStereotypes != null) {
+            values = allStereotypes.get(annotation);
+        }
+        return values != null ? newAnnotationValue(annotation, values) : null;
     }
 
     @Override
