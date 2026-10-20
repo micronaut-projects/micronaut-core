@@ -1644,12 +1644,11 @@ final class NettyHttpClient implements
                 if (!HttpUtil.isKeepAlive(response)) {
                     poolHandle.taint();
                 }
-                if (sink.isCancelled()) {
-                    // nobody takes the response of a cancelled exchange
+                if (sink.isCancelled() || !sink.tryComplete(new NettyClientByteBodyResponse(response, body, conversionService))) {
+                    // nobody takes the response of an exchange that was cancelled, or that
+                    // already failed because its streamed request body failed
                     body.close();
-                    return;
                 }
-                sink.complete(new NettyClientByteBodyResponse(response, body, conversionService));
             }
 
             @Override
