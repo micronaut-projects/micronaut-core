@@ -294,11 +294,12 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
             return values.isEmpty() ? null : values.get(0);
         }
-        // No layer considers the annotation repeatable, so the layers that are default metadata do not have to check again
+        // No layer considers the annotation repeatable, so the layers that are exactly default metadata do not have to
+        // check again; a subclass keeps answering through its getAnnotation(String)
         AnnotationValue<T> existing = null;
         for (AnnotationMetadata annotationMetadata : hierarchy) {
-            AnnotationValue<T> value = annotationMetadata instanceof DefaultAnnotationMetadata defaultAnnotationMetadata
-                ? defaultAnnotationMetadata.getNonRepeatableAnnotation(annotation)
+            AnnotationValue<T> value = annotationMetadata.getClass() == DefaultAnnotationMetadata.class
+                ? ((DefaultAnnotationMetadata) annotationMetadata).getNonRepeatableAnnotation(annotation)
                 : annotationMetadata.getAnnotation(annotation);
             existing = mergeValue(annotation, existing, value);
         }
