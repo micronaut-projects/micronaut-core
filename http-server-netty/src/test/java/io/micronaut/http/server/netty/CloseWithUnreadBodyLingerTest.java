@@ -48,14 +48,7 @@ class CloseWithUnreadBodyLingerTest {
                 String response = new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
                 assertTrue(response.startsWith("HTTP/1.1 200"), response);
                 // the server reads and drops what is written until it closes, then the writes fail
-                assertThrows(IOException.class, () -> {
-                    long deadline = System.nanoTime() + 30_000_000_000L;
-                    while (System.nanoTime() < deadline) {
-                        out.write('x');
-                        out.flush();
-                        Thread.sleep(50);
-                    }
-                });
+                assertThrows(IOException.class, () -> writeUntilClosed(out));
             }
         }
     }
@@ -83,6 +76,15 @@ class CloseWithUnreadBodyLingerTest {
                 assertTrue(response.startsWith("HTTP/1.1 200"), response);
                 assertTrue(response.endsWith("plain"), response);
             }
+        }
+    }
+
+    private static void writeUntilClosed(OutputStream out) throws IOException, InterruptedException {
+        long deadline = System.nanoTime() + 30_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            out.write('x');
+            out.flush();
+            Thread.sleep(50);
         }
     }
 
