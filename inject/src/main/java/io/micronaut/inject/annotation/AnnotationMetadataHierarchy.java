@@ -286,6 +286,12 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
+    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(Class<T> annotationClass) {
+        // The default checks repeatability before findAnnotation(String), which would check it again
+        return Optional.ofNullable(getAnnotation(annotationClass));
+    }
+
+    @Override
     public <T extends Annotation> @Nullable AnnotationValue<T> getAnnotation(Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         // As findAnnotation(Class), without creating an Optional to unwrap
