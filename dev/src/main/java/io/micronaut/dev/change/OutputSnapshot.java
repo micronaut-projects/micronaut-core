@@ -68,7 +68,8 @@ public final class OutputSnapshot {
                 continue;
             }
             try (Stream<Path> files = Files.walk(absoluteRoot)) {
-                files.filter(Files::isRegularFile).forEach(file -> {
+                // sorted, so that a change set lists its classes in the same order on every file system
+                files.filter(Files::isRegularFile).sorted().forEach(file -> {
                     String relative = absoluteRoot.relativize(file).toString().replace(java.io.File.separatorChar, '/');
                     if (relative.endsWith(".class")) {
                         String className = relative.substring(0, relative.length() - ".class".length()).replace('/', '.');
