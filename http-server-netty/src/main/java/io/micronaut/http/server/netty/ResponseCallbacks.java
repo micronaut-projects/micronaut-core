@@ -213,10 +213,13 @@ final class ResponseCallbacks {
         if (finalWrite != null) {
             finalWrite.addListener(future -> {
                 Throwable cause = future.cause();
-                settle(cause);
                 if (cause == null) {
+                    // removed before the completion callbacks run, so that they see the
+                    // connection without the listeners of this request
                     release();
+                    settle(null);
                 } else {
+                    settle(cause);
                     // the write fails when the connection or the stream closes, before the close
                     // is reported to the abandon callbacks in the same turn of the event loop:
                     // they are removed after that

@@ -190,6 +190,9 @@ class ResponseCallbacksTest {
         Recorder recorder = ctx.getBean(Recorder.class);
         try (Socket socket = new Socket(server.getHost(), server.getPort())) {
             ResponseCallbacksOverheadTest.exchange(socket, "/handler/keepalive?id=keepalive-0");
+            // the client can read the response before the final write completes on the server:
+            // the listeners of a request are removed before its completion callback runs
+            assertNull(failure(ctx, "keepalive-0"));
             Channel channel = recorder.channels.get("keepalive-0");
             int listeners = ResponseCallbacksOverheadTest.closeListeners(channel.closeFuture());
             for (int i = 1; i <= 500; i++) {
