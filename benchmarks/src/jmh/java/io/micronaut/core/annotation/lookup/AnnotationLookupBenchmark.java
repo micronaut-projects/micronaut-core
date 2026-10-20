@@ -96,6 +96,19 @@ public class AnnotationLookupBenchmark {
     }
 
 
+    /**
+     * A presence check by class through the hierarchy of the method metadata.
+     */
+    @Benchmark
+    public boolean hierarchyHasAnnotationClass() {
+        return method.hasAnnotation(LookupAnn.class);
+    }
+
+    @Benchmark
+    public boolean hierarchyHasStereotypeClass() {
+        return method.hasStereotype(LookupAnn.class);
+    }
+
     @Benchmark
     public String versionBinder() {
         return method.findAnnotation(Version.class)
