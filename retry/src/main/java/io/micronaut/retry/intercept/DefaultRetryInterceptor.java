@@ -64,7 +64,6 @@ import java.util.function.Supplier;
 public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
-    private static final String NAME = "name";
     private final ConversionService conversionService;
     @Nullable
     private final ApplicationEventPublisher eventPublisher;
@@ -177,20 +176,21 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        Optional<AnnotationValue<Retryable>> opt = context.findAnnotation(Retryable.class);
-        if (opt.isEmpty()) {
+        // What the annotations say is kept by the method: only the retry state is created per call
+        RetryPlan plan = context.getCachedValue(RetryPlan.class, RetryPlan::of);
+        AnnotationValue<Retryable> retry = plan.retry();
+        if (retry == null) {
             return context.proceed();
         }
 
-        AnnotationValue<Retryable> retry = opt.get();
-        boolean isCircuitBreaker = context.hasStereotype(CircuitBreaker.class);
+        boolean isCircuitBreaker = plan.isCircuitBreaker();
         MutableRetryState retryState;
         AnnotationRetryStateBuilder annotationRetryStateBuilder = new AnnotationRetryStateBuilder(
             context
         );
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
 
-        String name = retry.stringValue(NAME).orElse("");
+        String name = plan.name();
         RetryPolicy namedPolicy = null;
         if (!name.isEmpty()) {
             try {
@@ -207,7 +207,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         CircuitBreakerRetry windowedCircuit = null;
         if (isCircuitBreaker) {
             RetryPolicy retryPolicy = namedPolicy;
-            AnnotationValue<CircuitBreaker> circuitBreaker = context.findAnnotation(CircuitBreaker.class).orElse(null);
+            AnnotationValue<CircuitBreaker> circuitBreaker = plan.circuitBreaker();
             CircuitBreakerRetry circuitBreakerRetry;
             try {
                 circuitBreakerRetry = circuitContexts.computeIfAbsent(
@@ -221,6 +221,8 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             if (circuitBreakerRetry.circuit().getWindow() != null) {
                 windowedCircuit = circuitBreakerRetry;
             }
+        } else if (plan.policy() != null) {
+            retryState = (MutableRetryState) new PolicyRetryStateBuilder(plan.policy()).build();
         } else if (namedPolicy == null) {
             retryState = (MutableRetryState) annotationRetryStateBuilder.build();
         } else {

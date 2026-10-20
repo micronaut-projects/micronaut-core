@@ -16,6 +16,7 @@
 package io.micronaut.aop;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
@@ -62,6 +63,7 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
      * metadata, and is computed for the invocation otherwise, so that evaluated expressions see its target and
      * arguments.</p>
      */
+    @Experimental
     @Override
     default <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
         ExecutableMethod<T, R> executableMethod = getExecutableMethod();
@@ -71,6 +73,7 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
         return executableMethod.getCachedValue(key, factory);
     }
 
+    @Experimental
     @Override
     default <A extends Annotation> @Nullable AnnotationValue<A> getCachedAnnotationValue(Class<A> annotationType) {
         ExecutableMethod<T, R> executableMethod = getExecutableMethod();
@@ -80,6 +83,7 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
         return executableMethod.getCachedAnnotationValue(annotationType);
     }
 
+    @Experimental
     @Override
     default <A extends Annotation> @Nullable A getCachedAnnotation(Class<A> annotationType) {
         ExecutableMethod<T, R> executableMethod = getExecutableMethod();
