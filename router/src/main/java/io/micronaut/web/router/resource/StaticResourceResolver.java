@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Resolves resources from a set of resource loaders.
@@ -136,6 +137,24 @@ public class StaticResourceResolver {
      */
     @Internal
     public static Optional<ResolvedResource> resolveResource(List<ResourceLoader> loaders, String path, @Nullable String indexPage) {
+        return resolveResource(loaders, path, indexPage, resource -> true);
+    }
+
+    /**
+     * Resolves the path of a resource like {@link #resolveResource(List, String, String)}, taking
+     * only the resources a predicate accepts: a resource it refuses, e.g. another spelling of the
+     * path on a file system that ignores the case, is a miss, and the next location is tried.
+     *
+     * @param loaders    The resource loaders, tried in order
+     * @param path       The path of the resource, relative to the base of the loaders
+     * @param indexPage  The name of the index page, or {@code null} for none
+     * @param acceptable Whether a resource of a loader is the resource
+     * @return The resource, if a loader has one the predicate accepts
+     * @since 5.3.0
+     */
+    @Internal
+    public static Optional<ResolvedResource> resolveResource(List<ResourceLoader> loaders, String path, @Nullable String indexPage,
+                                                             Predicate<? super ResolvedResource> acceptable) {
         if (path.startsWith("/")) {
             path = path.substring(1);
         }
@@ -145,7 +164,13 @@ public class StaticResourceResolver {
             if (indexPage == null) {
                 return Optional.empty();
             }
-            return firstResource(loaders, indexPage).map(url -> new ResolvedResource(url, true));
+            for (ResourceLoader loader : loaders) {
+                Optional<ResolvedResource> resource = accepted(loader, indexPage, true, acceptable);
+                if (resource.isPresent()) {
+                    return resource;
+                }
+            }
+            return Optional.empty();
         }
         String indexPath = null;
         if (!root && indexPage != null && path.indexOf('.', path.lastIndexOf('/') + 1) == -1) {
@@ -153,28 +178,23 @@ public class StaticResourceResolver {
             indexPath = (path.endsWith("/") ? path : path + "/") + indexPage;
         }
         for (ResourceLoader loader : loaders) {
-            Optional<URL> resource = loader.getResource(path);
+            Optional<ResolvedResource> resource = accepted(loader, path, false, acceptable);
             if (resource.isPresent()) {
-                return Optional.of(new ResolvedResource(resource.get(), false));
+                return resource;
             }
             if (indexPath != null) {
-                resource = loader.getResource(indexPath);
+                resource = accepted(loader, indexPath, true, acceptable);
                 if (resource.isPresent()) {
-                    return Optional.of(new ResolvedResource(resource.get(), true));
+                    return resource;
                 }
             }
         }
         return Optional.empty();
     }
 
-    private static Optional<URL> firstResource(List<ResourceLoader> loaders, String path) {
-        for (ResourceLoader loader : loaders) {
-            Optional<URL> resource = loader.getResource(path);
-            if (resource.isPresent()) {
-                return resource;
-            }
-        }
-        return Optional.empty();
+    private static Optional<ResolvedResource> accepted(ResourceLoader loader, String path, boolean index,
+                                                       Predicate<? super ResolvedResource> acceptable) {
+        return loader.getResource(path).map(url -> new ResolvedResource(url, index)).filter(acceptable);
     }
 
     /**

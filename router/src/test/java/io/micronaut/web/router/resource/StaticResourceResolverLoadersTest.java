@@ -90,6 +90,22 @@ class StaticResourceResolverLoadersTest {
     }
 
     @Test
+    void aRefusedResourceIsAMissAndTheNextLocationIsTried() throws IOException {
+        write(first.resolve("hello.txt"));
+        write(second.resolve("hello.txt"));
+        write(first.resolve("docs/index.html"));
+        write(second.resolve("docs/index.html"));
+        List<ResourceLoader> loaders = List.of(new DefaultFileSystemResourceLoader(first), new DefaultFileSystemResourceLoader(second));
+
+        // the predicate refuses the resources of the first location
+        Path firstReal = first.toRealPath();
+        java.util.function.Predicate<StaticResourceResolver.ResolvedResource> notFirst = resource -> !path(Optional.of(resource.url())).startsWith(firstReal);
+        assertEquals(second.resolve("hello.txt").toRealPath(), path(StaticResourceResolver.resolveResource(loaders, "hello.txt", "index.html", notFirst).map(StaticResourceResolver.ResolvedResource::url)));
+        assertEquals(second.resolve("docs/index.html").toRealPath(), path(StaticResourceResolver.resolveResource(loaders, "docs", "index.html", notFirst).map(StaticResourceResolver.ResolvedResource::url)));
+        assertTrue(StaticResourceResolver.resolveResource(loaders, "hello.txt", "index.html", resource -> false).isEmpty());
+    }
+
+    @Test
     void eachLoaderIsTriedWithThePathBeforeTheIndexPageUnderIt() throws IOException {
         // a file without an extension that only the second loader has
         write(second.resolve("LICENSE"));

@@ -36,6 +36,12 @@ public interface ResourceHandler extends RequestHandler {
      * relative to the URI prefix, without a leading slash; the route of the prefix itself has no
      * such variable.
      *
+     * <p>The route of the resources checks at startup that the variables of its prefix match one
+     * segment each, as far as it can: a regular expression cannot be proven to. A handler that
+     * resolves its resources from the path refuses a request whose other path variables are empty
+     * or have a slash, whose path of the resource is then not the end of the path of the request,
+     * as {@code StaticResources} does.</p>
+     *
      * @return The name of the path variable
      */
     String pathVariable();

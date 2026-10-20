@@ -134,7 +134,9 @@ final class DefaultStaticResources implements StaticResources {
         }
         Optional<StaticResourceResolver.ResolvedResource> resolved;
         try {
-            resolved = StaticResourceResolver.resolveResource(loaders, path, indexFile);
+            // a file another location may have exactly, when the file of a location is another
+            // spelling of the path, or a directory
+            resolved = StaticResourceResolver.resolveResource(loaders, path, indexFile, resource -> isServable(resource, path));
         } catch (InvalidPathException e) {
             // a name the file system does not allow, e.g. a? on Windows
             return HttpResponse.notFound();
@@ -143,18 +145,8 @@ final class DefaultStaticResources implements StaticResources {
             return HttpResponse.notFound();
         }
         URL url = resolved.get().url();
-        boolean index = resolved.get().index();
-        FileCustomizableResponseType body;
-        if (FILE_PROTOCOL.equals(url.getProtocol())) {
-            File file = toFile(url);
-            if (file == null || !file.isFile() || !file.canRead() || !isSpelledAsRequested(file, path, index)) {
-                // a resource loader may resolve a directory
-                return HttpResponse.notFound();
-            }
-            body = new SystemFile(file);
-        } else {
-            body = new StreamedFile(url);
-        }
+        File file = FILE_PROTOCOL.equals(url.getProtocol()) ? toFile(url) : null;
+        FileCustomizableResponseType body = file != null ? new SystemFile(file) : new StreamedFile(url);
         // a HEAD response too: the server writes the body to set the headers of a GET response,
         // e.g. 304 to a matching If-Modified-Since, and discards the content
         MutableHttpResponse<?> response = HttpResponse.ok(body);
@@ -346,6 +338,23 @@ final class DefaultStaticResources implements StaticResources {
      */
     private static String withoutTrailingSlash(String path) {
         return path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+    }
+
+    /**
+     * Whether a resource of a location is served: a file of the file system that is a readable
+     * file, not a directory, spelled as the path of the request, or any other resource.
+     *
+     * @param resource The resource of a location
+     * @param path     The relative path of the request
+     * @return Whether it is served
+     */
+    private static boolean isServable(StaticResourceResolver.ResolvedResource resource, String path) {
+        URL url = resource.url();
+        if (!FILE_PROTOCOL.equals(url.getProtocol())) {
+            return true;
+        }
+        File file = toFile(url);
+        return file != null && file.isFile() && file.canRead() && isSpelledAsRequested(file, path, resource.index());
     }
 
     /**

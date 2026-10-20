@@ -20,7 +20,9 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.PathVariables;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.bind.MatchedPathVariables;
+import io.micronaut.http.server.types.files.SystemFile;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -37,6 +39,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -160,6 +163,20 @@ class StaticResourcesTest {
         assertEquals(HttpStatus.OK, resources.handle(HttpRequest.GET("/docs/v1/hello.txt"), variables(Map.of("v", "v1", "path", "hello.txt"))).getStatus());
         assertEquals(HttpStatus.NOT_FOUND, resources.handle(HttpRequest.GET("/docs//hello.txt"), variables(Map.of("v", "", "path", "hello.txt"))).getStatus());
         assertEquals(HttpStatus.NOT_FOUND, resources.handle(HttpRequest.GET("/docs/a/b/hello.txt"), variables(Map.of("v", "a/b", "path", "hello.txt"))).getStatus());
+    }
+
+    @Test
+    void anotherSpellingOfALocationIsAMissAndTheNextLocationServesTheExactName(@TempDir Path base) throws Exception {
+        Path first = Files.createDirectories(base.resolve("first"));
+        Path second = Files.createDirectories(base.resolve("second"));
+        Files.writeString(first.resolve("HELLO.TXT"), "upper");
+        Files.writeString(second.resolve("hello.txt"), "lower");
+        StaticResources resources = StaticResources.of("file:" + first, "file:" + second);
+
+        HttpResponse<?> response = resources.handle(HttpRequest.GET("/assets/hello.txt"), variables(Map.of("path", "hello.txt")));
+        assertEquals(HttpStatus.OK, response.getStatus());
+        SystemFile file = assertInstanceOf(SystemFile.class, response.body());
+        assertEquals(second.resolve("hello.txt").toRealPath(), file.getFile().toPath().toRealPath());
     }
 
     @Test

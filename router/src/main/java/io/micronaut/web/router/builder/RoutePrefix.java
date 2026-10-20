@@ -95,15 +95,19 @@ record RoutePrefix(String value) {
 
     /**
      * Check that the variables of a prefix match one segment each: a variable of the path that
-     * follows it, e.g. {@code {+path}}, starts after the last segment of the prefix.
+     * follows it, e.g. {@code {+path}}, starts after the last segment of the prefix. A regular
+     * expression cannot be proven to match one segment, so the check of a regular expression is
+     * a best effort: the handler of the route checks the values of the variables of a request, see
+     * {@link ResourceHandler}.
      *
      * @param prefix The prefix
      * @param owner  What the prefix is the prefix of, for the message, e.g. {@code a route of resources}
      * @throws IllegalArgumentException if a variable may match an empty value at the end of the
      *                                  prefix or several segments: an optional or reserved
      *                                  expansion, e.g. {@code {/version}} or {@code {+dir}}, an
-     *                                  exploded one, or a regular expression that matches an
-     *                                  empty value or a value with a slash
+     *                                  exploded one, or a regular expression with a slash outside
+     *                                  a character class, with capturing groups, or that matches
+     *                                  an empty value or a value with a slash it was tried on
      */
     static void checkSegmentVariables(String prefix, String owner) {
         int start = prefix.indexOf('{');
@@ -132,8 +136,9 @@ record RoutePrefix(String value) {
     }
 
     /**
-     * Whether a regular expression of a variable matches an empty value or a value with a slash,
-     * tried on values of the kinds that a regular expression of one segment does not match.
+     * Whether a regular expression of a variable may match an empty value or a value with a
+     * slash: it has a slash outside a character class, or capturing groups, or matches one of
+     * values of the kinds that a regular expression of one segment does not match.
      *
      * @param regex The regular expression
      * @return Whether it may match several segments or none
@@ -146,12 +151,38 @@ record RoutePrefix(String value) {
             // not a regular expression, e.g. the optional modifier of {v:?}
             return true;
         }
-        if (pattern.matcher("").groupCount() > 0) {
+        if (hasLiteralSlash(regex) || pattern.matcher("").groupCount() > 0) {
             // the matcher of a URI template reads the values of the variables from the groups
             return true;
         }
         for (String value : SPANNING_VALUES) {
             if (pattern.matcher(value).matches()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param regex A regular expression
+     * @return Whether it has a slash outside a character class, e.g. {@code foo/bar}, which
+     * matches a value of two segments, not {@code [^/]+}
+     */
+    private static boolean hasLiteralSlash(String regex) {
+        int classes = 0;
+        for (int i = 0; i < regex.length(); i++) {
+            char c = regex.charAt(i);
+            if (c == '\\') {
+                // an escaped slash \/ is a slash too
+                if (i + 1 < regex.length() && regex.charAt(i + 1) == '/' && classes == 0) {
+                    return true;
+                }
+                i++;
+            } else if (c == '[') {
+                classes++;
+            } else if (c == ']' && classes > 0) {
+                classes--;
+            } else if (c == '/' && classes == 0) {
                 return true;
             }
         }
