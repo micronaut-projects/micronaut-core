@@ -1651,8 +1651,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         Map<CharSequence, Object> annotationValues = sourceAnnotations != null ? sourceAnnotations.get(repeatableTypeName) : null;
         Map<CharSequence, Object> stereotypeValues = sourceStereotypes != null ? sourceStereotypes.get(repeatableTypeName) : null;
         // Found in a map that hasStereotype consults: it would answer true, so skip it
-        boolean present = annotationValues != null && isStereotypeSource(sourceAnnotations)
-            || stereotypeValues != null && isStereotypeSource(sourceStereotypes);
+        boolean present = StringUtils.isNotEmpty(repeatableTypeName)
+            && (annotationValues != null && isStereotypeSource(sourceAnnotations)
+                || stereotypeValues != null && isStereotypeSource(sourceStereotypes));
         if (!present && !hasStereotype(repeatableTypeName)) {
             return null;
         }
