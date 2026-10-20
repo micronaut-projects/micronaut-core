@@ -27,13 +27,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.AnnotationValue;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.CircuitBreakerPolicy;
 import io.micronaut.retry.CircuitBreakerWindow;
 import io.micronaut.retry.RetryPolicy;
 import io.micronaut.retry.RetryRegistry;
-import io.micronaut.retry.RetryState;
 import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.Retryable;
 import io.micronaut.retry.event.RetryEvent;
@@ -47,7 +45,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -228,9 +225,6 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         } else {
             retryState = (MutableRetryState) new PolicyRetryStateBuilder(namedPolicy).build();
         }
-
-        MutableConvertibleValues<Object> attrs = context.getAttributes();
-        attrs.put(RetryState.class.getName(), retry);
 
         try {
             if (windowedCircuit == null || interceptedMethod.resultType() != InterceptedMethod.ResultType.PUBLISHER) {
