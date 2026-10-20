@@ -471,20 +471,52 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
-        Set<String> list = new LinkedHashSet<>();
+        List<String> list = new ArrayList<>();
+        Set<String> uniqueNames = null;
         for (AnnotationMetadata am : hierarchy) {
-            list.addAll(am.getAnnotationNamesByStereotype(stereotype));
+            List<String> names = am.getAnnotationNamesByStereotype(stereotype);
+            for (int i = 0, n = names.size(); i < n; i++) {
+                String name = names.get(i);
+                if (list.isEmpty()) {
+                    list.add(name);
+                    continue;
+                }
+                if (uniqueNames == null) {
+                    // Only created once there is a second name to compare: the list holds the first name only
+                    uniqueNames = new HashSet<>();
+                    uniqueNames.add(list.get(0));
+                }
+                if (uniqueNames.add(name)) {
+                    list.add(name);
+                }
+            }
         }
-        return new ArrayList<>(list);
+        return list;
     }
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
-        Set<AnnotationValue<T>> list = new LinkedHashSet<>();
+        List<AnnotationValue<T>> list = new ArrayList<>();
+        Set<AnnotationValue<T>> uniqueValues = null;
         for (AnnotationMetadata am : hierarchy) {
-            list.addAll(am.getAnnotationValuesByStereotype(stereotype));
+            List<AnnotationValue<T>> values = am.getAnnotationValuesByStereotype(stereotype);
+            for (int i = 0, n = values.size(); i < n; i++) {
+                AnnotationValue<T> value = values.get(i);
+                if (list.isEmpty()) {
+                    list.add(value);
+                    continue;
+                }
+                if (uniqueValues == null) {
+                    // Only created once there is a second value to compare: the list holds the first value only
+                    uniqueValues = new HashSet<>();
+                    uniqueValues.add(list.get(0));
+                }
+                if (uniqueValues.add(value)) {
+                    list.add(value);
+                }
+            }
         }
-        return new ArrayList<>(list);
+        return list;
     }
 
     @Override
