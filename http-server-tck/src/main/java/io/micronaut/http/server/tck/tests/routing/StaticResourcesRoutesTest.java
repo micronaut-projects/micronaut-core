@@ -41,6 +41,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -244,6 +245,20 @@ public class StaticResourcesRoutesTest {
     }
 
     @Test
+    void anEncodedSlashOfAResourceVariableWithASuffixIsNotFound() throws IOException {
+        try (ServerUnderTest server = server()) {
+            assertEquals("Hello file", exchange(server, HttpRequest.GET("/suffix/hello.txt/download/1")).body());
+            for (HttpRequest<?> request : List.of(HttpRequest.GET("/suffix/sub/page.html/download/1"), HttpRequest.HEAD("/suffix/sub/page.html/download/1"))) {
+                assertEquals(HttpStatus.UNAUTHORIZED, exchange(server, request).getStatus(), request.toString());
+            }
+            // the more specific route is not bypassed by another spelling of the path of the resource
+            for (HttpRequest<?> request : List.of(HttpRequest.GET("/suffix/sub%2fpage.html/download/1"), HttpRequest.HEAD("/suffix/sub%2Fpage.html/download/1"))) {
+                assertEquals(HttpStatus.NOT_FOUND, exchange(server, request).getStatus(), request.toString());
+            }
+        }
+    }
+
+    @Test
     void theHiddenFilesAreNotFoundUnlessServed() throws IOException {
         try (ServerUnderTest server = server()) {
             for (String uri : new String[]{"/files/.env", "/files/.git/config"}) {
@@ -365,6 +380,8 @@ public class StaticResourcesRoutesTest {
             routes.GET("/files").resources(StaticResources.fileSystem(root));
             routes.GET("/all-files").resources(StaticResources.fileSystem(root).hiddenFiles(true));
             routes.GET("/encoded%2Fprefix").resources(StaticResources.fileSystem(root));
+            routes.GET("/suffix/{+path}/download/{id}", StaticResources.fileSystem(root));
+            routes.GET("/suffix/sub/page.html/download/{id}", (request, pathVariables) -> HttpResponse.unauthorized());
             routes.GET("/raw/{+file}", StaticResources.classpath("static-fn").pathVariable("file").indexFile(null));
             routes.GET("/static-fn/special.txt", (request, pathVariables) -> HttpResponse.ok("special handler").contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.path("/grouped", group -> {

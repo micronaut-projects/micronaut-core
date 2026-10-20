@@ -128,7 +128,7 @@ final class DefaultStaticResources implements StaticResources {
     @Override
     public HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables) {
         String path = pathVariables.findString(pathVariable).orElse("");
-        if (!isRelative(path) || (!hiddenFiles && isHidden(path)) || isAlias(path, request.getUri().getRawPath())
+        if (!isRelative(path) || (!hiddenFiles && isHidden(path)) || isAlias(path, request, pathVariables)
             || spansSegments(pathVariables)) {
             return HttpResponse.notFound();
         }
@@ -213,6 +213,28 @@ final class DefaultStaticResources implements StaticResources {
      * @param rawPath The raw path of the request
      * @return Whether it is an alias
      */
+    /**
+     * Whether the path of the resource is another spelling of a path, see
+     * {@link #isAlias(String, String)}: from the raw value of its variable, wherever the variable
+     * is in the URI template of the route, e.g. {@code /assets/{+path}/download/{id}}, else from
+     * the end of the raw path of the request.
+     *
+     * @param path          The decoded path of the resource
+     * @param request       The request
+     * @param pathVariables The path variables of the route
+     * @return Whether it is an alias
+     */
+    private boolean isAlias(String path, HttpRequest<?> request, PathVariables pathVariables) {
+        String raw;
+        try {
+            raw = pathVariables.raw().findString(pathVariable).orElse("");
+        } catch (UnsupportedOperationException e) {
+            // the variables of another router: the path of the resource ends the path of the request
+            return isAlias(path, request.getUri().getRawPath());
+        }
+        return path.contains("//") || path.endsWith("/") || raw.toLowerCase(Locale.ROOT).contains("%2f");
+    }
+
     static boolean isAlias(String path, @Nullable String rawPath) {
         if (path.contains("//") || path.endsWith("/")) {
             // an empty segment: the router captures the path without the one trailing slash it
