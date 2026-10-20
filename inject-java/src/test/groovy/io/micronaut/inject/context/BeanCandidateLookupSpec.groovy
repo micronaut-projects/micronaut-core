@@ -129,6 +129,24 @@ public class Beans {
         context.close()
     }
 
+    void "a replaced bean is left out before the qualifier whichever way the definitions are asked for"() {
+        given:
+        ApplicationContext context = buildContext('test.Beans', BEANS)
+        Class<?> engine = type(context, 'Engine')
+        Qualifier<Object> onlyTheOldEngine = new OnlyType(type(context, 'OldEngine'))
+
+        expect:
+        context.getBeanDefinitions((Class) engine, onlyTheOldEngine).isEmpty()
+        context.getBeanDefinitions(onlyTheOldEngine).isEmpty()
+
+        and: 'a filtering qualifier'
+        context.getBeanDefinitions((Class) engine, Qualifiers.byName('old')).isEmpty()
+        !context.getBeanDefinitions(Qualifiers.byName('old'))*.beanType.contains(type(context, 'OldEngine'))
+
+        cleanup:
+        context.close()
+    }
+
     private static Class<?> type(ApplicationContext context, String name) {
         context.classLoader.loadClass('test.Beans$' + name)
     }

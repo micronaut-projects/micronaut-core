@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.context.beans.BeanDefinitionService;
 import io.micronaut.context.beans.DefaultBeanDefinitionService;
@@ -260,6 +261,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * Advanced after bean definitions are added, so that an index exhaustiveness computed before is not used.
      */
     private final AtomicLong beanDefinitionsEpoch = new AtomicLong();
+
+    /**
+     * The enabled definitions that replace another, which a lookup without a type drops the replaced ones by,
+     * with the {@link #beanDefinitionsEpoch} they were found at.
+     */
+    @Nullable
+    @SuppressWarnings("java:S3077") // an immutable record
+    private volatile ReplacingDefinitions replacingDefinitions;
 
     private final ClassLoader classLoader;
     private final Set<Class<?>> thisInterfaces = CollectionUtils.setOf(
@@ -633,6 +642,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             beanProxyTargetCache.clear();
             containsBeanCache.clear();
             indexExhaustiveCache.clear();
+            replacingDefinitions = null;
             beanConfigurations.clear();
             disabledConfigurations.clear();
             singletonScope.clear();
@@ -2480,7 +2490,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             Argument<Object> indexedArgument = (Argument<Object>) filteringQualifier.getIndexedArgument();
             if (indexedArgument != null && isIndexExhaustive(indexedArgument, filteringQualifier)) {
                 // the compile-time index holds every bean this qualifier selects, so there is nothing to filter
-                return getBeanDefinitions(indexedArgument);
+                candidates = new ArrayList<>(getBeanDefinitions(indexedArgument));
+                removeReplacedBeans(candidates);
+                return candidates;
             }
             // Keep anonymous
             Predicate<BeanDefinitionReference<Object>> predicate = new Predicate<>() {
@@ -2494,12 +2506,57 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             Stream<BeanDefinition<Object>> beanDefinitionsClasses = StreamSupport.stream(
                 beanDefinitionProvider.getBeanDefinitions(this, Argument.OBJECT_ARGUMENT, null, null).spliterator(),
                 false);
-            candidates = qualifier.reduce(Object.class, beanDefinitionsClasses)
-                .toList();
+            candidates = new ArrayList<>(qualifier.reduce(Object.class, beanDefinitionsClasses).toList());
         }
 
-        filterReplacedBeans(candidates);
+        removeReplacedBeans(candidates);
         return candidates;
+    }
+
+    /**
+     * Removes the definitions any enabled definition replaces, the replacing one selected by the qualifier or not,
+     * which is what filtering the replaced beans out of every definition before the qualifier would leave, as
+     * {@link #getBeanDefinitions(Argument, Qualifier)} does.
+     *
+     * @param candidates The definitions a qualifier selected
+     */
+    private void removeReplacedBeans(Collection<BeanDefinition<Object>> candidates) {
+        if (candidates.isEmpty()) {
+            return;
+        }
+        List<Map.Entry<ReplacesDefinition<Object>, BeanDefinition<Object>>> replacements = findReplacingDefinitions();
+        if (!replacements.isEmpty()) {
+            candidates.removeIf(definition -> checkIfReplacementExists(replacements, definition));
+        }
+    }
+
+    private List<Map.Entry<ReplacesDefinition<Object>, BeanDefinition<Object>>> findReplacingDefinitions() {
+        long epoch = beanDefinitionsEpoch.get();
+        ReplacingDefinitions cached = replacingDefinitions;
+        if (cached != null && cached.epoch() == epoch) {
+            return cached.replacements();
+        }
+        List<Map.Entry<ReplacesDefinition<Object>, BeanDefinition<Object>>> replacements = new ArrayList<>(2);
+        for (BeanDefinition<Object> definition : beanDefinitionProvider.getBeanDefinitions(this, Argument.OBJECT_ARGUMENT,
+            reference -> reference.hasAnnotation(Replaces.class), null)) {
+            ReplacesDefinition<Object> replacesDefinition = definition.getReplacesDefinition();
+            if (replacesDefinition != null) {
+                replacements.add(Map.entry(replacesDefinition, definition));
+            }
+        }
+        // stored with the epoch read before computing, so a result that raced a registration is never used
+        replacingDefinitions = new ReplacingDefinitions(epoch, List.copyOf(replacements));
+        return replacements;
+    }
+
+    /**
+     * The enabled definitions that replace another.
+     *
+     * @param epoch        The {@link #beanDefinitionsEpoch} they were found at
+     * @param replacements What each replaces, by the replacing definition
+     */
+    private record ReplacingDefinitions(long epoch,
+                                        List<Map.Entry<ReplacesDefinition<Object>, BeanDefinition<Object>>> replacements) {
     }
 
     /**
@@ -2593,6 +2650,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     private void purgeCacheForBeanDefinition(RuntimeBeanDefinition<?> definition) {
+        replacingDefinitions = null;
         if (beanCandidateCache.isEmpty() && beanConcreteCandidateCache.isEmpty() &&
             singletonBeanRegistrations.isEmpty() && containsBeanCache.isEmpty()) {
             return;
@@ -2791,6 +2849,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Internal
     protected void invalidateCaches() {
         beanCandidateCache.clear();
+        replacingDefinitions = null;
         beanConcreteCandidateCache.clear();
         singletonBeanRegistrations.clear();
         indexExhaustiveCache.clear();
