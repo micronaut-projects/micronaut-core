@@ -483,6 +483,33 @@ public final class AnnotationMetadataGenUtils {
         return stringMapOf(values, loadClassValueExpressionFn);
     }
 
+    /**
+     * Creates the expression of an annotation value, in the form the annotation metadata records it.
+     *
+     * @param value                      The value
+     * @param loadClassValueExpressionFn The function creating the expression loading a class value
+     * @return The expression
+     * @since 5.3.0
+     */
+    public static ExpressionDef valueExpression(Object value,
+                                                Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        return asValueExpression(value, loadClassValueExpressionFn);
+    }
+
+    /**
+     * Creates the expression of new annotation metadata: the empty metadata, a reference, or a new instance of the
+     * metadata, a hierarchy merged.
+     *
+     * @param annotationMetadata         The annotation metadata
+     * @param loadClassValueExpressionFn The function creating the expression loading a class value
+     * @return The expression
+     * @since 5.3.0
+     */
+    public static ExpressionDef annotationMetadataExpression(AnnotationMetadata annotationMetadata,
+                                                             Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        return pushNewAnnotationMetadataOrReference(annotationMetadata, loadClassValueExpressionFn);
+    }
+
     private static ExpressionDef asValueExpression(Object value,
                                                    Function<String, ExpressionDef> loadClassValueExpressionFn) {
         if (value == null) {

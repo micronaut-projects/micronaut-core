@@ -16,6 +16,8 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationTypeMember;
+import io.micronaut.core.annotation.Experimental;
 
 import java.util.Optional;
 
@@ -59,6 +61,20 @@ public interface AnnotationMemberElement extends MemberElement, TypedElement {
      * @since 5.3.0
      */
     Optional<Object> getDefaultValue();
+
+    /**
+     * Whether the member declares a default: {@link AnnotationTypeMember.DefaultState#PRESENT} when
+     * {@link #getDefaultValue()} answers it, {@link AnnotationTypeMember.DefaultState#ABSENT} when the member is
+     * required, and {@link AnnotationTypeMember.DefaultState#UNKNOWN} when the compiler cannot tell, as KSP cannot for
+     * an annotation class that no element of the compilation is annotated with.
+     *
+     * @return The state of the default
+     * @since 5.3.0
+     */
+    @Experimental
+    default AnnotationTypeMember.DefaultState getDefaultState() {
+        return getDefaultValue().isPresent() ? AnnotationTypeMember.DefaultState.PRESENT : AnnotationTypeMember.DefaultState.ABSENT;
+    }
 
     /**
      * The annotation metadata of the member itself: what is written on the method or property, not what is

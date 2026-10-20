@@ -18,6 +18,8 @@ package io.micronaut.inject.annotation
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationBuilder
 import io.micronaut.core.annotation.AnnotationBuilderRegistry
+import io.micronaut.core.annotation.AnnotationType
+import io.micronaut.core.annotation.AnnotationTypeMember
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.AnnotationValueProvider
 import io.micronaut.core.convert.ConversionService
@@ -491,6 +493,39 @@ public class Holder {
 
         then:
         RegisteringVisitor.REGISTERED.contains("no origin:The builder of the annotation [jakarta.inject.Named] needs an originating element")
+    }
+
+    def "the builder describes its annotation type"() {
+        given:
+        def classLoader = buildClassLoader("test.Holder", SOURCE)
+        def builder = builder(classLoader, "test.Holder", "test.Holder\$Sample")
+        def sampleType = classLoader.loadClass("test.Holder\$Sample")
+
+        when:
+        AnnotationType type = builder.describe().orElseThrow()
+        def members = type.members.collectEntries { [it.name, it] }
+
+        then:
+        type.is(builder)
+        type.type == sampleType
+        type.members*.name == ["name", "count", "big", "flag", "ratio", "fraction", "small", "tiny", "letter", "type",
+                               "types", "shade", "shades", "names", "numbers", "tag", "tags"]
+        members.name.defaultState == AnnotationTypeMember.DefaultState.ABSENT
+        members.findAll { it.key != "name" }.values().every { it.defaultState == AnnotationTypeMember.DefaultState.PRESENT }
+
+        and: "the described defaults are those the builder fills in"
+        def sample = builder.build([name: "n"])
+        members.count.defaultValue.get() == sample.count()
+        members.letter.defaultValue.get() == sample.letter()
+        members.shade.defaultValue.get() == sample.shade().name()
+        members.type.defaultValue.get().name == sample.type().name
+        members.names.defaultValue.get() == sample.names()
+        members.numbers.defaultValue.get() == sample.numbers()
+
+        and: "the builders of the member annotations describe theirs"
+        def tag = AnnotationBuildersSpec.builder(classLoader, "test.Holder", "test.Holder\$Tag").describe().orElseThrow()
+        tag.type == members.tag.type
+        tag.members*.name == ["value", "weight"]
     }
 
     private static boolean hasBuilder(ClassLoader classLoader, String holder, String annotation) {

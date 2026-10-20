@@ -95,6 +95,20 @@ public interface AnnotationBuilder<A extends Annotation> {
     Class<A> annotationType();
 
     /**
+     * The description of the annotation type: its members, their defaults and annotations, and the annotations of
+     * the annotation type. The description is written with the builder; a builder written by an earlier processor
+     * has none.
+     *
+     * @return The description, empty when the builder has none
+     * @see AnnotationType#find(Class, ClassLoader)
+     * @since 5.3.0
+     */
+    @Experimental
+    default Optional<AnnotationType<A>> describe() {
+        return Optional.empty();
+    }
+
+    /**
      * Creates the annotation from the member values.
      *
      * @param values            The member values by member name

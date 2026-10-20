@@ -18,17 +18,27 @@ package io.micronaut.core.annotation.builder;
 import io.micronaut.core.annotation.AnnotationBuilder;
 import io.micronaut.core.annotation.AnnotationBuilderRegistry;
 import io.micronaut.core.annotation.AnnotationConversionUtils;
+import io.micronaut.core.annotation.AnnotationType;
+import io.micronaut.core.annotation.AnnotationTypeMember;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueProvider;
 import io.micronaut.core.convert.ConversionService;
 import org.junit.jupiter.api.Test;
 
+import java.lang.annotation.Annotation;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.RetentionPolicy;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -152,6 +162,95 @@ class AnnotationBuilderRegistryTest {
         assertNotSame(numbers, members.get("numbers"));
         assertArrayEquals(numbers, (int[]) members.get("numbers"));
         assertFalse(members.containsKey("missing"));
+    }
+
+    @Test
+    void aBuilderOfAnEarlierProcessorDescribesNothing() {
+        assertTrue(registry.find(TestFlag.class).orElseThrow().describe().isEmpty());
+        ClassLoader classLoader = getClass().getClassLoader();
+        assertTrue(AnnotationType.find(TestFlag.class, classLoader).isEmpty());
+        assertTrue(AnnotationType.find(TestFlag.class.getName(), classLoader).isEmpty());
+    }
+
+    @Test
+    void aDescribingBuilderIsTheAnnotationType() {
+        ClassLoader classLoader = getClass().getClassLoader();
+        AnnotationBuilder<TestMarker> builder = AnnotationBuilder.find(TestMarker.class, classLoader).orElseThrow();
+        AnnotationType<TestMarker> type = builder.describe().orElseThrow();
+        assertSame(builder, type);
+        assertEquals(TestMarker.class, AnnotationType.find(TestMarker.class, classLoader).orElseThrow().getType());
+        assertEquals(TestMarker.class, AnnotationType.find(TestMarker.class.getName(), classLoader).orElseThrow().getType());
+        assertTrue(AnnotationType.find("not.An.Annotation", classLoader).isEmpty());
+
+        assertEquals(TestMarker.class, type.getType());
+        assertEquals(Optional.of(TestMarkers.class.getName()), type.getRepeatableContainer());
+        assertEquals(RetentionPolicy.RUNTIME, type.getRetentionPolicy());
+        assertEquals(Set.of(ElementType.TYPE, ElementType.METHOD), type.getTargets());
+        assertTrue(type.isInherited());
+        assertTrue(type.getAnnotationMetadata().isEmpty());
+
+        List<AnnotationTypeMember<?>> members = type.getMembers();
+        assertEquals(List.of("value", "level", "tags"), members.stream().map(AnnotationTypeMember::getName).toList());
+        AnnotationTypeMember<?> value = members.get(0);
+        assertEquals(String.class, value.getType());
+        assertEquals(AnnotationTypeMember.DefaultState.ABSENT, value.getDefaultState());
+        assertTrue(value.getDefaultValue().isEmpty());
+        AnnotationTypeMember<?> level = type.findMember("level").orElseThrow();
+        assertEquals(int.class, level.asArgument().getType());
+        assertEquals(AnnotationTypeMember.DefaultState.PRESENT, level.getDefaultState());
+        assertEquals(2, level.getDefaultValue().orElseThrow());
+        assertTrue(type.findMember("missing").isEmpty());
+    }
+
+    @Test
+    void anArrayDefaultIsCopied() {
+        AnnotationType<TestMarker> type = AnnotationType.find(TestMarker.class, getClass().getClassLoader()).orElseThrow();
+        AnnotationTypeMember<?> tags = type.findMember("tags").orElseThrow();
+        String[] first = (String[]) tags.getDefaultValue().orElseThrow();
+        first[0] = "changed";
+        assertArrayEquals(new String[] {"a"}, (String[]) tags.getDefaultValue().orElseThrow());
+        assertThrows(UnsupportedOperationException.class, () -> type.getMembers().clear());
+        assertThrows(UnsupportedOperationException.class, () -> type.getTargets().clear());
+    }
+
+    @Test
+    void theDescriptionsOfALoaderAreItsOwn() throws Exception {
+        URL testClasses = TestMarker.class.getProtectionDomain().getCodeSource().getLocation();
+        try (ChildFirstLoader isolated = new ChildFirstLoader(testClasses, getClass().getClassLoader())) {
+            Class<? extends Annotation> isolatedMarker = isolated.loadClass(TestMarker.class.getName()).asSubclass(Annotation.class);
+            assertNotSame(TestMarker.class, isolatedMarker);
+            // the type the loader sees is described, not the one of this test
+            assertTrue(AnnotationType.find(TestMarker.class, isolated).isEmpty());
+            AnnotationType<?> type = AnnotationType.find(isolatedMarker, isolated).orElseThrow();
+            assertEquals(isolatedMarker, type.getType());
+            assertEquals(isolatedMarker, AnnotationType.find(TestMarker.class.getName(), isolated).orElseThrow().getType());
+            assertNotSame(type, AnnotationType.find(TestMarker.class, getClass().getClassLoader()).orElseThrow());
+        }
+        // a loader that sees no builder finds no description
+        try (URLClassLoader empty = new URLClassLoader(new URL[0], ClassLoader.getPlatformClassLoader())) {
+            assertTrue(AnnotationType.find(TestMarker.class.getName(), empty).isEmpty());
+        }
+    }
+
+    /**
+     * Loads the classes of this package itself, and everything else from its parent.
+     */
+    private static final class ChildFirstLoader extends URLClassLoader {
+
+        ChildFirstLoader(URL classes, ClassLoader parent) {
+            super(new URL[] {classes}, parent);
+        }
+
+        @Override
+        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if (!name.startsWith(TestMarker.class.getPackageName() + ".")) {
+                return super.loadClass(name, resolve);
+            }
+            synchronized (getClassLoadingLock(name)) {
+                Class<?> loaded = findLoadedClass(name);
+                return loaded != null ? loaded : findClass(name);
+            }
+        }
     }
 
     @Test

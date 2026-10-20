@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast.utils;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationTypeMember;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
@@ -31,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -47,6 +49,7 @@ public final class DefaultAnnotationMemberElement implements AnnotationMemberEle
     private final MemberElement member;
     private final ClassElement type;
     private final Supplier<Map<CharSequence, Object>> defaultValues;
+    private final Function<String, AnnotationTypeMember.DefaultState> stateWithoutValue;
 
     /**
      * @param member        The element the compiler answers the member as
@@ -56,9 +59,25 @@ public final class DefaultAnnotationMemberElement implements AnnotationMemberEle
     public DefaultAnnotationMemberElement(MemberElement member,
                                           ClassElement type,
                                           Supplier<Map<CharSequence, Object>> defaultValues) {
+        this(member, type, defaultValues, name -> AnnotationTypeMember.DefaultState.ABSENT);
+    }
+
+    /**
+     * @param member            The element the compiler answers the member as
+     * @param type              The declared type of the member
+     * @param defaultValues     The default values of the annotation by member name, as the metadata builder records them
+     * @param stateWithoutValue The state of the default of a member, by name, that has no default value: absent when
+     *                          the compiler reports every default, unknown when it cannot
+     * @since 5.3.0
+     */
+    public DefaultAnnotationMemberElement(MemberElement member,
+                                          ClassElement type,
+                                          Supplier<Map<CharSequence, Object>> defaultValues,
+                                          Function<String, AnnotationTypeMember.DefaultState> stateWithoutValue) {
         this.member = member;
         this.type = type;
         this.defaultValues = defaultValues;
+        this.stateWithoutValue = stateWithoutValue;
     }
 
     @Override
@@ -89,6 +108,14 @@ public final class DefaultAnnotationMemberElement implements AnnotationMemberEle
     @Override
     public Optional<Object> getDefaultValue() {
         return Optional.ofNullable(defaultValues.get().get(member.getName()));
+    }
+
+    @Override
+    public AnnotationTypeMember.DefaultState getDefaultState() {
+        if (getDefaultValue().isPresent()) {
+            return AnnotationTypeMember.DefaultState.PRESENT;
+        }
+        return stateWithoutValue.apply(member.getName());
     }
 
     @Override

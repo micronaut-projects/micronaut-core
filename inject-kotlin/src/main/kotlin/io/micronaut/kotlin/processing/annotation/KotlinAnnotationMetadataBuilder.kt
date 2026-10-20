@@ -62,7 +62,7 @@ internal class KotlinAnnotationMetadataBuilder(
 ) : AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
 
     private var defaultArgumentsCacheResolver: Resolver? = null
-    private val defaultArgumentsCache = mutableMapOf<String, List<KSValueArgument>>()
+    private val annotationUsageCache = mutableMapOf<String, KSAnnotation?>()
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSAnnotated {
         return KotlinAnnotationType(annotationMirror, visitorContext.getTypeForAnnotation(annotationMirror))
@@ -467,22 +467,33 @@ internal class KotlinAnnotationMetadataBuilder(
      * so the defaults of an annotation that is never used cannot be resolved and an empty list is returned. The
      * result is cached for the lifetime of the current [Resolver], since scanning for usages is not cheap.
      */
-    private fun findDefaultArguments(annotationType: KSClassDeclaration): List<KSValueArgument> {
+    private fun findDefaultArguments(annotationType: KSClassDeclaration): List<KSValueArgument> =
+        findAnnotationUsage(annotationType)?.defaultArguments ?: emptyList()
+
+    /**
+     * Whether a usage of the given annotation type is visible in the current round, which is where KSP reads the
+     * defaults of its members: without one, the defaults are unknown.
+     */
+    internal fun hasAnnotationUsage(annotationType: KSClassDeclaration): Boolean =
+        findAnnotationUsage(annotationType) != null
+
+    private fun findAnnotationUsage(annotationType: KSClassDeclaration): KSAnnotation? {
         if (defaultArgumentsCacheResolver !== resolver) {
             defaultArgumentsCacheResolver = resolver
-            defaultArgumentsCache.clear()
+            annotationUsageCache.clear()
         }
         // Annotation names are binary names (Outer$Inner) while KSP names declarations by source name (Outer.Inner):
         // look usages up by the source name and match them by declaration, so a nested annotation resolves too.
-        val sourceName = annotationType.qualifiedName?.asString() ?: return emptyList()
+        val sourceName = annotationType.qualifiedName?.asString() ?: return null
         val binaryName = visitorContext.getBinaryName(annotationType)
-        return defaultArgumentsCache.getOrPut(binaryName) {
-            resolver.getSymbolsWithAnnotation(sourceName)
-                .flatMap { it.annotations }
-                .firstOrNull { visitorContext.getBinaryName(visitorContext.getTypeForAnnotation(it)) == binaryName }
-                ?.defaultArguments
-                ?: emptyList()
+        if (annotationUsageCache.containsKey(binaryName)) {
+            return annotationUsageCache[binaryName]
         }
+        val usage = resolver.getSymbolsWithAnnotation(sourceName)
+            .flatMap { it.annotations }
+            .firstOrNull { visitorContext.getBinaryName(visitorContext.getTypeForAnnotation(it)) == binaryName }
+        annotationUsageCache[binaryName] = usage
+        return usage
     }
 
     override fun getOriginatingClassName(orginatingElement: KSAnnotated): String? {

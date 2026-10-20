@@ -16,9 +16,12 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AbstractAnnotationBuilder;
+import io.micronaut.core.annotation.AbstractAnnotationTypeBuilder;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationBuilder;
 import io.micronaut.core.annotation.AnnotationBuilderRegistry;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationTypeMember;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueProvider;
 import io.micronaut.core.annotation.Generated;
@@ -26,6 +29,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.annotation.AnnotationConversionUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ast.AnnotationElement;
 import io.micronaut.inject.ast.AnnotationMemberElement;
 import io.micronaut.inject.ast.ClassElement;
@@ -48,16 +52,21 @@ import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 
+import org.jspecify.annotations.Nullable;
+
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * Writes the {@link AnnotationBuilder} of an annotation type and the implementation of the annotation it creates.
@@ -69,6 +78,11 @@ import java.util.Objects;
  * over the members, as {@link Annotation} defines them; the annotation value is created when first asked for and kept. The builder extends {@link AbstractAnnotationBuilder} and adds the description of the
  * annotation type, the members and the defaults, and {@link AnnotationBuilder#toMap(Annotation)}, which reads the
  * members of any annotation of the type through its accessors.</p>
+ *
+ * <p>For an {@link AnnotationElement} the builder extends {@link AbstractAnnotationTypeBuilder} and is the
+ * {@link io.micronaut.core.annotation.AnnotationType} of the annotation type as well: the members as
+ * {@link Argument}s with their annotation metadata and defaults, the repeatable container, the retention, the targets
+ * and the annotation metadata of the annotation type, written by the annotation metadata generator.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -91,6 +105,14 @@ final class AnnotationBuilderWriter {
     private static final String EQUALS = "equals";
     private static final String ANNOTATION_VALUE_FIELD = "$annotationValue";
     private static final TypeDef OBJECT_ARRAY = TypeDef.OBJECT.array();
+    private static final ClassTypeDef ARGUMENT_TYPE = ClassTypeDef.of(Argument.class);
+    private static final ClassTypeDef ANNOTATION_TYPE_MEMBER_TYPE = ClassTypeDef.of(AnnotationTypeMember.class);
+    private static final ClassTypeDef MEMBER_TYPE = ClassTypeDef.of(AbstractAnnotationTypeBuilder.Member.class);
+    private static final ClassTypeDef DEFAULT_STATE_TYPE = ClassTypeDef.of(AnnotationTypeMember.DefaultState.class);
+    private static final ClassTypeDef RETENTION_POLICY_TYPE = ClassTypeDef.of(RetentionPolicy.class);
+    private static final ClassTypeDef ELEMENT_TYPE_TYPE = ClassTypeDef.of(ElementType.class);
+    private static final ClassTypeDef ANNOTATION_METADATA_TYPE = ClassTypeDef.of(AnnotationMetadata.class);
+    private static final String MEMBERS_FIELD = "$MEMBERS";
 
     private AnnotationBuilderWriter() {
     }
@@ -132,18 +154,18 @@ final class AnnotationBuilderWriter {
         List<Member> members = new ArrayList<>();
         if (annotationType instanceof AnnotationElement annotationElement) {
             for (AnnotationMemberElement member : annotationElement.getMembers()) {
-                members.add(new Member(member.getName(), member.getType()));
+                members.add(new Member(member.getName(), member.getType(), member));
             }
             if (!members.isEmpty()) {
                 return members;
             }
         }
         for (MethodElement method : annotationType.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyAbstract())) {
-            members.add(new Member(method.getName(), method.getReturnType()));
+            members.add(new Member(method.getName(), method.getReturnType(), null));
         }
         if (members.isEmpty()) {
             for (PropertyElement property : annotationType.getBeanProperties(PropertyElementQuery.of(annotationType))) {
-                members.add(new Member(property.getName(), property.getType()));
+                members.add(new Member(property.getName(), property.getType(), null));
             }
         }
         return members;
@@ -515,20 +537,24 @@ final class AnnotationBuilderWriter {
         Map<CharSequence, Object> defaults = new LinkedHashMap<>(context.getAnnotationDefaultValues(annotationType.getName()));
         ClassTypeDef builderTypeDef = ClassTypeDef.of(name);
         Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
-        ExpressionDef defaultsExpression = AnnotationMetadataGenUtils.valuesMapExpression(
-            defaults, AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(builderTypeDef, loadTypeMethods));
+        Function<String, ExpressionDef> loadClassValueFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(builderTypeDef, loadTypeMethods);
+        ExpressionDef defaultsExpression = AnnotationMetadataGenUtils.valuesMapExpression(defaults, loadClassValueFn);
 
         ClassDef.ClassDefBuilder builder = ClassDef.builder(name)
             .synthetic()
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-            .superclass(ClassTypeDef.of(AbstractAnnotationBuilder.class))
-            .addAnnotation(AnnotationDef.builder(Generated.class).build())
-            .addMethod(MethodDef.constructor()
-                .addModifiers(Modifier.PUBLIC)
-                .build((aThis, parameters) -> aThis.superRef().invokeConstructor(
-                    ExpressionDef.constant(annotationTypeDef),
-                    defaultsExpression)))
-            .addMethod(MethodDef.builder("create")
+            .addAnnotation(AnnotationDef.builder(Generated.class).build());
+        if (annotationType instanceof AnnotationElement annotationElement) {
+            describe(builder, builderTypeDef, annotationElement, annotationTypeDef, defaultsExpression, members, loadClassValueFn);
+        } else {
+            builder.superclass(ClassTypeDef.of(AbstractAnnotationBuilder.class))
+                .addMethod(MethodDef.constructor()
+                    .addModifiers(Modifier.PUBLIC)
+                    .build((aThis, parameters) -> aThis.superRef().invokeConstructor(
+                        ExpressionDef.constant(annotationTypeDef),
+                        defaultsExpression)));
+        }
+        builder.addMethod(MethodDef.builder("create")
                 .addModifiers(Modifier.PROTECTED)
                 .overrides()
                 .addParameter("values", MAP_TYPE)
@@ -576,12 +602,124 @@ final class AnnotationBuilderWriter {
     }
 
     /**
+     * Makes the builder the {@link io.micronaut.core.annotation.AnnotationType} of the annotation type: it extends
+     * {@link AbstractAnnotationTypeBuilder}, the annotation metadata of the annotation type and the members are kept
+     * in static fields, and the defaults of the annotations they hold are registered when the class is initialized,
+     * as for any generated annotation metadata.
+     */
+    private static void describe(ClassDef.ClassDefBuilder builder,
+                                 ClassTypeDef builderTypeDef,
+                                 AnnotationElement annotationType,
+                                 ClassTypeDef annotationTypeDef,
+                                 ExpressionDef defaultsExpression,
+                                 List<Member> members,
+                                 Function<String, ExpressionDef> loadClassValueFn) {
+        List<StatementDef> staticStatements = new ArrayList<>();
+        AnnotationMetadata annotationMetadata = annotationType.getAnnotationMetadata();
+        AnnotationMetadataGenUtils.addAnnotationDefaults(staticStatements, annotationMetadata, loadClassValueFn);
+        FieldDef metadataField = FieldDef.builder(AnnotationMetadataGenUtils.FIELD_ANNOTATION_METADATA_NAME, ANNOTATION_METADATA_TYPE)
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
+            .initializer(AnnotationMetadataGenUtils.annotationMetadataExpression(annotationMetadata, loadClassValueFn))
+            .build();
+
+        List<ExpressionDef> memberExpressions = new ArrayList<>(members.size());
+        for (Member member : members) {
+            AnnotationMetadata memberMetadata = member.annotationMetadata();
+            AnnotationMetadataGenUtils.addAnnotationDefaults(staticStatements, memberMetadata, loadClassValueFn);
+            ExpressionDef argument = ARGUMENT_TYPE.invokeStatic("of",
+                List.of(TypeDef.CLASS, TypeDef.STRING, ANNOTATION_METADATA_TYPE, ARGUMENT_TYPE.array()), ARGUMENT_TYPE,
+                List.of(ExpressionDef.constant(member.typeDef()), ExpressionDef.constant(member.name()),
+                    AnnotationMetadataGenUtils.annotationMetadataExpression(memberMetadata, loadClassValueFn),
+                    ARGUMENT_TYPE.getStaticField("ZERO_ARGUMENTS", ARGUMENT_TYPE.array())));
+            AnnotationTypeMember.DefaultState state = member.defaultState();
+            Object defaultValue = state == AnnotationTypeMember.DefaultState.PRESENT ? member.defaultValue() : null;
+            memberExpressions.add(MEMBER_TYPE.instantiate(
+                List.of(ARGUMENT_TYPE, DEFAULT_STATE_TYPE, TypeDef.OBJECT),
+                List.of(argument,
+                    DEFAULT_STATE_TYPE.getStaticField(state.name(), DEFAULT_STATE_TYPE),
+                    defaultValue == null ? ExpressionDef.nullValue() : AnnotationMetadataGenUtils.valueExpression(defaultValue, loadClassValueFn))));
+        }
+        FieldDef membersField = FieldDef.builder(MEMBERS_FIELD, ANNOTATION_TYPE_MEMBER_TYPE.array())
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
+            .initializer(ANNOTATION_TYPE_MEMBER_TYPE.array().instantiate(memberExpressions))
+            .build();
+
+        List<ExpressionDef> targets = new ArrayList<>();
+        for (ElementType target : ElementType.values()) {
+            if (annotationType.getTargets().contains(target)) {
+                targets.add(ELEMENT_TYPE_TYPE.getStaticField(target.name(), ELEMENT_TYPE_TYPE));
+            }
+        }
+        String container = annotationType.getRepeatableContainer().orElse(null);
+
+        builder.superclass(ClassTypeDef.of(AbstractAnnotationTypeBuilder.class))
+            .addField(metadataField)
+            .addField(membersField)
+            .addMethod(MethodDef.constructor()
+                .addModifiers(Modifier.PUBLIC)
+                .build((aThis, parameters) -> aThis.superRef().invokeConstructor(
+                    List.of(TypeDef.CLASS, MAP_TYPE, ANNOTATION_METADATA_TYPE, ANNOTATION_TYPE_MEMBER_TYPE.array(),
+                        TypeDef.STRING, RETENTION_POLICY_TYPE, ELEMENT_TYPE_TYPE.array(), TypeDef.Primitive.BOOLEAN),
+                    List.of(ExpressionDef.constant(annotationTypeDef),
+                        defaultsExpression,
+                        builderTypeDef.getStaticField(metadataField),
+                        builderTypeDef.getStaticField(membersField),
+                        container == null ? ExpressionDef.nullValue() : ExpressionDef.constant(container),
+                        RETENTION_POLICY_TYPE.getStaticField(annotationType.getRetentionPolicy().name(), RETENTION_POLICY_TYPE),
+                        ELEMENT_TYPE_TYPE.array().instantiate(targets),
+                        ExpressionDef.constant(annotationType.isInherited())))));
+        if (!staticStatements.isEmpty()) {
+            builder.addStaticInitializer(StatementDef.multi(staticStatements));
+        }
+    }
+
+    /**
      * A member of an annotation type.
      *
-     * @param name The name, which is the name of the accessor
-     * @param type The declared type
+     * @param name    The name, which is the name of the accessor
+     * @param type    The declared type
+     * @param element The member element, when the annotation type answers its members
      */
-    record Member(String name, ClassElement type) {
+    record Member(String name, ClassElement type, @Nullable AnnotationMemberElement element) {
+
+        AnnotationMetadata annotationMetadata() {
+            return element == null ? AnnotationMetadata.EMPTY_METADATA : element.getAnnotationMetadata();
+        }
+
+        AnnotationTypeMember.DefaultState defaultState() {
+            return element == null ? AnnotationTypeMember.DefaultState.UNKNOWN : element.getDefaultState();
+        }
+
+        /**
+         * The default in the form the annotation metadata records it: a class, which a processor can report by
+         * name, as an {@link AnnotationClassValue}.
+         */
+        @Nullable Object defaultValue() {
+            Object value = element == null ? null : element.getDefaultValue().orElse(null);
+            if (value == null || !isClass()) {
+                return value;
+            }
+            if (!isArray()) {
+                return classValue(value);
+            }
+            List<Object> items = new ArrayList<>();
+            if (value instanceof Object[] array) {
+                items.addAll(Arrays.asList(array));
+            } else if (value instanceof Iterable<?> iterable) {
+                iterable.forEach(items::add);
+            } else {
+                items.add(value);
+            }
+            AnnotationClassValue<?>[] classValues = new AnnotationClassValue<?>[items.size()];
+            for (int i = 0; i < classValues.length; i++) {
+                classValues[i] = classValue(items.get(i));
+            }
+            return classValues;
+        }
+
+        private static AnnotationClassValue<?> classValue(Object value) {
+            return value instanceof AnnotationClassValue<?> classValue ? classValue : new AnnotationClassValue<>(value.toString());
+        }
 
         /**
          * @return The type of the accessor: a Kotlin class reference is a {@link Class} on the JVM

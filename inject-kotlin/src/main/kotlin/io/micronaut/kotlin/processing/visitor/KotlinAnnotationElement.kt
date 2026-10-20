@@ -19,6 +19,8 @@ import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.Origin
+import io.micronaut.core.annotation.AnnotationTypeMember
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.util.SupplierUtil
 import io.micronaut.inject.ast.AnnotationElement
@@ -106,16 +108,36 @@ internal class KotlinAnnotationElement(
 
     /*
      * KSP answers the members of an annotation class as its properties and no functions, a Java annotation
-     * on the classpath included; the defaults are only visible on a use of the annotation.
+     * on the classpath included; the defaults are only visible on a use of the annotation. Without a use, a member
+     * of a Kotlin annotation class whose constructor parameter has no default is required, and the default of any
+     * other member is unknown.
      */
     override fun getMembers(): List<AnnotationMemberElement> {
         val defaultValues = SupplierUtil.memoized {
             visitorContext.annotationMetadataBuilder.getAnnotationDefaultValues(name, declaration)
         }
+        val defaultsKnown = SupplierUtil.memoized {
+            defaultValues.get().isNotEmpty() || visitorContext.annotationMetadataBuilder.hasAnnotationUsage(declaration)
+        }
+        val stateWithoutValue = java.util.function.Function<String, AnnotationTypeMember.DefaultState> { memberName ->
+            if (defaultsKnown.get() || isRequiredKotlinParameter(memberName)) {
+                AnnotationTypeMember.DefaultState.ABSENT
+            } else {
+                AnnotationTypeMember.DefaultState.UNKNOWN
+            }
+        }
         return declaration.getDeclaredProperties().map { property ->
             val element = KotlinPropertyElement(this, property, elementAnnotationMetadataFactory, visitorContext)
-            DefaultAnnotationMemberElement(element, element.type, defaultValues)
+            DefaultAnnotationMemberElement(element, element.type, defaultValues, stateWithoutValue)
         }.toList()
+    }
+
+    private fun isRequiredKotlinParameter(memberName: String): Boolean {
+        if (declaration.origin != Origin.KOTLIN && declaration.origin != Origin.KOTLIN_LIB) {
+            return false
+        }
+        val parameter = declaration.primaryConstructor?.parameters?.find { it.name?.asString() == memberName }
+        return parameter != null && !parameter.hasDefault
     }
 
     private fun addTargets(value: Any?, targets: EnumSet<ElementType>) {
