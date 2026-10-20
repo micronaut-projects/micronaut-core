@@ -1657,3 +1657,185 @@ class Http2ServerHandlerSpec extends Specification {
         client.finishAndReleaseAll()
         server.finishAndReleaseAll()
     }
+
+    def "graceful goaway does not cancel in-flight streams"() {
+        given:
+        def collector = new BodyCollector()
+        OutboundAccess outboundAccessR = null
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                outboundAccessR = outboundAccess
+                NettyByteBodyFactory.toByteBufs(body).subscribe(collector)
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when: "send the request headers and some data"
+        def stream1 = duplexHandler.newStream()
+        client.writeOutbound(new DefaultHttp2HeadersFrame(postHeaders(), false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        def data1 = randomData(500)
+        client.writeOutbound(new DefaultHttp2DataFrame(data1.retainedSlice(), false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        collector.received.readSlice(collector.received.readableBytes()) == data1
+
+        when: "the client announces it will not open more streams"
+        client.writeOutbound(new DefaultHttp2GoAwayFrame(Http2Error.NO_ERROR))
+        EmbeddedTestUtil.advance(server, client)
+        then: "the in-flight request is unaffected"
+        collector.err == null
+        !collector.complete
+
+        when: "the client finishes the upload"
+        def data2 = randomData(100)
+        client.writeOutbound(new DefaultHttp2DataFrame(data2.retainedSlice(), true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        collector.complete
+        collector.received.readSlice(collector.received.readableBytes()) == data2
+
+        when: "the server responds"
+        def responseBody = Unpooled.copiedBuffer("bar", StandardCharsets.UTF_8)
+        outboundAccessR.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(server).adapt(responseBody))
+        EmbeddedTestUtil.advance(server, client)
+        then: "the response is still delivered"
+        def response = (Http2HeadersFrame) client.readInbound()
+        "200".contentEquals(response.headers().status())
+        duplexHandler.received.toString(StandardCharsets.UTF_8) == "bar"
+
+        cleanup:
+        collector.received.release()
+        data1.release()
+        data2.release()
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "100-continue: rejected before the body is consumed"(String responseBody) {
+        given:
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                // e.g. a security filter rejecting the request. The body is closed after the response
+                // has been written, which is what RoutingInBoundHandler.responseWritten does.
+                def bb = Unpooled.copiedBuffer(responseBody, StandardCharsets.UTF_8)
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.UNAUTHORIZED), new NettyByteBodyFactory(ctx.channel()).adapt(bb))
+                body.close()
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = postHeaders()
+        req1.set(HttpHeaderNames.EXPECT, HttpHeaderValues.CONTINUE)
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then: "we get the 401 and a reset for the request body, but no 100 continue and no goaway"
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        def response = (Http2HeadersFrame) client.readInbound()
+        "401".contentEquals(response.headers().status())
+        response.isEndStream() == responseBody.isEmpty()
+        duplexHandler.received.toString(StandardCharsets.UTF_8) == responseBody
+        Http2ResetFrame rst = client.readInbound()
+        rst.stream() == stream1
+        rst.errorCode() == Http2Error.NO_ERROR.code() // the response was delivered in full
+        client.readInbound() == null
+        server.isOpen()
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+
+        where:
+        responseBody << ["", "unauthorized"]
+    }
+
+    def "response written after the stream is finished is released"() {
+        given:
+        OutboundAccess outboundAccessR = null
+        boolean subscribed = false
+        boolean cancelled = false
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                outboundAccessR = outboundAccess
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when: "the client resets the stream, and the first response is dropped"
+        def stream1 = duplexHandler.newStream()
+        client.writeOutbound(new DefaultHttp2HeadersFrame(postHeaders(), false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        client.writeOutbound(new DefaultHttp2ResetFrame(Http2Error.CANCEL).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        outboundAccessR.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty())
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        client.readInbound() == null
+
+        when: "another response with a buffered body is written"
+        def responseBuf = randomData(100)
+        outboundAccessR.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(server).adapt(responseBuf))
+        EmbeddedTestUtil.advance(server, client)
+        then: "the body is released"
+        responseBuf.refCnt() == 0
+        client.readInbound() == null
+
+        when: "a response with a streaming body is written"
+        outboundAccessR.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(server).adaptNetty(new Publisher<ByteBuf>() {
+            @Override
+            void subscribe(Subscriber<? super ByteBuf> s) {
+                subscribed = true
+                s.onSubscribe(new Subscription() {
+                    @Override
+                    void request(long n) {
+                    }
+
+                    @Override
+                    void cancel() {
+                        cancelled = true
+                    }
+                })
+            }
+        }))
+        EmbeddedTestUtil.advance(server, client)
+        then: "the publisher is either never subscribed to, or cancelled"
+        !subscribed || cancelled
+        client.readInbound() == null
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+}

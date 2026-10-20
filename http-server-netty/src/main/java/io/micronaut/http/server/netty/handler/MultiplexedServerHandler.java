@@ -342,11 +342,8 @@ abstract class MultiplexedServerHandler {
         @Override
         public void write(HttpResponse response, ByteBody body) {
             body.touch();
-            if (finished) {
-                body.touch();
-                // stream reset
-                return;
-            }
+            // note: if the stream is already finished (e.g. reset by the peer), writeFull and
+            // writeStreaming release/cancel the body.
 
             // we do some preparation immediately on the calling thread, so that the ByteBody
             // primary operation happens here.

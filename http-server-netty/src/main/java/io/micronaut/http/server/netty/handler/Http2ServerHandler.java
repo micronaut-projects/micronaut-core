@@ -237,6 +237,16 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         if (http2Error == null) {
             http2Error = Http2Error.INTERNAL_ERROR;
         }
+        if (http2Error == Http2Error.NO_ERROR) {
+            // RFC 9113 section 6.8: a graceful GOAWAY only forbids the receiver from opening new
+            // streams. lastStreamId refers to streams initiated by the receiver, i.e. server
+            // push, which we don't do. The streams the client has already opened "might still
+            // complete successfully", so leave them alone. Netty handles the rest.
+            return;
+        }
+        // GOAWAY with an error code: the peer has detected a connection error and MUST close
+        // the connection (section 5.4.1). Abort the in-flight streams now instead of waiting
+        // for the TCP close.
         Exception e = HTTP2_ERRORS.get(http2Error);
         requiredConnectionHandler().connection().forEachActiveStream(s -> {
             Http2ServerHandler.Http2Stream stream = s.getProperty(streamKey);
@@ -509,20 +519,38 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
         @Override
         void writeHeaders(HttpResponse headers, boolean endStream, ChannelPromise promise) {
-            if (endStream && closeInput) {
-                promise = promise.unvoid();
-                promise.addListener(future -> closeInput());
+            if (endStream) {
+                promise = closeInputWhenWritten(promise);
             }
             requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), HttpConversionUtil.toHttp2Headers(headers, true), 0, endStream, promise);
         }
 
         @Override
         void writeData0(ByteBuf data, boolean endStream, ChannelPromise promise) {
-            if (endStream && closeInput) {
-                promise = promise.unvoid();
-                promise.addListener(future -> closeInput());
+            if (endStream) {
+                promise = closeInputWhenWritten(promise);
             }
             requiredConnectionHandler().encoder().writeData(requiredCtx(), stream.id(), data, 0, endStream, promise);
+        }
+
+        /**
+         * The response is complete once the frame with the given promise has been written. If
+         * the application has discarded the request body by then, tell the client to stop
+         * sending it. The check happens on completion rather than up front because the body is
+         * usually closed after the response was written, while the final frame may still be
+         * queued in the flow controller.
+         *
+         * @param promise The promise of the END_STREAM frame
+         * @return The promise to use for the write
+         */
+        private ChannelPromise closeInputWhenWritten(ChannelPromise promise) {
+            ChannelPromise unvoided = promise.unvoid();
+            unvoided.addListener(future -> {
+                if (closeInput) {
+                    closeInput();
+                }
+            });
+            return unvoided;
         }
     }
 
