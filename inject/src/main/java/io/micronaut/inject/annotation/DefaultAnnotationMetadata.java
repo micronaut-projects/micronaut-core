@@ -179,6 +179,37 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         this.hasEvaluatedExpressions = hasEvaluatedExpressions;
     }
 
+    /**
+     * Creates the metadata of an element that declares everything it has: the declared annotations and stereotypes are
+     * all of them, and are shared rather than stored twice.
+     *
+     * @param declaredAnnotations     The declared annotations, which are all the annotations
+     * @param declaredStereotypes     The declared stereotypes, which are all the stereotypes
+     * @param annotationsByStereotype The annotations by stereotype
+     * @param hasPropertyExpressions  Whether property expressions exist in the metadata
+     * @param hasEvaluatedExpressions Whether evaluated expressions exist in the metadata
+     * @return The metadata
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public static DefaultAnnotationMetadata ofDeclared(
+            @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
+            @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
+            @Nullable Map<String, List<String>> annotationsByStereotype,
+            boolean hasPropertyExpressions,
+            boolean hasEvaluatedExpressions) {
+        return new DefaultAnnotationMetadata(
+            declaredAnnotations,
+            declaredStereotypes,
+            declaredStereotypes,
+            declaredAnnotations,
+            annotationsByStereotype,
+            hasPropertyExpressions,
+            hasEvaluatedExpressions
+        );
+    }
+
     @Override
     public AnnotationMetadata getDeclaredMetadata() {
         if (isDeclaredOnly()) {
