@@ -15,7 +15,7 @@ snippet::io.micronaut.docs.server.filters.bodybuffer.ChecksumController[tags="cl
 
 NOTE: `AsyncRequestBody.of(request)` is supported by the Netty server. A server that does not support it, e.g. a servlet server without support for it yet, throws an `UnsupportedOperationException`: a filter method can take an api:http.body.AsyncRequestBody[] argument there instead.
 
-Each call of `AsyncRequestBody.of` with the same request returns the same body, which is read once: read a `copy()` for each reader, also for readers that run at the same time.
+Each call of `AsyncRequestBody.of` creates an independent reader. Readers of the same bytes share their consumption state and synchronize access, including readers acquired through different wrappers. Acquiring another reader does not copy the bytes or allow the same bytes to be consumed twice: read a `copy()` for each reader that must leave the body for the route. The body is resolved when the read starts, so an earlier lookup does not hide a body replacement by another filter.
 
 Nothing is read before the filter reads the body, so requests whose filters do not read it stream their body to the route as usual. A request that sends `Expect: 100-continue` is answered with `100 Continue` when the filter reads the body: a filter that answers without reading it, e.g. with `401`, never receives it.
 

@@ -421,9 +421,11 @@ public interface AsyncRequestBody {
      * e.g. an {@link io.micronaut.http.filter.HttpServerFilter} or a filter of a functional
      * route: the body of the request as the filters before it left it, like the
      * {@code AsyncRequestBody} argument of a filter method. Read a {@link #copy()} of it to leave
-     * the body for the route. The calls with the same request return the same
-     * {@code AsyncRequestBody}, which has one read: read a {@link #copy()} of it for each reader,
-     * e.g. for two readers that run at the same time.
+     * the body for the route. Each call creates an independent reader; acquiring another reader
+     * does not copy the bytes or allow the same bytes to be consumed twice. Readers of requests that
+     * wrap the same body share its consumption state and synchronize access to its bytes.
+     * The effective body is resolved when a read starts, including a replacement set after this
+     * method was called. Read a {@link #copy()} for each reader that must leave the body intact.
      *
      * <p>It is supported by the Netty server. A server that does not support it, e.g. a servlet
      * server that does not implement it yet, throws an {@link UnsupportedOperationException}.</p>

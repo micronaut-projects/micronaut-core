@@ -18,6 +18,7 @@ package io.micronaut.http.server.tck.tests.filter;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -95,7 +96,7 @@ public class AsyncRequestBodyOfTest {
         try (ServerUnderTest server = server(Map.of())) {
             HttpResponse<String> response = server.exchange(post("/fbb/concurrent", body), String.class);
             assertEquals(200, response.code());
-            assertEquals("same," + sha256(body) + "," + sha256(body) + ":" + body.length(), response.body());
+            assertEquals(sha256(body) + "," + sha256(body) + "," + sha256(body) + ":" + body.length(), response.body());
         }
     }
 
@@ -196,14 +197,17 @@ public class AsyncRequestBodyOfTest {
                 }));
             routes.serverFilter("/fbb/concurrent").beforeReplacingAsync(request -> {
                 AsyncRequestBody first = AsyncRequestBody.of(request);
-                AsyncRequestBody second = AsyncRequestBody.of(request);
-                // two readers that acquired the body separately read their copies on other threads
+                AsyncRequestBody second = AsyncRequestBody.of(new HttpRequestWrapper<>(request));
+                AsyncRequestBody third = AsyncRequestBody.of(request);
+                // readers acquired through different wrappers share the same byte-body lock
                 CompletableFuture<byte[]> a = CompletableFuture.supplyAsync(() -> second.copy().bytes(Integer.MAX_VALUE))
                     .thenCompose(CompletionStage::toCompletableFuture);
                 CompletableFuture<byte[]> b = CompletableFuture.supplyAsync(() -> first.copy().bytes(Integer.MAX_VALUE))
                     .thenCompose(CompletionStage::toCompletableFuture);
-                return a.thenCombine(b, (x, y) -> {
-                    request.setAttribute(DIGEST, (first == second ? "same," : "different,") + sha256(x) + "," + sha256(y));
+                CompletableFuture<byte[]> c = CompletableFuture.supplyAsync(() -> third.copy().bytes(Integer.MAX_VALUE))
+                    .thenCompose(CompletionStage::toCompletableFuture);
+                return a.thenCombine(b, (x, y) -> sha256(x) + "," + sha256(y)).thenCombine(c, (digests, z) -> {
+                    request.setAttribute(DIGEST, digests + "," + sha256(z));
                     return (HttpResponse<?>) null;
                 });
             });
