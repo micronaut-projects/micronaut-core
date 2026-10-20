@@ -491,8 +491,9 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                     continue;
                 }
                 if (uniqueNames == null) {
-                    // Only created once there is a second name to compare: the list holds the first name only
-                    uniqueNames = new HashSet<>();
+                    // Only created once there is a second name to compare: the list holds the first name only. Few names
+                    // are expected, so a small table
+                    uniqueNames = new HashSet<>(4);
                     uniqueNames.add(list.get(0));
                 }
                 if (uniqueNames.add(name)) {
@@ -518,8 +519,9 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                     continue;
                 }
                 if (uniqueValues == null) {
-                    // Only created once there is a second value to compare: the list holds the first value only
-                    uniqueValues = new HashSet<>();
+                    // Only created once there is a second value to compare: the list holds the first value only. Few values
+                    // are expected, so a small table
+                    uniqueValues = new HashSet<>(4);
                     uniqueValues.add(list.get(0));
                 }
                 if (uniqueValues.add(value)) {
@@ -610,8 +612,9 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                     continue;
                 }
                 if (uniqueValues == null) {
-                    // Only created once there is a second value to compare: the list holds the first value only
-                    uniqueValues = new HashSet<>();
+                    // Only created once there is a second value to compare: the list holds the first value only. Few values
+                    // are expected, so a small table
+                    uniqueValues = new HashSet<>(4);
                     uniqueValues.add(list.get(0));
                 }
                 if (uniqueValues.add(value)) {
@@ -645,8 +648,9 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
                     continue;
                 }
                 if (uniqueValues == null) {
-                    // Only created once there is a second value to compare: the list holds the first value only
-                    uniqueValues = new HashSet<>();
+                    // Only created once there is a second value to compare: the list holds the first value only. Few values
+                    // are expected, so a small table
+                    uniqueValues = new HashSet<>(4);
                     uniqueValues.add(list.get(0));
                 }
                 if (uniqueValues.add(value)) {
