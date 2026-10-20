@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -192,25 +193,50 @@ class CachedValuesTest {
     @Test
     void racingCallsGetTheSameKeptValue() throws Exception {
         ExecutableMethod<PlainBean, Object> method = method("annotated");
-        int threads = 8;
+        int threads = 4;
+        // Every factory waits for the others, so that they all compute before one is kept
+        CyclicBarrier computing = new CyclicBarrier(threads);
         ExecutorService executor = Executors.newFixedThreadPool(threads);
         try {
-            CountDownLatch start = new CountDownLatch(1);
             List<Future<Object>> results = new ArrayList<>();
             for (int i = 0; i < threads; i++) {
-                results.add(executor.submit(() -> {
-                    start.await();
-                    return method.getCachedValue(Object.class, m -> new Object());
-                }));
+                results.add(executor.submit(() -> method.getCachedValue(Object.class, m -> {
+                    try {
+                        computing.await(10, TimeUnit.SECONDS);
+                    } catch (Exception e) {
+                        throw new IllegalStateException(e);
+                    }
+                    return new Object();
+                })));
             }
-            start.countDown();
-            Object kept = method.getCachedValue(Object.class, m -> new Object());
+            Object kept = results.get(0).get(10, TimeUnit.SECONDS);
             for (Future<Object> result : results) {
-                assertSame(kept, result.get());
+                assertSame(kept, result.get(10, TimeUnit.SECONDS));
             }
+            assertSame(kept, method.getCachedValue(Object.class, m -> new Object()));
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    void aBuiltAnnotationIsKeptApartFromAValueKeptUnderItsType() {
+        ExecutableMethod<PlainBean, Object> method = method("annotated");
+
+        assertNull(method.getCachedValue(Sample.class, m -> null));
+        Sample sample = method.getCachedAnnotation(Sample.class);
+        assertNotNull(sample);
+        assertEquals("sample", sample.name());
+        assertNull(method.getCachedValue(Sample.class, m -> sample));
+
+        ExecutableMethod<PlainBean, Object> other = method("placeholderAnnotated");
+        assertNotNull(other.getCachedAnnotation(Sample.class));
+        AtomicInteger computed = new AtomicInteger();
+        assertNull(other.getCachedValue(Sample.class, m -> {
+            computed.incrementAndGet();
+            return null;
+        }));
+        assertEquals(1, computed.get());
     }
 
     @Test

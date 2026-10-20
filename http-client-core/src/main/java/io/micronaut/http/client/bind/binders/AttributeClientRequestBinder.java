@@ -35,8 +35,10 @@ public class AttributeClientRequestBinder implements AnnotatedClientRequestBinde
     public void bind(MethodInvocationContext<Object, Object> context,
                      ClientRequestUriContext uriContext,
                      MutableHttpRequest<?> request) {
-        // The attributes of the method are kept by the method
-        List<Object> attributes = context.getCachedValue(Attributes.class, Attributes::of).namesAndValues();
+        // The attributes of the method are kept by the method, unless their placeholders may resolve to another value
+        // on every request (e.g. ${random.uuid})
+        List<Object> attributes = (context.hasPropertyExpressions() ? Attributes.of(context) : context.getCachedValue(Attributes.class, Attributes::of))
+            .namesAndValues();
         for (int i = 0; i < attributes.size(); i += 2) {
             request.setAttribute((String) attributes.get(i), attributes.get(i + 1));
         }

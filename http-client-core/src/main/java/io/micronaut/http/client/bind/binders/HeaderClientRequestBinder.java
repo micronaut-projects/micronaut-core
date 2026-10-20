@@ -36,8 +36,10 @@ public class HeaderClientRequestBinder implements AnnotatedClientRequestBinder<H
     public void bind(MethodInvocationContext<Object, Object> context,
                      ClientRequestUriContext uriContext,
                      MutableHttpRequest<?> request) {
-        // The headers of the method are kept by the method
-        List<String> headers = context.getCachedValue(Headers.class, Headers::of).namesAndValues();
+        // The headers of the method are kept by the method, unless their placeholders may resolve to another value
+        // on every request (e.g. ${random.uuid})
+        List<String> headers = (context.hasPropertyExpressions() ? Headers.of(context) : context.getCachedValue(Headers.class, Headers::of))
+            .namesAndValues();
         if (!headers.isEmpty()) {
             MutableHttpHeaders requestHeaders = request.getHeaders();
             for (int i = 0; i < headers.size(); i += 2) {
