@@ -185,21 +185,7 @@ abstract class MultiplexedServerHandler {
 
                 if (endOfStream) {
                     // we got the full message before readComplete
-                    ByteBuf fullBody;
-                    if (bufferedContent == null) {
-                        fullBody = data;
-                    } else {
-                        bufferedContent.add(data);
-                        List<ByteBuf> pieces = bufferedContent;
-                        // composeBody takes ownership of the pieces even when it fails
-                        bufferedContent = null;
-                        fullBody = PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
-                    }
-                    bufferedContent = null;
-
-                    requestAccepted = true;
-                    notifyDataConsumed(fullBody.readableBytes());
-                    requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory().createChecked(bodySizeLimits, fullBody), this);
+                    acceptFullBody(data);
                 } else {
                     if (bufferedContent == null) {
                         bufferedContent = new ArrayList<>();
@@ -214,6 +200,55 @@ abstract class MultiplexedServerHandler {
                 }
             }
             return 0;
+        }
+
+        /**
+         * Accept the request with the buffered content and the given last piece as its full body.
+         *
+         * @param data The last piece of the body. Release ownership is transferred to this method
+         */
+        private void acceptFullBody(ByteBuf data) {
+            ByteBuf fullBody;
+            if (bufferedContent == null) {
+                fullBody = data;
+            } else {
+                if (data.isReadable()) {
+                    bufferedContent.add(data);
+                } else {
+                    data.release();
+                }
+                List<ByteBuf> pieces = bufferedContent;
+                // composeBody takes ownership of the pieces even when it fails
+                bufferedContent = null;
+                fullBody = PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
+            }
+
+            requestAccepted = true;
+            notifyDataConsumed(fullBody.readableBytes());
+            requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory().createChecked(bodySizeLimits, fullBody), this);
+        }
+
+        /**
+         * Called when request trailers are read. The trailer values are not exposed to the
+         * application, but the END_STREAM flag they carry completes the request body.
+         *
+         * @param endOfStream Whether this is the last request packet
+         */
+        final void onTrailersRead(boolean endOfStream) {
+            if (!endOfStream || inputEnded || reset || closed || request == null) {
+                return;
+            }
+            if (streamer == null) {
+                if (requestAccepted) {
+                    // the request had no body and was accepted with the headers
+                    return;
+                }
+                // we got the full message before readComplete
+                acceptFullBody(Unpooled.EMPTY_BUFFER);
+            } else {
+                inputEnded = true;
+                streamer.complete();
+            }
         }
 
         /**

@@ -1366,4 +1366,294 @@ class Http2ServerHandlerSpec extends Specification {
         where:
         streaming << [false, true]
     }
-}
+
+    /**
+     * Like {@link #configure(RequestHandler)}, but the client bytes are not forwarded
+     * automatically. Use {@link #transfer(EmbeddedChannel, EmbeddedChannel, boolean)} to deliver
+     * everything the client has written so far to the server as a <i>single</i> read batch.
+     */
+    private static Tuple3<EmbeddedChannel, EmbeddedChannel, DuplexHandler> configureRaw(RequestHandler requestHandler) {
+        EmbeddedChannel server = new EmbeddedChannel(new Http2ServerHandler.ConnectionHandlerBuilder(requestHandler).build())
+        def duplexHandler = new DuplexHandler()
+        EmbeddedChannel client = new EmbeddedChannel(Http2FrameCodecBuilder.forClient().build(), duplexHandler)
+        return new Tuple(server, client, duplexHandler)
+    }
+
+    private static ByteBuf drainOutbound(EmbeddedChannel channel) {
+        CompositeByteBuf composite = ByteBufAllocator.DEFAULT.compositeBuffer()
+        ByteBuf buf
+        while ((buf = channel.readOutbound()) != null) {
+            composite.addComponent(true, buf)
+        }
+        return composite
+    }
+
+    /**
+     * Deliver all bytes the raw client has written to the server in one channelRead, optionally
+     * followed by a channelReadComplete, and then forward the server output to the client.
+     */
+    private static void transfer(EmbeddedChannel server, EmbeddedChannel client, boolean readComplete) {
+        def packet = drainOutbound(client)
+        if (readComplete) {
+            server.writeInbound(packet)
+        } else {
+            server.writeOneInbound(packet)
+        }
+        server.runPendingTasks()
+        def response = drainOutbound(server)
+        if (response.isReadable() && client.isOpen()) {
+            client.writeInbound(response)
+        } else {
+            response.release()
+        }
+        client.runPendingTasks()
+    }
+
+    private static DefaultHttp2Headers postHeaders() {
+        def req = new DefaultHttp2Headers()
+        req.method(HttpMethod.POST.asciiName())
+        req.scheme("http")
+        req.authority("yawk.at")
+        req.path("/")
+        return req
+    }
+
+    private static class BodyCollector implements Subscriber<ByteBuf> {
+        final CompositeByteBuf received = ByteBufAllocator.DEFAULT.compositeBuffer()
+        Throwable err
+        boolean complete
+
+        @Override
+        void onSubscribe(Subscription s) {
+            s.request(Long.MAX_VALUE)
+        }
+
+        @Override
+        void onNext(ByteBuf byteBuf) {
+            received.addComponent(true, byteBuf)
+        }
+
+        @Override
+        void onError(Throwable t) {
+            err = t
+        }
+
+        @Override
+        void onComplete() {
+            complete = true
+        }
+    }
+
+    def "stream reset before readComplete releases buffered data"() {
+        given:
+        boolean accepted = false
+        def (server, client, duplexHandler) = configureRaw(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                accepted = true
+                body.close()
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when: "headers, data and rst arrive in one read batch"
+        def stream1 = duplexHandler.newStream()
+        client.writeOutbound(new DefaultHttp2HeadersFrame(postHeaders(), false).stream(stream1))
+        client.writeOutbound(new DefaultHttp2DataFrame(randomData(500), false).stream(stream1))
+        client.writeOutbound(new DefaultHttp2ResetFrame(Http2Error.CANCEL).stream(stream1))
+        transfer(server, client, true)
+        then: "the request was never dispatched, and the buffered data is released (checked by the leak detector)"
+        !accepted
+        server.isOpen()
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+    }
+
+    def "connection close with streaming body in progress"() {
+        given:
+        def collector = new BodyCollector()
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                NettyByteBodyFactory.toByteBufs(body).subscribe(collector)
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when: "send the request headers and some data"
+        def stream1 = duplexHandler.newStream()
+        client.writeOutbound(new DefaultHttp2HeadersFrame(postHeaders(), false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        def data1 = randomData(500)
+        client.writeOutbound(new DefaultHttp2DataFrame(data1.retainedSlice(), false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then: "the body is in streaming mode and the data has been received"
+        collector.received.readSlice(collector.received.readableBytes()) == data1
+        collector.err == null
+        !collector.complete
+
+        when: "the connection goes away (idle timeout, client disconnect)"
+        server.unsafe().close(server.newPromise())
+        EmbeddedTestUtil.advance(server, client)
+        then: "the body subscriber is notified"
+        collector.err instanceof ClosedChannelException
+        !collector.complete
+
+        cleanup:
+        collector.received.release()
+        data1.release()
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+    }
+
+    def "connection close before readComplete releases buffered data"() {
+        given:
+        boolean accepted = false
+        def (server, client, duplexHandler) = configureRaw(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                accepted = true
+                body.close()
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when: "headers and data arrive in one read, and the connection closes before readComplete"
+        def stream1 = duplexHandler.newStream()
+        client.writeOutbound(new DefaultHttp2HeadersFrame(postHeaders(), false).stream(stream1))
+        client.writeOutbound(new DefaultHttp2DataFrame(randomData(500), false).stream(stream1))
+        transfer(server, client, false)
+        server.unsafe().close(server.newPromise())
+        server.runPendingTasks()
+        then: "the request was never dispatched, and the buffered data is released (checked by the leak detector)"
+        !accepted
+        !server.isOpen()
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+    }
+
+    def "trailers complete the request body (readComplete between frames)"() {
+        given:
+        def collector = new BodyCollector()
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                NettyByteBodyFactory.toByteBufs(body).subscribe(collector)
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when: "send headers, data and trailers, each in their own read"
+        def stream1 = duplexHandler.newStream()
+        client.writeOutbound(new DefaultHttp2HeadersFrame(postHeaders(), false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        def data1 = randomData(500)
+        client.writeOutbound(new DefaultHttp2DataFrame(data1.retainedSlice(), false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        !collector.complete
+
+        when:
+        def trailers = new DefaultHttp2Headers()
+        trailers.set("x-checksum", "abc")
+        client.writeOutbound(new DefaultHttp2HeadersFrame(trailers, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then: "the body completes with the data, and the response arrives"
+        collector.complete
+        collector.err == null
+        collector.received.readSlice(collector.received.readableBytes()) == data1
+        def response = (Http2HeadersFrame) client.readInbound()
+        "200".contentEquals(response.headers().status())
+        response.isEndStream()
+
+        cleanup:
+        collector.received.release()
+        data1.release()
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "trailers complete the request body (single read batch)"() {
+        given:
+        boolean accepted = false
+        ByteBuf receivedBody = null
+        Throwable err = null
+        def (server, client, duplexHandler) = configureRaw(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                accepted = true
+                InternalByteBody.bufferFlow(body).onComplete((imm, t) -> {
+                    err = t
+                    if (imm != null) {
+                        receivedBody = NettyByteBodyFactory.toByteBuf(imm)
+                    }
+                })
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when: "headers, data and trailers arrive in one read batch"
+        def stream1 = duplexHandler.newStream()
+        client.writeOutbound(new DefaultHttp2HeadersFrame(postHeaders(), false).stream(stream1))
+        def data1 = randomData(500)
+        client.writeOutbound(new DefaultHttp2DataFrame(data1.retainedSlice(), false).stream(stream1))
+        def trailers = new DefaultHttp2Headers()
+        trailers.set("x-checksum", "abc")
+        client.writeOutbound(new DefaultHttp2HeadersFrame(trailers, true).stream(stream1))
+        transfer(server, client, true)
+        then: "the request is dispatched with the full body, and the response arrives"
+        accepted
+        err == null
+        receivedBody != null
+        receivedBody == data1
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        def response = (Http2HeadersFrame) client.readInbound()
+        "200".contentEquals(response.headers().status())
+        response.isEndStream()
+
+        cleanup:
+        receivedBody?.release()
+        data1.release()
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+    }
