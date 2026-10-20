@@ -23,7 +23,9 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Header;
 import io.micronaut.http.client.bind.AnnotatedClientRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
+import io.micronaut.inject.ExecutableMethod;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -34,14 +36,12 @@ public class HeaderClientRequestBinder implements AnnotatedClientRequestBinder<H
     public void bind(MethodInvocationContext<Object, Object> context,
                      ClientRequestUriContext uriContext,
                      MutableHttpRequest<?> request) {
-        List<AnnotationValue<Header>> headerAnnotations = context.getAnnotationValuesByType(Header.class);
-        for (AnnotationValue<Header> headerAnnotation : headerAnnotations) {
-            String headerName = headerAnnotation.stringValue("name").orElse(null);
-            String headerValue = headerAnnotation.stringValue().orElse(null);
-            MutableHttpHeaders headers = request.getHeaders();
-
-            if (StringUtils.isNotEmpty(headerName) && StringUtils.isNotEmpty(headerValue)) {
-                headers.setIfMissing(headerName, headerValue);
+        // The headers of the method are kept by the method
+        List<String> headers = context.getCachedValue(Headers.class, Headers::of).namesAndValues();
+        if (!headers.isEmpty()) {
+            MutableHttpHeaders requestHeaders = request.getHeaders();
+            for (int i = 0; i < headers.size(); i += 2) {
+                requestHeaders.setIfMissing(headers.get(i), headers.get(i + 1));
             }
         }
     }
@@ -50,4 +50,27 @@ public class HeaderClientRequestBinder implements AnnotatedClientRequestBinder<H
     public Class<Header> getAnnotationType() {
         return Header.class;
     }
+
+    /**
+     * The headers of a client method, as name/value pairs, skipping a header without a name or a value.
+     *
+     * @param namesAndValues The names and values
+     */
+    private record Headers(List<String> namesAndValues) {
+
+        static Headers of(ExecutableMethod<?, ?> method) {
+            List<AnnotationValue<Header>> headerAnnotations = method.getAnnotationValuesByType(Header.class);
+            List<String> namesAndValues = new ArrayList<>(headerAnnotations.size() * 2);
+            for (AnnotationValue<Header> headerAnnotation : headerAnnotations) {
+                String headerName = headerAnnotation.stringValue("name").orElse(null);
+                String headerValue = headerAnnotation.stringValue().orElse(null);
+                if (StringUtils.isNotEmpty(headerName) && StringUtils.isNotEmpty(headerValue)) {
+                    namesAndValues.add(headerName);
+                    namesAndValues.add(headerValue);
+                }
+            }
+            return new Headers(List.copyOf(namesAndValues));
+        }
+    }
+
 }
