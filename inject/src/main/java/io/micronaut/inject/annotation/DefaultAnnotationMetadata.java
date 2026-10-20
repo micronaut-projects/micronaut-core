@@ -17,6 +17,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationDefaultValuesProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -66,6 +67,11 @@ import java.util.stream.Collectors;
  */
 @Internal
 public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implements AnnotationMetadata, Cloneable, EnvironmentAnnotationMetadata {
+
+    /**
+     * Resolves the defaults when the annotation value is asked for them, instead of on every lookup.
+     */
+    private static final AnnotationDefaultValuesProvider DEFAULT_VALUES_PROVIDER = AnnotationMetadataSupport::getDefaultValuesOrNull;
 
     @Nullable
     Map<String, Map<CharSequence, Object>> declaredAnnotations;
@@ -1014,7 +1020,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     protected <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
-        return new AnnotationValue<>(annotationType, values, AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType));
+        return new AnnotationValue<>(annotationType, values, DEFAULT_VALUES_PROVIDER);
     }
 
     @Override
