@@ -1648,19 +1648,26 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                                                                                          Map<String, Map<CharSequence, Object>> sourceStereotypes,
                                                                                          @Nullable
                                                                                          Map<String, Map<CharSequence, Object>> sourceAnnotations) {
-        if (!hasStereotype(repeatableTypeName)) {
+        Map<CharSequence, Object> annotationValues = sourceAnnotations != null ? sourceAnnotations.get(repeatableTypeName) : null;
+        Map<CharSequence, Object> stereotypeValues = sourceStereotypes != null ? sourceStereotypes.get(repeatableTypeName) : null;
+        // Found in a map that hasStereotype consults: it would answer true, so skip it
+        boolean present = annotationValues != null && isStereotypeSource(sourceAnnotations)
+            || stereotypeValues != null && isStereotypeSource(sourceStereotypes);
+        if (!present && !hasStereotype(repeatableTypeName)) {
             return null;
         }
-        List<AnnotationValue<T>> results = null;
-        if (sourceAnnotations != null) {
-            Map<CharSequence, Object> values = sourceAnnotations.get(repeatableTypeName);
-            results = collectResult(results, values);
-        }
-        if (sourceStereotypes != null) {
-            Map<CharSequence, Object> values = sourceStereotypes.get(repeatableTypeName);
-            results = collectResult(results, values);
-        }
+        List<AnnotationValue<T>> results = collectResult(null, annotationValues);
+        results = collectResult(results, stereotypeValues);
         return results == null ? List.of() : results;
+    }
+
+    /**
+     * @param source The annotations or stereotypes
+     * @return Whether {@link #hasStereotype(String)} consults the map, for metadata that does not override it
+     */
+    private boolean isStereotypeSource(@Nullable Map<String, Map<CharSequence, Object>> source) {
+        return getClass() == DefaultAnnotationMetadata.class
+            && (source == allAnnotations || source == declaredAnnotations || source == allStereotypes);
     }
 
     @Nullable
