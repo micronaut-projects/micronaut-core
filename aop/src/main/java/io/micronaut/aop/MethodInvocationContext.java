@@ -14,8 +14,14 @@
  * limitations under the License.
  */
 package io.micronaut.aop;
+
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
+import org.jspecify.annotations.Nullable;
+
+import java.lang.annotation.Annotation;
+import java.util.function.Function;
 
 /**
  * Extended version of {@link InvocationContext} for {@link MethodInterceptor} instances.
@@ -47,5 +53,39 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
     @Override
     default Class<T> getDeclaringType() {
         return getExecutableMethod().getDeclaringType();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The value is kept by the {@link #getExecutableMethod() executable method} when the invocation sees its
+     * metadata, and is computed for the invocation otherwise, so that evaluated expressions see its target and
+     * arguments.</p>
+     */
+    @Override
+    default <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
+        ExecutableMethod<T, R> executableMethod = getExecutableMethod();
+        if (executableMethod == this || executableMethod.getAnnotationMetadata() != getAnnotationMetadata()) {
+            return factory.apply(this);
+        }
+        return executableMethod.getCachedValue(key, factory);
+    }
+
+    @Override
+    default <A extends Annotation> @Nullable AnnotationValue<A> getCachedAnnotationValue(Class<A> annotationType) {
+        ExecutableMethod<T, R> executableMethod = getExecutableMethod();
+        if (executableMethod == this || executableMethod.getAnnotationMetadata() != getAnnotationMetadata()) {
+            return getAnnotation(annotationType);
+        }
+        return executableMethod.getCachedAnnotationValue(annotationType);
+    }
+
+    @Override
+    default <A extends Annotation> @Nullable A getCachedAnnotation(Class<A> annotationType) {
+        ExecutableMethod<T, R> executableMethod = getExecutableMethod();
+        if (executableMethod == this || executableMethod.getAnnotationMetadata() != getAnnotationMetadata()) {
+            return ExecutableMethod.super.getCachedAnnotation(annotationType);
+        }
+        return executableMethod.getCachedAnnotation(annotationType);
     }
 }

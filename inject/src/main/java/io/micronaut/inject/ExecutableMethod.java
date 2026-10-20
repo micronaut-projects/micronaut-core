@@ -15,12 +15,19 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.core.annotation.AnnotationBuilder;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.Described;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 
+import org.jspecify.annotations.Nullable;
+
+import java.lang.annotation.Annotation;
 import java.util.Arrays;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -71,4 +78,70 @@ public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReferenc
     default String getDescription() {
         return getDescription(true);
     }
+
+    /**
+     * A value derived from this method, computed once by the factory and kept for the next calls. Interceptors use it
+     * to avoid reading the annotation metadata or rebuilding the same objects on every invocation.
+     *
+     * <p>The key identifies the value: use a type owned by the caller, such as a record holding what the factory
+     * derives. The factory must not have side effects and must return an immutable value: it may be invoked more than
+     * once when calls race, and the value of the first call to finish is kept. The value is computed on every call,
+     * without being kept, when the metadata of the method resolves property placeholders or evaluated expressions,
+     * and by implementations that don't keep values.</p>
+     *
+     * @param key     The key of the value
+     * @param factory Computes the value from the method
+     * @param <V>     The value type
+     * @return The value
+     * @since 5.3.0
+     */
+    @Experimental
+    default <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
+        return factory.apply(this);
+    }
+
+    /**
+     * The value of the given annotation on this method, kept as {@link #getCachedValue(Class, Function)} keeps values.
+     *
+     * @param annotationType The annotation type
+     * @param <A>            The annotation type
+     * @return The annotation value or {@code null} if the method doesn't have the annotation
+     * @since 5.3.0
+     */
+    @Experimental
+    default <A extends Annotation> @Nullable AnnotationValue<A> getCachedAnnotationValue(Class<A> annotationType) {
+        return getAnnotation(annotationType);
+    }
+
+    /**
+     * The given annotation of this method, built by the {@link AnnotationBuilder} registered for its type and kept as
+     * {@link #getCachedValue(Class, Function)} keeps values. The annotation is never synthesized reflectively.
+     *
+     * @param annotationType The annotation type
+     * @param <A>            The annotation type
+     * @return The annotation or {@code null} if the method doesn't have the annotation
+     * @throws IllegalStateException If no {@link AnnotationBuilder} is registered for the annotation type
+     * @since 5.3.0
+     */
+    @Experimental
+    default <A extends Annotation> @Nullable A getCachedAnnotation(Class<A> annotationType) {
+        AnnotationValue<A> annotationValue = getCachedAnnotationValue(annotationType);
+        return annotationValue != null ? buildAnnotation(annotationType, annotationValue) : null;
+    }
+
+
+    /**
+     * Builds an annotation with the builder registered for its type.
+     *
+     * @param annotationType  The annotation type
+     * @param annotationValue The annotation value
+     * @param <A>             The annotation type
+     * @return The annotation
+     */
+    private static <A extends Annotation> A buildAnnotation(Class<A> annotationType, AnnotationValue<A> annotationValue) {
+        AnnotationBuilder<A> builder = AnnotationBuilder.find(annotationType).orElseThrow(() -> new IllegalStateException(
+            "No AnnotationBuilder is registered for " + annotationType.getName() + ": register it with @RegisterAnnotations"));
+        return builder.build(annotationValue, ConversionService.SHARED);
+    }
+
 }

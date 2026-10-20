@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -34,6 +35,7 @@ import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -422,6 +425,11 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     private static final class DispatchedExecutableMethod<T, R> implements ExecutableMethod<T, R>,
         EnvironmentConfigurable, BeanContextConfigurable, UnsafeExecutable<T, R> {
 
+        /**
+         * A kept {@code null} value.
+         */
+        private static final Object NULL_VALUE = new Object();
+
         private final AbstractExecutableMethodsDefinition dispatcher;
         private final int index;
         private final MethodReference methodReference;
@@ -450,6 +458,109 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         @Nullable
         private ImmutableStringIntMap argumentIndex;
 
+        /**
+         * The values kept by {@link #getCachedValue(Class, Function)} and the annotation lookups, as key/value pairs:
+         * {@code null} until a value is kept, then replaced by a longer copy for each new key.
+         */
+        @SuppressWarnings("java:S3077") // never modified once published: volatile publishes it
+        private volatile Object @Nullable [] cachedValues;
+
+        @Override
+        @SuppressWarnings({"unchecked", "NullAway"}) // V is nullable when the factory returns null
+        public <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
+            Object[] values = cachedValues;
+            if (values != null) {
+                for (int i = 0; i < values.length; i += 2) {
+                    if (values[i] == key && !isAnnotationValueEntry(values[i + 1])) {
+                        return (V) unmask(values[i + 1]);
+                    }
+                }
+            }
+            AnnotationMetadata metadata = annotationMetadata;
+            if (!isCacheable(metadata)) {
+                return factory.apply(this);
+            }
+            return (V) unmask(keep(metadata, key, mask(factory.apply(this)), false));
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <A extends Annotation> @Nullable AnnotationValue<A> getCachedAnnotationValue(Class<A> annotationType) {
+            Object[] values = cachedValues;
+            if (values != null) {
+                for (int i = 0; i < values.length; i += 2) {
+                    if (values[i] == annotationType && values[i + 1] instanceof KeptAnnotationValue kept) {
+                        return (AnnotationValue<A>) kept.value;
+                    }
+                }
+            }
+            AnnotationMetadata metadata = annotationMetadata;
+            AnnotationValue<A> annotationValue = metadata.getAnnotation(annotationType);
+            if (!isCacheable(metadata)) {
+                return annotationValue;
+            }
+            return (AnnotationValue<A>) ((KeptAnnotationValue) keep(metadata, annotationType, new KeptAnnotationValue(annotationValue), true)).value;
+        }
+
+        @Override
+        public <A extends Annotation> @Nullable A getCachedAnnotation(Class<A> annotationType) {
+            // Kept under the annotation type, as getCachedValue(annotationType, ...) would keep it
+            return getCachedValue(annotationType, method -> ExecutableMethod.super.getCachedAnnotation(annotationType));
+        }
+
+        /**
+         * @param metadata The metadata of the method
+         * @return Whether values derived from the metadata can be kept: values resolved from property placeholders can
+         * change with the environment, and evaluated expressions depend on the invocation
+         */
+        private boolean isCacheable(AnnotationMetadata metadata) {
+            return !metadata.hasPropertyExpressions() && !metadata.hasEvaluatedExpressions() && !argumentsAnnotationsWithExpressions;
+        }
+
+        /**
+         * Keeps the value under the key, unless another call kept one first or the metadata it was computed from was
+         * replaced meanwhile.
+         *
+         * @param metadata        The metadata the value was computed from
+         * @param key             The key
+         * @param value           The value, masked
+         * @param annotationValue Whether it is an annotation value entry
+         * @return The kept value, masked
+         */
+        private synchronized Object keep(AnnotationMetadata metadata, Class<?> key, Object value, boolean annotationValue) {
+            if (metadata != annotationMetadata) {
+                return value;
+            }
+            Object[] values = cachedValues;
+            if (values == null) {
+                cachedValues = new Object[] {key, value};
+                return value;
+            }
+            for (int i = 0; i < values.length; i += 2) {
+                if (values[i] == key && isAnnotationValueEntry(values[i + 1]) == annotationValue) {
+                    return values[i + 1];
+                }
+            }
+            Object[] newValues = Arrays.copyOf(values, values.length + 2);
+            newValues[values.length] = key;
+            newValues[values.length + 1] = value;
+            cachedValues = newValues;
+            return value;
+        }
+
+        private static boolean isAnnotationValueEntry(Object value) {
+            return value instanceof KeptAnnotationValue;
+        }
+
+        private static Object mask(@Nullable Object value) {
+            return value != null ? value : NULL_VALUE;
+        }
+
+        @Nullable
+        private static Object unmask(Object value) {
+            return value == NULL_VALUE ? null : value;
+        }
+
         private DispatchedExecutableMethod(AbstractExecutableMethodsDefinition dispatcher,
                                            int index,
                                            MethodReference methodReference,
@@ -467,6 +578,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public void configure(Environment environment) {
+            cachedValues = null;
             if (declaredAnnotationMetadata.hasPropertyExpressions()) {
                 environmentAnnotationMetadata = new MethodAnnotationMetadata(declaredAnnotationMetadata, environment);
                 annotationMetadata = environmentAnnotationMetadata;
@@ -475,6 +587,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public void configure(BeanContext beanContext) {
+            cachedValues = null;
             annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(environmentAnnotationMetadata);
             if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
                 eam.configure(beanContext);
@@ -715,4 +828,14 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             return environment;
         }
     }
+
+    /**
+     * A value kept by {@code getCachedAnnotationValue}, told apart from a value kept by {@code getCachedValue} under
+     * the same annotation type.
+     *
+     * @param value The annotation value or {@code null} when the method doesn't have the annotation
+     */
+    private record KeptAnnotationValue(@Nullable AnnotationValue<?> value) {
+    }
+
 }
