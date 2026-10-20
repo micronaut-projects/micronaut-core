@@ -1532,6 +1532,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (other == null || !annotationName.equals(other.getAnnotationName())) {
             return false;
         }
+        if (values == other.values && getClass() == AnnotationValue.class && other.getClass() == AnnotationValue.class
+            && getDefaultValues() == other.getDefaultValues()) {
+            // The same stored members and defaults: no need to read them
+            return true;
+        }
         // Compares the members completed with the defaults, declared members winning, without building the
         // completed maps
         Map<CharSequence, Object> declared = memberValues();
@@ -1625,6 +1630,10 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
         if (!annotationName.equals(other.getAnnotationName())) {
             return false;
+        }
+        if (values == other.values && getClass() == AnnotationValue.class && other.getClass() == AnnotationValue.class) {
+            // The same stored members: no need to read them
+            return true;
         }
 
         Map<CharSequence, Object> otherValues = other.memberValues();
