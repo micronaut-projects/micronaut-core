@@ -59,6 +59,7 @@ public final class RawRequestOptions {
     private final boolean closeOnDiscard;
     @Nullable
     private final ServiceInstance serviceInstance;
+    private final boolean retryStaleConnection;
 
     private RawRequestOptions(Builder builder) {
         this.followRedirects = builder.followRedirects;
@@ -71,6 +72,7 @@ public final class RawRequestOptions {
         this.readIdleTimeout = builder.readIdleTimeout;
         this.closeOnDiscard = builder.closeOnDiscard;
         this.serviceInstance = builder.serviceInstance;
+        this.retryStaleConnection = builder.retryStaleConnection;
     }
 
     /**
@@ -89,7 +91,9 @@ public final class RawRequestOptions {
 
     /**
      * The preset for relaying a request to an upstream server: redirects are not followed, the
-     * {@code Host} header is computed from the request URI and the response is not decompressed.
+     * {@code Host} header is computed from the request URI, the response is not decompressed and
+     * upgrades are relayed. A relay with a retry policy of its own also turns off
+     * {@link #isRetryStaleConnection()}.
      *
      * @return The proxy options
      */
@@ -111,7 +115,8 @@ public final class RawRequestOptions {
             .returnUnsentBody(returnUnsentBody)
             .readIdleTimeout(readIdleTimeout)
             .closeOnDiscard(closeOnDiscard)
-            .serviceInstance(serviceInstance);
+            .serviceInstance(serviceInstance)
+            .retryStaleConnection(retryStaleConnection);
     }
 
     /**
@@ -208,6 +213,20 @@ public final class RawRequestOptions {
     }
 
     /**
+     * Whether the client sends an idempotent request again, once, on a new connection when the
+     * reused connection it was sent on turns out to be closed before any response, as for any
+     * other request of the client. {@code false} leaves every retry to the caller, e.g. the retry
+     * policy of a gateway: the exchange then fails with the closed connection. Defaults to
+     * {@code true}, also for {@link #proxy()}.
+     *
+     * @return Whether the client retries a request on a closed reused connection
+     * @since 5.3.0
+     */
+    public boolean isRetryStaleConnection() {
+        return retryStaleConnection;
+    }
+
+    /**
      * The read timeout of this exchange instead of the read timeout of the client: the exchange
      * fails with a {@link io.micronaut.http.client.exceptions.ReadTimeoutException} when nothing
      * is read from the connection for this long while the exchange runs, until the end of the
@@ -275,12 +294,13 @@ public final class RawRequestOptions {
             returnUnsentBody == that.returnUnsentBody &&
             Objects.equals(readIdleTimeout, that.readIdleTimeout) &&
             closeOnDiscard == that.closeOnDiscard &&
-            Objects.equals(serviceInstance, that.serviceInstance);
+            Objects.equals(serviceInstance, that.serviceInstance) &&
+            retryStaleConnection == that.retryStaleConnection;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody, readIdleTimeout, closeOnDiscard, serviceInstance);
+        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody, readIdleTimeout, closeOnDiscard, serviceInstance, retryStaleConnection);
     }
 
     @Override
@@ -296,6 +316,7 @@ public final class RawRequestOptions {
             ", readIdleTimeout=" + readIdleTimeout +
             ", closeOnDiscard=" + closeOnDiscard +
             ", serviceInstance=" + (serviceInstance == null ? null : serviceInstance.getId() + " " + serviceInstance.getURI()) +
+            ", retryStaleConnection=" + retryStaleConnection +
             '}';
     }
 
@@ -317,6 +338,7 @@ public final class RawRequestOptions {
         private boolean closeOnDiscard;
         @Nullable
         private ServiceInstance serviceInstance;
+        private boolean retryStaleConnection = true;
 
         private Builder() {
         }
@@ -328,6 +350,16 @@ public final class RawRequestOptions {
          */
         public Builder closeOnDiscard(boolean closeOnDiscard) {
             this.closeOnDiscard = closeOnDiscard;
+            return this;
+        }
+
+        /**
+         * @param retryStaleConnection See {@link RawRequestOptions#isRetryStaleConnection()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder retryStaleConnection(boolean retryStaleConnection) {
+            this.retryStaleConnection = retryStaleConnection;
             return this;
         }
 

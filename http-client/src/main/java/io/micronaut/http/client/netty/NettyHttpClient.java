@@ -190,6 +190,12 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     static final String ALLOW_UPGRADE = "micronaut.http.client.raw.allow-upgrade";
 
     /**
+     * Request attribute: the request is not sent again on a new connection when its reused
+     * connection was closed, see {@link RawRequestOptions#isRetryStaleConnection()}.
+     */
+    static final String NO_STALE_CONNECTION_RETRY = "micronaut.http.client.raw.no-stale-connection-retry";
+
+    /**
      * Request attribute with the {@link RawRequestOptions#getActivityTimeout() activity timeout}
      * of an upgraded connection.
      */
@@ -1049,6 +1055,9 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         if (options.isAllowUpgrade()) {
             request.setAttribute(ALLOW_UPGRADE, Boolean.TRUE);
         }
+        if (!options.isRetryStaleConnection()) {
+            request.setAttribute(NO_STALE_CONNECTION_RETRY, Boolean.TRUE);
+        }
         if (options.getActivityTimeout() != null) {
             request.setAttribute(ACTIVITY_TIMEOUT, options.getActivityTimeout());
         }
@@ -1193,7 +1202,8 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     ) {
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         boolean reusedConnection = markRequestSent(poolHandle);
-        if (!reusedConnection || poolHandle.http2 || !(byteBody instanceof AvailableByteBody) || !request.getMethod().isIdempotent()) {
+        if (!reusedConnection || poolHandle.http2 || !(byteBody instanceof AvailableByteBody) || !request.getMethod().isIdempotent()
+            || request.getAttribute(NO_STALE_CONNECTION_RETRY).isPresent()) {
             return sendRawRequest(propagatedContext, poolHandle, request, selection, byteBody, nettyRequest, false);
         }
         return sendRawRequest(propagatedContext, poolHandle, request, selection, byteBody, nettyRequest, true)
