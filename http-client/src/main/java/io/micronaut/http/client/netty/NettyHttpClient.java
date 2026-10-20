@@ -1653,6 +1653,14 @@ final class NettyHttpClient implements
             }
 
             @Override
+            public void bodyFailed(ChannelHandlerContext ctx, Throwable cause) {
+                // the rest of the body was not read, or can no longer be read, e.g. after an
+                // invalid chunk or content that cannot be decompressed: the connection cannot be
+                // reused
+                poolHandle.taint();
+            }
+
+            @Override
             public void discardLimitReached() {
                 // the rest of an abandoned body is too long to drain (e.g. an endless stream whose
                 // downstream client went away): close the connection (HTTP/1) or reset the stream
