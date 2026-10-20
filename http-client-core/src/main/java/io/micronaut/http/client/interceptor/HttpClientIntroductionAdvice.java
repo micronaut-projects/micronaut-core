@@ -20,10 +20,7 @@ import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.kotlin.KotlinInterceptedMethod;
-import io.micronaut.context.PropertyResolverDelegate;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.context.env.Environment;
-import io.micronaut.context.env.PropertySourcePropertyResolver;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -71,6 +68,7 @@ import io.micronaut.http.client.internal.ElementsStages;
 import io.micronaut.http.client.MappedBodyElements;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
 import io.micronaut.http.client.bind.HttpClientBinderRegistry;
@@ -95,7 +93,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -132,32 +129,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * client methods; the cap only guards against a caller that passes a new metadata instance on
      * every call, in which case the method data is no longer cached.
      */
-    private static final int METHOD_CACHE_MAX_SIZE = 2048;
-    /**
-     * The revision of a {@link ClientMethod} whose values are not tied to a properties revision.
-     */
-    private static final long NO_REVISION = -1;
 
     private final List<ReactiveClientResultTransformer> transformers;
     private final HttpClientBinderRegistry binderRegistry;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
     private final HttpClientRegistry<?> clientFactory;
     private final ConversionService conversionService;
-    /**
-     * The properties the placeholders of the client annotations are resolved from, to know when
-     * they may have changed, or {@code null} if that cannot be known.
-     */
-    private final @Nullable PropertySourcePropertyResolver properties;
-    /**
-     * Cache of the per-method client call data computed for an annotation metadata instance, keyed
-     * by identity. A declarative client passes the same (generated) metadata instance on every call
-     * of a method, so this avoids repeating the annotation lookups and parsing the URI template on
-     * every call. The map is copy-on-write and never mutated once published: reads are lock-free and
-     * misses publish a new copy under {@link #methodCacheLock}.
-     */
-    @SuppressWarnings("java:S3077") // the published map is never modified, volatile only publishes it
-    private volatile IdentityHashMap<AnnotationMetadata, ClientMethod> methodCache = new IdentityHashMap<>();
-    private final Object methodCacheLock = new Object();
 
     /**
      * Constructor for advice class to set up things like Headers, Cookies, Parameters for Clients.
@@ -167,27 +144,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @param transformers         transformation classes
      * @param binderRegistry       The client binder registry
      * @param conversionService    The bean conversion context
-     */
-    public HttpClientIntroductionAdvice(
-            HttpClientRegistry<?> clientFactory,
-            JsonMediaTypeCodec jsonMediaTypeCodec,
-            List<ReactiveClientResultTransformer> transformers,
-            HttpClientBinderRegistry binderRegistry,
-            ConversionService conversionService) {
-        this(clientFactory, jsonMediaTypeCodec, transformers, binderRegistry, conversionService, null);
-    }
-
-    /**
-     * Constructor for advice class to set up things like Headers, Cookies, Parameters for Clients.
-     *
-     * @param clientFactory        The client factory
-     * @param jsonMediaTypeCodec   The JSON media type codec
-     * @param transformers         transformation classes
-     * @param binderRegistry       The client binder registry
-     * @param conversionService    The bean conversion context
-     * @param environment          The environment the property placeholders of the client
-     *                             annotations are resolved with, if any
-     * @since 5.3.0
      */
     @Inject
     public HttpClientIntroductionAdvice(
@@ -195,15 +151,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             JsonMediaTypeCodec jsonMediaTypeCodec,
             List<ReactiveClientResultTransformer> transformers,
             HttpClientBinderRegistry binderRegistry,
-            ConversionService conversionService,
-            @Nullable Environment environment) {
+            ConversionService conversionService) {
         this.clientFactory = clientFactory;
         this.jsonMediaTypeCodec = jsonMediaTypeCodec;
         this.transformers = transformers != null ? transformers : Collections.emptyList();
         this.binderRegistry = binderRegistry;
         this.conversionService = conversionService;
-        this.properties = environment instanceof PropertyResolverDelegate delegate
-            && delegate.delegate() instanceof PropertySourcePropertyResolver resolver ? resolver : null;
     }
 
     /**
@@ -216,10 +169,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         final AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
-        ClientMethod clientMethod = methodCache.get(annotationMetadata);
-        if (clientMethod == null && !context.hasStereotype(Client.class)) {
-            throw new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context);
-        }
+        // Kept by the method, and computed again when the properties its placeholders resolve from change
+        ClientMethod clientMethod = context.getCachedValue(ClientMethod.class, ClientMethod::of);
 
         Class<?> declaringType = context.getDeclaringType();
         if (Closeable.class == declaringType || AutoCloseable.class == declaringType) {
@@ -228,7 +179,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
 
         HttpClient httpClient = clientFactory.getClient(annotationMetadata);
-        clientMethod = resolveClientMethod(context, annotationMetadata, clientMethod);
         if (clientMethod.mapped()) {
             HttpMethod httpMethod = clientMethod.httpMethod();
             String httpMethodName = clientMethod.httpMethodName();
@@ -266,54 +216,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
         // try other introduction advice
         return context.proceed();
-    }
-
-    /**
-     * Returns the client call data of the invoked method, computing and caching it on a miss.
-     *
-     * @param context            The invocation context
-     * @param annotationMetadata The annotation metadata of the method, the cache key
-     * @param cached             The cached data or {@code null}
-     * @return The client call data
-     */
-    private ClientMethod resolveClientMethod(MethodInvocationContext<Object, Object> context,
-                                             AnnotationMetadata annotationMetadata,
-                                             @Nullable ClientMethod cached) {
-        if (cached != null && !cached.revalidate()) {
-            return cached;
-        }
-        // Read before the values, so that a change of the properties made while they are read
-        // leaves a revision that differs from the one recorded with them.
-        long revision = properties != null ? properties.getRevision() : NO_REVISION;
-        MethodValues values = null;
-        if (cached != null) {
-            if (revision != NO_REVISION && revision == cached.revision()) {
-                // the properties have not changed since the values were read
-                return cached;
-            }
-            // Values with property placeholders are resolved by the environment on access and may
-            // change when a property source is added or the environment is refreshed, so they are
-            // read again and the cached data is reused only when they are unchanged.
-            values = MethodValues.read(context);
-            if (values.equals(cached.values())) {
-                cached.revision(revision);
-                return cached;
-            }
-        }
-        ClientMethod clientMethod = ClientMethod.of(context, annotationMetadata, values, revision);
-        // Metadata with evaluated expressions (EvaluatedAnnotationMetadata) is re-created for every
-        // invocation and its values may depend on the call arguments, so it is never cached.
-        if (!annotationMetadata.hasEvaluatedExpressions()) {
-            synchronized (methodCacheLock) {
-                IdentityHashMap<AnnotationMetadata, ClientMethod> current = methodCache;
-                if (current.containsKey(annotationMetadata) || current.size() < METHOD_CACHE_MAX_SIZE) {
-                    IdentityHashMap<AnnotationMetadata, ClientMethod> copy = new IdentityHashMap<>(current);
-                    copy.put(annotationMetadata, clientMethod);
-                    methodCache = copy;
-                }
-            }
-        }
-        return clientMethod;
     }
 
     @Nullable
@@ -976,11 +878,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     /**
-     * The annotation values of a client method that may contain property placeholders. They are
-     * read once to compute the {@link ClientMethod} and, when the metadata has property expressions,
-     * again on a call after the properties of the environment may have changed (a property source
-     * was added or the environment was refreshed), to detect a change of the resolved values. Without
-     * a {@link PropertySourcePropertyResolver} to tell when that happens, they are read on every call.
+     * The annotation values of a client method that may contain property placeholders, read to
+     * compute the {@link ClientMethod}. The method keeps it, and computes it again when the
+     * properties its placeholders resolve from may have changed.
      *
      * @param mappedUri    The value of the HTTP method mapping annotation
      * @param customMethod The {@link CustomHttpMethod#method()} value
@@ -998,15 +898,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         List<String> produces
     ) {
 
-        static MethodValues read(MethodInvocationContext<Object, Object> context) {
-            AnnotationValue<HttpMethodMapping> mapping = Objects.requireNonNull(context.getAnnotation(HttpMethodMapping.class));
+        static MethodValues read(ExecutableMethod<?, ?> method) {
+            AnnotationValue<HttpMethodMapping> mapping = Objects.requireNonNull(method.getAnnotation(HttpMethodMapping.class));
             return new MethodValues(
                 mapping.getRequiredValue(String.class),
-                context.stringValue(CustomHttpMethod.class, "method").orElse(null),
-                context.stringValue(Client.class, "path").orElse(null),
-                context.stringValue(Client.class).orElse(null),
-                Arrays.asList(context.stringValues(Consumes.class)),
-                Arrays.asList(context.stringValues(Produces.class))
+                method.stringValue(CustomHttpMethod.class, "method").orElse(null),
+                method.stringValue(Client.class, "path").orElse(null),
+                method.stringValue(Client.class).orElse(null),
+                Arrays.asList(method.stringValues(Consumes.class)),
+                Arrays.asList(method.stringValues(Produces.class))
             );
         }
     }
@@ -1032,10 +932,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     private static final class ClientMethod {
 
-        private static final ClientMethod NOT_MAPPED = new ClientMethod(false, false, null, HttpMethod.CUSTOM, "", "", HttpClient.DEFAULT_ERROR_TYPE, List.of(), true);
+        private static final ClientMethod NOT_MAPPED = new ClientMethod(false, null, HttpMethod.CUSTOM, "", "", HttpClient.DEFAULT_ERROR_TYPE, List.of(), true);
 
         private final boolean mapped;
-        private final boolean revalidate;
         private final @Nullable MethodValues values;
         private final HttpMethod httpMethod;
         private final String httpMethodName;
@@ -1043,12 +942,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         private final Argument<?> errorType;
         private final List<Class<? extends Annotation>> methodBinderTypes;
         private final boolean clientDefinition;
-        /**
-         * The revision of the properties the {@link #values} were read at, or {@link #NO_REVISION}.
-         * Updated by a call that read the same values again at another revision; a race can only
-         * make a later call read them once more.
-         */
-        private volatile long revision = NO_REVISION;
         // The lazily computed values below are immutable once published (the array is never
         // modified), so volatile is enough to publish them safely. A race only computes them twice.
         @SuppressWarnings("java:S3077")
@@ -1059,7 +952,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         private volatile @Nullable MediaType contentType;
 
         private ClientMethod(boolean mapped,
-                             boolean revalidate,
                              @Nullable MethodValues values,
                              HttpMethod httpMethod,
                              String httpMethodName,
@@ -1068,7 +960,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                              List<Class<? extends Annotation>> methodBinderTypes,
                              boolean clientDefinition) {
             this.mapped = mapped;
-            this.revalidate = revalidate;
             this.values = values;
             this.httpMethod = httpMethod;
             this.httpMethodName = httpMethodName;
@@ -1081,23 +972,21 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         /**
          * Computes the client method data.
          *
-         * @param context            The invocation context
-         * @param annotationMetadata The annotation metadata of the method
-         * @param values             The values already read for the method or {@code null}
-         * @param revision           The revision of the properties read before the values, or {@link #NO_REVISION}
+         * @param method The method
          * @return The client method data
          */
-        static ClientMethod of(MethodInvocationContext<Object, Object> context,
-                               AnnotationMetadata annotationMetadata,
-                               @Nullable MethodValues values,
-                               long revision) {
-            Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
-            if (httpMethodMapping.isEmpty() || !context.hasStereotype(HttpMethodMapping.class)) {
+        static ClientMethod of(ExecutableMethod<?, ?> method) {
+            if (!method.hasStereotype(Client.class)) {
+                throw new IllegalStateException("Client advice called from type that is not annotated with @Client: " + method);
+            }
+            AnnotationMetadata annotationMetadata = method.getAnnotationMetadata();
+            Optional<Class<? extends Annotation>> httpMethodMapping = method.getAnnotationTypeByStereotype(HttpMethodMapping.class);
+            if (httpMethodMapping.isEmpty() || !method.hasStereotype(HttpMethodMapping.class)) {
                 return NOT_MAPPED;
             }
-            MethodValues methodValues = values != null ? values : MethodValues.read(context);
+            MethodValues methodValues = MethodValues.read(method);
             String mappedUri = methodValues.mappedUri();
-            String uri = StringUtils.isEmpty(mappedUri) ? "/" + context.getMethodName() : mappedUri;
+            String uri = StringUtils.isEmpty(mappedUri) ? "/" + method.getMethodName() : mappedUri;
 
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
             HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase(Locale.ENGLISH));
@@ -1107,16 +996,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Argument<?> errorType = annotationMetadata.classValue(Client.class, "errorType")
                 .<Argument<?>>map(Argument::of).orElse(HttpClient.DEFAULT_ERROR_TYPE);
 
-            List<Class<? extends Annotation>> methodBinderTypes = new ArrayList<>(context.getAnnotationTypesByStereotype(Bindable.class));
+            List<Class<? extends Annotation>> methodBinderTypes = new ArrayList<>(method.getAnnotationTypesByStereotype(Bindable.class));
             // @Version is not a bindable, so it needs to looked for separately
-            methodBinderTypes.addAll(context.getAnnotationTypesByStereotype(Version.class));
+            methodBinderTypes.addAll(method.getAnnotationTypesByStereotype(Version.class));
 
             var definitionType = annotationMetadata.enumValue(Client.class, "definitionType", Client.DefinitionType.class)
                 .orElse(Client.DefinitionType.CLIENT);
 
-            var clientMethod = new ClientMethod(
+            return new ClientMethod(
                 true,
-                annotationMetadata.hasPropertyExpressions(),
                 methodValues,
                 httpMethod,
                 httpMethodName,
@@ -1125,24 +1013,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 Collections.unmodifiableList(methodBinderTypes),
                 definitionType.isClient()
             );
-            clientMethod.revision = revision;
-            return clientMethod;
         }
 
         boolean mapped() {
             return mapped;
-        }
-
-        boolean revalidate() {
-            return revalidate;
-        }
-
-        long revision() {
-            return revision;
-        }
-
-        void revision(long revision) {
-            this.revision = revision;
         }
 
         @Nullable
