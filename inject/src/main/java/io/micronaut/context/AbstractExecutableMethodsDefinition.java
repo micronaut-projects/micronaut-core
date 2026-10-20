@@ -425,6 +425,16 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private final AbstractExecutableMethodsDefinition dispatcher;
         private final int index;
         private final MethodReference methodReference;
+        /**
+         * The generated metadata of the method. The method is shared by the contexts that load its bean definition
+         * (the definition keeps it in a static field), so each context wraps this metadata, never the metadata another
+         * context configured.
+         */
+        private final AnnotationMetadata declaredAnnotationMetadata;
+        /**
+         * The metadata resolving the property placeholders with the environment of the last configured context.
+         */
+        private AnnotationMetadata environmentAnnotationMetadata;
         private AnnotationMetadata annotationMetadata;
         @Nullable
         private ReturnType<R> returnType;
@@ -447,6 +457,8 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             this.dispatcher = dispatcher;
             this.index = index;
             this.methodReference = methodReference;
+            this.declaredAnnotationMetadata = annotationMetadata;
+            this.environmentAnnotationMetadata = annotationMetadata;
             this.annotationMetadata = annotationMetadata;
             MethodArguments methodArguments = methodArguments(methodReference);
             this.arguments = methodArguments.arguments;
@@ -455,14 +467,15 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public void configure(Environment environment) {
-            if (annotationMetadata.hasPropertyExpressions()) {
-                annotationMetadata = new MethodAnnotationMetadata(annotationMetadata, environment);
+            if (declaredAnnotationMetadata.hasPropertyExpressions()) {
+                environmentAnnotationMetadata = new MethodAnnotationMetadata(declaredAnnotationMetadata, environment);
+                annotationMetadata = environmentAnnotationMetadata;
             }
         }
 
         @Override
         public void configure(BeanContext beanContext) {
-            annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
+            annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(environmentAnnotationMetadata);
             if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
                 eam.configure(beanContext);
             }
