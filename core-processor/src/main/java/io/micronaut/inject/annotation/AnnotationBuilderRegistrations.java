@@ -168,7 +168,13 @@ public final class AnnotationBuilderRegistrations {
                 // written before by a processor or a round this registry does not know of: the builder is the same
                 return;
             }
+            builders.remove(builderName);
             throw new ProcessingException(originatingElements[0], "Failed to write the annotation builder of " + annotationName + ": " + e.getMessage(), e);
+        } catch (RuntimeException e) {
+            // not written, such as when the originating element is postponed to the next round: the next
+            // registration writes it
+            builders.remove(builderName);
+            throw e;
         }
     }
 

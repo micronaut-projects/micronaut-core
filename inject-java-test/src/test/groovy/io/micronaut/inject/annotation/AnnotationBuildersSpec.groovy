@@ -25,6 +25,7 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.visitor.ElementPostponedToNextRoundException
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 
@@ -36,7 +37,7 @@ class AnnotationBuildersSpec extends AbstractTypeElementSpec {
 
     @Override
     protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
-        return [new RegisterAnnotationsVisitor(), new RegisteringVisitor()]
+        return [new PostponeOnceVisitor(), new RegisterAnnotationsVisitor(), new RegisteringVisitor()]
     }
 
     private static final String SOURCE = '''
@@ -458,6 +459,26 @@ public class Holder {
         e.message.contains("The annotation [collision.Holder\$A\$B] cannot have a builder next to collision.Holder: its name flattens to the same builder name as the annotation [collision.Holder\$A_B], which has one there")
     }
 
+    def "the builders of a type postponed to the next round are written in that round"() {
+        when:
+        def classLoader = buildClassLoader("postponed.Holder", '''
+package postponed;
+
+import io.micronaut.core.annotation.RegisterAnnotations;
+
+@interface PostponeOnce {
+}
+
+@PostponeOnce
+@RegisterAnnotations(jakarta.inject.Named.class)
+public class Holder {
+}
+''')
+
+        then:
+        builder(classLoader, "postponed.Holder", "jakarta.inject.Named").build([value: "n"]).value() == "n"
+    }
+
     def "a registration needs an originating element"() {
         when:
         buildClassLoader("noorigin.Holder", '''
@@ -478,6 +499,27 @@ public class Holder {
             return true
         } catch (ClassNotFoundException ignored) {
             return false
+        }
+    }
+
+    /**
+     * Postpones each type annotated {@code postponed.PostponeOnce} the first time it visits it, before the other
+     * visitors visit it in the same round.
+     */
+    static class PostponeOnceVisitor implements TypeElementVisitor<Object, Object> {
+
+        private final Set<String> postponed = new HashSet<>()
+
+        @Override
+        void visitClass(ClassElement element, VisitorContext context) {
+            if (element.hasDeclaredAnnotation("postponed.PostponeOnce") && postponed.add(element.name)) {
+                throw new ElementPostponedToNextRoundException(element)
+            }
+        }
+
+        @Override
+        VisitorKind getVisitorKind() {
+            return VisitorKind.ISOLATING
         }
     }
 
