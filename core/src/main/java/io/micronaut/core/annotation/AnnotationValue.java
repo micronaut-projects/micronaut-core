@@ -1532,42 +1532,79 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (other == null || !annotationName.equals(other.getAnnotationName())) {
             return false;
         }
-        Map<CharSequence, Object> members = completedValues(this);
-        Map<CharSequence, Object> otherMembers = completedValues(other);
-        if (members.size() != otherMembers.size()) {
+        // Compares the members completed with the defaults, declared members winning, without building the
+        // completed maps
+        Map<CharSequence, Object> declared = memberValues();
+        Map<CharSequence, Object> defaults = nonNullDefaults(getDefaultValues());
+        Map<CharSequence, Object> otherDeclared = other.memberValues();
+        Map<CharSequence, Object> otherDefaults = nonNullDefaults(other.getDefaultValues());
+        if (completedSize(declared, defaults) != completedSize(otherDeclared, otherDefaults)) {
             return false;
         }
-        for (Map.Entry<CharSequence, Object> member : members.entrySet()) {
-            if (!otherMembers.containsKey(member.getKey())) {
+        for (Map.Entry<CharSequence, Object> member : declared.entrySet()) {
+            if (!matchesMember(member.getKey(), member.getValue(), otherDeclared, otherDefaults)) {
                 return false;
             }
-            Object value = member.getValue();
-            Object otherValue = otherMembers.get(member.getKey());
-            if (value == null || otherValue == null) {
-                if (value != null || otherValue != null) {
-                    return false;
-                }
-            } else if (!AnnotationUtil.areEqual(value, otherValue)) {
+        }
+        for (Map.Entry<CharSequence, Object> member : defaults.entrySet()) {
+            if (!declared.containsKey(member.getKey()) && !matchesMember(member.getKey(), member.getValue(), otherDeclared, otherDefaults)) {
                 return false;
             }
         }
         return true;
     }
 
-    private static Map<CharSequence, Object> completedValues(AnnotationValue<?> value) {
-        Map<CharSequence, Object> defaults = value.getDefaultValues();
-        Map<CharSequence, Object> declared = value.getValues();
-        if (defaults == null || defaults.isEmpty()) {
-            return declared;
+    private static Map<CharSequence, Object> nonNullDefaults(@Nullable Map<CharSequence, Object> defaults) {
+        return defaults != null ? defaults : Collections.emptyMap();
+    }
+
+    /**
+     * @return The number of members once the declared members are completed with the defaults
+     */
+    private static int completedSize(Map<CharSequence, Object> declared, Map<CharSequence, Object> defaults) {
+        int size = declared.size();
+        for (CharSequence member : defaults.keySet()) {
+            if (!declared.containsKey(member)) {
+                size++;
+            }
         }
-        Map<CharSequence, Object> completed = new LinkedHashMap<>(defaults);
-        completed.putAll(declared);
-        return completed;
+        return size;
+    }
+
+    private static boolean matchesMember(CharSequence member,
+                                         @Nullable Object value,
+                                         Map<CharSequence, Object> otherDeclared,
+                                         Map<CharSequence, Object> otherDefaults) {
+        Object otherValue;
+        if (otherDeclared.containsKey(member)) {
+            otherValue = otherDeclared.get(member);
+        } else if (otherDefaults.containsKey(member)) {
+            otherValue = otherDefaults.get(member);
+        } else {
+            return false;
+        }
+        if (value == null || otherValue == null) {
+            return value == null && otherValue == null;
+        }
+        return AnnotationUtil.areEqual(value, otherValue);
+    }
+
+    /**
+     * The members as {@link #getValues()} exposes them, without the read-only wrapper when nothing has to be
+     * filtered out. A subclass may override {@link #getValues()}, so it keeps answering through it.
+     *
+     * @return The members, not to be modified
+     */
+    private Map<CharSequence, Object> memberValues() {
+        if (getClass() != AnnotationValue.class || values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            return getValues();
+        }
+        return values;
     }
 
     @Override
     public int hashCode() {
-        return 31 * annotationName.hashCode() + AnnotationUtil.calculateHashCode(getValues());
+        return 31 * annotationName.hashCode() + AnnotationUtil.calculateHashCode(memberValues());
     }
 
     @Override
@@ -1586,8 +1623,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return false;
         }
 
-        Map<CharSequence, Object> otherValues = other.getValues();
-        Map<CharSequence, Object> values = getValues();
+        Map<CharSequence, Object> otherValues = other.memberValues();
+        Map<CharSequence, Object> values = memberValues();
         if (values.size() != otherValues.size()) {
             return false;
         }
