@@ -70,6 +70,15 @@ public class AnnotationLookupBenchmark {
     }
 
 
+    /**
+     * Reads a member through the conversion service, which uses the convertible values of the annotation value.
+     */
+    @Benchmark
+    public Integer typeGetAnnotationConverted() {
+        AnnotationValue<LookupAnn> value = definition.getAnnotation(LookupAnn.class);
+        return value != null ? value.get("count", Integer.class).orElse(null) : null;
+    }
+
     @Benchmark
     public int typeGetAnnotationTwoMembers() {
         AnnotationValue<LookupAnn> value = definition.getAnnotation(LookupAnn.class);
