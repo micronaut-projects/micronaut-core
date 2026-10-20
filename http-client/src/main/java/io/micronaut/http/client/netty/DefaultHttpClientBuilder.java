@@ -173,7 +173,16 @@ public final class DefaultHttpClientBuilder {
         return this;
     }
 
-    DefaultHttpClientBuilder eventLoopGroup(@Nullable EventLoopGroup eventLoopGroup) {
+    /**
+     * Set the event loop group of the client, to share one group between clients. The client does
+     * not own a group set here: closing the client does not shut it down, the caller does. Without
+     * a group, the client creates its own and shuts it down on close.
+     *
+     * @param eventLoopGroup The event loop group, or {@code null} for a group owned by the client
+     * @return This builder
+     * @since 5.3.0
+     */
+    public DefaultHttpClientBuilder eventLoopGroup(@Nullable EventLoopGroup eventLoopGroup) {
         delegate.eventLoopGroup(eventLoopGroup);
         return this;
     }
