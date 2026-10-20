@@ -1120,7 +1120,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Override
     public boolean hasAnnotation(@Nullable String annotation) {
-        return hasDeclaredAnnotation(annotation) || (allAnnotations != null && StringUtils.isNotEmpty(annotation) && allAnnotations.containsKey(annotation));
+        if (allAnnotations != null && StringUtils.isNotEmpty(annotation) && allAnnotations.containsKey(annotation)) {
+            return true;
+        }
+        // The same map when the metadata declares everything it has: no second lookup
+        return declaredAnnotations != allAnnotations && hasDeclaredAnnotation(annotation);
     }
 
     @Override
