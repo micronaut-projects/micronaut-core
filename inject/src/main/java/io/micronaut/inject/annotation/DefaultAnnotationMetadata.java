@@ -1146,6 +1146,30 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
+    public boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
+        if (annotation != null) {
+            String repeatableAnnotationContainer = findRepeatableAnnotationContainerInternal(annotation.getName());
+            if (repeatableAnnotationContainer != null) {
+                return hasAnnotation(repeatableAnnotationContainer);
+            }
+            return hasAnnotation(annotation.getName());
+        }
+        return false;
+    }
+
+    @Override
+    public boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
+        if (stereotype != null) {
+            String repeatableAnnotationContainer = findRepeatableAnnotationContainerInternal(stereotype.getName());
+            if (repeatableAnnotationContainer != null) {
+                return hasDeclaredStereotype(repeatableAnnotationContainer);
+            }
+            return hasDeclaredStereotype(stereotype.getName());
+        }
+        return false;
+    }
+
+    @Override
     public boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
             String repeatableAnnotationContainer = findRepeatableAnnotationContainerInternal(annotation.getName());
