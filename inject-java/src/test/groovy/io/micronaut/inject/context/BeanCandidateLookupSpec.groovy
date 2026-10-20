@@ -108,6 +108,27 @@ public class Beans {
         context.close()
     }
 
+    void "a raw lookup of a type a factory's list exposes finds it"() {
+        given:
+        ApplicationContext context = buildContext('test.Beans', BEANS)
+        Class<?> part = type(context, 'Part')
+        BeanDefinition<?> parts = context.getBeanDefinitions(List).find { definition ->
+            definition.getTypeArguments(List)*.type == [part]
+        }
+
+        expect:
+        parts.exposedTypes.contains(Collection)
+        context.getBeanDefinitions(Collection).contains(parts)
+        context.getBeanDefinitions(Argument.of(Collection)).contains(parts)
+        context.getBeanDefinitions(Iterable).contains(parts)
+
+        and: 'a list of the parts is still injected as all the part beans'
+        context.getBean(type(context, 'Bolt')).parts*.name.sort() == ['bolt', 'nut']
+
+        cleanup:
+        context.close()
+    }
+
     private static Class<?> type(ApplicationContext context, String name) {
         context.classLoader.loadClass('test.Beans$' + name)
     }
