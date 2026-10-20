@@ -811,10 +811,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         final String annotationTypeName = getAnnotationTypeName(annotationType);
         Map<? extends T, ?> annotationValues = readAnnotationRawValues(annotationType);
         T theType = getTypeForAnnotation(annotationType);
-        if (theType != null) {
-            // A nested annotation carries no native type, the retention of what it composes resolves it by name
-            processedAnnotationTypes.putIfAbsent(annotationTypeName, theType);
-        }
+        // A nested annotation carries no native type, the retention of what it composes resolves it by name
+        processedAnnotationTypes.putIfAbsent(annotationTypeName, theType);
         if (annotationValues.isEmpty()) {
             Map<CharSequence, Object> annotationDefaults = resolveAnnotationDefaults(theType, annotationTypeName, resolvedDefaults);
             return new AnnotationValue<>(annotationTypeName, Collections.emptyMap(), annotationDefaults);
