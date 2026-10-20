@@ -357,6 +357,42 @@ class ClientExchangeOrderingTest {
     }
 
     @Test
+    void aResponseThatArrivesAfterTheStreamedBodyFailedIsClosed() {
+        TestPublisher publisher = new TestPublisher();
+        Attempt attempt = start(put(), streamed(publisher), false);
+        publisher.fail(new IOException("upload failed"));
+        Assertions.assertEquals("upload failed", attempt.failure.get().getMessage());
+
+        // the server answered without reading the whole body
+        DefaultFullHttpResponse response = response(HttpResponseStatus.OK, "ok");
+        response.retain();
+        channel.writeInbound(response);
+        Assertions.assertEquals(1, response.refCnt(), "The response body was not released");
+        response.release();
+        Assertions.assertEquals(1, attempt.completions.get());
+        Assertions.assertEquals("upload failed", attempt.failure.get().getMessage());
+        assertFinished(attempt, true, LoadBalancer.Outcome.CANCELLED);
+    }
+
+    @Test
+    void aSwitchThatArrivesAfterTheStreamedBodyFailedClosesTheConnection() {
+        TestPublisher publisher = new TestPublisher();
+        DefaultHttpRequest request = put();
+        request.headers().set(HttpHeaderNames.UPGRADE, "custom");
+        Attempt attempt = start(request, streamed(publisher), false);
+        publisher.fail(new IOException("upload failed"));
+        Assertions.assertEquals("upload failed", attempt.failure.get().getMessage());
+
+        DefaultFullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SWITCHING_PROTOCOLS);
+        response.headers().set(HttpHeaderNames.UPGRADE, "custom");
+        channel.writeInbound(response);
+        Assertions.assertFalse(channel.isActive());
+        Assertions.assertEquals(1, attempt.completions.get());
+        Assertions.assertEquals(1, attempt.handle.releases, "The pool handle was not released once");
+        Assertions.assertEquals(List.of(LoadBalancer.Outcome.CANCELLED), outcomes);
+    }
+
+    @Test
     void theTimerOfAFinishedExchangeDoesNotSendAfterTheConnectionIsReused() {
         ByteBuf firstPayload = payload();
         Attempt first = start(expectContinue(), buffered(firstPayload), false);
@@ -524,6 +560,9 @@ class ClientExchangeOrderingTest {
         LoadBalancerSelection selection = new LoadBalancerSelection(loadBalancer, instance);
         DelayedExecutionFlow<NettyClientByteBodyResponse> sink = DelayedExecutionFlow.create();
         HttpRequest<?> request = HttpRequest.create(io.micronaut.http.HttpMethod.parse(nettyRequest.method().name()), "http://localhost" + nettyRequest.uri());
+        if (nettyRequest.headers().contains(HttpHeaderNames.UPGRADE)) {
+            request.setAttribute(NettyHttpClient.ALLOW_UPGRADE, Boolean.TRUE);
+        }
         ExchangePlan plan = ExchangePlan.of(request, nettyRequest, selection, body, allowRetry);
         ClientExchange exchange = new ClientExchange(client, handle, plan, sink);
         Attempt attempt = new Attempt(exchange, handle, selection, sink);
@@ -637,6 +676,12 @@ class ClientExchangeOrderingTest {
             Subscriber<? super ReadBuffer> s = subscriber.get();
             Assertions.assertNotNull(s);
             s.onNext(ReadBufferFactory.getJdkFactory().copyOf(text, StandardCharsets.UTF_8));
+        }
+
+        void fail(Throwable failure) {
+            Subscriber<? super ReadBuffer> s = subscriber.get();
+            Assertions.assertNotNull(s);
+            s.onError(failure);
         }
     }
 }

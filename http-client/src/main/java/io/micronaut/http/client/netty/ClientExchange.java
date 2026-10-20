@@ -436,7 +436,7 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
     /**
      * Accept the final response: the body still held back for {@code 100 Continue} is dropped, a
      * streamed body goes on, the request can no longer be sent again, and the caller gets the
-     * response unless it cancelled.
+     * response unless it cancelled or the exchange already failed.
      *
      * @param head The response head
      * @param body The response body, owned by the exchange from here on
@@ -451,14 +451,13 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
         if (!HttpUtil.isKeepAlive(head)) {
             poolHandle.taint();
         }
-        if (sink.isCancelled()) {
-            // nobody takes the response of a cancelled exchange, and its outcome says nothing
-            // about the instance
+        if (sink.isCancelled() || !sink.tryComplete(new NettyClientByteBodyResponse(head, body, client.conversionService()))) {
+            // nobody takes the response of an exchange that was cancelled, or that already failed
+            // because its streamed request body failed, and its outcome says nothing about the
+            // instance
             reportOnce(null);
             body.close();
-            return;
         }
-        sink.complete(new NettyClientByteBodyResponse(head, body, client.conversionService()));
     }
 
     /**
@@ -512,7 +511,12 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
                 pipeline.remove(name);
             }
         }
-        sink.complete(new NettyClientUpgradedResponse(head, duplex, client.conversionService()));
+        NettyClientUpgradedResponse upgraded = new NettyClientUpgradedResponse(head, duplex, client.conversionService());
+        if (!sink.tryComplete(upgraded)) {
+            // the exchange already failed because its streamed request body failed: nobody takes
+            // the upgraded connection
+            upgraded.close();
+        }
         return true;
     }
 
