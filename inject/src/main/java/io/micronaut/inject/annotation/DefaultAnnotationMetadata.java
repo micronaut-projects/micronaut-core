@@ -1373,6 +1373,26 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return repeated.isEmpty() ? null : repeated.get(0);
     }
 
+    /**
+     * The annotation value, for an annotation known not to be repeatable: {@link #getAnnotation(String)} without
+     * the repeatable container lookup.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return The annotation value or {@code null}
+     */
+    @Nullable
+    <T extends Annotation> AnnotationValue<T> getNonRepeatableAnnotation(String annotation) {
+        if (allAnnotations == null) {
+            return null;
+        }
+        Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (values == null && allStereotypes != null) {
+            values = allStereotypes.get(annotation);
+        }
+        return values != null ? newAnnotationValue(annotation, values) : null;
+    }
+
     @Override
     public <T extends Annotation> @Nullable AnnotationValue<T> getAnnotation(Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
