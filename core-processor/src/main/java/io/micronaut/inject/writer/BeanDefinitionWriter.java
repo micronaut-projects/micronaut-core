@@ -981,8 +981,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private Map<String, Map<String, ClassElement>> nameableTypeArguments(Map<String, Map<String, ClassElement>> typeArguments) {
         Map<String, Map<String, ClassElement>> nameable = CollectionUtils.newLinkedHashMap(typeArguments.size());
         for (Map.Entry<String, Map<String, ClassElement>> entry : typeArguments.entrySet()) {
-            if (entry.getValue().values().stream().allMatch(argument -> TypeHierarchyWriter.isNameableFrom(argument, beanDefinitionPackageName))) {
-                nameable.put(entry.getKey(), entry.getValue());
+            Map<String, ClassElement> arguments = entry.getValue();
+            if (arguments.values().stream().allMatch(argument -> TypeHierarchyWriter.isNameableFrom(argument, beanDefinitionPackageName))) {
+                nameable.put(entry.getKey(), arguments);
             }
         }
         return nameable;
