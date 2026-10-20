@@ -272,8 +272,9 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
         } else if (end) {
             end();
         } else if (subscribe) {
-            // the reader decodes piece by piece with a limit of its own
-            InternalByteBody.toUnbufferedReadBufferPublisher(body).subscribe(this);
+            // the elements of a piece are kept until they are read: the bytes received but not
+            // read yet are held to the buffer limit, like those of the reactive streams
+            body.toReadBufferPublisher().subscribe(this);
         } else if (s != null) {
             s.request(1);
         }
