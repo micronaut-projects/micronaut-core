@@ -1538,6 +1538,10 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         Map<CharSequence, Object> defaults = nonNullDefaults(getDefaultValues());
         Map<CharSequence, Object> otherDeclared = other.memberValues();
         Map<CharSequence, Object> otherDefaults = nonNullDefaults(other.getDefaultValues());
+        if (declared == otherDeclared && defaults == otherDefaults) {
+            // Values read from the same stored members, with the same defaults
+            return true;
+        }
         if (completedSize(declared, defaults) != completedSize(otherDeclared, otherDefaults)) {
             return false;
         }
@@ -1625,6 +1629,10 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
         Map<CharSequence, Object> otherValues = other.memberValues();
         Map<CharSequence, Object> values = memberValues();
+        if (values == otherValues) {
+            // Values read from the same stored members
+            return true;
+        }
         if (values.size() != otherValues.size()) {
             return false;
         }
