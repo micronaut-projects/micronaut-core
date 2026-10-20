@@ -32,8 +32,9 @@ import io.micronaut.web.router.builder.ValueMatcher;
  *
  * <p>The exchange is valid only while the handler runs, on the thread that received the request:
  * it is never kept, nor given to another thread. The status is {@code 200} unless written. The
- * server adds what it adds to every direct response, the framing, and the {@code Date} and
- * {@code Server} headers unless they are written. A name or value given as a constant
+ * server adds the framing, and the {@code Server} header unless it is written; it adds no
+ * {@code Date} header: the handler writes it, e.g. a value it formats once per second. A name or
+ * value given as a constant
  * {@link CharSequence} of the runtime, e.g. a Netty {@code AsciiString}, is written without being
  * encoded again.</p>
  *

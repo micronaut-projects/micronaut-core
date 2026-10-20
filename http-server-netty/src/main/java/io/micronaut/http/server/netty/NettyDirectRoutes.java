@@ -35,7 +35,6 @@ import io.micronaut.http.server.util.HttpDateHeader;
 import io.micronaut.web.router.builder.ValueMatcher;
 import io.micronaut.web.router.direct.DirectExchange;
 import io.micronaut.web.router.direct.DirectMatch;
-import io.micronaut.web.router.direct.DirectRequest;
 import io.micronaut.web.router.direct.DirectRouteLookup;
 import io.micronaut.web.router.direct.InvalidDirectRequestException;
 import io.micronaut.web.router.uri.UriUtil;
@@ -229,7 +228,7 @@ final class NettyDirectRoutes {
         body.close();
         if (direct instanceof PreparedDirectResponse prepared) {
             // the value of the route, validated and buffered once
-            write(request, prepared.head(), prepared.content(), outboundAccess);
+            write(request, prepared.head(), prepared.content(), outboundAccess, true);
             return true;
         }
         ByteBuf content;
@@ -249,7 +248,7 @@ final class NettyDirectRoutes {
             writeServerError(outboundAccess);
             return true;
         }
-        write(request, head, content, outboundAccess);
+        write(request, head, content, outboundAccess, true);
         return true;
     }
 
@@ -289,7 +288,7 @@ final class NettyDirectRoutes {
             writeServerError(outboundAccess);
             return true;
         }
-        write(request, head, content, outboundAccess);
+        write(request, head, content, outboundAccess, false);
         return true;
     }
 
@@ -377,7 +376,7 @@ final class NettyDirectRoutes {
             }
             writeServerError(outboundAccess);
         } else if (prepared != null) {
-            write(request, prepared.head(), prepared.content(), outboundAccess);
+            write(request, prepared.head(), prepared.content(), outboundAccess, true);
         } else {
             writeServerError(outboundAccess);
         }
@@ -420,13 +419,16 @@ final class NettyDirectRoutes {
 
     /**
      * Write a response, on the event loop.
+     *
+     * @param date Whether the server adds the {@code Date} header: not to the response of a
+     *             handler, which writes it itself
      */
-    private void write(HttpRequest request, HttpResponse head, ByteBuf content, OutboundAccess outboundAccess) {
+    private void write(HttpRequest request, HttpResponse head, ByteBuf content, OutboundAccess outboundAccess, boolean date) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Direct response {} - {} {}", head.status().code(), request.method(), request.uri());
         }
         HttpHeaders headers = head.headers();
-        addConfiguredHeaders(headers);
+        addConfiguredHeaders(headers, date);
         // the framing of the body: the Content-Length of the body is set by the outbound handler
         headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
         boolean headRequest = HttpMethod.HEAD.equals(request.method());
@@ -454,7 +456,7 @@ final class NettyDirectRoutes {
 
     private void writeServerError(OutboundAccess outboundAccess) {
         DefaultHttpResponse error = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
-        addConfiguredHeaders(error.headers());
+        addConfiguredHeaders(error.headers(), true);
         error.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
         outboundAccess.write(error, NettyByteBodyFactory.empty());
     }
@@ -463,9 +465,11 @@ final class NettyDirectRoutes {
      * Add the headers the server is configured to add to every response, like the ordinary
      * responses get them: the {@code Date} header, formatted at most once per second, and the
      * {@code Server} header, unless the route set them.
+     *
+     * @param date Whether to add the {@code Date} header
      */
-    private void addConfiguredHeaders(HttpHeaders headers) {
-        if (dateHeader && !headers.contains(HttpHeaderNames.DATE)) {
+    private void addConfiguredHeaders(HttpHeaders headers, boolean date) {
+        if (date && dateHeader && !headers.contains(HttpHeaderNames.DATE)) {
             headers.set(HttpHeaderNames.DATE, date());
         }
         CharSequence server = serverHeader;

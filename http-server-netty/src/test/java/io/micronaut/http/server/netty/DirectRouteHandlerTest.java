@@ -61,7 +61,8 @@ class DirectRouteHandlerTest {
             assertTrue(ok.contains("etag: \"v1\""), ok);
             assertTrue(ok.contains("content-type: text/plain"), ok);
             assertTrue(ok.contains("content-length: 7"), ok);
-            assertTrue(ok.contains("date: "), ok);
+            // the server adds no Date header to the response of a handler
+            assertFalse(ok.contains("date: "), ok);
             assertTrue(ok.contains("server: micronaut-test"), ok);
             assertTrue(ok.endsWith("\r\n\r\ncurrent"), ok);
 
@@ -75,6 +76,12 @@ class DirectRouteHandlerTest {
             String head = DirectRouteTest.readResponse(in, true);
             assertTrue(head.startsWith("http/1.1 200 ok"), head);
             assertTrue(head.contains("content-length: 7"), head);
+
+            // the Date header the handler writes
+            out.write(request("GET", "/handled/dated", null));
+            String dated = DirectRouteTest.readResponse(in, false);
+            assertTrue(dated.contains("date: thu, 01 jan 2026 00:00:00 gmt\r\n"), dated);
+            assertTrue(dated.indexOf("date: ") == dated.lastIndexOf("date: "), dated);
 
             // a text body, encoded as UTF-8, and a path variable
             out.write(request("GET", "/handled/greetings/world", null));
@@ -115,6 +122,8 @@ class DirectRouteHandlerTest {
             routes.GET("/handled/version").handle((exchange, pathVariables) -> exchange.checkHeader(HttpHeaders.IF_NONE_MATCH, CURRENT)
                 ? exchange.writeStatus(304).writeHeader(ETAG, VERSION).end()
                 : exchange.writeHeader(ETAG, VERSION).writeHeader(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN).writeBody(BODY).end());
+            routes.GET("/handled/dated").handle((exchange, pathVariables) ->
+                exchange.writeHeader(HttpHeaders.DATE, "Thu, 01 Jan 2026 00:00:00 GMT").writeBody(BODY).end());
             routes.GET("/handled/greetings/{name}").handle((exchange, pathVariables) ->
                 exchange.writeBody("Hello " + pathVariables.getString("name") + " é").end());
             routes.GET("/handled/declined").handle((exchange, pathVariables) -> {
