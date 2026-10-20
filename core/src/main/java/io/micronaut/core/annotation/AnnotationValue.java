@@ -2013,7 +2013,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     private Object getRawSingleValue(String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = values.get(member);
         if (rawValue != null) {
-            if (rawValue.getClass().isArray()) {
+            if (rawValue instanceof Object[] array) {
+                // The common String[]/AnnotationValue[]/AnnotationClassValue[] members, without reflective access
+                if (array.length > 0) {
+                    rawValue = array[0];
+                }
+            } else if (rawValue.getClass().isArray()) {
                 int len = Array.getLength(rawValue);
                 if (len > 0) {
                     rawValue = Array.get(rawValue, 0);
