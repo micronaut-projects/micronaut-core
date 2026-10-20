@@ -55,6 +55,7 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
     private final CloseableByteBody body;
     private final PieceReader<T> reader;
     private final Function<Throwable, Throwable> wrap;
+    private final boolean limited;
 
     private final ConcurrentLinkedQueue<ReadBuffer> incoming = new ConcurrentLinkedQueue<>();
     private final AtomicInteger draining = new AtomicInteger();
@@ -84,9 +85,21 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
      * @param wrap   The failure of the elements, from a failure to read the body or an element
      */
     public ByteBodyElements(CloseableByteBody body, PieceReader<T> reader, Function<Throwable, Throwable> wrap) {
+        this(body, reader, wrap, false);
+    }
+
+    /**
+     * @param body    The body, which the elements take over
+     * @param reader  The reader of the pieces of the body, which the elements take over
+     * @param wrap    The failure of the elements, from a failure to read the body or an element
+     * @param limited Whether the bytes received but not read yet are held to the buffer limit of
+     *                the body, for a reader that decodes a whole piece into elements it keeps
+     */
+    public ByteBodyElements(CloseableByteBody body, PieceReader<T> reader, Function<Throwable, Throwable> wrap, boolean limited) {
         this.body = body;
         this.reader = reader;
         this.wrap = wrap;
+        this.limited = limited;
     }
 
     /**
@@ -272,9 +285,9 @@ public final class ByteBodyElements<T> extends PulledBodyElements<T> implements 
         } else if (end) {
             end();
         } else if (subscribe) {
-            // the elements of a piece are kept until they are read: the bytes received but not
-            // read yet are held to the buffer limit, like those of the reactive streams
-            body.toReadBufferPublisher().subscribe(this);
+            // a limited reader keeps the elements of a piece until they are read, so the bytes
+            // received but not read yet are held to the buffer limit; others decode piece by piece
+            (limited ? body.toReadBufferPublisher() : InternalByteBody.toUnbufferedReadBufferPublisher(body)).subscribe(this);
         } else if (s != null) {
             s.request(1);
         }
