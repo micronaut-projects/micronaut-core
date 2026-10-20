@@ -1252,6 +1252,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         }
         if (annotationsByStereotype != null) {
             List<String> annotations = annotationsByStereotype.get(stereotype);
+            if (annotations != null && annotations.size() == 1) {
+                String annotation = annotations.get(0);
+                if (findRepeatableAnnotationContainerInternal(annotation) == null) {
+                    // One annotation: no list to build and wrap
+                    return Collections.singletonList(getAnnotation(annotation));
+                }
+            }
             if (annotations != null) {
                 List<AnnotationValue<T>> result = new ArrayList<>(annotations.size());
                 for (String annotation : annotations) {
