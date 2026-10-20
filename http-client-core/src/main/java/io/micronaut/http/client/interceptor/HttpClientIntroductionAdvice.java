@@ -124,11 +124,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * The default Accept-Types.
      */
     private static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
-    /**
-     * Upper bound for {@link #methodCache}. Method metadata is bounded by the number of declarative
-     * client methods; the cap only guards against a caller that passes a new metadata instance on
-     * every call, in which case the method data is no longer cached.
-     */
 
     private final List<ReactiveClientResultTransformer> transformers;
     private final HttpClientBinderRegistry binderRegistry;

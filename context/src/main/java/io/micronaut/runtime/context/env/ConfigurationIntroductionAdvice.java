@@ -172,8 +172,12 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
     private record Plan(boolean bean, @Nullable String property, @Nullable String defaultValue, boolean nullable) {
 
         static Plan of(ExecutableMethod<?, ?> method) {
+            if (method.isTrue(ConfigurationAdvice.class, MEMBER_BEAN)) {
+                // A bean getter never reads the property members
+                return new Plan(true, null, null, method.isNullable());
+            }
             return new Plan(
-                method.isTrue(ConfigurationAdvice.class, MEMBER_BEAN),
+                false,
                 method.stringValue(Property.class, MEMBER_NAME).orElse(null),
                 method.stringValue(Bindable.class, "defaultValue").orElse(null),
                 method.isNullable()

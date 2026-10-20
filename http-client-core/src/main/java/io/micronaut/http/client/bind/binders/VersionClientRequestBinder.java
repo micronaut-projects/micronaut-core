@@ -88,7 +88,7 @@ public class VersionClientRequestBinder implements AnnotatedClientRequestBinder<
         static Plan of(ExecutableMethod<?, ?> method) {
             AnnotationValue<Version> version = method.getAnnotation(Version.class);
             String value = version != null ? version.stringValue().filter(StringUtils::isNotEmpty).orElse(null) : null;
-            return new Plan(value, method.stringValue(Client.class).orElse(null));
+            return value != null ? new Plan(value, method.stringValue(Client.class).orElse(null)) : new Plan(null, null);
         }
     }
 }

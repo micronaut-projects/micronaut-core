@@ -85,9 +85,10 @@ public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReferenc
      *
      * <p>The key identifies the value: use a type owned by the caller, such as a record holding what the factory
      * derives. The factory must not have side effects and must return an immutable value: it may be invoked more than
-     * once when calls race, and the value of the first call to finish is kept. The value is computed on every call,
-     * without being kept, when the metadata of the method resolves property placeholders or evaluated expressions,
-     * and by implementations that don't keep values.</p>
+     * once when calls race, and the value of the first call to finish is kept. When the metadata of the method resolves
+     * property placeholders, the value is kept until the properties may have changed, and is computed again then. The
+     * value is computed on every call, without being kept, when the metadata has evaluated expressions, which can
+     * depend on the invocation, and by implementations that don't keep values.</p>
      *
      * @param key     The key of the value
      * @param factory Computes the value from the method

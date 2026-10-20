@@ -471,7 +471,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         @SuppressWarnings("java:S3077") // never modified once published: volatile publishes it
         private volatile Object @Nullable [] cachedValues;
         /**
-         * How values derived from the metadata can be kept, updated when the metadata is replaced.
+         * How values derived from the metadata can be kept, updated when the metadata is replaced. The method is
+         * configured before it is published to callers, so the configuration fields are not read concurrently with
+         * their writes.
          */
         private byte cacheMode;
         /**

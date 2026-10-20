@@ -33,6 +33,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -41,6 +42,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class CachedValuesTest {
 
@@ -210,7 +213,51 @@ class CachedValuesTest {
         }
     }
 
+    @Test
+    void aConfigurationBeanGetterDoesNotReadThePropertyMembers() {
+        PlannedConfig config = context.getBean(PlannedConfig.class);
+
+        assertSame(context.getBean(PlainBean.class), config.getBean());
+        assertSame(context.getBean(PlainBean.class), config.getBean());
+        assertEquals("fallback", config.getName());
+    }
+
+    @Test
+    void aValueComputedWhileThePropertiesChangeIsNotKept() throws Exception {
+        ExecutableMethod<PlainBean, Object> method = method("placeholderAnnotated");
+        CountDownLatch computing = new CountDownLatch(1);
+        CountDownLatch changed = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<String> stale = executor.submit(() -> method.getCachedValue(String.class, m -> {
+                try {
+                    return m.stringValue(Sample.class, "name").orElse(null);
+                } finally {
+                    computing.countDown();
+                    try {
+                        assertTrue(changed.await(10, TimeUnit.SECONDS));
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }));
+            if (!computing.await(10, TimeUnit.SECONDS)) {
+                stale.get(1, TimeUnit.SECONDS); // surfaces why the factory didn't run
+                fail("The factory did not run");
+            }
+            context.getEnvironment().addPropertySource(PropertySource.of("override", Map.of("cached.sample.name", "changed"), Ordered.HIGHEST_PRECEDENCE));
+            changed.countDown();
+
+            assertEquals("from-environment", stale.get(10, TimeUnit.SECONDS), "the call that computed it still gets its value");
+            assertEquals("changed", method.getCachedValue(String.class, m -> m.stringValue(Sample.class, "name").orElse(null)));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private ExecutableMethod<PlainBean, Object> method(String name, Class<?>... argumentTypes) {
+        // Creating the bean configures its definition for this context: the generated methods are shared by the contexts of the JVM
+        context.getBean(PlainBean.class);
         return context.getBeanDefinition(PlainBean.class).getRequiredMethod(name, argumentTypes);
     }
 }
