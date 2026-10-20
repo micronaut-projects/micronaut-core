@@ -89,7 +89,10 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
             return;
         }
         Argument<?> argument = segment.getArgument();
-        add(segment, dependency, false, argument.isContainerType() || argument.getType().isArray());
+        // a bean that is not a provider, received at a point that injects a provider, is what the provider resolved
+        // later: the receiving bean holds the provider, and the edge to the bean was recorded lazy as it was injected
+        boolean lazy = providedArgument(resolutionContext) != null;
+        add(segment, dependency, lazy, argument.isContainerType() || argument.getType().isArray());
     }
 
     /**

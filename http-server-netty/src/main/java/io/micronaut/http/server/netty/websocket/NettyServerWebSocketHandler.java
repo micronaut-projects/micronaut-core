@@ -36,6 +36,7 @@ import io.micronaut.core.util.KotlinUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
@@ -161,6 +162,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     @Nullable
     private final Executor routeExecutor;
+    private final PropagatedContext propagatedContext;
     /**
      * The endpoint of a WebSocket route of handler functions, or {@code null} for a bean.
      */
@@ -258,6 +260,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      * @param coroutineHelper            Helper for kotlin coroutines
      * @param routeEndpoint              The endpoint of a WebSocket route of handler functions, or {@code null} for a bean
      * @param routeExecutor              The executor of the WebSocket route of handler functions, or {@code null} for a bean
+     * @param propagatedContext          The context of the upgrade request after the filters
      * @param releaseRequest             Releases the request used to create the websocket once
      *                                   the session ended
      */
@@ -275,6 +278,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         @Nullable CoroutineHelper coroutineHelper,
         @Nullable WebSocketRouteEndpoint routeEndpoint,
         @Nullable Executor routeExecutor,
+        PropagatedContext propagatedContext,
         Runnable releaseRequest) {
         super(
                 nettyEmbeddedServices.getRequestArgumentSatisfier().getBinderRegistry(),
@@ -293,6 +297,9 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         this.releaseRequest = releaseRequest;
         this.eventLoop = ctx.channel().eventLoop();
         this.routeExecutor = routeExecutor;
+        // the handlers run in the context of the upgrade request, e.g. with the elements that a
+        // filter added to it, and with the upgrade request as the current request
+        this.propagatedContext = propagatedContext.plus(new ServerHttpRequestContext(request));
         this.routeEndpoint = routeEndpoint;
         this.maxConcurrentMessages = routeEndpoint == null ? 0 : routeEndpoint.maxConcurrentMessages();
         this.streamsMessages = routeEndpoint != null && routeEndpoint.streamsMessages();
@@ -328,9 +335,9 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             Executor executor = command -> {
                 if (onEventLoop && channel.eventLoop().inEventLoop()) {
                     // already on the executor of the route: no task per message
-                    ServerRequestContext.with(originatingRequest, command);
+                    this.propagatedContext.propagate(command);
                 } else {
-                    handlerExecutor.execute(() -> ServerRequestContext.with(originatingRequest, command));
+                    handlerExecutor.execute(() -> this.propagatedContext.propagate(command));
                 }
             };
             routeEndpoint.connected(serverSession, executor, error -> {
@@ -879,7 +886,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             if (target instanceof ExecutableMethod<?, ?> executableMethod) {
                 if (executableMethod.isSuspend()) {
                     try {
-                        coroutineHelper.setupCoroutineContext(originatingRequest, Context.empty(), PropagatedContext.getOrEmpty());
+                        coroutineHelper.setupCoroutineContext(originatingRequest, Context.empty(), propagatedContext);
 
                         Object immediateReturnValue = invokeExecutable0(boundExecutable, messageHandler);
 
@@ -922,7 +929,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                     ? converted
                     : Flux.from(converted).contextWrite(Context.of(ServerRequestContext.KEY, originatingRequest));
                 // subscribe eagerly so that synchronous results complete inline
-                return ServerRequestContext.with(originatingRequest,
+                return propagatedContext.propagate(
                     (Supplier<ExecutionFlow<Object>>) () -> ReactiveExecutionFlow.fromPublisherEager(publisher, PropagatedContext.getOrEmpty()));
             }
             if (returnType.isAsync()) {
@@ -938,15 +945,8 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     private Supplier<?> invokeWithContext(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
-        return () -> ServerRequestContext.with(originatingRequest,
+        return () -> propagatedContext.propagate(
             (Supplier<Object>) () -> boundExecutable.invoke(messageHandler.getTarget()));
-    }
-
-    @Override
-    protected boolean answersCloseFrame() {
-        // a WebSocket route completes the close handshake: a client, e.g. the JDK one, may not
-        // notice the end of a connection whose close it waits for
-        return routeEndpoint != null;
     }
 
     @Override

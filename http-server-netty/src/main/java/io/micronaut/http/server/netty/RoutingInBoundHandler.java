@@ -205,6 +205,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     private void cleanupRequest(NettyHttpRequest<?> request) {
         try {
+            request.responseCleanedUp();
             request.release();
         } finally {
             ExecutionFlow<Void> terminatedFlow = ExecutionFlow.empty();
@@ -239,6 +240,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 request.getChannelHandlerContext().channel().attr(ACCESS_LOG_REQUEST_ATTRIBUTE).compareAndSet(request, null);
             }
             cleanupRequest(request);
+        }
+    }
+
+    @Override
+    public void responseFailed(@Nullable Object attachment, Throwable cause) {
+        if (attachment != null) {
+            ((NettyHttpRequest<?>) attachment).responseFailed(cause);
         }
     }
 
@@ -358,6 +366,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             ctx.channel().attr(ACCESS_LOG_REQUEST_ATTRIBUTE).set(mnRequest);
         }
         outboundAccess.attachment(mnRequest);
+        mnRequest.outboundAccess(outboundAccess);
     }
 
     /**
@@ -462,6 +471,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             finalResponse.onComplete((r, t) -> {
                 ByteBodyHttpResponse<?> encodedResponse;
                 if (t != null) {
+                    nettyHttpRequest.responseFailed(t);
                     // fallback of the fallback...
                     encodedResponse = ByteBodyHttpResponseWrapper.wrap(HttpResponse.serverError(), NettyByteBodyFactory.empty());
                     try {
@@ -476,8 +486,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 UpgradedHttpResponse<?> upgraded = encodedResponse.code() == HttpResponseStatus.SWITCHING_PROTOCOLS.code()
                     ? UpgradedHttpResponse.unwrap(encodedResponse) : null;
                 if (upgraded != null) {
-                    // the response is a connection to relay, not a body to write: it stays open
-                    switchProtocols(outboundAccess, nettyHttpRequest, NettyMutableHttpResponse.toNoBodyResponse(encodedResponse), upgraded);
+                    // the response is a connection to relay, not a body to write: it stays open. The
+                    // switch waits for the responses of earlier pipelined requests
+                    io.netty.handler.codec.http.HttpResponse head = NettyMutableHttpResponse.toNoBodyResponse(encodedResponse);
+                    outboundAccess.runInResponseOrder(
+                        () -> switchProtocols(outboundAccess, nettyHttpRequest, head, upgraded),
+                        upgraded::close
+                    );
                     return;
                 }
                 try (encodedResponse) {
@@ -506,6 +521,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                         u.addSuppressed(t);
                     }
                     t = u;
+                    nettyHttpRequest.responseFailed(u);
                     // the response may not have reached the connection: the client would wait
                     // for it until it times out
                     writeFallbackResponse(outboundAccess, u);
