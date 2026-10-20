@@ -81,18 +81,20 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
      * The type variable used with type-use annotations, such as {@code Annotated[E, NotNull()]} as a type argument.
      * The copy stays a {@link GenericPlaceholderElement}, so the type argument keeps naming the type variable.
      *
-     * @param typeUseAnnotationMetadata The type-use annotation metadata of the type node
+     * @param metadata The type-use annotation metadata of the type node
      * @return The annotated type variable
      */
-    public PythonGenericPlaceholderElement withTypeUseAnnotationMetadata(ElementAnnotationMetadata typeUseAnnotationMetadata) {
-        PythonGenericPlaceholderElement copy = new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement, typeUseAnnotationMetadata, arrayDimensions);
-        copyValues(copy);
-        return copy;
+    public PythonGenericPlaceholderElement withTypeUseAnnotationMetadata(ElementAnnotationMetadata metadata) {
+        return copyWith(metadata, arrayDimensions);
     }
 
     @Override
-    protected ClassElement createWithArrayDimensions(int arrayDimensions) {
-        PythonGenericPlaceholderElement copy = new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement, typeUseAnnotationMetadata, arrayDimensions);
+    protected ClassElement createWithArrayDimensions(int dimensions) {
+        return copyWith(typeUseAnnotationMetadata, dimensions);
+    }
+
+    private PythonGenericPlaceholderElement copyWith(@Nullable ElementAnnotationMetadata metadata, int dimensions) {
+        PythonGenericPlaceholderElement copy = new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement, metadata, dimensions);
         copyValues(copy);
         return copy;
     }

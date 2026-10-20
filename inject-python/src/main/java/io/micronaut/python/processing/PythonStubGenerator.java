@@ -6102,7 +6102,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (returnType.isVoid()) {
             // For void methods, just invoke the Python method without returning
             return invokedValue;
-        } else if (returnType.isArray()) {
+        } else if (returnType instanceof GenericPlaceholderElement || returnType.isArray()) {
             return convertRuntimeValue(returnType, invokedValue);
         } else if (returnType.isPrimitive()) {
             return convertPrimitive(returnType, invokedValue);
@@ -6681,7 +6681,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private ExpressionDef convertValueForType(ClassElement type, ExpressionDef member) {
-        if (type.isArray()) {
+        if (type instanceof GenericPlaceholderElement || type.isArray()) {
             return convertRuntimeValue(type, member);
         } else if (type.isPrimitive()) {
             return switch (type.getName()) {
