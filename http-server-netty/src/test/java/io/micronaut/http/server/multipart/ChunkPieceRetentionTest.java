@@ -97,6 +97,7 @@ class ChunkPieceRetentionTest {
     private static final class MockUpstream implements BufferConsumer.Upstream {
         @Override
         public void onBytesConsumed(long bytesConsumed) {
+            // the test feeds the pieces directly, there is no upstream to resume
         }
     }
 }
