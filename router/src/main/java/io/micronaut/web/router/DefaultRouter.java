@@ -577,11 +577,19 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         Class<?> originatingClass,
         Throwable error,
         HttpRequest<?> request) {
-        if (originatingClass != null && localErrorRouteTypes != null && !localErrorRouteTypes.contains(originatingClass)) {
+        if (!mayHaveLocalErrorRoutes(originatingClass)) {
             // a local error route only matches the type it is local to
             return Optional.empty();
         }
         return findErrorRouteInternal(originatingClass, error, request);
+    }
+
+    /**
+     * @param originatingClass The class the error originates from, {@code null} for the global error routes
+     * @return Whether to look up the error routes: always for {@code null}, and when an error route may be local to the class
+     */
+    private boolean mayHaveLocalErrorRoutes(@Nullable Class<?> originatingClass) {
+        return originatingClass == null || localErrorRouteTypes == null || localErrorRouteTypes.contains(originatingClass);
     }
 
     /**
