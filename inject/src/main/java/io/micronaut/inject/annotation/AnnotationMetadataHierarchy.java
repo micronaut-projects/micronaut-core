@@ -478,58 +478,20 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
-        List<String> list = null;
-        Set<String> uniqueNames = null;
+        UniqueValues<String> merged = new UniqueValues<>();
         for (AnnotationMetadata am : hierarchy) {
-            List<String> names = am.getAnnotationNamesByStereotype(stereotype);
-            for (int i = 0, n = names.size(); i < n; i++) {
-                String name = names.get(i);
-                if (list == null) {
-                    // Sized for the first layer with results: a single result does not need the default capacity
-                    list = new ArrayList<>(n);
-                    list.add(name);
-                    continue;
-                }
-                if (uniqueNames == null) {
-                    // Only created once there is a second name to compare: the list holds the first name only. Few names
-                    // are expected, so a small table
-                    uniqueNames = new HashSet<>(4);
-                    uniqueNames.add(list.get(0));
-                }
-                if (uniqueNames.add(name)) {
-                    list.add(name);
-                }
-            }
+            merged.addAll(am.getAnnotationNamesByStereotype(stereotype));
         }
-        return list != null ? list : new ArrayList<>();
+        return merged.list();
     }
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
-        List<AnnotationValue<T>> list = null;
-        Set<AnnotationValue<T>> uniqueValues = null;
+        UniqueValues<AnnotationValue<T>> merged = new UniqueValues<>();
         for (AnnotationMetadata am : hierarchy) {
-            List<AnnotationValue<T>> values = am.getAnnotationValuesByStereotype(stereotype);
-            for (int i = 0, n = values.size(); i < n; i++) {
-                AnnotationValue<T> value = values.get(i);
-                if (list == null) {
-                    // Sized for the first layer with results: a single result does not need the default capacity
-                    list = new ArrayList<>(n);
-                    list.add(value);
-                    continue;
-                }
-                if (uniqueValues == null) {
-                    // Only created once there is a second value to compare: the list holds the first value only. Few values
-                    // are expected, so a small table
-                    uniqueValues = new HashSet<>(4);
-                    uniqueValues.add(list.get(0));
-                }
-                if (uniqueValues.add(value)) {
-                    list.add(value);
-                }
-            }
+            merged.addAll(am.getAnnotationValuesByStereotype(stereotype));
         }
-        return list != null ? list : new ArrayList<>();
+        return merged.list();
     }
 
     @Override
@@ -598,31 +560,11 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
-        List<AnnotationValue<T>> list = null;
-        Set<AnnotationValue<T>> uniqueValues = null;
+        UniqueValues<AnnotationValue<T>> merged = new UniqueValues<>();
         for (AnnotationMetadata am : hierarchy) {
-            // An index loop: the layers' lists are random access, and their iterators were allocated on every call
-            List<AnnotationValue<T>> values = am.getAnnotationValuesByType(annotationType);
-            for (int i = 0, n = values.size(); i < n; i++) {
-                AnnotationValue<T> value = values.get(i);
-                if (list == null) {
-                    // Sized for the first layer with results: a single result does not need the default capacity
-                    list = new ArrayList<>(n);
-                    list.add(value);
-                    continue;
-                }
-                if (uniqueValues == null) {
-                    // Only created once there is a second value to compare: the list holds the first value only. Few values
-                    // are expected, so a small table
-                    uniqueValues = new HashSet<>(4);
-                    uniqueValues.add(list.get(0));
-                }
-                if (uniqueValues.add(value)) {
-                    list.add(value);
-                }
-            }
+            merged.addAll(am.getAnnotationValuesByType(annotationType));
         }
-        return list != null ? list : new ArrayList<>();
+        return merged.list();
     }
 
     @Override
@@ -635,30 +577,11 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     private <T extends Annotation, V> List<AnnotationValue<T>> mergeAnnotationValues(V annotationType,
                                                                                      BiFunction<AnnotationMetadata, V, List<AnnotationValue<T>>> fn) {
-        List<AnnotationValue<T>> list = null;
-        Set<AnnotationValue<T>> uniqueValues = null;
+        UniqueValues<AnnotationValue<T>> merged = new UniqueValues<>();
         for (AnnotationMetadata am : hierarchy) {
-            List<AnnotationValue<T>> values = fn.apply(am, annotationType);
-            for (int i = 0, n = values.size(); i < n; i++) {
-                AnnotationValue<T> value = values.get(i);
-                if (list == null) {
-                    // Sized for the first layer with results: a single result does not need the default capacity
-                    list = new ArrayList<>(n);
-                    list.add(value);
-                    continue;
-                }
-                if (uniqueValues == null) {
-                    // Only created once there is a second value to compare: the list holds the first value only. Few values
-                    // are expected, so a small table
-                    uniqueValues = new HashSet<>(4);
-                    uniqueValues.add(list.get(0));
-                }
-                if (uniqueValues.add(value)) {
-                    list.add(value);
-                }
-            }
+            merged.addAll(fn.apply(am, annotationType));
         }
-        return list == null ? Collections.emptyList() : Collections.unmodifiableList(list);
+        return merged.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(merged.list());
     }
 
 
@@ -1124,14 +1047,6 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     /**
-     * {@link #isRepeatableAnnotation(Class)}, asking the shared registry once for all the layers that are exactly
-     * {@link DefaultAnnotationMetadata}, since that is all such a layer asks.
-     *
-     * @param annotationClass The annotation
-     * @param annotation      The annotation name
-     * @return Whether a layer considers the annotation repeatable
-     */
-    /**
      * {@link #findRepeatableAnnotation(Class)} without an {@link java.util.Optional} per layer, asking the shared
      * registry once for all the layers that are exactly {@link DefaultAnnotationMetadata}.
      *
@@ -1196,6 +1111,14 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return hasDeclaredStereotype(container != null ? container : stereotype.getName());
     }
 
+    /**
+     * {@link #isRepeatableAnnotation(Class)}, asking the shared registry once for all the layers that are exactly
+     * {@link DefaultAnnotationMetadata}, since that is all such a layer asks.
+     *
+     * @param annotationClass The annotation
+     * @param annotation      The annotation name
+     * @return Whether a layer considers the annotation repeatable
+     */
     private boolean isRepeatableInAnyLayer(Class<? extends Annotation> annotationClass, String annotation) {
         boolean registryChecked = false;
         for (AnnotationMetadata metadata : hierarchy) {
@@ -1319,5 +1242,44 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     public int size() {
         return hierarchy.length;
+    }
+
+    /**
+     * The values of the layers in order, without duplicates. The list is created with the first value, sized for the
+     * first layer with values, and the set to find duplicates only once there is a second value to compare.
+     *
+     * @param <E> The value type
+     */
+    private static final class UniqueValues<E> {
+        private @Nullable List<E> list;
+        private @Nullable Set<E> unique;
+
+        void addAll(List<E> values) {
+            // An index loop: the layers' lists are random access, and their iterators were allocated on every call
+            for (int i = 0, n = values.size(); i < n; i++) {
+                E value = values.get(i);
+                if (list == null) {
+                    list = new ArrayList<>(n);
+                    list.add(value);
+                    continue;
+                }
+                if (unique == null) {
+                    // Few values are expected, so a small table
+                    unique = new HashSet<>(4);
+                    unique.add(list.get(0));
+                }
+                if (unique.add(value)) {
+                    list.add(value);
+                }
+            }
+        }
+
+        boolean isEmpty() {
+            return list == null;
+        }
+
+        List<E> list() {
+            return list != null ? list : new ArrayList<>();
+        }
     }
 }
