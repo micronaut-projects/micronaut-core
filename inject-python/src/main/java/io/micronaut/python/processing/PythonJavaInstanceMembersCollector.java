@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing;
 
+import io.micronaut.annotation.processing.PostponeToNextRoundException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -74,27 +75,47 @@ final class PythonJavaInstanceMembersCollector {
     }
 
     void referencePythonType(ClassElement type) {
-        type.getSuperType().filter(parent -> !parent.getName().equals(Object.class.getName()))
-            .ifPresent(parent -> reference(parent, 0));
-        type.getInterfaces().forEach(parent -> reference(parent, 0));
-        for (MethodElement method : type.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())) {
-            referenceSignature(method);
-        }
-        for (MethodElement constructor : type.getEnclosedElements(ElementQuery.CONSTRUCTORS)) {
-            referenceSignature(constructor);
-        }
-        type.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyDeclared()).forEach(field -> reference(field.getType(), 0));
-        type.getBeanProperties().forEach(property -> reference(property.getType(), 0));
+        skipIncomplete(() -> {
+            type.getSuperType().filter(parent -> !parent.getName().equals(Object.class.getName()))
+                .ifPresent(parent -> reference(parent, 0));
+            type.getInterfaces().forEach(parent -> reference(parent, 0));
+            for (MethodElement method : type.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())) {
+                referenceSignature(method);
+            }
+            for (MethodElement constructor : type.getEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+                referenceSignature(constructor);
+            }
+            type.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyDeclared()).forEach(field -> reference(field.getType(), 0));
+            type.getBeanProperties().forEach(property -> reference(property.getType(), 0));
+        });
     }
 
     private void referenceSignature(MethodElement method) {
-        for (var parameter : method.getParameters()) {
-            reference(parameter.getType(), 0);
+        skipIncomplete(() -> {
+            for (var parameter : method.getParameters()) {
+                reference(parameter.getType(), 0);
+            }
+            reference(method.getReturnType(), 0);
+        });
+    }
+
+    /**
+     * Runs a step of the walk, leaving out what javac cannot complete in this round (a type of a missing
+     * dependency), as the type checker does ({@code TypeFacts}), rather than postponing the round.
+     */
+    private static void skipIncomplete(Runnable step) {
+        try {
+            step.run();
+        } catch (PostponeToNextRoundException e) {
+            // no names for an incomplete type
         }
-        reference(method.getReturnType(), 0);
     }
 
     private void reference(ClassElement element, int depth) {
+        skipIncomplete(() -> walk(element, depth));
+    }
+
+    private void walk(ClassElement element, int depth) {
         // a hint with type annotations (Optional[Color]) wraps the type, which may be a Python class
         ClassElement referenced = element;
         while (referenced instanceof TypeAnnotatedClassElement annotated) {
