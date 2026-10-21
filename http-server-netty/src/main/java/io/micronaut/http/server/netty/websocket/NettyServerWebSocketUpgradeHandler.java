@@ -357,7 +357,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
             ExecutionFlow<HttpResponse<?>> response;
             if (route != null) {
-                response = runWithFilters(request, (filteredRequest, propagatedContext) -> ExecutionFlow.just(proceed));
+                response = runWithPreMatchingFilters(request, (filteredRequest, propagatedContext) -> ExecutionFlow.just(proceed));
             } else {
                 response = onError(request, new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"))
                     .putInContext(ServerRequestContext.KEY, request);

@@ -373,6 +373,48 @@ public class RequestLifecycle {
         }
     }
 
+    /**
+     * Run the pre-matching filters and the filters for this request, and then run the given flow.
+     * The route must already be matched and set on the request.
+     *
+     * @param request          The request
+     * @param responseProvider Downstream flow, runs inside the filters
+     * @return Execution flow that completes after the all the filters and the downstream flow
+     * @since 5.2.18
+     */
+    protected final ExecutionFlow<HttpResponse<?>> runWithPreMatchingFilters(HttpRequest<?> request, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
+        try {
+            List<GenericHttpFilter> preMatchingFilters = routeExecutor.router.findPreMatchingFilters(request);
+            FilterRunner filterRunner = new FilterRunner(preMatchingFilters, null, responseProvider) {
+
+                @Override
+                protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
+                    return routeExecutor.router.findFilters(request);
+                }
+
+                @Override
+                protected void doRouteMatch(HttpRequest<?> request) {
+                    // The route is already matched
+                }
+
+                @Override
+                protected ExecutionFlow<HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
+                    RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
+                    return handleStatusException(request, response, routeInfo, propagatedContext)
+                        .onErrorResume(throwable -> onErrorNoFilter(request, throwable, propagatedContext));
+                }
+
+                @Override
+                protected ExecutionFlow<HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
+                    return onErrorNoFilter(request, failure, propagatedContext);
+                }
+            };
+            return filterRunner.run(request);
+        } catch (Throwable e) {
+            return ExecutionFlow.error(e);
+        }
+    }
+
     private ExecutionFlow<HttpResponse<?>> runServerFilters(HttpRequest<?> request) {
         try {
             PropagatedContext propagatedContext = PropagatedContext.get();
@@ -398,6 +440,15 @@ public class RequestLifecycle {
                         //Check if there is a file for the route before returning route not found
                         FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
                         if (fileCustomizableResponseType != null) {
+                            HttpMethod method = request.getMethod();
+                            if (method != HttpMethod.GET && method != HttpMethod.HEAD) {
+                                // Static resources are only served for GET and HEAD
+                                return onStatusError(
+                                    request,
+                                    new NotAllowedException(request.getMethodName(), request.getUri(), Set.of(HttpMethod.GET.name(), HttpMethod.HEAD.name())),
+                                    null,
+                                    propagatedContext);
+                            }
                             return ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType));
                         }
                         return onRouteMiss(request, propagatedContext);

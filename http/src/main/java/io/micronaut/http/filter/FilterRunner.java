@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 
 /**
@@ -272,7 +273,12 @@ public class FilterRunner {
             // At-least one request filter
             ExecutionFlow<FilterContext> flow;
             if (filter.hasContinuation()) {
+                // The downstream shares the iterator, it can only be entered once
+                AtomicBoolean proceeded = new AtomicBoolean();
                 flow = filter.processRequestFilter(context, newContext -> {
+                    if (!proceeded.compareAndSet(false, true)) {
+                        return ExecutionFlow.error(new IllegalStateException("The filter continuation can only proceed once"));
+                    }
                     if (newContext.response() != null) {
                         return ExecutionFlow.just(newContext);
                     }
@@ -428,7 +434,9 @@ public class FilterRunner {
                 }
                 List<InternalHttpFilter> postFilters = findInternalFiltersAfterRouteMatch(request);
                 for (InternalHttpFilter postFilter : postFilters) {
-                    filterIterator.add(postFilter);
+                    if (postFilter.isEnabled(request)) {
+                        filterIterator.add(postFilter);
+                    }
                 }
                 while (filterIterator.hasPrevious()) {
                     filterIterator.previous();

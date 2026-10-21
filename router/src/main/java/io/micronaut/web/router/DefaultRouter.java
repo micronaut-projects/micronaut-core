@@ -605,7 +605,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                     continue;
                 }
             }
-            filterRoute.match(method, path).ifPresent(httpFilters::add);
+            matchFilter(filterRoute, method, path, routeMatch).ifPresent(httpFilters::add);
         }
         FilterRunner.sort(httpFilters);
         return Collections.unmodifiableList(httpFilters);
@@ -627,10 +627,23 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             if (routeMatch != null && !matchesFilterMatcher(filterRoute, routeMatch)) {
                 continue;
             }
-            filterRoute.match(method, path).ifPresent(httpFilters::add);
+            matchFilter(filterRoute, method, path, routeMatch).ifPresent(httpFilters::add);
         }
         FilterRunner.sort(httpFilters);
         return Collections.unmodifiableList(httpFilters);
+    }
+
+    /**
+     * Match the filter route. An implicit {@code HEAD} route runs the {@code GET} handler, so the
+     * filters scoped to {@code GET} apply to it as well.
+     */
+    private static Optional<GenericHttpFilter> matchFilter(FilterRoute filterRoute, HttpMethod method, String path, @Nullable RouteMatch<?> routeMatch) {
+        Optional<GenericHttpFilter> filter = filterRoute.match(method, path);
+        if (filter.isEmpty() && method == HttpMethod.HEAD && routeMatch != null
+            && routeMatch.getRouteInfo() instanceof UriRouteInfo<?, ?> uriRouteInfo && uriRouteInfo.isImplicitHead()) {
+            return filterRoute.match(HttpMethod.GET, path);
+        }
+        return filter;
     }
 
     @Override
