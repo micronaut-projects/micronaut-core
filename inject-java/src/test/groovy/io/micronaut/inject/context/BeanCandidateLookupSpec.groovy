@@ -32,6 +32,7 @@ class BeanCandidateLookupSpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Replaces;
@@ -82,6 +83,19 @@ public class Beans {
     @Singleton
     @Replaces(OldEngine.class)
     public static class NewEngine implements Engine {
+    }
+
+    public interface Pump {
+    }
+
+    @Singleton
+    @Named("old")
+    public static class OldPump implements Pump {
+    }
+
+    @EachProperty("pumps")
+    @Replaces(OldPump.class)
+    public static class ConfiguredPump implements Pump {
     }
 }
 '''
@@ -147,6 +161,34 @@ public class Beans {
         context.close()
     }
 
+    void "a qualifier that chooses among the definitions is given only those not replaced"() {
+        given:
+        ApplicationContext context = buildContext('test.Beans', BEANS)
+        Class<?> engine = type(context, 'Engine')
+        Qualifier<Object> preferTheOldEngine = new Prefer(type(context, 'OldEngine'), engine)
+
+        expect: 'the replaced engine is not there to be preferred, so the other one is chosen'
+        context.getBeanDefinitions((Class) engine, preferTheOldEngine)*.beanType == [type(context, 'NewEngine')]
+        context.getBeanDefinitions(preferTheOldEngine)*.beanType == [type(context, 'NewEngine')]
+
+        cleanup:
+        context.close()
+    }
+
+    void "an each property bean that produces no bean replaces nothing whichever way the definitions are asked for"() {
+        given:
+        ApplicationContext context = buildContext('test.Beans', BEANS)
+        Class<?> oldPump = type(context, 'OldPump')
+
+        expect:
+        context.getBeanDefinitions(type(context, 'Pump'))*.beanType == [oldPump]
+        context.getBeanDefinitions(Qualifiers.byName('old'))*.beanType.contains(oldPump)
+        context.getBeanDefinitions(new OnlyType(oldPump))*.beanType == [oldPump]
+
+        cleanup:
+        context.close()
+    }
+
     private static Class<?> type(ApplicationContext context, String name) {
         context.classLoader.loadClass('test.Beans$' + name)
     }
@@ -161,6 +203,26 @@ public class Beans {
         @Override
         <B extends BeanType<Object>> Stream<B> reduce(Class<Object> beanType, Stream<B> candidates) {
             candidates.filter { it.beanType == type }
+        }
+    }
+
+    /**
+     * Chooses one definition of a type, the preferred one if it is there.
+     */
+    private static final class Prefer implements Qualifier<Object> {
+        private final Class<?> preferred
+        private final Class<?> type
+
+        Prefer(Class<?> preferred, Class<?> type) {
+            this.preferred = preferred
+            this.type = type
+        }
+
+        @Override
+        <B extends BeanType<Object>> Stream<B> reduce(Class<Object> beanType, Stream<B> candidates) {
+            List<B> ofType = candidates.filter { type.isAssignableFrom(it.beanType) }.toList()
+            B chosen = ofType.find { it.beanType == preferred } ?: ofType.find()
+            chosen == null ? Stream.empty() : Stream.of(chosen)
         }
     }
 }

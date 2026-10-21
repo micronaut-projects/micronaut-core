@@ -22,7 +22,6 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
-import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.context.beans.BeanDefinitionService;
 import io.micronaut.context.beans.DefaultBeanDefinitionService;
@@ -261,14 +260,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * Advanced after bean definitions are added, so that an index exhaustiveness computed before is not used.
      */
     private final AtomicLong beanDefinitionsEpoch = new AtomicLong();
-
-    /**
-     * The enabled definitions that replace another, which a lookup without a type drops the replaced ones by,
-     * with the {@link #beanDefinitionsEpoch} they were found at.
-     */
-    @Nullable
-    @SuppressWarnings("java:S3077") // an immutable record
-    private volatile ReplacingDefinitions replacingDefinitions;
 
     private final ClassLoader classLoader;
     private final Set<Class<?>> thisInterfaces = CollectionUtils.setOf(
@@ -642,7 +633,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             beanProxyTargetCache.clear();
             containsBeanCache.clear();
             indexExhaustiveCache.clear();
-            replacingDefinitions = null;
             beanConfigurations.clear();
             disabledConfigurations.clear();
             singletonScope.clear();
@@ -2502,61 +2492,52 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 }
             };
             candidates = beanDefinitionProvider.getBeanDefinitions(this, predicate, null);
+            // the qualifier decides on each definition alone, so removing what it kept is removing it before
+            removeReplacedBeans(candidates);
         } else {
-            Stream<BeanDefinition<Object>> beanDefinitionsClasses = StreamSupport.stream(
-                beanDefinitionProvider.getBeanDefinitions(this, Argument.OBJECT_ARGUMENT, null, null).spliterator(),
-                false);
-            candidates = new ArrayList<>(qualifier.reduce(Object.class, beanDefinitionsClasses).toList());
+            List<BeanDefinition<Object>> definitions = new ArrayList<>();
+            beanDefinitionProvider.getBeanDefinitions(this, Argument.OBJECT_ARGUMENT, null, null).forEach(definitions::add);
+            // a qualifier that reduces may choose among the definitions, so it is given only those not replaced
+            removeReplacedBeans(definitions);
+            candidates = qualifier.reduce(Object.class, definitions.stream()).toList();
         }
-
-        removeReplacedBeans(candidates);
         return candidates;
     }
 
     /**
-     * Removes the definitions any enabled definition replaces, the replacing one selected by the qualifier or not,
-     * which is what filtering the replaced beans out of every definition before the qualifier would leave, as
-     * {@link #getBeanDefinitions(Argument, Qualifier)} does.
+     * Removes the definitions an enabled definition replaces, whether that one is among them or not, as
+     * {@link #getBeanDefinitions(Argument, Qualifier)} removes them from every candidate of the type before the qualifier.
      *
-     * @param candidates The definitions a qualifier selected
+     * @param definitions The definitions
      */
-    private void removeReplacedBeans(Collection<BeanDefinition<Object>> candidates) {
-        if (candidates.isEmpty()) {
+    private void removeReplacedBeans(Collection<BeanDefinition<Object>> definitions) {
+        if (definitions.isEmpty()) {
             return;
         }
-        List<Map.Entry<ReplacesDefinition<Object>, BeanDefinition<Object>>> replacements = findReplacingDefinitions();
-        if (!replacements.isEmpty()) {
-            candidates.removeIf(definition -> checkIfReplacementExists(replacements, definition));
+        Iterator<BeanDefinition<Object>> replacing = beanDefinitionProvider.getReplacingBeans(this).iterator();
+        if (!replacing.hasNext()) {
+            return;
         }
-    }
-
-    private List<Map.Entry<ReplacesDefinition<Object>, BeanDefinition<Object>>> findReplacingDefinitions() {
-        long epoch = beanDefinitionsEpoch.get();
-        ReplacingDefinitions cached = replacingDefinitions;
-        if (cached != null && cached.epoch() == epoch) {
-            return cached.replacements();
+        Set<BeanDefinition<Object>> replacingBeans = new LinkedHashSet<>();
+        while (replacing.hasNext()) {
+            BeanDefinition<Object> definition = replacing.next();
+            if (definition.isConfigurationProperties()) {
+                // as a lookup by type does, an each bean replaces only through the beans it produces
+                collectIterableBeans(null, definition, replacingBeans, Argument.OBJECT_ARGUMENT);
+            } else {
+                replacingBeans.add(definition);
+            }
         }
-        List<Map.Entry<ReplacesDefinition<Object>, BeanDefinition<Object>>> replacements = new ArrayList<>(2);
-        for (BeanDefinition<Object> definition : beanDefinitionProvider.getBeanDefinitions(this, Argument.OBJECT_ARGUMENT,
-            reference -> reference.hasAnnotation(Replaces.class), null)) {
+        List<Map.Entry<ReplacesDefinition<Object>, BeanDefinition<Object>>> replacements = new ArrayList<>(replacingBeans.size());
+        for (BeanDefinition<Object> definition : replacingBeans) {
             ReplacesDefinition<Object> replacesDefinition = definition.getReplacesDefinition();
             if (replacesDefinition != null) {
                 replacements.add(Map.entry(replacesDefinition, definition));
             }
         }
-        // stored with the epoch read before computing, so a result that raced a registration is never used
-        replacingDefinitions = new ReplacingDefinitions(epoch, List.copyOf(replacements));
-        return replacements;
-    }
-
-    /**
-     * The enabled definitions that replace another.
-     *
-     * @param epoch        The {@link #beanDefinitionsEpoch} they were found at
-     * @param replacements What each replaces, by the replacing definition
-     */
-    private record ReplacingDefinitions(long epoch,
-                                        List<Map.Entry<ReplacesDefinition<Object>, BeanDefinition<Object>>> replacements) {
+        if (!replacements.isEmpty()) {
+            definitions.removeIf(definition -> checkIfReplacementExists(replacements, definition));
+        }
     }
 
     /**
@@ -2650,7 +2631,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     private void purgeCacheForBeanDefinition(RuntimeBeanDefinition<?> definition) {
-        replacingDefinitions = null;
         if (beanCandidateCache.isEmpty() && beanConcreteCandidateCache.isEmpty() &&
             singletonBeanRegistrations.isEmpty() && containsBeanCache.isEmpty()) {
             return;
@@ -2849,7 +2829,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Internal
     protected void invalidateCaches() {
         beanCandidateCache.clear();
-        replacingDefinitions = null;
         beanConcreteCandidateCache.clear();
         singletonBeanRegistrations.clear();
         indexExhaustiveCache.clear();
