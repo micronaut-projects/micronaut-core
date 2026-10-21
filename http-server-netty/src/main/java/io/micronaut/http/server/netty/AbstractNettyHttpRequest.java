@@ -49,6 +49,8 @@ import java.nio.charset.Charset;
 @Internal
 public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap implements HttpRequest<B>, NettyHttpRequestBuilder {
 
+    private static final URI AUTHORITY_FORM_URI = URI.create("");
+
     protected final io.netty.handler.codec.http.HttpRequest nettyRequest;
     protected final ConversionService conversionService;
     protected final HttpMethod httpMethod;
@@ -72,19 +74,24 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     public AbstractNettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest, ConversionService conversionService, boolean escapeHtmlUrl) {
         this.nettyRequest = nettyRequest;
         this.conversionService = conversionService;
+        this.httpMethodName = nettyRequest.method().name();
+        this.httpMethod = HttpMethod.parse(httpMethodName);
         String uri = nettyRequest.uri();
         if (!UriUtil.isValidPath(uri)) {
             if (escapeHtmlUrl && UriUtil.isRelative(uri)) {
                 uri = UriUtil.toValidPath(uri);
             }
-            URI parsed = createURI(uri);
-            this.uri = parsed;
-            // the path must be the path of the URI so that routing, filters and getUri() agree
-            this.path = parsed.getRawPath();
+            if (httpMethod == HttpMethod.CONNECT && isAuthorityForm(uri)) {
+                // authority-form is only valid for CONNECT (RFC 9112 section 3.2.3) and has no path
+                this.uri = AUTHORITY_FORM_URI;
+            } else {
+                URI parsed = createURI(uri);
+                this.uri = parsed;
+                // the path must be the path of the URI so that routing, filters and getUri() agree
+                this.path = parsed.getRawPath();
+            }
         }
         this.unvalidatedUrl = uri;
-        this.httpMethodName = nettyRequest.method().name();
-        this.httpMethod = HttpMethod.parse(httpMethodName);
     }
 
     @Override
@@ -230,6 +237,10 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     @Override
     public String getMethodName() {
         return httpMethodName;
+    }
+
+    private static boolean isAuthorityForm(String url) {
+        return !url.isEmpty() && url.charAt(0) != '/' && !"*".equals(url) && !url.contains("://");
     }
 
     private static URI createURI(String url) {
