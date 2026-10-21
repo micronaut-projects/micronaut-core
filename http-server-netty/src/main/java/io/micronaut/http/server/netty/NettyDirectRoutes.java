@@ -52,6 +52,7 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpStatusClass;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.QueryStringDecoder;
@@ -74,6 +75,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
@@ -306,7 +308,7 @@ final class NettyDirectRoutes {
         stage.whenComplete((response, error) -> {
             // on the thread that completed the stage
             if (error != null || response == null) {
-                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, error, null));
+                onEventLoop(ctx, body, null, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, error, null));
                 return;
             }
             MutableHttpResponse<?> mutable;
@@ -315,7 +317,7 @@ final class NettyDirectRoutes {
                 mutable = mutable(response);
                 writer = writer(mutable, true);
             } catch (Throwable e) {
-                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, e, null));
+                onEventLoop(ctx, body, null, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, e, null));
                 return;
             }
             Runnable prepare = () -> {
@@ -324,20 +326,20 @@ final class NettyDirectRoutes {
                     prepared = prepare(ctx, request, mutable, writer);
                 } catch (Throwable t) {
                     // e.g. an allocation error
-                    onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, t, null));
+                    onEventLoop(ctx, body, null, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, t, null));
                     return;
                 }
-                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, null, prepared));
+                onEventLoop(ctx, body, prepared, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, null, prepared));
             };
             if (writer == null || !writer.blocking()) {
                 // bytes, text and the writers that do not block are written on the event loop
-                onEventLoop(ctx, prepare);
+                onEventLoop(ctx, body, null, prepare);
             } else if (Thread.currentThread() instanceof FastThreadLocalThread) {
                 // a blocking writer never runs on an event loop, e.g. of a client that completed the stage
                 try {
                     ioExecutor.get().execute(prepare);
                 } catch (RuntimeException e) {
-                    onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, e, null));
+                    onEventLoop(ctx, body, null, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, e, null));
                 }
             } else {
                 // e.g. the executor of the route
@@ -382,11 +384,26 @@ final class NettyDirectRoutes {
         }
     }
 
-    private static void onEventLoop(ChannelHandlerContext ctx, Runnable task) {
+    /**
+     * Run a task on the event loop of the channel.
+     *
+     * @param body     The body of the request, closed if the event loop rejects the task, e.g.
+     *                 as it shut down: the task never completes the request then
+     * @param prepared The response the task writes, released if the event loop rejects the task
+     */
+    private static void onEventLoop(ChannelHandlerContext ctx, CloseableByteBody body, @Nullable Prepared prepared, Runnable task) {
         if (ctx.executor().inEventLoop()) {
             task.run();
-        } else {
+            return;
+        }
+        try {
             ctx.executor().execute(task);
+        } catch (RejectedExecutionException e) {
+            LOG.debug("The event loop rejected the response of a direct route: {}", e.getMessage());
+            body.close();
+            if (prepared != null) {
+                prepared.content().release();
+            }
         }
     }
 
@@ -426,6 +443,14 @@ final class NettyDirectRoutes {
     private void write(HttpRequest request, HttpResponse head, ByteBuf content, OutboundAccess outboundAccess, boolean date) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Direct response {} - {} {}", head.status().code(), request.method(), request.uri());
+        }
+        if (head.status().codeClass() == HttpStatusClass.INFORMATIONAL) {
+            // e.g. 103: an interim response is never the response of a request
+            LOG.error("The direct route of {} {} answered with the informational status {}, which is not a final response",
+                request.method(), request.uri(), head.status().code());
+            content.release();
+            writeServerError(outboundAccess);
+            return;
         }
         HttpHeaders headers = head.headers();
         addConfiguredHeaders(headers, date);
@@ -533,7 +558,7 @@ final class NettyDirectRoutes {
             MessageBodyWriter<Object> writer = bodyHandlers.findWriter(argument, List.of(key.mediaType()))
                 .orElseThrow(() -> new CodecException("No message body writer for a body of type " + key.type().getName()
                     + " and media type " + key.mediaType() + " of a direct route"));
-            return new ResolvedWriter(argument, key.mediaType(), writer.createSpecific(argument), writer.isBlocking());
+            return new ResolvedWriter(argument, writer.createSpecific(argument), writer.isBlocking());
         });
         if (resolved.blocking() && !allowBlocking) {
             throw new CodecException("The message body writer of a body of type " + type.getName() + " blocks: "
@@ -557,7 +582,9 @@ final class NettyDirectRoutes {
             return Unpooled.EMPTY_BUFFER;
         }
         if (writer != null) {
-            return (ByteBuf) writer.writer().writeTo(writer.type(), writer.mediaType(), body, response.getHeaders(),
+            // the media type of this response: the writer is shared by the media types that differ in their parameters only, e.g. the charset
+            MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
+            return (ByteBuf) writer.writer().writeTo(writer.type(), mediaType, body, response.getHeaders(),
                 new NettyByteBufferFactory(ctx.alloc())).asNativeBuffer();
         }
         if (body instanceof byte[] bytes) {
@@ -616,18 +643,18 @@ final class NettyDirectRoutes {
 
     /**
      * @param type      The type of the body
-     * @param mediaType The media type of the response
+     * @param mediaType The media type of the response, compared by its name: its parameters, e.g.
+     *                  the charset, do not select the writer
      */
     private record WriterKey(Class<?> type, MediaType mediaType) {
     }
 
     /**
-     * @param type      The type of the body
-     * @param mediaType The media type of the response
-     * @param writer    The writer of the type
-     * @param blocking  Whether the writer blocks
+     * @param type     The type of the body
+     * @param writer   The writer of the type
+     * @param blocking Whether the writer blocks
      */
-    private record ResolvedWriter(Argument<Object> type, MediaType mediaType, MessageBodyWriter<Object> writer, boolean blocking) {
+    private record ResolvedWriter(Argument<Object> type, MessageBodyWriter<Object> writer, boolean blocking) {
     }
 
     /**
@@ -686,8 +713,12 @@ final class NettyDirectRoutes {
             if (parameters == null) {
                 Charset charset = HttpUtil.getCharset(request, configuration.getDefaultCharset());
                 try {
-                    parameters = new QueryStringDecoder(target(), charset, true, configuration.getMaxParams(),
-                        configuration.isSemicolonIsNormalChar()).parameters();
+                    // like NettyHttpRequest: a target that is not a valid path, e.g. in absolute form, is decoded from its URI
+                    String validated = target();
+                    QueryStringDecoder decoder = UriUtil.isValidPath(request.uri())
+                        ? AbstractNettyHttpRequest.validPathDecoder(validated, charset, configuration.getMaxParams(), configuration.isSemicolonIsNormalChar())
+                        : AbstractNettyHttpRequest.validatedTargetDecoder(validated, charset, configuration.getMaxParams(), configuration.isSemicolonIsNormalChar());
+                    parameters = decoder.parameters();
                 } catch (IllegalArgumentException e) {
                     throw new InvalidDirectRequestException(e);
                 }

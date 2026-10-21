@@ -187,4 +187,24 @@ class ValueMatcherTest {
         assertThrows(IllegalArgumentException.class, () -> ValueMatcher.entityTag("\"v\"1\""));
         assertThrows(NullPointerException.class, () -> ValueMatcher.entityTag(null));
     }
+
+    @Test
+    void entityTagListsFollowTheGrammar() {
+        ValueMatcher current = ValueMatcher.entityTag("\"v1\"");
+        // * only as the whole value, with optional whitespace
+        assertTrue(current.matches(" * "));
+        assertFalse(current.matches("*garbage"));
+        assertFalse(current.matches("*, \"v1\""));
+        assertFalse(current.matches("\"v0\", *"));
+        // tags are separated by commas, with optional whitespace
+        assertFalse(current.matches("\"old\"\"v1\""));
+        assertFalse(current.matches("\"old\" \"v1\""));
+        assertFalse(current.matches("W/\"old\"W/\"v1\""));
+        assertTrue(current.matches("\"old\" , \"v1\""));
+        assertTrue(current.matches("\"old\"\t,\t\"v1\" "));
+        assertTrue(current.matches(", ,\"old\",,\"v1\""));
+        // a malformed list still matches up to the first tag that cannot be read
+        assertTrue(current.matches("\"v1\"junk"));
+        assertFalse(current.matches("\"old\"junk, \"v1\""));
+    }
 }
