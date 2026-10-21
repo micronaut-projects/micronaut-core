@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.web.router.AcceptedMediaTypes;
 
 import java.util.Collection;
 import java.util.List;
@@ -26,12 +27,12 @@ import java.util.Objects;
 import java.util.function.Predicate;
 
 /**
- * Shorthands of {@link RouteCondition} for {@link HttpRouteSpec#where} and
+ * Shorthands of {@link RequestCondition} for {@link HttpRouteSpec#where} and
  * {@link HttpRouteGroup#where}: conditions on the headers, query parameters, accepted media
- * types, content type and method of a request. Each returns a {@link RouteCondition}, so they
- * combine with {@link RouteCondition#and}, {@link RouteCondition#or} and
- * {@link RouteCondition#negate}, with lambdas made conditions with
- * {@link RouteCondition#custom(Predicate)}, or with {@link #all} and {@link #any}.
+ * types, content type and method of a request. Each returns a {@link RequestCondition}, so they
+ * combine with {@link RequestCondition#and}, {@link RequestCondition#or} and
+ * {@link RequestCondition#negate}, with lambdas made conditions with
+ * {@link RequestCondition#custom(Predicate)}, or with {@link #all} and {@link #any}.
  *
  * <pre>{@code
  * import static io.micronaut.web.router.builder.RequestPredicates.*;
@@ -55,7 +56,7 @@ import java.util.function.Predicate;
  *
  * <p>{@link #accept} and {@link #contentType} compare media types, with the wildcards of either
  * side, and read the list of the {@code Accept} header, in which a request without the header
- * accepts every type: they are {@link RouteCondition.Custom} conditions, since a matcher of the
+ * accepts every type: they are {@link RequestCondition.Custom} conditions, since a matcher of the
  * string of a header does not express that. So is a condition that takes a lambda of a
  * value.</p>
  *
@@ -73,10 +74,10 @@ public final class RequestPredicates {
      *
      * @param name The name of the header, case-insensitive
      * @return The condition
-     * @see RouteCondition#header(String)
+     * @see RequestCondition#header(String)
      */
-    public static RouteCondition header(String name) {
-        return RouteCondition.header(name);
+    public static RequestCondition header(String name) {
+        return RequestCondition.header(name);
     }
 
     /**
@@ -86,25 +87,25 @@ public final class RequestPredicates {
      * @param name  The name of the header, case-insensitive
      * @param value The value, case-sensitive
      * @return The condition
-     * @see RouteCondition#header(String, String)
+     * @see RequestCondition#header(String, String)
      */
-    public static RouteCondition header(String name, String value) {
-        return RouteCondition.header(name, value);
+    public static RequestCondition header(String name, String value) {
+        return RequestCondition.header(name, value);
     }
 
     /**
      * A request with a header of the name whose value meets a condition, one of its values if
-     * the header is repeated. {@link RouteCondition#header(String, ValueMatcher)} is a condition
+     * the header is repeated. {@link RequestCondition#header(String, ValueMatcher)} is a condition
      * the router can read.
      *
      * @param name  The name of the header, case-insensitive
      * @param value The condition on the value
-     * @return The condition, a {@link RouteCondition.Custom} one
+     * @return The condition, a {@link RequestCondition.Custom} one
      */
-    public static RouteCondition header(String name, Predicate<String> value) {
+    public static RequestCondition header(String name, Predicate<String> value) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(value, "value");
-        return new RouteCondition.Custom(new ValuePredicate(name, value, false));
+        return new RequestCondition.Custom(new ValuePredicate(name, value, false));
     }
 
     /**
@@ -113,10 +114,10 @@ public final class RequestPredicates {
      *
      * @param name The name of the query parameter, case-sensitive
      * @return The condition
-     * @see RouteCondition#query(String)
+     * @see RequestCondition#query(String)
      */
-    public static RouteCondition queryParam(String name) {
-        return RouteCondition.query(name);
+    public static RequestCondition queryParam(String name) {
+        return RequestCondition.query(name);
     }
 
     /**
@@ -126,25 +127,25 @@ public final class RequestPredicates {
      * @param name  The name of the query parameter, case-sensitive
      * @param value The decoded value, case-sensitive
      * @return The condition
-     * @see RouteCondition#query(String, String)
+     * @see RequestCondition#query(String, String)
      */
-    public static RouteCondition queryParam(String name, String value) {
-        return RouteCondition.query(name, value);
+    public static RequestCondition queryParam(String name, String value) {
+        return RequestCondition.query(name, value);
     }
 
     /**
      * A request with a query parameter of the name whose value meets a condition, one of its
-     * values if the parameter is repeated. {@link RouteCondition#query(String, ValueMatcher)}
+     * values if the parameter is repeated. {@link RequestCondition#query(String, ValueMatcher)}
      * is a condition the router can read.
      *
      * @param name  The name of the query parameter, case-sensitive
      * @param value The condition on the decoded value
-     * @return The condition, a {@link RouteCondition.Custom} one
+     * @return The condition, a {@link RequestCondition.Custom} one
      */
-    public static RouteCondition queryParam(String name, Predicate<String> value) {
+    public static RequestCondition queryParam(String name, Predicate<String> value) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(value, "value");
-        return new RouteCondition.Custom(new ValuePredicate(name, value, true));
+        return new RequestCondition.Custom(new ValuePredicate(name, value, true));
     }
 
     /**
@@ -153,10 +154,10 @@ public final class RequestPredicates {
      * an {@code Accept} header accepts every type.
      *
      * @param mediaTypes The media types
-     * @return The condition, a {@link RouteCondition.Custom} one
+     * @return The condition, a {@link RequestCondition.Custom} one
      */
-    public static RouteCondition accept(MediaType... mediaTypes) {
-        return new RouteCondition.Custom(new MediaTypePredicate(mediaTypes(mediaTypes), true));
+    public static RequestCondition accept(MediaType... mediaTypes) {
+        return new RequestCondition.Custom(new MediaTypePredicate(mediaTypes(mediaTypes), true));
     }
 
     /**
@@ -165,10 +166,10 @@ public final class RequestPredicates {
      * does not meet the condition.
      *
      * @param mediaTypes The media types
-     * @return The condition, a {@link RouteCondition.Custom} one
+     * @return The condition, a {@link RequestCondition.Custom} one
      */
-    public static RouteCondition contentType(MediaType... mediaTypes) {
-        return new RouteCondition.Custom(new MediaTypePredicate(mediaTypes(mediaTypes), false));
+    public static RequestCondition contentType(MediaType... mediaTypes) {
+        return new RequestCondition.Custom(new MediaTypePredicate(mediaTypes(mediaTypes), false));
     }
 
     /**
@@ -178,32 +179,32 @@ public final class RequestPredicates {
      *
      * @param methods The methods
      * @return The condition
-     * @see RouteCondition#method(HttpMethod...)
+     * @see RequestCondition#method(HttpMethod...)
      */
-    public static RouteCondition method(HttpMethod... methods) {
-        return RouteCondition.method(methods);
+    public static RequestCondition method(HttpMethod... methods) {
+        return RequestCondition.method(methods);
     }
 
     /**
      * A request that meets every condition. The router evaluates them cheapest first until one
      * is not met, the lambdas last, in order.
      *
-     * @param conditions The conditions, see {@link RouteCondition#custom(Predicate)} for a lambda
+     * @param conditions The conditions, see {@link RequestCondition#custom(Predicate)} for a lambda
      * @return The condition, met by every request if there are none
      */
-    public static RouteCondition all(RouteCondition... conditions) {
-        return new RouteCondition.AllOf(List.of(conditions));
+    public static RequestCondition all(RequestCondition... conditions) {
+        return new RequestCondition.AllOf(List.of(conditions));
     }
 
     /**
      * A request that meets one of the conditions. The router evaluates them cheapest first
      * until one is met, the lambdas last, in order.
      *
-     * @param conditions The conditions, see {@link RouteCondition#custom(Predicate)} for a lambda
+     * @param conditions The conditions, see {@link RequestCondition#custom(Predicate)} for a lambda
      * @return The condition, met by no request if there are none
      */
-    public static RouteCondition any(RouteCondition... conditions) {
-        return new RouteCondition.AnyOf(List.of(conditions));
+    public static RequestCondition any(RequestCondition... conditions) {
+        return new RequestCondition.AnyOf(List.of(conditions));
     }
 
     private static List<MediaType> mediaTypes(MediaType[] mediaTypes) {
@@ -255,8 +256,24 @@ public final class RequestPredicates {
             if (accepted.isEmpty()) {
                 return true;
             }
+            if (AcceptedMediaTypes.hasRejected(accepted)) {
+                return acceptable(accepted);
+            }
             for (MediaType acceptedType : accepted) {
                 if (compatible(acceptedType)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * With accepted types of the quality 0: one of the types, with its parameters, or ranges,
+         * has an acceptable intersection with the accepted types.
+         */
+        private boolean acceptable(Collection<MediaType> accepted) {
+            for (MediaType candidate : types) {
+                if (AcceptedMediaTypes.intersects(candidate, accepted)) {
                     return true;
                 }
             }

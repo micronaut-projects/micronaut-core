@@ -48,6 +48,7 @@ import java.util.Objects;
  *                    an async generator, bridged as a Publisher of its elements.
  * {@code null} when the function is not a constructor or does not call the super constructor
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
+ * @param span The location of the definition in its Python source, or {@code null} for a generated definition
  */
 @Experimental
 public record FunctionDef(
@@ -65,7 +66,8 @@ public record FunctionDef(
     boolean hasPlaceholderBody,
     ClassDef declaringClass,
     @Nullable List<SuperArgumentDef> superArguments,
-    boolean isGenerator
+    boolean isGenerator,
+    @Nullable SourceSpan span
 ) implements ElementDef, MemberDef {
 
     public static final String CONSTRUCTOR_NAME = "__init__";
@@ -88,11 +90,19 @@ public record FunctionDef(
     }
 
     /**
+     * Creates a definition without a source position.
+     */
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync, boolean hasReturnValue, boolean hasPlaceholderBody, ClassDef declaringClass, @Nullable List<SuperArgumentDef> superArguments, boolean isGenerator) {
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, hasPlaceholderBody, declaringClass, superArguments, isGenerator, null);
+    }
+
+    /**
      * Creates a function that is not a generator.
      */
     @SuppressWarnings("checkstyle:ParameterNumber")
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync, boolean hasReturnValue, boolean hasPlaceholderBody, ClassDef declaringClass, @Nullable List<SuperArgumentDef> superArguments) {
-        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, hasPlaceholderBody, declaringClass, superArguments, false);
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, hasPlaceholderBody, declaringClass, superArguments, false, null);
     }
 
     /**
@@ -100,7 +110,7 @@ public record FunctionDef(
      */
     @SuppressWarnings("checkstyle:ParameterNumber")
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync, boolean hasReturnValue, boolean hasPlaceholderBody, boolean isGenerator) {
-        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, hasPlaceholderBody, null, null, isGenerator);
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, hasPlaceholderBody, null, null, isGenerator, null);
     }
 
     /**
@@ -140,20 +150,20 @@ public record FunctionDef(
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, List<DecoratorDef> decorators, String returnTypeAnnotation) {
         this(name, createArgumentsDef(argumentNames, argumentTypes), decorators,
              returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(new TypeRef(returnTypeAnnotation)) : ReturnDef.none(),
-             "", java.util.List.of(), null, false, false, false, false, false, null);
+             "", java.util.List.of(), null, false, false, false, false, false, null, null);
     }
 
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, String returnTypeAnnotation) {
         this(name, createArgumentsDef(argumentNames, argumentTypes), java.util.List.of(),
              returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(new TypeRef(returnTypeAnnotation)) : ReturnDef.none(),
-             "", java.util.List.of(), null, false, false, false, false, false, null);
+             "", java.util.List.of(), null, false, false, false, false, false, null, null);
     }
 
     // Constructor for Python interop with return type decorators
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, String returnTypeAnnotation, List<DecoratorDef> returnTypeDecorators) {
         this(name, arguments, decorators,
              returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(new TypeRef(returnTypeAnnotation), returnTypeDecorators) : ReturnDef.none(),
-             "", java.util.List.of(), null, false, false, false, false, false, null);
+             "", java.util.List.of(), null, false, false, false, false, false, null, null);
     }
 
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract) {
@@ -224,7 +234,8 @@ public record FunctionDef(
             hasPlaceholderBody,
             classDef,
             superArguments,
-            isGenerator
+            isGenerator,
+            span
         );
         return new FunctionDef(
             name,
@@ -241,7 +252,8 @@ public record FunctionDef(
             hasPlaceholderBody,
             classDef,
             superArguments,
-            isGenerator
+            isGenerator,
+            span
         );
     }
 
@@ -267,7 +279,17 @@ public record FunctionDef(
             hasPlaceholderBody,
             declaringClass,
             superArguments,
-            isGenerator
+            isGenerator,
+            span
         );
+    }
+
+    /**
+     * @param span The location of the definition in its Python source
+     * @return A copy of this definition located at the given span
+     * @since 5.3.0
+     */
+    public FunctionDef withSpan(@Nullable SourceSpan span) {
+        return new FunctionDef(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, hasPlaceholderBody, declaringClass, superArguments, isGenerator, span);
     }
 }

@@ -53,6 +53,23 @@ public interface FormCapableHttpRequest<B> extends ServerHttpRequest<B>, Lifecyc
     }
 
     /**
+     * Get the raw form field publisher of bytes of the form of this request, like
+     * {@link #getRawFormFields(ByteBody)}, with the content of the fields as it appears in the
+     * body: an {@code application/x-www-form-urlencoded} value is not percent-decoded, and a
+     * {@code +} is not turned into a space. The names of the fields are decoded, and the limits and
+     * the validation of the form are those of the decoded fields. Can only be subscribed to once.
+     *
+     * @param byteBody The bytes of the form, which the publisher owns
+     * @return The raw form fields
+     * @throws IllegalStateException         If this request does not contain a form body
+     * @throws UnsupportedOperationException If this request cannot keep the content as it appears
+     * @since 5.3.0
+     */
+    default Publisher<RawFormField> getEncodedFormFields(ByteBody byteBody) throws IllegalStateException {
+        throw new UnsupportedOperationException("This request cannot read the form fields without decoding them");
+    }
+
+    /**
      * Check whether this request contains a form body (url encoded or multipart).
      *
      * @return {@code true} if this is a form request
