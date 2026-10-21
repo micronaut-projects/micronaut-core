@@ -34,7 +34,6 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
@@ -48,7 +47,6 @@ import io.micronaut.sourcegen.model.VariableDef;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -112,8 +110,8 @@ final class AnnotationBuilderWriter {
         // the type of an annotation is an interface, which a type made from a name does not know, and the calls of
         // its accessors have to be interface calls: a type made from the definition of an interface knows it
         ClassTypeDef annotationTypeDef = ClassTypeDef.of(InterfaceDef.builder(annotationName).build());
-        write(implementation(implementationName, annotationTypeDef, members), implementationName, origin, context);
-        write(builder(builderName, implementationName, annotationType, annotationTypeDef, context), builderName, origin, context);
+        write(implementation(implementationName, annotationTypeDef, members), origin, context);
+        write(builder(builderName, implementationName, annotationType, annotationTypeDef, context), origin, context);
         context.visitServiceDescriptor(AnnotationBuilder.class, builderName, origin);
     }
 
@@ -133,10 +131,9 @@ final class AnnotationBuilderWriter {
         return members;
     }
 
-    private static void write(ClassDef classDef, String name, Element origin, VisitorContext context) throws IOException {
-        try (OutputStream outputStream = context.visitClass(name, origin)) {
-            outputStream.write(ByteCodeWriterUtils.writeByteCode(classDef, context));
-        }
+    private static void write(ClassDef classDef, Element origin, VisitorContext context) throws IOException {
+        // Through the context, which writes the class as the bytecode or the source its language writes
+        context.visitObjectDef(classDef, origin);
     }
 
     private static ClassDef implementation(String name, ClassTypeDef annotationTypeDef, List<Member> members) {

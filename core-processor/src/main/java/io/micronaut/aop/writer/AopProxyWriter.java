@@ -678,7 +678,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         if (cacheLazyTarget || hotswap) {
             targetField = FieldDef.builder(FIELD_TARGET, TypeDef.OBJECT).addModifiers(Modifier.PRIVATE).build();
             proxyBuilder.addField(targetField);
-        } else if (!lazy) {
+        } else if (!lazy && isProxyTarget) {
+            // Only a proxy target assigns it; an unassigned final field does not compile as source
             targetField = FieldDef.builder(FIELD_TARGET, TypeDef.OBJECT).addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
             proxyBuilder.addField(targetField);
         } else {
@@ -690,7 +691,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             proxyBuilder.addField(proxyTargetFields.targetRegistration());
         }
 
-        ClassTypeDef classTargetType = ClassTypeDef.of(this.targetType.getName());
+        // The nested name is kept: a Java source generator writes `Outer.Inner`, where the binary name has a `$`
+        ClassTypeDef classTargetType = ClassTypeDef.of(this.targetType.getName(), this.targetType.isInner());
         if (!targetType.isInterface()) {
             proxyBuilder.superclass(classTargetType);
         }
@@ -1133,7 +1135,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             // 1st argument: this.$proxyBeanDefinition
             aThis.field(proxyBeanDefinitionField),
             // 2nd argument: the type
-            pushTargetArgument(ClassTypeDef.of(targetType.getName())),
+            pushTargetArgument(ClassTypeDef.of(targetType.getName(), targetType.isInner())),
             // 3rd argument: the qualifier
             aThis.field(beanQualifierField)
         );
@@ -1379,7 +1381,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             // 1st argument: this.$proxyBeanDefinition
             proxyBeanDefinition,
             // 2nd argument: the type
-            pushTargetArgument(ClassTypeDef.of(targetType.getName())),
+            pushTargetArgument(ClassTypeDef.of(targetType.getName(), targetType.isInner())),
             // 3rd argument: the qualifier
             qualifier
         );

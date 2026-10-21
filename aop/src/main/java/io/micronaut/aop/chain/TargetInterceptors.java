@@ -113,10 +113,13 @@ public final class TargetInterceptors {
      * @param targetRegistration The registration of the target bean, not of the proxy; null if the context holds
      *                           none for the instance
      * @param targetBean The target instance the proxy is calling
+     * @param <T>        The type of the intercepted bean
+     * @param <R>        The result type of the intercepted methods
      * @return The interceptors selected for each proxied method
      */
     @UsedByGeneratedCode
-    public Interceptor<?, ?>[][] resolve(@Nullable BeanRegistration<?> targetRegistration, @Nullable Object targetBean) {
+    @SuppressWarnings("unchecked")
+    public <T, R> Interceptor<T, R>[][] resolve(@Nullable BeanRegistration<?> targetRegistration, @Nullable Object targetBean) {
         BeanDependencies targetDependencies = dependenciesOf(targetRegistration, targetBean);
         if (targetDependencies != null) {
             // The target can own interceptors: use its selection, making it on the first call.
@@ -135,11 +138,12 @@ public final class TargetInterceptors {
                 }
             }
             if (interceptors != null) {
-                return interceptors;
+                // The interceptors of a method are of the bean the proxy fronts, which the caller knows the type of
+                return (Interceptor<T, R>[][]) interceptors;
             }
             // The target is being destroyed and can no longer be given dependents: fall through.
         }
-        return ofProxy();
+        return (Interceptor<T, R>[][]) ofProxy();
     }
 
     /**

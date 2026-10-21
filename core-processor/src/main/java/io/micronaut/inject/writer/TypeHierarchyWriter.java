@@ -41,7 +41,6 @@ import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
@@ -138,9 +137,10 @@ public final class TypeHierarchyWriter {
         Element origin = originatingElements[0];
         Built built = build(type, plan);
         TypeHierarchyRecord record = TypeHierarchyRecord.of(plan.recordName, built.omittedSuperTypeNames);
-        // the class first: a compiler that refuses to write a class twice says so here, before the service entry
-        try (OutputStream outputStream = context.visitClass(plan.recordName, originatingElements)) {
-            outputStream.write(ByteCodeWriterUtils.writeByteCode(built.classDef, context));
+        // the class first: a compiler that refuses to write a class twice says so here, before the service entry.
+        // Through the context, which writes the class as the bytecode or the source its language writes
+        try {
+            context.visitObjectDef(built.classDef, originatingElements);
         } catch (IOException e) {
             if (e instanceof FileAlreadyExistsException || ALREADY_WRITTEN.contains(e.getClass().getName())) {
                 // recorded before in this compilation, from another origin or in an earlier round: the record is the

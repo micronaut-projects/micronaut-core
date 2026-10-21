@@ -264,7 +264,7 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
 
         ClassTypeDef thisType = ClassTypeDef.of(className);
 
-        Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(thisType, loadTypeMethods);
+        Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(thisType, loadTypeMethods, evaluatedExpressionProcessor.getVisitorContext());
 
         ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(className)
             .synthetic()

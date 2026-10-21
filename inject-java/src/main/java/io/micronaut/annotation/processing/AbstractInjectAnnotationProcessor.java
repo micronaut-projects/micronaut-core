@@ -26,7 +26,6 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.sourcegen.model.ObjectDef;
 import org.jspecify.annotations.Nullable;
@@ -42,7 +41,6 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 
-import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -347,9 +345,8 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
             if (serviceClass != null) {
                 classWriterOutputVisitor.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
             }
-            try (OutputStream outputStream = classWriterOutputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
-                outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
-            }
+            // Through the context, which writes the class as the bytecode or the source its language writes
+            visitorContext.visitObjectDef(objectDef, originatingElements.getOriginatingElements());
         } catch (Exception e) {
             // raise a compile error
             String message = e.getMessage();
