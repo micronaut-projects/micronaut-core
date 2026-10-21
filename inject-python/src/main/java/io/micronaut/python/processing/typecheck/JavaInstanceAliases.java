@@ -116,7 +116,7 @@ public final class JavaInstanceAliases {
         /**
          * @return Whether the name is ambiguous or excluded
          */
-        public boolean blocked() {
+        public boolean isBlocked() {
             return target.isEmpty();
         }
     }
