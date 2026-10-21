@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.AnnotationBuilderRegistrations;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
@@ -139,6 +140,53 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     default RetentionPolicy getAnnotationRetentionPolicy(String annotationName) {
         return getAnnotationMetadataBuilder().getRetentionPolicy(annotationName);
+    }
+
+    /**
+     * Registers an {@link io.micronaut.core.annotation.AnnotationBuilder} for an annotation type, as if the type were
+     * listed in {@link io.micronaut.core.annotation.RegisterAnnotations}, so that
+     * {@link io.micronaut.core.annotation.AnnotationBuilder#find(Class)} creates and reads annotations of the type
+     * without reflection. A visitor calls it for an annotation type it encounters, which can be declared in the
+     * compilation or come from a library. The annotation types of the members, and of the members of those, get a
+     * builder too.
+     *
+     * <p>The builders are owned by the type of the first originating element: the type itself, the type that
+     * declares a member, or the {@code package-info} of a package. They are written next to it, named after it as
+     * those of {@link io.micronaut.core.annotation.RegisterAnnotations} are, so that they are written again whenever
+     * the owner is in an incremental compilation, and they are written once per owner and annotation type in the
+     * compilation, however many visitors register them. To have a single builder for an annotation type declared in
+     * the compilation, register it with the declaration of the annotation type as the originating element. Other
+     * owners and modules can have a builder for the same annotation type: they are the same, and at runtime the
+     * registry picks one.</p>
+     *
+     * <p>Every originating element is reported to the compiler. The builders are written when they are registered,
+     * as for {@link #registerBean(ClassElement, Element...)}: registering from
+     * {@link TypeElementVisitor#finish(VisitorContext)} is not portable.</p>
+     *
+     * @param annotationType      The annotation type
+     * @param originatingElements The originating elements, at least one; the first is a type, a member of a type or
+     *                            a package of the compilation
+     * @throws IllegalArgumentException if no originating element is given, or the first one is of another kind
+     * @throws io.micronaut.inject.processing.ProcessingException if the type is not an annotation, or the annotation
+     *                                                             type, the annotation type or enum type of a member,
+     *                                                             or a type enclosing those, is not public
+     * @since 5.3.0
+     */
+    @Experimental
+    default void registerAnnotationBuilder(ClassElement annotationType, Element... originatingElements) {
+        getAnnotationBuilderRegistrations().register(annotationType, this, originatingElements);
+    }
+
+    /**
+     * The annotation builders registered in the compilation. A language processor shares them between its visitor
+     * contexts.
+     *
+     * @return The annotation builders of the compilation
+     * @since 5.3.0
+     */
+    @Internal
+    default AnnotationBuilderRegistrations getAnnotationBuilderRegistrations() {
+        return AnnotationBuilderRegistrations.forCompilation(this);
     }
 
     /**
