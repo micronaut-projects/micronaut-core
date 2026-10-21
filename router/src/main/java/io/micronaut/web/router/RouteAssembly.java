@@ -41,6 +41,7 @@ import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriRouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
@@ -1138,14 +1139,16 @@ public final class RouteAssembly {
         }
 
         /**
-         * The named executor, looked up when a filter first runs on it.
+         * The named executor, looked up when a filter first runs on it. The filter holds it, so
+         * it holds the executor selector and the error, not the filters, nor the assembly.
          *
          * @param executorName The name of the executor
          * @return The executor
          */
         private Supplier<Executor> executor(String executorName) {
+            ExecutorSelector selector = RouteAssembly.this.executorSelector;
+            Function<String, RuntimeException> noExecutor = this.noExecutor;
             return SupplierUtil.memoized(() -> {
-                ExecutorSelector selector = RouteAssembly.this.executorSelector;
                 if (selector == null) {
                     throw new IllegalStateException("No executor selector to find executor: " + executorName);
                 }
@@ -1614,7 +1617,7 @@ public final class RouteAssembly {
                 effectivePort,
                 conversionService,
                 // the executor choice as it is now: a later change to the route does not change the route info
-                new RouteExecutorSelector(settings.getExecutorName(), settings.isNonBlocking()),
+                new RouteExecutorSelector(executorSelector, targetMethod.getExecutableMethod(), settings.getExecutorName(), settings.isNonBlocking()),
                 messageBodyHandlerRegistry,
                 implicitHead,
                 routeFilters(),
@@ -1756,7 +1759,7 @@ public final class RouteAssembly {
             for (Argument<?> argument : targetMethod.getArguments()) {
                 if (argument.getAnnotationMetadata().hasAnnotation(Body.class)
                     && InputStream.class.isAssignableFrom(argument.getType())
-                    && new RouteExecutorSelector(null, settings.isNonBlocking()).select(targetMethod.getExecutableMethod(), threadSelection).isEmpty()) {
+                    && new RouteExecutorSelector(executorSelector, targetMethod.getExecutableMethod(), null, settings.isNonBlocking()).select(targetMethod.getExecutableMethod(), threadSelection).isEmpty()) {
                     throw new RoutingException("The route " + this + " reads the body as an InputStream, which blocks, on the event loop"
                         + ": run it on an executor, e.g. with executeOn(TaskExecutors.BLOCKING)");
                 }
@@ -1818,8 +1821,10 @@ public final class RouteAssembly {
          * the outer group, then of the inner groups, then of the route, see {@link RouteFilters#chain()}
          */
         List<GenericHttpFilter> routeFilters() {
+            // the error is held by the filters of the route info, so it holds the method, not the route
+            ExecutableMethod<Object, Object> method = targetMethod.getExecutableMethod();
             RouteFilters filters = new RouteFilters(settings.getGroupFilters(), executorName -> new SchedulerConfigurationException(
-                targetMethod.getExecutableMethod(), NO_EXECUTOR + executorName));
+                method, NO_EXECUTOR + executorName));
             for (FilterRegistration filter : settings.getFilters()) {
                 filters.add(filter);
             }
@@ -1924,13 +1929,22 @@ public final class RouteAssembly {
 
         /**
          * Selects the executor of a route info, with the choice of the route when the route info
-         * was built.
+         * was built. It holds the executor selector of the services, the method and the choice,
+         * not the route: the route info, which lives as long as the router, must not keep the
+         * route, and through it the assembly and the other routes, reachable.
          */
-        private final class RouteExecutorSelector implements ExecutorSelector {
+        private static final class RouteExecutorSelector implements ExecutorSelector {
+            private final @Nullable ExecutorSelector executorSelector;
+            private final ExecutableMethod<?, ?> method;
             private final @Nullable String executorName;
             private final boolean eventLoop;
 
-            RouteExecutorSelector(@Nullable String executorName, boolean eventLoop) {
+            RouteExecutorSelector(@Nullable ExecutorSelector executorSelector,
+                                  ExecutableMethod<?, ?> method,
+                                  @Nullable String executorName,
+                                  boolean eventLoop) {
+                this.executorSelector = executorSelector;
+                this.method = method;
                 this.executorName = executorName;
                 this.eventLoop = eventLoop;
             }
@@ -1941,15 +1955,15 @@ public final class RouteAssembly {
                 String name = executorName;
                 if (name != null) {
                     return Optional.of(select(name).orElseThrow(() -> new SchedulerConfigurationException(
-                        targetMethod.getExecutableMethod(), NO_EXECUTOR + name)));
+                        this.method, NO_EXECUTOR + name)));
                 }
                 if (eventLoop && threadSelection == ThreadSelection.AUTO) {
                     return Optional.empty();
                 }
-                if (RouteAssembly.this.executorSelector != null) {
+                if (executorSelector != null) {
                     // the handler of a located route has the annotations it inherits, e.g. an @ExecuteOn of a group of its locator route
-                    MethodReference<?, ?> annotated = method instanceof HandlerMethod<?> handler ? handler : targetMethod.getExecutableMethod();
-                    return RouteAssembly.this.executorSelector.select(annotated, threadSelection);
+                    MethodReference<?, ?> annotated = method instanceof HandlerMethod<?> handler ? handler : this.method;
+                    return executorSelector.select(annotated, threadSelection);
                 } else {
                     return Optional.empty();
                 }
@@ -1957,8 +1971,8 @@ public final class RouteAssembly {
 
             @Override
             public Optional<ExecutorService> select(String name) {
-                if (RouteAssembly.this.executorSelector != null) {
-                    return RouteAssembly.this.executorSelector.select(name);
+                if (executorSelector != null) {
+                    return executorSelector.select(name);
                 } else {
                     return Optional.empty();
                 }
@@ -1970,8 +1984,8 @@ public final class RouteAssembly {
                     // selects with the route's choice, see select(MethodReference, ThreadSelection)
                     return ExecutorSelector.super.selectExecutor(method, configuration);
                 }
-                if (RouteAssembly.this.executorSelector != null) {
-                    return RouteAssembly.this.executorSelector.selectExecutor(method, configuration);
+                if (executorSelector != null) {
+                    return executorSelector.selectExecutor(method, configuration);
                 } else {
                     return ImmediateExecutor.INSTANCE;
                 }
