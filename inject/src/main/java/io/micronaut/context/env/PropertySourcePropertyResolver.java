@@ -857,6 +857,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     @SuppressWarnings("MagicNumber")
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
         synchronized (catalogLock) {
+            if (refreshingThread != null) {
+                // The writes go into the replacement a refresh publishes, which changes the revision: the published
+                // state and its caches are unchanged
+                processProperties(properties, convention);
+                return;
+            }
             // odd while the catalogs change
             revision.incrementAndGet();
             try {
@@ -1250,7 +1256,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         currentState.containsCache.clear();
         currentState.resolvedValueCache.clear();
         currentState.placeholderResolutionCache.clear();
-        revision.addAndGet(2);
+        if (refreshingThread == null) {
+            // the caches of a replacement being refreshed are not the published ones
+            revision.addAndGet(2);
+        }
     }
 
     /**

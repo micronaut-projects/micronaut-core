@@ -63,4 +63,21 @@ class PropertySourcePropertyResolverConcurrencySpec extends Specification {
         cleanup:
         executor.shutdownNow()
     }
+
+    void "a refresh that fails before it is published keeps the cached values"() {
+        given:
+        def resolver = new PropertySourcePropertyResolver(PropertySource.of("random", ["token": '${random.uuid}']))
+        def token = resolver.getProperty("token", String).get()
+
+        when:
+        resolver.refresh {
+            resolver.reset()
+            resolver.addPropertySource(PropertySource.of("replacement", ["token": '${random.uuid}']))
+            throw new IllegalStateException("refresh failed")
+        }
+
+        then:
+        thrown(IllegalStateException)
+        resolver.getProperty("token", String).get() == token
+    }
 }
