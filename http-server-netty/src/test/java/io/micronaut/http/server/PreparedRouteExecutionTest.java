@@ -49,7 +49,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -293,9 +292,11 @@ class PreparedRouteExecutionTest {
     @Requires(property = "spec.name", value = SPEC)
     static class ShapesController {
         private final Counters counters;
+        private final RouteTestTimer timer;
 
-        ShapesController(Counters counters) {
+        ShapesController(Counters counters, RouteTestTimer timer) {
             this.counters = counters;
+            this.timer = timer;
         }
 
         @Get("/string")
@@ -390,7 +391,7 @@ class PreparedRouteExecutionTest {
 
         @Get("/stage-delayed")
         CompletionStage<String> stageDelayed() {
-            return Mono.delay(Duration.ofMillis(10)).map(t -> "ok").toFuture();
+            return timer.later("ok").toFuture();
         }
 
         @Get("/stage-null")
@@ -445,7 +446,7 @@ class PreparedRouteExecutionTest {
 
         @Get("/mono-delayed")
         Mono<String> monoDelayed() {
-            return Mono.delay(Duration.ofMillis(10)).map(t -> "ok");
+            return timer.later("ok");
         }
 
         @Get("/mono-empty")

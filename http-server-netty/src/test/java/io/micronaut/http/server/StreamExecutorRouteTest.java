@@ -36,9 +36,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
-import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -73,7 +71,7 @@ class StreamExecutorRouteTest {
                     String body = client.toBlocking().retrieve(HttpRequest.GET(path), String.class);
                     String[] threads = body.substring(1, body.length() - 1).split(",");
                     assertFalse(threads[1].contains(LOOP), path + ": " + body);
-                    // a response completed later, by a timer of Reactor, e.g. after an asynchronous
+                    // a response completed later, by a timer, e.g. after an asynchronous
                     // filter, streams on the executor that invoked the route too
                     assertEquals(pool(threads[0]), pool(threads[1]), path + ": " + body);
                 }
@@ -84,10 +82,10 @@ class StreamExecutorRouteTest {
     }
 
     /**
-     * A response completed on a thread of the parallel scheduler of Reactor.
+     * A response completed later, on the thread of the timer.
      */
-    private static CompletableFuture<HttpResponse<Flux<String>>> delayed() {
-        return Mono.delay(Duration.ofMillis(10)).<HttpResponse<Flux<String>>>map(tick -> HttpResponse.ok(thread())).toFuture();
+    private static CompletableFuture<HttpResponse<Flux<String>>> delayed(RouteTestTimer timer) {
+        return timer.later("tick").<HttpResponse<Flux<String>>>map(tick -> HttpResponse.ok(thread())).toFuture();
     }
 
     /**
@@ -109,6 +107,11 @@ class StreamExecutorRouteTest {
     @Controller("/stream")
     @Requires(property = "spec.name", value = SPEC)
     static class StreamController {
+        private final RouteTestTimer timer;
+
+        StreamController(RouteTestTimer timer) {
+            this.timer = timer;
+        }
 
         @Get(value = "/annotated", produces = MediaType.APPLICATION_JSON)
         @ExecuteOn(TaskExecutors.BLOCKING)
@@ -119,7 +122,7 @@ class StreamExecutorRouteTest {
         @Get(value = "/annotated-delayed", produces = MediaType.APPLICATION_JSON)
         @ExecuteOn(TaskExecutors.BLOCKING)
         CompletionStage<HttpResponse<Flux<String>>> annotatedDelayed() {
-            return delayed();
+            return delayed(timer);
         }
 
         @Get(value = "/filtered/annotated", produces = MediaType.APPLICATION_JSON)
@@ -135,27 +138,39 @@ class StreamExecutorRouteTest {
     }
 
     /**
-     * Completes the response later, on a thread of the parallel scheduler of Reactor, so the
-     * writer subscribes to the streamed body on that thread.
+     * Completes the response later, on the thread of the timer, so the writer subscribes to the
+     * streamed body on that thread.
      */
     @ServerFilter("/stream/filtered/**")
     @Requires(property = "spec.name", value = SPEC)
     static final class DelayingFilter {
+        private final RouteTestTimer timer;
+
+        DelayingFilter(RouteTestTimer timer) {
+            this.timer = timer;
+        }
+
         @ResponseFilter
         Publisher<MutableHttpResponse<?>> delay(MutableHttpResponse<?> response) {
-            return Mono.delay(Duration.ofMillis(10)).thenReturn(response);
+            return timer.later(response);
         }
     }
 
     @Singleton
     @Requires(property = "spec.name", value = SPEC)
     static final class Routes implements HttpRoutes {
+        private final RouteTestTimer timer;
+
+        Routes(RouteTestTimer timer) {
+            this.timer = timer;
+        }
+
         @Override
         public void routes(io.micronaut.web.router.builder.HttpRouteBuilder routes) {
             routes.GET("/stream/route").produces(MediaType.APPLICATION_JSON_TYPE).executeOn(TaskExecutors.BLOCKING)
                 .handle((request, pathVariables) -> HttpResponse.ok(thread()));
             routes.GET("/stream/route-delayed").produces(MediaType.APPLICATION_JSON_TYPE).executeOn(TaskExecutors.BLOCKING)
-                .handleAsync((request, pathVariables) -> delayed());
+                .handleAsync((request, pathVariables) -> delayed(timer));
             // the route declares its streamed body, which the server streams on the route executor
             routes.GET("/stream/filtered/route").produces(MediaType.APPLICATION_JSON_TYPE).executeOn(TaskExecutors.BLOCKING)
                 .responseType(Argument.of(Flux.class, Argument.STRING))
