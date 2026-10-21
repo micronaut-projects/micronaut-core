@@ -119,7 +119,7 @@ public class NettyWebSocketSession implements WebSocketSession {
         return !closing && channel.isOpen() && channel.isActive();
     }
 
-    void markClosing() {
+    final void markClosing() {
         closing = true;
     }
 
