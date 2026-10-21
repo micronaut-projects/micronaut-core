@@ -17,3 +17,38 @@ TIP: If you only need fallbacks to help with testing against external Microservi
 As you can see the fallback does not perform any network operations and is quite simple, hence will provide a successful result in the case of an external system being down.
 
 Of course, the actual behaviour of the fallback is up to you. You can for example implement a fallback that pulls data from a local cache when real data is not available, and sends alert emails or other notifications to operations about downtime.
+
+The api:retry.intercept.RecoveryInterceptor[] performs the recovery: it calls the fallback when a `@Recoverable` method fails. To customize it, for example to change how the fallback is looked up, replace it with a subclass that is also bound to `@Recoverable`:
+
+[source,java]
+----
+import io.micronaut.aop.InterceptorBean;
+import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.annotation.Replaces;
+import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.retry.annotation.Recoverable;
+import io.micronaut.retry.intercept.RecoveryInterceptor;
+
+import java.util.Optional;
+
+@InterceptorBean(Recoverable.class) // <1>
+@Replaces(RecoveryInterceptor.class) // <2>
+public class CustomRecoveryInterceptor extends RecoveryInterceptor {
+
+    public CustomRecoveryInterceptor(BeanContext beanContext) {
+        super(beanContext);
+    }
+
+    @Override
+    public Optional<? extends MethodExecutionHandle<?, Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
+        // look up the fallback differently, or delegate to the default lookup
+        return super.findFallbackMethod(context);
+    }
+}
+----
+
+<1> The ann:aop.InterceptorBean[] annotation binds the interceptor to `@Recoverable`
+<2> The ann:context.annotation.Replaces[] annotation removes the default `RecoveryInterceptor`
+
+NOTE: `@Replaces` alone is not enough. `@Recoverable` is bound to the `RecoveryInterceptor` type itself, not to its subclasses, so a replacement without `@InterceptorBean(Recoverable.class)` is never invoked: the default interceptor is gone, and failures of `@Recoverable` methods propagate without a fallback.
