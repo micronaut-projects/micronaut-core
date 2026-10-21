@@ -241,7 +241,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 return this;
             }
         }
-        propertyPlaceholderResolver.resetCaches();
+        propertyPlaceholderResolver.resetCachesAndRandomValues();
         internalProcessPropertySource(propertySource);
         return this;
     }
@@ -256,7 +256,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 return this;
             }
         }
-        propertyPlaceholderResolver.resetCaches();
+        propertyPlaceholderResolver.resetCachesAndRandomValues();
         return this;
     }
 

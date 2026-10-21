@@ -431,6 +431,50 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty('random.shortuuid', String).get().length() == 10
     }
 
+    void "a random value stays the same when another property source is processed"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of('a', ['app.id': '${random.uuid}', 'app.url': 'http://localhost:${random.port}/'])
+        )
+        String id = resolver.getProperty('app.id', String).get()
+        String url = resolver.getProperty('app.url', String).get()
+
+        when:
+        resolver.addPropertySource(PropertySource.of('b', ['other.value': 'x']))
+
+        then:
+        resolver.getProperty('app.id', String).get() == id
+        resolver.getProperty('app.url', String).get() == url
+
+        when: "a property source replaces the random expression"
+        resolver.addPropertySource(PropertySource.of('c', ['app.id': '${random.shortuuid}']))
+
+        then: "the new expression is resolved"
+        resolver.getProperty('app.id', String).get().length() == 10
+    }
+
+    void "a property source that reads a random value while it is processed gets the value later lookups return"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of('a', ['app.id': '${random.uuid}'])
+        )
+        resolver.addPropertySource(new PropertySource() {
+            @Override
+            String getName() { 'derived' }
+
+            @Override
+            Object get(String key) {
+                key == 'derived.id' ? resolver.getProperty('app.id', String).orElse(null) : null
+            }
+
+            @Override
+            Iterator<String> iterator() { ['derived.id'].iterator() }
+        })
+
+        expect:
+        resolver.getProperty('derived.id', String).get() == resolver.getProperty('app.id', String).get()
+    }
+
     void "test random integer placeholders in range for properties"() {
         given:
         def values = [

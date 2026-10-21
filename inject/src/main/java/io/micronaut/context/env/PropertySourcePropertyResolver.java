@@ -80,6 +80,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private static final Object NO_VALUE = new Object();
     private static final PropertyCatalog[] CONVENTIONS = {PropertyCatalog.GENERATED, PropertyCatalog.RAW};
     private static final String WILD_CARD_SUFFIX = ".*";
+    private static final String RANDOM_EXPRESSION = "random.";
     private final ConversionService conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     private final Logger log;
@@ -655,7 +656,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 Optional<T> converted;
                 if (entries != null) {
                     // iff entries is null, the value is from placeholderResolutionCache and doesn't need this step
-                    value = resolvePlaceHoldersIfNecessary(currentState, value);
+                    value = resolvePlaceHolders(currentState, name, value);
                     cache(currentState.placeholderResolutionCache, name, value, lookupRevision);
                 }
                 if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
@@ -1353,6 +1354,80 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
+     * Resets the caches, and forgets what the random expressions have resolved to, as a property
+     * source added to or removed from a running environment does.
+     */
+    void resetCachesAndRandomValues() {
+        resetCaches();
+        readState().randomTexts.clear();
+    }
+
+    /**
+     * Resolves the placeholders of the value that a lookup has found for a name.
+     *
+     * <p>A text whose placeholders are all random expressions, such as <code>${random.port}</code>
+     * or <code>http://localhost:${random.port}/</code>, resolves to something else every time, and
+     * the cache that keeps what it has resolved to is cleared after each property source. A
+     * property source that reads such a value while the property sources are being processed
+     * would be left with one that no later lookup returns. So what the text has resolved to is
+     * remembered with the text, and returned again for as long as a lookup by the name finds the
+     * same text.</p>
+     *
+     * <p>Only a text whose every placeholder is a random expression is remembered, whatever else
+     * the text holds: resolving it reads no property, so nothing a property source adds can make
+     * what it has resolved to out of date. A text that names a property next to a random
+     * expression is resolved again by every lookup that does not find it cached, and so are the
+     * random expressions in a list or a map.</p>
+     *
+     * @param resolverState The state the value was read from
+     * @param name          The name the value was looked up by
+     * @param value         The value
+     * @return The value with its placeholders resolved
+     */
+    private Object resolvePlaceHolders(ResolverState resolverState, String name, Object value) {
+        if (!(value instanceof CharSequence)) {
+            return resolvePlaceHoldersIfNecessary(resolverState, value);
+        }
+        String text = value.toString();
+        if (!isRandomText(text)) {
+            return resolvePlaceHoldersIfNecessary(resolverState, text);
+        }
+        RandomText remembered = resolverState.randomTexts.get(name);
+        if (remembered == null || !remembered.text().equals(text)) {
+            Object resolved = resolvePlaceHoldersIfNecessary(resolverState, text);
+            // what a lookup of another thread has remembered for the text meanwhile is returned instead
+            remembered = resolverState.randomTexts.compute(name, (key, earlier) ->
+                earlier != null && earlier.text().equals(text) ? earlier : new RandomText(text, resolved));
+        }
+        return remembered.resolved();
+    }
+
+    /**
+     * @param text The text of a value
+     * @return Whether it holds placeholders and each of them is a random expression
+     */
+    private boolean isRandomText(String text) {
+        String prefix = propertyPlaceholderResolver.getPrefix();
+        int placeholder = text.indexOf(prefix);
+        if (placeholder == -1) {
+            return false;
+        }
+        int length = text.length();
+        while (placeholder != -1) {
+            int expression = placeholder + prefix.length();
+            // an expression is trimmed before it is resolved
+            while (expression < length && text.charAt(expression) <= ' ') {
+                expression++;
+            }
+            if (!text.regionMatches(true, expression, RANDOM_EXPRESSION, 0, RANDOM_EXPRESSION.length())) {
+                return false;
+            }
+            placeholder = text.indexOf(prefix, expression);
+        }
+        return true;
+    }
+
+    /**
      * Reads a cached value.
      *
      * @param cache          The cache
@@ -1513,9 +1588,24 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          */
         private final Map<String, CachedValue> placeholderResolutionCache = new ConcurrentHashMap<>(20);
         /**
+         * What the texts whose placeholders are all random expressions have resolved to, by the
+         * name they were looked up by. Unlike the caches it is kept when a property source is
+         * processed. It holds one entry per name whose value is such a text, and goes with its state.
+         */
+        private final Map<String, RandomText> randomTexts = new ConcurrentHashMap<>(4);
+        /**
          * Cache for values <i>after</i> conversion.
          */
         private final Map<ConversionCacheKey, CachedValue> resolvedValueCache = new ConcurrentHashMap<>(20);
+    }
+
+    /**
+     * What a text whose placeholders are all random expressions has resolved to.
+     *
+     * @param text     The text
+     * @param resolved What it has resolved to
+     */
+    private record RandomText(String text, Object resolved) {
     }
 
     /**
