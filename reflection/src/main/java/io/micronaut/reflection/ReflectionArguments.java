@@ -433,16 +433,16 @@ public final class ReflectionArguments {
      * the {@code Outer<X>} of an {@code Outer<X>.Inner<Y>}. A rendered variable has no declaration, and is
      * equal to another rendered variable of the same name whose bounds erase to the same classes.</p>
      *
-     * <p>Rendering inspects no class, and is {@link ArgumentTypes#toType(Argument)}, which needs no reflection.</p>
+     * <p>Rendering inspects no class, and is {@link Argument#asType()}, which needs no reflection.</p>
      *
      * @param argument The argument
      * @return The type
      * @see #toType(Argument, boolean) to render a placeholder and a wildcard as the type they are bounded by instead
-     * @see ArgumentTypes#toType(Argument)
+     * @see Argument#asType()
      * @since 5.3.0
      */
     public static Type toExactType(Argument<?> argument) {
-        return ArgumentTypes.toType(argument);
+        return argument.asType();
     }
 
     /**

@@ -34,12 +34,9 @@ import java.util.Objects;
 import java.util.StringJoiner;
 
 /**
- * Renders an {@link Argument} as the {@link Type} the declaration it describes wrote, for the APIs that are
- * written in {@code java.lang.reflect} types.
- *
- * <p>Rendering reads the argument alone - its type, its type parameters, the bounds of its placeholders and of
- * its wildcards - and inspects no class: it calls no reflective method, needs no reflection metadata in a native
- * image, and is the inverse of reading a declared type into an argument.</p>
+ * Builds the {@link Type}s the {@code java.lang.reflect} APIs are written in, without reading a class: the
+ * parameterized types, wildcards, generic arrays and type variables {@link TypeInformation#asType()} renders an
+ * argument as, made from other types.
  *
  * <p>The types made here are equal to the ones the JDK reflects wherever the JDK defines the equality of its
  * type with one of another implementation: a {@link ParameterizedType}, a {@link WildcardType} and a
@@ -62,25 +59,13 @@ public final class ArgumentTypes {
     }
 
     /**
-     * Renders an argument as a {@link Type}, the way the declaration wrote it: the class when it has no type
-     * argument or is {@link Argument#isRawType() raw}, a {@link ParameterizedType} otherwise, a
-     * {@link WildcardType} with its bounds for a {@link WildcardArgument}, a {@link TypeVariable} with every bound
-     * it declares for an unresolved {@link GenericPlaceholder}, the type itself for a
-     * {@link GenericPlaceholder#isResolved() resolved} one, and a {@link GenericArrayType} for an array of a
-     * parameterized type or of a variable.
+     * The type {@link TypeInformation#asType()} renders.
      *
-     * <p>The owner of a nested parameterized type is its declaring class: an argument does not carry the type
-     * arguments of the {@code Outer<X>} of an {@code Outer<X>.Inner<Y>}, so the type rendered for such an inner
-     * class differs from the reflected one in its owner;
-     * {@link #parameterizedTypeWithOwner(Type, Class, Type...)} builds one with the owner given. A variable named
-     * again within its own bounds, the {@code T} of {@code T extends Comparable<T>}, is the variable being
-     * rendered.</p>
-     *
-     * @param argument The argument
+     * @param type The type information
      * @return The type
      */
-    public static Type toType(Argument<?> argument) {
-        return toType(argument, Map.of());
+    static Type toType(TypeInformation<?> type) {
+        return toType(type, Map.of());
     }
 
     /**
@@ -147,7 +132,7 @@ public final class ArgumentTypes {
     /**
      * Renders an argument as a type inside the bounds of the given variables.
      */
-    private static Type toType(Argument<?> argument, Map<String, TypeVariableValue> bounding) {
+    private static Type toType(TypeInformation<?> argument, Map<String, TypeVariableValue> bounding) {
         if (argument instanceof WildcardArgument<?> wildcard) {
             Type[] upperBounds = toTypes(wildcard.getUpperBounds(), bounding);
             return new WildcardTypeValue(upperBounds.length == 0 ? OBJECT_BOUND : upperBounds,
@@ -171,7 +156,7 @@ public final class ArgumentTypes {
         Argument<?>[] typeParameters = argument.getTypeParameters();
         // a raw argument keeps the type arguments the type declares, and renders back as the bare type it
         // was written as, not as one parameterized by the variables it kept
-        if (typeParameters.length == 0 || argument.isRawType()) {
+        if (typeParameters.length == 0 || argument instanceof Argument<?> declared && declared.isRawType()) {
             return type;
         }
         Type[] arguments = new Type[typeParameters.length];
