@@ -237,18 +237,21 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         if (http2Error == null) {
             http2Error = Http2Error.INTERNAL_ERROR;
         }
-        if (http2Error == Http2Error.NO_ERROR) {
-            // RFC 9113 section 6.8: a graceful GOAWAY only forbids the receiver from opening new
-            // streams. lastStreamId refers to streams initiated by the receiver, i.e. server
-            // push, which we don't do. The streams the client has already opened "might still
-            // complete successfully", so leave them alone. Netty handles the rest.
-            return;
-        }
+        // RFC 9113 section 6.8: a graceful GOAWAY only forbids the receiver from opening new
+        // streams. The streams the client has already opened "might still complete
+        // successfully", so leave them alone. lastStreamId refers to streams initiated by the
+        // receiver, i.e. server push: pushed streams above it were rejected and Netty closes
+        // them, so abort their responses.
         // GOAWAY with an error code: the peer has detected a connection error and MUST close
-        // the connection (section 5.4.1). Abort the in-flight streams now instead of waiting
+        // the connection (section 5.4.1). Abort all in-flight streams now instead of waiting
         // for the TCP close.
+        boolean graceful = http2Error == Http2Error.NO_ERROR;
         Exception e = HTTP2_ERRORS.get(http2Error);
-        requiredConnectionHandler().connection().forEachActiveStream(s -> {
+        Http2Connection connection = requiredConnectionHandler().connection();
+        connection.forEachActiveStream(s -> {
+            if (graceful && (s.id() <= lastStreamId || !connection.local().isValidStreamId(s.id()))) {
+                return true;
+            }
             Http2ServerHandler.Http2Stream stream = s.getProperty(streamKey);
             if (stream != null) {
                 stream.onGoAwayRead(Objects.requireNonNull(e));

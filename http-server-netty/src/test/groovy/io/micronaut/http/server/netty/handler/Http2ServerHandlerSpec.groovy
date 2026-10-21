@@ -17,6 +17,7 @@ import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.handler.codec.http.DefaultFullHttpRequest
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpHeaders
 import io.netty.handler.codec.http.DefaultHttpResponse
@@ -1720,6 +1721,56 @@ class Http2ServerHandlerSpec extends Specification {
         client.finishAndReleaseAll()
         server.finishAndReleaseAll()
         EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "graceful goaway cancels pushed streams the client rejects"() {
+        given:
+        boolean pushCancelled = false
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                if (request.uri() == "/pushed") {
+                    // a streaming response that is still waiting for data
+                    def publisher = Flux.<ByteBuf> never().doOnCancel { pushCancelled = true }
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(ctx.channel()).adapt(publisher, null, null))
+                    return
+                }
+                // what NettyHttpRequest.serverPush0 does
+                def connectionHandler = (Http2ServerHandler.ConnectionHandler) ctx.handler()
+                int pushId = connectionHandler.connection().local().incrementAndGetNextStreamId()
+                def pushHeaders = new DefaultHttp2Headers().method("GET").scheme("http").authority("yawk.at").path("/pushed")
+                connectionHandler.encoder().writePushPromise(ctx, request.headers().getInt("x-http2-stream-id"), pushId, pushHeaders, 0, ctx.newPromise()).addListener {
+                    connectionHandler.handleFakeRequest(connectionHandler.connection().stream(pushId), new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/pushed"))
+                }
+                ctx.flush()
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when: "the client sends a request, and the server pushes a streaming response"
+        def stream1 = duplexHandler.newStream()
+        def headers = postHeaders()
+        headers.method(HttpMethod.GET.asciiName())
+        client.writeOutbound(new DefaultHttp2HeadersFrame(headers, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        !pushCancelled
+
+        when: "the client sends a graceful GOAWAY with lastStreamId=0, rejecting the pushed stream 2"
+        // frame header (length 8, type GOAWAY, no flags, stream 0), last stream id 0, NO_ERROR
+        server.writeInbound(Unpooled.wrappedBuffer([0, 0, 8, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] as byte[]))
+        server.runPendingTasks()
+        then: "the pushed response is cancelled"
+        pushCancelled
+
+        cleanup:
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
     }
 
     def "100-continue: rejected before the body is consumed"(String responseBody) {
