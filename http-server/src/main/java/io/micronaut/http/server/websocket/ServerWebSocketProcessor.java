@@ -33,6 +33,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.web.router.DefaultRouteBuilder;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.builder.RequestCondition;
+import io.micronaut.web.router.websocket.WebSocketUpgradeCondition;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
