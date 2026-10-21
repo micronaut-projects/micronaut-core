@@ -20,6 +20,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.processing.element.TypeAnnotatedClassElement;
 import io.micronaut.python.processing.typecheck.JavaInstanceAliases;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
 import io.micronaut.python.processing.util.PythonJavaTypes;
@@ -93,7 +94,12 @@ final class PythonJavaInstanceMembersCollector {
         reference(method.getReturnType(), 0);
     }
 
-    private void reference(ClassElement referenced, int depth) {
+    private void reference(ClassElement element, int depth) {
+        // a hint with type annotations (Optional[Color]) wraps the type, which may be a Python class
+        ClassElement referenced = element;
+        while (referenced instanceof TypeAnnotatedClassElement annotated) {
+            referenced = annotated.delegate();
+        }
         if (referenced.isPrimitive() || referenced.isVoid() || referenced.isArray() || PythonJavaTypes.isPythonClass(referenced)) {
             return;
         }
