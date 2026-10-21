@@ -24,7 +24,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
@@ -56,7 +56,7 @@ class HandlerRouteHostConditionTest {
         @Singleton
         HttpRoutes routes() {
             return routes -> {
-                routes.GET("/site").where(RouteCondition.host("example.com")).order(-1)
+                routes.GET("/site").where(RequestCondition.host("example.com")).order(-1)
                     .handle((request, pathVariables) -> HttpResponse.ok("example").contentType(MediaType.TEXT_PLAIN_TYPE));
                 routes.GET("/site", (request, pathVariables) -> HttpResponse.ok("other").contentType(MediaType.TEXT_PLAIN_TYPE));
             };

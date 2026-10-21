@@ -553,7 +553,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise = promise.unvoid();
                 promise.addListener(future -> closeInput());
             }
-            Http2Headers http2Headers = HttpConversionUtil.toHttp2Headers(headers, true);
+            Http2Headers http2Headers = toHttp2Headers(headers, promise);
             if (exposeResponseRequest) {
                 Attribute<Object> attribute = requiredCtx().channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST);
                 attribute.set(attachment());
@@ -582,7 +582,29 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise = promise.unvoid();
                 promise.addListener(future -> closeInput());
             }
-            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), HttpConversionUtil.toHttp2Headers(trailers, true), 0, true, promise);
+            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), toHttp2Headers(trailers, promise), 0, true, promise);
+        }
+
+        /**
+         * Convert the headers, failing the promise of the write if they cannot be converted, e.g.
+         * with an invalid {@code te} header: the promise never reaches the connection then.
+         */
+        private static Http2Headers toHttp2Headers(HttpResponse response, ChannelPromise promise) {
+            try {
+                return HttpConversionUtil.toHttp2Headers(response, true);
+            } catch (RuntimeException e) {
+                promise.tryFailure(e);
+                throw e;
+            }
+        }
+
+        private static Http2Headers toHttp2Headers(HttpHeaders trailers, ChannelPromise promise) {
+            try {
+                return HttpConversionUtil.toHttp2Headers(trailers, true);
+            } catch (RuntimeException e) {
+                promise.tryFailure(e);
+                throw e;
+            }
         }
     }
 
