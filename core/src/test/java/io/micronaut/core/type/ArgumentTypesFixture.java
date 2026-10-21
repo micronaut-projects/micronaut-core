@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Declarations whose reflected types the types rendered by {@link ArgumentTypes} are compared with.
+ * Declarations whose reflected types the types rendered by {@link Argument#asType()} are compared with.
  *
  * @param <T> A variable with a class and an interface bound naming it
  * @param <S> A variable with a single interface bound

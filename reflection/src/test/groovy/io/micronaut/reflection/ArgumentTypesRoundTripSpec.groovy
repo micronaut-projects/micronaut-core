@@ -22,8 +22,8 @@ import java.lang.reflect.Type
 import java.lang.reflect.TypeVariable
 
 /**
- * A type read reflectively into an argument renders back through core's {@link ArgumentTypes}, which
- * {@link ReflectionArguments#toExactType} delegates to, as the type it was read from.
+ * A type read reflectively into an argument renders back through core's {@link io.micronaut.core.type.Argument#asType()},
+ * which {@link ReflectionArguments#toExactType} delegates to, as the type it was read from.
  */
 class ArgumentTypesRoundTripSpec extends Specification {
 
@@ -34,7 +34,7 @@ class ArgumentTypesRoundTripSpec extends Specification {
     void "a type read exactly renders back equal to the type read"() {
         given:
         def reflected = typeOf(field)
-        def rendered = ArgumentTypes.toType(ReflectionArguments.ofExact(reflected))
+        def rendered = ReflectionArguments.ofExact(reflected).asType()
 
         expect:
         rendered == reflected
@@ -49,7 +49,7 @@ class ArgumentTypesRoundTripSpec extends Specification {
     void "a type with a variable renders back with the same name and shape"() {
         given:
         def reflected = typeOf(field)
-        def rendered = ArgumentTypes.toType(ReflectionArguments.ofExact(reflected))
+        def rendered = ReflectionArguments.ofExact(reflected).asType()
 
         expect:
         rendered.typeName == reflected.typeName
@@ -63,8 +63,8 @@ class ArgumentTypesRoundTripSpec extends Specification {
         def argument = ReflectionArguments.ofExact(typeOf(field))
 
         expect:
-        ReflectionArguments.toExactType(argument) == ArgumentTypes.toType(argument)
-        ReflectionArguments.toExactType(argument).getClass() == ArgumentTypes.toType(argument).getClass()
+        ReflectionArguments.toExactType(argument) == argument.asType()
+        ReflectionArguments.toExactType(argument).getClass() == argument.asType().getClass()
 
         where:
         field << ['extendsNumber', 'stringMaps', 'keys', 'nested']
