@@ -895,6 +895,15 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
          */
         private final boolean unbuffered;
         private boolean first = true;
+        /**
+         * The bytes this reader holds that are charged to its own tracker. Guarded by this.
+         */
+        private long chargedBytes;
+        /**
+         * The bytes of a single buffer larger than the limit of the own tracker, which this
+         * reader holds while it holds nothing else, see {@link #chargeOwn}. Guarded by this.
+         */
+        private long unchargedBytes;
         private BufferConsumer.@Nullable Upstream upstream;
 
         public AsPublisher(BaseSharedBuffer sharedBuffer) {
@@ -939,7 +948,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 Exception bufferExceededExc;
                 SizeLimitTracker readerTracker = ownTracker;
                 if (readerTracker != null) {
-                    bufferExceededExc = readerTracker.add(size);
+                    bufferExceededExc = chargeOwn(readerTracker, size);
                 } else {
                     if (first) {
                         // we need to upgrade to an atomic tracker so that we can properly subtract
@@ -1004,13 +1013,43 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         /**
+         * Charge a buffer to the own tracker of this reader. A single buffer larger than the
+         * limit is held while the reader holds nothing else: the limit bounds what a reader
+         * accumulates, not the size of the buffers of the upstream, e.g. a chunk larger than the
+         * limit of a replayable body, which its first reader passes on.
+         *
+         * @param tracker The own tracker
+         * @param size    The size of the buffer
+         * @return The failure if the reader would hold more than its limit, or {@code null}
+         */
+        private synchronized @Nullable Exception chargeOwn(SizeLimitTracker tracker, int size) {
+            Exception exceeded = tracker.add(size);
+            if (exceeded == null) {
+                chargedBytes += size;
+                return null;
+            }
+            if (chargedBytes == 0 && unchargedBytes == 0) {
+                unchargedBytes = size;
+                return null;
+            }
+            return exceeded;
+        }
+
+        /**
          * The bytes of a buffer that is delivered or dropped are no longer held for this reader.
          *
          * @param size The number of bytes
          */
-        private void uncharge(int size) {
+        private synchronized void uncharge(int size) {
             if (ownTracker != null) {
-                ownTracker.subtract(size);
+                // the uncharged bytes first, whichever buffer they were for: the totals match
+                long free = Math.min(unchargedBytes, size);
+                unchargedBytes -= free;
+                long charged = size - free;
+                if (charged > 0) {
+                    chargedBytes -= charged;
+                    ownTracker.subtract(charged);
+                }
             } else if (!unbuffered) {
                 sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
             }
