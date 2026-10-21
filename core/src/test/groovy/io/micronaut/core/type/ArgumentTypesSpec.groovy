@@ -261,6 +261,14 @@ class ArgumentTypesSpec extends Specification {
         type.typeName == 'java.lang.String'
     }
 
+    void "as a parameterized type, an array is named the way Java writes it"() {
+        expect:
+        Argument.of(String[]).asParameterizedType().typeName == 'java.lang.String[]'
+        Argument.of(int[][]).asParameterizedType().typeName == 'int[][]'
+        Argument.of(String[]).asParameterizedType().rawType.is(String[])
+        ArgumentTypes.parameterizedType(List[], String).typeName == 'java.util.List[]<java.lang.String>'
+    }
+
     void "a type information that is not an argument renders its type arguments exactly"() {
         given:
         TypeInformation<?> information = new TypeInformation<Object>() {
