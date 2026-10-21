@@ -140,6 +140,19 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
     }
 
     /**
+     * Whether the route sends the error responses it returns as they are: a response with a status
+     * of {@code 400} or more that its handler returns is not replaced by a status route, see
+     * {@code RouteSpec#keepErrorResponses()}. An exception the handler throws is still answered
+     * by the error routes.
+     *
+     * @return Whether the error responses the route returns are sent as they are
+     * @since 5.3.0
+     */
+    default boolean isKeepErrorResponses() {
+        return false;
+    }
+
+    /**
      * The order of the route among the routes that are equally good for a request, e.g. two
      * routes of the same URI template whose conditions a request both meets: the one with the
      * lowest order answers it. The order only breaks such a tie: it is consulted after the

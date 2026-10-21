@@ -129,6 +129,12 @@ final class DefaultHttpBodyRouteSpec<B extends @Nullable Object> implements Http
     }
 
     @Override
+    public HttpBodyRouteSpec<B> keepErrorResponses() {
+        route.keepErrorResponses();
+        return this;
+    }
+
+    @Override
     public HttpBodyRouteSpec<B> selectedBy(@Nullable RouteMatchSelector selector) {
         route.selectedBy(selector);
         return this;

@@ -52,6 +52,10 @@ final class RouteGroupDefaults {
      * The executor the routes run on, or the event loop.
      */
     static final int EXECUTOR_SETTING = 1 << 2;
+    /**
+     * The routes send their error responses as they are, see {@link RouteSpec#keepErrorResponses()}.
+     */
+    static final int KEEP_ERROR_RESPONSES_SETTING = 1 << 3;
 
     private final @Nullable RouteGroupDefaults enclosing;
     /**
@@ -62,6 +66,7 @@ final class RouteGroupDefaults {
     private @Nullable Consumer<RouteSettings> consumes;
     private @Nullable Consumer<RouteSettings> produces;
     private @Nullable Consumer<RouteSettings> executor;
+    private @Nullable Consumer<RouteSettings> keepErrorResponses;
     private boolean closed;
 
     /**
@@ -119,6 +124,14 @@ final class RouteGroupDefaults {
     }
 
     /**
+     * @see RouteSpec#keepErrorResponses()
+     */
+    void keepErrorResponses() {
+        checkOpen();
+        keepErrorResponses = RouteSettings::keepErrorResponses;
+    }
+
+    /**
      * Declare routes of a handler in the group.
      *
      * @param handlerRoutes The routes of the handler
@@ -162,6 +175,7 @@ final class RouteGroupDefaults {
             Consumer<RouteSettings> value = switch (setting) {
                 case CONSUMES_SETTING -> group.consumes;
                 case PRODUCES_SETTING -> group.produces;
+                case KEEP_ERROR_RESPONSES_SETTING -> group.keepErrorResponses;
                 default -> group.executor;
             };
             if (value != null) {
@@ -199,6 +213,7 @@ final class RouteGroupDefaults {
             inherit(CONSUMES_SETTING);
             inherit(PRODUCES_SETTING);
             inherit(EXECUTOR_SETTING);
+            inherit(KEEP_ERROR_RESPONSES_SETTING);
         }
 
         private void inherit(int setting) {

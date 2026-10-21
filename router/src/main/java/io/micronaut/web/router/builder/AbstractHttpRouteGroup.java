@@ -134,6 +134,11 @@ abstract sealed class AbstractHttpRouteGroup<G extends RouteSpec<G>> extends Abs
         return self();
     }
 
+    public G keepErrorResponses() {
+        defaults.keepErrorResponses();
+        return self();
+    }
+
     public G selectedBy(@Nullable RouteMatchSelector selector) {
         settings.selectedBy(selector);
         return self();

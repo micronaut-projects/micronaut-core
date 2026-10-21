@@ -527,6 +527,19 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
     S order(int order);
 
     /**
+     * Send the error responses that the route, or the routes of the group, return as they are:
+     * a response with a status of {@code 400} or more that the handler returns is not replaced by
+     * a status route, global or of a group, e.g. a {@code 404} or a {@code 502} that a route
+     * relays from an upstream server, with its body and its headers. An exception that the
+     * handler throws is still answered by the error routes, and by the status routes of the
+     * status the exception has.
+     *
+     * @return The route or the group
+     * @since 5.3.0
+     */
+    S keepErrorResponses();
+
+    /**
      * Select among the routes that match a request with a route selector instead of the
      * Micronaut route selection policy, e.g. the routes of a JAX-RS application, see
      * {@link RouteMatchSelector}: the selector selects when every route that matches a request has
