@@ -16,9 +16,24 @@
 package io.micronaut.python.compiler
 
 import io.micronaut.context.python.PythonContextExecutor
+import io.micronaut.context.python.PythonJavaInstanceMembers
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 
 class JavaInstanceMembersManifestSpec extends AbstractPythonTypeElementSpec {
+
+    /**
+     * The names a compilation recorded in META-INF/pyronaut/java-instance-members.tsv, by binary name and Python
+     * name: {@code [method, kind]}, or an empty list for a blocked name.
+     */
+    private static Map<String, Map<String, List<String>>> instanceMembers(File target) {
+        def file = new File(target, "META-INF/${PythonJavaInstanceMembers.RESOURCE.substring('META-INF/'.length())}")
+        Map<String, Map<String, List<String>>> members = [:]
+        (file.exists() ? file.readLines() : []).findAll { it }.each { line ->
+            def (type, name, method, kind) = line.split('\t', -1) as List
+            members.computeIfAbsent(type) { [:] }[name] = kind == 'blocked' ? [] : [method, kind]
+        }
+        members
+    }
 
     private static final String SOURCE = '''
 from jakarta.inject import Singleton
@@ -71,13 +86,13 @@ class Caller:
         return str(fixture.get_http_status().add("alias")) + fixture.literal_value("-exact")
 '''
 
-    def "the compiler records the instance member names of the referenced Java types in the Java imports manifest"() {
+    def "the compiler records the instance member names of the referenced Java types for the runtime"() {
         given:
         def target = File.createTempDir('python-instance-members', '')
 
         when:
         PyronautCompiler.builder().pythonCode(SOURCE).targetDir(target).build().compile()
-        def members = JavaImportsManifest.read(target).instanceMembers
+        def members = instanceMembers(target)
 
         then: "imports, their method return types and the receivers the checker resolved in a deeper chain"
         members['io.micronaut.http.HttpRequest']['uri'] == ['getUri', 'property']
@@ -153,7 +168,7 @@ class Caller:
 
         when:
         PyronautCompiler.builder().pythonCode(source).targetDir(target).build().compile()
-        def members = JavaImportsManifest.read(target).instanceMembers
+        def members = instanceMembers(target)
 
         then:
         members['io.micronaut.http.MutableHttpRequest']['basic_auth'] == ['basicAuth', 'method']
@@ -187,7 +202,7 @@ class Plain:
 ''').build().compile()
 
         then:
-        JavaImportsManifest.read(target).instanceMembers.isEmpty()
+        instanceMembers(target).isEmpty()
 
         cleanup:
         target.deleteDir()
