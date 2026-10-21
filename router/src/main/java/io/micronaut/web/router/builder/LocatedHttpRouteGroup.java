@@ -16,6 +16,7 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.http.uri.RouteTemplateParser;
 
 /**
  * A group of the routes of located targets of a type, declared with
@@ -41,4 +42,28 @@ import io.micronaut.core.annotation.Experimental;
  */
 @Experimental
 public sealed interface LocatedHttpRouteGroup<T> extends LocatedHttpRouteScope<T>, RouteSpec<LocatedHttpRouteGroup<T>> permits DefaultLocatedHttpRouteGroup {
+
+    /**
+     * Parse the {@code String} templates of the routes and of the locator prefixes this group,
+     * and its nested groups, declare with a parser of another template language than the URI
+     * templates of Micronaut, e.g. the templates of a JAX-RS application. A template is parsed once,
+     * when its route is added by its terminal, or when its locator is declared:
+     *
+     * <pre>{@code
+     * routes.group(jaxrs -> {
+     *     jaxrs.templates(application.templates()).selectedBy(application.selector());
+     *     jaxrs.GET("/items/{id: [0-9]+}", itemHandler);
+     * });
+     * }</pre>
+     *
+     * <p>Declare it before the routes: the routes declared before it keep the parser they were
+     * declared with. A group with a prefix with variables, see
+     * {@link LocatedHttpRouteScope#path(String, java.util.function.Consumer)}, accepts URI templates only; the templates of
+     * a group with a literal prefix are mounted under it.</p>
+     *
+     * @param parser The parser of the templates, e.g. {@link io.micronaut.http.uri.UriRouteTemplate#PARSER}
+     * @return This group
+     * @since 5.3.0
+     */
+    LocatedHttpRouteGroup<T> templates(RouteTemplateParser parser);
 }

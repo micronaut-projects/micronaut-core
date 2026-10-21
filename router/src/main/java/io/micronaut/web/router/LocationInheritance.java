@@ -19,14 +19,17 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.web.router.builder.RouteSettings;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
 /**
  * What the routes a locator route locates inherit from the groups of the locator routes, like
- * the routes declared in those groups: their annotations, attributes, media types and executor.
+ * the routes declared in those groups: their annotations, attributes, media types, executor and
+ * route selector.
  * The settings of a located route, and of the groups of its {@link io.micronaut.web.router.builder.LocatedRoutes},
  * override them. A location keeps the same instance for every request, so the routes built with
  * it, see {@link DefaultUrlRouteInfo#inheriting(LocationInheritance)}, are built once.
@@ -37,6 +40,8 @@ import java.util.Map;
  * @param produces           The media types the routes produce, or {@code null} if no group sets them
  * @param executorName       The executor the routes run on, or {@code null}
  * @param nonBlocking        Whether the routes run on the event loop, see {@code nonBlocking()}
+ * @param selector           The route selector of the routes, see {@code RouteSpec#selectedBy}, or {@code null}
+ * @param selectorOrder      The order of the selector, read once, or {@code null}
  * @author Denis Stepanov
  * @since 5.3.0
  */
@@ -46,12 +51,14 @@ record LocationInheritance(AnnotationMetadata annotationMetadata,
                            @Nullable List<MediaType> consumes,
                            @Nullable List<MediaType> produces,
                            @Nullable String executorName,
-                           boolean nonBlocking) {
+                           boolean nonBlocking,
+                           @Nullable RouteMatchSelector selector,
+                           @Nullable Comparator<UriRouteInfo<?, ?>> selectorOrder) {
 
     /**
      * Nothing to inherit.
      */
-    static final LocationInheritance NONE = new LocationInheritance(AnnotationMetadata.EMPTY_METADATA, Map.of(), null, null, null, false);
+    static final LocationInheritance NONE = new LocationInheritance(AnnotationMetadata.EMPTY_METADATA, Map.of(), null, null, null, false, null, null);
 
     /**
      * What the routes of a locator route inherit.
@@ -60,12 +67,16 @@ record LocationInheritance(AnnotationMetadata annotationMetadata,
      * @param attributes         The attributes of the locator route, with the ones it inherits
      * @param groupSettings      The media types and the executor of the groups of the locator route, or {@code null}
      * @param outer              What the locator route inherits from the locator routes that located it, or {@code null}
+     * @param selector           The route selector of the locator route, or {@code null}
+     * @param selectorOrder      The order of the selector, read once, or {@code null}
      * @return The inheritance
      */
     static LocationInheritance of(AnnotationMetadata annotationMetadata,
                                   Map<String, Object> attributes,
                                   @Nullable RouteSettings groupSettings,
-                                  @Nullable LocationInheritance outer) {
+                                  @Nullable LocationInheritance outer,
+                                  @Nullable RouteMatchSelector selector,
+                                  @Nullable Comparator<UriRouteInfo<?, ?>> selectorOrder) {
         List<MediaType> consumes = groupSettings == null ? null : groupSettings.getConsumes();
         List<MediaType> produces = groupSettings == null ? null : groupSettings.getProduces();
         String executorName = groupSettings == null ? null : groupSettings.getExecutorName();
@@ -82,7 +93,7 @@ record LocationInheritance(AnnotationMetadata annotationMetadata,
                 nonBlocking = outer.nonBlocking;
             }
         }
-        LocationInheritance inheritance = new LocationInheritance(annotationMetadata, attributes, consumes, produces, executorName, nonBlocking);
+        LocationInheritance inheritance = new LocationInheritance(annotationMetadata, attributes, consumes, produces, executorName, nonBlocking, selector, selectorOrder);
         return inheritance.isEmpty() ? NONE : inheritance;
     }
 
@@ -90,7 +101,7 @@ record LocationInheritance(AnnotationMetadata annotationMetadata,
      * @return Whether there is nothing to inherit
      */
     boolean isEmpty() {
-        return annotationMetadata.isEmpty() && attributes.isEmpty() && consumes == null && produces == null && !hasExecutor();
+        return annotationMetadata.isEmpty() && attributes.isEmpty() && consumes == null && produces == null && !hasExecutor() && selector == null;
     }
 
     /**
