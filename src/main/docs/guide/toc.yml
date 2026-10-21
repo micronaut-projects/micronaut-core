@@ -218,6 +218,7 @@ httpServer:
     functionalRoutesErrors: Error and Status Routes
     functionalRoutesLocators: Locator Routes
     functionalRoutesWebSocket: WebSocket Routes
+    functionalRoutesStaticResources: Static Resources
     functionalRoutesLimitations: Limitations
   sessions: HTTP Sessions
   sse: Server Sent Events

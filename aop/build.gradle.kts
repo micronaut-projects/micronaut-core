@@ -16,13 +16,8 @@ dependencies {
     compileOnly(projects.micronautCoreReactive)
     compileOnly(libs.managed.kotlinx.coroutines.core)
     compileOnly(libs.managed.reactor)
-}
 
-tasks {
-    test {
-        // there are no real tests in this project
-        failOnNoDiscoveredTests = false
-    }
+    testImplementation(libs.managed.kotlinx.coroutines.core)
 }
 
 noReflection {

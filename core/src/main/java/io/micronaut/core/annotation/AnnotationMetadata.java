@@ -1484,9 +1484,9 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
-            return findRepeatableAnnotation(annotation)
-                    .map(this::hasAnnotation)
-                    .orElseGet(() -> hasAnnotation(annotation.getName()));
+            // A branch instead of map/orElseGet: the capturing lambda was allocated on every call
+            String repeatableContainer = findRepeatableAnnotation(annotation).orElse(null);
+            return repeatableContainer != null ? hasAnnotation(repeatableContainer) : hasAnnotation(annotation.getName());
         }
         return false;
     }
@@ -1501,9 +1501,9 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
-            return findRepeatableAnnotation(annotation)
-                    .map(this::hasStereotype)
-                    .orElseGet(() -> hasStereotype(annotation.getName()));
+            // A branch instead of map/orElseGet: the capturing lambda was allocated on every call
+            String repeatableContainer = findRepeatableAnnotation(annotation).orElse(null);
+            return repeatableContainer != null ? hasStereotype(repeatableContainer) : hasStereotype(annotation.getName());
         }
         return false;
     }
@@ -1565,9 +1565,9 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
-            return findRepeatableAnnotation(annotation)
-                    .map(this::hasDeclaredAnnotation)
-                    .orElseGet(() -> hasDeclaredAnnotation(annotation.getName()));
+            // A branch instead of map/orElseGet: the capturing lambda was allocated on every call
+            String repeatableContainer = findRepeatableAnnotation(annotation).orElse(null);
+            return repeatableContainer != null ? hasDeclaredAnnotation(repeatableContainer) : hasDeclaredAnnotation(annotation.getName());
         }
         return false;
     }
@@ -1580,9 +1580,9 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
         if (stereotype != null) {
-            return findRepeatableAnnotation(stereotype)
-                    .map(this::hasDeclaredStereotype)
-                    .orElseGet(() -> hasDeclaredStereotype(stereotype.getName()));
+            // A branch instead of map/orElseGet: the capturing lambda was allocated on every call
+            String repeatableContainer = findRepeatableAnnotation(stereotype).orElse(null);
+            return repeatableContainer != null ? hasDeclaredStereotype(repeatableContainer) : hasDeclaredStereotype(stereotype.getName());
         }
         return false;
     }

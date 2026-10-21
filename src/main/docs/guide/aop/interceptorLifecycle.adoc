@@ -228,7 +228,8 @@ lookup; an injection point declared `@Nullable` receives `null` in those cases a
 
 [.lang-java.lang-groovy.lang-kotlin]
 --
-The target is known whenever the container creates the interceptor for a bean: while the bean itself is created, to
+The target is known whenever the container creates the interceptor for a bean: while the bean itself is created,
+whether the context resolves it or a call to `createBean` creates it with the arguments of the caller, to
 intercept its construction, its lifecycle or, through the subclass or introduction proxy that is the bean, its
 methods, and when a proxy with a separate target and `lazyInterceptorsPerTarget` resolves the interceptors of a
 target on its first call. It is not known to the interceptors a proxy creates for a target the context holds no
