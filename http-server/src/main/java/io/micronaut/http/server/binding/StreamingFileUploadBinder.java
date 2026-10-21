@@ -60,7 +60,7 @@ public final class StreamingFileUploadBinder implements TypedRequestArgumentBind
 
         CompletableFuture<? extends @Nullable StreamingFileUpload> completableFuture =
             FormFieldFlows.first(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_START, argument)),
-                raw -> formFactory.get().streamFileUpload(raw));
+                raw -> formFactory.get().streamFileUpload(formFactory.get().limitFileSize(request, raw)));
         BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(completableFuture));
 
         return new PendingRequestBindingResult<>() {
