@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.handler
 
 import io.micronaut.core.io.buffer.ByteBuffer
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.body.AvailableByteBody
 import io.micronaut.http.body.ByteBody
 import io.micronaut.http.body.CloseableAvailableByteBody
@@ -8,6 +9,7 @@ import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.stream.BodySizeLimits
 import io.micronaut.http.body.stream.BufferConsumer
 import io.micronaut.http.exceptions.ContentLengthExceededException
+import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.micronaut.http.netty.body.StreamingNettyByteBody
 import io.micronaut.buffer.netty.NettyReadBufferFactory
@@ -21,6 +23,7 @@ import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.ChannelPromise
 import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.handler.codec.DecoderResult
 import io.netty.handler.codec.compression.DecompressionException
 import io.netty.handler.codec.compression.SnappyFrameEncoder
 import io.netty.handler.codec.compression.ZlibCodecFactory
@@ -40,6 +43,7 @@ import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpHeaderValues
 import io.netty.handler.codec.http.HttpHeaders
 import io.netty.handler.codec.http.HttpMethod
+import io.netty.handler.codec.http.HttpRequestDecoder
 import io.netty.handler.codec.http.HttpRequest
 import io.netty.handler.codec.http.HttpResponse
 import io.netty.handler.codec.http.HttpResponseStatus
@@ -54,6 +58,7 @@ import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ThreadLocalRandom
+import java.util.zip.GZIPOutputStream
 
 class PipeliningServerHandlerSpec extends Specification {
     def 'pipelined requests have their responses batched'() {
@@ -835,6 +840,156 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.finishAndReleaseAll()
     }
 
+    def 'malformed chunk fails the request body and closes the connection (#description, split=#split, gzip=#gzip)'() {
+        given:
+        Throwable failure = null
+        boolean completed = false
+        int received = 0
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                Flux.from(body.toByteArrayPublisher()).subscribe({ received += it.length }, {
+                    failure = it
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST), NettyByteBodyFactory.empty())
+                }, {
+                    completed = true
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty())
+                })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+        def ch = new EmbeddedChannel(new HttpRequestDecoder(), handler)
+        byte[] firstChunk = "hello".getBytes(StandardCharsets.UTF_8)
+        if (gzip) {
+            def bos = new ByteArrayOutputStream()
+            new GZIPOutputStream(bos).withCloseable { it.write(firstChunk) }
+            firstChunk = bos.toByteArray()
+        }
+        String head = "POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n" +
+            (gzip ? "Content-Encoding: gzip\r\n" : "") +
+            "\r\n" + Integer.toHexString(firstChunk.length) + "\r\n" + new String(firstChunk, StandardCharsets.ISO_8859_1) + "\r\n"
+
+        when:
+        if (split) {
+            ch.writeInbound(Unpooled.copiedBuffer(head, StandardCharsets.ISO_8859_1))
+            ch.writeInbound(Unpooled.copiedBuffer(malformed, StandardCharsets.ISO_8859_1))
+        } else {
+            ch.writeInbound(Unpooled.copiedBuffer(head + malformed, StandardCharsets.ISO_8859_1))
+        }
+
+        then:
+        !completed
+        failure instanceof HttpStatusException
+        ((HttpStatusException) failure).status == status
+        failure.cause != null
+
+        and: 'the response is written and the connection is closed afterwards'
+        HttpResponse response = ch.readOutbound()
+        response.status() == HttpResponseStatus.BAD_REQUEST
+        response.headers().get(HttpHeaderNames.CONNECTION) == 'close'
+        !ch.isOpen()
+
+        cleanup:
+        ch.finishAndReleaseAll()
+
+        where:
+        [description, malformed, status, split, gzip] << [
+            [
+                ['chunk extension too long', '5;' + 'a' * 5000 + '\r\nhello\r\n0\r\n\r\n', HttpStatus.REQUEST_ENTITY_TOO_LARGE],
+                ['invalid chunk size', 'xyz\r\nhello\r\n0\r\n\r\n', HttpStatus.BAD_REQUEST],
+                ['invalid trailer', '0\r\ninvalid trailer\r\n\r\n', HttpStatus.BAD_REQUEST],
+            ],
+            [false, true],
+            [false, true],
+        ].combinations().collect { it.flatten() }
+    }
+
+    def 'failed content without a request closes the connection'() {
+        given:
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                throw new AssertionError()
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                throw new AssertionError(cause)
+            }
+        }))
+        def content = new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER)
+        content.setDecoderResult(DecoderResult.failure(new IllegalArgumentException("invalid chunk")))
+
+        when:
+        ch.writeInbound(content)
+
+        then:
+        !ch.isOpen()
+        ch.checkException()
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'malformed chunk does not drop an early response that is not flushed yet'() {
+        given:
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                Flux.from(body.toByteArrayPublisher()).subscribe(new Subscriber<byte[]>() {
+                    Subscription subscription
+
+                    @Override
+                    void onSubscribe(Subscription s) {
+                        subscription = s
+                        s.request(1)
+                    }
+
+                    @Override
+                    void onNext(byte[] bytes) {
+                        // reject the request early and discard the rest of the body
+                        subscription.cancel()
+                        outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.UNAUTHORIZED), NettyByteBodyFactory.empty())
+                    }
+
+                    @Override
+                    void onError(Throwable t) {
+                    }
+
+                    @Override
+                    void onComplete() {
+                    }
+                })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+        def ch = new EmbeddedChannel(new HttpRequestDecoder(), handler)
+
+        when: 'the request head arrives, and the body is streamed to the handler'
+        ch.writeInbound(Unpooled.copiedBuffer("POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n", StandardCharsets.ISO_8859_1))
+        then:
+        ch.readOutbound() == null
+
+        when: 'the handler responds on the first chunk, and a malformed chunk follows in the same read'
+        ch.writeInbound(Unpooled.copiedBuffer("5\r\nhello\r\nxyz\r\n", StandardCharsets.ISO_8859_1))
+
+        then: 'the response is still written, and the connection is closed afterwards'
+        HttpResponse response = ch.readOutbound()
+        response.status() == HttpResponseStatus.UNAUTHORIZED
+        !ch.isOpen()
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
     def 'decompression limit applies across concatenated gzip members'() {
         given:
         Throwable failure = null
@@ -1159,6 +1314,139 @@ class PipeliningServerHandlerSpec extends Specification {
         errors[0].message == "accept failed"
         content.refCnt() == 0
         requests == ["/first", "/second"]
+        !ch.open
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'a request the request handler rejects is answered and the connection closed'(String kind) {
+        given:
+        def errors = []
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                throw new IllegalArgumentException("accept failed")
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                errors << cause
+            }
+        }))
+
+        when:
+        HttpRequest req
+        switch (kind) {
+            case 'full':
+                req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER)
+                break
+            case 'bodyless':
+                req = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/")
+                break
+            default:
+                // a body that has not fully arrived by read complete is passed on as a stream
+                req = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+                req.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        }
+        ch.writeInbound(req)
+
+        then:
+        // the request can never be handled, so it is answered and the connection closed rather
+        // than left open waiting for a response that never comes
+        errors.size() == 1
+        errors[0].message == "accept failed"
+        HttpResponse response = ch.readOutbound()
+        response.status() == HttpResponseStatus.INTERNAL_SERVER_ERROR
+        response.headers().get(HttpHeaderNames.CONNECTION) == 'close'
+        !ch.open
+
+        cleanup:
+        ch.finishAndReleaseAll()
+
+        where:
+        kind << ['full', 'bodyless', 'streaming']
+    }
+
+    def 'a request handler that fails after starting a response'(boolean expectContinue, boolean respond) {
+        given:
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                // demanding the body sends the 100 Continue, if one is expected
+                Flux.from(body.toByteArrayPublisher()).subscribe()
+                if (respond) {
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
+                }
+                throw new IllegalArgumentException("accept failed")
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+            }
+        }))
+
+        when:
+        def req = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        if (expectContinue) {
+            req.headers().add(HttpHeaderNames.EXPECT, HttpHeaderValues.CONTINUE)
+        }
+        req.headers().add(HttpHeaderNames.CONTENT_LENGTH, 3)
+        ch.writeInbound(req)
+
+        then:
+        if (expectContinue) {
+            assert ((HttpResponse) ch.readOutbound()).status() == HttpResponseStatus.CONTINUE
+        }
+        // the response the handler wrote is kept, otherwise the request is answered with a 500
+        ((HttpResponse) ch.readOutbound()).status() == (respond ? HttpResponseStatus.NO_CONTENT : HttpResponseStatus.INTERNAL_SERVER_ERROR)
+        !ch.outboundMessages().any { it instanceof HttpResponse }
+        !ch.open
+
+        cleanup:
+        ch.finishAndReleaseAll()
+
+        where:
+        expectContinue | respond
+        true           | true
+        true           | false
+        false          | true
+    }
+
+    def 'the responses of earlier pipelined requests are written before a rejected request closes the connection'() {
+        given:
+        OutboundAccess first = null
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                if (request.uri() == "/first") {
+                    first = outboundAccess
+                } else {
+                    throw new IllegalArgumentException("accept failed")
+                }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+            }
+        }))
+
+        when:
+        ch.writeInbound(
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/first", Unpooled.EMPTY_BUFFER),
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/second", Unpooled.EMPTY_BUFFER)
+        )
+        then:
+        ch.open
+        ch.readOutbound() == null
+
+        when:
+        first.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
+        ch.runPendingTasks()
+        then:
+        ((HttpResponse) ch.readOutbound()).status() == HttpResponseStatus.NO_CONTENT
+        ((HttpResponse) ch.readOutbound()).status() == HttpResponseStatus.INTERNAL_SERVER_ERROR
         !ch.open
 
         cleanup:
