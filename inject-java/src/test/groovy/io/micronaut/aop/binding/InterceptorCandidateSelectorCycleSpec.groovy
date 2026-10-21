@@ -47,7 +47,7 @@ class InterceptorCandidateSelectorCycleSpec extends AbstractTypeElementSpec {
 
         then:
         result == 'done'
-        context.classLoader.loadClass('candidatecycle.Selector').getDeclaredField('calls').get(null) > 0
+        context.classLoader.loadClass('candidatecycle.Selector').getDeclaredField('calls').with { accessible = true; it.get(null) } > 0
 
         cleanup:
         context.close()
