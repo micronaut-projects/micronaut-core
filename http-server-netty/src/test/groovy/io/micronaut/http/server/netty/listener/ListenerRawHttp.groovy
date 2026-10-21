@@ -20,8 +20,13 @@ class ListenerRawHttp {
         }
         try {
             socket.soTimeout = timeoutMs
-            socket.outputStream.write("GET $path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII))
-            socket.outputStream.flush()
+            try {
+                socket.outputStream.write("GET $path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII))
+                socket.outputStream.flush()
+            } catch (IOException ignored) {
+                // the connection was reset by a listener that is closing: nothing is served
+                return null
+            }
             return readAll(socket.inputStream)
         } finally {
             socket.close()
