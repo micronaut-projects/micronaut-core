@@ -121,6 +121,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     // these three handlers can be reused and are cached here
     private final DroppingInboundHandler droppingInboundHandler = new DroppingInboundHandler();
+    /**
+     * The state after a request that has no body, while its empty end marker is still to be
+     * read. Nothing but that marker can follow, so it is not a reason to read on after a
+     * response that closes the connection, see {@link #closeAfterResponse()}.
+     */
+    private final DroppingInboundHandler noBodyInboundHandler = new DroppingInboundHandler();
     private final InboundHandler baseInboundHandler = new MessageInboundHandler();
     private final OptimisticBufferingInboundHandler optimisticBufferingInboundHandler = new OptimisticBufferingInboundHandler();
 
@@ -587,15 +593,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * Close the connection after the last response was written. When the request body has not
-     * been received in full, closing the socket with unread bytes makes the transport reset the
+     * Close the connection after the last response was written. When the request has no body, or
+     * its body has been received in full, the connection is closed right away. When the request body
+     * has not been received in full, closing the socket with unread bytes makes the transport reset the
      * connection, and the client may see the reset instead of the response. In that case only
      * the output is shut down, and the rest of the body is read and dropped before the
      * connection is closed, within {@link #LINGER_MILLIS} and {@link #LINGER_MAX_BYTES}.
      */
     private void closeAfterResponse() {
         ChannelHandlerContext context = requiredCtx();
-        if (inboundHandler == baseInboundHandler || removed
+        if (inboundHandler == baseInboundHandler || inboundHandler == noBodyInboundHandler || removed
             || !(context.channel() instanceof DuplexChannel channel) || !channel.isActive()) {
             context.close();
             return;
@@ -697,7 +704,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 CloseableByteBody body = byteBodyFactory().withTrailers(byteBodyFactory().createChecked(bodySizeLimits, fullRequest.content()), fullRequest.trailingHeaders());
                 requestHandler.accept(requiredCtx(), request, body, outboundAccess);
             } else if (!hasBody(request)) {
-                inboundHandler = droppingInboundHandler;
+                // a request that failed to decode may be followed by arbitrary bytes
+                inboundHandler = request.decoderResult().isFailure() ? droppingInboundHandler : noBodyInboundHandler;
                 if (full) {
                     inboundHandler.read(message);
                 }
