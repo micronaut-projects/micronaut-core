@@ -5,32 +5,35 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
-import io.netty.channel.MultiThreadIoEventLoopGroup
-import io.netty.channel.nio.NioIoHandler
 import spock.lang.Specification
 
 class SharedEventLoopGroupSpec extends Specification {
 
-    def 'a client does not shut down an event loop group it is given'() {
+    def 'a client runs on the event loop of another client, which keeps owning it'() {
         given:
         def server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'SharedEventLoopGroupSpec'])
-        def group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory())
-        def first = DefaultHttpClient.builder().uri(server.URI).eventLoopGroup(group).build()
-        def second = DefaultHttpClient.builder().uri(server.URI).eventLoopGroup(group).build()
+        def owner = DefaultHttpClient.builder().uri(server.URI).build()
+        def sharing = DefaultHttpClient.builder().uri(server.URI).eventLoopOf(owner).build()
+        def group = owner.connectionManager().eventLoopGroup()
 
         expect:
-        first.toBlocking().retrieve('/shared-group') == 'ok'
+        sharing.connectionManager().eventLoopGroup().is(group)
+        sharing.toBlocking().retrieve('/shared-group') == 'ok'
 
         when:
-        first.close()
+        sharing.close()
 
         then:
         !group.isShuttingDown()
-        second.toBlocking().retrieve('/shared-group') == 'ok'
+        owner.toBlocking().retrieve('/shared-group') == 'ok'
+
+        when:
+        owner.close()
+
+        then:
+        group.isShuttingDown()
 
         cleanup:
-        second?.close()
-        group.shutdownGracefully(0, 1, java.util.concurrent.TimeUnit.SECONDS).await()
         server.close()
     }
 
