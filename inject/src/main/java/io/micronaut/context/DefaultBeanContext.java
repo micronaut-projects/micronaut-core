@@ -6217,10 +6217,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     /**
      * Destroys what was created during shutdown and is still held, in reverse creation order. A dependent already
-     * destroyed with its owner, or released by it, is skipped.
+     * destroyed with its owner, or released by it, is skipped. What the destruction itself creates is destroyed in
+     * turn, for a bounded number of rounds: work on another thread may keep adding dependents while the callbacks run,
+     * and what is left is for the next pass of {@link #stop()}, which bounds the passes.
      */
     private void destroyShutdownDependents() {
-        while (true) {
+        for (int round = 0; round < MAX_SHUTDOWN_PASSES; round++) {
             List<ShutdownDependent> taken;
             synchronized (shutdownDependents) {
                 if (shutdownDependents.isEmpty()) {

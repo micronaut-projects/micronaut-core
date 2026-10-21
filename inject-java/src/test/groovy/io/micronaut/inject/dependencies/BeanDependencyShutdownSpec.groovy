@@ -5,6 +5,8 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 
+import spock.util.concurrent.PollingConditions
+
 class BeanDependencyShutdownSpec extends AbstractTypeElementSpec {
     private static final String HEADER = '''
 package test;
@@ -462,6 +464,46 @@ class Holder {
         def e = thrown(ExecutionException)
         e.cause instanceof IllegalStateException
         log.EVENTS == ['slow created', 'shared', 'slow destroyed']
+    }
+
+    void "a thread that keeps resolving during shutdown cannot keep the shutdown from completing"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+class Holder {
+    static BeanDependencyGroup group;
+    static final CountDownLatch STARTED = new CountDownLatch(1);
+    static volatile Throwable stopped;
+}
+@Singleton class Owner {
+    @PreDestroy void close() throws InterruptedException {
+        Thread worker = new Thread(() -> {
+            try {
+                while (true) {
+                    Holder.group.getBean(Resource.class);
+                    Holder.STARTED.countDown();
+                }
+            } catch (Throwable e) {
+                Holder.stopped = e;
+            }
+        });
+        worker.setDaemon(true);
+        worker.start();
+        Holder.STARTED.await(30, TimeUnit.SECONDS);
+    }
+}
+''')
+        def holder = ctx.classLoader.loadClass('test.Holder')
+        holder.group = ctx.createDependencyGroup()
+        ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+
+        when: 'the worker refills the shutdown dependents for as long as the callbacks may resolve'
+        java.util.concurrent.CompletableFuture.runAsync { ctx.close() }.get(60, TimeUnit.SECONDS)
+
+        then: 'the shutdown gives up after its passes, and the worker is rejected from then on'
+        noExceptionThrown()
+        new PollingConditions(timeout: 30).eventually {
+            assert holder.stopped instanceof IllegalStateException
+        }
     }
 
     void "a per-target interceptor first needed during shutdown is destroyed with its target"() {
