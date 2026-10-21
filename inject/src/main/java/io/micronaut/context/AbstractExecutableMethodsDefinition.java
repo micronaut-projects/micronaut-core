@@ -60,6 +60,10 @@ import java.util.stream.Stream;
 public abstract class AbstractExecutableMethodsDefinition<T> implements ExecutableMethodsDefinition<T>, EnvironmentConfigurable, BeanContextConfigurable {
 
     private final MethodReference[] methodsReferences;
+    /**
+     * The generated definition invoking the methods: this one, or the one a copy is made from.
+     */
+    private final AbstractExecutableMethodsDefinition<T> dispatcher;
     private final DispatchedExecutableMethod<T, ?>[] executableMethods;
     @Nullable
     private Environment environment;
@@ -74,7 +78,26 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
     protected AbstractExecutableMethodsDefinition(MethodReference[] methodsReferences) {
         this.methodsReferences = methodsReferences;
+        this.dispatcher = this;
         this.executableMethods = new DispatchedExecutableMethod[methodsReferences.length];
+    }
+
+    private AbstractExecutableMethodsDefinition(AbstractExecutableMethodsDefinition<T> dispatcher) {
+        this.methodsReferences = dispatcher.methodsReferences;
+        this.dispatcher = dispatcher;
+        this.executableMethods = new DispatchedExecutableMethod[methodsReferences.length];
+    }
+
+    /**
+     * A copy with its own methods, invoked by this definition. A generated bean definition keeps its methods
+     * definition in a static field, shared by every context that loads the bean definition, so each loaded bean
+     * definition takes a copy: the methods, their metadata and the values they keep then belong to one context, and
+     * are dropped with it.
+     *
+     * @return The copy
+     */
+    AbstractExecutableMethodsDefinition<T> copy() {
+        return new Copy<>(dispatcher);
     }
 
     @Override
@@ -212,7 +235,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         DispatchedExecutableMethod<T, R> executableMethod = (DispatchedExecutableMethod<T, R>) executableMethods[index];
         if (executableMethod == null) {
             MethodReference methodsReference = methodsReferences[index];
-            executableMethod = new DispatchedExecutableMethod<>(this, index, methodsReference, methodsReference.annotationMetadata);
+            executableMethod = new DispatchedExecutableMethod<>(dispatcher, index, methodsReference, methodsReference.annotationMetadata);
             if (environment != null) {
                 executableMethod.configure(environment);
             }
@@ -418,6 +441,47 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     }
 
     /**
+     * A copy of a generated definition with its own methods. The generated definition invokes them and answers the
+     * lifecycle method indexes.
+     *
+     * @param <T> The type
+     */
+    private static final class Copy<T> extends AbstractExecutableMethodsDefinition<T> {
+
+        private final AbstractExecutableMethodsDefinition<T> generated;
+
+        private Copy(AbstractExecutableMethodsDefinition<T> generated) {
+            super(generated);
+            this.generated = generated;
+        }
+
+        @Override
+        protected Object dispatch(int index, T target, @Nullable Object[] args) {
+            return generated.dispatch(index, target, args);
+        }
+
+        @Override
+        protected Method getTargetMethodByIndex(int index) {
+            return generated.getTargetMethodByIndex(index);
+        }
+
+        @Override
+        protected int @Nullable [] getPostConstructMethodIndexes() {
+            return generated.getPostConstructMethodIndexes();
+        }
+
+        @Override
+        protected int @Nullable [] getPreDestroyMethodIndexes() {
+            return generated.getPreDestroyMethodIndexes();
+        }
+
+        @Override
+        public boolean requiresMethodProcessing() {
+            return generated.requiresMethodProcessing();
+        }
+    }
+
+    /**
      * An {@link ExecutableMethod} instance based on dispatching by index.
      *
      * @param <T> The type
@@ -442,9 +506,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private final int index;
         private final MethodReference methodReference;
         /**
-         * The generated metadata of the method. The method is shared by the contexts that load its bean definition
-         * (the definition keeps it in a static field), so each context wraps this metadata, never the metadata another
-         * context configured.
+         * The generated metadata of the method, wrapped by the configured metadata.
          */
         private final AnnotationMetadata declaredAnnotationMetadata;
         /**

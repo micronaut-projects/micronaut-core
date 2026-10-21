@@ -92,8 +92,8 @@ public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReferenc
      * value is computed on every call, without being kept, when the metadata has evaluated expressions, which can
      * depend on the invocation, and by implementations that don't keep values.</p>
      *
-     * <p>A generated method can be shared by the contexts of the JVM that load its bean definition: a value must only
-     * hold what the factory derives from the method, never beans, clients or other state owned by a context.</p>
+     * <p>The methods of a bean definition, and of the proxies a context creates, belong to that context: the values
+     * they keep are dropped with it, and are not seen by another context.</p>
      *
      * @param key     The key of the value
      * @param factory Computes the value from the method
