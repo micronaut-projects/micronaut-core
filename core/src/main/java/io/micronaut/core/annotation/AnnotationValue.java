@@ -1829,29 +1829,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param valueMapper The value mapper
      * @return The string[] or null
      */
-    /**
-     * The first element of an array or an iterable member value, or the value itself.
-     *
-     * @param rawValue The raw value
-     * @return The first element, or the value
-     * @since 5.3.0
-     */
-    @Internal
-    public static @Nullable Object firstValue(@Nullable Object rawValue) {
-        if (rawValue instanceof Object[] array) {
-            // The common String[]/AnnotationValue[]/AnnotationClassValue[] members, without reflective access
-            return array.length > 0 ? array[0] : rawValue;
-        }
-        if (rawValue != null && rawValue.getClass().isArray()) {
-            return Array.getLength(rawValue) > 0 ? Array.get(rawValue, 0) : rawValue;
-        }
-        if (rawValue instanceof Iterable<?> iterable) {
-            Iterator<?> i = iterable.iterator();
-            return i.hasNext() ? i.next() : rawValue;
-        }
-        return rawValue;
-    }
-
     @Internal
     public static String @Nullable[] resolveStringValues(@Nullable Object value, @Nullable Function<Object, @Nullable Object> valueMapper) {
         if (value == null) {
@@ -2051,7 +2028,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Nullable
     private Object getRawSingleValue(String member, @Nullable Function<Object, Object> valueMapper) {
-        Object rawValue = firstValue(values.get(member));
+        Object rawValue = ArrayUtils.firstElement(values.get(member));
         if (valueMapper != null && (rawValue instanceof String || rawValue instanceof EvaluatedExpression)) {
             return valueMapper.apply(rawValue);
         }

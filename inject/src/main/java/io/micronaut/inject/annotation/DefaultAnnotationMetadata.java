@@ -28,6 +28,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
@@ -1685,7 +1686,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Nullable
     private Object getRawSingleValue(String annotation, String member, @Nullable Function<Object, Object> valueMapper) {
-        Object rawValue = AnnotationValue.firstValue(getRawValue(annotation, member));
+        Object rawValue = ArrayUtils.firstElement(getRawValue(annotation, member));
         if (valueMapper != null && rawValue instanceof CharSequence) {
             return valueMapper.apply(rawValue);
         } else {
