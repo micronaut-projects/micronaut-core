@@ -490,9 +490,7 @@ final class Pool40 implements Pool {
 
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
-                try (PropagatedContext.Scope ignored = propagatedContext.propagate()) {
-                    sink.completeExceptionally(t);
-                }
+                propagatedContext.wrap(() -> sink.completeExceptionally(t)).run();
                 return true;
             } else {
                 return false;
@@ -505,9 +503,7 @@ final class Pool40 implements Pool {
                 if (sink.isCancelled()) {
                     return false;
                 }
-                try (PropagatedContext.Scope ignored = propagatedContext.propagate()) {
-                    sink.complete(value);
-                }
+                propagatedContext.wrap(() -> sink.complete(value)).run();
                 return true;
             } else {
                 return false;
