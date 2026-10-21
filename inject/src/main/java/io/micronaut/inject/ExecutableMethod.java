@@ -18,16 +18,15 @@ package io.micronaut.inject;
 import io.micronaut.core.annotation.AnnotationBuilder;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.Described;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
+import io.micronaut.inject.annotation.RegisteredAnnotationBuilders;
 
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -133,26 +132,9 @@ public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReferenc
     @Experimental
     default <A extends Annotation> @Nullable A getCachedAnnotation(Class<A> annotationType) {
         AnnotationValue<A> annotationValue = getCachedAnnotationValue(annotationType);
-        return annotationValue != null ? buildAnnotation(annotationType, annotationValue) : null;
-    }
-
-
-    /**
-     * Builds an annotation with the builder registered for its type.
-     *
-     * @param annotationType  The annotation type
-     * @param annotationValue The annotation value
-     * @param <A>             The annotation type
-     * @return The annotation
-     */
-    private static <A extends Annotation> A buildAnnotation(Class<A> annotationType, AnnotationValue<A> annotationValue) {
-        ClassLoader annotationLoader = annotationType.getClassLoader();
-        AnnotationBuilder<A> builder = AnnotationBuilder.find(annotationType)
-            // An application annotation and its builder can be in a class loader below the one of Micronaut
-            .or(() -> annotationLoader != null ? AnnotationBuilder.find(annotationType, annotationLoader) : Optional.empty())
-            .orElseThrow(() -> new IllegalStateException(
-                "No AnnotationBuilder is registered for " + annotationType.getName() + ": register it with @RegisterAnnotations"));
-        return builder.build(annotationValue, ConversionService.SHARED);
+        return annotationValue != null
+            ? RegisteredAnnotationBuilders.build(annotationType, annotationValue, Thread.currentThread().getContextClassLoader())
+            : null;
     }
 
 }

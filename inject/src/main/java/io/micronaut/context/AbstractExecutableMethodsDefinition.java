@@ -35,6 +35,7 @@ import io.micronaut.inject.ExecutableMethodsDefinition;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
+import io.micronaut.inject.annotation.RegisteredAnnotationBuilders;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -517,6 +518,11 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          */
         private final AnnotationMetadata declaredAnnotationMetadata;
         /**
+         * The class loader of the context that configured the method, which builds the annotations of the
+         * application.
+         */
+        private volatile @Nullable ClassLoader classLoader;
+        /**
          * The metadata resolving the property placeholders with the environment of the last configured context.
          */
         private AnnotationMetadata environmentAnnotationMetadata;
@@ -584,18 +590,31 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             return (AnnotationValue<A>) ((KeptAnnotationValue) kept).value;
         }
 
+        /**
+         * Builds the annotation of this method with the builder registered for its type, among the builders of
+         * the class loader of the context too.
+         */
+        private <A extends Annotation> @Nullable A buildAnnotation(Class<A> annotationType) {
+            AnnotationValue<A> annotationValue = getCachedAnnotationValue(annotationType);
+            ClassLoader loader = classLoader;
+            return annotationValue != null
+                ? RegisteredAnnotationBuilders.build(annotationType, annotationValue,
+                    loader != null ? loader : Thread.currentThread().getContextClassLoader())
+                : null;
+        }
+
         @Override
         @SuppressWarnings("unchecked")
         public <A extends Annotation> @Nullable A getCachedAnnotation(Class<A> annotationType) {
             AnnotationMetadata metadata = annotationMetadata;
             long revision = revision();
             if (revision == NOT_CACHEABLE) {
-                return ExecutableMethod.super.getCachedAnnotation(annotationType);
+                return buildAnnotation(annotationType);
             }
             Object kept = find(metadata, revision, annotationType, ENTRY_ANNOTATION);
             if (kept == null) {
                 // Kept apart from a value kept by getCachedValue under the same annotation type
-                kept = keep(metadata, revision, annotationType, new KeptAnnotation(ExecutableMethod.super.getCachedAnnotation(annotationType)), ENTRY_ANNOTATION);
+                kept = keep(metadata, revision, annotationType, new KeptAnnotation(buildAnnotation(annotationType)), ENTRY_ANNOTATION);
             }
             return (A) ((KeptAnnotation) kept).annotation;
         }
@@ -728,6 +747,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         @Override
         public synchronized void configure(BeanContext beanContext) {
             cachedValues = null;
+            classLoader = beanContext.getClassLoader();
             if (annotationMetadata instanceof EvaluatedAnnotationMetadata current
                 && current.getAnnotationMetadata() == environmentAnnotationMetadata) {
                 // The same environment: configure the wrapper the return type may already hold, as before
