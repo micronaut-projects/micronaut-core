@@ -1165,7 +1165,7 @@ class JavaReceiverRules:
                 or description.nestedTypes().containsKey(name) or description.enumConstants().contains(name)):
             return None
         alias = description.instanceAliases().get(name)
-        if alias is None or alias.blocked():
+        if alias is None or alias.isBlocked():
             return None
         # registered for the runtime as well, so the alias also works on deeper call chains
         self.checker._java_alias_types.add(description.name())
