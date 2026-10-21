@@ -15,10 +15,13 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ExceptionUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.filter.GenericHttpFilter;
@@ -49,10 +52,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * The target of a locator route, see
@@ -151,6 +157,38 @@ public final class RouteLocator implements DynamicRouteTarget {
         this.routesOf = routesOf(routesOf);
         this.tables = Objects.requireNonNull(tables, "tables");
         this.groupSettings = groupSettings;
+    }
+
+    /**
+     * A locator that runs on an executor, see
+     * {@link io.micronaut.web.router.builder.HttpRouteScope#locateOn(String, String, LocatorHandler, Function)}.
+     *
+     * @param assembly     The assembly of the routes, which selects the executor
+     * @param executorName The name of the executor, selected when the locator first runs, like the executor of a handler
+     * @param locator      The locator, which may block
+     * @param <T>          The type of the target
+     * @return The asynchronous locator, whose stage completes on the executor
+     */
+    public static <T> AsyncLocatorHandler<T> onExecutor(RouteAssembly assembly, String executorName, LocatorHandler<? extends T> locator) {
+        Objects.requireNonNull(locator, LOCATOR_NAME);
+        String name = RouteArguments.executorName(executorName);
+        Supplier<ExecutorService> selected = SupplierUtil.memoized(() -> Optional.ofNullable(assembly.executorSelector)
+            .flatMap(selector -> selector.select(name))
+            .orElseThrow(() -> new ConfigurationException("No executor configured for name: " + name + ", of a locator route")));
+        Executor executor = task -> selected.get().execute(task);
+        return (request, pathVariables) -> {
+            PropagatedContext context = PropagatedContext.getOrEmpty();
+            return CompletableFuture.supplyAsync(() -> context.propagate(() -> located(locator, request, pathVariables)), executor);
+        };
+    }
+
+    private static <T> @Nullable T located(LocatorHandler<? extends T> locator, HttpRequest<?> request, PathVariables pathVariables) {
+        try {
+            return locator.locate(request, pathVariables);
+        } catch (Exception e) {
+            // the router answers the cause with the error routes
+            throw new CompletionException(e);
+        }
     }
 
     /**
