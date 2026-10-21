@@ -43,6 +43,7 @@ import java.util.TreeMap;
  */
 @Internal
 final class PythonJavaInstanceMembersCollector {
+    private static final String COMPLETION_FAILURE = "com.sun.tools.javac.code.Symbol$CompletionFailure";
     // the types whose values GraalPy hands to Python as Python values, never as Java objects
     private static final Set<String> PYTHON_VALUE_TYPES = Set.of(String.class.getName(), Boolean.class.getName(),
         Character.class.getName(), Byte.class.getName(), Short.class.getName(), Integer.class.getName(),
@@ -100,15 +101,36 @@ final class PythonJavaInstanceMembersCollector {
     }
 
     /**
-     * Runs a step of the walk, leaving out what javac cannot complete in this round (a type of a missing
-     * dependency), as the type checker does ({@code TypeFacts}), rather than postponing the round.
+     * Runs a step of the walk, leaving out what javac cannot complete (a type of a missing dependency, such
+     * as an optional one of a referenced API), as the type checker does ({@code TypeFacts}), rather than
+     * postponing the round or failing the compilation.
      */
     private static void skipIncomplete(Runnable step) {
         try {
             step.run();
         } catch (PostponeToNextRoundException e) {
             // no names for an incomplete type
+        } catch (RuntimeException e) {
+            if (!isCompletionFailure(e)) {
+                throw e;
+            }
         }
+    }
+
+    /**
+     * Whether javac failed to complete a symbol because its class file is missing: its internal
+     * {@code Symbol.CompletionFailure} (see {@code ModelUtils#resolveKind}), matched by name since
+     * {@code jdk.compiler} does not export it.
+     */
+    private static boolean isCompletionFailure(Throwable failure) {
+        for (Throwable current = failure; current != null; current = current.getCause()) {
+            for (Class<?> type = current.getClass(); type != null; type = type.getSuperclass()) {
+                if (COMPLETION_FAILURE.equals(type.getName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void reference(ClassElement element, int depth) {
