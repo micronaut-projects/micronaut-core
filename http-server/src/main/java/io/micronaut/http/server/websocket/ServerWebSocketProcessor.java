@@ -32,12 +32,13 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.web.router.DefaultRouteBuilder;
 import io.micronaut.web.router.RouteAssembly;
-import io.micronaut.web.router.UriRoute;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
+import io.micronaut.web.router.websocket.WebSocketUpgradeCondition;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
+import io.micronaut.websocket.context.WebSocketMethods;
 import jakarta.inject.Singleton;
 
 import java.util.HashSet;
@@ -74,15 +75,11 @@ public class ServerWebSocketProcessor extends DefaultRouteBuilder implements Bea
         if (mappedWebSockets.contains(beanType)) {
             return;
         }
-        ExecutableMethod<?, ?> onOpen = null;
-        ExecutableMethod<?, ?> onMessage = null;
-        for (ExecutableMethod<?, ?> method : beanDefinition.getExecutableMethods()) {
-            if (onOpen == null && method.isAnnotationPresent(OnOpen.class)) {
-                onOpen = method;
-            } else if (onMessage == null && method.isAnnotationPresent(OnMessage.class)) {
-                onMessage = method;
-            }
-        }
+        // the methods the WebSocket bean registry calls: an @OnMessage method of the pongs is
+        // not the method of the messages, and does not give the route its annotations
+        WebSocketMethods<?> methods = WebSocketMethods.of(beanDefinition.getExecutableMethods());
+        ExecutableMethod<?, ?> onOpen = methods.onOpen();
+        ExecutableMethod<?, ?> onMessage = methods.onMessage();
         // the route targets the @OnOpen method, which the upgrade request opens the WebSocket
         // with, or else the @OnMessage method
         ExecutableMethod<?, ?> target = onOpen != null ? onOpen : onMessage;
@@ -90,7 +87,7 @@ public class ServerWebSocketProcessor extends DefaultRouteBuilder implements Bea
             return;
         }
         mappedWebSockets.add(beanType);
-        String uri = beanDefinition.stringValue(ServerWebSocket.class).orElse("/ws");
+        String uri = webSocketUri(beanDefinition.stringValue(ServerWebSocket.class).orElse("/ws"));
 
         ExecutableMethod<Object, Object> method = (ExecutableMethod<Object, Object>) target;
         if (onOpen != null && onMessage != null) {
@@ -111,17 +108,28 @@ public class ServerWebSocketProcessor extends DefaultRouteBuilder implements Bea
         // request to the same path is left to the other routes. The upgrade condition is a
         // declared condition of the route, which is tested before the @RouteCondition of the
         // methods, so that a plain request never evaluates the conditions of the WebSocket
-        UriRoute route = buildRoute(HttpMethod.GET, uri, handle);
+        // the routes of a DefaultRouteBuilder are assembled routes, and this processor cannot be
+        // subclassed outside its package to build them otherwise
+        RouteAssembly.DefaultUriRoute route = (RouteAssembly.DefaultUriRoute) buildRoute(HttpMethod.GET, uri, handle);
         WebSocketUpgradeCondition.registered();
-        if (route instanceof RouteAssembly.DefaultUriRoute defaultRoute) {
-            defaultRoute.settings().where(RouteCondition.custom(WebSocketUpgradeCondition.INSTANCE));
-        } else {
-            route = route.where(WebSocketUpgradeCondition.INSTANCE);
-        }
+        route.settings().where(RequestCondition.custom(WebSocketUpgradeCondition.INSTANCE));
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Created WebSocket: {}", route);
         }
+    }
+
+    /**
+     * The URI of the route of a WebSocket: the URI of the {@link ServerWebSocket} resolved by the
+     * {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy}, which puts it under the
+     * context path of the server like the URIs of the controllers.
+     *
+     * @param uri The URI of the {@link ServerWebSocket}
+     * @return The URI of the route
+     */
+    private String webSocketUri(String uri) {
+        // a leading slash, so that the naming strategy takes the URI as it is
+        return uriNamingStrategy.resolveUri(uri.isEmpty() || uri.charAt(0) != '/' ? '/' + uri : uri);
     }
 
     /**

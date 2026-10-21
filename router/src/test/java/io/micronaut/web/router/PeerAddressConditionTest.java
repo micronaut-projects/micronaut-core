@@ -22,8 +22,8 @@ import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.web.router.builder.Cidr;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
-import io.micronaut.web.router.builder.RouteCondition;
-import io.micronaut.web.router.builder.RouteConditions;
+import io.micronaut.web.router.builder.RequestCondition;
+import io.micronaut.web.router.builder.RequestConditions;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -31,14 +31,14 @@ import java.net.InetSocketAddress;
 import java.time.Clock;
 import java.util.List;
 
-import static io.micronaut.web.router.builder.RouteCondition.all;
-import static io.micronaut.web.router.builder.RouteCondition.any;
-import static io.micronaut.web.router.builder.RouteCondition.custom;
-import static io.micronaut.web.router.builder.RouteCondition.header;
-import static io.micronaut.web.router.builder.RouteCondition.method;
-import static io.micronaut.web.router.builder.RouteCondition.not;
-import static io.micronaut.web.router.builder.RouteCondition.peerAddress;
-import static io.micronaut.web.router.builder.RouteCondition.remoteAddress;
+import static io.micronaut.web.router.builder.RequestCondition.all;
+import static io.micronaut.web.router.builder.RequestCondition.any;
+import static io.micronaut.web.router.builder.RequestCondition.custom;
+import static io.micronaut.web.router.builder.RequestCondition.header;
+import static io.micronaut.web.router.builder.RequestCondition.method;
+import static io.micronaut.web.router.builder.RequestCondition.not;
+import static io.micronaut.web.router.builder.RequestCondition.peerAddress;
+import static io.micronaut.web.router.builder.RequestCondition.remoteAddress;
 import static io.micronaut.web.router.builder.ValueMatcher.regex;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,14 +49,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link RouteCondition#peerAddress(String...)}: the address of the peer of the connection only,
+ * {@link RequestCondition#peerAddress(String...)}: the address of the peer of the connection only,
  * never a resolved or forwarded address.
  */
 class PeerAddressConditionTest {
 
     @Test
     void thePeerOfTheConnectionMatches() {
-        RouteCondition internal = peerAddress("10.0.0.0/8", "fd00::/8");
+        RequestCondition internal = peerAddress("10.0.0.0/8", "fd00::/8");
         assertTrue(meets(internal, from("10.1.2.3")));
         assertFalse(meets(internal, from("11.0.0.1")));
         assertTrue(meets(internal, from("fd12::1")));
@@ -93,9 +93,9 @@ class PeerAddressConditionTest {
             }
         };
 
-        assertFalse(RouteConditions.matches(peerAddress("10.0.0.0/8"), spoofed, resolving), "the peer, not the forwarded address");
-        assertTrue(RouteConditions.matches(remoteAddress("10.0.0.0/8"), spoofed, resolving), "the resolved address, which the header gives");
-        assertTrue(RouteConditions.matches(peerAddress("203.0.113.0/24"), spoofed, resolving));
+        assertFalse(RequestConditions.matches(peerAddress("10.0.0.0/8"), spoofed, resolving), "the peer, not the forwarded address");
+        assertTrue(RequestConditions.matches(remoteAddress("10.0.0.0/8"), spoofed, resolving), "the resolved address, which the header gives");
+        assertTrue(RequestConditions.matches(peerAddress("203.0.113.0/24"), spoofed, resolving));
     }
 
     @Test
@@ -120,7 +120,7 @@ class PeerAddressConditionTest {
                 return Clock.systemUTC();
             }
         };
-        assertTrue(RouteConditions.matches(remoteAddress("fe80::/10"), request, scoped), "the zone id does not prevent a match");
+        assertTrue(RequestConditions.matches(remoteAddress("fe80::/10"), request, scoped), "the zone id does not prevent a match");
         assertNull(Cidr.address("fe80::1%"), "an empty zone id");
         assertNull(Cidr.address("fe80::zz%en0"), "not hexadecimal before the zone id");
     }
@@ -128,29 +128,29 @@ class PeerAddressConditionTest {
     @Test
     void equalityNormalizationAndCost() {
         assertEquals(peerAddress("10.0.0.0/8"), peerAddress("10.1.2.3/8"), "equal ranges");
-        assertEquals(new RouteCondition.PeerAddress(List.of(Cidr.parse("::1"))), peerAddress("::1"));
+        assertEquals(new RequestCondition.PeerAddress(List.of(Cidr.parse("::1"))), peerAddress("::1"));
         assertNotEquals(peerAddress("10.0.0.0/8"), remoteAddress("10.0.0.0/8"), "not the resolved address");
-        assertThrows(IllegalArgumentException.class, RouteCondition::peerAddress);
+        assertThrows(IllegalArgumentException.class, RequestCondition::peerAddress);
         assertThrows(IllegalArgumentException.class, () -> peerAddress("localhost"));
-        assertThrows(IllegalArgumentException.class, () -> new RouteCondition.PeerAddress(List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new RequestCondition.PeerAddress(List.of()));
 
-        RouteCondition peer = peerAddress("10.0.0.0/8");
-        assertEquals(peer, RouteConditions.normalize(not(not(peer))));
+        RequestCondition peer = peerAddress("10.0.0.0/8");
+        assertEquals(peer, RequestConditions.normalize(not(not(peer))));
         assertEquals(peer, peer.negate().negate());
-        assertEquals(peer, RouteConditions.normalize(all(peer, peerAddress("10.0.0.0/8"))), "a duplicate is removed");
-        assertEquals(any(header("X-A"), peer), RouteConditions.normalize(any(peer, header("X-A"), peer)));
+        assertEquals(peer, RequestConditions.normalize(all(peer, peerAddress("10.0.0.0/8"))), "a duplicate is removed");
+        assertEquals(any(header("X-A"), peer), RequestConditions.normalize(any(peer, header("X-A"), peer)));
 
-        RouteCondition lambda = custom(request -> true);
-        RouteCondition regexHeader = header("X-R", regex("\\d+"));
-        RouteCondition remote = remoteAddress("192.168.0.0/16");
+        RequestCondition lambda = custom(request -> true);
+        RequestCondition regexHeader = header("X-R", regex("\\d+"));
+        RequestCondition remote = remoteAddress("192.168.0.0/16");
         assertEquals(List.of(method(HttpMethod.GET), peer, regexHeader, remote, lambda),
-            RouteConditions.conjuncts(RouteConditions.normalize(all(lambda, peer, regexHeader, remote, method(HttpMethod.GET)))),
+            RequestConditions.conjuncts(RequestConditions.normalize(all(lambda, peer, regexHeader, remote, method(HttpMethod.GET)))),
             "the tier of the regular expressions and the client address, stably, before the lambdas");
     }
 
     @Test
     void aPeerAddressSelectsAHandlerRoute() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder routes = new DefaultHttpRouteBuilder(assembly);
         routes.GET("/admin")
             .where(peerAddress("127.0.0.0/8", "::1"))
@@ -185,7 +185,7 @@ class PeerAddressConditionTest {
         }
     }
 
-    private static boolean meets(io.micronaut.web.router.builder.RouteCondition condition, io.micronaut.http.HttpRequest<?> request) {
-        return io.micronaut.web.router.builder.RouteConditions.matches(condition, request, RouteConditionContext.fallback());
+    private static boolean meets(io.micronaut.web.router.builder.RequestCondition condition, io.micronaut.http.HttpRequest<?> request) {
+        return io.micronaut.web.router.builder.RequestConditions.matches(condition, request, RouteConditionContext.fallback());
     }
 }
