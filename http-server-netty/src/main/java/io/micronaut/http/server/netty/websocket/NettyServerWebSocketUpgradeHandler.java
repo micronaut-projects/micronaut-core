@@ -29,7 +29,6 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.context.ServerHttpRequestContext;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
@@ -557,6 +556,16 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
     /**
      * @param routeMatch A route match
+     * @return Whether it is the route of a WebSocket, of the route builder or of a
+     * {@code @ServerWebSocket} bean
+     */
+    private static boolean isWebSocketRoute(RouteMatch<?> routeMatch) {
+        return isFunctionalWebSocketRoute(routeMatch)
+            || routeMatch.isAnnotationPresent(OnMessage.class) || routeMatch.isAnnotationPresent(OnOpen.class);
+    }
+
+    /**
+     * @param routeMatch A route match
      * @return Whether it is a WebSocket route of the route builder, rather than of a
      * {@code @ServerWebSocket} bean
      */
@@ -613,6 +622,12 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         private NettyHttpRequest<?> nettyRequest;
         @Nullable
         private MutableHttpResponse<?> proceed;
+        /**
+         * The WebSocket route of the request, or {@code null} when no WebSocket route takes it and
+         * it is routed like any other request.
+         */
+        @Nullable
+        private UriRouteMatch<Object, Object> webSocketMatch;
 
         WebsocketRequestLifecycle(RouteExecutor routeExecutor, Router router) {
             super(routeExecutor);
@@ -642,21 +657,30 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             // the conditions of the route, e.g. a @RouteCondition, which reads the request of the
             // context, apply to the upgrade request. Router.find(HttpMethod, path, request) only
             // matches the method and the path, so the conditions are tested here, once
-            return PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request))
+            UriRouteMatch<Object, Object> webSocket = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request))
                 .propagate(() -> findWebSocketRoute(router, request).orElse(null));
+            webSocketMatch = webSocket;
+            if (webSocket != null) {
+                return webSocket;
+            }
+            // no WebSocket takes the request: it is routed like any other request, e.g. to a
+            // route that relays the upgrade to an upstream server, which switches the protocols
+            // with an UpgradedHttpResponse, or answers it like a plain request
+            UriRouteMatch<Object, Object> match = super.matchRoute(request);
+            if (match != null && isWebSocketRoute(match)) {
+                // a WebSocket whose conditions the request does not meet
+                return null;
+            }
+            return match;
         }
 
         @Override
         protected ExecutionFlow<HttpResponse<?>> provideRouteResponse(HttpRequest<?> request,
                                                                       @Nullable UriRouteMatch<Object, Object> routeMatch,
                                                                       PropagatedContext propagatedContext) {
-            if (routeMatch == null) {
-                // a route selector that rejected the upgrade answers 406 or 415, as for other requests
-                ExecutionFlow<HttpResponse<?>> rejection = rejectionResponse(request, propagatedContext);
-                if (rejection != null) {
-                    return rejection;
-                }
-                return ExecutionFlow.error(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
+            if (routeMatch == null || routeMatch != webSocketMatch) {
+                // not a WebSocket: the response of the route, or of no route, as for any other request
+                return super.provideRouteResponse(request, routeMatch, propagatedContext);
             }
             this.propagatedContext = propagatedContext;
             MutableHttpResponse<?> response = HttpResponse.ok();
