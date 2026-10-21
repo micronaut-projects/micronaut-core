@@ -3955,6 +3955,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             || element.getAllSuperTypes().stream().anyMatch(PythonStubGenerator::isPythonDataclass);
     }
 
+    /**
+     * The Python class of a generated type as the Java imports manifest records it: its package
+     * ({@code python} for a top-level class) and its name, nested classes separated by dots.
+     */
+    static List<String> pythonClassPath(ClassElement element) {
+        PythonClassReferenceDef classReference = pythonClassReferenceDef(element);
+        return List.of(java.util.Objects.toString(classReference.packageName(), "python"), classReference.displayName());
+    }
+
     private static PythonClassReferenceDef pythonClassReferenceDef(ClassElement element) {
         String pythonSimpleName = pythonSimpleName(element);
         int nestedSeparator = pythonSimpleName.indexOf('.');

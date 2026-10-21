@@ -74,18 +74,6 @@ final class GraalPyContextFactoryTest {
     }
 
     @Test
-    void registersEachDataclassOnceWhenProvidersOverlap() {
-        var first = new PythonDataclassProvider.Entry(String.class,
-            new PythonContextRuntime.PythonClassReference("python", "Book", new String[0], "Book", "first"));
-        var duplicate = new PythonDataclassProvider.Entry(String.class,
-            new PythonContextRuntime.PythonClassReference("python", "Book", new String[0], "Book", "second"));
-        PythonDataclassProvider firstProvider = () -> List.of(first);
-        PythonDataclassProvider secondProvider = () -> List.of(duplicate);
-
-        assertEquals(List.of(first), GraalPyContextFactory.dataclasses(List.of(firstProvider, secondProvider)));
-    }
-
-    @Test
     void loadsMainFromTheConfiguredVfsMountPoint() throws IOException {
         ClassLoader classLoader = getClass().getClassLoader();
         System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");

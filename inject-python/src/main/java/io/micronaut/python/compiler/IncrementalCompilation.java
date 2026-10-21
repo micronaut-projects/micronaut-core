@@ -69,7 +69,6 @@ final class IncrementalCompilation {
     // the name prefix of the provider of functional interfaces Python processing generates (see
     // io.micronaut.python.processing.PythonFunctionalInterfaceProviderGenerator)
     private static final String FUNCTIONAL_INTERFACE_PROVIDER_PREFIX = "$PythonFunctionalInterfaces$";
-    private static final String DATACLASS_PROVIDER_PREFIX = "PythonDataclasses$";
     private static final String PYTHON_INIT_MODULE_SUFFIX = ".__init__";
     private static final Pattern JAVA_PACKAGE = Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
     private static final Pattern JAVA_TYPE = Pattern.compile("\\b(?:class|interface|record|enum|@interface)\\s+([A-Za-z_$][\\w$]*)");
@@ -290,7 +289,7 @@ final class IncrementalCompilation {
             Set<String> pythonAggregatingOutputs = new LinkedHashSet<>(
                 compilationTrace.pythonProcessorOutputs()
             );
-            pythonAggregatingOutputs.addAll(pythonProviderOutputs(
+            pythonAggregatingOutputs.addAll(functionalInterfaceProviderOutputs(
                 compilationTrace.pythonProcessorOutputs(),
                 outputFiles
             ));
@@ -983,35 +982,31 @@ final class IncrementalCompilation {
         String generatedApplicationPath = packageName.replace('.', '/') + "/PyronautMain";
         return output.startsWith(VFS_ROOT + '/')
             || output.startsWith(generatedApplicationPath)
-            || isPythonProviderOutput(output)
+            || isFunctionalInterfaceProviderOutput(output)
             || output.startsWith("META-INF/pyronaut/")
             || output.startsWith("META-INF/swagger/views/")
             || output.startsWith("META-INF/services/")
             || output.startsWith("META-INF/native-image/");
     }
 
-    private static boolean isPythonProviderOutput(String output) {
+    private static boolean isFunctionalInterfaceProviderOutput(String output) {
         String fileName = output.substring(output.lastIndexOf('/') + 1);
         return fileName.startsWith(FUNCTIONAL_INTERFACE_PROVIDER_PREFIX)
-            || fileName.contains('.' + FUNCTIONAL_INTERFACE_PROVIDER_PREFIX)
-            || fileName.startsWith(DATACLASS_PROVIDER_PREFIX)
-            || fileName.startsWith('$' + DATACLASS_PROVIDER_PREFIX)
-            || fileName.contains('.' + DATACLASS_PROVIDER_PREFIX)
-            || fileName.contains(".$" + DATACLASS_PROVIDER_PREFIX);
+            || fileName.contains('.' + FUNCTIONAL_INTERFACE_PROVIDER_PREFIX);
     }
 
     /**
-     * The outputs derived from the metadata providers Python processing declared: the
+     * The outputs derived from the functional interface providers Python processing declared: the
      * classes javac compiles from them, and the bean definitions and bean references their
      * {@code @Singleton} produces. The provider has no origin among the sources (it is named by the
      * hash of all of their entries), so these are Python aggregating outputs: replaced, and the
      * ones of a provider no longer generated deleted, whenever Python processing writes the
      * shared outputs again.
      */
-    private static Set<String> pythonProviderOutputs(Set<String> declaredPythonOutputs,
-                                                     Set<String> outputFiles) {
+    private static Set<String> functionalInterfaceProviderOutputs(Set<String> declaredPythonOutputs,
+                                                                  Set<String> outputFiles) {
         Set<String> providerPaths = declaredPythonOutputs.stream()
-            .filter(output -> output.endsWith(JAVA_EXTENSION) && isPythonProviderOutput(output))
+            .filter(output -> output.endsWith(JAVA_EXTENSION) && isFunctionalInterfaceProviderOutput(output))
             .map(output -> output.substring(0, output.length() - JAVA_EXTENSION.length()))
             .collect(java.util.stream.Collectors.toSet());
         if (providerPaths.isEmpty()) {
@@ -1019,19 +1014,13 @@ final class IncrementalCompilation {
         }
         return outputFiles.stream()
             .filter(output -> providerPaths.stream().anyMatch(providerPath -> {
-                int nameStart = providerPath.lastIndexOf('/') + 1;
-                String beanPath = providerPath.charAt(nameStart) == '$' ? providerPath
-                    : providerPath.substring(0, nameStart) + '$' + providerPath.substring(nameStart);
                 if (output.endsWith(CLASS_EXTENSION)) {
-                    return output.equals(providerPath + CLASS_EXTENSION)
-                        || output.startsWith(providerPath + '$') || output.startsWith(beanPath + '$');
+                    return output.equals(providerPath + CLASS_EXTENSION) || output.startsWith(providerPath + '$');
                 }
                 String providerName = providerPath.replace('/', '.');
-                String beanName = beanPath.replace('/', '.');
                 String fileName = output.substring(output.lastIndexOf('/') + 1);
                 return output.startsWith("META-INF/micronaut/")
-                    && (fileName.equals(providerName) || fileName.startsWith(providerName + '$')
-                        || fileName.startsWith(beanName + '$'));
+                    && (fileName.equals(providerName) || fileName.startsWith(providerName + '$'));
             }))
             .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }

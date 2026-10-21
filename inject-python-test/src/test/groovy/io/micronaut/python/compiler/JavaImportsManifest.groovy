@@ -31,13 +31,16 @@ class JavaImportsManifest {
     final Map<String, Map<String, List<String>>> members
     /** By binary name of a Java type, its instance member names: Python name to {@code [method, kind]}, empty when blocked. */
     final Map<String, Map<String, List<String>>> instanceMembers
+    /** By binary name of the Java wrapper of a Python dataclass, the {@code [package, dotted name]} of its class. */
+    final Map<String, List<String>> dataclasses
 
     private JavaImportsManifest(Map<String, String> packages, Map<String, String> types, Map<String, Map<String, List<String>>> members,
-                                Map<String, Map<String, List<String>>> instanceMembers) {
+                                Map<String, Map<String, List<String>>> instanceMembers, Map<String, List<String>> dataclasses) {
         this.packages = packages
         this.types = types
         this.members = members
         this.instanceMembers = instanceMembers
+        this.dataclasses = dataclasses
     }
 
     /** The manifest files a compilation wrote to the given target directory. */
@@ -72,6 +75,7 @@ class JavaImportsManifest {
         Map<String, String> types = [:]
         Map<String, Map<String, List<String>>> members = [:]
         Map<String, Map<String, List<String>>> instanceMembers = [:]
+        Map<String, List<String>> dataclasses = [:]
         manifests.each { manifest ->
             packages.putAll(manifest.packages as Map)
             types.putAll(manifest.types as Map)
@@ -81,19 +85,21 @@ class JavaImportsManifest {
             (manifest.instance_members as Map ?: [:]).each { type, entries ->
                 instanceMembers.computeIfAbsent(type as String) { [:] }.putAll(entries as Map)
             }
+            dataclasses.putAll(manifest.dataclasses as Map ?: [:])
         }
-        new JavaImportsManifest(packages, types, members, instanceMembers)
+        new JavaImportsManifest(packages, types, members, instanceMembers, dataclasses)
     }
 
     /**
      * Parses the manifest module: three dict literals ({@code PACKAGES}, {@code TYPES}, {@code MEMBERS}) and the
-     * optional {@code INSTANCE_MEMBERS} in JSON syntax, read without a JSON library on the test class path.
+     * optional {@code INSTANCE_MEMBERS} and {@code DATACLASSES} in JSON syntax, read without a JSON library on the
+     * test class path.
      */
     static Map parseManifest(String text) {
         Map manifest = [:]
-        ['PACKAGES', 'TYPES', 'MEMBERS', 'INSTANCE_MEMBERS'].each { name ->
+        ['PACKAGES', 'TYPES', 'MEMBERS', 'INSTANCE_MEMBERS', 'DATACLASSES'].each { name ->
             int start = text.indexOf("\n${name} = ")
-            if (start < 0 && name == 'INSTANCE_MEMBERS') {
+            if (start < 0 && name in ['INSTANCE_MEMBERS', 'DATACLASSES']) {
                 return
             }
             assert start >= 0 : "no ${name} in the manifest"

@@ -17,7 +17,6 @@ package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
@@ -36,7 +35,6 @@ import org.graalvm.polyglot.PolyglotAccess;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
-import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.jspecify.annotations.Nullable;
@@ -47,8 +45,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -200,7 +196,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * without changing what {@code asPolyglotValue()} hands to Python code that calls it itself.
      */
     private static final Source JAVA_WRAPPER_VIEW_SOURCE = Source.newBuilder(PYTHON, """
-        def __micronaut_register_java_wrapper_view(wrapper_class, dataclass_classes, dataclass_resolvers):
+        def __micronaut_register_java_wrapper_view(wrapper_class):
             import polyglot
 
             def unwrap(value):
@@ -254,20 +250,6 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 polyglot.register_interop_type(wrapper_class, JavaWrapperView)
             except KeyError:
                 pass  # already registered in this context
-
-            def dataclass_member(resolve_class, name):
-                class Member:
-                    def __get__(self, instance, owner):
-                        return getattr(resolve_class(), name)
-                return Member()
-
-            for java_class, resolve_class in zip(dataclass_classes, dataclass_resolvers):
-                # dataclasses checks type(value); class and instance metadata must belong to this context.
-                view = type('DataclassView', (), {
-                    name: dataclass_member(resolve_class, name)
-                    for name in ('__dataclass_fields__', '__dataclass_params__')
-                })
-                polyglot.register_interop_type(java_class, view, allow_method_overwrites=True)
         """, "micronaut-java-wrapper-view.py").cached(true).buildLiteral();
 
     private final ApplicationContext applicationContext;
@@ -319,8 +301,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             var classLoader = applicationContext.getClassLoader();
             LOG.debug("Building Primary GraalPy context");
             long now = System.currentTimeMillis();
-            var context = buildContext(hostAccess, engine, classLoader, contextConfiguration,
-                APPLICATION_MAIN, dataclasses(applicationContext));
+            var context = buildContext(hostAccess, engine, classLoader, contextConfiguration);
 
             // Make context available to bridge classes
             runtime.set(PythonContextRuntime.setContext(context, classLoader));
@@ -411,30 +392,6 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         return new GraalPyHostAccessFactory().hostAccess(mappings, classLoader);
     }
 
-    private static List<PythonDataclassProvider.Entry> dataclasses(ClassLoader classLoader) {
-        return dataclasses(SoftServiceLoader.load(PythonDataclassProvider.class, classLoader).collectAll());
-    }
-
-    static List<PythonDataclassProvider.Entry> dataclasses(BeanContext beanContext) {
-        return dataclasses(beanContext.getBeansOfType(PythonDataclassProvider.class));
-    }
-
-    static List<PythonDataclassProvider.Entry> dataclasses(Collection<PythonDataclassProvider> providers) {
-        Map<Class<?>, PythonDataclassProvider.Entry> dataclasses = new LinkedHashMap<>();
-        for (PythonDataclassProvider provider : providers) {
-            for (PythonDataclassProvider.Entry entry : provider.entries()) {
-                dataclasses.putIfAbsent(entry.type(), entry);
-            }
-        }
-        return List.copyOf(dataclasses.values());
-    }
-
-    private static ProxyExecutable[] dataclassResolvers(Context context, List<PythonDataclassProvider.Entry> dataclasses) {
-        return dataclasses.stream()
-            .map(entry -> (ProxyExecutable) arguments -> PythonContextRuntime.findClass(entry.pythonClass(), context))
-            .toArray(ProxyExecutable[]::new);
-    }
-
     static Context buildContext(HostAccess hostAccess, Engine engine, ClassLoader classLoader) throws IOException {
         return buildContext(hostAccess, engine, classLoader, new GraalPyContextConfiguration());
     }
@@ -451,16 +408,6 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                                 ClassLoader classLoader,
                                 GraalPyContextConfiguration contextConfiguration,
                                 String applicationMain) throws IOException {
-        return buildContext(hostAccess, engine, classLoader, contextConfiguration,
-            applicationMain, dataclasses(classLoader));
-    }
-
-    static Context buildContext(HostAccess hostAccess,
-                                Engine engine,
-                                ClassLoader classLoader,
-                                GraalPyContextConfiguration contextConfiguration,
-                                String applicationMain,
-                                List<PythonDataclassProvider.Entry> dataclasses) throws IOException {
         System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
         System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
         long now = System.currentTimeMillis();
@@ -512,9 +459,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         boolean bootstrapped = false;
         try {
             PythonContextRuntime.helper(context, "__micronaut_register_java_wrapper_view", JAVA_WRAPPER_VIEW_SOURCE)
-                .executeVoid(ValueCoercible.class,
-                    dataclasses.stream().map(PythonDataclassProvider.Entry::type).toArray(Class<?>[]::new),
-                    dataclassResolvers(context, dataclasses));
+                .executeVoid(ValueCoercible.class);
             // The per-context builtin is only needed by context-reuse tests. Avoid
             // evaluating another Python snippet during normal application startup.
             if (Boolean.getBoolean(CONTEXT_ID_PROPERTY)) {
