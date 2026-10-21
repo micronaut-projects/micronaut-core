@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.model;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -41,6 +42,7 @@ import java.util.Objects;
  * @param values The enum values if this is an enum.
  * @param documentation The class documentation string.
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.ClassDef">Python AST ClassDef</a>
+ * @param span The location of the definition in its Python source, or {@code null} for a generated definition
  */
 @Experimental
 public record ClassDef(
@@ -57,7 +59,8 @@ public record ClassDef(
     boolean frozenDataclass,
     boolean isEnum,
     List<String> values,
-    String documentation
+    String documentation,
+    @Nullable SourceSpan span
 ) implements ElementDef {
 
     public ClassDef {
@@ -109,6 +112,14 @@ public record ClassDef(
         }
     }
 
+    /**
+     * Creates a definition without a source position.
+     */
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public ClassDef(String name, String packageName, List<TypeRef> bases, List<DecoratorDef> decorators, List<TypeVar> typeParams, List<FunctionDef> functions, List<AttributeDef> attributes, List<PropertyDef> properties, List<ClassDef> nestedClasses, FunctionDef constructor, boolean frozenDataclass, boolean isEnum, List<String> values, String documentation) {
+        this(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, frozenDataclass, isEnum, values, documentation, null);
+    }
+
     public ClassDef(String name,
                     String packageName,
                     List<TypeRef> bases,
@@ -121,7 +132,7 @@ public record ClassDef(
                     boolean isEnum,
                     List<String> values,
                     String documentation) {
-        this(name, packageName, bases, decorators, typeParams, functions, attributes, properties, List.of(), constructor, false, isEnum, values, documentation);
+        this(name, packageName, bases, decorators, typeParams, functions, attributes, properties, List.of(), constructor, false, isEnum, values, documentation, null);
     }
 
     @SuppressWarnings("checkstyle:ParameterNumber")
@@ -138,7 +149,7 @@ public record ClassDef(
                     boolean isEnum,
                     List<String> values,
                     String documentation) {
-        this(name, packageName, bases, decorators, typeParams, functions, attributes, properties, List.of(), constructor, frozenDataclass, isEnum, values, documentation);
+        this(name, packageName, bases, decorators, typeParams, functions, attributes, properties, List.of(), constructor, frozenDataclass, isEnum, values, documentation, null);
     }
 
     public ClassDef(String name) {
@@ -157,7 +168,7 @@ public record ClassDef(
             decorators, typeParams,
             functions,
             attributes,
-            properties, nestedClasses, constructor.withClassDef(this), frozenDataclass, isEnum, values, documentation);
+            properties, nestedClasses, constructor.withClassDef(this), frozenDataclass, isEnum, values, documentation, span);
     }
 
     public ClassDef withFunction(FunctionDef function) {
@@ -179,7 +190,8 @@ public record ClassDef(
             frozenDataclass,
             isEnum,
             values,
-            documentation
+            documentation,
+            span
         );
     }
 
@@ -189,7 +201,7 @@ public record ClassDef(
         AttributeDef attributeWithDeclaringClass = attribute.withDeclaringClass(this);
         List<AttributeDef> attributes = new ArrayList<>(this.attributes);
         attributes.add(attributeWithDeclaringClass);
-        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, frozenDataclass, isEnum, values, documentation);
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, frozenDataclass, isEnum, values, documentation, span);
     }
 
     public ClassDef withProperty(PropertyDef property) {
@@ -198,22 +210,22 @@ public record ClassDef(
         PropertyDef propertyWithDeclaringClass = property.withDeclaringClass(this);
         List<PropertyDef> properties = new ArrayList<>(this.properties);
         properties.add(propertyWithDeclaringClass);
-        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, frozenDataclass, isEnum, values, documentation);
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, frozenDataclass, isEnum, values, documentation, span);
     }
 
     public ClassDef withNestedClass(ClassDef nestedClass) {
         Objects.requireNonNull(nestedClass, "Nested class cannot be null");
         List<ClassDef> nestedClasses = new ArrayList<>(this.nestedClasses);
         nestedClasses.add(nestedClass);
-        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, frozenDataclass, isEnum, values, documentation);
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, frozenDataclass, isEnum, values, documentation, span);
     }
 
     public ClassDef withEnum(boolean isEnum, List<String> values) {
-        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, frozenDataclass, isEnum, values, documentation);
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, frozenDataclass, isEnum, values, documentation, span);
     }
 
     public ClassDef withFrozenDataclass(boolean frozenDataclass) {
-        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, frozenDataclass, isEnum, values, documentation);
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, frozenDataclass, isEnum, values, documentation, span);
     }
 
     public String qualifiedName() {
@@ -232,5 +244,14 @@ public record ClassDef(
     @Override
     public int hashCode() {
         return Objects.hash(name, packageName);
+    }
+
+    /**
+     * @param span The location of the definition in its Python source
+     * @return A copy of this definition located at the given span
+     * @since 5.3.0
+     */
+    public ClassDef withSpan(@Nullable SourceSpan span) {
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, frozenDataclass, isEnum, values, documentation, span);
     }
 }

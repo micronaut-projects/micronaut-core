@@ -70,7 +70,7 @@ public class DefaultRouteDataCollector implements RouteDataCollector<Map<String,
             .collect(Collectors.joining(" || "));
 
         return "{[" +
-            route.getUriMatchTemplate() +
+            route.getRouteTemplate().expression() +
             "],method=[" +
             route.getHttpMethodName() +
             "],produces=[" +
