@@ -48,6 +48,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -101,8 +102,10 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         }
         // the body is released however the exchange ends, also when the JDK client never reads
         // it, e.g. because the connection was refused or the request is a GET
+        Runnable release = releaseOnce(body);
         return Mono.defer(() -> Mono.from(ReactiveExecutionFlow.toPublisher(pipelineClient().rawExchangeFlow(rawRequest, blockedThread))))
-            .doFinally(signal -> body.close());
+            .doOnTerminate(release)
+            .doOnCancel(release);
     }
 
     @Override
@@ -211,7 +214,8 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         if (requestBody != null) {
             // released unless they were sent, e.g. when the connection is refused, also when the
             // exchange is cancelled
-            response = response.doFinally(signal -> requestBody.close());
+            Runnable release = releaseOnce(requestBody);
+            response = response.doOnTerminate(release).doOnCancel(release);
         }
         return response;
     }
@@ -266,6 +270,23 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
             flow = RawHttpClientSupport.withResponseTimeout(flow, options.getResponseTimeout(), uploads.started(), uploads.uploaded());
         }
         return flow.map(RawHttpClientSupport::toMutableResponse);
+    }
+
+    /**
+     * Releases the request body of an exchange at most once. It runs from {@code doOnTerminate}
+     * and {@code doOnCancel}, not {@code doFinally}, which Reactor runs after the terminal signal
+     * has reached the subscriber: the body is released before the subscriber sees the exchange end.
+     *
+     * @param body The request body
+     * @return The release action
+     */
+    private static Runnable releaseOnce(CloseableByteBody body) {
+        AtomicBoolean released = new AtomicBoolean();
+        return () -> {
+            if (released.compareAndSet(false, true)) {
+                body.close();
+            }
+        };
     }
 
     private static Set<String> allowedRestrictedHeaders() {

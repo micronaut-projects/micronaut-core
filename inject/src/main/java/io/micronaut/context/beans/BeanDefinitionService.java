@@ -96,6 +96,16 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
     Iterable<BeanDefinition<Object>> getTargetProxyBeans(BeanContext beanContext);
 
     /**
+     * Returns the enabled bean definitions that replace another, those declaring
+     * {@link io.micronaut.context.annotation.Replaces}.
+     *
+     * @param beanContext the bean context to eliminate disabled beans
+     * @return an iterable of the bean definitions that replace another
+     * @since 5.3
+     */
+    Iterable<BeanDefinition<Object>> getReplacingBeans(BeanContext beanContext);
+
+    /**
      * Returns a disabled beans.
      *
      * @param beanContext the bean context to eliminate disabled beans
