@@ -17,8 +17,8 @@ package io.micronaut.web.router;
 
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.web.router.builder.RouteCondition;
-import io.micronaut.web.router.builder.RouteConditions;
+import io.micronaut.web.router.builder.RequestCondition;
+import io.micronaut.web.router.builder.RequestConditions;
 import io.micronaut.web.router.builder.ValueMatcher;
 import org.junit.jupiter.api.Test;
 
@@ -27,17 +27,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 
-import static io.micronaut.web.router.builder.RouteCondition.after;
-import static io.micronaut.web.router.builder.RouteCondition.all;
-import static io.micronaut.web.router.builder.RouteCondition.any;
-import static io.micronaut.web.router.builder.RouteCondition.cookie;
-import static io.micronaut.web.router.builder.RouteCondition.custom;
-import static io.micronaut.web.router.builder.RouteCondition.header;
-import static io.micronaut.web.router.builder.RouteCondition.host;
-import static io.micronaut.web.router.builder.RouteCondition.method;
-import static io.micronaut.web.router.builder.RouteCondition.not;
-import static io.micronaut.web.router.builder.RouteCondition.query;
-import static io.micronaut.web.router.builder.RouteCondition.remoteAddress;
+import static io.micronaut.web.router.builder.RequestCondition.after;
+import static io.micronaut.web.router.builder.RequestCondition.all;
+import static io.micronaut.web.router.builder.RequestCondition.any;
+import static io.micronaut.web.router.builder.RequestCondition.cookie;
+import static io.micronaut.web.router.builder.RequestCondition.custom;
+import static io.micronaut.web.router.builder.RequestCondition.header;
+import static io.micronaut.web.router.builder.RequestCondition.host;
+import static io.micronaut.web.router.builder.RequestCondition.method;
+import static io.micronaut.web.router.builder.RequestCondition.not;
+import static io.micronaut.web.router.builder.RequestCondition.query;
+import static io.micronaut.web.router.builder.RequestCondition.remoteAddress;
 import static io.micronaut.web.router.builder.ValueMatcher.contains;
 import static io.micronaut.web.router.builder.ValueMatcher.endsWith;
 import static io.micronaut.web.router.builder.ValueMatcher.equalTo;
@@ -56,76 +56,76 @@ class RouteConditionNormalizationTest {
 
     @Test
     void nestedCombinationsAreFlattened() {
-        RouteCondition a = header("X-A");
-        RouteCondition b = header("X-B");
-        RouteCondition c = header("X-C");
+        RequestCondition a = header("X-A");
+        RequestCondition b = header("X-B");
+        RequestCondition c = header("X-C");
 
-        assertEquals(all(a, b, c), RouteConditions.normalize(all(a, all(b, all(c)))));
-        assertEquals(any(a, b, c), RouteConditions.normalize(any(any(a, b), c)));
-        assertEquals(all(a, any(b, c)), RouteConditions.normalize(all(a, any(b, c))), "an AnyOf in an AllOf stays");
-        assertEquals(a, RouteConditions.normalize(all(all(a))), "a single part is the part");
+        assertEquals(all(a, b, c), RequestConditions.normalize(all(a, all(b, all(c)))));
+        assertEquals(any(a, b, c), RequestConditions.normalize(any(any(a, b), c)));
+        assertEquals(all(a, any(b, c)), RequestConditions.normalize(all(a, any(b, c))), "an AnyOf in an AllOf stays");
+        assertEquals(a, RequestConditions.normalize(all(all(a))), "a single part is the part");
     }
 
     @Test
     void doubleNegationsAndDuplicatesAreRemoved() {
-        RouteCondition a = header("X-A");
-        RouteCondition b = header("X-B");
+        RequestCondition a = header("X-A");
+        RequestCondition b = header("X-B");
 
-        assertEquals(a, RouteConditions.normalize(new RouteCondition.Not(new RouteCondition.Not(a))));
-        assertEquals(a, RouteConditions.normalize(not(not(a))));
-        assertEquals(all(a, b), RouteConditions.normalize(all(a, b, a, all(b))));
-        assertEquals(any(a, b), RouteConditions.normalize(any(a, b, a)));
-        assertEquals(new RouteCondition.Header("X-A", equalTo("1")),
-            RouteConditions.normalize(new RouteCondition.Header("X-A", ValueMatcher.not(ValueMatcher.not(equalTo("1"))))), "in a matcher too");
-        assertEquals(new RouteCondition.Header("X-A", ValueMatcher.allOf(equalTo("1"), startsWith("1"))),
-            RouteConditions.normalize(new RouteCondition.Header("X-A", ValueMatcher.allOf(startsWith("1"), ValueMatcher.allOf(equalTo("1"), startsWith("1"))))),
+        assertEquals(a, RequestConditions.normalize(new RequestCondition.Not(new RequestCondition.Not(a))));
+        assertEquals(a, RequestConditions.normalize(not(not(a))));
+        assertEquals(all(a, b), RequestConditions.normalize(all(a, b, a, all(b))));
+        assertEquals(any(a, b), RequestConditions.normalize(any(a, b, a)));
+        assertEquals(new RequestCondition.Header("X-A", equalTo("1")),
+            RequestConditions.normalize(new RequestCondition.Header("X-A", ValueMatcher.not(ValueMatcher.not(equalTo("1"))))), "in a matcher too");
+        assertEquals(new RequestCondition.Header("X-A", ValueMatcher.allOf(equalTo("1"), startsWith("1"))),
+            RequestConditions.normalize(new RequestCondition.Header("X-A", ValueMatcher.allOf(startsWith("1"), ValueMatcher.allOf(equalTo("1"), startsWith("1"))))),
             "a matcher is flattened, deduplicated and ordered too");
     }
 
     @Test
     void combinationsThatAreAlwaysOrNeverMetAreFolded() {
-        RouteCondition a = header("X-A");
+        RequestCondition a = header("X-A");
 
-        assertEquals(RouteConditions.ALWAYS, RouteConditions.normalize(all()));
-        assertEquals(RouteConditions.NEVER, RouteConditions.normalize(any()));
-        assertEquals(RouteConditions.NEVER, RouteConditions.normalize(all(a, any())), "a part never met");
-        assertEquals(RouteConditions.ALWAYS, RouteConditions.normalize(any(a, all())), "a part always met");
-        assertEquals(a, RouteConditions.normalize(all(a, all())));
-        assertEquals(RouteConditions.NEVER, RouteConditions.normalize(not(all())));
-        assertEquals(RouteConditions.ALWAYS, RouteConditions.normalize(not(any())));
-        assertEquals(RouteConditions.ALWAYS, RouteConditions.normalizeAll(List.of()));
+        assertEquals(RequestConditions.ALWAYS, RequestConditions.normalize(all()));
+        assertEquals(RequestConditions.NEVER, RequestConditions.normalize(any()));
+        assertEquals(RequestConditions.NEVER, RequestConditions.normalize(all(a, any())), "a part never met");
+        assertEquals(RequestConditions.ALWAYS, RequestConditions.normalize(any(a, all())), "a part always met");
+        assertEquals(a, RequestConditions.normalize(all(a, all())));
+        assertEquals(RequestConditions.NEVER, RequestConditions.normalize(not(all())));
+        assertEquals(RequestConditions.ALWAYS, RequestConditions.normalize(not(any())));
+        assertEquals(RequestConditions.ALWAYS, RequestConditions.normalizeAll(List.of()));
     }
 
     @Test
     void thePartsAreOrderedCheapestFirstStably() {
         Predicate<HttpRequest<?>> first = request -> true;
         Predicate<HttpRequest<?>> second = request -> true;
-        RouteCondition regexHeader = header("X-R", regex("\\d+"));
-        RouteCondition affix = header("X-S", startsWith("a"));
-        RouteCondition lookup = query("q", oneOf("a", "b"));
-        RouteCondition presence = cookie("c");
-        RouteCondition methods = method(HttpMethod.GET);
-        RouteCondition hostCondition = host(endsWith(".example.com"));
-        RouteCondition address = remoteAddress("10.0.0.0/8");
-        RouteCondition time = after(Instant.EPOCH);
+        RequestCondition regexHeader = header("X-R", regex("\\d+"));
+        RequestCondition affix = header("X-S", startsWith("a"));
+        RequestCondition lookup = query("q", oneOf("a", "b"));
+        RequestCondition presence = cookie("c");
+        RequestCondition methods = method(HttpMethod.GET);
+        RequestCondition hostCondition = host(endsWith(".example.com"));
+        RequestCondition address = remoteAddress("10.0.0.0/8");
+        RequestCondition time = after(Instant.EPOCH);
 
-        RouteCondition normalized = RouteConditions.normalize(all(custom(first), regexHeader, hostCondition, affix,
+        RequestCondition normalized = RequestConditions.normalize(all(custom(first), regexHeader, hostCondition, affix,
             custom(second), address, lookup, time, presence, methods));
 
         assertEquals(List.of(methods, lookup, time, presence, affix, regexHeader, hostCondition, address,
-                new RouteCondition.Custom(first), new RouteCondition.Custom(second)),
-            RouteConditions.conjuncts(normalized),
+                new RequestCondition.Custom(first), new RequestCondition.Custom(second)),
+            RequestConditions.conjuncts(normalized),
             "the method, the lookups and the time, the affixes, the regular expressions and the resolved values, then the lambdas in order");
-        assertEquals(any(methods, affix, new RouteCondition.Custom(first)),
-            RouteConditions.normalize(any(custom(first), affix, methods)), "an AnyOf too");
+        assertEquals(any(methods, affix, new RequestCondition.Custom(first)),
+            RequestConditions.normalize(any(custom(first), affix, methods)), "an AnyOf too");
         assertEquals(all(header("X-A", equalTo("1")), not(header("X-B", contains("x")))),
-            RouteConditions.normalize(all(not(header("X-B", contains("x"))), header("X-A", equalTo("1")))), "a negation costs what it negates");
+            RequestConditions.normalize(all(not(header("X-B", contains("x"))), header("X-A", equalTo("1")))), "a negation costs what it negates");
     }
 
     @Test
     void theEvaluationStopsAtThePartThatDecides() {
         List<String> evaluated = new ArrayList<>();
-        RouteCondition condition = RouteConditions.normalize(all(recorded(evaluated, "lambda"), header("X-A"), method(HttpMethod.POST)));
+        RequestCondition condition = RequestConditions.normalize(all(recorded(evaluated, "lambda"), header("X-A"), method(HttpMethod.POST)));
 
         assertFalse(meets(condition, HttpRequest.GET("/x").header("X-A", "1")));
         assertEquals(List.of(), evaluated, "the method decides before the lambda runs");
@@ -133,19 +133,19 @@ class RouteConditionNormalizationTest {
         assertEquals(List.of("lambda"), evaluated);
 
         evaluated.clear();
-        RouteCondition either = RouteConditions.normalize(any(recorded(evaluated, "lambda"), header("X-A")));
+        RequestCondition either = RequestConditions.normalize(any(recorded(evaluated, "lambda"), header("X-A")));
         assertTrue(meets(either, HttpRequest.GET("/x").header("X-A", "1")));
         assertEquals(List.of(), evaluated, "the header decides before the lambda runs");
     }
 
-    private static RouteCondition recorded(List<String> evaluated, String name) {
+    private static RequestCondition recorded(List<String> evaluated, String name) {
         return custom(request -> {
             evaluated.add(name);
             return true;
         });
     }
 
-    private static boolean meets(io.micronaut.web.router.builder.RouteCondition condition, io.micronaut.http.HttpRequest<?> request) {
-        return io.micronaut.web.router.builder.RouteConditions.matches(condition, request, RouteConditionContext.fallback());
+    private static boolean meets(io.micronaut.web.router.builder.RequestCondition condition, io.micronaut.http.HttpRequest<?> request) {
+        return io.micronaut.web.router.builder.RequestConditions.matches(condition, request, RouteConditionContext.fallback());
     }
 }

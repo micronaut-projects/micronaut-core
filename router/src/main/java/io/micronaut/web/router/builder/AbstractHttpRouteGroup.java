@@ -21,7 +21,9 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
+import io.micronaut.http.uri.RouteTemplateParser;
 import io.micronaut.web.router.RouteAssembly;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -117,7 +119,7 @@ abstract sealed class AbstractHttpRouteGroup<G extends RouteSpec<G>> extends Abs
         return self();
     }
 
-    public G where(RouteCondition condition) {
+    public G where(RequestCondition condition) {
         settings.where(condition);
         return self();
     }
@@ -129,6 +131,23 @@ abstract sealed class AbstractHttpRouteGroup<G extends RouteSpec<G>> extends Abs
 
     public G order(int order) {
         settings.order(order);
+        return self();
+    }
+
+    public G selectedBy(@Nullable RouteMatchSelector selector) {
+        settings.selectedBy(selector);
+        return self();
+    }
+
+    /**
+     * The language of the {@code String} templates of the routes and of the locator prefixes the
+     * group declares, see {@link HttpRouteGroup#templates(RouteTemplateParser)}.
+     *
+     * @param parser The parser of the templates
+     * @return The group
+     */
+    public G templates(RouteTemplateParser parser) {
+        templateParser(Objects.requireNonNull(parser, "parser"));
         return self();
     }
 

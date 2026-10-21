@@ -950,7 +950,8 @@ public class MediaType implements CharSequence {
                 void visitAttributeValue(String attribute, String value) {
                     String normalizedAttribute = attribute.trim();
                     String normalizedValue = value.trim();
-                    if ("q".equals(normalizedAttribute)) {
+                    // parameter names are case-insensitive, RFC 9110 5.6.6
+                    if (Q_PARAMETER.equalsIgnoreCase(normalizedAttribute)) {
                         qualityNumberField = new BigDecimal(unquoteParameterValue(normalizedValue));
                     }
                     parsedParameters.put(normalizedAttribute, normalizedValue);
