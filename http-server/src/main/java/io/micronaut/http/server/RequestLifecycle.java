@@ -355,6 +355,12 @@ public class RequestLifecycle {
         try {
             List<GenericHttpFilter> httpFilters = routeExecutor.router.findFilters(request);
             FilterRunner filterRunner = new FilterRunner(httpFilters, responseProvider) {
+
+                @Override
+                protected boolean isProceedOnce() {
+                    return true;
+                }
+
                 @Override
                 protected ExecutionFlow<HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
                     RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
@@ -386,6 +392,11 @@ public class RequestLifecycle {
         try {
             List<GenericHttpFilter> preMatchingFilters = routeExecutor.router.findPreMatchingFilters(request);
             FilterRunner filterRunner = new FilterRunner(preMatchingFilters, null, responseProvider) {
+
+                @Override
+                protected boolean isProceedOnce() {
+                    return true;
+                }
 
                 @Override
                 protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
@@ -428,6 +439,11 @@ public class RequestLifecycle {
 
                 @Nullable
                 UriRouteMatch<Object, Object> routeMatch;
+
+                @Override
+                protected boolean isProceedOnce() {
+                    return true;
+                }
 
                 @Override
                 protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
