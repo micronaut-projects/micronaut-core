@@ -25,9 +25,9 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.RequestFilter;
-import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.FormOptions;
@@ -106,6 +106,13 @@ class RawRouteValuesTest {
     void aDecodedPathVariableKeepsAPlusAsAPlus(String path) throws Exception {
         // only form and query decoding treat a + as a space, RFC 3986 section 3.3
         assertEquals("a+b c+", get(path + "a+b%20c%2B"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/raw/decoded-plus/", "/raw/fn-decoded/"})
+    void anEncodedPlusDecodesToAPlusAndAnEncodedSpaceToASpace(String path) throws Exception {
+        assertEquals("+", get(path + "%2B"));
+        assertEquals("+ +", get(path + "%2B%20%2B"));
     }
 
     @Test
