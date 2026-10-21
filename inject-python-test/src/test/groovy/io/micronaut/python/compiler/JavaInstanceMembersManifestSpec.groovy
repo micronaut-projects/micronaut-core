@@ -16,12 +16,10 @@
 package io.micronaut.python.compiler
 
 import io.micronaut.context.python.PythonContextExecutor
-import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 
-class JavaInstanceMembersProviderSpec extends AbstractPythonTypeElementSpec {
+class JavaInstanceMembersManifestSpec extends AbstractPythonTypeElementSpec {
 
-    private static final String PROVIDER = 'io.micronaut.context.python.PythonJavaInstanceMembersProvider'
     private static final String SOURCE = '''
 from jakarta.inject import Singleton
 from java.lang import Object
@@ -73,50 +71,48 @@ class Caller:
         return str(fixture.get_http_status().add("alias")) + fixture.literal_value("-exact")
 '''
 
-    def "the compiler registers instance aliases and they work through a referenced interface"() {
+    def "the compiler records the instance member names of the referenced Java types in the Java imports manifest"() {
         given:
         def target = File.createTempDir('python-instance-members', '')
-        def compiler = PyronautCompiler.builder().pythonCode(SOURCE).targetDir(target).build()
 
         when:
-        compiler.compile()
-        def services = new File(target, 'META-INF/micronaut/' + PROVIDER).list() as List
+        PyronautCompiler.builder().pythonCode(SOURCE).targetDir(target).build().compile()
+        def members = JavaImportsManifest.read(target).instanceMembers
 
-        then:
-        services != null
-        services.size() == 1
-        services[0].contains('PythonJavaInstanceMembers$')
+        then: "imports, their method return types and the receivers the checker resolved in a deeper chain"
+        members['io.micronaut.http.HttpRequest']['uri'] == ['getUri', 'property']
+        members['io.micronaut.http.MutableHttpRequest']['basic_auth'] == ['basicAuth', 'method']
+        members['java.lang.Object']['get_class'] == ['getClass', 'method']
+        !members['java.lang.Object'].containsKey('class')
+        members[InstanceAliasFixture.Leaf.name]['value'] == ['getValue', 'property']
 
-        when:
-        def loader = new URLClassLoader([target.toURI().toURL()] as URL[], getClass().classLoader)
-        def providers = SoftServiceLoader.load(loader.loadClass(PROVIDER), loader).collectAll()
-        def entries = providers.collectMany { it.entries() }
+        and: "neither Python classes, implementations nor the types GraalPy converts to Python values"
+        !members.containsKey('python.PythonControl')
+        !members.containsKey('io.micronaut.http.simple.SimpleHttpRequest')
+        !members.containsKey('java.lang.String')
 
-        then:
-        entries.any { it.type().name == 'io.micronaut.http.HttpRequest' }
-        entries.any { it.type().name == 'io.micronaut.http.MutableHttpRequest' }
-        entries.any { it.type() == InstanceAliasFixture.Leaf }
-        !entries.any { it.type().name == 'python.PythonControl' }
-        !entries.any { it.type().name == 'io.micronaut.http.simple.SimpleHttpRequest' }
-        providers[0].entries().is(providers[0].entries())
-
-        when: "an optional method return type is missing at runtime"
-        def optionalLoader = new OptionalApiClassLoader(target.toURI().toURL(), getClass().classLoader)
-        def optionalProviders = SoftServiceLoader.load(optionalLoader.loadClass(PROVIDER), optionalLoader).collectAll()
-        def available = optionalProviders.collectMany { it.entries() }
-
-        then:
-        optionalProviders.size() == 1
-        available.any { it.type() == InstanceAliasFixture }
-        !available.any { it.type().name == 'java.util.StringJoiner' }
+        and: "an ambiguous name, or a method with static overloads, is blocked; a static method has no name"
+        def fixture = members[InstanceAliasFixture.name]
+        fixture['ready'] == ['isReady', 'property']
+        fixture['with_value'] == ['withValue', 'method']
+        fixture['http_status'] == ['getHTTPStatus', 'property']
+        fixture['http2_status'] == ['getHTTP2Status', 'property']
+        fixture['get_http2_status'] == ['getHTTP2Status', 'method']
+        fixture['with__value'] == ['with__Value', 'method']
+        fixture['get_void'] == ['getVoid', 'method']
+        fixture['url'] == []
+        fixture['get_url'] == []
+        fixture['mixed_value'] == []
+        !fixture.containsKey('void')
+        !fixture.containsKey('wrong')
+        !fixture.containsKey('static_value')
+        !fixture.containsKey('get_static_value')
 
         cleanup:
-        optionalLoader?.close()
-        loader?.close()
         target.deleteDir()
     }
 
-    def "generated aliases retain concrete host dispatch in primary and pooled contexts"() {
+    def "the registered names retain concrete host dispatch in primary and pooled contexts"() {
         given:
         def context = buildContext(SOURCE, false, ['micronaut.python.pool.enabled': true, 'micronaut.python.pool.size': 1])
         def caller = getBean(context, 'python.Caller')
@@ -139,7 +135,7 @@ str(request.get_uri()) + ":" + request.getHeaders().get("Authorization")
         context?.close()
     }
 
-    def "plain Python-only sources do not register Object aliases"() {
+    def "plain Python sources record no instance member names"() {
         given:
         def target = File.createTempDir('python-no-instance-members', '')
 
@@ -151,26 +147,15 @@ from jakarta.inject import Singleton
 class Plain:
     def value(self) -> int:
         return 1
+
+    def text(self, value: str) -> str:
+        return value
 ''').build().compile()
 
         then:
-        !new File(target, 'META-INF/micronaut/' + PROVIDER).exists()
+        JavaImportsManifest.read(target).instanceMembers.isEmpty()
 
         cleanup:
         target.deleteDir()
-    }
-
-    private static final class OptionalApiClassLoader extends URLClassLoader {
-        OptionalApiClassLoader(URL url, ClassLoader parent) {
-            super([url] as URL[], parent)
-        }
-
-        @Override
-        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-            if (name == 'java.util.StringJoiner') {
-                throw new ClassNotFoundException(name)
-            }
-            return super.loadClass(name, resolve)
-        }
     }
 }

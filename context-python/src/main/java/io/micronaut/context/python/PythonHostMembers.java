@@ -32,8 +32,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Members of Java objects that GraalPy host interop does not expose: the public methods a public class inherits from a non-public
- * superclass.
+ * Members of Java objects that GraalPy host interop does not expose: the public methods a public
+ * class inherits from a non-public superclass.
  * <p>
  * GraalPy only exposes a method whose declaring class is public, so the methods
  * {@code PullSubscribeOptions.Builder} inherits from the protected generic
@@ -147,5 +147,4 @@ public final class PythonHostMembers {
         }
         return methods;
     }
-
 }

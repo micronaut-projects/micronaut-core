@@ -69,7 +69,6 @@ final class IncrementalCompilation {
     // the name prefix of the provider of functional interfaces Python processing generates (see
     // io.micronaut.python.processing.PythonFunctionalInterfaceProviderGenerator)
     private static final String FUNCTIONAL_INTERFACE_PROVIDER_PREFIX = "$PythonFunctionalInterfaces$";
-    private static final String INSTANCE_MEMBERS_PROVIDER_PREFIX = "PythonJavaInstanceMembers$";
     private static final String PYTHON_INIT_MODULE_SUFFIX = ".__init__";
     private static final Pattern JAVA_PACKAGE = Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
     private static final Pattern JAVA_TYPE = Pattern.compile("\\b(?:class|interface|record|enum|@interface)\\s+([A-Za-z_$][\\w$]*)");
@@ -993,11 +992,7 @@ final class IncrementalCompilation {
     private static boolean isFunctionalInterfaceProviderOutput(String output) {
         String fileName = output.substring(output.lastIndexOf('/') + 1);
         return fileName.startsWith(FUNCTIONAL_INTERFACE_PROVIDER_PREFIX)
-            || fileName.contains('.' + FUNCTIONAL_INTERFACE_PROVIDER_PREFIX)
-            || fileName.startsWith(INSTANCE_MEMBERS_PROVIDER_PREFIX)
-            || fileName.contains('.' + INSTANCE_MEMBERS_PROVIDER_PREFIX)
-            || fileName.startsWith('$' + INSTANCE_MEMBERS_PROVIDER_PREFIX)
-            || fileName.contains(".$" + INSTANCE_MEMBERS_PROVIDER_PREFIX);
+            || fileName.contains('.' + FUNCTIONAL_INTERFACE_PROVIDER_PREFIX);
     }
 
     /**
@@ -1019,20 +1014,13 @@ final class IncrementalCompilation {
         }
         return outputFiles.stream()
             .filter(output -> providerPaths.stream().anyMatch(providerPath -> {
-                int separator = providerPath.lastIndexOf('/');
-                String simpleName = providerPath.substring(separator + 1);
-                String beanPath = simpleName.startsWith("$") ? providerPath
-                    : providerPath.substring(0, separator + 1) + '$' + simpleName;
                 if (output.endsWith(CLASS_EXTENSION)) {
-                    return output.equals(providerPath + CLASS_EXTENSION) || output.startsWith(providerPath + '$')
-                        || output.startsWith(beanPath + '$');
+                    return output.equals(providerPath + CLASS_EXTENSION) || output.startsWith(providerPath + '$');
                 }
                 String providerName = providerPath.replace('/', '.');
-                String beanName = beanPath.replace('/', '.');
                 String fileName = output.substring(output.lastIndexOf('/') + 1);
                 return output.startsWith("META-INF/micronaut/")
-                    && (fileName.equals(providerName) || fileName.startsWith(providerName + '$')
-                        || fileName.startsWith(beanName + '$'));
+                    && (fileName.equals(providerName) || fileName.startsWith(providerName + '$'));
             }))
             .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }
