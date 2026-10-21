@@ -110,8 +110,10 @@ class RawRouteValuesTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"/raw/decoded-plus/", "/raw/fn-decoded/"})
-    void anEncodedPlusDecodesToAPlusAndAnEncodedSpaceToASpace(String path) throws Exception {
+    void anEncodedPlusIsAPlusAndAnEncodedSpaceASpace(String path) throws Exception {
+        // %2B on its own, and %20 in the same segment, without a literal +
         assertEquals("+", get(path + "%2B"));
+        assertEquals("a b", get(path + "a%20b"));
         assertEquals("+ +", get(path + "%2B%20%2B"));
     }
 

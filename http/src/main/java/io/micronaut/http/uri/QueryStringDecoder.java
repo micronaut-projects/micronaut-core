@@ -339,11 +339,12 @@ public final class QueryStringDecoder {
      * decoded and, unlike {@link #decodeComponent(String)}, a {@code +} is a literal plus sign, not
      * a space (RFC 3986, Section 3.3), since only form and query decoding treat it as a space.
      *
-     * @implNote Path variables of a route are decoded with this method since 5.3.0, so a
-     * {@code +} in a path segment is kept as {@code +}. Before 5.3.0 a path variable was decoded
-     * with form decoding, which turned a {@code +} into a space.
+     * @implNote The router decodes the path variables of a match with this method since 5.3.0, so
+     * a {@code +} in a path variable is a plus sign. Before, they were decoded like a form value,
+     * which turned a {@code +} into a space.
      *
-     * @param s The string to decode (can be empty or {@code null}, which decodes to an empty string)
+     * @param s The string to decode (can be empty). A {@code null} string is decoded as an empty
+     * string, like {@link #decodeComponent(String)} does
      * @param charset The charset of the percent-encoded octets
      * @return The decoded string, or {@code s} if there's nothing to decode. If the string to
      * decode is {@code null}, returns an empty string.
