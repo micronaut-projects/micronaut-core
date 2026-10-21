@@ -15,7 +15,11 @@ import io.micronaut.http.annotation.ResponseFilter
 import io.micronaut.http.annotation.ServerFilter
 import io.micronaut.http.filter.ConditionalFilter
 import io.micronaut.http.server.annotation.PreMatching
+import io.micronaut.context.annotation.Replaces
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.web.router.resource.StaticResourceResolver
+import io.micronaut.web.router.resource.TrackingStaticResourceResolver
+import jakarta.inject.Singleton
 import io.micronaut.websocket.annotation.OnMessage
 import io.micronaut.websocket.annotation.OnOpen
 import io.micronaut.websocket.annotation.ServerWebSocket
@@ -27,6 +31,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
+import spock.util.concurrent.PollingConditions
 
 /**
  * Filters scoped to a route must run for every request that reaches it.
@@ -225,4 +230,121 @@ class FilterSelectionBypassSpec extends Specification {
             msg
         }
     }
+
+    def 'a WebSocket upgrade rewritten by a @PreMatching filter goes to the route the filters were selected for'() {
+        given:
+        def server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'FilterSelectionBypassSpec.wsRewrite'])
+        def internal = server.applicationContext.getBean(RewriteInternalFeed)
+        def pub = server.applicationContext.getBean(RewritePublicFeed)
+        def upgrade = "GET /rw-internal/feed HTTP/1.1\r\n" +
+                "Host: localhost\r\n" +
+                "X-Rewrite: yes\r\n" +
+                "Connection: Upgrade\r\n" +
+                "Upgrade: websocket\r\n" +
+                "Sec-WebSocket-Version: 13\r\n" +
+                "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n"
+
+        expect: 'control: the internal upgrade without the rewrite is rejected by the guard'
+        firstLine(server.port, upgrade.replace("X-Rewrite: yes\r\n", "")).startsWith('HTTP/1.1 401')
+
+        when:
+        def line = firstLine(server.port, upgrade)
+
+        then: 'the upgrade goes to the public endpoint, not the guarded internal one'
+        line.startsWith('HTTP/1.1 101')
+        new PollingConditions(timeout: 10).eventually {
+            assert pub.opened.get() == 1
+        }
+        internal.opened.get() == 0
+
+        cleanup:
+        server.close()
+    }
+
+    @Unroll
+    def 'a static resource stream opened for a rejected #method is closed'() {
+        given:
+        def server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'FilterSelectionBypassSpec.streamed'])
+        def resolver = server.applicationContext.getBean(TrackingResourceResolver)
+
+        when:
+        def resp = raw(server.port, "$method /tracked/report.txt HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+
+        then:
+        resp.startsWith('HTTP/1.1 405')
+        resolver.opened.get() == 1
+        resolver.closed.get() == 1
+
+        cleanup:
+        server.close()
+
+        where:
+        method << ['POST', 'PUT']
+    }
+
+    @Requires(property = 'spec.name', value = 'FilterSelectionBypassSpec.streamed')
+    @Singleton
+    @Replaces(StaticResourceResolver)
+    static class TrackingResourceResolver extends TrackingStaticResourceResolver {
+        TrackingResourceResolver() {
+            super('/tracked/report.txt')
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'FilterSelectionBypassSpec.wsRewrite')
+    @ServerFilter('/**')
+    static class RewriteFilter {
+        @PreMatching
+        @RequestFilter
+        @Nullable
+        HttpRequest<?> rewrite(HttpRequest<?> request) {
+            if (request.headers.get('X-Rewrite') == 'yes' && request.path == '/rw-internal/feed') {
+                return request.mutate().uri(URI.create('/rw-public/feed'))
+            }
+            null
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'FilterSelectionBypassSpec.wsRewrite')
+    @ServerFilter('/rw-internal/**')
+    static class RewriteInternalGuard {
+        @RequestFilter
+        @Nullable
+        HttpResponse<?> filter(HttpRequest<?> request) {
+            request.headers.get('X-Token') == 'tok' ? null : HttpResponse.unauthorized()
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'FilterSelectionBypassSpec.wsRewrite')
+    @ServerWebSocket('/rw-internal/feed')
+    static class RewriteInternalFeed {
+        final AtomicInteger opened = new AtomicInteger()
+
+        @OnOpen
+        void open() {
+            opened.incrementAndGet()
+        }
+
+        @OnMessage
+        String message(String msg) {
+            msg
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'FilterSelectionBypassSpec.wsRewrite')
+    @ServerWebSocket('/rw-public/feed')
+    static class RewritePublicFeed {
+        final AtomicInteger opened = new AtomicInteger()
+
+        @OnOpen
+        void open() {
+            opened.incrementAndGet()
+        }
+
+        @OnMessage
+        String message(String msg) {
+            msg
+        }
+    }
+
 }

@@ -174,11 +174,9 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 return;
             }
 
-            Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getPath(), msg)
-                .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
-                .findFirst();
+            Optional<UriRouteMatch<Object, Object>> optionalRoute = findWebSocketRoute(router, msg);
 
-            WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, optionalRoute.orElse(null));
+            WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, router, optionalRoute.orElse(null));
             ExecutionFlow<HttpResponse<?>> responseFlow = ExecutionFlow.async(
                 ctx.channel().eventLoop(),
                 () -> PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(msg))
@@ -325,6 +323,12 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         return (isSecure ? SCHEME_SECURE_WEBSOCKET : SCHEME_WEBSOCKET) + req.getHeaders().get(HttpHeaderNames.HOST) + req.getUri();
     }
 
+    private static Optional<UriRouteMatch<Object, Object>> findWebSocketRoute(Router router, HttpRequest<?> request) {
+        return router.find(HttpMethod.GET, request.getPath(), request)
+            .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
+            .findFirst();
+    }
+
     @Override
     public void removed() {
         cancelUpgrade = true;
@@ -340,8 +344,14 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
         boolean shouldProceedNormally;
 
-        WebsocketRequestLifecycle(RouteExecutor routeExecutor, @Nullable RouteMatch<?> route) {
+        @Nullable
+        RouteMatch<?> matchedRoute;
+
+        final Router router;
+
+        WebsocketRequestLifecycle(RouteExecutor routeExecutor, Router router, @Nullable RouteMatch<?> route) {
             super(routeExecutor);
+            this.router = router;
             this.route = route;
         }
 
@@ -357,7 +367,16 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
             ExecutionFlow<HttpResponse<?>> response;
             if (route != null) {
-                response = runWithPreMatchingFilters(request, (filteredRequest, propagatedContext) -> ExecutionFlow.just(proceed));
+                response = runWithPreMatchingFilters(request, this::matchRoute, (filteredRequest, propagatedContext) -> {
+                    // A pre-matching filter can rewrite the request, upgrade to the route the filters were selected for
+                    RouteMatch<?> matched = this.matchedRoute;
+                    if (matched == null) {
+                        return ExecutionFlow.error(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
+                    }
+                    RouteAttributes.setRouteMatch(proceed, matched);
+                    RouteAttributes.setRouteInfo(proceed, matched.getRouteInfo());
+                    return ExecutionFlow.just(proceed);
+                });
             } else {
                 response = onError(request, new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"))
                     .putInContext(ServerRequestContext.KEY, request);
@@ -368,6 +387,15 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 }
                 return r;
             });
+        }
+
+        private void matchRoute(HttpRequest<?> request) {
+            UriRouteMatch<Object, Object> matched = findWebSocketRoute(router, request).orElse(null);
+            matchedRoute = matched;
+            if (matched != null) {
+                RouteAttributes.setRouteMatch(request, matched);
+                RouteAttributes.setRouteInfo(request, matched.getRouteInfo());
+            }
         }
     }
 }

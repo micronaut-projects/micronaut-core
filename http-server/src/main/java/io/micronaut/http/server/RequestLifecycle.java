@@ -45,6 +45,7 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -71,6 +72,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -381,14 +383,16 @@ public class RequestLifecycle {
 
     /**
      * Run the pre-matching filters and the filters for this request, and then run the given flow.
-     * The route must already be matched and set on the request.
+     * The route matcher runs after the pre-matching filters, which can change the request, and
+     * must set the matched route on the request.
      *
      * @param request          The request
+     * @param routeMatcher     Matches the route of the request returned by the pre-matching filters
      * @param responseProvider Downstream flow, runs inside the filters
      * @return Execution flow that completes after the all the filters and the downstream flow
      * @since 5.2.18
      */
-    protected final ExecutionFlow<HttpResponse<?>> runWithPreMatchingFilters(HttpRequest<?> request, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
+    protected final ExecutionFlow<HttpResponse<?>> runWithPreMatchingFilters(HttpRequest<?> request, Consumer<HttpRequest<?>> routeMatcher, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
         try {
             List<GenericHttpFilter> preMatchingFilters = routeExecutor.router.findPreMatchingFilters(request);
             FilterRunner filterRunner = new FilterRunner(preMatchingFilters, null, responseProvider) {
@@ -405,7 +409,7 @@ public class RequestLifecycle {
 
                 @Override
                 protected void doRouteMatch(HttpRequest<?> request) {
-                    // The route is already matched
+                    routeMatcher.accept(request);
                 }
 
                 @Override
@@ -458,6 +462,13 @@ public class RequestLifecycle {
                         if (fileCustomizableResponseType != null) {
                             HttpMethod method = request.getMethod();
                             if (method != HttpMethod.GET && method != HttpMethod.HEAD) {
+                                if (fileCustomizableResponseType instanceof StreamedFile streamedFile) {
+                                    try {
+                                        streamedFile.getInputStream().close();
+                                    } catch (IOException e) {
+                                        // ignore
+                                    }
+                                }
                                 // Static resources are only served for GET and HEAD
                                 return onStatusError(
                                     request,
