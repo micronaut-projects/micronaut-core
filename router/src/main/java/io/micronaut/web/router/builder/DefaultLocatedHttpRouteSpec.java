@@ -112,6 +112,12 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
     }
 
     @Override
+    public LocatedHttpRouteSpec<T> keepErrorResponses() {
+        route.keepErrorResponses();
+        return this;
+    }
+
+    @Override
     public LocatedHttpRouteSpec<T> selectedBy(@Nullable RouteMatchSelector selector) {
         route.selectedBy(selector);
         return this;

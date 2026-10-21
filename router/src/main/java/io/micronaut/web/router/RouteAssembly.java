@@ -1629,7 +1629,8 @@ public final class RouteAssembly {
                 declaredSettings(),
                 null,
                 effectiveSelector(settings, group),
-                pathVariablePlusAsSpace
+                pathVariablePlusAsSpace,
+                settings.isKeepErrorResponses()
             );
             if (errorScope != null) {
                 // built now: a duplicate fails when the router is built

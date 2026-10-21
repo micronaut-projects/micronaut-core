@@ -24,3 +24,5 @@ Within each level, the closest exception type wins. Local scope takes precedence
 Requests that match no route use only global handlers. A group's local status route therefore does not handle every `404` under its prefix.
 
 Error handlers receive the request and the filters' propagated context. Route and group response filters also apply to their responses. If an error handler fails, the server returns its default error response.
+
+Use `keepErrorResponses()` on a route or group to send the `400` or higher responses its handlers return unchanged, with their body and headers, for example error responses relayed from an upstream server. No status route replaces them. An exception thrown by a handler is still handled by the error routes, and by the status routes for the status of an api:http.exceptions.HttpStatusException[].

@@ -111,6 +111,12 @@ record HandlerRoutes(List<RouteSettings> routes, RouteGroupDefaults.@Nullable In
         }
     }
 
+    void keepErrorResponses() {
+        for (RouteSettings route : routes) {
+            route.keepErrorResponses();
+        }
+    }
+
     void selectedBy(@Nullable RouteMatchSelector selector) {
         for (RouteSettings route : routes) {
             route.selectedBy(selector);

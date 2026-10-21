@@ -85,6 +85,9 @@ public sealed interface LocatedHttpRouteSpec<T> extends HttpRouteSpec permits De
     LocatedHttpRouteSpec<T> order(int order);
 
     @Override
+    LocatedHttpRouteSpec<T> keepErrorResponses();
+
+    @Override
     LocatedHttpRouteSpec<T> selectedBy(@Nullable RouteMatchSelector selector);
 
     @Override

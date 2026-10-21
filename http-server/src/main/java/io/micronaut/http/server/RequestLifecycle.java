@@ -70,6 +70,7 @@ import io.micronaut.web.router.RouteRejections;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.websocket.WebSocketUpgradeCondition;
+import io.micronaut.web.router.UriRouteInfo;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -808,6 +809,10 @@ public class RequestLifecycle {
             return ExecutionFlow.just(response);
         }
         RouteInfo<?> routeInfo = routeMatch == null ? null : routeMatch.getRouteInfo();
+        if (routeInfo instanceof UriRouteInfo<?, ?> uriRouteInfo && uriRouteInfo.isKeepErrorResponses()) {
+            // the route sends the error responses it returns as they are, see RouteSpec#keepErrorResponses()
+            return ExecutionFlow.just(response);
+        }
         return handleStatusException(request, response, routeInfo, propagatedContext);
     }
 

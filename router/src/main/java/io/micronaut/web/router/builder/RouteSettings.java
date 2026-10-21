@@ -72,6 +72,7 @@ public final class RouteSettings {
     private @Nullable Argument<?> responseType;
     private boolean anyMethod;
     private boolean declaresHead;
+    private boolean keepErrorResponses;
 
     /**
      * @param exposePort Exposes the port of the route when it is set
@@ -110,6 +111,7 @@ public final class RouteSettings {
         this.responseType = other.responseType;
         this.anyMethod = other.anyMethod;
         this.declaresHead = other.declaresHead;
+        this.keepErrorResponses = other.keepErrorResponses;
     }
 
     /**
@@ -238,6 +240,20 @@ public final class RouteSettings {
      */
     public void order(int order) {
         this.order = order;
+    }
+
+    /**
+     * @see RouteSpec#keepErrorResponses()
+     */
+    public void keepErrorResponses() {
+        this.keepErrorResponses = true;
+    }
+
+    /**
+     * @return Whether the route sends its error responses as they are, see {@link RouteSpec#keepErrorResponses()}
+     */
+    public boolean isKeepErrorResponses() {
+        return keepErrorResponses;
     }
 
     /**
