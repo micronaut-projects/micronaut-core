@@ -87,19 +87,14 @@ class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
     }
 
     @Override
-    public void visitServiceDescriptor(String type, String classname, Element originatingElement) {
-        visitServiceDescriptor(type, classname, originatingElement, null);
-    }
-
-    @Override
     @SuppressWarnings("java:S1075")
-    public void visitServiceDescriptor(String type, String classname, Element originatingElement, byte @Nullable [] content) {
+    public void visitServiceDescriptor(String type, String classname, Element originatingElement) {
         File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                 classesDir
             );
-            outputVisitor.visitServiceDescriptor(type, classname, originatingElement, content);
+            outputVisitor.visitServiceDescriptor(type, classname, originatingElement);
             outputVisitor.finish();
         }
     }

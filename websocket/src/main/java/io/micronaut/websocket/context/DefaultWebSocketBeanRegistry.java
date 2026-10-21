@@ -23,17 +23,10 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutionHandle;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.websocket.WebSocketPongMessage;
-import io.micronaut.websocket.annotation.OnClose;
-import io.micronaut.websocket.annotation.OnError;
-import io.micronaut.websocket.annotation.OnMessage;
-import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.exceptions.WebSocketException;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -73,51 +66,12 @@ final class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
             Qualifier<T> qualifier = Qualifiers.byStereotype(stereotype);
             BeanDefinition<T> beanDefinition = beanContext.getBeanDefinition(type, qualifier);
             T bean = beanContext.getBean(type, qualifier);
-            Collection<ExecutableMethod<T, ?>> executableMethods = beanDefinition.getExecutableMethods();
-            MethodExecutionHandle<T, ?> onOpen = null;
-            MethodExecutionHandle<T, ?> onClose = null;
-            MethodExecutionHandle<T, ?> onMessage = null;
-            MethodExecutionHandle<T, ?> onPong = null;
-            MethodExecutionHandle<T, ?> onError = null;
-            for (ExecutableMethod<T, ?> method : executableMethods) {
-                if (method.isAnnotationPresent(OnOpen.class)) {
-                    onOpen = ExecutionHandle.of(
-                        bean,
-                        method
-                    );
-                    continue;
-                }
-
-                if (method.isAnnotationPresent(OnClose.class)) {
-                    onClose = ExecutionHandle.of(
-                        bean,
-                        method
-                    );
-                    continue;
-                }
-
-                if (method.isAnnotationPresent(OnError.class)) {
-                    onError = ExecutionHandle.of(
-                        bean,
-                        method
-                    );
-                    continue;
-                }
-
-                if (method.isAnnotationPresent(OnMessage.class)) {
-                    if (Arrays.asList(method.getArgumentTypes()).contains(WebSocketPongMessage.class)) {
-                        onPong = ExecutionHandle.of(
-                            bean,
-                            method
-                        );
-                    } else {
-                        onMessage = ExecutionHandle.of(
-                            bean,
-                            method
-                        );
-                    }
-                }
-            }
+            WebSocketMethods<T> methods = WebSocketMethods.of(beanDefinition.getExecutableMethods());
+            MethodExecutionHandle<T, ?> onOpen = handle(bean, methods.onOpen());
+            MethodExecutionHandle<T, ?> onClose = handle(bean, methods.onClose());
+            MethodExecutionHandle<T, ?> onMessage = handle(bean, methods.onMessage());
+            MethodExecutionHandle<T, ?> onPong = handle(bean, methods.onPong());
+            MethodExecutionHandle<T, ?> onError = handle(bean, methods.onError());
             if (onMessage == null) {
                 throw new WebSocketException("WebSocket handler must specify an @OnMessage handler: " + bean);
             }
@@ -127,6 +81,10 @@ final class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
             }
             return newWebSocketBean;
         }
+    }
+
+    private static <T> @Nullable MethodExecutionHandle<T, ?> handle(T bean, @Nullable ExecutableMethod<T, ?> method) {
+        return method == null ? null : ExecutionHandle.of(bean, method);
     }
 
     /**

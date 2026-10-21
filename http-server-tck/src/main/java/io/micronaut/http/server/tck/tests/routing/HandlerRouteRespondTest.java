@@ -28,7 +28,7 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
@@ -224,11 +224,11 @@ public class HandlerRouteRespondTest {
             });
 
             routes.GET("/respond/channel")
-                .where(RouteCondition.header("X-Beta"))
+                .where(RequestCondition.header("X-Beta"))
                 .order(-1)
                 .respond(text("beta"));
             routes.GET("/respond/channel").respond(text("stable"));
-            routes.GET("/respond/beta-only").where(RouteCondition.header("X-Beta")).respond(text("beta"));
+            routes.GET("/respond/beta-only").where(RequestCondition.header("X-Beta")).respond(text("beta"));
 
             routes.GET("/respond/status/{shop}")
                 .constrain("shop", List.of("north", "south"))

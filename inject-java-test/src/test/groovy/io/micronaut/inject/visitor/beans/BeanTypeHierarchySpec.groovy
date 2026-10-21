@@ -2,6 +2,8 @@ package io.micronaut.inject.visitor.beans
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.beans.BeanIntrospectionReference
+import io.micronaut.core.type.TypeHierarchies
+import io.micronaut.core.type.TypeHierarchy
 
 class BeanTypeHierarchySpec extends AbstractTypeElementSpec {
 
@@ -300,5 +302,40 @@ class Target extends Thread {
         then:
         hierarchy.types == [target, Thread, Runnable]
         hierarchy.getSuperclass(Thread).get() == Object
+    }
+    void "the generic hierarchy of the introspected type is recorded beside the introspection"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Child', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.util.function.Supplier;
+
+abstract class Base<T> implements Supplier<T> {
+}
+
+@Introspected(hierarchy = true)
+class Child<T extends Number> extends Base<T> implements Comparable<Child<T>> {
+    public T get() { return null; }
+    public int compareTo(Child<T> other) { return 0; }
+}
+''')
+        def hierarchy = introspection.getTypeHierarchy().orElseThrow()
+        def classLoader = introspection.beanType.classLoader
+        def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName('test.Child', 'test')).getConstructor().newInstance()
+
+        expect: "the record carries what the raw hierarchy does not"
+        record.type == introspection.beanType
+        record.typeVariables*.name == ['T']
+        record.typeVariables[0].type == Number
+        record.genericSuperclass.get().type == classLoader.loadClass('test.Base')
+        record.genericSuperclass.get().typeParameters[0].isUnresolvedTypeVariable()
+        record.genericInterfaces*.type == [Comparable]
+        record.genericInterfaces[0].typeParameters[0].type == introspection.beanType
+
+        and: "the closure of the hierarchy starts with the type and ends with Object, whether or not the record is found through this class loader"
+        hierarchy.typeClosure.first().type == introspection.beanType
+        hierarchy.typeClosure.last().type == Object
+        hierarchy.typeClosure*.type.containsAll([classLoader.loadClass('test.Base'), Comparable])
     }
 }

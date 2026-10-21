@@ -32,3 +32,4 @@ io.micronaut.visitors.BuilderVisitor
 io.micronaut.visitors.ImportTypeElementSpec$DefaultTypeElementVisitor
 io.micronaut.visitors.query.TypeElementQuerySpec$TypeElementQueryVisitor
 io.micronaut.inject.annotation.AnnotationMemberDefaultsSpec$DefaultsRecordingVisitor
+io.micronaut.inject.annotation.RemapperStereotypesSpec$ExtraStereotypeVisitor
