@@ -60,6 +60,7 @@ import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
+import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -69,6 +70,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -114,6 +116,14 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     private final AtomicBoolean closeInitiated = new AtomicBoolean(false);
     private final AtomicReference<CompositeByteBuf> frameBuffer = new AtomicReference<>();
     private final int maxPayloadLength;
+    /**
+     * Frames read while a message is being handled. They are handled in order once the handler of
+     * the message completes, and reading is paused meanwhile. Only accessed on the event loop.
+     */
+    private final ArrayDeque<WebSocketFrame> pendingFrames = new ArrayDeque<>();
+    private boolean messageInFlight;
+    private boolean drainingPendingFrames;
+    private boolean readPaused;
 
     /**
      * Default constructor.
@@ -321,7 +331,16 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof WebSocketFrame frame) {
-            handleWebSocketFrame(ctx, frame);
+            if (messageInFlight || !pendingFrames.isEmpty()) {
+                // a message is being handled: keep the frame until it completes, and stop reading
+                pendingFrames.add(frame.retain());
+                if (!readPaused) {
+                    readPaused = true;
+                    ctx.channel().config().setAutoRead(false);
+                }
+            } else {
+                handleWebSocketFrame(ctx, frame);
+            }
         } else {
             ctx.fireChannelRead(msg);
         }
@@ -352,7 +371,13 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 Object data;
                 ByteBuf content = null;
 
+                ReferenceCounted readerOwned = null;
+
                 if (WebSocketFrame.class.isAssignableFrom(bodyArgument.getType())) {
+                    if (msg.content().readableBytes() > maxPayloadLength) {
+                        rejectTooLargeMessage(ctx);
+                        return;
+                    }
                     data = msg.retain();
                 } else {
                     CompositeByteBuf buffered = frameBuffer.get();
@@ -415,6 +440,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(payload);
                         try {
                             data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+                            // a reader can hand over the payload itself (e.g. a ByteBuf body), release it
+                            // once the handler completes
+                            readerOwned = data instanceof ReferenceCounted rc ? rc : null;
                         } catch (Throwable t) {
                             // readers release the buffer on success only
                             payload.release();
@@ -438,14 +466,27 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         );
 
                         Object finalData = data;
+                        ReferenceCounted finalReaderOwned = readerOwned;
+                        messageInFlight = true;
                         invokeExecutable(boundExecutable, messageHandler).onComplete((v, e) -> {
-                            if (e == null) {
-                                messageHandled(ctx, finalData);
-                            } else {
-                                messageProcessingException(ctx, e);
+                            try {
+                                if (e == null) {
+                                    messageHandled(ctx, finalData);
+                                } else {
+                                    messageProcessingException(ctx, e);
+                                }
+                            } finally {
+                                if (finalReaderOwned != null && finalReaderOwned.refCnt() > 0) {
+                                    finalReaderOwned.release();
+                                }
+                                runOnEventLoop(ctx, () -> messageCompleted(ctx));
                             }
                         });
                     } catch (Throwable e) {
+                        if (readerOwned != null && readerOwned.refCnt() > 0) {
+                            readerOwned.release();
+                        }
+                        messageInFlight = false;
                         messageProcessingException(ctx, e);
                     }
 
@@ -458,9 +499,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 }
             }
         } else if (msg instanceof PingWebSocketFrame pingWebSocketFrame) {
-            // respond with pong
-            PingWebSocketFrame frame = pingWebSocketFrame.retain();
-            ctx.writeAndFlush(new PongWebSocketFrame(frame.content()));
+            // respond with pong, unless the peer does not read what was already written
+            if (ctx.channel().isWritable()) {
+                ctx.writeAndFlush(new PongWebSocketFrame(pingWebSocketFrame.content().retain()));
+            }
 
         } else if (msg instanceof PongWebSocketFrame) {
             if (pongHandler != null) {
@@ -504,6 +546,46 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     ctx,
                     CloseReason.UNSUPPORTED_DATA
             );
+        }
+    }
+
+    private void runOnEventLoop(ChannelHandlerContext ctx, Runnable task) {
+        if (ctx.executor().inEventLoop()) {
+            task.run();
+        } else {
+            try {
+                ctx.executor().execute(task);
+            } catch (RejectedExecutionException ignored) {
+                // the event loop is shutting down
+            }
+        }
+    }
+
+    /**
+     * Called on the event loop once the handler of a message completes. Handles the frames read
+     * meanwhile, until the next message is in flight, and resumes reading once all are handled.
+     */
+    private void messageCompleted(ChannelHandlerContext ctx) {
+        messageInFlight = false;
+        if (drainingPendingFrames) {
+            return;
+        }
+        drainingPendingFrames = true;
+        try {
+            WebSocketFrame frame;
+            while (!messageInFlight && (frame = pendingFrames.poll()) != null) {
+                try {
+                    handleWebSocketFrame(ctx, frame);
+                } finally {
+                    frame.release();
+                }
+            }
+        } finally {
+            drainingPendingFrames = false;
+        }
+        if (readPaused && !messageInFlight && pendingFrames.isEmpty() && !closeInitiated.get()) {
+            readPaused = false;
+            ctx.channel().config().setAutoRead(true);
         }
     }
 
@@ -719,6 +801,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         CompositeByteBuf buffer = frameBuffer.getAndSet(null);
         if (buffer != null) {
             buffer.release();
+        }
+        if (!drainingPendingFrames) {
+            WebSocketFrame frame;
+            while ((frame = pendingFrames.poll()) != null) {
+                frame.release();
+            }
         }
     }
 }

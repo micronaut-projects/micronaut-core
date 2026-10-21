@@ -840,7 +840,7 @@ final class HttpPipelineBuilder {
 
             Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler = embeddedServices.getWebSocketUpgradeHandler(server);
             if (webSocketUpgradeHandler.isPresent()) {
-                pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
+                pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler(webSocketUpgradeHandler.get().getMaxPayloadLength()));
             }
             if (server.getServerConfiguration().getServerType() != NettyHttpServerConfiguration.HttpServerType.STREAMED) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR,
