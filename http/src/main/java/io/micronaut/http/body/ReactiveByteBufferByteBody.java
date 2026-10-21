@@ -169,6 +169,7 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
 
         public DelayedExecutionFlow<ReadBuffer> subscribeFull(Upstream specificUpstream) {
             DelayedExecutionFlow<ReadBuffer> flow = DelayedExecutionFlow.create();
+            flow.onCancel(() -> submit(() -> cancelFull0(flow, specificUpstream)));
             submit(() -> subscribeFull0(flow, specificUpstream, false));
             return flow;
         }
