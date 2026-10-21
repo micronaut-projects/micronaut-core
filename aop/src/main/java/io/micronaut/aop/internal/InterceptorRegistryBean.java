@@ -44,6 +44,12 @@ import java.util.Set;
 public final class InterceptorRegistryBean implements InstantiatableBeanDefinition<InterceptorRegistry>, BeanDefinitionReference<InterceptorRegistry> {
     public static final AnnotationMetadata ANNOTATION_METADATA;
 
+    /**
+     * Set while this thread creates a registry. The singleton lock is reentrant, so a selector that needs the
+     * registry would otherwise get a second registry, created without selectors.
+     */
+    private static final ThreadLocal<Boolean> CREATING_REGISTRY = new ThreadLocal<>();
+
     static {
         MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
         metadata.addDeclaredAnnotation(BootstrapContextCompatible.class.getName(), Collections.emptyMap());
@@ -125,8 +131,17 @@ public final class InterceptorRegistryBean implements InstantiatableBeanDefiniti
 
     @Override
     public InterceptorRegistry instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
-        return new DefaultInterceptorRegistry(context,
-            List.copyOf(resolutionContext.getBeansOfType(InterceptorCandidateSelector.class)));
+        if (CREATING_REGISTRY.get() != null) {
+            throw new BeanInstantiationException(resolutionContext, "The interceptor registry is required while it is being created. "
+                + "An InterceptorCandidateSelector bean must not be intercepted and must not depend on an intercepted bean or on the interceptor registry.");
+        }
+        CREATING_REGISTRY.set(Boolean.TRUE);
+        try {
+            return new DefaultInterceptorRegistry(context,
+                List.copyOf(resolutionContext.getBeansOfType(InterceptorCandidateSelector.class)));
+        } finally {
+            CREATING_REGISTRY.remove();
+        }
     }
 
     @Override

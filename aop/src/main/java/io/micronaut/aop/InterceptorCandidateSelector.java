@@ -18,51 +18,61 @@ package io.micronaut.aop;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Executable;
 
 import java.util.List;
 
 /**
- * Filters and orders interceptor candidates after the registry has matched their bindings.
- * Register implementations as beans to customize the default registry.
+ * Filters and orders the interceptors the default {@link InterceptorRegistry} selected for an interception point.
+ * Implementations are registered as beans.
  *
- * <p>Candidates start in Micronaut order. Implementations may remove candidates and use
- * {@link List#sort(java.util.Comparator)} to stably order the remainder, preserving the incoming order
- * for ties. Candidates must not be added or duplicated. Multiple selectors run in injected list order,
- * each receiving the previous selector's result; the registry does not sort again afterwards.</p>
+ * <p>The registry first selects the interceptors whose bindings match the interception point and whose kind can
+ * run there ({@link ConstructorInterceptor} for constructors, {@link MethodInterceptor} otherwise), and sorts them
+ * by {@link Ordered}. It then passes that list to every selector, in the order of the selectors themselves, and
+ * invokes the interceptors in the order of the list the last selector leaves. The registry does not sort the list
+ * again.</p>
  *
- * <p>Selection can be retained by the caller, so implementations must not depend on invocation arguments
- * or mutable request state. Implementations must be thread-safe and must not retain the mutable list.
- * Selector beans must not themselves require interception or depend on the interceptor registry.</p>
+ * <p>The list is owned by the registry and is only valid during the call. A selector may remove candidates, for
+ * example to enable only some of them, and reorder the rest. {@link List#sort(java.util.Comparator)} is stable, so
+ * a comparator that only breaks ties keeps the incoming order otherwise. A selector must not add candidates or
+ * duplicate them. Each {@link BeanRegistration} gives the interceptor's {@link io.micronaut.inject.BeanDefinition},
+ * so a selector can decide by the interceptor's type and annotation metadata.</p>
+ *
+ * <p>The selection is retained for the interception point and reused by every invocation, so a selector must not
+ * depend on invocation arguments or other state that changes. Selectors must be thread-safe.</p>
+ *
+ * <p>The interceptor registry is created with the selectors, so a selector must not be intercepted itself and
+ * must not depend, directly or indirectly, on an intercepted bean or on the registry. Such a selector would need the
+ * registry while the registry is being created, and creating the registry fails with a
+ * {@link io.micronaut.context.exceptions.BeanInstantiationException}.</p>
  *
  * @since 5.3.0
  */
 @Experimental
-public interface InterceptorCandidateSelector {
+public interface InterceptorCandidateSelector extends Ordered {
 
     /**
-     * Filters and orders the matched interceptors for a method or lifecycle callback.
+     * Filters and orders the interceptors selected for a method, including the lifecycle methods.
      *
-     * @param executable The intercepted executable, normally an {@code ExecutableMethod}.
-     * @param kind The interception kind.
-     * @param candidates The mutable, ordered candidates, with their bean definition metadata.
-     * @param <T> The intercepted bean type.
-     * @since 5.3.0
+     * @param executable The intercepted executable, normally an {@code ExecutableMethod}
+     * @param kind The interception kind
+     * @param candidates The mutable list of selected interceptors, in invocation order
+     * @param <T> The intercepted bean type
      */
     default <T> void selectInterceptors(Executable<T, ?> executable, InterceptorKind kind,
-                                      List<BeanRegistration<Interceptor<T, ?>>> candidates) {
+                                        List<BeanRegistration<Interceptor<T, ?>>> candidates) {
     }
 
     /**
-     * Filters and orders the matched interceptors for a constructor.
+     * Filters and orders the interceptors selected for a constructor.
      *
-     * @param constructor The intercepted bean constructor.
-     * @param kind The interception kind, {@link InterceptorKind#AROUND_CONSTRUCT}.
-     * @param candidates The mutable, ordered candidates, with their bean definition metadata.
-     * @param <T> The constructed bean type.
-     * @since 5.3.0
+     * @param constructor The intercepted bean constructor
+     * @param kind The interception kind, always {@link InterceptorKind#AROUND_CONSTRUCT}
+     * @param candidates The mutable list of selected interceptors, in invocation order
+     * @param <T> The constructed bean type
      */
     default <T> void selectConstructorInterceptors(BeanConstructor<T> constructor, InterceptorKind kind,
-                                                 List<BeanRegistration<Interceptor<T, T>>> candidates) {
+                                                   List<BeanRegistration<Interceptor<T, T>>> candidates) {
     }
 }

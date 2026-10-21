@@ -273,6 +273,25 @@ bound to that kind. Binding to one kind does not imply the others, so an interce
 never runs for `AROUND`, and an interceptor bound only to `AROUND` never runs for a lifecycle phase. Interceptors bound
 by a different annotation are never applied to the bean.
 
+=== Filtering and Ordering the Selected Interceptors
+
+NOTE: This extension point is experimental and may change in a future release.
+
+Integrations that follow another interception model, such as Jakarta Interceptors or CDI, can need more than binding
+matching and `Ordered`: an interceptor may only be enabled when it is listed or carries a priority, and interceptors of
+the same order need a deterministic order. Such an integration registers a bean of type
+api:aop.InterceptorCandidateSelector[].
+
+After selecting and ordering the interceptors for a method, a lifecycle method or a constructor, the default
+api:aop.InterceptorRegistry[] passes the list of selected candidates to every selector bean, in the selectors' own
+order. Each candidate is a api:context.BeanRegistration[], so the selector can decide by the interceptor's bean
+definition, its annotation metadata and its type. A selector can remove candidates and reorder the remaining ones; it
+cannot add candidates. The selection is made once per interception point and reused by every invocation.
+
+Because the interceptor registry is created with the selectors, a selector bean must not be intercepted itself and must
+not depend on an intercepted bean or on the registry; creating the registry fails if one does. Without selector beans,
+interceptors are selected exactly as described above.
+
 TIP: Reuse of one interceptor instance across the phases of a proxied bean is part of the generated proxy. After
 upgrading, recompile intercepted classes so that beans compiled by an earlier version pick it up; until then they
 behave as they did before, resolving an interceptor per interception point.

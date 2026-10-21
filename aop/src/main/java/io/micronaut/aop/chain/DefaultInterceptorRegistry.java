@@ -149,37 +149,32 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
                                                      boolean selectConstructorInterceptor) {
         List<BeanRegistration<Interceptor<T, ?>>> selectedInterceptorRegistrations = new ArrayList<>(interceptors.size());
         for (BeanRegistration<Interceptor<T, ?>> beanRegistration : interceptors) {
-            if (selectInterceptor(declaringType, interceptorKind, interceptPointBindings, interceptPointMetadata, beanRegistration)) {
+            // the kind of interceptor is checked first, so that selectors only see the candidates that can run
+            Interceptor<T, ?> bean = beanRegistration.getBean();
+            if ((selectMethodInterceptor && (bean instanceof MethodInterceptor || !(bean instanceof ConstructorInterceptor))
+                || selectConstructorInterceptor && (bean instanceof ConstructorInterceptor || !(bean instanceof MethodInterceptor)))
+                && selectInterceptor(declaringType, interceptorKind, interceptPointBindings, interceptPointMetadata, beanRegistration)) {
                 selectedInterceptorRegistrations.add(beanRegistration);
             }
         }
         selectedInterceptorRegistrations.sort(OrderUtil.ORDERED_COMPARATOR);
-        if (!candidateSelectors.isEmpty()) {
+        for (InterceptorCandidateSelector selector : candidateSelectors) {
             if (selectConstructorInterceptor) {
-                selectedInterceptorRegistrations.removeIf(registration -> registration.getBean() instanceof MethodInterceptor
-                    && !(registration.getBean() instanceof ConstructorInterceptor));
-                for (InterceptorCandidateSelector selector : candidateSelectors) {
-                    selector.selectConstructorInterceptors((BeanConstructor<T>) interceptionPoint, interceptorKind,
-                        (List) selectedInterceptorRegistrations);
-                }
+                selector.selectConstructorInterceptors((BeanConstructor<T>) interceptionPoint, interceptorKind,
+                    (List) selectedInterceptorRegistrations);
             } else {
-                selectedInterceptorRegistrations.removeIf(registration -> registration.getBean() instanceof ConstructorInterceptor
-                    && !(registration.getBean() instanceof MethodInterceptor));
-                for (InterceptorCandidateSelector selector : candidateSelectors) {
-                    selector.selectInterceptors((Executable<T, ?>) interceptionPoint, interceptorKind, selectedInterceptorRegistrations);
-                }
+                selector.selectInterceptors((Executable<T, ?>) interceptionPoint, interceptorKind, selectedInterceptorRegistrations);
             }
         }
 
-        List<Interceptor<T, ?>> selectedInterceptors = new ArrayList<>(selectedInterceptorRegistrations.size());
-        for (BeanRegistration<Interceptor<T, ?>> beanRegistration : selectedInterceptorRegistrations) {
-            Interceptor<T, ?> bean = beanRegistration.getBean();
-            if (selectMethodInterceptor && (bean instanceof MethodInterceptor || !(bean instanceof ConstructorInterceptor))
-                || selectConstructorInterceptor && (bean instanceof ConstructorInterceptor || !(bean instanceof MethodInterceptor))) {
-                selectedInterceptors.add(bean);
-            }
+        if (selectedInterceptorRegistrations.isEmpty()) {
+            return ZERO_INTERCEPTORS;
         }
-        return selectedInterceptors.toArray(ZERO_INTERCEPTORS);
+        Interceptor<T, ?>[] selectedInterceptors = new Interceptor[selectedInterceptorRegistrations.size()];
+        for (int i = 0; i < selectedInterceptors.length; i++) {
+            selectedInterceptors[i] = selectedInterceptorRegistrations.get(i).getBean();
+        }
+        return selectedInterceptors;
     }
 
     private <T> boolean selectInterceptor(Class<?> declaringType,
