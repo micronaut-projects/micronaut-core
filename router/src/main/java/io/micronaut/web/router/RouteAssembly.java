@@ -117,7 +117,7 @@ public final class RouteAssembly {
      * The tables of the located targets of the routes, shared with the located tables.
      */
     @Nullable RouteTableFactory locatedTables;
-    private final @Nullable ExecutorSelector executorSelector;
+    final @Nullable ExecutorSelector executorSelector;
     private final ThreadSelection threadSelection;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private final UnaryOperator<String> routeUri;

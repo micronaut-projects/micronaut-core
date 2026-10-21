@@ -144,6 +144,38 @@ public sealed interface LocatedHttpRouteScope<T> extends HttpRouteScope permits 
     }
 
     /**
+     * Route the requests under a prefix to the routes of a target that a locator, which may
+     * block, locates on an executor from the located target of these routes.
+     *
+     * @param executorName The name of the executor that runs the locator
+     * @param prefixUri    The URI template of the prefix, relative to the prefix of the locator of these routes
+     * @param locator      Locates the target, or answers {@code null} for {@code 404}
+     * @param routesOf     The routes of a located target
+     * @param <U>          The type of the target the locator locates
+     * @see #locateOn(String, String, LocatorHandler, Function)
+     * @since 5.3.0
+     */
+    <U> void locateOn(String executorName, String prefixUri, LocatedLocatorHandler<T, ? extends U> locator,
+                      Function<? super U, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix to one set of routes of the targets that a locator, which
+     * may block, locates on an executor from the located target of these routes, see
+     * {@link #locateOn(String, String, LocatedLocatorHandler, Function)}.
+     *
+     * @param executorName The name of the executor that runs the locator
+     * @param prefixUri    The URI template of the prefix, relative to the prefix of the locator of these routes
+     * @param locator      Locates the target, or answers {@code null} for {@code 404}
+     * @param routes       The routes of every located target
+     * @param <U>          The type of the target the locator locates
+     * @since 5.3.0
+     */
+    default <U> void locateOn(String executorName, String prefixUri, LocatedLocatorHandler<T, ? extends U> locator, LocatedRoutes<U> routes) {
+        Objects.requireNonNull(routes, "routes");
+        locateOn(executorName, prefixUri, locator, target -> routes);
+    }
+
+    /**
      * Route the requests under a prefix to the routes of a target that a locator locates later
      * from the located target of these routes.
      *
