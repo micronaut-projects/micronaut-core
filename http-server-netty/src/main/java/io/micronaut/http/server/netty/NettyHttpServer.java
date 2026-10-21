@@ -386,25 +386,36 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 return ub;
             });
 
+            final Router router = this.nettyEmbeddedServices.getRouter();
+            final boolean restrictDefaultRoutes = isDefault && (CollectionUtils.isNotEmpty(router.getExposedPorts())
+                || listenerConfigurations.stream().anyMatch(cfg -> !cfg.isExposeDefaultRoutes()));
+            if (restrictDefaultRoutes) {
+                // the ports of the listeners are only known once they are bound. Until then, serve
+                // no default route on any of them, so that a listener that does not expose them
+                // never serves one while the others are being bound
+                router.applyDefaultPorts(List.of());
+            }
             List<Listener> listeners = new ArrayList<>();
             for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
                 listeners.add(bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig));
             }
             this.activeListeners = Collections.unmodifiableList(listeners);
 
-            if (isDefault) {
-                final Router router = this.nettyEmbeddedServices.getRouter();
-                final Set<Integer> exposedPorts = router.getExposedPorts();
-                if (CollectionUtils.isNotEmpty(exposedPorts)) {
-                    router.applyDefaultPorts(listeners.stream()
-                            .filter(l -> l.config.isExposeDefaultRoutes())
-                            .map(l -> Objects.requireNonNull(l.serverChannel).localAddress())
-                            .filter(InetSocketAddress.class::isInstance)
-                            .map(addr -> ((InetSocketAddress) addr).getPort())
-                            .toList());
-                }
+            if (restrictDefaultRoutes) {
+                router.applyDefaultPorts(listeners.stream()
+                        .filter(l -> l.config.isExposeDefaultRoutes())
+                        .map(l -> Objects.requireNonNull(l.serverChannel).localAddress())
+                        .filter(InetSocketAddress.class::isInstance)
+                        .map(addr -> ((InetSocketAddress) addr).getPort())
+                        .toList());
             }
-            fireStartupEvents();
+            try {
+                fireStartupEvents();
+            } catch (RuntimeException e) {
+                // the server is not running, so stop() would not close the listeners: close them now
+                stopInternal(false);
+                throw e;
+            }
             running.set(true);
         }
     }

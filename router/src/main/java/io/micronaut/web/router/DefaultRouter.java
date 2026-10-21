@@ -219,6 +219,12 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
+    public boolean exposesDefaultRoutes(HttpRequest<?> request) {
+        Set<Integer> defaultPorts = ports;
+        return defaultPorts == null || defaultPorts.contains(request.getServerAddress().getPort());
+    }
+
+    @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request, CharSequence uri) {
         return this.<T, R>toMatches(uri.toString(), findInternal(request)).stream();
     }
@@ -742,10 +748,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     private boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route) {
-        if (ports == null || route.getPort() != null) {
+        if (route.getPort() != null) {
             return false;
         }
-        return !ports.contains(request.getServerAddress().getPort());
+        return !exposesDefaultRoutes(request);
     }
 
     private UriRouteInfo<Object, Object>[] finalizeRoutes(List<UriRouteInfo<Object, Object>> routes) {
