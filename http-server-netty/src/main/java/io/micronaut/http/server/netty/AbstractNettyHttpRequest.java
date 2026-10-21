@@ -77,7 +77,10 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             if (escapeHtmlUrl && UriUtil.isRelative(uri)) {
                 uri = UriUtil.toValidPath(uri);
             }
-            this.uri = createURI(uri);
+            URI parsed = createURI(uri);
+            this.uri = parsed;
+            // the path must be the path of the URI so that routing, filters and getUri() agree
+            this.path = parsed.getRawPath();
         }
         this.unvalidatedUrl = uri;
         this.httpMethodName = nettyRequest.method().name();
@@ -230,22 +233,32 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     }
 
     private static URI createURI(String url) {
-        URI fullUri = URI.create(url);
-        if (fullUri.getAuthority() != null || fullUri.getScheme() != null) {
-            // https://example.com/foo -> /foo
-            try {
-                fullUri = new URI(
-                    null, // scheme
-                    null, // authority
-                    fullUri.getPath(),
-                    fullUri.getQuery(),
-                    fullUri.getFragment()
-                );
-            } catch (URISyntaxException e) {
-                throw new IllegalArgumentException(e);
-            }
+        if (url.startsWith("//")) {
+            // an origin-form path whose first segment is empty, not a network-path reference:
+            // an empty authority keeps the whole path, so getPath() and getUri() agree
+            return URI.create("//" + url);
         }
-        return fullUri;
+        URI fullUri = URI.create(url);
+        if (url.startsWith("/") || "*".equals(url)) {
+            return fullUri;
+        }
+        String scheme = fullUri.getScheme();
+        if (scheme == null || !url.startsWith("://", scheme.length())) {
+            // neither origin-form, absolute-form nor asterisk-form (RFC 9112 section 3.2)
+            throw new IllegalArgumentException(new URISyntaxException(url, "Invalid request target"));
+        }
+        // https://example.com/foo -> /foo, keeping the path as sent
+        String rawPath = fullUri.getRawPath();
+        var relative = new StringBuilder(rawPath == null || rawPath.isEmpty() ? "/" : rawPath);
+        String rawQuery = fullUri.getRawQuery();
+        if (rawQuery != null) {
+            relative.append('?').append(rawQuery);
+        }
+        String rawFragment = fullUri.getRawFragment();
+        if (rawFragment != null) {
+            relative.append('#').append(rawFragment);
+        }
+        return createURI(relative.toString());
     }
 
     /**

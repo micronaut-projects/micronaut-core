@@ -21,11 +21,14 @@ import io.micronaut.core.util.StringUtils;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -307,6 +310,10 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                     int index = readText(uri, requiresSlash);
                     if (index > 0) { // Deny empty path
                         String path = uri.substring(0, index);
+                        if (decodesToSeparator(path)) {
+                            // the handler receives the decoded value, which must still be a single segment
+                            return false;
+                        }
                         variableMap.put(segment.value, path);
                         uri = uri.substring(index);
                     } else {
@@ -316,6 +323,10 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                 case REGEXP -> {
                     Matcher matcher = segment.pattern.matcher(uri);
                     if (matcher.matches()) {
+                        if (uri.indexOf('%') != -1 && !matchesDecoded(segment, uri, matcher)) {
+                            // the handler receives the decoded values, which must still satisfy the template
+                            return false;
+                        }
                         int groupInx = 2;
                         for (String matchingVariable : segment.regexpVariables) {
                             String group = matcher.group(groupInx);
@@ -331,6 +342,50 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
             }
         }
         return uri.isEmpty();
+    }
+
+    private static boolean decodesToSeparator(String value) {
+        if (value.indexOf('%') == -1) {
+            return false;
+        }
+        String decoded = decode(value);
+        return decoded != null && decoded.indexOf('/') != -1;
+    }
+
+    private static boolean matchesDecoded(Segment segment, String uri, Matcher rawMatcher) {
+        String decodedUri = decode(uri);
+        if (decodedUri == null) {
+            return true;
+        }
+        Matcher decodedMatcher = segment.pattern.matcher(decodedUri);
+        if (!decodedMatcher.matches()) {
+            return false;
+        }
+        int groupInx = 2;
+        for (int i = 0; i < segment.regexpVariables.length; i++) {
+            String rawGroup = rawMatcher.group(groupInx);
+            String decodedGroup = decodedMatcher.group(groupInx);
+            if (rawGroup == null ? decodedGroup != null : !Objects.equals(decode(rawGroup), decodedGroup)) {
+                return false;
+            }
+            groupInx += 2;
+        }
+        return true;
+    }
+
+    /**
+     * Percent-decode a path value. Unlike form decoding, a {@code '+'} stays a {@code '+'}.
+     *
+     * @param value The raw value
+     * @return The decoded value, or {@code null} if the value has an invalid escape
+     */
+    @Nullable
+    private static String decode(String value) {
+        try {
+            return URLDecoder.decode(value.replace("+", "%2B"), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private static int readText(String input, boolean requiresSlash) {

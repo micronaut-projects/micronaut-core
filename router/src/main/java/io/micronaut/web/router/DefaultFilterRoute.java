@@ -27,6 +27,8 @@ import io.micronaut.http.filter.GenericHttpFilter;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -186,7 +188,7 @@ final class DefaultFilterRoute implements FilterRoute {
         }
         PathMatcher matcher = getPatternStyle().getPathMatcher();
         for (String pattern : patterns) {
-            if (matcher.matches(pattern, path)) {
+            if (matches(matcher, pattern, path)) {
                 GenericHttpFilter filter = getFilter();
                 if (!GenericHttpFilter.isEnabled(filter)) {
                     return Optional.empty();
@@ -195,6 +197,51 @@ final class DefaultFilterRoute implements FilterRoute {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Match a filter pattern against the request path and against the forms of the path the
+     * router and the static resource resolver use: the path without its trailing slash, and the
+     * percent-decoded path.
+     *
+     * @param matcher The path matcher
+     * @param pattern The filter pattern
+     * @param path    The raw request path
+     * @return Whether any form of the path matches the pattern
+     */
+    static boolean matches(PathMatcher matcher, String pattern, String path) {
+        if (matcher.matches(pattern, path)) {
+            return true;
+        }
+        if (path.isEmpty()) {
+            return matcher.matches(pattern, "/");
+        }
+        String stripped = trimTrailingSlash(path);
+        if (stripped != null && matcher.matches(pattern, stripped)) {
+            return true;
+        }
+        if (path.indexOf('%') == -1) {
+            return false;
+        }
+        String decoded;
+        try {
+            decoded = URLDecoder.decode(path.replace("+", "%2B"), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+        if (matcher.matches(pattern, decoded)) {
+            return true;
+        }
+        String decodedStripped = trimTrailingSlash(decoded);
+        return decodedStripped != null && matcher.matches(pattern, decodedStripped);
+    }
+
+    private static @Nullable String trimTrailingSlash(String path) {
+        int length = path.length();
+        if (length > 1 && path.charAt(length - 1) == '/') {
+            return path.substring(0, length - 1);
+        }
+        return null;
     }
 
     @Override
