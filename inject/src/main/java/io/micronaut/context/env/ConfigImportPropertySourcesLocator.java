@@ -63,7 +63,6 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
     private static final String PROVIDER = "provider";
 
     private final @Nullable Supplier<Collection<PropertySourceImporter<?>>> propertySourceImporterSupplier;
-    private final Map<String, PropertySourceImporter<?>> importerByKindMap = CollectionUtils.newLinkedHashMap(10);
 
     public ConfigImportPropertySourcesLocator() {
         this(null);
@@ -75,42 +74,44 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
 
     @Override
     public Collection<PropertySource> load(Environment environment) {
-        cleanupImporters();
         Collection<PropertySourceImporter<?>> importers;
         if (propertySourceImporterSupplier != null) {
             importers = propertySourceImporterSupplier.get();
         } else {
             importers = evaluatePropertySourceImporters(environment);
         }
-        importerByKindMap.putAll(toImporterByProvider(importers));
+        // The enabled importers belong to this load and are closed when it finishes, whether it
+        // succeeds or fails: the property sources it returns are copies of what the importers have
+        // read, see ImportedPropertySourceFactory. A load of another environment that shares this
+        // locator has importers of its own, so it cannot close these.
+        Map<String, PropertySourceImporter<?>> importerByProvider = toImporterByProvider(importers);
         List<PropertySource> result = new ArrayList<>();
         try (ImportPropertyResolver properties = new ImportPropertyResolver(environment)) {
             for (PropertySource propertySource : environment.getPropertySources()) {
-                result.addAll(resolveConfigImports(environment, propertySource, properties));
+                result.addAll(resolveConfigImports(environment, propertySource, properties, importerByProvider));
             }
+        } catch (RuntimeException | Error e) {
+            // the failure of the load is what the caller sees, with that of closing the importers
+            try {
+                closeImporters(importerByProvider.values());
+            } catch (RuntimeException closeFailure) {
+                e.addSuppressed(closeFailure);
+            }
+            throw e;
         }
+        closeImporters(importerByProvider.values());
         return result;
     }
 
     @Override
     public void close() {
-        cleanupImporters();
+        // nothing to close: the importers of a load are closed when it finishes
     }
 
-    private void cleanupImporters() {
-        Collection<PropertySourceImporter<?>> importers = importerByKindMap.values();
-        if (!importers.isEmpty()) {
-            closeImporters(importers);
-        }
-        importerByKindMap.clear();
-    }
-
-    @Nullable
-    private PropertySourceImporter<?> findPropertySourceImporter(String provider) {
-        return importerByKindMap.get(provider.toLowerCase(Locale.ROOT));
-    }
-
-    private List<PropertySource> resolveConfigImports(Environment environment, PropertySource root, ImportPropertyResolver properties) {
+    private List<PropertySource> resolveConfigImports(Environment environment,
+                                                      PropertySource root,
+                                                      ImportPropertyResolver properties,
+                                                      Map<String, PropertySourceImporter<?>> importerByProvider) {
         List<PropertySource> resolved = new ArrayList<>();
         Set<ConfigImportIdentity.ImportIdentity> visited = new LinkedHashSet<>();
         Deque<String> chain = new ArrayDeque<>();
@@ -118,6 +119,7 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
         resolveImports(
             environment,
             properties,
+            importerByProvider,
             parsed.imports(),
             parsed.propertySource().getOrigin(),
             parsed.propertySource().getOrder(),
@@ -131,6 +133,7 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
 
     private void resolveImports(Environment environment,
                                 ImportPropertyResolver properties,
+                                Map<String, PropertySourceImporter<?>> importerByProvider,
                                 List<ImportDeclaration> imports,
                                 Origin parentOrigin,
                                 int tierOrder,
@@ -152,7 +155,7 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
                 throw new ConfigurationException("Cycle detected while resolving micronaut.config.import: " + ConfigImportIdentity.cycleDisplay(previous, identityLocation));
             }
             if (!visited.contains(identity)) {
-                Optional<PropertySource> imported = importOne(environment, declaration, parentOrigin, tierOrder, parentConvention);
+                Optional<PropertySource> imported = importOne(environment, importerByProvider, declaration, parentOrigin, tierOrder, parentConvention);
                 if (imported.isPresent()) {
                     visited.add(identity);
 
@@ -162,7 +165,7 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
                         ResolvedImportDeclarations parsedImported = normalize(imported.get(), properties);
                         PropertySource importedSource = parsedImported.propertySource();
                         resolved.add(importedSource);
-                        resolveImports(environment, properties, parsedImported.imports(), importedSource.getOrigin(), tierOrder, importedSource.getConvention(), resolved, visited, chain);
+                        resolveImports(environment, properties, importerByProvider, parsedImported.imports(), importedSource.getOrigin(), tierOrder, importedSource.getConvention(), resolved, visited, chain);
                     } finally {
                         chain.removeLast();
                     }
@@ -172,11 +175,12 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
     }
 
     private Optional<PropertySource> importOne(Environment environment,
+                                               Map<String, PropertySourceImporter<?>> importerByProvider,
                                                ImportDeclaration declaration,
                                                Origin parentOrigin,
                                                int tierOrder,
                                                PropertyConvention fallbackConvention) {
-        PropertySourceImporter<?> importer = findRequiredImporter(declaration, parentOrigin);
+        PropertySourceImporter<?> importer = findRequiredImporter(importerByProvider, declaration, parentOrigin);
 
         PropertySource imported = importPropertySource(environment, importer, declaration, parentOrigin).orElse(null);
         if (imported == null) {
@@ -200,8 +204,10 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
         return typedImporter.importPropertySource(context);
     }
 
-    private PropertySourceImporter<?> findRequiredImporter(ImportDeclaration declaration, Origin parentOrigin) {
-        PropertySourceImporter<?> importer = findPropertySourceImporter(declaration.provider());
+    private PropertySourceImporter<?> findRequiredImporter(Map<String, PropertySourceImporter<?>> importerByProvider,
+                                                           ImportDeclaration declaration,
+                                                           Origin parentOrigin) {
+        PropertySourceImporter<?> importer = importerByProvider.get(declaration.provider().toLowerCase(Locale.ROOT));
         if (importer != null) {
             return importer;
         }
