@@ -807,6 +807,7 @@ final class HttpPipelineBuilder {
 
         private void insertHttp3FrameHandlers() {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new Http3FrameToHttpObjectCodec(true, server.getServerConfiguration().isValidateHeaders()));
+            pipeline.addLast(new Http3RequestStreamLifecycleHandler());
 
             insertHttp2DownstreamHandlers();
         }
