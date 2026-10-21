@@ -17,6 +17,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSModifierListOwner
+import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.util.ArrayUtils
@@ -29,6 +30,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import io.micronaut.inject.processing.ProcessingException
 
 internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     private val nativeType: T,
@@ -89,7 +91,21 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
         }
     }
 
+    private val hasContextParameters: Boolean by lazy {
+        declaration?.let { visitorContext.hasContextParameters(it) } ?: false
+    }
+
     override fun getSuspendParameters(): Array<ParameterElement> {
+        // The JVM method takes the context parameters first, but KSP does not report them, so the
+        // parameters are wrong for any code generated to invoke, override or inject the method
+        if (hasContextParameters) {
+            throw ProcessingException(
+                this,
+                "Kotlin context parameters are not supported by Micronaut yet: ${declaringType.name}.${declaration!!.simpleName.asString()}. " +
+                    "Micronaut cannot generate code that invokes, overrides or injects a function or property with context parameters " +
+                    "until KSP exposes them. Remove the context parameters, or the annotations that make Micronaut process the member."
+            )
+        }
         return if (isSuspend) {
             val continuationParameter =
                 visitorContext.getClassElement("kotlin.coroutines.Continuation")
@@ -160,14 +176,16 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
         } + ")"
     }
 
-    override fun getThrownTypes() = stringValues(Throws::class.java, "exceptionClasses")
-        .flatMap {
-            val ce = visitorContext.getClassElement(it).orElse(null)
-            if (ce != null) {
-                listOf(ce)
-            } else {
-                emptyList()
-            }
-        }.toTypedArray()
+    /**
+     * The checked exceptions of the JVM method: the Kotlin `@Throws` classes, or the `throws`
+     * clause of a Java method, in source or compiled.
+     */
+    protected abstract fun resolveThrownTypes(): Sequence<KSType>
+
+    override fun getThrownTypes(): Array<ClassElement> =
+        resolveThrownTypes()
+            .map { newClassElement(nativeType, it, declaringType.typeArguments) }
+            .toList()
+            .toTypedArray()
 
 }
