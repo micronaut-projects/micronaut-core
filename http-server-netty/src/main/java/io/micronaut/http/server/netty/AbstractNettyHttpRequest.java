@@ -227,15 +227,10 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     private NettyHttpParameters decodeParameters() {
         QueryStringDecoder queryStringDecoder;
         if (validPath) {
-            // the raw request target is exactly what URI would return from getRawPath/getRawQuery,
-            // so skip building the URI
-            queryStringDecoder = new QueryStringDecoder(
-                unvalidatedUrl,
+            queryStringDecoder = validPathDecoder(unvalidatedUrl,
                 Objects.requireNonNullElse(getCharacterEncoding(), HttpConstants.DEFAULT_CHARSET),
-                true,
                 getMaxParams(),
-                isSemicolonIsNormalChar()
-            );
+                isSemicolonIsNormalChar());
         } else {
             queryStringDecoder = createDecoder(getUri());
         }
@@ -245,6 +240,36 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     @Override
     public String getMethodName() {
         return httpMethodName;
+    }
+
+    /**
+     * The decoder of the query of a request target that {@link UriUtil#isValidPath(String)}
+     * accepts: the raw request target is exactly what URI would return from
+     * getRawPath/getRawQuery, so the URI is not built.
+     *
+     * @param target                The request target
+     * @param charset               The charset of the query
+     * @param maxParams             The maximum number of parameters
+     * @param semicolonIsNormalChar Whether a semicolon is not a delimiter
+     * @return The decoder
+     */
+    static QueryStringDecoder validPathDecoder(String target, Charset charset, int maxParams, boolean semicolonIsNormalChar) {
+        return new QueryStringDecoder(target, charset, true, maxParams, semicolonIsNormalChar);
+    }
+
+    /**
+     * The decoder of the query of a request target that {@link UriUtil#isValidPath(String)}
+     * rejects, e.g. an absolute-form target: the query is decoded from the URI the request
+     * creates of it, like {@link #getParameters()} decodes it.
+     *
+     * @param target                The validated request target, see {@link #validatedTarget(String, boolean)}
+     * @param charset               The charset of the query
+     * @param maxParams             The maximum number of parameters
+     * @param semicolonIsNormalChar Whether a semicolon is not a delimiter
+     * @return The decoder
+     */
+    static QueryStringDecoder validatedTargetDecoder(String target, Charset charset, int maxParams, boolean semicolonIsNormalChar) {
+        return new QueryStringDecoder(createURI(target), charset, maxParams, semicolonIsNormalChar);
     }
 
     /**

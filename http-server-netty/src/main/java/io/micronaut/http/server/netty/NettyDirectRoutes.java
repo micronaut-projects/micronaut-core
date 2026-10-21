@@ -654,8 +654,12 @@ final class NettyDirectRoutes {
             if (parameters == null) {
                 Charset charset = HttpUtil.getCharset(request, configuration.getDefaultCharset());
                 try {
-                    parameters = new QueryStringDecoder(target(), charset, true, configuration.getMaxParams(),
-                        configuration.isSemicolonIsNormalChar()).parameters();
+                    // like NettyHttpRequest: a target that is not a valid path, e.g. in absolute form, is decoded from its URI
+                    String validated = target();
+                    QueryStringDecoder decoder = UriUtil.isValidPath(request.uri())
+                        ? AbstractNettyHttpRequest.validPathDecoder(validated, charset, configuration.getMaxParams(), configuration.isSemicolonIsNormalChar())
+                        : AbstractNettyHttpRequest.validatedTargetDecoder(validated, charset, configuration.getMaxParams(), configuration.isSemicolonIsNormalChar());
+                    parameters = decoder.parameters();
                 } catch (IllegalArgumentException e) {
                     throw new InvalidDirectRequestException(e);
                 }
