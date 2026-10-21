@@ -23,6 +23,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.uri.RouteCaptures;
@@ -335,7 +336,11 @@ public final class RouteLocator implements DynamicRouteTarget {
         } catch (RuntimeException e) {
             throw located.failed(e);
         }
-        return target == null ? null : located.wrap(target);
+        if (target == null) {
+            located.wrapRejection();
+            return null;
+        }
+        return located.wrap(target);
     }
 
     @Override
@@ -357,7 +362,10 @@ public final class RouteLocator implements DynamicRouteTarget {
         return switch (target) {
             case RouteResolution.Matched<T, R> m -> new RouteResolution.Matched<>(located.wrap(m.match()));
             case RouteResolution.Pending<T, R> p -> new RouteResolution.Pending<>(p.pending().located(located.request(), located::wrap, located::failed));
-            case RouteResolution.NotFound<T, R> n -> n;
+            case RouteResolution.NotFound<T, R> n -> {
+                located.wrapRejection();
+                yield n;
+            }
         };
     }
 
@@ -376,6 +384,9 @@ public final class RouteLocator implements DynamicRouteTarget {
                 : located.routes().findAllClosest(located.request(), targetMatch -> filter.test(located.wrap(targetMatch)), null);
         } catch (RuntimeException e) {
             throw located.failed(e);
+        }
+        if (targetMatches.isEmpty()) {
+            located.wrapRejection();
         }
         return located.wrap(targetMatches);
     }
@@ -930,6 +941,17 @@ public final class RouteLocator implements DynamicRouteTarget {
          * @param <R>   The return type
          * @return The match of the request
          */
+        /**
+         * The rejection of the request by a route selector of the target's table, as the match of
+         * the request, with the variables and the scopes of the location, see {@link RouteRejections}.
+         */
+        void wrapRejection() {
+            DefaultUriRouteMatch<?, ?> rejection = RouteRejections.get(request);
+            if (rejection != null && wrap(rejection) instanceof DefaultUriRouteMatch<?, ?> wrapped) {
+                RouteRejections.set(request, wrapped);
+            }
+        }
+
         <T, R> UriRouteMatch<T, R> wrap(UriRouteMatch<T, R> match) {
             if (!(match instanceof DefaultUriRouteMatch<T, R> innerMatch) || !(match.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> route)) {
                 return match;
@@ -948,8 +970,10 @@ public final class RouteLocator implements DynamicRouteTarget {
             LocatedUriMatchInfo info = new LocatedUriMatchInfo(location.original().getPath(), values, variables, target,
                 location.filters(), location.errorScopes(),
                 located == route ? location.inheritance().annotationMetadata() : AnnotationMetadata.EMPTY_METADATA, location.prefixTemplate());
-            // the media type a route selector of the target's table negotiated is kept
-            return (UriRouteMatch<T, R>) located.resolvedMatch(info, innerMatch.selectedMediaType());
+            // the media type a route selector of the target's table negotiated is kept, and its rejection
+            UriRouteMatch<T, R> wrapped = (UriRouteMatch<T, R>) located.resolvedMatch(info, innerMatch.selectedMediaType());
+            HttpStatus rejection = innerMatch.rejectionStatus();
+            return rejection != null && wrapped instanceof DefaultUriRouteMatch<T, R> wrappedMatch ? wrappedMatch.withRejectionStatus(rejection) : wrapped;
         }
 
         /**
