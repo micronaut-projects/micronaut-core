@@ -119,7 +119,11 @@ class FilterSelectionBypassSpec extends Specification {
 
     def 'a disabled conditional filter stays disabled when the request carries an Origin'() {
         given:
-        def server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'FilterSelectionBypassSpec.conditional'])
+        def server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name'                    : 'FilterSelectionBypassSpec.conditional',
+                'micronaut.server.cors.enabled': true,
+                'micronaut.server.cors.configurations.all.allowed-origins': ['http://other.example'],
+        ])
         def gate = server.applicationContext.getBean(DisabledGate)
 
         when:
@@ -128,6 +132,7 @@ class FilterSelectionBypassSpec extends Specification {
 
         then:
         plain.contains('ROUTE')
+        withOrigin.contains('ROUTE')
         !withOrigin.toLowerCase().contains('x-gate-ran')
         gate.calls.get() == 0
 
