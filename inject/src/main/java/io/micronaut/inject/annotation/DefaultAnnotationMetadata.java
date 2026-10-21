@@ -212,7 +212,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Override
     public AnnotationMetadata getDeclaredMetadata() {
-        if (isDeclaredOnly()) {
+        if (isDeclaredOnly() && stereotypesOnlyListDeclaredAnnotations()) {
             return this;
         }
         return new DefaultAnnotationMetadata(
@@ -231,6 +231,26 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     private boolean isDeclaredOnly() {
         return declaredAnnotations == allAnnotations && declaredStereotypes == allStereotypes;
+    }
+
+    /**
+     * @return True if every annotation {@link #annotationsByStereotype} lists is declared, so that
+     * {@link #declaredAnnotationsByStereotype()} would not narrow it. The compiler removes the annotations that are
+     * not retained at runtime, but not their names from the stereotype lists.
+     */
+    private boolean stereotypesOnlyListDeclaredAnnotations() {
+        if (annotationsByStereotype == null) {
+            return true;
+        }
+        for (List<String> annotations : annotationsByStereotype.values()) {
+            for (String annotation : annotations) {
+                if ((declaredAnnotations == null || !declaredAnnotations.containsKey(annotation))
+                        && (declaredStereotypes == null || !declaredStereotypes.containsKey(annotation))) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
