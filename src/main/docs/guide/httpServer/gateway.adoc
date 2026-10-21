@@ -8,33 +8,49 @@ The gateway runs on the Netty server and relays with the raw HTTP client, so an 
 
 A bean of api:http.gateway.GatewayRoutes[] declares routes with a api:http.gateway.GatewayRouteBuilder[]:
 
-[source,java]
-----
-@Singleton
-class ApiGateway implements GatewayRoutes {
-    @Override
-    public void routes(GatewayRouteBuilder gateway) {
-        gateway.route("orders")
-            .path("/api/orders/**")
-            .where(RequestCondition.header("X-Tenant"))
-            .filters(GatewayFilters.stripPrefix(2), GatewayFilters.addRequestHeader("X-Gateway", "mn"))
-            .retry(GatewayRetry.of(2))
-            .circuitBreaker(GatewayCircuitBreaker.of("orders", fallbackHandler))
-            .responseTimeout(Duration.ofSeconds(5))
-            .uri("lb://orders");
-    }
-}
-----
+snippet::io.micronaut.docs.server.gateway.ApiGateway[tags="imports,clazz", indent=0, title="Gateway routes in code"]
+
+<1> The URI of the upstream, here from the configuration
+<2> The path pattern: the prefix and every path under it
+<3> A condition of the functional routes the gateway route becomes
+<4> The filters: `StripPrefix=1` relays `/api/orders/7` as `/orders/7`
+<5> The retries, see below
 
 The URI of a route is `http://host:port[/base]`, `https://...`, `ws://` or `wss://` (the same as `http://` and `https://`: every route relays WebSocket upgrades), or `lb://service-id`, a service whose instances the load balancer of the service selects, with the client configuration `micronaut.http.services.<service-id>.*`. A base path of the URI, or of an instance, is put before the path of each request.
 
+A route relays the upgrades to WebSocket only, by default: once the upstream switched protocols, the bytes of the connection pass the filters, the limits and the rate limits of the route as they are. `upgradeProtocols(...)` (`upgrade-protocols` in the configuration) names the protocols a route relays, none to relay no upgrade; a request for another protocol is relayed as a plain request, without its `Upgrade` header.
+
 The path patterns are URI templates of the router, e.g. `/api/orders/{id}`, or the patterns of Spring Cloud Gateway: `/prefix/**` for the prefix and every path under it (never `/prefixX`), `*` for one segment, and `{name}` for a segment captured as a variable. A route without a path pattern matches every path.
 
-To route to a gateway handler with the functional routes API, create it with the api:http.gateway.ProxyHandlerFactory[]: `routes.any("/api/orders/{+path}").consumesAll().handleAsync(proxies.create(route))`.
+=== How Gateway Routes Become Routes
+
+The gateway declares each gateway route as ordinary functional routes of any HTTP method, see <<functionalRoutes, Functional Routes>>, which are routed among the other routes of the application, controller routes included:
+
+* A path pattern of the router, e.g. `/api/orders/{id}`, or with `*` or `{name}` segments, is an exact template: `any(template)`. The handler receives the variables of the template, a variable named `path` included.
+* A prefix pattern, `/prefix/**`, is the prefix and every path under it: `any(prefix)` and `any(prefix + "/{+path}")`. The prefix itself must not have a variable named `path`, which is the rest of the path: a gateway route with such a pattern fails the startup.
+
+Every route consumes and produces every media type, takes the WebSocket upgrades that no WebSocket of the server takes, which the upstream switches the protocols of, and sends the error responses of the upstream as they are, see `keepErrorResponses()` in <<functionalRoutesErrors, Error and Status Routes>>: a `404` or a `500` of the upstream is relayed with its body and headers, whatever global or group status routes the application has. The failures of the gateway itself, e.g. a `502` for an upstream that cannot be reached, a `504` for a response timeout or a `503` for an open circuit breaker, are exceptions, an api:http.gateway.UpstreamException[], which the error routes, the exception handlers and the status routes of their status answer as for any other route. The response of a circuit breaker fallback is returned, and is relayed as it is.
+
+The path of the upstream request is the path of the request as the client sent it, percent-encoded, e.g. `/a%2Fb`, never the decoded value of a variable: a path filter rewrites the raw path, see the filters below, and its variables are the raw values of the variables of the pattern. A gateway route keeps the whole path by default, e.g. `/api/orders/1` reaches `/api/orders/1` of the upstream; `StripPrefix=n` removes the first segments, e.g. `StripPrefix=2` relays `/api/orders/1` as `/1`, and `PrefixPath` and `RewritePath` change it further.
+
+The order of the routes follows the router: of the routes that match a request, the most specific one answers, e.g. a controller route `/api/orders/special` before the gateway route `/api/orders/**`, and A route of the method of a request, e.g. a `GET` route of the application, answers before a gateway route of the same template, whatever their orders: the gateway routes are routes of any method. The `order` of a gateway route, or of any route, only breaks a tie between routes that match equally well, the lower order first. The order of the api:http.gateway.GatewayRoutes[] and api:web.router.builder.HttpRoutes[] beans only decides the order the routes are declared in. A WebSocket route of the application, a api:websocket.annotation.ServerWebSocket[] or a WebSocket route of the functional routes, takes an upgrade request before a gateway route of the same path.
+
+=== Proxy Handlers on Ordinary Routes
+
+A gateway route declared with api:http.gateway.GatewayRoutes[] or in the configuration has its conditions, order, weights, default filters and the route filters of its gateway filters, see `GatewayFilter.configure(...)`. To relay the requests of an ordinary route of the application instead, e.g. in a group of routes with filters or security annotations of its own, create the api:http.gateway.ProxyHandler[] of a gateway route with the api:http.gateway.ProxyHandlerFactory[] and route to it like to any asynchronous handler:
+
+snippet::io.micronaut.docs.server.gateway.OrderRoutes[tags="imports,clazz", indent=0, title="A proxy handler on ordinary routes"]
+
+<1> The handler of a gateway route, which is not registered itself
+<2> The routes of the application that relay to it
+
+Such a route is not a gateway route: the conditions, the order, the weights, the default filters and the route filters of the gateway route do not apply, only its upstream, its retries, its circuit breaker, its timeouts and the proxy transforms of its filters, which the handler applies. The route is the application's: it decides the media types, whether the error responses of the upstream replace the ones of its status routes, with `keepErrorResponses()`, and the paths it routes, e.g. `any(prefix)` and `any(prefix + "/{+path}")` for a prefix.
+
+The gateway is a reverse proxy: it relays each request to a server of its own choice, the upstream of the route, and the client does not know it. To call another service from the code of a route, e.g. to forward a request to a local server and use its answer, use the api:http.client.ProxyHttpClient[], or a declarative client with ann:http.client.annotation.Client[], which are not gateway routes either.
 
 == Routes in the Configuration
 
-[source,yaml]
+[configuration]
 ----
 micronaut:
   gateway:
@@ -60,7 +76,7 @@ micronaut:
           team: orders
 ----
 
-Predicates and filters are given in the shortcut syntax, `Name=arg1, arg2`, or by `name` and `args`. They are created by the beans of api:http.gateway.config.GatewayPredicateFactory[] and api:http.gateway.config.GatewayFilterFactory[] named after them, e.g. `@Named("StripPrefix")`: an application adds its own predicate or filter with a bean of its name. The arguments bind by position or by name, through the conversion service or to the constructor of an introspected record, without reflection. An unknown predicate or filter, an invalid argument, or a route without a URI fails the startup with the id of the route; a route with `enabled: false` is not registered.
+Predicates and filters are given in the shortcut syntax, `Name=arg1, arg2`, or by `name` and `args`. They are created by the beans of api:http.gateway.config.GatewayPredicateFactory[] and api:http.gateway.config.GatewayFilterFactory[] named after them, e.g. `@Named("StripPrefix")`: an application adds its own predicate or filter with a bean of its name. The arguments bind by position or by name, through the conversion service or to the constructor of an introspected record, without reflection. An unknown predicate or filter, an invalid argument, or a route without a URI fails the startup with the id of the route; a route with `enabled: false` is not registered. The routes of the configuration are a map keyed by their ids, so the order they are written in is not an order of the routes: the `order` of a route breaks the ties, see above.
 
 The predicates are `Path`, `Method`, `Header` (a regular expression matches the value or one of its comma-separated elements), `Query`, `Cookie`, `Host` (`**.example.org`, `{sub}.example.org`), `RemoteAddr` (the peer of the connection), `XForwardedRemoteAddr` (the client address of `X-Forwarded-For`, see below), `After`, `Before` and `Between`.
 
@@ -83,9 +99,9 @@ A `lb://` route selects an instance for each attempt, leaving out the instances 
 
 A api:http.gateway.GatewayRetry[] sends a request again only when it can: the body has been fully received or there is none, and either the request provably never reached the upstream (for any method), or its method is one of the retried methods (`GET` and `HEAD` by default) and the attempt failed before the headers of a response, or answered with a retried status (`502`, `503` and `504` by default). Nothing is retried once the headers of a response arrived. The delays follow a `RetryPolicy`.
 
-A api:http.gateway.GatewayCircuitBreaker[] guards each attempt with a named circuit of the api:retry.CircuitBreakerRegistry[], shared with the other routes and methods of the name, and configured, e.g. with a rolling window, under `micronaut.retry.circuit-breakers.<name>`. An attempt fails when it cannot reach the upstream or when the response has one of the failure statuses (`failure-statuses`, `500` and above by default); it is reported once the headers arrive, so the circuit never waits for a body. While the circuit is open, when the last attempt failed, or when the response has one of the fallback statuses (`fallback-statuses`, none by default), the fallback handler answers in process, with the failure as the request attribute `GatewayAttributes.FAILURE`; without one, the request fails, with a `503` while the circuit is open. A response of a failure status that is not a fallback status is relayed, and only counted.
+A api:http.gateway.GatewayCircuitBreaker[] guards each attempt with a named circuit of the api:retry.CircuitBreakerRegistry[], shared with the other routes and methods of the name, and configured, e.g. with a rolling window, under `micronaut.retry.circuit-breakers.<name>`. An attempt fails when it cannot reach the upstream or when the response has one of the failure statuses (`failure-statuses`, `500` and above by default); it is reported once the headers arrive, so the circuit never waits for a body. While the circuit is open, when the last attempt failed, or when the response has one of the fallback statuses (`fallback-statuses`, none by default), the fallback handler answers in process, with the failure as `GatewayRequestContext.find(request)` and its `failure()`; without one, the request fails, with a `503` while the circuit is open. A response of a failure status that is not a fallback status is relayed, and only counted.
 
-[source,yaml]
+[configuration]
 ----
 filters:
   - name: CircuitBreaker
@@ -112,9 +128,11 @@ Where gateways disagree, this one:
 |A trailing slash |matches the route without it, like any route, and is relayed as sent
 |Several `Host` headers, or a `Host` that is not a host and a port |`400`
 |`Host` |the host of the upstream, unless `PreserveHostHeader` or `SetRequestHostHeader`
-|Forwarded headers |`X-Forwarded-*` and `Forwarded` are sent (`micronaut.gateway.forwarded.x-forwarded` and `.forwarded`); those of a client that is not a trusted proxy (`micronaut.gateway.forwarded.trusted-proxies`, none by default) are replaced, not appended to; `X_Forwarded_For` and the like are dropped; `StripPrefix` sends the prefix it removes as `X-Forwarded-Prefix`; the scheme is `http` or `https`, also for a WebSocket
+|Forwarded headers |`X-Forwarded-*` and `Forwarded` are sent (`micronaut.gateway.forwarded.x-forwarded-headers` and `.forwarded-header`); those of a client that is not a trusted proxy (`micronaut.gateway.forwarded.trusted-proxies`, none by default) are replaced, not appended to; `X_Forwarded_For` and the like are dropped; `StripPrefix` sends the prefix it removes as `X-Forwarded-Prefix`; the scheme is `http` or `https`, also for a WebSocket; `X-Real-IP` is relayed only from a trusted proxy
 |The client address of `XForwardedRemoteAddr` |the right-most address of `X-Forwarded-For` that is not a trusted proxy, when the peer is a trusted proxy; the peer otherwise
 |Redirects of the upstream |relayed, never followed
+|A client that goes away before the response |the attempt in flight is cancelled, with its connection to the upstream, and no further attempt is made
+|A failure of the upstream |a `502` whose message names the route, not the address of the upstream, which is logged
 |Compression |a body is relayed as the upstream sent it: never decompressed, never compressed again, `Content-Length` kept
 |Hop-by-hop headers |removed from requests and responses, including the headers `Connection` names, before the gateway adds its own; `TE: trailers` is kept; `Upgrade` and `Connection: Upgrade` are kept for a protocol switch, and `Upgrade` on a `426`; `Upgrade: h2c` is never relayed
 |`Expect: 100-continue` |relayed: the client gets the `100` once the upstream asks for the body
@@ -131,7 +149,7 @@ WebSocket and other protocol switches are relayed on the Netty server with an HT
 
 Some behaviour of the server is decided for a connection, before any route, and is the same for the gateway routes and the other routes of the application. These settings are off by default; a gateway should turn them on:
 
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -148,11 +166,11 @@ micronaut:
 
 == The Gateway Endpoint
 
-With the management module present, the sensitive endpoint `/gateway` lists the gateway routes: their upstream, order, paths, predicates, filters, retries, circuit breaker and its state, and the templates the router matches. `/gateway/{id}` gives one route. The endpoint has no write operation.
+With the management module present, the sensitive endpoint `/gateway` lists the gateway routes: their upstream, order, paths, predicates, filters, retries, circuit breaker and its state, and the templates of their routes. The values of the header and parameter filters whose names carry credentials, e.g. `Authorization` or `X-Api-Key`, are masked. `/gateway/{id}` gives one route. The endpoint has no write operation.
 
 == Limitations
 
-* The gateway runs on the Netty server. On a servlet container, the plain HTTP relay works, but a protocol switch, e.g. a WebSocket, cannot be relayed.
+* The gateway runs on the Netty server, and is tested there only. It has no Netty code of its own, but a servlet container misses what it relies on, e.g. the streaming of request and response bodies and the relay of a protocol switch: it is not supported on a servlet container.
 * A request whose body streams in is never retried, even when it was not processed; a replay buffer is planned.
 * The response timeout of a route counts from the moment the request is sent on the Netty client; on the JDK client it counts from the start of the exchange, the upload included.
 * Bytes a client sends after an upgrade request, before the `101`, may be lost; a client must wait for the `101` (RFC 6455).
