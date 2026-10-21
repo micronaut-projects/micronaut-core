@@ -56,4 +56,18 @@ class DefaultPathVariablesTest {
         assertEquals("PathVariables{id=5}", new DefaultPathVariables(match, ConversionService.SHARED).toString());
         assertEquals("PathVariables{id=5} of order 5", new DefaultPathVariables(match, ConversionService.SHARED, "order 5").toString());
     }
+
+    @Test
+    void theRawViewKeepsTheTargetAndTheNegotiatedMediaType() {
+        DefaultPathVariables pathVariables = new DefaultPathVariables(Map.of("id", "a/b"), Map.of("id", "a%2Fb"), ConversionService.SHARED,
+            "order 5", io.micronaut.http.MediaType.APPLICATION_JSON_TYPE);
+        io.micronaut.http.PathVariables raw = pathVariables.raw();
+
+        assertEquals("a%2Fb", raw.getString("id"));
+        assertEquals("order 5", LocatedRoutes.locatedTarget(raw));
+        assertEquals("order 5", LocatedRoutes.locatedTarget(raw, String.class));
+        assertEquals(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE, io.micronaut.web.router.spi.RouteMatchSelector.selectedMediaType(raw));
+        // a missing variable of the raw view fails like one of the route
+        assertThrows(io.micronaut.web.router.exceptions.UnsatisfiedPathVariableRouteException.class, () -> raw.getString("missing"));
+    }
 }

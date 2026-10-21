@@ -29,12 +29,12 @@ import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Generates the annotation builders requested by {@link RegisterAnnotations}, on a type or on a package.
+ * Generates the annotation builders requested by {@link RegisterAnnotations}, on a type or on a package, and the
+ * builders of the annotation types of their members.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -49,7 +49,7 @@ public final class RegisterAnnotationsVisitor implements TypeElementVisitor<Regi
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        generate(element, element.getName(), context);
+        generate(element, context);
     }
 
     @Override
@@ -57,7 +57,7 @@ public final class RegisterAnnotationsVisitor implements TypeElementVisitor<Regi
         return VisitorKind.ISOLATING;
     }
 
-    static void generate(Element element, String holderName, VisitorContext context) {
+    static void generate(Element element, VisitorContext context) {
         AnnotationValue<RegisterAnnotations> annotation = element.getAnnotation(RegisterAnnotations.class);
         if (annotation == null) {
             return;
@@ -69,14 +69,7 @@ public final class RegisterAnnotationsVisitor implements TypeElementVisitor<Regi
         for (String name : names) {
             ClassElement annotationType = context.getClassElement(name)
                 .orElseThrow(() -> new ProcessingException(element, "Annotation type not found on the compilation classpath: " + name));
-            if (!annotationType.isPublic()) {
-                throw new ProcessingException(element, "The annotation type has to be public to have a builder: " + name);
-            }
-            try {
-                AnnotationBuilderWriter.write(holderName, annotationType, element, context);
-            } catch (IOException e) {
-                throw new ProcessingException(element, "Failed to write the annotation builder of " + name + ": " + e.getMessage(), e);
-            }
+            context.getAnnotationBuilderRegistrations().register(annotationType, context, element);
         }
     }
 
@@ -88,7 +81,7 @@ public final class RegisterAnnotationsVisitor implements TypeElementVisitor<Regi
 
         @Override
         public void visitPackage(PackageElement element, VisitorContext context) throws ProcessingException {
-            generate(element, element.getName() + ".package-info", context);
+            generate(element, context);
         }
 
         @Override

@@ -47,7 +47,6 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
-import io.micronaut.http.server.websocket.WebSocketUpgradeCondition;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -55,11 +54,18 @@ import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.DefaultUriRouteMatch;
+import io.micronaut.web.router.PendingRouteMatch;
+import io.micronaut.web.router.GroupErrorRoutes;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteLocator;
+import io.micronaut.web.router.RouteResolution;
 import io.micronaut.web.router.RouteMatch;
+import io.micronaut.web.router.RouteRejections;
+import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.exceptions.DuplicateRouteException;
+import io.micronaut.web.router.websocket.WebSocketUpgradeCondition;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,6 +98,16 @@ public class RequestLifecycle {
     private final boolean multipartEnabled;
     @Nullable
     private HttpRequest<?> request;
+    /**
+     * The matches that depend on the body of the request, see {@link #matchRoute(HttpRequest)}.
+     */
+    @Nullable
+    private PendingRouteMatch<Object, Object> pendingMatch;
+    /**
+     * Whether the request matched routes without its body, but its body met the body conditions
+     * of none of them.
+     */
+    private boolean bodyUnmatched;
 
     /**
      * @param routeExecutor The route executor to use for route resolution
@@ -506,7 +522,30 @@ public class RequestLifecycle {
                 protected @Nullable ExecutionFlow<?> doRouteMatchAsync(HttpRequest<?> request) {
                     try {
                         doRouteMatch(request);
-                        return null;
+                        PendingRouteMatch<Object, Object> pending = pendingMatch;
+                        if (pending == null) {
+                            return null;
+                        }
+                        // the route depends on the body: read it, and choose
+                        pendingMatch = null;
+                        return routeExecutor.bodyRouteSelector()
+                            .select(request, pending, PropagatedContext.getOrEmpty(), new BodyRouteSelector.Waits() {
+                                @Override
+                                public void onPendingLocation(HttpRequest<?> waiting, CompletionStage<?> located) {
+                                    RequestLifecycle.this.onPendingLocation(waiting, located);
+                                }
+
+                                @Override
+                                public @Nullable Runnable whenAbandoned(HttpRequest<?> waiting, Runnable action) {
+                                    return RequestLifecycle.this.whenAbandoned(waiting, action);
+                                }
+                            })
+                            .map(chosen -> {
+                                routeMatch = chosen.match();
+                                bodyUnmatched = !chosen.bodyMet();
+                                matched(request);
+                                return Boolean.TRUE;
+                            });
                     } catch (RuntimeException e) {
                         CompletionStage<?> pending = RouteLocator.pendingLocation(e);
                         if (pending == null) {
@@ -527,6 +566,13 @@ public class RequestLifecycle {
                     // Store it a field because RouteExecutor#findRouteMatch in some cases stores and sets something different
                     // This can be corrected after Cors / Options stuff migrated to pre-matching
                     routeMatch = matchRoute(request);
+                    if (pendingMatch == null) {
+                        matched(request);
+                    }
+                }
+
+                private void matched(HttpRequest<?> request) {
+                    UriRouteMatch<Object, Object> routeMatch = this.routeMatch;
                     if (routeMatch == null) {
                         if (LOG.isTraceEnabled()) {
                             LOG.trace("Not matched route for request {} - {}", request.getMethodName(), request.getUri().getPath());
@@ -562,13 +608,39 @@ public class RequestLifecycle {
      * pass on, and before the filters that apply to the matched route. A failure is answered
      * like a failure of the route.
      *
+     * <p>When the route depends on the body of the request, see
+     * {@link io.micronaut.web.router.builder.RequestCondition.Body}, no match is returned, and the
+     * route is chosen once the body is read.</p>
+     *
      * @param request The request, after the pre-matching filters
-     * @return The match of the route, or {@code null} if no route matches
+     * @return The match of the route, or {@code null} if no route matches, or it depends on the body
      * @since 5.3.0
      */
     @Internal
     protected @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request) {
-        return routeExecutor.findRouteMatch(request);
+        // the rejection of a route selector is the one of this routing
+        RouteRejections.clear(request);
+        Router router = routeExecutor.router;
+        if (!router.hasBodyConditions()) {
+            return routeExecutor.findRouteMatch(request);
+        }
+        try {
+            // the closest match as if every body condition were met: when it has none, the body
+            // does not decide, e.g. for the routes of a route locator without body conditions
+            UriRouteMatch<Object, Object> match = routeExecutor.findRouteMatch(request);
+            if (match == null || match.getRouteInfo().getBodyConditions().isEmpty()) {
+                return match;
+            }
+        } catch (DuplicateRouteException e) {
+            // routes of the same rank, which the body may tell apart
+        }
+        RouteResolution<Object, Object> resolution = router.resolve(request);
+        if (resolution instanceof RouteResolution.Pending<Object, Object> pending) {
+            // chosen once the body is read, see doRouteMatchAsync
+            pendingMatch = pending.pending();
+            return null;
+        }
+        return resolution.matchOrNull();
     }
 
     /**
@@ -587,6 +659,17 @@ public class RequestLifecycle {
                                                                   @Nullable UriRouteMatch<Object, Object> routeMatch,
                                                                   PropagatedContext propagatedContext) {
         if (routeMatch == null) {
+            if (bodyUnmatched) {
+                // as for a condition the request does not meet: never a 405, 415 or 406 of the
+                // routes whose body conditions the body did not meet, nor a file on their path
+                return onStatusError(request, new NotFoundException(), null, propagatedContext);
+            }
+            // a route selector that rejected the request chose a route of the path: the route
+            // answers, not a file of the path, which is not opened
+            DefaultUriRouteMatch<?, ?> rejected = RouteRejections.get(request);
+            if (rejected != null) {
+                return onRejection(request, rejected, propagatedContext);
+            }
             //Check if there is a file for the route before returning route not found
             FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
             if (fileCustomizableResponseType != null) {
@@ -637,7 +720,97 @@ public class RequestLifecycle {
     private ExecutionFlow<HttpResponse<?>> createDefaultErrorResponseFlow(HttpRequest<?> httpRequest,
                                                                           Throwable cause,
                                                                           PropagatedContext propagatedContext) {
+        onUnhandledError(cause);
         return propagatedContext.propagate(() -> ExecutionFlow.just(routeExecutor.createDefaultErrorResponse(httpRequest, cause)));
+    }
+
+    /**
+     * The routes of the path of a request for every HTTP method, see
+     * {@link io.micronaut.web.router.Router#findAny(HttpRequest)}. The route of a WebSocket only
+     * matches an upgrade request, see ServerWebSocketProcessor: the request is taken as one during
+     * the lookup, so that it also finds the WebSocket at its path.
+     */
+    private List<UriRouteMatch<Object, Object>> findAnyRoutes(HttpRequest<?> request) {
+        return WebSocketUpgradeCondition.assumingUpgrade(request, () -> routeExecutor.router.findAny(request));
+    }
+
+    private static @Nullable HttpStatus rejectionStatus(UriRouteMatch<?, ?> match) {
+        return match instanceof DefaultUriRouteMatch<?, ?> defaultMatch ? defaultMatch.rejectionStatus() : null;
+    }
+
+    /**
+     * Answer the request with the rejection of a route selector while it was routed, see
+     * {@link io.micronaut.web.router.spi.RouteMatchSelector.Selection#rejectionStatus()}, e.g. for
+     * a lifecycle that matches its routes differently, such as the upgrade of a WebSocket.
+     *
+     * @param request           The request
+     * @param propagatedContext The propagated context
+     * @return The response flow, or {@code null} if no route selector rejected the request
+     * @since 5.3.0
+     */
+    @Internal
+    protected final @Nullable ExecutionFlow<HttpResponse<?>> rejectionResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
+        DefaultUriRouteMatch<?, ?> rejected = RouteRejections.get(request);
+        return rejected == null ? null : onRejection(request, rejected, propagatedContext);
+    }
+
+    /**
+     * Answer a request that a route selector rejected, see
+     * {@link io.micronaut.web.router.spi.RouteMatchSelector.Selection#rejectionStatus()}, as a
+     * failure of the rejected route: the status routes and the error routes of the route, of its
+     * groups and of its locations first, then the global ones.
+     *
+     * @param request           The request
+     * @param rejected          The rejected match
+     * @param propagatedContext The propagated context
+     * @return The response flow
+     */
+    private ExecutionFlow<HttpResponse<?>> onRejection(HttpRequest<?> request, UriRouteMatch<?, ?> rejected,
+                                                       PropagatedContext propagatedContext) {
+        HttpStatus status = Objects.requireNonNull(rejectionStatus(rejected));
+        HttpStatusException cause = status == HttpStatus.UNSUPPORTED_MEDIA_TYPE
+            ? new UnsupportedMediaException(String.valueOf(request.getContentType().orElse(null)),
+                rejected.getRouteInfo().getConsumes().stream().map(MediaType::toString).toList())
+            : new NotAcceptableException(request.accept().stream().map(MediaType::toString).toList(),
+                rejected.getRouteInfo().getProduces().stream().map(MediaType::toString).toList());
+        // the error routes of the groups of the rejected route, and of its locations, find them
+        // from the route match of the request
+        RouteAttributes.setRouteMatch(request, rejected);
+        RouteAttributes.setRouteInfo(request, rejected.getRouteInfo());
+        // the routes of the rejected route, of its class, its groups and its locations, before the global ones
+        Router router = routeExecutor.router;
+        Class<?> declaringType = rejected.getDeclaringType();
+        RouteMatch<?> statusRoute = router.findStatusRoute(declaringType, status, request).orElse(null);
+        if (statusRoute == null) {
+            statusRoute = GroupErrorRoutes.findStatusRoute(request, rejected.getRouteInfo(), status.getCode());
+        }
+        if (statusRoute != null) {
+            return executeRoute(request, propagatedContext, statusRoute);
+        }
+        RouteMatch<?> errorRoute = router.findErrorRoute(declaringType, cause, request).orElse(null);
+        if (errorRoute == null) {
+            errorRoute = GroupErrorRoutes.findErrorRoute(request, rejected.getRouteInfo(), cause);
+        }
+        if (errorRoute != null) {
+            // as for the failure of a route, see RouteExecutor#findErrorRoute: its arguments, and an
+            // error route that fails is answered with the default error response
+            routeExecutor.requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(errorRoute, request);
+            return handleErrorRoute(request, propagatedContext, errorRoute, cause);
+        }
+        return onStatusError(request, cause, rejected.getDeclaringType(), propagatedContext);
+    }
+
+    /**
+     * Called when an error is answered with the default error response because no error route
+     * or exception handler handled it. The request may have been replaced by a filter, so the
+     * server reports the failure to the request it received, see
+     * {@link io.micronaut.http.ServerHttpRequest#whenResponseCompleted}.
+     *
+     * @param cause The error
+     * @since 5.3.0
+     */
+    protected void onUnhandledError(Throwable cause) {
+        // nothing to report by default
     }
 
     final ExecutionFlow<HttpResponse<?>> onRouteMiss(HttpRequest<?> httpRequest, PropagatedContext propagatedContext) {
@@ -649,11 +822,14 @@ public class RequestLifecycle {
             LOG.debug("No matching route: {} {}", httpMethod, httpRequest.getUri());
         }
 
-        // if there is no route present try to locate a route that matches a different HTTP method.
-        // The route of a WebSocket only matches an upgrade request, see ServerWebSocketProcessor:
-        // the request is taken as one during the lookup, so that it also finds the WebSocket at its path
-        final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = WebSocketUpgradeCondition.assumingUpgrade(httpRequest,
-            () -> routeExecutor.router.findAny(httpRequest));
+        // the rejection of a route selector, as the router decided it while it routed the request
+        DefaultUriRouteMatch<?, ?> rejected = RouteRejections.get(httpRequest);
+        if (rejected != null) {
+            return onRejection(httpRequest, rejected, propagatedContext);
+        }
+        // if there is no route present try to locate a route that matches a different HTTP method,
+        // with the WebSocket of the path, see findAnyRoutes
+        final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = findAnyRoutes(httpRequest);
         final Collection<MediaType> acceptedTypes = httpRequest.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);
 
@@ -777,6 +953,21 @@ public class RequestLifecycle {
      */
     protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
         // nothing to abandon by default: a server that knows when the client goes away overrides this
+    }
+
+    /**
+     * Run an action when the client abandons the request, e.g. closes the connection, while its
+     * route is chosen by its body, see {@link io.micronaut.web.router.builder.RequestCondition.Body}:
+     * the request stops waiting for an asynchronous body condition then.
+     *
+     * @param request The request
+     * @param action  The action
+     * @return Removes the action, or {@code null} if the server cannot tell when the client goes away
+     * @since 5.3.0
+     */
+    protected @Nullable Runnable whenAbandoned(HttpRequest<?> request, Runnable action) {
+        // nothing to abandon by default: a server that knows when the client goes away overrides this
+        return null;
     }
 
     /**
