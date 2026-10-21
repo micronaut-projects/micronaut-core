@@ -46,7 +46,7 @@ final class RemoteHostElement implements LogElement {
 
     @Override
     public String onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
-        return metadata.remoteAddress().flatMap(ConnectionMetadata::getHostName).orElse(ConstantElement.UNKNOWN_VALUE);
+        return metadata.remoteAddress().flatMap(ConnectionMetadata::getHostString).orElse(ConstantElement.UNKNOWN_VALUE);
     }
 
     @Override

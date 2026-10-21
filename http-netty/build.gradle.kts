@@ -63,6 +63,8 @@ tasks {
         filter {
             excludeTestsMatching("io.micronaut.http.netty.allocator.DefaultAllocatorSpec")
         }
+        // the loom carrier tests need access to the virtual thread scheduler internals
+        jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
     }
     check {
         dependsOn(allocatorTest)
