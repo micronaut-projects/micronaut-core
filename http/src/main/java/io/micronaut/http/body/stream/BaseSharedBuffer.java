@@ -483,7 +483,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                     if (buffer == null) {
                         buffer = new ArrayList<>();
                     }
-                    buffer.add(rb.move());
+                    ReadBufferCoalescing.add(buffer, rb.move(), readBufferFactory);
                 }
             }
             working = false;
