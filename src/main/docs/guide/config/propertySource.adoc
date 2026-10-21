@@ -31,6 +31,7 @@ The value can be a single string, a list, or indexed entries (`micronaut.config.
 
 Import locations and structured declaration values support property placeholders, including defaults and custom property expression resolvers.
 Placeholders are resolved before selecting the provider or parsing the connection string, using the current configuration and properties from imports already loaded.
+Declarations in one property source are resolved together, so a later entry cannot reference properties supplied by an earlier entry in the same list; use a nested import for that dependency.
 For example, `file://${CONFIG_DIRECTORY:/etc/myapp}/shared.properties` selects a directory from configuration or an environment variable, defaulting to `/etc/myapp`.
 A missing placeholder without a default fails configuration loading even when the import has the `optional:` prefix; that prefix permits a missing import target.
 

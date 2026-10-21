@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -215,6 +216,45 @@ public class ConfigImportPlaceholdersTest {
             assertTrue(exception.getMessage().contains("test://localhost/root"));
         } finally {
             context.close();
+        }
+    }
+
+    @Test
+    void deduplicatesStructuredImportsByArrayContents() {
+        Map<String, Object> database = Map.of(
+            "provider", "test", "resource-path", "/shared", "includes", new String[]{"${database.pattern}"});
+        Map<String, Object> equivalent = Map.of(
+            "provider", "test", "resource-path", "/shared", "includes", new String[]{"DB_.*"});
+        Map<String, Object> different = Map.of(
+            "provider", "test", "resource-path", "/shared", "includes", new String[]{"API_.*"});
+        RecordingImporter importer = new RecordingImporter();
+        try (ApplicationContext context = start(importer, null, source("structured-arrays", Map.of(
+            "micronaut.config.import", List.of(database, equivalent, different),
+            "database.pattern", "DB_.*"
+        )))) {
+            assertEquals(2, importer.imports.size());
+            assertArrayEquals(new String[]{"API_.*"}, (String[]) importer.structuredValues.get("includes"));
+            assertArrayEquals(new String[]{"${database.pattern}"}, (String[]) database.get("includes"));
+        }
+    }
+
+    @Test
+    void detectsStructuredImportCycleWithNestedArrays() {
+        Map<String, Object> declaration = Map.of(
+            "provider", "test", "resource-path", "/cycle",
+            "options", List.of(Map.of("includes", new Object[]{new String[]{"DB_.*"}})));
+        AtomicInteger calls = new AtomicInteger();
+        RecordingImporter importer = new RecordingImporter(ignored -> {
+            if (calls.incrementAndGet() > 8) {
+                throw new IllegalStateException("Cycle detection did not stop a repeated structured import");
+            }
+            return Optional.of(source("structured-cycle", Map.of("micronaut.config.import", declaration)));
+        });
+        try (ApplicationContext context = newContext(importer, null,
+            source("structured-cycle-root", Map.of("micronaut.config.import", declaration)))) {
+            ConfigurationException exception = assertThrows(ConfigurationException.class, context::start);
+            assertTrue(exception.getMessage().contains("Cycle detected"));
+            assertEquals(1, calls.get());
         }
     }
 

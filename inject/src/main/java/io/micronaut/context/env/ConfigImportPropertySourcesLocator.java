@@ -604,7 +604,25 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
                     // Fall through to default
                 }
             }
-            return provider() + ":" + filteredValues;
+            return provider() + ":" + identityValue(filteredValues);
+        }
+
+        private static @Nullable Object identityValue(@Nullable Object value) {
+            if (value instanceof Map<?, ?> map) {
+                Map<Object, Object> normalized = new LinkedHashMap<>(map.size());
+                map.forEach((key, entry) -> normalized.put(key, identityValue(entry)));
+                return normalized;
+            }
+            if (value instanceof Iterable<?> iterable) {
+                List<Object> normalized = new ArrayList<>();
+                iterable.forEach(entry -> normalized.add(identityValue(entry)));
+                return normalized;
+            }
+            if (value instanceof Object[] array) {
+                // Placeholder resolution copies arrays; import identities must use their contents.
+                return Arrays.stream(array).map(StructuredImportDeclaration::identityValue).toList();
+            }
+            return value;
         }
 
         @Override
