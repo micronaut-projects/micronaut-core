@@ -780,18 +780,22 @@ public class RequestLifecycle {
         // the routes of the rejected route, of its class, its groups and its locations, before the global ones
         Router router = routeExecutor.router;
         Class<?> declaringType = rejected.getDeclaringType();
-        RouteMatch<?> scoped = router.findStatusRoute(declaringType, status, request).orElse(null);
-        if (scoped == null) {
-            scoped = GroupErrorRoutes.findStatusRoute(request, rejected.getRouteInfo(), status.getCode());
+        RouteMatch<?> statusRoute = router.findStatusRoute(declaringType, status, request).orElse(null);
+        if (statusRoute == null) {
+            statusRoute = GroupErrorRoutes.findStatusRoute(request, rejected.getRouteInfo(), status.getCode());
         }
-        if (scoped == null) {
-            scoped = router.findErrorRoute(declaringType, cause, request).orElse(null);
+        if (statusRoute != null) {
+            return executeRoute(request, propagatedContext, statusRoute);
         }
-        if (scoped == null) {
-            scoped = GroupErrorRoutes.findErrorRoute(request, rejected.getRouteInfo(), cause);
+        RouteMatch<?> errorRoute = router.findErrorRoute(declaringType, cause, request).orElse(null);
+        if (errorRoute == null) {
+            errorRoute = GroupErrorRoutes.findErrorRoute(request, rejected.getRouteInfo(), cause);
         }
-        if (scoped != null) {
-            return executeRoute(request, propagatedContext, scoped);
+        if (errorRoute != null) {
+            // as for the failure of a route, see RouteExecutor#findErrorRoute: its arguments, and an
+            // error route that fails is answered with the default error response
+            routeExecutor.requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(errorRoute, request);
+            return handleErrorRoute(request, propagatedContext, errorRoute, cause);
         }
         return onStatusError(request, cause, rejected.getDeclaringType(), propagatedContext);
     }

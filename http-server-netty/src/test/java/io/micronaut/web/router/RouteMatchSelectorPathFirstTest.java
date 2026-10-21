@@ -51,6 +51,8 @@ class RouteMatchSelectorPathFirstTest {
 
     private static final String SPEC_NAME = "RouteMatchSelectorPathFirstTest";
 
+    private static final java.util.concurrent.atomic.AtomicInteger FAILING_HANDLER_CALLS = new java.util.concurrent.atomic.AtomicInteger();
+
     private static ApplicationContext context;
     private static EmbeddedServer server;
     private static HttpClient client;
@@ -193,6 +195,15 @@ class RouteMatchSelectorPathFirstTest {
         assertEquals(406, handshake.getResponse().statusCode());
     }
 
+    @Test
+    void aFailingGroupErrorRouteOfARejectionRunsOnce() throws Exception {
+        FAILING_HANDLER_CALLS.set(0);
+        java.net.http.HttpResponse<String> response = send("GET", "/errfail/fixed", "Accept", "text/plain");
+        // as for the failure of a route: the default error response, and the handler ran once
+        assertEquals(500, response.statusCode());
+        assertEquals(1, FAILING_HANDLER_CALLS.get());
+    }
+
     private static Set<String> allowed(java.net.http.HttpResponse<?> response) {
         return response.headers().allValues("Allow").stream()
             .flatMap(allow -> Arrays.stream(allow.split(",")))
@@ -274,6 +285,14 @@ class RouteMatchSelectorPathFirstTest {
                 group.templates(TestPathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(TestPathFirstColonRouteTemplateEngine.INSTANCE);
                 group.error(io.micronaut.http.server.exceptions.NotAcceptableException.class, (request, error) -> status406("group error"));
                 group.GET("/err/fixed").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("fixed"));
+            });
+            routes.group(group -> {
+                group.templates(TestPathFirstColonRouteTemplateEngine.INSTANCE).selectedBy(TestPathFirstColonRouteTemplateEngine.INSTANCE);
+                group.error(RuntimeException.class, (request, error) -> {
+                    FAILING_HANDLER_CALLS.incrementAndGet();
+                    throw new IllegalStateException("the error route fails");
+                });
+                group.GET("/errfail/fixed").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok("fixed"));
             });
             // a WebSocket has a URI template, and the selector of the routes of its path
             routes.GET("/ws/fixed").selectedBy(TestPathFirstColonRouteTemplateEngine.INSTANCE)
