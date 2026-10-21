@@ -25,6 +25,7 @@ import io.micronaut.context.DisabledBean;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.RuntimeBeanDefinition;
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.event.BeanDestroyedEventListener;
@@ -122,6 +123,15 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     @Nullable
     @SuppressWarnings("java:S3077")
     private volatile ProducersByDefinitionName producersByDefinitionName;
+
+    /**
+     * The producers of {@link #beans} whose reference declares {@link Replaces}, found on the first lookup that
+     * needs them, with the number of producers they were found among: a {@link io.micronaut.context.RuntimeBeanDefinition}
+     * added since is appended to the producers, which the count detects.
+     */
+    @Nullable
+    @SuppressWarnings("java:S3077")
+    private volatile ReplacingProducers replacingProducers;
 
     private final BeanResolutionCustomizer beanResolutionCustomizer;
 
@@ -477,6 +487,37 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     @Override
+    public Iterable<BeanDefinition<Object>> getReplacingBeans(BeanContext beanContext) {
+        Beans current = beans;
+        if (current == null) {
+            return List.of();
+        }
+        List<BeanDefinitionProducer> producers = replacingProducers(current);
+        if (producers.isEmpty()) {
+            return List.of();
+        }
+        return getBeanDefinitions(producers, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+    }
+
+    private List<BeanDefinitionProducer> replacingProducers(Beans current) {
+        // read before the producers are, so that one added meanwhile has the next lookup find them again
+        int count = current.all.size();
+        ReplacingProducers cached = replacingProducers;
+        if (cached != null && cached.beans == current && cached.count == count) {
+            return cached.producers;
+        }
+        List<BeanDefinitionProducer> producers = new ArrayList<>(2);
+        for (BeanDefinitionProducer producer : current.all) {
+            BeanDefinitionReference<?> reference = producer.reference;
+            if (reference != null && reference.hasAnnotation(Replaces.class)) {
+                producers.add(producer);
+            }
+        }
+        replacingProducers = new ReplacingProducers(current, count, producers);
+        return producers;
+    }
+
+    @Override
     public List<DisabledBean<?>> getDisabledBeans(BeanContext beanContext) {
         return disabledBeans.stream()
             .map(producer -> (DisabledBean<?>) producer.reference)
@@ -672,6 +713,9 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     private record ProducersByDefinitionName(Beans beans, Map<String, List<BeanDefinitionProducer>> index) {
+    }
+
+    private record ReplacingProducers(Beans beans, int count, List<BeanDefinitionProducer> producers) {
     }
 
     private record Beans(

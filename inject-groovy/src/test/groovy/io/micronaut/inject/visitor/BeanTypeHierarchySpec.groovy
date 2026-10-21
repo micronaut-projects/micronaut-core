@@ -1,6 +1,8 @@
 package io.micronaut.inject.visitor
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.core.type.TypeHierarchies
+import io.micronaut.core.type.TypeHierarchy
 
 class BeanTypeHierarchySpec extends AbstractBeanDefinitionSpec {
 
@@ -108,5 +110,35 @@ class Plain implements Runnable {
     void run() { }
 }
 ''').getTypeHierarchy().isPresent()
+    }
+    void "the generic hierarchy of the introspected type is recorded beside the introspection"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Child', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import java.util.function.Supplier
+
+abstract class Base<T> implements Supplier<T> {
+}
+
+@Introspected(hierarchy = true)
+class Child<T extends Number> extends Base<T> implements Comparable<Child<T>> {
+    T get() { null }
+    int compareTo(Child<T> other) { 0 }
+}
+''')
+        def hierarchy = introspection.getTypeHierarchy().orElseThrow()
+        def classLoader = introspection.beanType.classLoader
+        def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName('test.Child', 'test')).getConstructor().newInstance()
+
+        expect:
+        record.type == introspection.beanType
+        record.typeVariables*.name == ['T']
+        record.typeVariables[0].type == Number
+        record.genericSuperclass.get().type == classLoader.loadClass('test.Base')
+        record.genericInterfaces*.type == [Comparable]
+        hierarchy.typeClosure.first().type == introspection.beanType
+        hierarchy.typeClosure.last().type == Object
     }
 }

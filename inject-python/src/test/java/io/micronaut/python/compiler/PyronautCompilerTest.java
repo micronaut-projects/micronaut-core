@@ -54,6 +54,61 @@ final class PyronautCompilerTest {
     }
 
     @Test
+    void compilesDependencyPythonPackageWithoutExecutingItsInitializer(@TempDir Path directory) throws Exception {
+        assertCompilesDependencyPythonImport(directory, "micronaut.library_helper", "micronaut/library_helper/__init__.py");
+    }
+
+    @Test
+    void compilesDependencyPythonModuleWithoutExecutingIt(@TempDir Path directory) throws Exception {
+        assertCompilesDependencyPythonImport(directory, "micronaut.library_module", "micronaut/library_module.py");
+    }
+
+    private static void assertCompilesDependencyPythonImport(Path directory, String moduleName, String modulePath) throws Exception {
+        String vfs = "META-INF/GRAALPY-VFS/micronaut-application/";
+        String resource = vfs + "src/" + modulePath;
+        String dependencySource = """
+            def helper():
+                return "dependency"
+
+            raise AssertionError("Dependency Python must not execute during compilation")
+            """;
+        String filesList = "/" + vfs + "\n/" + vfs + "src/\n/" + vfs + "src/micronaut/\n";
+        if (modulePath.endsWith("/__init__.py")) {
+            filesList += "/" + resource.substring(0, resource.lastIndexOf('/') + 1) + "\n";
+        }
+        filesList += "/" + resource + "\n";
+        Path dependency = directory.resolve("python-library.jar");
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(dependency))) {
+            jar.putNextEntry(new JarEntry(resource));
+            jar.write(dependencySource.getBytes(StandardCharsets.UTF_8));
+            jar.closeEntry();
+            jar.putNextEntry(new JarEntry(vfs + "fileslist.txt"));
+            jar.write(filesList.getBytes(StandardCharsets.UTF_8));
+            jar.closeEntry();
+        }
+
+        String source = """
+            from %s import helper
+
+            class Consumer:
+                def value(self) -> str:
+                    return helper()
+            """.formatted(moduleName);
+        ClassLoader classLoader = PyronautCompiler.builder()
+            .pythonCode(source)
+            .classpath(List.of(dependency.toFile()))
+            .build()
+            .buildClassLoader();
+
+        assertNotNull(classLoader.loadClass("pyronaut_application.PyronautMain"));
+        assertNotNull(classLoader.getResource(resource));
+        try (var input = classLoader.getResourceAsStream(vfs + "src/__main__.py")) {
+            assertNotNull(input);
+            assertEquals(source, new String(input.readAllBytes(), StandardCharsets.UTF_8));
+        }
+    }
+
+    @Test
     void visitsAPythonClassOnceWhenItsAnnotationsAreCopiedForReflection(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python"));
         Path output = Files.createDirectories(directory.resolve("classes"));

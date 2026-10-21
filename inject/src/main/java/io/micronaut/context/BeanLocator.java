@@ -206,6 +206,11 @@ public interface BeanLocator {
     /**
      * Get all beans of the given type.
      *
+     * <p>The beans are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an injected
+     * {@code List}: a bean implementing {@link io.micronaut.core.order.Ordered} supplies its own order, otherwise
+     * the {@link io.micronaut.core.annotation.Order} of its definition is used. Beans with the same order keep
+     * their definition order, which depends on the class path.</p>
+     *
      * @param beanType The bean type
      * @param <T>      The bean type parameter
      * @return The found beans
@@ -214,6 +219,11 @@ public interface BeanLocator {
 
     /**
      * Get all beans of the given type.
+     *
+     * <p>The beans are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an injected
+     * {@code List}: a bean implementing {@link io.micronaut.core.order.Ordered} supplies its own order, otherwise
+     * the {@link io.micronaut.core.annotation.Order} of its definition is used. Beans with the same order keep
+     * their definition order, which depends on the class path.</p>
      *
      * @param beanType  The bean type
      * @param qualifier The qualifier
@@ -224,6 +234,11 @@ public interface BeanLocator {
 
     /**
      * Get all beans of the given type.
+     *
+     * <p>The beans are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an injected
+     * {@code List}: a bean implementing {@link io.micronaut.core.order.Ordered} supplies its own order, otherwise
+     * the {@link io.micronaut.core.annotation.Order} of its definition is used. Beans with the same order keep
+     * their definition order, which depends on the class path.</p>
      *
      * @param beanType The potenitally parameterized bean type
      * @param <T>      The bean type parameter
@@ -237,6 +252,11 @@ public interface BeanLocator {
 
     /**
      * Get all beans of the given type.
+     *
+     * <p>The beans are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an injected
+     * {@code List}: a bean implementing {@link io.micronaut.core.order.Ordered} supplies its own order, otherwise
+     * the {@link io.micronaut.core.annotation.Order} of its definition is used. Beans with the same order keep
+     * their definition order, which depends on the class path.</p>
      *
      * @param beanType  The potenitally parameterized bean type
      * @param qualifier The qualifier
@@ -252,6 +272,11 @@ public interface BeanLocator {
     /**
      * Obtain a stream of beans of the given type.
      *
+     * <p>The beans are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an injected
+     * {@code List}: a bean implementing {@link io.micronaut.core.order.Ordered} supplies its own order, otherwise
+     * the {@link io.micronaut.core.annotation.Order} of its definition is used. Beans with the same order keep
+     * their definition order, which depends on the class path.</p>
+     *
      * @param beanType  The bean type
      * @param qualifier The qualifier
      * @param <T>       The bean concrete type
@@ -262,6 +287,11 @@ public interface BeanLocator {
 
     /**
      * Obtain a stream of beans of the given type.
+     *
+     * <p>The beans are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an injected
+     * {@code List}: a bean implementing {@link io.micronaut.core.order.Ordered} supplies its own order, otherwise
+     * the {@link io.micronaut.core.annotation.Order} of its definition is used. Beans with the same order keep
+     * their definition order, which depends on the class path.</p>
      *
      * @param beanType  The potentially parameterized bean type
      * @param qualifier The qualifier
@@ -279,6 +309,11 @@ public interface BeanLocator {
 
     /**
      * Obtain a stream of beans of the given type.
+     *
+     * <p>The beans are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an injected
+     * {@code List}: a bean implementing {@link io.micronaut.core.order.Ordered} supplies its own order, otherwise
+     * the {@link io.micronaut.core.annotation.Order} of its definition is used. Beans with the same order keep
+     * their definition order, which depends on the class path.</p>
      *
      * @param beanType  The potentially parameterized bean type
      * @param <T>       The bean concrete type
@@ -372,6 +407,11 @@ public interface BeanLocator {
 
     /**
      * Obtain a stream of beans of the given type.
+     *
+     * <p>The beans are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an injected
+     * {@code List}: a bean implementing {@link io.micronaut.core.order.Ordered} supplies its own order, otherwise
+     * the {@link io.micronaut.core.annotation.Order} of its definition is used. Beans with the same order keep
+     * their definition order, which depends on the class path.</p>
      *
      * @param beanType The bean type
      * @param <T>      The bean concrete type

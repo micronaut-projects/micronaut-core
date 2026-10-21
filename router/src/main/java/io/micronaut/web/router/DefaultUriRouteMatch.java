@@ -20,6 +20,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.DelegatingExecutableMethod;
@@ -28,8 +30,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Default implementation of the {@link RouteMatch} interface for matches to URIs.
@@ -45,8 +49,15 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     private final UriMatchInfo matchInfo;
     private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
+    private final @Nullable MediaType selectedMediaType;
+    /**
+     * The status a route selector rejected the request with, {@code 406} or {@code 415}, see
+     * {@link io.micronaut.web.router.spi.RouteMatchSelector.Selection#rejectionStatus()}.
+     */
+    private final @Nullable HttpStatus rejectionStatus;
     @Nullable
     private Map<String, Object> variables;
+    private @Nullable Map<String, Object> rawVariables;
     private @Nullable ExecutableMethod<T, R> inheritingMethod;
 
     /**
@@ -59,10 +70,75 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
                          UriRouteInfo<T, R> routeInfo,
                          Charset defaultCharset, ConversionService conversionService
     ) {
+        this(matchInfo, routeInfo, defaultCharset, conversionService, null);
+    }
+
+    DefaultUriRouteMatch(UriMatchInfo matchInfo,
+                                 UriRouteInfo<T, R> routeInfo,
+                                 Charset defaultCharset,
+                                 ConversionService conversionService,
+                                 @Nullable MediaType selectedMediaType) {
+        this(matchInfo, routeInfo, defaultCharset, conversionService, selectedMediaType, null);
+    }
+
+    private DefaultUriRouteMatch(UriMatchInfo matchInfo,
+                                 UriRouteInfo<T, R> routeInfo,
+                                 Charset defaultCharset,
+                                 ConversionService conversionService,
+                                 @Nullable MediaType selectedMediaType,
+                                 @Nullable HttpStatus rejectionStatus) {
         super(routeInfo, conversionService);
         this.matchInfo = matchInfo;
         this.uriRouteInfo = routeInfo;
         this.defaultCharset = defaultCharset;
+        this.selectedMediaType = selectedMediaType;
+        this.rejectionStatus = rejectionStatus;
+    }
+
+    /**
+     * @param mediaType The media type of the response a route selector negotiated
+     * @return A new match of the same route and path with the media type
+     */
+    DefaultUriRouteMatch<T, R> withSelectedMediaType(MediaType mediaType) {
+        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, mediaType);
+    }
+
+    /**
+     * @param matchInfo The match info of the same route, e.g. with the variables of the prefixes of locators
+     * @return A new match with the match info and the negotiated media type of this match
+     */
+    DefaultUriRouteMatch<T, R> withMatchInfo(UriMatchInfo matchInfo) {
+        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, selectedMediaType, rejectionStatus);
+    }
+
+    /**
+     * @param status The status a route selector rejected the request with, {@code 406} or {@code 415}
+     * @return A new match of the same route and path, rejected with the status
+     */
+    DefaultUriRouteMatch<T, R> withRejectionStatus(HttpStatus status) {
+        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, selectedMediaType, status);
+    }
+
+    /**
+     * The status the route selector of the route rejected the request with: a match the router
+     * finds for the routes of any method, see {@link Router#findAny(io.micronaut.http.HttpRequest)},
+     * which the request is answered with {@code 406} or {@code 415} for, with the types of the route.
+     *
+     * @return The status, or {@code null} if the match is not rejected
+     * @since 5.3.0
+     */
+    public @Nullable HttpStatus rejectionStatus() {
+        return rejectionStatus;
+    }
+
+    @Override
+    public Optional<MediaType> getSelectedMediaType() {
+        return Optional.ofNullable(selectedMediaType);
+    }
+
+    @Override
+    @Nullable MediaType selectedMediaType() {
+        return selectedMediaType;
     }
 
     /**
@@ -132,6 +208,32 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
             }
         }
         return variables;
+    }
+
+    @Override
+    public Map<String, Object> getRawVariableValues() {
+        return Collections.unmodifiableMap(rawVariableValues());
+    }
+
+    @Override
+    Map<String, Object> rawVariableValues() {
+        Map<String, Object> raw = rawVariables;
+        if (raw == null) {
+            Map<String, Object> matchVariables = matchInfo.getVariableValues();
+            if (matchVariables.containsValue(null)) {
+                // an optional variable that is absent has no value
+                raw = CollectionUtils.newLinkedHashMap(matchVariables.size());
+                for (Map.Entry<String, Object> entry : matchVariables.entrySet()) {
+                    if (entry.getValue() != null) {
+                        raw.put(entry.getKey(), entry.getValue());
+                    }
+                }
+            } else {
+                raw = matchVariables;
+            }
+            rawVariables = raw;
+        }
+        return raw;
     }
 
     @Override

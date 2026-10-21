@@ -26,6 +26,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.annotation.AnnotationConversionUtils;
+import io.micronaut.inject.ast.AnnotationElement;
+import io.micronaut.inject.ast.AnnotationMemberElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
@@ -65,7 +67,8 @@ import java.util.Objects;
  * with {@link AnnotationConversionUtils} for classes, and with a generated {@code toAnnotation_<Type>} method for each
  * nested annotation type. {@code hashCode} and {@code equals} are generated
  * over the members, as {@link Annotation} defines them; the annotation value is created when first asked for and kept. The builder extends {@link AbstractAnnotationBuilder} and adds the description of the
- * annotation type: the members and the defaults.</p>
+ * annotation type, the members and the defaults, and {@link AnnotationBuilder#toMap(Annotation)}, which reads the
+ * members of any annotation of the type through its accessors.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -82,6 +85,7 @@ final class AnnotationBuilderWriter {
     private static final ClassTypeDef OBJECTS = ClassTypeDef.of(Objects.class);
     private static final String CONVERSION_SERVICE_PARAMETER = "conversionService";
     private static final String TO_STRING = "toString";
+    private static final String TO_MAP = "toMap";
     private static final String ANNOTATION_VALUE_METHOD = "annotationValue";
     private static final String HASH_CODE = "hashCode";
     private static final String EQUALS = "equals";
@@ -94,14 +98,14 @@ final class AnnotationBuilderWriter {
     /**
      * Writes the builder and the implementation for an annotation type.
      *
-     * @param holderName     The binary name of the type or package that lists the annotation, the generated
-     *                       classes are placed next to it
-     * @param annotationType The annotation type
-     * @param origin         The originating element
-     * @param context        The visitor context
+     * @param holderName          The binary name of the type or package that owns the builder, the generated
+     *                            classes are placed next to it
+     * @param annotationType      The annotation type
+     * @param context             The visitor context
+     * @param originatingElements The originating elements, at least one
      * @throws IOException When a class cannot be written
      */
-    static void write(String holderName, ClassElement annotationType, Element origin, VisitorContext context) throws IOException {
+    static void write(String holderName, ClassElement annotationType, VisitorContext context, Element... originatingElements) throws IOException {
         String annotationName = annotationType.getName();
         String baseName = holderName + "$" + AnnotationBuilderRegistry.mangle(annotationName);
         String builderName = baseName + AnnotationBuilderRegistry.BUILDER_SUFFIX;
@@ -112,16 +116,28 @@ final class AnnotationBuilderWriter {
         // the type of an annotation is an interface, which a type made from a name does not know, and the calls of
         // its accessors have to be interface calls: a type made from the definition of an interface knows it
         ClassTypeDef annotationTypeDef = ClassTypeDef.of(InterfaceDef.builder(annotationName).build());
-        write(implementation(implementationName, annotationTypeDef, members), implementationName, origin, context);
-        write(builder(builderName, implementationName, annotationType, annotationTypeDef, context), builderName, origin, context);
-        context.visitServiceDescriptor(AnnotationBuilder.class, builderName, origin);
+        write(implementation(implementationName, annotationTypeDef, members), implementationName, context, originatingElements);
+        write(builder(builderName, implementationName, annotationType, annotationTypeDef, members, context), builderName, context, originatingElements);
+        context.visitServiceDescriptor(AnnotationBuilder.class, builderName, originatingElements[0]);
     }
 
     /**
-     * The members of the annotation type: the abstract methods of a Java annotation, the properties of a Kotlin one.
+     * The members of the annotation type, in declaration order: the methods of a Java or Groovy annotation, the
+     * properties of a Kotlin one.
+     *
+     * @param annotationType The annotation type
+     * @return The members
      */
-    private static List<Member> membersOf(ClassElement annotationType) {
+    static List<Member> membersOf(ClassElement annotationType) {
         List<Member> members = new ArrayList<>();
+        if (annotationType instanceof AnnotationElement annotationElement) {
+            for (AnnotationMemberElement member : annotationElement.getMembers()) {
+                members.add(new Member(member.getName(), member.getType()));
+            }
+            if (!members.isEmpty()) {
+                return members;
+            }
+        }
         for (MethodElement method : annotationType.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyAbstract())) {
             members.add(new Member(method.getName(), method.getReturnType()));
         }
@@ -133,8 +149,8 @@ final class AnnotationBuilderWriter {
         return members;
     }
 
-    private static void write(ClassDef classDef, String name, Element origin, VisitorContext context) throws IOException {
-        try (OutputStream outputStream = context.visitClass(name, origin)) {
+    private static void write(ClassDef classDef, String name, VisitorContext context, Element... originatingElements) throws IOException {
+        try (OutputStream outputStream = context.visitClass(name, originatingElements)) {
             outputStream.write(ByteCodeWriterUtils.writeByteCode(classDef, context));
         }
     }
@@ -494,6 +510,7 @@ final class AnnotationBuilderWriter {
                                     String implementationName,
                                     ClassElement annotationType,
                                     ClassTypeDef annotationTypeDef,
+                                    List<Member> members,
                                     VisitorContext context) {
         Map<CharSequence, Object> defaults = new LinkedHashMap<>(context.getAnnotationDefaultValues(annotationType.getName()));
         ClassTypeDef builderTypeDef = ClassTypeDef.of(name);
@@ -521,9 +538,41 @@ final class AnnotationBuilderWriter {
                 .build((aThis, parameters) -> ClassTypeDef.of(implementationName)
                     .instantiate(List.of(MAP_TYPE, MAP_TYPE, CONVERSION_SERVICE_TYPE),
                         parameters.get(0), parameters.get(1), parameters.get(2))
-                    .returning()));
+                    .returning()))
+            .addMethod(toMapMethod(annotationTypeDef, members));
         loadTypeMethods.values().forEach(builder::addMethod);
         return builder.build();
+    }
+
+    /**
+     * {@code Map<String, Object> toMap(A annotation)}: the members read through the accessors of the annotation, as
+     * they are typed, which works for an annotation of the JVM as well as for a generated one. A primitive is
+     * boxed, an array copied, and a member that is not set left out.
+     */
+    private static MethodDef toMapMethod(ClassTypeDef annotationTypeDef, List<Member> members) {
+        return MethodDef.builder(TO_MAP)
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter("annotation", ClassTypeDef.of(Annotation.class))
+            .returns(MAP_TYPE)
+            .build((aThis, parameters) -> parameters.get(0).cast(annotationTypeDef).newLocal("typed", annotation ->
+                ClassTypeDef.of(CollectionUtils.class)
+                    .invokeStatic("newLinkedHashMap", List.of(TypeDef.Primitive.INT), ClassTypeDef.of(LinkedHashMap.class),
+                        List.of(ExpressionDef.constant(members.size())))
+                    .newLocal("members", map -> {
+                        List<StatementDef> statements = new ArrayList<>();
+                        for (Member member : members) {
+                            TypeDef type = member.typeDef();
+                            ExpressionDef value = annotation.invoke(member.name(), type);
+                            if (member.isPrimitive()) {
+                                ClassTypeDef wrapper = ((TypeDef.Primitive) type).wrapperType();
+                                value = wrapper.invokeStatic("valueOf", wrapper, value);
+                            }
+                            statements.add(CONVERSION_UTILS.invokeStatic("putMember", List.of(MAP_TYPE, TypeDef.STRING, TypeDef.OBJECT), TypeDef.VOID,
+                                List.of(map, ExpressionDef.constant(member.name()), value)));
+                        }
+                        statements.add(map.returning());
+                        return StatementDef.multi(statements);
+                    })));
     }
 
     /**
@@ -532,7 +581,7 @@ final class AnnotationBuilderWriter {
      * @param name The name, which is the name of the accessor
      * @param type The declared type
      */
-    private record Member(String name, ClassElement type) {
+    record Member(String name, ClassElement type) {
 
         /**
          * @return The type of the accessor: a Kotlin class reference is a {@link Class} on the JVM

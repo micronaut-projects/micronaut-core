@@ -17,6 +17,7 @@ package io.micronaut.http.server.stream;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
@@ -55,6 +56,11 @@ import java.util.function.Consumer;
  * writes before it that the connection has not taken are below the high-water mark. A write
  * while sixteen times the high-water mark are queued fails the stream.</p>
  *
+ * <p>A write the connection has not taken costs more than its bytes: the buffer and the objects
+ * that hold it. At most {@value #MAX_QUEUED_WRITES} such writes are passed to the connection
+ * separately; the writes after them wait in the stream, merged, until the connection takes some,
+ * so that many small writes to a slow connection do not hold more than their bytes.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
@@ -65,14 +71,24 @@ final class BodyStream implements BufferConsumer.Upstream {
      * The bound of the queue, as a multiple of the high-water mark.
      */
     static final int BUFFER_LIMIT_FACTOR = 16;
+    /**
+     * The writes the connection has not taken yet that are passed to it separately: the writes
+     * after them wait, and follow merged into one.
+     */
+    static final int MAX_QUEUED_WRITES = 256;
 
     private static final Logger LOG = LoggerFactory.getLogger(BodyStream.class);
     private static final CompletionStage<Void> DONE = CompletableFuture.completedStage(null);
+    /**
+     * The waiting writes merged at once.
+     */
+    private static final int MERGED_WRITES = 64;
 
     private final ReentrantLock lock = new ReentrantLock();
     private final BufferConsumer buffer;
     private final CloseableByteBody body;
     private final Executor executor;
+    private final ReadBufferFactory readBufferFactory;
     private final PropagatedContext context;
     /**
      * Whether the body is never written: the response of a HEAD request. A discard is then a
@@ -96,6 +112,24 @@ final class BodyStream implements BufferConsumer.Upstream {
      * for more in advance.
      */
     private long consumed;
+    /**
+     * The bytes passed to the buffer so far.
+     */
+    private long passed;
+    /**
+     * The offsets of the ends of the writes passed to the buffer that the connection has not
+     * taken yet, in order.
+     */
+    private final ArrayDeque<Long> passedEnds = new ArrayDeque<>();
+    /**
+     * The writes that wait until the connection took some of the passed writes, in order; the
+     * small ones are merged in groups of {@value #MERGED_WRITES}.
+     */
+    private final List<ReadBuffer> waiting = new ArrayList<>();
+    /**
+     * The writes at the end of {@link #waiting} that are not merged yet.
+     */
+    private int unmerged;
     private final ArrayDeque<Waiter> waiters = new ArrayDeque<>();
     private State state = State.OPEN;
     /**
@@ -116,6 +150,7 @@ final class BodyStream implements BufferConsumer.Upstream {
      */
     BodyStream(ByteBodyFactory factory, PropagatedContext context, int highWaterMark, boolean bodyless) {
         this.executor = factory.streamingBodyExecutor();
+        this.readBufferFactory = factory.readBufferFactory();
         this.context = context;
         this.highWaterMark = checkHighWaterMark(highWaterMark);
         this.bodyless = bodyless;
@@ -188,8 +223,11 @@ final class BodyStream implements BufferConsumer.Upstream {
                 result = CompletableFuture.failedStage(overflow);
             } else {
                 written += n;
-                // queued under the lock: the tasks run in the order of the writes
-                tasks.add(() -> buffer.add(data));
+                if (waiting.isEmpty() && passedEnds.size() < MAX_QUEUED_WRITES) {
+                    passLocked(data);
+                } else {
+                    waitLocked(data);
+                }
                 if (written - consumed < highWaterMark) {
                     result = DONE;
                 } else {
@@ -231,7 +269,8 @@ final class BodyStream implements BufferConsumer.Upstream {
             if (state != State.OPEN) {
                 return false;
             }
-            closeLocked(State.COMPLETED, new IllegalStateException(reason), null, effects);
+            passWaitingLocked();
+            closeLocked(State.COMPLETED, new StreamEnded(reason), null, effects);
             submitLocked(buffer::complete, effects);
         } finally {
             lock.unlock();
@@ -315,7 +354,7 @@ final class BodyStream implements BufferConsumer.Upstream {
             if (state != State.OPEN || !replace.getAsBoolean()) {
                 return false;
             }
-            closeLocked(State.COMPLETED, new IllegalStateException("The stream was answered with another response"), null, effects);
+            closeLocked(State.COMPLETED, new StreamEnded("The stream was answered with another response"), null, effects);
         } finally {
             lock.unlock();
         }
@@ -395,7 +434,18 @@ final class BodyStream implements BufferConsumer.Upstream {
             long c = consumed + bytesConsumed;
             // saturate: a downstream that asks for everything passes Long.MAX_VALUE
             consumed = c < consumed ? Long.MAX_VALUE : c;
+            Long end;
+            while ((end = passedEnds.peek()) != null && end <= consumed) {
+                passedEnds.poll();
+            }
             effects = releaseWaiters(null);
+            if (!waiting.isEmpty() && passedEnds.size() < MAX_QUEUED_WRITES && state == State.OPEN) {
+                passWaitingLocked();
+                if (effects == null) {
+                    effects = new Effects();
+                }
+                effects.drain = true;
+            }
         } finally {
             lock.unlock();
         }
@@ -453,8 +503,56 @@ final class BodyStream implements BufferConsumer.Upstream {
         return effects;
     }
 
+    /**
+     * Pass a write to the buffer.
+     *
+     * @param data The bytes
+     */
+    private void passLocked(ReadBuffer data) {
+        passed += data.readable();
+        if (passed > consumed) {
+            // else the connection asked for the bytes in advance
+            passedEnds.add(passed);
+        }
+        // queued under the lock: the tasks run in the order of the writes
+        tasks.add(() -> buffer.add(data));
+    }
+
+    /**
+     * Keep a write until the connection took some of the passed writes.
+     *
+     * @param data The bytes
+     */
+    private void waitLocked(ReadBuffer data) {
+        waiting.add(data);
+        if (++unmerged == MERGED_WRITES) {
+            List<ReadBuffer> group = waiting.subList(waiting.size() - MERGED_WRITES, waiting.size());
+            ReadBuffer merged = readBufferFactory.compose(new ArrayList<>(group));
+            group.clear();
+            waiting.add(merged);
+            unmerged = 0;
+        }
+    }
+
+    /**
+     * Pass the waiting writes to the buffer, as one.
+     */
+    private void passWaitingLocked() {
+        if (!waiting.isEmpty()) {
+            ReadBuffer merged = readBufferFactory.compose(new ArrayList<>(waiting));
+            waiting.clear();
+            unmerged = 0;
+            passLocked(merged);
+        }
+    }
+
     private void closeLocked(State newState, Throwable writeCause, @Nullable Throwable callbackCause, Effects effects) {
         state = newState;
+        for (ReadBuffer data : waiting) {
+            data.close();
+        }
+        waiting.clear();
+        unmerged = 0;
         cause = writeCause;
         Waiter waiter;
         while ((waiter = waiters.poll()) != null) {
@@ -594,6 +692,21 @@ final class BodyStream implements BufferConsumer.Upstream {
             if (demand != null) {
                 demand.run();
             }
+        }
+    }
+
+    /**
+     * Why a completed stream refuses the writes after it. Created for every stream that ends, and only
+     * read if a write follows, for its message: it has no stack trace to fill.
+     */
+    private static final class StreamEnded extends IllegalStateException {
+        StreamEnded(String message) {
+            super(message);
+        }
+
+        @Override
+        public synchronized Throwable fillInStackTrace() {
+            return this;
         }
     }
 }

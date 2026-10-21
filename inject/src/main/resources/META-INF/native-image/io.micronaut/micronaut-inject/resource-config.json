@@ -2,9 +2,6 @@
     "resources": {
         "includes": [
             {"pattern": "META-INF/micronaut/.*$"}
-        ],
-        "excludes": [
-            {"pattern": "META-INF/micronaut/io\\.micronaut\\.inject\\.BeanDefinitionReference/.+$"}
         ]
     }
 }

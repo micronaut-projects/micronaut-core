@@ -15,6 +15,11 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.core.type.TypeHierarchies
+import io.micronaut.core.type.TypeHierarchy
+
+import java.util.function.Supplier
+
 class BeanTypeHierarchySpec extends AbstractPythonTypeElementSpec {
 
     void "an introspection describes the hierarchy of its type when asked to"() {
@@ -209,5 +214,37 @@ class Plain(Runnable):
     def run(self) -> None:
         pass
 ''').getTypeHierarchy().isPresent()
+    }
+    void "the generic hierarchy of the introspected type is recorded beside the introspection"() {
+        given:
+        def introspection = buildBeanIntrospection('python.Child', '''
+from typing import Generic, TypeVar
+from java.lang import Number
+from java.util.function import Supplier
+from micronaut.core.annotation import Introspected
+
+T = TypeVar("T", bound=Number)
+
+class Base(Generic[T]):
+    def value(self) -> T:
+        return None
+
+@Introspected(hierarchy=True)
+class Child(Base[T], Supplier[T], Generic[T]):
+    def get(self) -> T:
+        return None
+''')
+        def hierarchy = introspection.getTypeHierarchy().orElseThrow()
+        def classLoader = introspection.beanType.classLoader
+        def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName('python.Child', 'python')).getConstructor().newInstance()
+
+        expect:
+        record.type == introspection.beanType
+        record.typeVariables*.name == ['T']
+        record.typeVariables[0].type == Number
+        record.genericSuperclass.get().type == classLoader.loadClass('python.Base')
+        record.genericInterfaces*.type == [Supplier]
+        hierarchy.typeClosure.first().type == introspection.beanType
+        hierarchy.typeClosure.last().type == Object
     }
 }
