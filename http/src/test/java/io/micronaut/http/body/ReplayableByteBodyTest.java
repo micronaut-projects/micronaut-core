@@ -87,6 +87,14 @@ class ReplayableByteBodyTest {
     }
 
     @Test
+    void aChunkOverTheLimitIsReadOnce() {
+        try (ReplayableByteBody replayable = FACTORY.replayable(streamed("more than ", "eight bytes"), 8)) {
+            Assertions.assertEquals("more than eight bytes", read(replayable.next()));
+            Assertions.assertFalse(replayable.isReplayable());
+        }
+    }
+
+    @Test
     void aBodyWhoseKnownLengthIsOverTheLimitIsNotReplayable() {
         try (ReplayableByteBody replayable = FACTORY.replayable(FACTORY.adapt(Flux.just(buf("abc"), buf("def")), OptionalLong.of(6)), 4)) {
             Assertions.assertFalse(replayable.isReplayable());

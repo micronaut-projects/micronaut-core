@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.bind.annotation;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.ArgumentBinder.BindingResult;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -45,6 +46,10 @@ public abstract class AbstractArgumentBinder<T> {
     private final String fallbackParameterName;
     @Nullable
     private final String defaultValue;
+    /**
+     * Whether the argument of a specific binder declares no default value, so it does not have to be looked up again.
+     */
+    private final boolean noDefaultValue;
 
     /**
      * Constructor.
@@ -56,6 +61,7 @@ public abstract class AbstractArgumentBinder<T> {
         this.parameterName = null;
         this.fallbackParameterName = null;
         this.defaultValue = null;
+        this.noDefaultValue = false;
     }
 
     /**
@@ -68,7 +74,10 @@ public abstract class AbstractArgumentBinder<T> {
         this.conversionService = conversionService;
         this.parameterName = getParameterName(argument);
         this.fallbackParameterName = getFallbackFormat(argument);
-        this.defaultValue = argument.getAnnotationMetadata().stringValue(Bindable.class, DEFAULT_VALUE_MEMBER).orElse(null);
+        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        this.defaultValue = annotationMetadata.stringValue(Bindable.class, DEFAULT_VALUE_MEMBER).orElse(null);
+        // Whether the member is declared does not depend on the environment, unlike its resolved value
+        this.noDefaultValue = defaultValue == null && !annotationMetadata.isPresent(Bindable.class, DEFAULT_VALUE_MEMBER);
     }
 
     /**
@@ -235,6 +244,9 @@ public abstract class AbstractArgumentBinder<T> {
     @Nullable
     private String resolveDefaultValue(Argument<T> argument) {
         if (defaultValue == null) {
+            if (noDefaultValue) {
+                return null;
+            }
             return argument.getAnnotationMetadata().stringValue(Bindable.class, DEFAULT_VALUE_MEMBER).orElse(null);
         }
         return defaultValue;

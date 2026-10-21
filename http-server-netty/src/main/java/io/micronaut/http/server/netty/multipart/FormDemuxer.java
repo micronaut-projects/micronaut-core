@@ -18,7 +18,6 @@ package io.micronaut.http.server.netty.multipart;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -45,9 +44,11 @@ import io.netty.contrib.multipart.ContentDisposition;
 import io.netty.contrib.multipart.FormDecoderException;
 import io.netty.contrib.multipart.ParsedHeaderValue;
 import io.netty.contrib.multipart.PostBodyDecoder;
+import io.netty.contrib.multipart.VintageAccess;
 import io.netty.contrib.multipart.TooManyFormFieldsException;
 import io.netty.contrib.multipart.UndecodedDataLimitExceededException;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +69,10 @@ import java.util.Optional;
 public final class FormDemuxer implements BufferConsumer {
     private static final Logger LOG = LoggerFactory.getLogger(FormDemuxer.class);
     private final PostBodyDecoder decoder;
+    // the URL-encoded decoder whose content is kept as it appears, or null to decode the content
+    private final VintageAccess.@Nullable UrlEncodedDecoder undecoded;
+    // whether the undecoded content is validated like the decoded content would be
+    private final boolean validateUndecoded;
     /**
      * Finds the close delimiter of a multipart body, {@code null} for another body.
      */
@@ -107,7 +112,27 @@ public final class FormDemuxer implements BufferConsumer {
      * @param byteBody          The body
      */
     public FormDemuxer(PostBodyDecoder decoder, @Nullable String multipartBoundary, Charset charset, Channel channel, BodySizeLimits fieldLimits, BodySizeLimits totalLimits, ByteBody byteBody) {
+        this(decoder, multipartBoundary, charset, channel, fieldLimits, totalLimits, byteBody, Content.DECODED);
+    }
+
+    /**
+     * @param decoder           The decoder
+     * @param multipartBoundary The boundary of a multipart body, {@code null} for URL-encoded data
+     * @param charset           The charset of the decoder, which it encodes the boundary with
+     * @param channel           The channel
+     * @param fieldLimits       The limits of a field
+     * @param totalLimits       The limits of the form
+     * @param byteBody          The body
+     * @param content           Whether the content of the fields is decoded, e.g. percent-decoded for
+     *                          URL-encoded data, or kept as it appears in the body. The limits and the
+     *                          validation of the form apply either way
+     */
+    public FormDemuxer(PostBodyDecoder decoder, @Nullable String multipartBoundary, Charset charset, Channel channel, BodySizeLimits fieldLimits,
+                       BodySizeLimits totalLimits, ByteBody byteBody, Content content) {
         this.decoder = decoder;
+        // a multipart field is not encoded: its content is the same either way
+        this.undecoded = content != Content.DECODED && decoder instanceof VintageAccess.UrlEncodedDecoder urlEncoded ? urlEncoded : null;
+        this.validateUndecoded = content == Content.UNDECODED_VALIDATED;
         this.closeDelimiter = multipartBoundary == null ? null : CloseDelimiter.of(multipartBoundary, charset);
         this.fieldLimits = fieldLimits;
         if (byteBody instanceof AvailableByteBody abb) {
@@ -297,13 +322,22 @@ public final class FormDemuxer implements BufferConsumer {
      * writes the next input into that buffer and compacts it in place. The bytes of a body can be
      * shared with another reader, e.g. a copy of the form that a filter decodes as it arrives
      * while the bytes are buffered for the route: writing into them corrupts the form the route
-     * reads. The decoder is given a composite view of the input, which it extends with components
-     * and compacts by dropping them, without writing into the bytes.
+     * reads. The multipart decoder is given a composite view of the input, which it extends with
+     * components and compacts by dropping them, without writing into the bytes. The URL-encoded
+     * decoder also percent-decodes the names, and the values that end its input, in place: it is
+     * given a private copy of the input, which is small, as the form is buffered.
      *
      * @param input The input, owned by the view
      * @return The view
      */
-    private static ByteBuf decoderInput(ByteBuf input) {
+    private ByteBuf decoderInput(ByteBuf input) {
+        if (decoder instanceof VintageAccess.UrlEncodedDecoder) {
+            try {
+                return input.alloc().buffer(input.readableBytes()).writeBytes(input);
+            } finally {
+                input.release();
+            }
+        }
         return input.alloc().compositeBuffer().addComponent(true, input);
     }
 
@@ -312,11 +346,13 @@ public final class FormDemuxer implements BufferConsumer {
         assert eventLoop == null || eventLoop.inEventLoop();
         try {
             decoder.endInput();
+            // the end of the input completes the last field, which the decoder validates then,
+            // e.g. a percent escape it was waiting on the rest of
+            forwardOutput();
         } catch (Exception e) {
             handleDecoderException(e);
             return;
         }
-        forwardOutput();
         if (closeDelimiter != null && !closeDelimiter.found()) {
             // the decoder ends the last part with the end of the input: a truncated body, or one
             // with another closing boundary, would be read as a shorter form
@@ -356,6 +392,53 @@ public final class FormDemuxer implements BufferConsumer {
             decoder.close();
             sink.complete();
         }
+    }
+
+    /**
+     * How the content of the fields is read.
+     */
+    public enum Content {
+        /**
+         * Decoded, e.g. percent-decoded for URL-encoded data.
+         */
+        DECODED,
+        /**
+         * As it appears in the body, for a decoder that validates nothing when it decodes the
+         * content, e.g. without the quirks that refuse malformed percent escapes.
+         */
+        UNDECODED,
+        /**
+         * As it appears in the body, validated like the decoded content, for a decoder that
+         * refuses malformed percent escapes.
+         */
+        UNDECODED_VALIDATED
+    }
+
+    /**
+     * @return The content of the current {@link PostBodyDecoder.Event#CONTENT} event, decoded or as
+     * it appears in the body
+     */
+    private ByteBuf content() {
+        VintageAccess.UrlEncodedDecoder urlEncoded = undecoded;
+        if (urlEncoded == null) {
+            return decoder.decodedContent();
+        }
+        ByteBuf content = urlEncoded.undecodedContent();
+        if (!validateUndecoded) {
+            return content;
+        }
+        // validated like the decoded content, e.g. the percent escapes the decoder refuses: the
+        // decoder does not split an escape between two contents
+        ByteBuf check = content.copy();
+        try {
+            urlEncoded.decodeComponent(check, false);
+        } catch (RuntimeException e) {
+            content.release();
+            throw e;
+        } finally {
+            check.release();
+        }
+        return content;
     }
 
     private static RuntimeException unexpectedEvent(PostBodyDecoder.Event event) {
@@ -522,7 +605,7 @@ public final class FormDemuxer implements BufferConsumer {
         @Override
         void accept(PostBodyDecoder.Event event) {
             if (event == PostBodyDecoder.Event.CONTENT) {
-                ByteBuf content = decoder.decodedContent();
+                ByteBuf content = content();
                 buffers.add(content);
                 if (tracker.add(content.readableBytes()) != null) {
                     this.devolveToStreaming(true);
@@ -612,7 +695,7 @@ public final class FormDemuxer implements BufferConsumer {
         @Override
         void accept(PostBodyDecoder.Event event) {
             if (event == PostBodyDecoder.Event.CONTENT) {
-                add(decoder.decodedContent());
+                add(content());
             } else if (event == PostBodyDecoder.Event.FIELD_COMPLETE) {
                 baseSharedBuffer.complete();
                 if (fieldsPublisherCancelled) {

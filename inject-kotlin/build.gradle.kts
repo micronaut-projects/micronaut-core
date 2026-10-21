@@ -88,7 +88,9 @@ tasks {
 //    }
         maxHeapSize = "3G"
         maxParallelForks = 4
-        // The annotation processing tests run short compilations: C2 costs more CPU than it saves
-        jvmArgs("-XX:TieredStopAtLevel=1")
+        // The annotation processing tests run short compilations: C2 costs more CPU than it saves.
+        // A C1-only JVM defaults to a 48 MB code cache, which the forks kept for the whole run outgrow,
+        // so give it the size of the default tiered code cache
+        jvmArgs("-XX:TieredStopAtLevel=1", "-XX:ReservedCodeCacheSize=240m")
     }
 }

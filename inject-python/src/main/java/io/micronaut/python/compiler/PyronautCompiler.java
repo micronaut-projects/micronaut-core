@@ -20,6 +20,8 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.python.processing.PythonProcessingSession;
 import io.micronaut.python.processing.PythonSourceVisitor;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
+import io.micronaut.python.processing.typecheck.TypeCheckMode;
 
 import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
@@ -81,6 +83,7 @@ public final class PyronautCompiler {
     private final List<File> bootclasspath;
     private final ClassLoader parentClassLoader;
     private final Consumer<ClassElement> classElementCallback;
+    private final Consumer<PythonDiagnostic> pythonDiagnosticCallback;
     private final List<String> compilerOptions;
     private final boolean verboseErrors;
     private final boolean compilePythonBytecode;
@@ -108,7 +111,8 @@ public final class PyronautCompiler {
         this.runtimeClasspath = builder.runtimeClasspath != null ? List.copyOf(builder.runtimeClasspath) : null;
         this.parentClassLoader = builder.parentClassLoader != null ? builder.parentClassLoader : PyronautCompiler.class.getClassLoader();
         this.classElementCallback = builder.classElementCallback;
-        this.compilerOptions = builder.compilerOptions != null ? List.copyOf(builder.compilerOptions) : null;
+        this.pythonDiagnosticCallback = builder.pythonDiagnosticCallback;
+        this.compilerOptions = compilerOptions(builder.compilerOptions, builder.typeCheckMode);
         this.verboseErrors = builder.verboseErrors;
         this.compilePythonBytecode = builder.compilePythonBytecode;
         this.errorDumpDirectory = builder.errorDumpDirectory;
@@ -180,6 +184,23 @@ public final class PyronautCompiler {
             .map(PyronautCompiler::toUrl)
             .toArray(URL[]::new);
         return new URLClassLoader(urls, parentClassLoader);
+    }
+
+    /**
+     * The compiler options with the type-check mode passed to the annotation processor as its option.
+     */
+    private static List<String> compilerOptions(List<String> options, TypeCheckMode typeCheckMode) {
+        if (typeCheckMode == null) {
+            return options != null ? List.copyOf(options) : null;
+        }
+        List<String> result = new ArrayList<>();
+        if (options != null) {
+            options.stream()
+                .filter(option -> !option.startsWith("-A" + TypeCheckMode.OPTION + "="))
+                .forEach(result::add);
+        }
+        result.add("-A" + TypeCheckMode.OPTION + "=" + typeCheckMode.optionValue());
+        return List.copyOf(result);
     }
 
     private static URL toUrl(File file) {
@@ -467,6 +488,9 @@ public final class PyronautCompiler {
         if (classElementCallback != null) {
             compiler.setClassElementCallback(classElementCallback);
         }
+        if (pythonDiagnosticCallback != null) {
+            compiler.setPythonDiagnosticCallback(pythonDiagnosticCallback);
+        }
         return compiler;
     }
 
@@ -692,6 +716,8 @@ public final class PyronautCompiler {
         private ClassLoader parentClassLoader;
         private List<String> compilerOptions;
         private Consumer<ClassElement> classElementCallback;
+        private Consumer<PythonDiagnostic> pythonDiagnosticCallback;
+        private TypeCheckMode typeCheckMode;
         private boolean verboseErrors;
         private boolean compilePythonBytecode;
         private File errorDumpDirectory;
@@ -843,6 +869,33 @@ public final class PyronautCompiler {
          */
         public Builder classElementCallback(Consumer<ClassElement> classElementCallback) {
             this.classElementCallback = classElementCallback;
+            return this;
+        }
+
+        /**
+         * Set a callback to be invoked for each problem found in the Python sources, such as an
+         * unresolved import or a type checking failure, before it is reported by the compiler.
+         *
+         * @param pythonDiagnosticCallback The callback function
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder pythonDiagnosticCallback(Consumer<PythonDiagnostic> pythonDiagnosticCallback) {
+            this.pythonDiagnosticCallback = pythonDiagnosticCallback;
+            return this;
+        }
+
+        /**
+         * Set how the Python sources are type checked against the Java types they use. The mode is
+         * passed to the annotation processor as the {@code micronaut.python.typecheck} option; when
+         * unset, the option given through {@link #options(List)}, if any, applies.
+         *
+         * @param typeCheckMode The mode
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder typeCheck(TypeCheckMode typeCheckMode) {
+            this.typeCheckMode = typeCheckMode;
             return this;
         }
 

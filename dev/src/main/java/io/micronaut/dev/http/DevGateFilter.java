@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.context.reload.RequestAdmission;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.dev.CompileFailure;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.compile.CompileDiagnostic;
@@ -30,6 +31,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
 import org.jspecify.annotations.Nullable;
@@ -59,7 +61,7 @@ import java.util.function.Supplier;
 @Requires(classes = ServerFilter.class)
 @DevelopmentActive
 @Requires(beans = DevRuntime.class)
-public final class DevGateFilter {
+public final class DevGateFilter implements Ordered {
 
     /**
      * The keys of the JSON body a client that is not a browser receives.
@@ -85,6 +87,17 @@ public final class DevGateFilter {
     DevGateFilter(DevRuntime runtime, @Nullable DevErrorPage errorPage) {
         this.runtime = runtime;
         this.errorPage = errorPage;
+    }
+
+    /**
+     * Runs after the security phase, so a request is authenticated and authorized before it is held or answered
+     * with the compilation failure.
+     *
+     * @return The order
+     */
+    @Override
+    public int getOrder() {
+        return ServerFilterPhase.SECURITY.after();
     }
 
     /**
