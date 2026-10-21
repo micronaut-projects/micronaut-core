@@ -98,4 +98,81 @@ class DefaultFilterRouteSpec extends Specification {
         !route.match(HttpMethod.POST, '/foe').isPresent()
         route.match(HttpMethod.PUT, '/foa').isPresent()
     }
+
+    void "a match-all route with methods matches every path starting with a slash"() {
+        given:
+        def filter = noopFilter()
+
+        when:
+        def route = new DefaultFilterRoute("/**", { filter } as Supplier<GenericHttpFilter>).methods(HttpMethod.POST)
+
+        then:
+        route.match(HttpMethod.POST, '/').isPresent()
+        route.match(HttpMethod.POST, '/foo/bar').isPresent()
+        !route.match(HttpMethod.POST, 'foo').isPresent()
+        !route.match(HttpMethod.GET, '/foo').isPresent()
+    }
+
+    void "a match-all route with the regex pattern style is matched as a regular expression"() {
+        given:
+        def filter = noopFilter()
+
+        when:
+        def route = new DefaultFilterRoute('/.*', { filter } as Supplier<GenericHttpFilter>).patternStyle(FilterPatternStyle.REGEX)
+
+        then:
+        route.match(HttpMethod.GET, '/foo').isPresent()
+        !route.match(HttpMethod.GET, 'foo').isPresent()
+    }
+
+    void "a route with several regex patterns matches any of them"() {
+        given:
+        def filter = noopFilter()
+
+        when:
+        def route = new DefaultFilterRoute('/?/?health', { filter } as Supplier<GenericHttpFilter>)
+                .pattern('/?/?health/?liveness')
+                .pattern('/?/?health/?readiness')
+                .patternStyle(FilterPatternStyle.REGEX)
+
+        then:
+        route.match(HttpMethod.GET, '/health').isPresent()
+        route.match(HttpMethod.GET, '/health/liveness').isPresent()
+        route.match(HttpMethod.GET, '/health/readiness').isPresent()
+        !route.match(HttpMethod.GET, '/health/other').isPresent()
+        !route.match(HttpMethod.GET, '/foo').isPresent()
+    }
+
+    void "patterns and the pattern style changed after a match are used for the next match"() {
+        given:
+        def filter = noopFilter()
+        def route = new DefaultFilterRoute('/foo', { filter } as Supplier<GenericHttpFilter>)
+
+        expect:
+        route.match(HttpMethod.GET, '/foo').isPresent()
+        !route.match(HttpMethod.GET, '/bar').isPresent()
+
+        when:
+        route.pattern('/bar')
+
+        then:
+        route.match(HttpMethod.GET, '/bar').isPresent()
+        !route.match(HttpMethod.GET, '/ba.').isPresent()
+
+        when:
+        route.patternStyle(FilterPatternStyle.REGEX).pattern('/ba.')
+
+        then:
+        route.match(HttpMethod.GET, '/baz').isPresent()
+        route.match(HttpMethod.GET, '/foo').isPresent()
+    }
+
+    private static GenericHttpFilter noopFilter() {
+        GenericHttpFilter.createLegacyFilter(new HttpFilter() {
+            @Override
+            Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
+                return null
+            }
+        }, new FilterOrder.Fixed(0))
+    }
 }

@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.model;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +36,7 @@ import java.util.Objects;
  * @param attributes The attributes defined at module level.
  * @param documentation The script documentation string.
  * @param decorators The annotations invoked at module level.
+ * @param span The location of the definition in its Python source, or {@code null} for a generated definition
  */
 @Experimental
 public record ScriptDef(
@@ -43,7 +45,8 @@ public record ScriptDef(
     List<FunctionDef> functions,
     List<AttributeDef> attributes,
     String documentation,
-    List<DecoratorDef> decorators
+    List<DecoratorDef> decorators,
+    @Nullable SourceSpan span
 ) implements ElementDef {
 
     public ScriptDef {
@@ -64,6 +67,13 @@ public record ScriptDef(
     }
 
     /**
+     * Creates a definition without a source position.
+     */
+    public ScriptDef(String name, String packageName, List<FunctionDef> functions, List<AttributeDef> attributes, String documentation, List<DecoratorDef> decorators) {
+        this(name, packageName, functions, attributes, documentation, decorators, null);
+    }
+
+    /**
      * Backwards-compatible constructor for scripts without module annotations.
      *
      * @param name The script name
@@ -77,11 +87,11 @@ public record ScriptDef(
                      List<FunctionDef> functions,
                      List<AttributeDef> attributes,
                      String documentation) {
-        this(name, packageName, functions, attributes, documentation, List.of());
+        this(name, packageName, functions, attributes, documentation, List.of(), null);
     }
 
     public ScriptDef(String name) {
-        this(name, "", List.of(), List.of(), null, List.of());
+        this(name, "", List.of(), List.of(), null, List.of(), null);
     }
 
     public ScriptDef withFunction(FunctionDef function) {
@@ -94,7 +104,8 @@ public record ScriptDef(
             functions,
             attributes,
             documentation,
-            decorators
+            decorators,
+            span
         );
     }
 
@@ -105,7 +116,7 @@ public record ScriptDef(
         }
         List<AttributeDef> attributes = new ArrayList<>(this.attributes);
         attributes.add(attribute);
-        return new ScriptDef(name, packageName, functions, attributes, documentation, decorators);
+        return new ScriptDef(name, packageName, functions, attributes, documentation, decorators, span);
     }
 
     public String qualifiedName() {
@@ -168,5 +179,14 @@ public record ScriptDef(
     @Override
     public int hashCode() {
         return Objects.hash(name, packageName);
+    }
+
+    /**
+     * @param span The location of the definition in its Python source
+     * @return A copy of this definition located at the given span
+     * @since 5.3.0
+     */
+    public ScriptDef withSpan(@Nullable SourceSpan span) {
+        return new ScriptDef(name, packageName, functions, attributes, documentation, decorators, span);
     }
 }

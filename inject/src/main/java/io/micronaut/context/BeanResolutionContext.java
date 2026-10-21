@@ -174,6 +174,28 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType);
 
     /**
+     * Resolves the registration of the bean of the given definition as the given bean type at the given point, on
+     * behalf of the bean this context resolves for.
+     *
+     * <p>This is {@link #getBeanRegistration(BeanDefinition, Argument)} with the lookup point pushed onto the path
+     * for the resolution: a bean the resolution creates sees the lookup point as the point it is created for, as an
+     * injected {@link io.micronaut.inject.InjectionPoint} does, and the dependency graph records the bean this
+     * context resolves for as receiving it there. The path is as it was once the resolution returns.</p>
+     *
+     * @param definition  The bean definition
+     * @param beanType    The potentially parameterized bean type to resolve the definition as
+     * @param lookupPoint The segment the resolution is made at, whose declaring type is the definition of the bean
+     *                    this context resolves for, or a segment that narrows one of the path
+     * @param <T>         The bean type
+     * @return The bean registration
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
+     *                                                             type
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
+                                                Segment<?, ?> lookupPoint);
+
+    /**
      * Obtains the bean registrations for the given type and qualifier.
      *
      * @param beanType          The bean type
@@ -301,6 +323,13 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
 
     /**
      * Copy current context to be used later.
+     *
+     * <p>The copy carries the path, the current qualifier and the attributes of this context, as they are now. It
+     * resolves on behalf of nobody: it owns no dependents, so a bean without a scope of its own that is created
+     * through the copy is not a dependent of the bean this context resolves for and is not destroyed with it, and
+     * {@link #getDependencyResolver()} of the copy is {@code null}. To create a bean later on behalf of the bean
+     * this context resolves for, keep its {@link #getDependencyResolver() dependency resolver} and the segment of
+     * the path to resolve at, see {@link BeanDependencyResolver#getBeanRegistration(BeanDefinition, Argument, Segment)}.</p>
      *
      * @return The bean resolution context
      * @since 3.1.0
