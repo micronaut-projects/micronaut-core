@@ -116,7 +116,7 @@ public final class EventStreams {
             BodyElements<Event<B>> elements;
             if (contentType != null && MediaType.TEXT_EVENT_STREAM_TYPE.matches(contentType)) {
                 // the data of each event is JSON
-                elements = new ByteBodyElements<>(body, reader(handlerRegistry, eventType, headers, maxBufferSize), wrap);
+                elements = new ByteBodyElements<>(body, reader(handlerRegistry, eventType, headers, maxBufferSize), wrap, true);
             } else {
                 // a single body, such as JSON, is one event
                 MediaType mediaType = contentType == null ? MediaType.APPLICATION_JSON_TYPE : contentType;
@@ -239,7 +239,7 @@ public final class EventStreams {
                 }
                 return decoded;
             };
-            return ElementsResponse.of(response, new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize), rawFailures), wrap));
+            return ElementsResponse.of(response, new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize), rawFailures), wrap, true));
         } catch (RuntimeException e) {
             body.close();
             throw e;

@@ -47,6 +47,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -72,6 +73,10 @@ public class NettyWebSocketSession implements WebSocketSession {
      * Whether the peer sent its close: nothing is sent by {@link #sendAllAsync} after it.
      */
     private volatile boolean closeReceived;
+    /**
+     * Whether a close frame was sent: a close frame is sent once (RFC 6455, 5.5.1).
+     */
+    private final AtomicBoolean closeSent = new AtomicBoolean();
     /**
      * The {@link #sendAllAsync} calls that send, completed with {@code false} by the close of the peer.
      */
@@ -130,6 +135,15 @@ public class NettyWebSocketSession implements WebSocketSession {
      * The peer sent its close: an endpoint sends no data after it (RFC 6455, 5.5.1), so the
      * publishers of {@link #sendAllAsync} stop, and their futures complete with {@code false}.
      */
+    /**
+     * Marks the close frame as sent.
+     *
+     * @return Whether no close frame was sent before
+     */
+    final boolean markCloseSent() {
+        return closeSent.compareAndSet(false, true);
+    }
+
     final void markCloseReceived() {
         closeReceived = true;
         for (CompletableFuture<Boolean> sent : sendingAll) {
@@ -295,9 +309,12 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public void close(CloseReason closeReason) {
-        if (channel.isOpen()) {
+        if (channel.isOpen() && markCloseSent()) {
             channel.writeAndFlush(new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason()))
                     .addListener(future -> channel.close());
+        } else {
+            // a close frame was sent already
+            channel.close();
         }
     }
 

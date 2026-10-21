@@ -1543,8 +1543,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             BeanDefinition<T> beanDefinition = candidate.get();
             try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
                 if (beanDefinition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                    T bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
-                    return postBeanCreated(resolutionContext, beanDefinition, beanArg, qualifier, bean);
+                    return createBeanWithArgumentValues(resolutionContext, instantiatableBeanDefinition, beanArg, qualifier, argumentValues);
                 }
             }
         }
@@ -1593,10 +1592,39 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             LOG.trace("Computed bean argument values: {}", argumentValues);
         }
         if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-            T bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
-            return postBeanCreated(resolutionContext, definition, beanType, qualifier, bean);
+            return createBeanWithArgumentValues(resolutionContext, instantiatableBeanDefinition, beanType, qualifier, argumentValues);
         } else {
             throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
+        }
+    }
+
+    /**
+     * Creates a bean the caller supplies the arguments of, outside the registrations the context tracks.
+     *
+     * <p>The creation is begun on the resolution context as {@link #createRegistration} begins the creation of a
+     * bean the context resolves, so that what is resolved on behalf of the bean knows it is being created: the
+     * interceptors created for it, those a subclass proxy is injected with among them, are told the bean, see
+     * {@link InterceptionTarget}, and a {@link BeanDependencyResolver} it injects is owned by it. The context
+     * holds no registration for the bean, so what the creation owns is not released with it; see
+     * {@link #destroyBean(Object)} for what is.</p>
+     */
+    private <T> T createBeanWithArgumentValues(BeanResolutionContext resolutionContext,
+                                               InstantiatableBeanDefinition<T> definition,
+                                               Argument<T> beanType,
+                                               @Nullable Qualifier<T> qualifier,
+                                               @Nullable Map<String, Object> argumentValues) {
+        AbstractBeanResolutionContext creatingContext = resolutionContext instanceof AbstractBeanResolutionContext creating ? creating : null;
+        BeanCreationState previousCreation = creatingContext == null ? null : creatingContext.creationState;
+        if (creatingContext != null) {
+            creatingContext.beginCreation(definition);
+        }
+        try {
+            T bean = resolveByBeanFactory(resolutionContext, definition, qualifier, argumentValues);
+            return postBeanCreated(resolutionContext, definition, beanType, qualifier, bean);
+        } finally {
+            if (creatingContext != null) {
+                creatingContext.creationState = previousCreation;
+            }
         }
     }
 
@@ -1774,11 +1802,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 return;
             }
         }
-        T beanToDestroy = registration.getBean();
+        T beanToDestroy = registration.beanOrNull();
         BeanDefinition<T> definition = registration.getBeanDefinition();
         if (beanToDestroy != null) {
-            purgeCacheForBeanInstance(beanToDestroy);
             if (definition.isSingleton()) {
+                // only a singleton registration is cached; the candidates of the types of a dependent bean stay
+                purgeCacheForBeanInstance(beanToDestroy);
                 singletonScope.purgeCacheForBeanInstance(definition, beanToDestroy);
             }
             watches.closeOwnedBy(beanToDestroy);
@@ -1787,6 +1816,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             // what a destroyed bean held is released with it; what held the bean stays recorded until that is destroyed.
             // A singleton definition may have a fresh registration beside the scoped instance, and both record under it
             dependencyGraph.destroyed(registration, definition.isSingleton() && singletonScope.findBeanRegistration(definition) != null);
+        }
+        if (beanToDestroy == null) {
+            // A @Nullable factory method produced no bean, so there is no instance for the pre-destroy listeners
+            // or a @PreDestroy method to see. What the factory method resolved to produce it is still released.
+            releaseDependents(registration, null);
+            return;
         }
         try {
             beanToDestroy = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
@@ -1921,7 +1956,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 try {
                     bean = (T) Objects.requireNonNull(
                         listener.bean.onPreDestroy(event),
-                        "PreDestroy event listener illegally returned null: " + listener.getClass()
+                        "PreDestroy event listener illegally returned null: " + listener.bean.getClass()
                     );
                 } catch (Exception e) {
                     throw new BeanDestructionException(beanDefinition, e);
@@ -2192,8 +2227,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             BeanDefinition<T> candidate = concreteCandidate.get();
             try (BeanResolutionContext context = newResolutionContext(candidate, resolutionContext)) {
                 if (candidate instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                    T bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
-                    return postBeanCreated(context, candidate, Argument.of(beanType), qualifier, bean);
+                    return createBeanWithArgumentValues(context, instantiatableBeanDefinition, Argument.of(beanType), qualifier, Collections.emptyMap());
                 } else {
                     throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                 }
@@ -2467,7 +2501,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             Argument<Object> indexedArgument = (Argument<Object>) filteringQualifier.getIndexedArgument();
             if (indexedArgument != null && isIndexExhaustive(indexedArgument, filteringQualifier)) {
                 // the compile-time index holds every bean this qualifier selects, so there is nothing to filter
-                return getBeanDefinitions(indexedArgument);
+                candidates = new ArrayList<>(getBeanDefinitions(indexedArgument));
+                removeReplacedBeans(candidates);
+                return candidates;
             }
             // Keep anonymous
             Predicate<BeanDefinitionReference<Object>> predicate = new Predicate<>() {
@@ -2477,16 +2513,52 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 }
             };
             candidates = beanDefinitionProvider.getBeanDefinitions(this, predicate, null);
+            // the qualifier decides on each definition alone, so removing what it kept is removing it before
+            removeReplacedBeans(candidates);
         } else {
-            Stream<BeanDefinition<Object>> beanDefinitionsClasses = StreamSupport.stream(
-                beanDefinitionProvider.getBeanDefinitions(this, Argument.OBJECT_ARGUMENT, null, null).spliterator(),
-                false);
-            candidates = qualifier.reduce(Object.class, beanDefinitionsClasses)
-                .toList();
+            List<BeanDefinition<Object>> definitions = new ArrayList<>();
+            beanDefinitionProvider.getBeanDefinitions(this, Argument.OBJECT_ARGUMENT, null, null).forEach(definitions::add);
+            // a qualifier that reduces may choose among the definitions, so it is given only those not replaced
+            removeReplacedBeans(definitions);
+            candidates = qualifier.reduce(Object.class, definitions.stream()).toList();
         }
-
-        filterReplacedBeans(candidates);
         return candidates;
+    }
+
+    /**
+     * Removes the definitions an enabled definition replaces, whether that one is among them or not, as
+     * {@link #getBeanDefinitions(Argument, Qualifier)} removes them from every candidate of the type before the qualifier.
+     *
+     * @param definitions The definitions
+     */
+    private void removeReplacedBeans(Collection<BeanDefinition<Object>> definitions) {
+        if (definitions.isEmpty()) {
+            return;
+        }
+        Iterator<BeanDefinition<Object>> replacing = beanDefinitionProvider.getReplacingBeans(this).iterator();
+        if (!replacing.hasNext()) {
+            return;
+        }
+        Set<BeanDefinition<Object>> replacingBeans = new LinkedHashSet<>();
+        while (replacing.hasNext()) {
+            BeanDefinition<Object> definition = replacing.next();
+            if (definition.isConfigurationProperties()) {
+                // as a lookup by type does, an each bean replaces only through the beans it produces
+                collectIterableBeans(null, definition, replacingBeans, Argument.OBJECT_ARGUMENT);
+            } else {
+                replacingBeans.add(definition);
+            }
+        }
+        List<Map.Entry<ReplacesDefinition<Object>, BeanDefinition<Object>>> replacements = new ArrayList<>(replacingBeans.size());
+        for (BeanDefinition<Object> definition : replacingBeans) {
+            ReplacesDefinition<Object> replacesDefinition = definition.getReplacesDefinition();
+            if (replacesDefinition != null) {
+                replacements.add(Map.entry(replacesDefinition, definition));
+            }
+        }
+        if (!replacements.isEmpty()) {
+            definitions.removeIf(definition -> checkIfReplacementExists(replacements, definition));
+        }
     }
 
     /**
@@ -3624,7 +3696,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             ReplacesDefinition<T> replacementCheck = replacement.getKey();
             if (isNotTheSameDefinition(beanDefinition, definitionToBeReplaced) &&
                 isNotTheTargetOfProxy(beanDefinition, definitionToBeReplaced) &&
-                replacementCheck.replaces(definitionToBeReplaced)) {
+                replacementCheck.replaces(beanDefinition, definitionToBeReplaced)) {
                 return true;
             }
         }
@@ -4602,70 +4674,30 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return Optional.ofNullable(definition);
     }
 
+    @Override
+    public final <T> List<BeanDefinition<T>> selectAmong(@Nullable Argument<T> beanType, Collection<BeanDefinition<T>> candidates) {
+        Objects.requireNonNull(candidates, "Candidates cannot be null");
+        return BeanSelection.select(beanType, null, candidates, beanResolutionCustomizer);
+    }
+
     @Nullable
     private <T> BeanDefinition<T> lastChanceResolve(Argument<T> beanType,
                                                     @Nullable Qualifier<T> qualifier,
                                                     boolean throwNonUnique,
                                                     Collection<BeanDefinition<T>> candidates) {
-        if (candidates.size() > 1) {
-            List<BeanDefinition<T>> primary = candidates.stream()
-                .filter(BeanDefinition::isPrimary)
-                .toList();
-            if (!primary.isEmpty()) {
-                candidates = primary;
-            }
-        }
-        if (candidates.size() == 1) {
-            return candidates.iterator().next();
-        }
-        Optional<BeanDefinition<T>> customResolved = beanResolutionCustomizer.resolveNonUniqueBean(beanType, qualifier, candidates);
-        if (customResolved.isPresent()) {
-            return customResolved.get();
-        }
-        Collection<BeanDefinition<T>> originalCandidates = candidates;
-        candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class)).toList();
-        if (candidates.size() == 1) {
-            return candidates.iterator().next();
-        }
-        // When every candidate is @Secondary none of them is preferable to another, but lowering the
-        // precedence of all of them shouldn't remove the ability to decide between them: carry on with
-        // the original candidates so that the order and @DefaultImplementation still get a say.
-        boolean allSecondary = candidates.isEmpty();
-        if (allSecondary) {
-            candidates = originalCandidates;
-        }
-        // pick the bean with the highest priority
-        ArrayList<BeanDefinition<T>> listCandidates = new ArrayList<>(candidates);
-        listCandidates.sort(OrderUtil.ORDERED_COMPARATOR);
-        Iterator<BeanDefinition<T>> iterator = listCandidates.iterator();
-        final BeanDefinition<T> bean = iterator.next();
-        final BeanDefinition<T> next = iterator.next();
-        // We should have at least two beans - no need for next checks
-        // Check there are not 2 beans with the same order
-        if (bean.getOrder() != next.getOrder()) {
-            LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, null);
+        List<BeanDefinition<T>> remaining = BeanSelection.select(beanType, qualifier, candidates, beanResolutionCustomizer);
+        if (remaining.size() == 1) {
+            BeanDefinition<T> bean = remaining.get(0);
+            LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, qualifier);
             return bean;
         }
-
-        // try resolve @DefaultImplementation
-        BeanDefinition<T> first = candidates.iterator().next();
-        Class<?> defaultImplementation = first.getDefaultImplementation();
-        if (defaultImplementation != null) {
-            for (BeanDefinition<T> bd : candidates) {
-                if (bd.getBeanType().equals(defaultImplementation)) {
-                    return bd;
-                }
-            }
-        }
-        Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType.getType(), candidates);
-        if (exactMatches.size() == 1) {
-            return exactMatches.iterator().next();
-        }
+        List<BeanDefinition<T>> considered = BeanSelection.primaryCandidates(candidates);
+        boolean allSecondary = considered.stream().allMatch(candidate -> candidate.hasDeclaredStereotype(Secondary.class));
         if (allSecondary) {
-            throw new NonUniqueBeanException(beanType.getType(), originalCandidates.iterator());
+            throw new NonUniqueBeanException(beanType.getType(), considered.iterator());
         }
         if (throwNonUnique) {
-            return findConcreteCandidate(beanType.getType(), qualifier, candidates);
+            return findConcreteCandidate(beanType.getType(), qualifier, remaining);
         }
         return null;
     }
@@ -4677,16 +4709,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 registerConfiguration(beanConfiguration);
             }
         }
-    }
-
-    private <T> Collection<BeanDefinition<T>> filterExactMatch(final Class<T> beanType, Collection<BeanDefinition<T>> candidates) {
-        List<BeanDefinition<T>> list = new ArrayList<>(candidates.size());
-        for (BeanDefinition<T> candidate : candidates) {
-            if (candidate.getBeanType() == beanType) {
-                list.add(candidate);
-            }
-        }
-        return list;
     }
 
     private void configureAndStartContext() {

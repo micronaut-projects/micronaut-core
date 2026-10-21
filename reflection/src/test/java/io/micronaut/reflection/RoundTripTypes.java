@@ -43,6 +43,12 @@ public class RoundTripTypes<K, V> {
 
     public List<String>[][] matrix;
 
+    @SuppressWarnings("rawtypes")
+    public List[] rawLists;
+
+    @SuppressWarnings("rawtypes")
+    public List[][] rawMatrix;
+
     public K[] keys;
 
     @SuppressWarnings("rawtypes")

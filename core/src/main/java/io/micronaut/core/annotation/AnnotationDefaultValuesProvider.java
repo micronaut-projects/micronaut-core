@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.core.annotation;
+import org.jspecify.annotations.Nullable;
+
 import java.util.Map;
 
 /**
@@ -26,8 +28,8 @@ public interface AnnotationDefaultValuesProvider {
 
     /**
      * @param annotationName The annotation name
-     * @return The annotation default values
+     * @return The annotation default values or {@code null} if the annotation has none
      */
-    Map<CharSequence, Object> provide(String annotationName);
+    @Nullable Map<CharSequence, Object> provide(String annotationName);
 
 }
