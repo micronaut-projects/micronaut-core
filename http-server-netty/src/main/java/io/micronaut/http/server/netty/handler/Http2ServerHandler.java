@@ -24,6 +24,7 @@ import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListe
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelOutboundBuffer;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
@@ -275,6 +276,9 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         private final int connectionWindowSize;
         private boolean connectionWindowRaised;
         private long idleTimeoutNanos = -1;
+        private int lastMessageHashCode;
+        private long lastPendingWriteBytes;
+        private long lastProgress;
 
         private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, ConnectionHandlerBuilder builder) {
             super(decoder, encoder, initialSettings, decoupleCloseAndGoAway, flushPreface);
@@ -319,11 +323,38 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             handler.devolvePendingStreams();
             handler.reading = false;
             super.channelReadComplete(ctx);
-            if (idleTimeoutNanos > 0 && System.nanoTime() - handler.lastStreamActivity >= idleTimeoutNanos) {
-                // only PING, SETTINGS and the like for the whole idle timeout. These reset the
-                // idle state handler, but must not keep a stalled connection open.
-                ctx.close();
+            if (idleTimeoutNanos > 0) {
+                long now = System.nanoTime();
+                if (outputChanged(ctx)) {
+                    // a response is still being drained to the peer
+                    handler.lastStreamActivity = now;
+                } else if (now - handler.lastStreamActivity >= idleTimeoutNanos) {
+                    // only PING, SETTINGS and the like for the whole idle timeout. These reset the
+                    // idle state handler, but must not keep a stalled connection open.
+                    ctx.close();
+                }
             }
+        }
+
+        /**
+         * Whether the channel's outbound buffer made progress since the last call, like
+         * {@link IdleStateHandler} does with {@code observeOutput}.
+         */
+        private boolean outputChanged(ChannelHandlerContext ctx) {
+            ChannelOutboundBuffer buf = ctx.channel().unsafe().outboundBuffer();
+            if (buf == null) {
+                return false;
+            }
+            int messageHashCode = System.identityHashCode(buf.current());
+            long pendingWriteBytes = buf.totalPendingWriteBytes();
+            long progress = buf.currentProgress();
+            boolean changed = messageHashCode != lastMessageHashCode
+                || pendingWriteBytes != lastPendingWriteBytes
+                || progress != lastProgress;
+            lastMessageHashCode = messageHashCode;
+            lastPendingWriteBytes = pendingWriteBytes;
+            lastProgress = progress;
+            return changed;
         }
 
         @Override

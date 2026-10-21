@@ -50,6 +50,7 @@ import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpDecoderConfig;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequest;
@@ -653,7 +654,13 @@ final class HttpPipelineBuilder {
                     sourceCodec,
                     upgradeCodecFactory,
                     server.getServerConfiguration().getMaxH2cUpgradeRequestSize()
-            );
+            ) {
+                @Override
+                protected boolean shouldHandleUpgradeRequest(HttpRequest req) {
+                    // a head the decoder rejected is answered by the HTTP/1 fallback
+                    return !req.decoderResult().isFailure() && super.shouldHandleUpgradeRequest(req);
+                }
+            };
             ChannelHandler priorKnowledgeHandler = frameCodec == null ? connectionHandler : new ChannelInitializer<>() {
                 @Override
                 protected void initChannel(Channel ch) {
@@ -1030,7 +1037,7 @@ final class HttpPipelineBuilder {
         @Override
         protected void handleOversizedMessage(ChannelHandlerContext ctx, HttpMessage oversized) throws Exception {
             if (oversized instanceof HttpRequest) {
-                ctx.writeAndFlush(new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE, Unpooled.EMPTY_BUFFER, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, 0), EmptyHttpHeaders.INSTANCE))
+                ctx.writeAndFlush(new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE, Unpooled.EMPTY_BUFFER, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, 0).add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE), EmptyHttpHeaders.INSTANCE))
                     .addListener(ChannelFutureListener.CLOSE);
             } else {
                 super.handleOversizedMessage(ctx, oversized);

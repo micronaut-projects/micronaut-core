@@ -32,7 +32,7 @@ class H2cUpgradeMalformedHeadSpec extends Specification {
         when:
         Socket socket = new Socket('127.0.0.1', server.port)
         socket.soTimeout = 1500
-        socket.outputStream.write(("GET /f35 HTTP/1.1\r\nHost: localhost\r\n" + badLine +
+        socket.outputStream.write(("GET /h2c-malformed HTTP/1.1\r\nHost: localhost\r\n" + badLine +
                 "Connection: Upgrade, HTTP2-Settings\r\nUpgrade: h2c\r\nHTTP2-Settings: AAMAAABkAAQAAP__\r\n\r\n").getBytes(StandardCharsets.US_ASCII))
         socket.outputStream.flush()
         Thread.sleep(300)
