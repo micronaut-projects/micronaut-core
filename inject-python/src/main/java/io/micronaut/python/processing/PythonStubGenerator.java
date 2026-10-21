@@ -199,6 +199,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String IS_LIVE_INSTANCE = "isLiveInstance";
     private static final String PYTHON_CLASS_REFERENCE_PARAMETER = "pythonClassReference";
     public static final String GENERATOR_NAME = "python";
+    /** The Python package of a top-level class, which has no package of its own. */
+    private static final String TOP_LEVEL_PACKAGE = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
     static final String PUBLISHER = "org.reactivestreams.Publisher";
     private static final String CONVERT_PUBLISHER = "convertPublisher";
@@ -3961,7 +3963,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     static List<String> pythonClassPath(ClassElement element) {
         PythonClassReferenceDef classReference = pythonClassReferenceDef(element);
-        return List.of(java.util.Objects.toString(classReference.packageName(), "python"), classReference.displayName());
+        return List.of(java.util.Objects.toString(classReference.packageName(), TOP_LEVEL_PACKAGE), classReference.displayName());
     }
 
     private static PythonClassReferenceDef pythonClassReferenceDef(ClassElement element) {
@@ -3978,7 +3980,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             rootName,
             nestedMemberNames,
             pythonSimpleName,
-            "class-instance:" + java.util.Objects.toString(packageName, "python") + "." + pythonSimpleName
+            "class-instance:" + java.util.Objects.toString(packageName, TOP_LEVEL_PACKAGE) + "." + pythonSimpleName
         );
     }
 
