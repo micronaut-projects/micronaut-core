@@ -289,6 +289,12 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         }.ifEmpty {
             mutableListOf(getJavaObjectClassElement()).asSequence()
         }.toList()
+        if (!stripTypeArguments) {
+            // The parameter is visited while its own bounds are resolved, which is what stops at the T within the
+            // bounds of T : Comparable<T>. It is not visited for what is resolved after it, so that the T within the
+            // bounds of a sibling V : List<out T> keeps its own bounds
+            visitedTypes.remove(typeParameter)
+        }
 
         return KotlinGenericPlaceholderElement(
             KotlinTypeParameterNativeElement(typeParameter, owner),
@@ -558,15 +564,23 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             return visitorContext.getClassElement("kotlin.Any").get()
         }
         val resolvedType = type.resolve()
-        val stripTypeArguments2 = stripTypeArguments || !visitedTypes.add(type)
+        val added = visitedTypes.add(type)
+        val stripTypeArguments2 = stripTypeArguments || !added
 
-        val resolved = newTypeArgument(
-            owner,
-            resolvedType,
-            parentTypeArguments,
-            visitedTypes,
-            stripTypeArguments2
-        )
+        val resolved = try {
+            newTypeArgument(
+                owner,
+                resolvedType,
+                parentTypeArguments,
+                visitedTypes,
+                stripTypeArguments2
+            )
+        } finally {
+            if (added) {
+                // Visited only while the argument itself is resolved, as the type parameters are
+                visitedTypes.remove(type)
+            }
+        }
         if (resolved is KotlinGenericPlaceholderElement) {
             // Keep the occurrence separate from the declaration and the type it resolves to.
             resolved.typeArgument = typeArgument
