@@ -191,7 +191,17 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     @Override
     public void handle(RequestHandler handler) {
         RequestHandler checked = route.terminal(handler, HANDLER);
+        if (checked instanceof ResourceHandler resources) {
+            // the handler of resources at a route of its own: the executor and the media types of a route of resources
+            route.endResourceHandler(resources);
+            return;
+        }
         route.end(() -> HandlerMethod.of(checked), null, 0);
+    }
+
+    @Override
+    public void resources(ResourceHandler resources) {
+        route.endResources(route.terminal(resources, "resources"));
     }
 
     @Override
