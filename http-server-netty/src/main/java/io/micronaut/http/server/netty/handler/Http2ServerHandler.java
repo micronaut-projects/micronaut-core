@@ -436,13 +436,27 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public ConnectionHandler build() {
             connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
-            Http2FrameListener fl = decompress ? new DelegatingDecompressorFrameListener(connection(), frameListener, false) : frameListener;
+            Http2FrameListener fl = decompress ? new DelegatingDecompressorFrameListener(connection(), frameListener, false, maxDecompressionAllocation()) : frameListener;
             if (accessLogManagerFactory != null) {
                 accessLogManager = new Http2AccessLogManager(accessLogManagerFactory, connection());
                 fl = new Http2AccessLogFrameListener(fl, accessLogManager);
             }
             frameListener(fl);
             return super.build();
+        }
+
+        /**
+         * Bound the output of a single decompression step by the buffer limit, like the HTTP/1
+         * path, so that a small compressed frame cannot expand without bound.
+         *
+         * @return The max allocation of the decompressor, {@code 0} for unlimited
+         */
+        private int maxDecompressionAllocation() {
+            long maxBufferSize = frameListener.bodySizeLimits.maxBufferSize();
+            if (maxBufferSize > Integer.MAX_VALUE) {
+                return 0;
+            }
+            return (int) Math.max(1, maxBufferSize);
         }
 
         @Override

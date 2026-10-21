@@ -95,6 +95,10 @@ abstract class MultiplexedServerHandler {
         private HttpRequest request;
         @Nullable
         private List<ByteBuf> bufferedContent;
+        /**
+         * Number of bytes in {@link #bufferedContent}.
+         */
+        private long bufferedLength;
         private BufferConsumer.@Nullable Upstream writerUpstream;
         @Nullable
         private InputStreamer streamer;
@@ -191,6 +195,7 @@ abstract class MultiplexedServerHandler {
                         fullBody = PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
                     }
                     bufferedContent = null;
+                    bufferedLength = 0;
 
                     requestAccepted = true;
                     notifyDataConsumed(fullBody.readableBytes());
@@ -200,6 +205,13 @@ abstract class MultiplexedServerHandler {
                         bufferedContent = new ArrayList<>();
                     }
                     bufferedContent.add(data);
+                    bufferedLength += data.readableBytes();
+                    if (bufferedLength > bodySizeLimits.maxBufferSize()) {
+                        // a decompressed body can grow far beyond the flow control window, so
+                        // stop buffering once the limit is exceeded and let the streaming buffer
+                        // apply the size limits and backpressure
+                        devolveToStreaming();
+                    }
                 }
             } else {
                 streamer.add(byteBodyFactory().readBufferFactory().adapt(data));
@@ -229,6 +241,7 @@ abstract class MultiplexedServerHandler {
                     streamer.add(byteBodyFactory().readBufferFactory().adapt(buf));
                 }
                 bufferedContent = null;
+                bufferedLength = 0;
             }
             requestAccepted = true;
             requestHandler.accept(requiredCtx(), request, new StreamingNettyByteBody(streamer.dest), this);
@@ -270,6 +283,7 @@ abstract class MultiplexedServerHandler {
                     buf.release();
                 }
                 bufferedContent = null;
+                bufferedLength = 0;
             }
         }
 
