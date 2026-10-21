@@ -178,7 +178,7 @@ final class DefaultFilterRoute implements FilterRoute {
 
     @Override
     public Optional<GenericHttpFilter> match(HttpMethod method, URI uri) {
-        return match(method, uri.getPath());
+        return match(method, uri.getRawPath());
     }
 
     @Override
