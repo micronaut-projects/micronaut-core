@@ -200,18 +200,23 @@ abstract class MultiplexedServerHandler {
                     requestAccepted = true;
                     notifyDataConsumed(fullBody.readableBytes());
                     requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory().createChecked(bodySizeLimits, fullBody), this);
+                } else if (bufferedLength + data.readableBytes() > bodySizeLimits.maxBufferSize()) {
+                    // a decompressed body can grow far beyond the flow control window, so stop
+                    // buffering before the limit is exceeded and let the streaming buffer apply
+                    // the size limits and backpressure
+                    devolveToStreaming();
+                    InputStreamer s = streamer;
+                    if (s == null) {
+                        data.release();
+                    } else {
+                        s.add(byteBodyFactory().readBufferFactory().adapt(data));
+                    }
                 } else {
                     if (bufferedContent == null) {
                         bufferedContent = new ArrayList<>();
                     }
                     bufferedContent.add(data);
                     bufferedLength += data.readableBytes();
-                    if (bufferedLength > bodySizeLimits.maxBufferSize()) {
-                        // a decompressed body can grow far beyond the flow control window, so
-                        // stop buffering once the limit is exceeded and let the streaming buffer
-                        // apply the size limits and backpressure
-                        devolveToStreaming();
-                    }
                 }
             } else {
                 streamer.add(byteBodyFactory().readBufferFactory().adapt(data));

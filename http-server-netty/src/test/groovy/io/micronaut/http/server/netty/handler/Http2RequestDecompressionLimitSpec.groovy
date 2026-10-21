@@ -16,6 +16,7 @@ import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
 import io.netty.handler.codec.http2.Http2ChannelDuplexHandler
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 import java.util.concurrent.atomic.AtomicLong
@@ -121,6 +122,60 @@ class Http2RequestDecompressionLimitSpec extends Specification {
 
         cleanup:
         bodies.each { it.close() }
+        // drop the connection: a graceful close would queue a GOAWAY for the open stream
+        server?.unsafe()?.close(server.unsafe().voidPromise())
+        server?.runPendingTasks()
+        server?.finishAndReleaseAll()
+        client?.finishAndReleaseAll()
+    }
+
+    def "streamed http2 request body may decompress beyond the buffer limit"() {
+        given:
+        int bufferLimit = 1024 * 1024
+        def server = new EmbeddedChannel()
+        def client = new EmbeddedChannel()
+        EmbeddedTestUtil.connect(server, client)
+        long received = 0
+        Throwable failure = null
+        boolean completed = false
+        server.pipeline().addLast(new Http2ServerHandler.ConnectionHandlerBuilder(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                Flux.from(body.toByteArrayPublisher()).subscribe({ received += it.length }, { failure = it }, { completed = true })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                failure = cause
+            }
+        }).bodySizeLimits(new BodySizeLimits(4 * bufferLimit, bufferLimit)).decompress(true).build())
+        def duplex = new DuplexHandler()
+        client.pipeline().addLast(Http2FrameCodecBuilder.forClient().build(), duplex)
+        EmbeddedTestUtil.advance(server, client)
+
+        def bos = new ByteArrayOutputStream()
+        new GZIPOutputStream(bos).withCloseable { it.write(new byte[2 * bufferLimit]) }
+        byte[] gz = bos.toByteArray()
+
+        when:
+        def stream = duplex.newStream()
+        def headers = new DefaultHttp2Headers()
+        headers.method(HttpMethod.POST.asciiName()).scheme("http").authority("example.com").path("/")
+        headers.add("content-encoding", "gzip")
+        client.write(new DefaultHttp2HeadersFrame(headers, false).stream(stream))
+        client.write(new DefaultHttp2DataFrame(Unpooled.wrappedBuffer(gz), true).stream(stream))
+        client.flush()
+        EmbeddedTestUtil.advance(server, client)
+
+        then:
+        failure == null
+        completed
+        received == 2L * bufferLimit
+
+        cleanup:
+        // drop the connection: a graceful close would queue a GOAWAY for the open stream
+        server?.unsafe()?.close(server.unsafe().voidPromise())
+        server?.runPendingTasks()
         server?.finishAndReleaseAll()
         client?.finishAndReleaseAll()
     }
