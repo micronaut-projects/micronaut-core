@@ -17,9 +17,13 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.RouteTemplate;
+import io.micronaut.http.uri.RouteTemplateParser;
+import io.micronaut.http.uri.UriRouteTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.RouteArguments;
@@ -83,6 +87,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
      * {@link #declaredBy(Class)}; a group has the one of its builder.
      */
     private @Nullable Class<?> declaringBean;
+    /**
+     * The parser of the {@code String} templates, or {@code null} for URI templates: see
+     * {@link HttpRouteGroup#templates(RouteTemplateParser)}; a group has the one of its builder.
+     */
+    private @Nullable RouteTemplateParser templateParser;
 
     /**
      * @param assembly     The assembly the routes are added to
@@ -152,7 +161,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
     @Override
     public HttpRouteSpec route(HttpMethod method, String uri) {
         standardMethod(method);
-        return pending(method.name(), uri, method == HttpMethod.GET, (template, handler) -> List.of(route(method, template, handler.get())));
+        return pending(method.name(), uri, method == HttpMethod.GET, (template, handler) -> List.of(add(method.name(), method, template, handler.get())));
     }
 
     @Override
@@ -174,7 +183,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         return pending(names.toString(), uri, get, (template, handler) -> {
             List<RouteSettings> routes = new ArrayList<>(declared.size());
             for (HttpMethod method : declared) {
-                routes.add(route(method, template, handler.get()));
+                routes.add(add(method.name(), method, template, handler.get()));
             }
             return routes;
         });
@@ -186,8 +195,92 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         HttpMethod method = HttpMethod.parse(httpMethodName);
         // a standard method by its canonical name, a custom one by the given name
         String name = method == HttpMethod.CUSTOM ? httpMethodName : method.name();
-        return pending(name, uri, method == HttpMethod.GET, (template, handler) ->
-            List.of(grouped(assembly.addRoute(name, method, template, DEFAULT_CONSUMES, handle(handler.get())).settings())));
+        return pending(name, uri, method == HttpMethod.GET, (template, handler) -> List.of(add(name, method, template, handler.get())));
+    }
+
+    @Override
+    public HttpRouteSpec route(HttpMethod method, RouteTemplate template) {
+        standardMethod(method);
+        return route(method.name(), method, template);
+    }
+
+    @Override
+    public HttpRouteSpec route(String httpMethodName, RouteTemplate template) {
+        RouteArguments.httpMethodName(httpMethodName);
+        HttpMethod method = HttpMethod.parse(httpMethodName);
+        // a standard method by its canonical name, a custom one by the given name
+        return route(method == HttpMethod.CUSTOM ? httpMethodName : method.name(), method, template);
+    }
+
+    /**
+     * Declare a pending route with a template of any kind: a Micronaut one under the prefix of
+     * the builder, another one as it is, outside a group with a prefix.
+     *
+     * @param name     The name of the HTTP method
+     * @param method   The HTTP method
+     * @param template The template
+     * @return The spec of the pending route
+     */
+    private HttpRouteSpec route(String name, HttpMethod method, RouteTemplate template) {
+        Objects.requireNonNull(template, "template");
+        checkOpen();
+        if (prefix != null && template instanceof UriRouteTemplate uriTemplate && uriTemplate.matcher() != null) {
+            // joined to the prefix of the group as a String URI template is: parsed once
+            String uri = uri(uriTemplate.expression());
+            DeclaredTemplate declared = uriDeclaration(uri);
+            return pending(name + " " + uri, handler -> List.of(add(name, method, declared, handler.get())),
+                method == HttpMethod.GET ? () -> uri : null);
+        }
+        Prefixed parsed = underPrefix(template);
+        DeclaredTemplate declared = new DeclaredTemplate(SupplierUtil.memoized(() -> assembly.mounted(parsed.template(), parsed.prefix())));
+        return pending(name + " " + parsed.prefix() + parsed.template().expression(), handler -> List.of(add(name, method, declared, handler.get())),
+            method == HttpMethod.GET ? () -> webSocketTemplate(parsed.template()) : null);
+    }
+
+    /**
+     * Add a {@code GET} route of a URI template, e.g. a route of resources.
+     *
+     * @param uri     The URI template, under the prefix of the builder
+     * @param handler The handler
+     * @return The settings of the route
+     */
+    final RouteSettings getRoute(String uri, HandlerMethod<?> handler) {
+        return add(HttpMethod.GET.name(), HttpMethod.GET, uriDeclaration(uri), handler);
+    }
+
+    /**
+     * @param uri A URI template, under the prefix of the builder
+     * @return The declaration: the routes of its methods share one template, built when the first is added
+     */
+    private DeclaredTemplate uriDeclaration(String uri) {
+        return new DeclaredTemplate(SupplierUtil.memoized(() -> assembly.uriTemplate(uri)));
+    }
+
+    /**
+     * @param template A template, relative to the prefix of the builder
+     * @return The template under the prefix: a URI template joined to it, another template with
+     * the literal prefix to mount it at, together with the mount of the assembly
+     * @throws IllegalArgumentException if the template is not a URI template and the prefix has variables
+     */
+    private Prefixed underPrefix(RouteTemplate template) {
+        RoutePrefix routePrefix = prefix;
+        if (routePrefix == null) {
+            return new Prefixed(template, "");
+        }
+        if (template instanceof UriRouteTemplate uriTemplate) {
+            if (uriTemplate.matcher() == null) {
+                throw new IllegalArgumentException("The route template " + template.expression() + " of a subclass of UriMatchTemplate cannot be declared in the route group with the prefix "
+                    + routePrefix + ": joined to the prefix, it would lose the rules of its class");
+            }
+            return new Prefixed(UriRouteTemplate.of(routePrefix.prefix(uriTemplate.expression())), "");
+        }
+        String literal = routePrefix.toString();
+        if (literal.indexOf('{') >= 0) {
+            throw new IllegalArgumentException("The route template " + template.expression()
+                + " cannot be declared in the route group with the prefix " + routePrefix
+                + ": a prefix with variables is joined to URI templates only. Declare it in a group with a literal prefix, or without a prefix");
+        }
+        return new Prefixed(template, "/".equals(literal) ? "" : literal);
     }
 
     @Override
@@ -202,15 +295,50 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
      * @param uri     The URI template of the route, relative to the prefix of the builder
      * @param get     Whether it is a route of {@code GET} only, which may be a WebSocket route
      * @param routes  Adds the routes of a handler, given the URI template under the prefix
+     * @param getOnly Whether the route is a route of {@code GET} only
      * @return The spec of the pending route
      */
-    private HttpRouteSpec pending(String methods, String uri, boolean get, BiFunction<String, Supplier<HandlerMethod<?>>, List<RouteSettings>> routes) {
-        String template = uri(uri);
+    private HttpRouteSpec pending(String methods, String uri, boolean get, BiFunction<DeclaredTemplate, Supplier<HandlerMethod<?>>, List<RouteSettings>> routes) {
+        RouteTemplateParser parser = templateParser;
+        if (parser == null) {
+            String template = uri(uri);
+            DeclaredTemplate declared = uriDeclaration(template);
+            return pending(methods + " " + template, handler -> routes.apply(declared, handler), get ? () -> template : null);
+        }
+        Objects.requireNonNull(uri, "uri");
+        checkOpen();
+        // parsed and mounted once, by the terminal that adds the routes, or the WebSocket terminal
+        Supplier<Prefixed> parsed = SupplierUtil.memoized(() -> underPrefix(parser.parse(uri)));
+        DeclaredTemplate declared = new DeclaredTemplate(SupplierUtil.memoized(() -> assembly.mounted(parsed.get().template(), parsed.get().prefix())));
+        return pending(methods + " " + uri, handler -> routes.apply(declared, handler),
+            get ? () -> webSocketTemplate(parsed.get().template()) : null);
+    }
+
+    /**
+     * @param template The template of a {@code GET} route
+     * @return The URI template of the template, which a WebSocket route is matched with, or
+     * {@code null} if it is a template of another language
+     */
+    private static @Nullable String webSocketTemplate(@Nullable RouteTemplate template) {
+        return template instanceof UriRouteTemplate uriTemplate && uriTemplate.matcher() != null ? uriTemplate.expression() : null;
+    }
+
+    /**
+     * Declare a pending route, which its terminal adds.
+     *
+     * @param route             Describes the route, e.g. {@code GET /items/{id}}, for the messages
+     * @param routes            Adds the routes of a handler
+     * @param webSocketTemplate Gives the URI template of a route of {@code GET} only, which may be a WebSocket route,
+     *                          {@code null} if its template is of another language; or {@code null} for another route
+     * @return The spec of the pending route
+     */
+    private HttpRouteSpec pending(String route, Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes,
+                                  @Nullable Supplier<@Nullable String> webSocketTemplate) {
         Class<?> bean = declaringBean;
-        String description = methods + " " + template + (bean == null ? "" : " declared by " + beanName(bean));
-        PendingRoute route = new PendingRoute(this, handler -> routes.apply(template, handler), description, get ? template : null);
-        pending.add(route);
-        return new DefaultHttpRouteSpec(route);
+        String description = route + (bean == null ? "" : " declared by " + beanName(bean));
+        PendingRoute pendingRoute = new PendingRoute(this, routes, description, webSocketTemplate);
+        pending.add(pendingRoute);
+        return new DefaultHttpRouteSpec(pendingRoute);
     }
 
     /**
@@ -251,15 +379,14 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
      * @param handler  Creates the handler method of a route
      * @return The routes
      */
-    private List<RouteSettings> anyMethod(String template, Supplier<HandlerMethod<?>> handler) {
+    private List<RouteSettings> anyMethod(DeclaredTemplate template, Supplier<HandlerMethod<?>> handler) {
         List<RouteSettings> routes = new ArrayList<>(HttpMethod.values().length);
         for (HttpMethod method : HttpMethod.values()) {
             if (method != HttpMethod.CUSTOM) {
-                routes.add(route(method, template, handler.get()));
+                routes.add(add(method.name(), method, template, handler.get()));
             }
         }
-        routes.add(grouped(assembly.addRoute(AnyMethodRoutes.CUSTOM_METHODS, HttpMethod.CUSTOM, template, DEFAULT_CONSUMES,
-            handle(handler.get())).settings()));
+        routes.add(add(AnyMethodRoutes.CUSTOM_METHODS, HttpMethod.CUSTOM, template, handler.get()));
         for (RouteSettings route : routes) {
             route.anyMethod();
         }
@@ -274,6 +401,15 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
      */
     final void declaredBy(@Nullable Class<?> bean) {
         this.declaringBean = bean;
+    }
+
+    /**
+     * @param parser The parser of the {@code String} templates of the routes declared from now on,
+     *               see {@link HttpRouteGroup#templates(RouteTemplateParser)}
+     */
+    final void templateParser(@Nullable RouteTemplateParser parser) {
+        // the URI templates take the path they always had
+        this.templateParser = parser == UriRouteTemplate.PARSER ? null : parser;
     }
 
     /**
@@ -335,6 +471,12 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         locate(prefixUri, new RouteLocator(locator, routesOf, assembly.locatedTables(), locatorGroupSettings()));
     }
 
+    @Override
+    public final <T> void locateOn(String executorName, String prefixUri, LocatorHandler<? extends T> locator,
+                                   Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locateAsync(prefixUri, RouteLocator.onExecutor(assembly, executorName, locator), routesOf);
+    }
+
     /**
      * The media types and the executor of the groups of a locator route, which the routes it
      * locates inherit: they are given to the settings when the outermost group is closed, like
@@ -354,20 +496,43 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
 
     private void locate(String prefixUri, RouteLocator locator) {
         Objects.requireNonNull(prefixUri, "prefixUri");
-        RoutePrefix.checkPath(prefixUri, "a locator route");
         checkOpen();
+        RouteTemplateParser parser = templateParser;
+        if (parser != null) {
+            // the parser validates the text of its language, e.g. a regular expression with a '?'
+            locate(underPrefix(parser.parse(prefixUri)), locator);
+            return;
+        }
+        RoutePrefix.checkPath(prefixUri, "a locator route");
         MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(locator));
-        for (String template : RouteLocator.templates(uri(prefixUri))) {
+        for (String uri : RouteLocator.templates(uri(prefixUri))) {
+            // the routes of every method share the template
+            RouteTemplate template = assembly.uriTemplate(uri);
             for (HttpMethod method : HttpMethod.values()) {
                 if (method != HttpMethod.CUSTOM) {
                     // the routes of the target decide which media types they consume and produce, inheriting
                     // the ones of the groups; the located route carries the filters of the groups of the locator route
-                    grouped(assembly.addRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
+                    grouped(assembly.addMountedRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
                 }
             }
             // a request with a custom method is located too, and matched against the located
             // routes of its method, or of any method
-            grouped(assembly.addRoute(AnyMethodRoutes.CUSTOM_METHODS, HttpMethod.CUSTOM, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
+            grouped(assembly.addMountedRoute(AnyMethodRoutes.CUSTOM_METHODS, HttpMethod.CUSTOM, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
+        }
+    }
+
+    /**
+     * Declare the locator routes of a prefix that is not a URI template.
+     *
+     * @param prefixTemplate The prefix, under the prefix of the builder
+     * @param locator        The locator
+     */
+    private void locate(Prefixed prefixTemplate, RouteLocator locator) {
+        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(locator));
+        for (RouteAssembly.DefaultUriRoute route : assembly.addLocatorRoutes(prefixTemplate.template(), prefixTemplate.prefix(), DEFAULT_CONSUMES, target)) {
+            // the routes of the target decide which media types they consume and produce
+            // the located route carries the filters of the groups of the locator route
+            grouped(route.settings()).consumesAll();
         }
     }
 
@@ -402,6 +567,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         G group = factory.create(assembly, assembly.groupFilters(groupFilters), assembly.routeGroup(groupSettings),
             new RouteGroupDefaults(groupDefaults()), groupPrefix, placeholderResolver);
         group.declaredBy(declaringBean);
+        group.templateParser(templateParser);
         try {
             routes.accept(group);
             // the routes of the group are ended in its lambda
@@ -495,8 +661,17 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
      * @param handler  The handler method
      * @return The route
      */
-    private RouteSettings route(HttpMethod method, String template, HandlerMethod<?> handler) {
-        return grouped(assembly.addRoute(method.name(), method, template, DEFAULT_CONSUMES, handle(handler)).settings());
+    /**
+     * Add a route of a declared template.
+     *
+     * @param name     The name of the HTTP method
+     * @param method   The HTTP method
+     * @param template The template
+     * @param handler  The handler
+     * @return The settings of the route
+     */
+    private RouteSettings add(String name, HttpMethod method, DeclaredTemplate template, HandlerMethod<?> handler) {
+        return grouped(assembly.addMountedRoute(name, method, template.mounted().get(), DEFAULT_CONSUMES, handle(handler)).settings());
     }
 
     @SuppressWarnings("unchecked")
@@ -548,5 +723,23 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
          */
         G create(RouteAssembly assembly, RouteAssembly.RouteFilters filters, RouteAssembly.RouteGroup settings,
                  RouteGroupDefaults defaults, @Nullable RoutePrefix prefix, @Nullable PropertyPlaceholderResolver placeholderResolver);
+    }
+
+    /**
+     * The template of a declared route, shared by the routes of its methods.
+     *
+     * @param mounted Gives the template under the prefix of the builder and the mount of the
+     *                assembly, built once, when the first route is added
+     */
+    private record DeclaredTemplate(Supplier<RouteTemplate> mounted) {
+    }
+
+    /**
+     * A template under the prefix of the builder.
+     *
+     * @param template The template: a URI template joined to the prefix, or another template
+     * @param prefix   The literal prefix to mount the other template at, with the mount of the assembly, or empty
+     */
+    private record Prefixed(RouteTemplate template, String prefix) {
     }
 }

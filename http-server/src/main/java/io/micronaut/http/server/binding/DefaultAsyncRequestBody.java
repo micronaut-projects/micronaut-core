@@ -35,6 +35,7 @@ import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.FormOptions;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
@@ -49,6 +50,9 @@ import io.micronaut.http.form.FormPart;
 import io.micronaut.http.form.FormParts;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.server.exceptions.UnsupportedMediaException;
+import io.micronaut.http.server.multipart.FormFactory;
+import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -57,8 +61,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -99,7 +105,20 @@ import java.util.function.Supplier;
  */
 @Internal
 final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBody {
+    /**
+     * The arguments of the classes the handlers read, created once: a handler reads a body of the same
+     * class at every request.
+     */
+    private static final ClassValue<Argument<?>> ARGUMENTS = new ClassValue<>() {
+        @Override
+        protected Argument<?> computeValue(Class<?> type) {
+            return Argument.of(type);
+        }
+    };
 
+    // every ASCII character, which a raw value of a URL-encoded form keeps
+    private static final byte[] ASCII_BYTES = asciiBytes();
+    private static final String ASCII = new String(ASCII_BYTES, StandardCharsets.US_ASCII);
     private static final Logger LOG = LoggerFactory.getLogger(DefaultAsyncRequestBody.class);
     private static final List<String> ELEMENT_MEDIA_TYPES = List.of(MediaType.APPLICATION_JSON, MediaType.APPLICATION_JSON_STREAM);
     private static final List<String> FORM_MEDIA_TYPES = List.of(MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA);
@@ -170,6 +189,11 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         return cleared == null ? server.byteBody() : cleared;
     }
 
+    @SuppressWarnings("unchecked")
+    private static <T> Argument<T> argumentOf(Class<T> type) {
+        return (Argument<T>) ARGUMENTS.get(type);
+    }
+
     @Override
     public boolean hasBody() {
         if (decoded) {
@@ -186,7 +210,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     @Override
     public <T> CompletionStage<@Nullable T> body(Class<T> type) {
-        return body(Argument.of(type));
+        return body(argumentOf(type));
     }
 
     @Override
@@ -309,7 +333,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     @Override
     public <T> BodyElements<T> elements(Class<T> type) {
-        return elements(Argument.of(type));
+        return elements(argumentOf(type));
     }
 
     @Override
@@ -337,6 +361,71 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         synchronized (lock) {
             return startForm();
         }
+    }
+
+    @Override
+    public CompletionStage<FormData> form(FormOptions options) {
+        MediaType contentType = request.getContentType().orElse(null);
+        if (!options.rawValues() || contentType == null || !contentType.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
+            // a multipart form has no percent-encoding
+            return form();
+        }
+        synchronized (lock) {
+            if (decoded) {
+                // a filter set the body to an object: its values are not the ones of the body
+                throw new IllegalStateException("The raw values of the form cannot be read: a filter replaced the body");
+            }
+            claimBytes("form");
+            try {
+                if (cleared != null) {
+                    // no body: a form without fields
+                    return CompletableFuture.completedFuture(new DefaultFormData(Map.of(), Map.of(), binder.conversionService));
+                }
+                FormCapableHttpRequest<?> formRequest = formRequest();
+                // decoded by the decoder of the form, with its limits and its validation, but the
+                // values are kept as they appear: ASCII, unless the client sent other bytes
+                Charset charset = request.getCharacterEncoding();
+                UploadContext context = UploadContext.of(binder.formFactory(), formRequest, isAsciiCompatible(charset) ? charset : StandardCharsets.ISO_8859_1);
+                CloseableByteBody body = readBytes("form");
+                FormDataArgumentBinder.Collection collection = FormDataArgumentBinder.start(context, binder.formFactory(), binder.conversionService, formRequest,
+                    () -> encodedFields(formRequest, body));
+                owned(() -> {
+                    collection.cancel();
+                    return CompletableFuture.completedStage(null);
+                });
+                return collection.result().minimalCompletionStage();
+            } catch (Throwable e) {
+                return CompletableFuture.failedStage(e);
+            }
+        }
+    }
+
+    private static byte[] asciiBytes() {
+        byte[] bytes = new byte[128];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) i;
+        }
+        return bytes;
+    }
+
+    private static Publisher<RawFormField> encodedFields(FormCapableHttpRequest<?> formRequest, CloseableByteBody body) {
+        try {
+            return formRequest.getEncodedFormFields(body);
+        } catch (Throwable e) {
+            // no publisher took the body
+            body.close();
+            throw e;
+        }
+    }
+
+    /**
+     * @param charset A charset
+     * @return Whether it encodes and decodes every ASCII character as its ASCII byte: the raw value
+     * of a field keeps any ASCII character, e.g. {@code ~}, which some charsets map elsewhere
+     */
+    private static boolean isAsciiCompatible(Charset charset) {
+        return charset.equals(StandardCharsets.UTF_8) || charset.equals(StandardCharsets.ISO_8859_1) || charset.equals(StandardCharsets.US_ASCII)
+            || Arrays.equals(ASCII.getBytes(charset), ASCII_BYTES) && new String(ASCII_BYTES, charset).equals(ASCII);
     }
 
     private CompletionStage<FormData> startForm() {
@@ -660,11 +749,15 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
     }
 
     /**
-     * @return The context of the body: the text is in the charset of the request of the route,
-     * like its content type
+     * @return The context of the body: the text is in the charset of the content type of the
+     * request of the route, else the default charset, like a {@code String} body
      */
     private UploadContext uploadContext() {
-        return UploadContext.of(binder.formFactory(), server, request.getCharacterEncoding());
+        FormFactory formFactory = binder.formFactory();
+        Charset charset = request.getContentType()
+            .flatMap(MediaType::getCharset)
+            .orElseGet(() -> formFactory.getConfiguration().getDefaultCharset());
+        return UploadContext.of(formFactory, server, charset);
     }
 
     /**
@@ -820,7 +913,17 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
         @Override
         public Optional<MediaType> getContentType() {
-            return getDelegate().getContentType();
+            Optional<MediaType> contentType = getDelegate().getContentType();
+            if (contentType.isPresent()) {
+                return contentType;
+            }
+            // A request without a content type is read as the route consumes, like the body of a
+            // controller route, whose reader the route has resolved for the type of its body: the
+            // type of the body of this route is not known before the handler reads it
+            return RouteAttributes.getRouteInfo(getDelegate())
+                .map(RouteInfo::getConsumes)
+                .filter(consumes -> consumes.size() == 1 && !MediaType.ALL_TYPE.equals(consumes.get(0)))
+                .map(consumes -> consumes.get(0));
         }
 
         @Override

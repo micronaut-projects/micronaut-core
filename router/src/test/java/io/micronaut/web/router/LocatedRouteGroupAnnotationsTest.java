@@ -128,7 +128,7 @@ class LocatedRouteGroupAnnotationsTest {
     }
 
     private static Router versioned(Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         RouteVersionFilter versions = new RouteVersionFilter(List.of(new HeaderVersionResolver(new HeaderVersionResolverConfiguration())), null, null, null);

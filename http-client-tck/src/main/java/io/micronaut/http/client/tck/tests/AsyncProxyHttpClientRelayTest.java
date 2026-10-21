@@ -64,13 +64,13 @@ class AsyncProxyHttpClientRelayTest {
         // Keep response writing within this test's inherited leak-detection scope.
         private final ExecutorService responses = Executors.newSingleThreadExecutor();
 
+        RelayController(@Client("/") AsyncProxyHttpClient client) {
+            this.client = client;
+        }
+
         @PreDestroy
         void close() {
             responses.close();
-        }
-
-        RelayController(@Client("/") AsyncProxyHttpClient client) {
-            this.client = client;
         }
 
         @Post(value = "/gateway", consumes = MediaType.ALL)
