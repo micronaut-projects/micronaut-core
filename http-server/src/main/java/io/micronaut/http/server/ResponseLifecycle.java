@@ -228,7 +228,7 @@ public abstract class ResponseLifecycle {
                 .orElse(null);
         }
         if (messageBodyWriter == null || !responseBodyType.isInstance(body) || !messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
-            responseBodyType = Argument.ofInstance(body);
+            responseBodyType = fallbackBodyType(responseBodyType, body);
             messageBodyWriter = messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(responseMediaType));
         }
         return buildFinalResponse(nettyRequest, (MutableHttpResponse<Object>) response, responseBodyType, responseMediaType, body, messageBodyWriter, false);
@@ -273,7 +273,7 @@ public abstract class ResponseLifecycle {
                 Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
 
                 if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
-                    responseBodyType = Argument.ofInstance(message);
+                    responseBodyType = fallbackBodyType(responseBodyType, message);
                     messageBodyWriter = wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType)));
                 }
                 ExecutionFlow<CloseableByteBody> flow = writePieceAsync(
@@ -327,6 +327,23 @@ public abstract class ResponseLifecycle {
      * @param type The item type
      * @return {@code true} if the items may be joined into a JSON array
      */
+    /**
+     * The type to look up a fallback writer with, when the writer of the route does not write the body
+     * in the selected media type. The annotations of the route (for example a JSON view) still apply
+     * to a body of the declared type.
+     *
+     * @param declaredType The declared response body type
+     * @param body The body
+     * @return The type of the body
+     */
+    private static Argument<Object> fallbackBodyType(Argument<Object> declaredType, Object body) {
+        Argument<Object> type = Argument.ofInstance(body);
+        if (declaredType.isInstance(body)) {
+            return type.withAnnotationMetadata(declaredType.getAnnotationMetadata());
+        }
+        return type;
+    }
+
     private static boolean isJsonFormattable(Argument<?> type) {
         // it would be nice to support netty ByteBuf here, but it's not clear how.
         // A ByteBody is raw bytes too: the writer passes it through unchanged, so framing it
