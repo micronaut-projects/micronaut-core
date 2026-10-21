@@ -18,13 +18,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HttpDateHeaderTest {
     /**
+     * The IMF-fixdate format of RFC 9110 section 5.6.7.
+     */
+    private static final DateTimeFormatter IMF_FIXDATE =
+        DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ENGLISH);
+
+    /**
      * The IMF-fixdate of RFC 9110 section 5.6.7 for the given instant, formatted without the
      * cache.
      */
     private static String legacy(long epochMillis) {
         return ZonedDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneId.systemDefault())
             .withZoneSameInstant(MutableHttpHeaders.GMT)
-            .format(DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ENGLISH));
+            .format(IMF_FIXDATE);
     }
 
     @ParameterizedTest
