@@ -71,7 +71,7 @@ final class HttpRoutesAssembly extends DefaultRouteBuilder implements AssembledR
                        List<HttpRoutes> routes,
                        @Nullable @Value("${micronaut.server.context-path}") String contextPath) {
         this(executionHandleLocator, conversionService, routes, new RouteAssembly(executionHandleLocator, conversionService,
-            contextPath, route -> { }));
+            contextPath));
     }
 
     private HttpRoutesAssembly(ExecutionHandleLocator executionHandleLocator,

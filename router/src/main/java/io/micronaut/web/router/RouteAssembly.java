@@ -71,7 +71,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -107,7 +106,6 @@ public final class RouteAssembly {
     private final ThreadSelection threadSelection;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private final UnaryOperator<String> routeUri;
-    private final Consumer<DefaultUriRoute> routeCreated;
     /**
      * Whether the literal path the routes that are not nested are mounted under is known, see
      * {@link #mountPrefix}: only then can templates other than URI templates be
@@ -128,28 +126,24 @@ public final class RouteAssembly {
      * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
      * @param conversionService The conversion service
      * @param routeUri          The URI template of a route that is not nested in another route, e.g. under the context path
-     * @param routeCreated      Called for every URI route when it is created, before any further configuration of it
      */
     public RouteAssembly(@Nullable Object beanLocator,
                          ConversionService conversionService,
-                         UnaryOperator<String> routeUri,
-                         Consumer<DefaultUriRoute> routeCreated) {
-        this(beanLocator, conversionService, routeUri, routeCreated, null);
+                         UnaryOperator<String> routeUri) {
+        this(beanLocator, conversionService, routeUri, null);
     }
 
     /**
      * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
      * @param conversionService The conversion service
      * @param routeUri          The URI template of a route that is not nested in another route, e.g. under the context path
-     * @param routeCreated      Called for every URI route when it is created, before any further configuration of it
      * @param contextPath       The context path the patterns of the server filters are under, or {@code null}
      */
     public RouteAssembly(@Nullable Object beanLocator,
                          ConversionService conversionService,
                          UnaryOperator<String> routeUri,
-                         Consumer<DefaultUriRoute> routeCreated,
                          @Nullable String contextPath) {
-        this(beanLocator, conversionService, routeUri, routeCreated, false, null, contextPath);
+        this(beanLocator, conversionService, routeUri, false, null, contextPath);
     }
 
     /**
@@ -160,20 +154,17 @@ public final class RouteAssembly {
      * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
      * @param conversionService The conversion service
      * @param contextPath       The context path, e.g. the {@code micronaut.server.context-path} property, or {@code null}
-     * @param routeCreated      Called for every URI route when it is created, before any further configuration of it
      */
     public RouteAssembly(@Nullable Object beanLocator,
                          ConversionService conversionService,
-                         @Nullable String contextPath,
-                         Consumer<DefaultUriRoute> routeCreated) {
-        this(beanLocator, conversionService, uri -> underContextPath(contextPath, uri), routeCreated, true, RouteTemplates.mountPrefix(contextPath), contextPath);
+                         @Nullable String contextPath) {
+        this(beanLocator, conversionService, uri -> underContextPath(contextPath, uri), true, RouteTemplates.mountPrefix(contextPath), contextPath);
     }
 
     @SuppressWarnings("ParameterNumber")
     private RouteAssembly(@Nullable Object beanLocator,
                           ConversionService conversionService,
                           UnaryOperator<String> routeUri,
-                          Consumer<DefaultUriRoute> routeCreated,
                           boolean mountKnown,
                           @Nullable String mountPrefix,
                           @Nullable String contextPath) {
@@ -181,7 +172,6 @@ public final class RouteAssembly {
         this.beanLocator = beanLocator;
         this.conversionService = conversionService;
         this.routeUri = routeUri;
-        this.routeCreated = routeCreated;
         this.mountKnown = mountKnown;
         this.mountPrefix = mountPrefix;
         if (beanLocator instanceof ApplicationContext applicationContext) {
@@ -216,7 +206,6 @@ public final class RouteAssembly {
         this.conversionService = resolved.conversionService;
         // the URIs of located routes are relative to the prefix of their locator
         this.routeUri = uri -> uri;
-        this.routeCreated = route -> { };
         // relative to the prefix of the locator: no context path, so templates of every language are supported
         this.mountKnown = true;
         this.mountPrefix = null;
@@ -329,7 +318,6 @@ public final class RouteAssembly {
             route = new DefaultUriRoute(httpMethod, routeUri.apply(uri), mediaTypes, executableHandle, httpMethodName, conversionService);
         }
         uriRoutes.add(route);
-        routeCreated.accept(route);
         return route;
     }
 
@@ -357,7 +345,6 @@ public final class RouteAssembly {
             route = new DefaultUriRoute(httpMethod, mount(checked), mediaTypes, executableHandle, httpMethodName, conversionService);
         }
         uriRoutes.add(route);
-        routeCreated.accept(route);
         return route;
     }
 
@@ -412,7 +399,6 @@ public final class RouteAssembly {
         }
         DefaultUriRoute route = new DefaultUriRoute(httpMethod, template, mediaTypes, executableHandle, httpMethodName, conversionService);
         uriRoutes.add(route);
-        routeCreated.accept(route);
         return route;
     }
 
@@ -443,7 +429,6 @@ public final class RouteAssembly {
                 currentParentRoute.nestedRoutes.add(route);
             }
             uriRoutes.add(route);
-            routeCreated.accept(route);
             routes.add(route);
         }
         return routes;
@@ -486,20 +471,6 @@ public final class RouteAssembly {
             return settings.getSelector();
         }
         return group == null ? null : group.selector();
-    }
-
-    /**
-     * A URI route that is not added: the caller builds its route info.
-     *
-     * @param httpMethod       The HTTP method
-     * @param uri              The URI template
-     * @param mediaTypes       The media types the route consumes
-     * @param executableHandle The target of the route
-     * @param httpMethodName   The name of the HTTP method
-     * @return The route
-     */
-    public DefaultUriRoute newRoute(HttpMethod httpMethod, String uri, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle, String httpMethodName) {
-        return new DefaultUriRoute(httpMethod, uri, mediaTypes, executableHandle, httpMethodName, conversionService);
     }
 
     /**
