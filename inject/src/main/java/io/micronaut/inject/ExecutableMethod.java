@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -145,8 +146,12 @@ public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReferenc
      * @return The annotation
      */
     private static <A extends Annotation> A buildAnnotation(Class<A> annotationType, AnnotationValue<A> annotationValue) {
-        AnnotationBuilder<A> builder = AnnotationBuilder.find(annotationType).orElseThrow(() -> new IllegalStateException(
-            "No AnnotationBuilder is registered for " + annotationType.getName() + ": register it with @RegisterAnnotations"));
+        ClassLoader annotationLoader = annotationType.getClassLoader();
+        AnnotationBuilder<A> builder = AnnotationBuilder.find(annotationType)
+            // An application annotation and its builder can be in a class loader below the one of Micronaut
+            .or(() -> annotationLoader != null ? AnnotationBuilder.find(annotationType, annotationLoader) : Optional.empty())
+            .orElseThrow(() -> new IllegalStateException(
+                "No AnnotationBuilder is registered for " + annotationType.getName() + ": register it with @RegisterAnnotations"));
         return builder.build(annotationValue, ConversionService.SHARED);
     }
 

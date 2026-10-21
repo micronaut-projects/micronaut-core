@@ -728,9 +728,19 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         @Override
         public synchronized void configure(BeanContext beanContext) {
             cachedValues = null;
-            annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(environmentAnnotationMetadata);
-            if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
-                eam.configure(beanContext);
+            if (annotationMetadata instanceof EvaluatedAnnotationMetadata current
+                && current.getAnnotationMetadata() == environmentAnnotationMetadata) {
+                // The same environment: configure the wrapper the return type may already hold, as before
+                current.configure(beanContext);
+            } else {
+                AnnotationMetadata wrapped = EvaluatedAnnotationMetadata.wrapIfNecessary(environmentAnnotationMetadata);
+                if (wrapped instanceof EvaluatedAnnotationMetadata eam) {
+                    // configured before it is published, so a concurrent reader never evaluates without a context
+                    eam.configure(beanContext);
+                }
+                annotationMetadata = wrapped;
+                // built from the previous metadata
+                returnType = null;
             }
             updateCacheMode();
             if (argumentsAnnotationsWithExpressions) {

@@ -28,4 +28,10 @@ public class LabeledBean {
     public String labeled() {
         return "labeled";
     }
+
+    @Executable
+    @Labeled("#{ env['reuse.label'] }")
+    public String evaluated() {
+        return "evaluated";
+    }
 }

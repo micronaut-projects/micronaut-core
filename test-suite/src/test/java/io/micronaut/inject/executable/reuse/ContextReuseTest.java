@@ -40,4 +40,17 @@ class ContextReuseTest {
             }
         }
     }
+
+    @Test
+    void eachContextEvaluatesTheExpressionsOfAMethodAndItsReturnType() {
+        for (String label : new String[] {"first", "second", "third"}) {
+            try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "ContextReuseTest", "reuse.label", label))) {
+                context.getBean(LabeledBean.class);
+                ExecutableMethod<LabeledBean, Object> method = context.getBeanDefinition(LabeledBean.class).getRequiredMethod("evaluated");
+
+                assertEquals(label, method.stringValue(Labeled.class).orElse(null));
+                assertEquals(label, method.getReturnType().getAnnotationMetadata().stringValue(Labeled.class).orElse(null));
+            }
+        }
+    }
 }
