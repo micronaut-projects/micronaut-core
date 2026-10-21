@@ -31,6 +31,6 @@ api:core.beans.BeanTypeHierarchy[] exposes:
 
 The methods are looked up by identity, so pass the api:core.beans.BeanMethod[] instances of the same introspection. The declarations of properties are not part of the hierarchy: they are the members of each property, see <<propertyMembers, Bean Property Members>>.
 
-The hierarchy is the one the compiler saw, with raw types: the type arguments passed to super types are not described.
+The hierarchy is the one the compiler saw, with raw types: the type arguments passed to super types are not described here. The generic hierarchy of the introspected type is recorded beside the introspection as a <<typeHierarchyRecords, type hierarchy record>>: `hierarchy.getGenericHierarchy()` gives it, and `hierarchy.getTypeClosure()` the super types of the introspected type with their type arguments, `[Book, Publication, ..., Comparable<Book>, Object]`.
 
 IMPORTANT: `hierarchy` defaults to `false` because the generated introspection grows by the code describing the hierarchy. The hierarchy is built, and its classes loaded, when it is first asked for.
