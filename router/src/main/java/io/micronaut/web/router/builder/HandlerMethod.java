@@ -138,6 +138,10 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private AnnotationMetadata annotationMetadata;
     private @Nullable AnnotationMetadataProvider annotationMetadataProvider;
     /**
+     * The bean method the handler implements, see {@link RouteMethodProvider}, read once, or {@code null}.
+     */
+    private final @Nullable ExecutableMethod<?, ?> providedMethod;
+    /**
      * The annotations given to the route itself, see {@link HttpRouteSpec#annotate(AnnotationValue)}.
      */
     private final DefaultRouteAnnotations annotations = new DefaultRouteAnnotations();
@@ -148,11 +152,11 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private @Nullable ReturnType<R> annotatedReturnType;
 
     private HandlerMethod(Object handler, Class<?> handlerType, Argument<?>[] arguments, ReturnType<R> returnType, Invoker<R> invoker) {
-        this(handler, handlerType, arguments, returnType, invoker, AnnotationMetadata.EMPTY_METADATA);
+        this(handler, handlerType, arguments, returnType, invoker, AnnotationMetadata.EMPTY_METADATA, providedMethod(handler));
     }
 
     private HandlerMethod(Object handler, Class<?> handlerType, Argument<?>[] arguments, ReturnType<R> returnType,
-                          Invoker<R> invoker, AnnotationMetadata baseAnnotationMetadata) {
+                          Invoker<R> invoker, AnnotationMetadata baseAnnotationMetadata, @Nullable ExecutableMethod<?, ?> providedMethod) {
         this.baseAnnotationMetadata = baseAnnotationMetadata;
         this.annotationMetadata = baseAnnotationMetadata;
         this.handler = Objects.requireNonNull(handler, "handler");
@@ -160,6 +164,30 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         this.arguments = arguments;
         this.returnType = returnType;
         this.invoker = invoker;
+        this.providedMethod = providedMethod;
+        if (providedMethod != null) {
+            // as if the method were given with annotationMetadata(...), which replaces it
+            updateAnnotationMetadata();
+        }
+    }
+
+    /**
+     * The bean method a handler implements, read once, when its route is added.
+     *
+     * @param handler The handler
+     * @return The method, or {@code null} if the handler is not a {@link RouteMethodProvider}
+     * @throws NullPointerException if the provider gives no method
+     */
+    private static @Nullable ExecutableMethod<?, ?> providedMethod(Object handler) {
+        if (handler instanceof RouteMethodProvider provider) {
+            ExecutableMethod<?, ?> method = provider.routeMethod();
+            if (method == null) {
+                throw new NullPointerException("The route method provider " + handler + " gave no route method");
+            }
+            Objects.requireNonNull(method.getAnnotationMetadata(), "annotationMetadata");
+            return method;
+        }
+        return null;
     }
 
     /**
@@ -455,7 +483,9 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             args -> {
                 throw new IllegalStateException("The server upgrades a request to the WebSocket route " + endpoint + ", and hands the connection to its handlers");
             },
-            Objects.requireNonNull(endpointMetadata, "endpointMetadata")
+            Objects.requireNonNull(endpointMetadata, "endpointMetadata"),
+            // the endpoint is not a handler function: the annotations of a WebSocket route stay its own
+            null
         );
     }
 
@@ -474,7 +504,10 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             returnType(Object.class),
             args -> {
                 throw new IllegalStateException("The router resolves a locator route to a route of the located target: " + locator);
-            }
+            },
+            AnnotationMetadata.EMPTY_METADATA,
+            // the locator is not a handler function: its route is never invoked
+            null
         );
     }
 
@@ -643,7 +676,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         }
         AnnotationMetadata own = annotationMetadata;
         AnnotationMetadata metadata = own.isEmpty() ? inherited : new AnnotationMetadataHierarchy(true, inherited, own);
-        HandlerMethod<R> method = new HandlerMethod<>(handler, handlerType, arguments, returnType, invoker);
+        HandlerMethod<R> method = new HandlerMethod<>(handler, handlerType, arguments, returnType, invoker, AnnotationMetadata.EMPTY_METADATA, providedMethod);
         method.annotationMetadataProvider = annotationMetadataProvider;
         method.groupAnnotations = groupAnnotations;
         method.annotationMetadata = metadata;
@@ -665,15 +698,19 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
-     * @return The element of the route, or else the one of its innermost group that has one, see
+     * @return The element of the route, or else the method its handler implements, see
+     * {@link RouteMethodProvider}, or else the element of its innermost group that has one, see
      * {@link HttpRouteGroup#annotationMetadata}
      */
     private @Nullable AnnotationMetadataProvider elementProvider() {
         AnnotationMetadataProvider provider = annotationMetadataProvider;
-        if (provider == null && groupAnnotations != null) {
-            return groupAnnotations.element();
+        if (provider != null) {
+            return provider;
         }
-        return provider;
+        if (providedMethod != null) {
+            return providedMethod;
+        }
+        return groupAnnotations == null ? null : groupAnnotations.element();
     }
 
     /**
