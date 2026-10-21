@@ -15,7 +15,7 @@
  */
 package io.micronaut.reflection
 
-import io.micronaut.core.type.ArgumentTypes
+import io.micronaut.core.reflect.GenericTypeUtils
 import spock.lang.Specification
 
 import java.lang.reflect.Type
@@ -25,7 +25,7 @@ import java.lang.reflect.TypeVariable
  * A type read reflectively into an argument renders back through core's {@link io.micronaut.core.type.Argument#asType()},
  * which {@link ReflectionArguments#toExactType} delegates to, as the type it was read from.
  */
-class ArgumentTypesRoundTripSpec extends Specification {
+class ArgumentAsTypeRoundTripSpec extends Specification {
 
     private static Type typeOf(String field) {
         RoundTripTypes.getDeclaredField(field).genericType
@@ -76,6 +76,6 @@ class ArgumentTypesRoundTripSpec extends Specification {
 
         expect:
         ReflectionArguments.toType(argument) instanceof TypeVariable
-        ReflectionArguments.toType(argument).getClass() == ArgumentTypes.typeVariable('K').getClass()
+        ReflectionArguments.toType(argument).getClass() == GenericTypeUtils.typeVariable('K').getClass()
     }
 }

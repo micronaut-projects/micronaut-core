@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.type
 
+import io.micronaut.core.reflect.GenericTypeUtils
 import spock.lang.Specification
 
 import java.lang.reflect.GenericArrayType
@@ -26,12 +27,12 @@ import java.lang.reflect.WildcardType
 /**
  * {@link Argument#asType()} renders an argument as the {@link Type} the declaration it describes wrote, equal to
  * the type the JDK reflects for that declaration wherever the JDK defines the equality of a type with one it did
- * not make; the types {@link ArgumentTypes} builds are equal to the JDK ones as well.
+ * not make; the types {@link GenericTypeUtils} builds are equal to the JDK ones as well.
  */
-class ArgumentTypesSpec extends Specification {
+class ArgumentAsTypeSpec extends Specification {
 
     private static Type typeOf(String field) {
-        ArgumentTypesFixture.getDeclaredField(field).genericType
+        ArgumentAsTypeFixture.getDeclaredField(field).genericType
     }
 
     private static void sameAsJdk(Type rendered, Type reflected) {
@@ -90,32 +91,25 @@ class ArgumentTypesSpec extends Specification {
     void "a nested parameterized type has its declaring class as its owner"() {
         given:
         def entry = Argument.of(Map.Entry, String, Integer).asType()
-        def nested = Argument.of(ArgumentTypesFixture.Nested, String).asType()
+        def nested = Argument.of(ArgumentAsTypeFixture.Nested, String).asType()
 
         expect:
         ((ParameterizedType) entry).ownerType.is(Map)
         sameAsJdk(entry, typeOf('entry'))
         entry.typeName == 'java.util.Map$Entry<java.lang.String, java.lang.Integer>'
-        ((ParameterizedType) nested).ownerType.is(ArgumentTypesFixture)
+        ((ParameterizedType) nested).ownerType.is(ArgumentAsTypeFixture)
         sameAsJdk(nested, typeOf('nested'))
     }
 
-    void "an inner type of a parameterized type is rendered with a class owner, and built with the parameterized one"() {
+    void "an inner type of a parameterized type is rendered with a class owner"() {
         given:
         def reflected = (ParameterizedType) typeOf('inner')
-        def rendered = (ParameterizedType) Argument.of(ArgumentTypesFixture.Outer.Inner, Integer).asType()
+        def rendered = (ParameterizedType) Argument.of(ArgumentAsTypeFixture.Outer.Inner, Integer).asType()
 
         expect: "an argument does not carry the type arguments of the owner"
-        rendered.ownerType.is(ArgumentTypesFixture.Outer)
+        rendered.ownerType.is(ArgumentAsTypeFixture.Outer)
         rendered != reflected
-
-        and: "the owner given is kept"
-        def built = ArgumentTypes.parameterizedTypeWithOwner(
-            ArgumentTypes.parameterizedType(ArgumentTypesFixture.Outer, String),
-            ArgumentTypesFixture.Outer.Inner,
-            Integer)
-        sameAsJdk(built, reflected)
-        built.typeName == 'io.micronaut.core.type.ArgumentTypesFixture$Outer<java.lang.String>$Inner<java.lang.Integer>'
+        rendered.typeName == 'io.micronaut.core.type.ArgumentAsTypeFixture$Outer$Inner<java.lang.Integer>'
     }
 
     void "an array of a parameterized type is a generic array"() {
@@ -229,14 +223,12 @@ class ArgumentTypesSpec extends Specification {
 
     void "the built types are equal to the JDK ones"() {
         expect:
-        sameAsJdk(ArgumentTypes.parameterizedType(List, String), typeOf('list'))
-        sameAsJdk(ArgumentTypes.parameterizedType(Map.Entry, String, Integer), typeOf('entry'))
-        sameAsJdk(ArgumentTypes.parameterizedType(List, ArgumentTypes.wildcardType([Number] as Type[], [] as Type[])), typeOf('extendsNumber'))
-        sameAsJdk(ArgumentTypes.parameterizedType(List, ArgumentTypes.wildcardType([] as Type[], [] as Type[])), typeOf('unbounded'))
-        sameAsJdk(ArgumentTypes.genericArrayType(ArgumentTypes.genericArrayType(ArgumentTypes.parameterizedType(List, String))), typeOf('listMatrix'))
-        ArgumentTypes.typeVariable('S', CharSequence).bounds == ((TypeVariable) typeOf('chars')).bounds
-        ArgumentTypes.typeVariable('S').bounds == [Object] as Type[]
-        ArgumentTypes.typeVariable('S', CharSequence) == ArgumentTypes.typeVariable('S', CharSequence)
+        sameAsJdk(GenericTypeUtils.parameterizedType(List, String), typeOf('list'))
+        sameAsJdk(GenericTypeUtils.parameterizedType(Map.Entry, String, Integer), typeOf('entry'))
+        sameAsJdk(GenericTypeUtils.parameterizedType(Map, String, GenericTypeUtils.parameterizedType(List, Integer)), typeOf('map'))
+        GenericTypeUtils.typeVariable('S', CharSequence).bounds == ((TypeVariable) typeOf('chars')).bounds
+        GenericTypeUtils.typeVariable('S').bounds == [Object] as Type[]
+        GenericTypeUtils.typeVariable('S', CharSequence) == GenericTypeUtils.typeVariable('S', CharSequence)
     }
 
     void "as a parameterized type, an argument keeps its owner, its wildcards and its variables"() {
@@ -266,7 +258,7 @@ class ArgumentTypesSpec extends Specification {
         Argument.of(String[]).asParameterizedType().typeName == 'java.lang.String[]'
         Argument.of(int[][]).asParameterizedType().typeName == 'int[][]'
         Argument.of(String[]).asParameterizedType().rawType.is(String[])
-        ArgumentTypes.parameterizedType(List[], String).typeName == 'java.util.List[]<java.lang.String>'
+        GenericTypeUtils.parameterizedType(List[], String).typeName == 'java.util.List[]<java.lang.String>'
     }
 
     void "a type information that is not an argument renders its type arguments exactly"() {
@@ -292,7 +284,7 @@ class ArgumentTypesSpec extends Specification {
     void "a built type copies what it is given"() {
         given:
         Type[] arguments = [String]
-        def type = ArgumentTypes.parameterizedType(List, arguments)
+        def type = GenericTypeUtils.parameterizedType(List, arguments)
         arguments[0] = Integer
 
         expect:

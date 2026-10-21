@@ -25,7 +25,7 @@ import java.util.Map;
  * @param <S> A variable with a single interface bound
  */
 @SuppressWarnings("unused")
-class ArgumentTypesFixture<T extends Number & Comparable<T>, S extends CharSequence> {
+class ArgumentAsTypeFixture<T extends Number & Comparable<T>, S extends CharSequence> {
 
     List<String> list;
     Map<String, List<Integer>> map;
