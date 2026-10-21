@@ -289,7 +289,7 @@ public final class ArgumentTypes {
         public String toString() {
             StringBuilder builder = new StringBuilder();
             if (ownerType == null) {
-                builder.append(rawType.getName());
+                builder.append(rawType.getTypeName());
             } else {
                 builder.append(ownerType.getTypeName()).append('$');
                 Erasure owner = erasureOf(ownerType);
