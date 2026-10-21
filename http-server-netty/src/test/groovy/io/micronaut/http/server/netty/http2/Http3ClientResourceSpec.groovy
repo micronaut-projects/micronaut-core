@@ -10,6 +10,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.lang.Timeout
 
@@ -68,6 +69,8 @@ class Http3ClientResourceSpec extends Specification {
         serverCtx?.close()
     }
 
+    // counts the open file descriptors, which only a Unix JVM reports
+    @IgnoreIf({ !(ManagementFactory.operatingSystemMXBean instanceof UnixOperatingSystemMXBean) })
     def "a failed QUIC handshake does not leave a UDP socket open"() {
         given:
         def serverCtx = ApplicationContext.run([
