@@ -25,6 +25,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -183,6 +184,21 @@ public final class PrimitiveElement implements ArrayableClassElement {
     @Override
     public PrimitiveElement withArrayDimensions(int arrayDimensions) {
         return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata, typeAnnotationMetadata, doc, arrayTypeAnnotations);
+    }
+
+    /**
+     * A primitive, and an array of one, has no type arguments, so a copy without any is the element itself, as
+     * {@link #foldBoundGenericTypes(java.util.function.Function)} asks for the {@code int[]} of a {@code List<int[]>}.
+     *
+     * @param typeArguments The type arguments, which must be empty
+     * @return This element
+     */
+    @Override
+    public ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
+        if (typeArguments.isEmpty()) {
+            return this;
+        }
+        return ArrayableClassElement.super.withTypeArguments(typeArguments);
     }
 
     /**

@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -63,6 +64,18 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type) {
         return dependencies.resolve(context, null, resolution -> {
+            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type);
+            resolution.require(registration);
+            return registration;
+        });
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                       BeanResolutionContext.Segment<?, ?> lookupPoint) {
+        return dependencies.resolve(context, null, resolution -> {
+            // each call has a path of its own, so the segment is pushed for the whole of the resolution
+            resolution.getPath().push(lookupPoint);
             BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type);
             resolution.require(registration);
             return registration;
@@ -121,6 +134,11 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
             return true;
         }
         return false;
+    }
+
+    @Override
+    public <T> Optional<BeanRegistration<T>> findRegistration(@Nullable T bean) {
+        return bean == null ? Optional.empty() : Optional.ofNullable(dependencies.find(bean));
     }
 
     @Override

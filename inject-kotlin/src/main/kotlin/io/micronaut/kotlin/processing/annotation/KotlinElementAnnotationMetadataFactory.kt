@@ -109,7 +109,8 @@ internal class KotlinElementAnnotationMetadataFactory(
         }
         return metadataBuilder.lookupOrBuild(
             kotlinClassElement.nativeType,
-            KotlinAnnotations(kotlinClassElement.kotlinType.annotations)
+            // The use type, which for the use of an alias is the alias and not the type it expands to
+            KotlinAnnotations(kotlinClassElement.nativeType.type!!.annotations)
         )
     }
 

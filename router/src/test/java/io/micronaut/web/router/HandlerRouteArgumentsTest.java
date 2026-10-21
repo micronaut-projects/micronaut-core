@@ -169,7 +169,7 @@ class HandlerRouteArgumentsTest {
     @Test
     void aRouteByTheNameOfAStandardMethodIsARouteOfThatMethod() {
         Router router = router(routes -> {
-            assertMissing("uri", () -> routes.route("PROPFIND", null));
+            assertMissing("uri", () -> routes.route("PROPFIND", (String) null));
             routes.route("get", "/x").handle(HandlerRouteArgumentsTest::ok);
             routes.route("PROPFIND", "/y").handle(HandlerRouteArgumentsTest::ok);
         });
@@ -230,7 +230,7 @@ class HandlerRouteArgumentsTest {
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
         routes.accept(builder);
         builder.close();

@@ -52,6 +52,7 @@ ioc:
     accessKind: Bean Fields
     introspectedProperty: Explicit Bean Properties
     propertyMembers: Bean Property Members
+    introspectionIncludeInjected: Injection Points as Bean Properties
     introspectionHierarchy: Type Hierarchy
     typeHierarchyRecords: Type Hierarchy Records
     atCreator: Constructor Methods
@@ -214,7 +215,9 @@ httpServer:
     functionalRoutesAnnotations: Annotations on Handler Routes
     functionalRoutesErrors: Error and Status Routes
     functionalRoutesLocators: Locator Routes
+    functionalRoutesTemplates: Route Templates and Route Selectors
     functionalRoutesWebSocket: WebSocket Routes
+    functionalRoutesStaticResources: Static Resources
     functionalRoutesLimitations: Limitations
   sessions: HTTP Sessions
   sse: Server Sent Events
