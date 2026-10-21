@@ -506,7 +506,7 @@ final class NettyDirectRoutes {
             MessageBodyWriter<Object> writer = bodyHandlers.findWriter(argument, List.of(key.mediaType()))
                 .orElseThrow(() -> new CodecException("No message body writer for a body of type " + key.type().getName()
                     + " and media type " + key.mediaType() + " of a direct route"));
-            return new ResolvedWriter(argument, key.mediaType(), writer.createSpecific(argument), writer.isBlocking());
+            return new ResolvedWriter(argument, writer.createSpecific(argument), writer.isBlocking());
         });
         if (resolved.blocking() && !allowBlocking) {
             throw new CodecException("The message body writer of a body of type " + type.getName() + " blocks: "
@@ -530,7 +530,9 @@ final class NettyDirectRoutes {
             return Unpooled.EMPTY_BUFFER;
         }
         if (writer != null) {
-            return (ByteBuf) writer.writer().writeTo(writer.type(), writer.mediaType(), body, response.getHeaders(),
+            // the media type of this response: the writer is shared by the media types that differ in their parameters only, e.g. the charset
+            MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
+            return (ByteBuf) writer.writer().writeTo(writer.type(), mediaType, body, response.getHeaders(),
                 new NettyByteBufferFactory(ctx.alloc())).asNativeBuffer();
         }
         if (body instanceof byte[] bytes) {
@@ -589,18 +591,18 @@ final class NettyDirectRoutes {
 
     /**
      * @param type      The type of the body
-     * @param mediaType The media type of the response
+     * @param mediaType The media type of the response, compared by its name: its parameters, e.g.
+     *                  the charset, do not select the writer
      */
     private record WriterKey(Class<?> type, MediaType mediaType) {
     }
 
     /**
-     * @param type      The type of the body
-     * @param mediaType The media type of the response
-     * @param writer    The writer of the type
-     * @param blocking  Whether the writer blocks
+     * @param type     The type of the body
+     * @param writer   The writer of the type
+     * @param blocking Whether the writer blocks
      */
-    private record ResolvedWriter(Argument<Object> type, MediaType mediaType, MessageBodyWriter<Object> writer, boolean blocking) {
+    private record ResolvedWriter(Argument<Object> type, MessageBodyWriter<Object> writer, boolean blocking) {
     }
 
     /**
