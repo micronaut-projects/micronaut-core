@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -133,6 +134,11 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
             return true;
         }
         return false;
+    }
+
+    @Override
+    public <T> Optional<BeanRegistration<T>> findRegistration(@Nullable T bean) {
+        return bean == null ? Optional.empty() : Optional.ofNullable(dependencies.find(bean));
     }
 
     @Override

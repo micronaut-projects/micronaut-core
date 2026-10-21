@@ -32,6 +32,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
+import io.micronaut.inject.annotation.AnnotationBuilderRegistrations;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
@@ -340,6 +341,13 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     @Override
     public ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
         return expressionCompilationContextFactory;
+    }
+
+    @Override
+    public AnnotationBuilderRegistrations getAnnotationBuilderRegistrations() {
+        // the element utilities of javac are shared by the processors of a compilation, the processing environment
+        // and the filer can be wrapped per processor
+        return AnnotationBuilderRegistrations.forCompilation(elements);
     }
 
     @Override
