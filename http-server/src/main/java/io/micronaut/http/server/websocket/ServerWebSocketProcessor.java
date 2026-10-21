@@ -38,6 +38,7 @@ import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
+import io.micronaut.websocket.context.WebSocketMethods;
 import jakarta.inject.Singleton;
 
 import java.util.HashSet;
@@ -74,15 +75,11 @@ public class ServerWebSocketProcessor extends DefaultRouteBuilder implements Bea
         if (mappedWebSockets.contains(beanType)) {
             return;
         }
-        ExecutableMethod<?, ?> onOpen = null;
-        ExecutableMethod<?, ?> onMessage = null;
-        for (ExecutableMethod<?, ?> method : beanDefinition.getExecutableMethods()) {
-            if (onOpen == null && method.isAnnotationPresent(OnOpen.class)) {
-                onOpen = method;
-            } else if (onMessage == null && method.isAnnotationPresent(OnMessage.class)) {
-                onMessage = method;
-            }
-        }
+        // the methods the WebSocket bean registry calls: an @OnMessage method of the pongs is
+        // not the method of the messages, and does not give the route its annotations
+        WebSocketMethods<?> methods = WebSocketMethods.of(beanDefinition.getExecutableMethods());
+        ExecutableMethod<?, ?> onOpen = methods.onOpen();
+        ExecutableMethod<?, ?> onMessage = methods.onMessage();
         // the route targets the @OnOpen method, which the upgrade request opens the WebSocket
         // with, or else the @OnMessage method
         ExecutableMethod<?, ?> target = onOpen != null ? onOpen : onMessage;
