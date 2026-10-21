@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -17,13 +18,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HttpDateHeaderTest {
     /**
-     * The value {@link MutableHttpHeaders#date(java.time.LocalDateTime)} produced before the
-     * cache was introduced, for the given instant.
+     * The IMF-fixdate of RFC 9110 section 5.6.7 for the given instant, formatted without the
+     * cache.
      */
     private static String legacy(long epochMillis) {
         return ZonedDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneId.systemDefault())
             .withZoneSameInstant(MutableHttpHeaders.GMT)
-            .format(DateTimeFormatter.RFC_1123_DATE_TIME);
+            .format(DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ENGLISH));
     }
 
     @ParameterizedTest
@@ -34,7 +35,7 @@ class HttpDateHeaderTest {
 
     @Test
     void fixedValues() {
-        assertEquals("Thu, 1 Jan 1970 00:00:00 GMT", HttpDateHeader.get(0));
+        assertEquals("Thu, 01 Jan 1970 00:00:00 GMT", HttpDateHeader.get(0));
         assertEquals("Tue, 14 Nov 2023 22:13:20 GMT", HttpDateHeader.get(1_700_000_000_000L));
         assertEquals("Tue, 14 Nov 2023 22:13:20 GMT", HttpDateHeader.get(1_700_000_000_999L));
         assertEquals("Tue, 14 Nov 2023 22:13:21 GMT", HttpDateHeader.get(1_700_000_001_000L));
