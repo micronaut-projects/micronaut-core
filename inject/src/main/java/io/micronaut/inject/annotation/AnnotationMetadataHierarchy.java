@@ -39,6 +39,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.RandomAccess;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -1250,22 +1251,33 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         private @Nullable Set<E> unique;
 
         void addAll(List<E> values) {
-            // An index loop: the layers' lists are random access, and their iterators were allocated on every call
-            for (int i = 0, n = values.size(); i < n; i++) {
-                E value = values.get(i);
-                if (list == null) {
-                    list = new ArrayList<>(n);
-                    list.add(value);
-                    continue;
+            int n = values.size();
+            if (values instanceof RandomAccess) {
+                // An index loop: the lists of the generated metadata are random access, and their iterators were
+                // allocated on every call
+                for (int i = 0; i < n; i++) {
+                    add(values.get(i), n);
                 }
-                if (unique == null) {
-                    // Few values are expected, so a small table
-                    unique = new HashSet<>(4);
-                    unique.add(list.get(0));
+            } else {
+                for (E value : values) {
+                    add(value, n);
                 }
-                if (unique.add(value)) {
-                    list.add(value);
-                }
+            }
+        }
+
+        private void add(E value, int layerSize) {
+            if (list == null) {
+                list = new ArrayList<>(layerSize);
+                list.add(value);
+                return;
+            }
+            if (unique == null) {
+                // Few values are expected, so a small table
+                unique = new HashSet<>(4);
+                unique.add(list.get(0));
+            }
+            if (unique.add(value)) {
+                list.add(value);
             }
         }
 

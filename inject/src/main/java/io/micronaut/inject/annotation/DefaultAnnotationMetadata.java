@@ -1122,8 +1122,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (allAnnotations != null && StringUtils.isNotEmpty(annotation) && allAnnotations.containsKey(annotation)) {
             return true;
         }
-        // The same map when the metadata declares everything it has: no second lookup
-        return declaredAnnotations != allAnnotations && hasDeclaredAnnotation(annotation);
+        // The same map when the metadata declares everything it has: no second lookup, unless a subclass may answer
+        // the declared lookup from elsewhere
+        return (declaredAnnotations != allAnnotations || getClass() != DefaultAnnotationMetadata.class)
+            && hasDeclaredAnnotation(annotation);
     }
 
     @Override
@@ -1654,13 +1656,17 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                                                                                          Map<String, Map<CharSequence, Object>> sourceStereotypes,
                                                                                          @Nullable
                                                                                          Map<String, Map<CharSequence, Object>> sourceAnnotations) {
+        if (getClass() != DefaultAnnotationMetadata.class && !hasStereotype(repeatableTypeName)) {
+            // A subclass may fill the maps while it answers, so it is asked before they are read
+            return null;
+        }
         Map<CharSequence, Object> annotationValues = sourceAnnotations != null ? sourceAnnotations.get(repeatableTypeName) : null;
         Map<CharSequence, Object> stereotypeValues = sourceStereotypes != null ? sourceStereotypes.get(repeatableTypeName) : null;
         // Found in a map that hasStereotype consults: it would answer true, so skip it
         boolean present = StringUtils.isNotEmpty(repeatableTypeName)
             && (annotationValues != null && isStereotypeSource(sourceAnnotations)
                 || stereotypeValues != null && isStereotypeSource(sourceStereotypes));
-        if (!present && !hasStereotype(repeatableTypeName)) {
+        if (!present && getClass() == DefaultAnnotationMetadata.class && !hasStereotype(repeatableTypeName)) {
             return null;
         }
         List<AnnotationValue<T>> results = collectResult(null, annotationValues);
