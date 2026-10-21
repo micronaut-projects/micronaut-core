@@ -17,10 +17,14 @@ package io.micronaut.http.gateway;
 
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.TaskScheduler;
+import io.micronaut.web.router.RouteAssembly;
+import io.micronaut.web.router.RouteConditionContext;
+import io.micronaut.web.router.builder.DefaultLocatedHttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedHttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
 import jakarta.annotation.PreDestroy;
@@ -34,10 +38,12 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Loads the routes of the {@link GatewayRouteLocator} beans, and replaces them all at once on a
@@ -59,7 +65,7 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
     private final GatewayDefaultFilters defaultFilters;
     private final Map<String, GatewayWeightGroupConfiguration> weightGroups;
     private final AtomicLong generations = new AtomicLong();
-    private volatile Snapshot current = new Snapshot(List.of(), Map.of(), 0);
+    private final AtomicReference<Snapshot> current = new AtomicReference<>(new Snapshot(List.of(), Map.of(), RouteConditionContext.fallback(), 0));
     @Nullable
     private final ScheduledFuture<?> schedule;
 
@@ -89,7 +95,7 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
      * @return The routes of the last refresh
      */
     Snapshot current() {
-        return current;
+        return Objects.requireNonNull(current.get());
     }
 
     /**
@@ -97,7 +103,7 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
      */
     List<GatewayRoute> getRoutes() {
         List<GatewayRoute> routes = new ArrayList<>();
-        for (ProxyHandler handler : current.handlers()) {
+        for (ProxyHandler handler : current().handlers()) {
             routes.add(handler.getRoute());
         }
         return routes;
@@ -130,13 +136,13 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
                 routes.addAll(load.join());
             }
             List<GatewayFilter> defaults = defaultFilters == null ? List.of() : defaultFilters.filters();
-            Snapshot next = new Snapshot(GatewayRouteRegistrar.handlers(routes, factory, defaults), weightGroups, generation);
-            synchronized (this) {
-                // a slower, older refresh does not replace a newer one
-                if (current.generation() < generation) {
-                    current = next;
-                }
-            }
+            Snapshot next = new Snapshot(GatewayRouteRegistrar.handlers(routes, factory, defaults), weightGroups, factory.routeConditions(), generation);
+            // the routes are declared before the snapshot is published: a route that cannot be
+            // declared fails the refresh, and the last routes stay, instead of every request to
+            // the routes of the snapshot failing
+            next.check();
+            // a slower, older refresh does not replace a newer one
+            current.accumulateAndGet(next, (previous, candidate) -> previous.generation() < candidate.generation() ? candidate : previous);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Refreshed {} gateway routes of the route locators", routes.size());
             }
@@ -170,6 +176,7 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
     static final class Snapshot implements LocatedRoutes<Snapshot> {
         private final List<ProxyHandler> handlers;
         private final Map<String, GatewayWeightGroupConfiguration> weightGroups;
+        private final RouteConditionContext conditions;
         private final long generation;
         private final List<GatewayPathPattern> patterns = new ArrayList<>();
         private final boolean anyPath;
@@ -177,11 +184,14 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
         /**
          * @param handlers     The handlers of the routes
          * @param weightGroups The settings of the weight groups
+         * @param conditions   What the server resolves for the conditions of the routes
          * @param generation   The number of the refresh
          */
-        Snapshot(List<ProxyHandler> handlers, Map<String, GatewayWeightGroupConfiguration> weightGroups, long generation) {
+        Snapshot(List<ProxyHandler> handlers, Map<String, GatewayWeightGroupConfiguration> weightGroups, RouteConditionContext conditions,
+                 long generation) {
             this.handlers = List.copyOf(handlers);
             this.weightGroups = weightGroups;
+            this.conditions = conditions;
             this.generation = generation;
             boolean any = false;
             for (ProxyHandler handler : handlers) {
@@ -211,7 +221,26 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
 
         @Override
         public void routes(LocatedHttpRouteBuilder<Snapshot> routes) {
-            GatewayRouteRegistrar.register(routes, handlers, weightGroups);
+            GatewayRouteRegistrar.register(routes, handlers, weightGroups, conditions);
+        }
+
+        /**
+         * Declare the routes of the snapshot on a builder of their own, as the router declares
+         * them when a request is first routed with the snapshot.
+         *
+         * @throws RuntimeException if a route cannot be declared, e.g. a prefix with a variable
+         *                          named {@code path}
+         */
+        void check() {
+            RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
+            DefaultLocatedHttpRouteBuilder<Snapshot> builder = new DefaultLocatedHttpRouteBuilder<>(assembly, targetType(), Snapshot.class);
+            try {
+                routes(builder);
+            } catch (RuntimeException e) {
+                builder.discard();
+                throw e;
+            }
+            builder.close();
         }
 
         /**
