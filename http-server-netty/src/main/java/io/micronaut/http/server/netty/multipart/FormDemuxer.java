@@ -139,7 +139,11 @@ public final class FormDemuxer implements BufferConsumer {
     private void devolveIfStillBuffering() {
         assert eventLoop == null || eventLoop.inEventLoop();
         if (state instanceof OptimisticBufferingContent opt) {
-            opt.devolveToStreaming(false);
+            try {
+                opt.devolveToStreaming(false);
+            } catch (Exception e) {
+                handleDecoderException(e);
+            }
         }
     }
 
@@ -278,14 +282,19 @@ public final class FormDemuxer implements BufferConsumer {
         assert eventLoop == null || eventLoop.inEventLoop();
         try {
             decoder.endInput();
+            forwardOutput();
         } catch (Exception e) {
             handleDecoderException(e);
             return;
         }
-        forwardOutput();
-        if (closeDelimiter != null && !closeDelimiter.found()) {
+        if (state == null) {
+            return;
+        }
+        if (closeDelimiter != null && (!closeDelimiter.found() || !(state instanceof BeforeField bf && bf.mixedHeaders == null))) {
             // the decoder ends the last part with the end of the input: a truncated body, or one
-            // with another closing boundary, would be read as a shorter form
+            // with another closing boundary, would be read as a shorter form. The scan for the
+            // close delimiter does not know where in the body it is, e.g. in the headers of a
+            // part, so a part that is still open fails the body too
             handleDecoderException(new HttpStatusException(HttpStatus.BAD_REQUEST, "The multipart body ended before its closing boundary"));
             return;
         }
@@ -357,10 +366,14 @@ public final class FormDemuxer implements BufferConsumer {
          * @param boundary The boundary of the body
          * @param charset  The charset the decoder encodes the boundary with
          * @return The matcher, or {@code null} if the boundary is not usable, i.e. it contains a
-         * line break, which the decoder could never match either
+         * line break, which the decoder could never match either, or the charset cannot encode
          */
         @Nullable
         static CloseDelimiter of(String boundary, Charset charset) {
+            if (!charset.canEncode()) {
+                // the decoder fails on such a body when it searches for the boundary
+                return null;
+            }
             byte[] encoded = ("--" + boundary).getBytes(charset);
             for (byte b : encoded) {
                 if (b == '\n' || b == '\r') {

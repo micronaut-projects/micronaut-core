@@ -63,6 +63,14 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
             return BindingResult.empty();
         }
         Flux<? extends CompletedPart> parts = Flux.from(fchr.getRawFormFields())
+            .filter(raw -> {
+                if (raw.metadata().name() == null) {
+                    // a part without a name cannot be a CompletedPart, skip it like the FormData binder
+                    raw.close();
+                    return false;
+                }
+                return true;
+            })
             .flatMap(raw -> ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(fchr, raw)))
             .doOnDiscard(CompletedPart.class, p -> p.closeAsync(formFactory.get().getDiskWriteExecutor()));
         return () -> Optional.of(parts::subscribe);
