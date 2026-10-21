@@ -103,6 +103,10 @@ public final class FormDemuxer implements BufferConsumer {
      * The number of bytes given to the decoder since it last produced an event.
      */
     private long heldInput = 0;
+    /**
+     * The undecoded limit of the decoder, see {@link #feedDecoder}.
+     */
+    private final long undecodedLimit;
 
     /**
      * @param decoder           The decoder
@@ -120,6 +124,7 @@ public final class FormDemuxer implements BufferConsumer {
         this.decoder = decoder;
         this.closeDelimiter = multipartBoundary == null ? null : CloseDelimiter.of(multipartBoundary, charset);
         this.fieldLimits = fieldLimits;
+        this.undecodedLimit = Math.min(fieldLimits.maxBufferSize(), totalLimits.maxBufferSize());
         if (byteBody instanceof AvailableByteBody abb) {
             // NettyBodyAnnotationBinder triggers this branch from outside the EventLoop sometimes,
             // and requires immediate results, without waiting for the EventLoop. That means we
@@ -235,6 +240,22 @@ public final class FormDemuxer implements BufferConsumer {
      */
     private void feedDecoder(ByteBuf buf) {
         ByteBuf pending = pendingInput;
+        long pendingBytes = pending == null ? 0 : pending.readableBytes();
+        if (heldInput + pendingBytes + buf.readableBytes() > undecodedLimit) {
+            // the decoder enforces the undecoded limit on the input it holds, so it is given all
+            // input that may exceed the limit
+            if (pending != null) {
+                pendingInput = null;
+                try {
+                    decode(pending);
+                } catch (RuntimeException e) {
+                    buf.release();
+                    throw e;
+                }
+            }
+            decode(buf);
+            return;
+        }
         if (pending == null) {
             if (heldInput < MIN_DEFERRED_INPUT || buf.readableBytes() >= heldInput) {
                 decode(buf);
@@ -609,17 +630,20 @@ public final class FormDemuxer implements BufferConsumer {
                 // do this early in case there's an error
                 FormFieldMetadata metadata = headers.computeMetadata();
 
+                for (int i = 0; i < buffers.size(); i++) {
+                    if (!fromOverflow || i != buffers.size() - 1) {
+                        // remove the buffer from the tracker, the SC will track on its own.
+                        // on overflow, we didn't add the last buffer to the tracker, so skip that one.
+                        tracker.subtract(buffers.get(i).readableBytes());
+                    }
+                }
+
                 // before any content is added: the declared length is charged to the field and
                 // form limits in full, and the content that follows is not charged again
                 sc.baseSharedBuffer.setExpectedLengthFrom(headers.contentLength);
 
                 for (int i = 0; i < buffers.size(); i++) {
                     ByteBuf buffer = buffers.get(i);
-                    if (!fromOverflow || i != buffers.size() - 1) {
-                        // remove the buffer from the tracker, the SC will track on its own.
-                        // on overflow, we didn't add the last buffer to the tracker, so skip that one.
-                        tracker.subtract(buffer.readableBytes());
-                    }
                     // the SC owns the buffer from here, also if the add fails, e.g. on more
                     // content than the declared length
                     buffers.set(i, Unpooled.EMPTY_BUFFER);
