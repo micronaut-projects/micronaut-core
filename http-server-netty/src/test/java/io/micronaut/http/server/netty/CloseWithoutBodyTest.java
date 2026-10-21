@@ -16,7 +16,9 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -27,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class CloseWithoutBodyTest {
     private static final String SPEC_NAME = "CloseWithoutBodyTest";
+    private static final AtomicInteger AFTER_CLOSE_CALLS = new AtomicInteger();
 
     private static ApplicationContext ctx;
     private static EmbeddedServer server;
@@ -35,8 +38,7 @@ class CloseWithoutBodyTest {
     static void start() {
         ctx = ApplicationContext.run(Map.of(
             "spec.name", SPEC_NAME,
-            "micronaut.server.port", -1,
-            "micronaut.server.max-request-buffer-size", "1KB"
+            "micronaut.server.port", -1
         ));
         server = ctx.getBean(EmbeddedServer.class).start();
     }
@@ -77,13 +79,17 @@ class CloseWithoutBodyTest {
                     + "Connection: close\r\n"
                     + "\r\n";
                 // the closing request and the start of another one arrive in the same write
-                out.write((request + request.replace("Connection: close", "Connection: keep-alive")).getBytes(StandardCharsets.US_ASCII));
+                String next = request.replace("/no-body/plain", "/no-body/after-close").replace("Connection: close", "Connection: keep-alive");
+                out.write((request + next).getBytes(StandardCharsets.US_ASCII));
                 out.flush();
                 String response = new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
                 assertTrue(response.startsWith("HTTP/1.1 200"), response);
-                assertTrue(response.contains("plain"), response);
+                assertTrue(response.endsWith("plain"), response);
+                assertEquals(1, response.split("HTTP/1.1 ", -1).length - 1, response);
             }
         }
+        // the request after the one that closed the connection never reaches a route
+        assertEquals(0, AFTER_CLOSE_CALLS.get());
     }
 
     @Singleton
@@ -93,6 +99,11 @@ class CloseWithoutBodyTest {
         public void routes(HttpRouteBuilder routes) {
             routes.GET("/no-body/plain")
                 .body().handle((request, pathVariables, body) -> HttpResponse.ok("plain").contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.GET("/no-body/after-close")
+                .body().handle((request, pathVariables, body) -> {
+                    AFTER_CLOSE_CALLS.incrementAndGet();
+                    return HttpResponse.ok("after-close").contentType(MediaType.TEXT_PLAIN_TYPE);
+                });
         }
     }
 }

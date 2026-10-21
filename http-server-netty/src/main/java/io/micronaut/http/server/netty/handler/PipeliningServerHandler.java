@@ -602,8 +602,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private void closeAfterResponse() {
         ChannelHandlerContext context = requiredCtx();
-        if (inboundHandler == baseInboundHandler || inboundHandler == noBodyInboundHandler || removed
-            || !(context.channel() instanceof DuplexChannel channel) || !channel.isActive()) {
+        if (inboundHandler == baseInboundHandler || inboundHandler == noBodyInboundHandler) {
+            // the decoder may still fire requests that arrived in the same read, drop them
+            inboundHandler = new ClosedInboundHandler();
+            context.close();
+            return;
+        }
+        if (removed || !(context.channel() instanceof DuplexChannel channel) || !channel.isActive()) {
             context.close();
             return;
         }
@@ -1110,6 +1115,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void discard() {
             dispose();
             delegate.discard();
+        }
+    }
+
+    /**
+     * Handler after the connection was closed by a response: whatever the client sent after the
+     * request that closed it is released and never reaches the request handler.
+     */
+    private static final class ClosedInboundHandler extends InboundHandler {
+        @Override
+        void read(Object message) {
+            ReferenceCountUtil.release(message);
+        }
+
+        @Override
+        void handleUpstreamError(Throwable cause) {
         }
     }
 
