@@ -112,8 +112,11 @@ public class FilterRunner {
     }
 
     private static void checkOrdered(List<? extends GenericHttpFilter> filters) {
-        if (!filters.stream().allMatch(f -> f instanceof Ordered)) {
-            throw new IllegalStateException("Some filters cannot be ordered: " + filters);
+        // a loop by index, not a stream: this runs for every request that has filters to sort
+        for (int i = 0, size = filters.size(); i < size; i++) {
+            if (!(filters.get(i) instanceof Ordered)) {
+                throw new IllegalStateException("Some filters cannot be ordered: " + filters);
+            }
         }
     }
 
@@ -264,14 +267,16 @@ public class FilterRunner {
                     if (matching.tryCompleteValue() == null) {
                         // the route match completes later: then the filters after it run, and
                         // only a failure of the route match itself is processed here
-                        return failureOf(matching).flatMap(failure -> {
+                        // in the propagated context: the route match may complete on another thread, and the
+                        // filters after it are found and enabled with the context of the request
+                        return failureOf(matching).flatMap(failure -> propagatedContext.propagate(() -> {
                             if (failure.isPresent()) {
                                 Throwable t = failure.get();
                                 ExecutionFlow<HttpResponse<?>> processed = processFailure(request, t, propagatedContext);
                                 return processed == null ? ExecutionFlow.error(t) : processed;
                             }
                             return runAfterRouteMatch(request, propagatedContext);
-                        });
+                        }));
                     }
                 }
                 return runAfterRouteMatch(request, propagatedContext);
@@ -687,7 +692,8 @@ public class FilterRunner {
             }
             // the route match completes later: then the filters after it are found, once, and a
             // failure to find them is processed by the filter chain, not as one of the route match
-            return failureOf(matching).flatMap(failure -> {
+            // in the propagated context: the route match may complete on another thread
+            return failureOf(matching).flatMap(failure -> context.propagatedContext().propagate(() -> {
                 if (failure.isPresent()) {
                     ExecutionFlow<FilterContext> processed = processFailurePropagateException(failure.get(), context);
                     replaceFilters(request);
@@ -695,7 +701,7 @@ public class FilterRunner {
                 }
                 replaceFilters(request);
                 return ExecutionFlow.just(context);
-            });
+            }));
         }
 
         /**

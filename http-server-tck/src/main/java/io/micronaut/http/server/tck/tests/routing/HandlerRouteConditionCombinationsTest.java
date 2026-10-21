@@ -28,7 +28,7 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
@@ -36,18 +36,18 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 
-import static io.micronaut.web.router.builder.RouteCondition.after;
-import static io.micronaut.web.router.builder.RouteCondition.all;
-import static io.micronaut.web.router.builder.RouteCondition.any;
-import static io.micronaut.web.router.builder.RouteCondition.before;
-import static io.micronaut.web.router.builder.RouteCondition.cookie;
-import static io.micronaut.web.router.builder.RouteCondition.header;
-import static io.micronaut.web.router.builder.RouteCondition.host;
-import static io.micronaut.web.router.builder.RouteCondition.method;
-import static io.micronaut.web.router.builder.RouteCondition.not;
-import static io.micronaut.web.router.builder.RouteCondition.peerAddress;
-import static io.micronaut.web.router.builder.RouteCondition.query;
-import static io.micronaut.web.router.builder.RouteCondition.remoteAddress;
+import static io.micronaut.web.router.builder.RequestCondition.after;
+import static io.micronaut.web.router.builder.RequestCondition.all;
+import static io.micronaut.web.router.builder.RequestCondition.any;
+import static io.micronaut.web.router.builder.RequestCondition.before;
+import static io.micronaut.web.router.builder.RequestCondition.cookie;
+import static io.micronaut.web.router.builder.RequestCondition.header;
+import static io.micronaut.web.router.builder.RequestCondition.host;
+import static io.micronaut.web.router.builder.RequestCondition.method;
+import static io.micronaut.web.router.builder.RequestCondition.not;
+import static io.micronaut.web.router.builder.RequestCondition.peerAddress;
+import static io.micronaut.web.router.builder.RequestCondition.query;
+import static io.micronaut.web.router.builder.RequestCondition.remoteAddress;
 import static io.micronaut.web.router.builder.ValueMatcher.endsWith;
 import static io.micronaut.web.router.builder.ValueMatcher.equalTo;
 import static io.micronaut.web.router.builder.ValueMatcher.oneOf;
@@ -55,7 +55,7 @@ import static io.micronaut.web.router.builder.ValueMatcher.regex;
 import static io.micronaut.web.router.builder.ValueMatcher.startsWith;
 
 /**
- * The declarative conditions of handler routes, {@link RouteCondition}, and their combinations:
+ * The declarative conditions of handler routes, {@link RequestCondition}, and their combinations:
  * the headers, query parameters, cookies and methods of a request, its host and client address
  * as the server resolves them, and the time.
  */
@@ -178,7 +178,7 @@ public class HandlerRouteConditionCombinationsTest {
 
         @Override
         public void routes(HttpRouteBuilder routes) {
-            RouteCondition beta = any(
+            RequestCondition beta = any(
                 header("X-Channel", oneOf("beta", "canary").ignoringCase()),
                 query("channel", regex("(beta|canary)(-\\d+)?")));
             routes.GET("/combinations/search")
@@ -211,8 +211,8 @@ public class HandlerRouteConditionCombinationsTest {
                 .where(not(host(endsWith(".example.com"))))
                 .handle((request, pathVariables) -> text("other"));
 
-            RouteCondition loopback = remoteAddress("127.0.0.0/8", "::1");
-            RouteCondition partner = remoteAddress("198.51.100.0/24");
+            RequestCondition loopback = remoteAddress("127.0.0.0/8", "::1");
+            RequestCondition partner = remoteAddress("198.51.100.0/24");
             routes.GET("/combinations/address")
                 .where(loopback)
                 .handle((request, pathVariables) -> text("loopback"));
@@ -241,7 +241,7 @@ public class HandlerRouteConditionCombinationsTest {
                 .handle((request, pathVariables) -> text("pending"));
             // a lambda combined with the declarative conditions
             routes.GET("/combinations/launch")
-                .where(header("X-Never").and(RouteCondition.custom(request -> request.getPath().startsWith("/combinations"))))
+                .where(header("X-Never").and(RequestCondition.custom(request -> request.getPath().startsWith("/combinations"))))
                 .handle((request, pathVariables) -> text("never"));
             routes.GET("/combinations/prefixed/{name}")
                 .constrain("name", startsWith("item-"))

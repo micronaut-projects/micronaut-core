@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
@@ -80,6 +81,24 @@ class ConditionRoutesTest {
         HttpClientResponseException notAZip = assertThrows(HttpClientResponseException.class,
             () -> http.retrieve(notAZipRequest));
         assertEquals(HttpStatus.NOT_FOUND, notAZip.getStatus());
+    }
+
+    @Test
+    void aConditionOnTheBodySelectsTheRoute() {
+        BlockingHttpClient http = client.toBlocking();
+        assertEquals("express order 1", http.retrieve(HttpRequest.POST("/orders", Map.of("kind", "express", "id", 1))));
+        assertEquals("order 2", http.retrieve(HttpRequest.POST("/orders", Map.of("kind", "standard", "id", 2))));
+        assertEquals("csv import", http.retrieve(HttpRequest.POST("/imports", "id,name\n1,lamp").contentType(MediaType.TEXT_PLAIN_TYPE)));
+        HttpClientResponseException notCsv = assertThrows(HttpClientResponseException.class,
+            () -> http.retrieve(HttpRequest.POST("/imports", "name,id").contentType(MediaType.TEXT_PLAIN_TYPE)));
+        assertEquals(HttpStatus.NOT_FOUND, notCsv.getStatus());
+        HttpClientResponseException tooLarge = assertThrows(HttpClientResponseException.class,
+            () -> http.retrieve(HttpRequest.POST("/imports", "id," + "x".repeat(2048)).contentType(MediaType.TEXT_PLAIN_TYPE)));
+        assertEquals(HttpStatus.NOT_FOUND, tooLarge.getStatus());
+        assertEquals("payment of alice", http.retrieve(HttpRequest.POST("/payments", Map.of("customer", "alice"))));
+        HttpClientResponseException unknown = assertThrows(HttpClientResponseException.class,
+            () -> http.retrieve(HttpRequest.POST("/payments", Map.of("customer", "bob"))));
+        assertEquals(HttpStatus.NOT_FOUND, unknown.getStatus());
     }
 
     @Test
