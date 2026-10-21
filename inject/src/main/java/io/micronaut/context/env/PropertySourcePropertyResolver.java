@@ -517,7 +517,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (cached != null) {
             return cached == NO_VALUE ? Optional.empty() : Optional.of((T) cached);
         }
-        Object value = cached(currentState.placeholderResolutionCache, name, lookupRevision);
+        @Nullable Object value = cached(currentState.placeholderResolutionCache, name, lookupRevision);
         // entries map to get the value from, only populated if there's a cache miss with placeholderResolutionCache
         Map<String, DefaultPropertyEntry> entries = null;
         if (value == null) {

@@ -521,6 +521,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          * The class loader of the context that configured the method, which builds the annotations of the
          * application.
          */
+        @SuppressWarnings("java:S3077") // a class loader reference, published once configured
         private volatile @Nullable ClassLoader classLoader;
         /**
          * The metadata resolving the property placeholders with the environment of the last configured context.
