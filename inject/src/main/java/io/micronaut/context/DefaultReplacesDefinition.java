@@ -29,6 +29,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Represents the default implementation of the {@link ReplacesDefinition} interface, designed to define rules for replacing
@@ -96,7 +97,9 @@ public record DefaultReplacesDefinition<T>(Class<T> beanType,
         if (factoryClass != null) {
             Optional<Class<?>> declaringType = beanDefinition.getDeclaringType();
             if (declaringType.isPresent()) {
-                if (factoryClass == declaringType.get()) {
+                // a bean type named next to the factory narrows the beans of the factory replaced to those of that type
+                if (factoryClass == declaringType.get()
+                    && (beanTypeToReplace == null || checkIfTypeMatches(beanDefinition, beanTypeToReplace))) {
                     if (DefaultBeanContext.LOG.isDebugEnabled()) {
                         if (beanTypeToReplace == null) {
                             DefaultBeanContext.LOG.debug("Bean [{}] replaces the factory type [{}]", beanType, factoryClass);
@@ -118,6 +121,30 @@ public record DefaultReplacesDefinition<T>(Class<T> beanType,
             return isTypeMatches;
         }
         return false; // No more replacement definition to check
+    }
+
+    @Override
+    public boolean replaces(BeanDefinition<T> replacingDefinition, BeanDefinition<T> beanDefinition) {
+        if (!replaces(beanDefinition)) {
+            return false;
+        }
+        if (qualifier == null || beanTypeToReplace == null || checkIfTypeMatches(beanDefinition, beanTypeToReplace)) {
+            return true;
+        }
+        // A bean the qualifier selects that is not of the bean type named next to it is replaced when it is of a type
+        // the replacing bean is too, as the candidates of a lookup by that type are; not one of an unrelated type
+        Set<Class<?>> replacingTypes = replacingDefinition.getExposedTypes();
+        if (replacingTypes.isEmpty()) {
+            // compiled without its exposed types
+            return true;
+        }
+        Class<?> replacedType = getCanonicalBeanType(beanDefinition);
+        for (Class<?> type : replacingTypes) {
+            if (type != Object.class && type.isAssignableFrom(replacedType)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean checkIfTypeMatches(BeanDefinition<T> definitionToBeReplaced,

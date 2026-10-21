@@ -23,6 +23,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -52,7 +53,7 @@ import java.util.function.Predicate;
 public final class RouteSettings {
     private final IntConsumer exposePort;
     private final @Nullable HandlerMethod<?> handler;
-    private final List<RouteCondition> conditions;
+    private final List<RequestCondition> conditions;
     private final List<Predicate<? super PathVariables>> constraints;
     private final Map<String, Object> attributes;
     private final List<FilterRegistration> filters;
@@ -63,6 +64,8 @@ public final class RouteSettings {
     private boolean nonBlocking;
     private @Nullable Integer port;
     private @Nullable Integer order;
+    private @Nullable RouteMatchSelector selector;
+    private boolean selectorSet;
     private RouteAssembly.@Nullable RouteFilters groupFilters;
     private RouteAssembly.@Nullable RouteGroup group;
     private @Nullable AnnotationMetadataProvider element;
@@ -98,6 +101,8 @@ public final class RouteSettings {
         this.nonBlocking = other.nonBlocking;
         this.port = other.port;
         this.order = other.order;
+        this.selector = other.selector;
+        this.selectorSet = other.selectorSet;
         this.groupFilters = other.groupFilters;
         this.group = other.group;
         this.element = other.element;
@@ -218,6 +223,15 @@ public final class RouteSettings {
     }
 
     /**
+     * @param selector The route selector of the route, or {@code null} for none, overriding the one of its groups
+     * @see RouteSpec#selectedBy(RouteMatchSelector)
+     */
+    public void selectedBy(@Nullable RouteMatchSelector selector) {
+        this.selector = selector;
+        this.selectorSet = true;
+    }
+
+    /**
      * @param name  The name
      * @param value The value
      * @see HttpRouteSpec#attribute(String, Object)
@@ -228,9 +242,9 @@ public final class RouteSettings {
 
     /**
      * @param condition The condition
-     * @see HttpRouteSpec#where(RouteCondition)
+     * @see HttpRouteSpec#where(RequestCondition)
      */
-    public void where(RouteCondition condition) {
+    public void where(RequestCondition condition) {
         conditions.add(Objects.requireNonNull(condition, "condition"));
     }
 
@@ -347,6 +361,20 @@ public final class RouteSettings {
     }
 
     /**
+     * @return Whether the route sets its route selector, see {@link #getSelector()}
+     */
+    public boolean isSelectorSet() {
+        return selectorSet;
+    }
+
+    /**
+     * @return The route selector the route sets, or {@code null}
+     */
+    public @Nullable RouteMatchSelector getSelector() {
+        return selector;
+    }
+
+    /**
      * @return The order of the route, or {@code null} if it has none of its own
      */
     public @Nullable Integer getOrder() {
@@ -363,7 +391,7 @@ public final class RouteSettings {
     /**
      * @return The conditions of the route, a read-only view
      */
-    public List<RouteCondition> getConditions() {
+    public List<RequestCondition> getConditions() {
         return Collections.unmodifiableList(conditions);
     }
 

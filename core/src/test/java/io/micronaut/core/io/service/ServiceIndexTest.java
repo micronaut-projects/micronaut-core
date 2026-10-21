@@ -86,6 +86,8 @@ public class ServiceIndexTest {
 
     @BeforeEach
     void captureTheLog() {
+        // what an earlier test checked and did not log
+        ServiceIndex.logCheck();
         logged.start();
         ((Logger) LoggerFactory.getLogger(ServiceIndex.class)).addAppender(logged);
     }
@@ -296,10 +298,10 @@ public class ServiceIndexTest {
                 Map.of(SERVICE, List.of("s.S"), OTHER_SERVICE, List.of()), null);
 
             for (int i = 0; i < 3; i++) {
-                assertSame(index, index.forLookup(classLoader));
+                assertSame(index, lookUp(index, classLoader));
             }
             // a lookup for another class loader is not served, and says nothing
-            assertNull(index.forLookup(ServiceIndexTest.class.getClassLoader()));
+            assertNull(lookUp(index, ServiceIndexTest.class.getClassLoader()));
 
             assertEquals(1, logged.list.size(), () -> logged.list.toString());
             ILoggingEvent event = logged.list.get(0);
@@ -312,13 +314,29 @@ public class ServiceIndexTest {
     }
 
     @Test
+    void isLoggedWhenTheApplicationContextAsksForItAndNotByALookup() throws IOException {
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[0], null)) {
+            ServiceIndex index = ServiceIndex.copyOf(classLoader, Map.of(SERVICE, Set.of("a.A")), Map.of(), null);
+
+            // the first lookup can come before logging is configured
+            assertSame(index, index.forLookup(classLoader));
+            assertSame(index, index.forLookup(classLoader));
+            assertEquals(List.of(), logged.list);
+
+            ServiceIndex.logCheck();
+            ServiceIndex.logCheck();
+            assertEquals(List.of(Level.INFO), logged.list.stream().map(ILoggingEvent::getLevel).toList());
+        }
+    }
+
+    @Test
     void logsNothingWhenItIsSwitchedOff() throws IOException {
         String previous = System.getProperty(ServiceIndex.ENABLED_PROPERTY);
         try (URLClassLoader classLoader = new URLClassLoader(new URL[0], null)) {
             System.setProperty(ServiceIndex.ENABLED_PROPERTY, "false");
             ServiceIndex index = ServiceIndex.copyOf(classLoader, Map.of(), Map.of(), null);
 
-            assertNull(index.forLookup(classLoader));
+            assertNull(lookUp(index, classLoader));
             assertEquals(List.of(), logged.list);
         } finally {
             restoreProperty(ServiceIndex.ENABLED_PROPERTY, previous);
@@ -340,7 +358,7 @@ public class ServiceIndexTest {
                 new ClassPathEntry("second.jar", Files.size(second)),
                 new ClassPathEntry("classes", -1)
             ), built.classPath());
-            assertSame(built, built.forLookup(classLoader));
+            assertSame(built, lookUp(built, classLoader));
             assertEquals(Level.INFO, logged.list.get(0).getLevel());
             // the log says what was compared: with two JARs, their manifests are not read
             assertTrue(logged.list.get(0).getFormattedMessage().contains("(class path compared: the 3 entries of the URLs of the class loader, without the Class-Path of the manifests of its JARs)"),
@@ -352,7 +370,7 @@ public class ServiceIndexTest {
                 new ClassPathEntry("second.jar", -1),
                 new ClassPathEntry("first.jar", Files.size(first))
             ));
-            assertSame(reordered, reordered.forLookup(classLoader));
+            assertSame(reordered, lookUp(reordered, classLoader));
             assertEquals(List.of(Level.INFO, Level.INFO), logged.list.stream().map(ILoggingEvent::getLevel).toList());
         }
     }
@@ -370,9 +388,9 @@ public class ServiceIndexTest {
         try (URLClassLoader classLoader = new URLClassLoader(new URL[]{first.toUri().toURL(), second.toUri().toURL()}, null)) {
             ServiceIndex stale = ServiceIndex.copyOf(classLoader, built.micronautServices(), built.standardServices(), built.classPath());
 
-            assertNull(stale.forLookup(classLoader));
-            assertNull(stale.forLookup(classLoader));
-            assertEquals(List.of("a.A", "b.B", "d.D", "e.E"), names(classLoader, SERVICE, stale.forLookup(classLoader), false));
+            assertNull(lookUp(stale, classLoader));
+            assertNull(lookUp(stale, classLoader));
+            assertEquals(List.of("a.A", "b.B", "d.D", "e.E"), names(classLoader, SERVICE, lookUp(stale, classLoader), false));
             assertEquals(1, logged.list.size(), () -> logged.list.toString());
             assertEquals(Level.WARN, logged.list.get(0).getLevel());
             assertEquals("Not using the service index registered for class loader " + classLoader
@@ -390,7 +408,7 @@ public class ServiceIndexTest {
                 new ClassPathEntry("removed.jar", -1)
             ));
 
-            assertNull(stale.forLookup(classLoader));
+            assertNull(lookUp(stale, classLoader));
             assertTrue(logged.list.get(1).getFormattedMessage().endsWith("the class path lacks [first.jar (" + (Files.size(first) + 1) + " bytes), removed.jar], which the index was built for,"
                 + " and has [first.jar (" + Files.size(second) + " bytes)], which it was not built for"
                 + " (compared with the 1 entry of the URLs of the class loader, to which the manifest of first.jar adds nothing)"), logged.list.get(1).getFormattedMessage());
@@ -412,7 +430,7 @@ public class ServiceIndexTest {
             // the services of the parent are indexed, and its class path is not listed
             assertEquals(List.of("p.One", "c.C"), built.standardServices().get(SERVICE));
             assertEquals(List.of(new ClassPathEntry("child.jar", Files.size(child))), built.classPath());
-            assertSame(built, built.forLookup(classLoader));
+            assertSame(built, lookUp(built, classLoader));
             assertTrue(logged.list.get(0).getFormattedMessage().contains(notCompared), logged.list.get(0).getFormattedMessage());
         }
 
@@ -421,7 +439,7 @@ public class ServiceIndexTest {
              URLClassLoader classLoader = new URLClassLoader(new URL[]{child.toUri().toURL()}, parent)) {
             ServiceIndex stale = ServiceIndex.copyOf(classLoader, built.micronautServices(), built.standardServices(), built.classPath());
 
-            assertSame(stale, stale.forLookup(classLoader));
+            assertSame(stale, lookUp(stale, classLoader));
             assertEquals(List.of("p.One", "c.C"), names(classLoader, SERVICE, stale, false));
             assertEquals(List.of("p.One", "p.Two", "c.C"), names(classLoader, SERVICE, null, false));
             assertEquals(List.of(Level.INFO, Level.INFO), logged.list.stream().map(ILoggingEvent::getLevel).toList());
@@ -432,7 +450,7 @@ public class ServiceIndexTest {
         try (URLClassLoader classLoader = new URLClassLoader(new URL[]{child.toUri().toURL()}, ClassLoader.getPlatformClassLoader())) {
             ServiceIndex index = ServiceIndexBuilder.build(classLoader, List.of(SERVICE));
 
-            assertSame(index, index.forLookup(classLoader));
+            assertSame(index, lookUp(index, classLoader));
             assertTrue(logged.list.get(2).getFormattedMessage().contains("(class path compared: the 1 entry of the URLs of the class loader, to which the manifest of child.jar adds nothing)"),
                 logged.list.get(2).getFormattedMessage());
         }
@@ -454,11 +472,11 @@ public class ServiceIndexTest {
 
         // an index that lists the class path of the system class loader is compared with java.class.path
         ServiceIndex index = ServiceIndex.copyOf(system, Map.of(), Map.of(), expected);
-        assertSame(index, index.forLookup(system));
+        assertSame(index, lookUp(index, system));
         List<ClassPathEntry> longer = new ArrayList<>(expected);
         longer.add(new ClassPathEntry("removed.jar", 1));
         ServiceIndex stale = ServiceIndex.copyOf(system, Map.of(), Map.of(), longer);
-        assertNull(stale.forLookup(system));
+        assertNull(lookUp(stale, system));
         assertTrue(logged.list.get(0).getFormattedMessage().contains("(class path compared: the " + expected.size() + " entries of java.class.path"), logged.list.get(0).getFormattedMessage());
         assertTrue(logged.list.get(1).getFormattedMessage().contains("the class path lacks [removed.jar (1 bytes)], which the index was built for (compared with the " + expected.size() + " entries of java.class.path"),
             logged.list.get(1).getFormattedMessage());
@@ -471,7 +489,7 @@ public class ServiceIndexTest {
             assertNull(ServiceIndex.classPathOf(remote));
         }
         ServiceIndex unchecked = ServiceIndex.copyOf(custom, Map.of(), Map.of(), longer);
-        assertSame(unchecked, unchecked.forLookup(custom));
+        assertSame(unchecked, lookUp(unchecked, custom));
         assertTrue(logged.list.get(2).getFormattedMessage().contains("(class path not compared: the class loader is neither the system class loader nor a URLClassLoader of files)"),
             logged.list.get(2).getFormattedMessage());
     }
@@ -514,13 +532,13 @@ public class ServiceIndexTest {
 
             built = ServiceIndexBuilder.build(classLoader, List.of(SERVICE));
             assertEquals(listed, built.classPath());
-            assertSame(built, built.forLookup(classLoader));
+            assertSame(built, lookUp(built, classLoader));
             assertEquals(Level.INFO, logged.list.get(0).getLevel());
             assertTrue(logged.list.get(0).getFormattedMessage().contains("(class path compared: " + compared + ")"), logged.list.get(0).getFormattedMessage());
 
             // an index that only lists the JAR was not built for the libraries of its manifest
             ServiceIndex unaware = ServiceIndex.copyOf(classLoader, built.micronautServices(), built.standardServices(), List.of(new ClassPathEntry("app.jar", -1)));
-            assertNull(unaware.forLookup(classLoader));
+            assertNull(lookUp(unaware, classLoader));
             assertEquals(Level.WARN, logged.list.get(1).getLevel());
             assertTrue(logged.list.get(1).getFormattedMessage().endsWith("the class path has [dep.jar (" + Files.size(dep) + " bytes), my lib.jar (" + Files.size(spaced) + " bytes), config, abs.jar ("
                 + Files.size(elsewhere) + " bytes), .], which the index was not built for (compared with " + compared + ")"), logged.list.get(1).getFormattedMessage());
@@ -533,8 +551,8 @@ public class ServiceIndexTest {
         try (URLClassLoader classLoader = new URLClassLoader(alone, null)) {
             ServiceIndex stale = ServiceIndex.copyOf(classLoader, built.micronautServices(), built.standardServices(), built.classPath());
 
-            assertNull(stale.forLookup(classLoader));
-            assertEquals(List.of("a.A", "b.B", "c.C", "d.D", "e.E", "l.L", "n.N", "s.S"), sortedNames(classLoader, SERVICE, stale.forLookup(classLoader)));
+            assertNull(lookUp(stale, classLoader));
+            assertEquals(List.of("a.A", "b.B", "c.C", "d.D", "e.E", "l.L", "n.N", "s.S"), sortedNames(classLoader, SERVICE, lookUp(stale, classLoader)));
             assertEquals(3, logged.list.size(), () -> logged.list.toString());
             assertEquals(Level.WARN, logged.list.get(2).getLevel());
             assertTrue(logged.list.get(2).getFormattedMessage().endsWith("the class path lacks [dep.jar (" + builtFor + " bytes)], which the index was built for, and has [dep.jar (" + Files.size(dep)
@@ -547,7 +565,7 @@ public class ServiceIndexTest {
             List<ClassPathEntry> withoutManifests = List.of(new ClassPathEntry("app.jar", Files.size(app)), new ClassPathEntry("my lib.jar", Files.size(spaced)));
             assertEquals(withoutManifests, ServiceIndex.classPathOf(classLoader));
             ServiceIndex index = ServiceIndex.copyOf(classLoader, Map.of(), Map.of(), withoutManifests);
-            assertSame(index, index.forLookup(classLoader));
+            assertSame(index, lookUp(index, classLoader));
             assertTrue(logged.list.get(3).getFormattedMessage().contains("(class path compared: the 2 entries of the URLs of the class loader, without the Class-Path of the manifests of its JARs)"),
                 logged.list.get(3).getFormattedMessage());
         }
@@ -631,8 +649,8 @@ public class ServiceIndexTest {
         try (URLClassLoader classLoader = new URLClassLoader(new URL[]{deployed.toUri().toURL()}, null)) {
             // the entries are compared by name, so the JAR that holds the index does not match the name it was packaged with
             ServiceIndex asPackaged = ServiceIndex.copyOf(classLoader, built.micronautServices(), built.standardServices(), List.of(new ClassPathEntry("app.jar", -1)));
-            assertNull(asPackaged.forLookup(classLoader));
-            assertEquals(List.of("a.A", "d.D"), names(classLoader, SERVICE, asPackaged.forLookup(classLoader), false));
+            assertNull(lookUp(asPackaged, classLoader));
+            assertEquals(List.of("a.A", "d.D"), names(classLoader, SERVICE, lookUp(asPackaged, classLoader), false));
             assertEquals(1, logged.list.size(), () -> logged.list.toString());
             assertEquals(Level.WARN, logged.list.get(0).getLevel());
             assertTrue(logged.list.get(0).getFormattedMessage().endsWith("the class path lacks [app.jar], which the index was built for, and has [application.jar (" + Files.size(deployed)
@@ -640,10 +658,10 @@ public class ServiceIndexTest {
 
             // a producer that knows the name the JAR is deployed with lists that name
             ServiceIndex asDeployed = ServiceIndex.copyOf(classLoader, built.micronautServices(), built.standardServices(), List.of(new ClassPathEntry("application.jar", -1)));
-            assertSame(asDeployed, asDeployed.forLookup(classLoader));
+            assertSame(asDeployed, lookUp(asDeployed, classLoader));
             // and one that does not know it lists no class path, which is then not compared
             ServiceIndex unlisted = ServiceIndex.copyOf(classLoader, built.micronautServices(), built.standardServices(), null);
-            assertSame(unlisted, unlisted.forLookup(classLoader));
+            assertSame(unlisted, lookUp(unlisted, classLoader));
             assertEquals(List.of(Level.WARN, Level.INFO, Level.INFO), logged.list.stream().map(ILoggingEvent::getLevel).toList());
             assertTrue(logged.list.get(2).getFormattedMessage().contains("(class path not compared: the index does not list one)"), logged.list.get(2).getFormattedMessage());
         }
@@ -668,15 +686,15 @@ public class ServiceIndexTest {
                 Map.of(SERVICE, List.of("a.A", "a.A", "c.C"), OTHER_SERVICE, List.of("o.O"), MISSING_SERVICE, List.of()), null);
 
             // without the validation, the wrong index is served as it is
-            assertSame(wrong, wrong.forLookup(classLoader));
+            assertSame(wrong, lookUp(wrong, classLoader));
 
             System.setProperty(ServiceIndex.VALIDATE_PROPERTY, "true");
-            assertSame(built, built.forLookup(classLoader));
+            assertSame(built, lookUp(built, classLoader));
             assertTrue(logged.list.get(1).getFormattedMessage().contains("(class path compared: the 1 entry of the URLs of the class loader, to which the manifest of app.jar adds nothing, names validated against a scan)"),
                 logged.list.get(1).getFormattedMessage());
 
             for (int i = 0; i < 2; i++) {
-                ServiceConfigurationError e = assertThrows(ServiceConfigurationError.class, () -> wrong.forLookup(classLoader));
+                ServiceConfigurationError e = assertThrows(ServiceConfigurationError.class, () -> lookUp(wrong, classLoader));
                 assertEquals("The service index registered for class loader " + classLoader + " failed its validation: the index differs from a scan of the class path:"
                     + "\n  META-INF/micronaut/" + BEANS + ": missing from the index [y.$Y$Definition], not on the class path [z.$Z$Definition]"
                     + "\n  META-INF/services/" + SERVICE + ": missing from the index [b.B], not on the class path [a.A, c.C]", e.getMessage());
@@ -688,13 +706,13 @@ public class ServiceIndexTest {
                 many.add("n.N" + i);
             }
             ServiceIndex longer = ServiceIndex.copyOf(classLoader, Map.of(SERVICE, many, BEANS, built.micronautServices().get(BEANS)), built.standardServices(), null);
-            ServiceConfigurationError cut = assertThrows(ServiceConfigurationError.class, () -> longer.forLookup(classLoader));
+            ServiceConfigurationError cut = assertThrows(ServiceConfigurationError.class, () -> lookUp(longer, classLoader));
             assertTrue(cut.getMessage().endsWith("META-INF/micronaut/" + SERVICE + ": not on the class path [n.N10, n.N11, n.N12, n.N13, n.N14, n.N15, n.N16, n.N17, n.N18, n.N19,"
                 + " n.N20, n.N21, n.N22, n.N23, n.N24, n.N25, n.N26, n.N27, n.N28, n.N29] and 5 more"), cut.getMessage());
 
             // an index that was built for another class path fails too, where it is only set aside without the validation
             ServiceIndex stale = ServiceIndex.copyOf(classLoader, built.micronautServices(), built.standardServices(), List.of(new ClassPathEntry("other.jar", -1)));
-            ServiceConfigurationError e = assertThrows(ServiceConfigurationError.class, () -> stale.forLookup(classLoader));
+            ServiceConfigurationError e = assertThrows(ServiceConfigurationError.class, () -> lookUp(stale, classLoader));
             assertTrue(e.getMessage().contains("failed its validation: the index was built for a different class path: the class path lacks [other.jar]"), e.getMessage());
             assertEquals(List.of(Level.INFO, Level.INFO), logged.list.stream().map(ILoggingEvent::getLevel).toList());
         } finally {
@@ -1081,6 +1099,15 @@ public class ServiceIndexTest {
         }
     }
 
+    /**
+     * Looks the index up, and logs the check, as the application context does once it starts.
+     */
+    private static ServiceIndex lookUp(ServiceIndex index, ClassLoader classLoader) {
+        ServiceIndex served = index.forLookup(classLoader);
+        ServiceIndex.logCheck();
+        return served;
+    }
+
     private static void restoreProperty(String name, String previous) {
         if (previous == null) {
             System.clearProperty(name);
@@ -1199,6 +1226,8 @@ public class ServiceIndexTest {
         public static void main(String[] args) {
             List<String> names = new ArrayList<>();
             SoftServiceLoader.newCollector(SERVICE, name -> true, ClassLoader.getSystemClassLoader(), Function.identity()).collect(names, false);
+            // as the application context does once it starts
+            ServiceIndex.logCheck();
             Collections.sort(names);
             System.out.println("java.class.path=" + System.getProperty("java.class.path"));
             System.out.println("names=" + names);
