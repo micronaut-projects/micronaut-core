@@ -76,6 +76,7 @@ import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
+import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import jakarta.inject.Singleton;
@@ -546,6 +547,22 @@ public final class RouteExecutor {
             executor = null;
         }
         return executor;
+    }
+
+    /**
+     * The executor a streamed body of a route is subscribed to and observed on: the executor of
+     * a URI route, which its invocation runs on, with the settings of the route and of its
+     * groups, e.g. {@code executeOn(...)}, or, for another route, e.g. an error route, the
+     * executor selected for its method.
+     *
+     * @param routeInfo The route
+     * @return The executor, or {@code null}
+     */
+    @Nullable ExecutorService streamExecutor(RouteInfo<?> routeInfo) {
+        if (routeInfo instanceof UriRouteInfo<?, ?>) {
+            return routeInfo.getExecutor(serverConfiguration.getThreadSelection());
+        }
+        return findExecutor(routeInfo);
     }
 
     <T> Flux<T> applyExecutorToPublisher(Publisher<T> publisher, @Nullable ExecutorService executor, PropagatedContext propagatedContext) {
