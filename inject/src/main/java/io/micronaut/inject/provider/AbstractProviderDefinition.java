@@ -174,6 +174,28 @@ public abstract class AbstractProviderDefinition<T> extends AbstractInjectionPoi
     }
 
     /**
+     * Retains the resolution of the injection point a provider is built for, so that a lookup the provider makes
+     * later resolves at that point.
+     *
+     * <p>The resolution context a provider is built in belongs to the creation of the bean it is injected into: once
+     * that ends its path is empty, and a lookup copying it then starts a path of its own, so a bean the lookup
+     * creates sees its own creation, not the provider's injection point, as the point it is created for. The
+     * retained copy keeps the path and the qualifier as they were when the provider was built. It is never resolved
+     * in: each lookup copies it, so lookups may be concurrent. The attributes of the creation in progress, the
+     * interceptor registrations, are left out, as a lookup may happen long after that creation ended. The copy owns
+     * no dependents, as the provider's lookups never did.</p>
+     *
+     * @param resolutionContext The resolution context the provider is built in
+     * @return The retained resolution context
+     */
+    static BeanResolutionContext retain(BeanResolutionContext resolutionContext) {
+        BeanResolutionContext retained = resolutionContext.copy();
+        retained.removeAttribute(BeanResolutionContext.SHARED_INTERCEPTOR_REGISTRATIONS);
+        retained.removeAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS);
+        return retained;
+    }
+
+    /**
      * Return whether missing providers are allowed for this implementation. If {@code false} a {@link io.micronaut.context.exceptions.NoSuchBeanException} is thrown.
      * @param context The context
      * @return Returns {@code true} if missing providers are allowed

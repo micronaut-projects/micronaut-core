@@ -89,7 +89,9 @@ public class AnnotationValueBuilder<T extends Annotation> {
     AnnotationValueBuilder(AnnotationValue<T> value, @Nullable RetentionPolicy retentionPolicy) {
         this.annotationName = value.getAnnotationName();
         this.values.putAll(value.getValues());
-        this.defaultValues = value.getDefaultValues();
+        Map<CharSequence, Object> existingDefaults = value.getDefaultValues();
+        // copy, so that defaultValues(Map) never writes into the source value's map, which may be immutable or shared
+        this.defaultValues = existingDefaults == null ? null : new LinkedHashMap<>(existingDefaults);
         this.stereotypes = value.getStereotypes() == null ? null : new ArrayList<>(value.getStereotypes());
         this.retentionPolicy = retentionPolicy != null ? retentionPolicy : RetentionPolicy.RUNTIME;
         // getValues() hides the reserved member, so remember that the value being copied persisted its
