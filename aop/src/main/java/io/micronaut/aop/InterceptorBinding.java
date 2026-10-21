@@ -97,7 +97,9 @@ public @interface InterceptorBinding {
      * </ul>
      *
      * <p>Members annotated with {@link io.micronaut.context.annotation.NonBinding} are left out of the comparison.
-     * This is the selection that Jakarta Interceptors and CDI specify for repeatable interceptor bindings.</p>
+     * The occurrences are compared as they were compiled, without resolving property placeholders or evaluating
+     * expressions in their members. This is the selection that Jakarta Interceptors and CDI specify for repeatable
+     * interceptor bindings.</p>
      *
      * @return Whether the occurrences of the binding annotation are matched as one group
      * @since 5.3.0

@@ -49,6 +49,8 @@ snippet::io.micronaut.docs.aop.binding.Audit[tags="imports,annotation", indent=0
 <3> The `value` member is compared
 <4> The `reason` member is left out of the comparison
 
+NOTE: A decorator declared in Python cannot be repeated, so a Python application declares a repeatable binding annotation in Java and imports it, as the Python examples below do with `io.micronaut.docs.aop.binding.Audit`.
+
 snippet::io.micronaut.docs.aop.binding.PaymentAuditInterceptor[tags="imports,interceptor", indent=0, title="Interceptor Requiring Two Occurrences"]
 
 <1> The interceptor applies only where both `security` and `billing` are declared
