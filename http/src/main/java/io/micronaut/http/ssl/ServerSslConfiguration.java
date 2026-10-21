@@ -33,6 +33,8 @@ public class ServerSslConfiguration extends SslConfiguration {
      */
     public static final String PREFIX = "micronaut.server.ssl";
 
+    private @Nullable String contextName;
+
     /**
      * Overrides the default constructor and sets {@link #isEnabled()} to true.
      *
@@ -54,6 +56,30 @@ public class ServerSslConfiguration extends SslConfiguration {
      * Constructs the default server SSL configuration.
      */
     public ServerSslConfiguration() {
+    }
+
+    /**
+     * Name of a {@link javax.net.ssl.SSLContext} bean to serve with, instead of the configured key and trust
+     * material. The client authentication mode, protocols and ciphers still apply, and ALPN is negotiated for
+     * HTTP/2. A context set with {@link #setSslContext(javax.net.ssl.SSLContext)} takes precedence.
+     *
+     * @return the bean name, or {@code null}
+     * @since 5.3.0
+     */
+    public @Nullable String getContextName() {
+        return contextName;
+    }
+
+    /**
+     * Name of a {@link javax.net.ssl.SSLContext} bean to serve with, instead of the configured key and trust
+     * material. The client authentication mode, protocols and ciphers still apply, and ALPN is negotiated for
+     * HTTP/2. A context set with {@link #setSslContext(javax.net.ssl.SSLContext)} takes precedence.
+     *
+     * @param contextName the bean name, or {@code null}
+     * @since 5.3.0
+     */
+    public void setContextName(@Nullable String contextName) {
+        this.contextName = contextName;
     }
 
     /**

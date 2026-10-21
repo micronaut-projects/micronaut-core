@@ -32,11 +32,13 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.web.router.builder.RouteCondition;
-import io.micronaut.web.router.builder.RouteConditions;
+import io.micronaut.web.router.builder.RequestCondition;
+import io.micronaut.web.router.builder.RequestConditions;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.http.uri.RouteTemplate;
+import io.micronaut.http.uri.UriRouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -51,6 +53,7 @@ import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RouteSettings;
 import io.micronaut.web.router.builder.DefaultRouteAnnotations;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import io.micronaut.web.router.exceptions.RoutingException;
 import org.jspecify.annotations.Nullable;
 
@@ -68,7 +71,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -100,11 +102,21 @@ public final class RouteAssembly {
      * The tables of the located targets of the routes, shared with the located tables.
      */
     @Nullable RouteTableFactory locatedTables;
-    private final @Nullable ExecutorSelector executorSelector;
+    final @Nullable ExecutorSelector executorSelector;
     private final ThreadSelection threadSelection;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private final UnaryOperator<String> routeUri;
-    private final Consumer<DefaultUriRoute> routeCreated;
+    /**
+     * Whether the literal path the routes that are not nested are mounted under is known, see
+     * {@link #mountPrefix}: only then can templates other than URI templates be
+     * mounted, since {@link #routeUri} composes Micronaut templates only.
+     */
+    private final boolean mountKnown;
+    /**
+     * The literal path the routes that are not nested are mounted under, e.g. the context path,
+     * or {@code null} for none.
+     */
+    private final @Nullable String mountPrefix;
     private final List<ServerFilters> serverFilters = new ArrayList<>(0);
     private final @Nullable String contextPath;
     private final RouteConditionContext conditionContext;
@@ -114,32 +126,54 @@ public final class RouteAssembly {
      * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
      * @param conversionService The conversion service
      * @param routeUri          The URI template of a route that is not nested in another route, e.g. under the context path
-     * @param routeCreated      Called for every URI route when it is created, before any further configuration of it
      */
     public RouteAssembly(@Nullable Object beanLocator,
                          ConversionService conversionService,
-                         UnaryOperator<String> routeUri,
-                         Consumer<DefaultUriRoute> routeCreated) {
-        this(beanLocator, conversionService, routeUri, routeCreated, null);
+                         UnaryOperator<String> routeUri) {
+        this(beanLocator, conversionService, routeUri, null);
     }
 
     /**
      * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
      * @param conversionService The conversion service
      * @param routeUri          The URI template of a route that is not nested in another route, e.g. under the context path
-     * @param routeCreated      Called for every URI route when it is created, before any further configuration of it
      * @param contextPath       The context path the patterns of the server filters are under, or {@code null}
      */
     public RouteAssembly(@Nullable Object beanLocator,
                          ConversionService conversionService,
                          UnaryOperator<String> routeUri,
-                         Consumer<DefaultUriRoute> routeCreated,
                          @Nullable String contextPath) {
+        this(beanLocator, conversionService, routeUri, false, null, contextPath);
+    }
+
+    /**
+     * An assembly of routes under a context path. The context path is a literal mount: the
+     * templates of every language are mounted under it. The patterns of the server
+     * filters are under it too.
+     *
+     * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
+     * @param conversionService The conversion service
+     * @param contextPath       The context path, e.g. the {@code micronaut.server.context-path} property, or {@code null}
+     */
+    public RouteAssembly(@Nullable Object beanLocator,
+                         ConversionService conversionService,
+                         @Nullable String contextPath) {
+        this(beanLocator, conversionService, uri -> underContextPath(contextPath, uri), true, RouteTemplates.mountPrefix(contextPath), contextPath);
+    }
+
+    @SuppressWarnings("ParameterNumber")
+    private RouteAssembly(@Nullable Object beanLocator,
+                          ConversionService conversionService,
+                          UnaryOperator<String> routeUri,
+                          boolean mountKnown,
+                          @Nullable String mountPrefix,
+                          @Nullable String contextPath) {
         this.contextPath = contextPath;
         this.beanLocator = beanLocator;
         this.conversionService = conversionService;
         this.routeUri = routeUri;
-        this.routeCreated = routeCreated;
+        this.mountKnown = mountKnown;
+        this.mountPrefix = mountPrefix;
         if (beanLocator instanceof ApplicationContext applicationContext) {
             Environment environment = applicationContext.getEnvironment();
             defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
@@ -172,7 +206,9 @@ public final class RouteAssembly {
         this.conversionService = resolved.conversionService;
         // the URIs of located routes are relative to the prefix of their locator
         this.routeUri = uri -> uri;
-        this.routeCreated = route -> { };
+        // relative to the prefix of the locator: no context path, so templates of every language are supported
+        this.mountKnown = true;
+        this.mountPrefix = null;
         this.defaultCharset = resolved.defaultCharset;
         this.executorSelector = resolved.executorSelector;
         this.threadSelection = resolved.threadSelection;
@@ -265,9 +301,13 @@ public final class RouteAssembly {
     public DefaultUriRoute addRoute(String httpMethodName, HttpMethod httpMethod, String uri, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
         DefaultUriRoute route;
         if (currentParentRoute != null) {
+            UriMatchTemplate parentTemplate = currentParentRoute.uriMatchTemplate;
+            if (parentTemplate == null) {
+                throw RouteTemplates.notNested(uri, currentParentRoute.template);
+            }
             route = new DefaultUriRoute(
                 httpMethod,
-                currentParentRoute.uriMatchTemplate.nest(uri),
+                parentTemplate.nest(uri),
                 mediaTypes,
                 executableHandle,
                 httpMethodName,
@@ -278,22 +318,159 @@ public final class RouteAssembly {
             route = new DefaultUriRoute(httpMethod, routeUri.apply(uri), mediaTypes, executableHandle, httpMethodName, conversionService);
         }
         uriRoutes.add(route);
-        routeCreated.accept(route);
         return route;
     }
 
     /**
-     * A URI route that is not added: the caller builds its route info.
+     * Add a URI route with a template of any language: nested in the current parent route, or
+     * mounted under the context path. The template is used as it is, unless it is nested or
+     * mounted.
      *
+     * @param httpMethodName   The name of the HTTP method, which differs from {@link HttpMethod#name()} for a custom method
      * @param httpMethod       The HTTP method
-     * @param uri              The URI template
+     * @param template         The template
      * @param mediaTypes       The media types the route consumes
      * @param executableHandle The target of the route
-     * @param httpMethodName   The name of the HTTP method
      * @return The route
+     * @throws IllegalArgumentException if the route would be nested and its template or the one
+     *                                  of the parent route is not a URI template
      */
-    public DefaultUriRoute newRoute(HttpMethod httpMethod, String uri, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle, String httpMethodName) {
-        return new DefaultUriRoute(httpMethod, uri, mediaTypes, executableHandle, httpMethodName, conversionService);
+    public DefaultUriRoute addRoute(String httpMethodName, HttpMethod httpMethod, RouteTemplate template, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
+        RouteTemplate checked = RouteTemplates.checked(template);
+        DefaultUriRoute route;
+        if (currentParentRoute != null) {
+            route = new DefaultUriRoute(httpMethod, RouteTemplates.nested(currentParentRoute.uriMatchTemplate, currentParentRoute.template, checked), mediaTypes, executableHandle, httpMethodName, conversionService);
+            currentParentRoute.nestedRoutes.add(route);
+        } else {
+            route = new DefaultUriRoute(httpMethod, mount(checked), mediaTypes, executableHandle, httpMethodName, conversionService);
+        }
+        uriRoutes.add(route);
+        return route;
+    }
+
+    /**
+     * The template of a declared route that is not nested, checked and mounted once at a literal
+     * prefix, e.g. of a route group, under the mount of the assembly, e.g. the context path:
+     * mounted once for every route of the declaration, see {@link #addMountedRoute}.
+     *
+     * @param template The template
+     * @param prefix   The literal prefix, e.g. {@code /api}, or empty for none
+     * @return The template under the prefix and the mount
+     */
+    public RouteTemplate mounted(RouteTemplate template, String prefix) {
+        RouteTemplate checked = RouteTemplates.checked(template);
+        if (prefix.isEmpty()) {
+            return mount(checked);
+        }
+        if (mountKnown && mountPrefix != null) {
+            // the context path and the prefix at once
+            return RouteTemplates.checked(checked.mount(mountPrefix + prefix));
+        }
+        return mount(RouteTemplates.checked(checked.mount(prefix)));
+    }
+
+    /**
+     * The URI template of a declared route that is not nested, composed as {@link #addRoute(String, HttpMethod, String, List, MethodExecutionHandle)}
+     * composes it, e.g. under the context path: built once for every route of the declaration.
+     *
+     * @param uri The URI template
+     * @return The template under the mount
+     */
+    public UriRouteTemplate uriTemplate(String uri) {
+        return UriRouteTemplate.of(new UriMatchTemplate(routeUri.apply(uri)));
+    }
+
+    /**
+     * Add a URI route of a template already under the mount of the assembly, see {@link #mounted}
+     * and {@link #uriTemplate}: the routes of the methods of a declaration share it.
+     *
+     * @param httpMethodName   The name of the HTTP method, which differs from {@link HttpMethod#name()} for a custom method
+     * @param httpMethod       The HTTP method
+     * @param template         The template, under the mount
+     * @param mediaTypes       The media types the route consumes
+     * @param executableHandle The target of the route
+     * @return The route
+     * @throws IllegalStateException if a parent route is being nested in
+     */
+    public DefaultUriRoute addMountedRoute(String httpMethodName, HttpMethod httpMethod, RouteTemplate template, List<MediaType> mediaTypes,
+                                           MethodExecutionHandle<Object, Object> executableHandle) {
+        if (currentParentRoute != null) {
+            throw new IllegalStateException("A mounted route template cannot be nested: " + template.expression());
+        }
+        DefaultUriRoute route = new DefaultUriRoute(httpMethod, template, mediaTypes, executableHandle, httpMethodName, conversionService);
+        uriRoutes.add(route);
+        return route;
+    }
+
+    /**
+     * Add the routes of a locator whose prefix is a template that is not a URI template, one per
+     * standard HTTP method, see {@link RouteLocator}. The prefix is nested in the current parent
+     * route or mounted under the context path.
+     *
+     * @param prefix           The prefix
+     * @param mountPrefix      The literal prefix the prefix is mounted at, e.g. of a route group, or empty for none
+     * @param mediaTypes       The media types the routes consume
+     * @param executableHandle The locator
+     * @return The routes
+     */
+    public List<DefaultUriRoute> addLocatorRoutes(RouteTemplate prefix, String mountPrefix, List<MediaType> mediaTypes,
+                                                  MethodExecutionHandle<Object, Object> executableHandle) {
+        RouteTemplate composed = RouteLocator.prefixTemplate(currentParentRoute != null
+            ? RouteTemplates.nested(currentParentRoute.uriMatchTemplate, currentParentRoute.template,
+                RouteTemplates.checked(mountPrefix.isEmpty() ? prefix : prefix.mount(mountPrefix)))
+            : mounted(prefix, mountPrefix));
+        List<DefaultUriRoute> routes = new ArrayList<>(HttpMethod.values().length);
+        for (HttpMethod method : HttpMethod.values()) {
+            // a request with a custom method is located too, and matched against the located
+            // routes of its method, or of any method
+            String methodName = method == HttpMethod.CUSTOM ? AnyMethodRoutes.CUSTOM_METHODS : method.name();
+            DefaultUriRoute route = new DefaultUriRoute(method, composed, mediaTypes, executableHandle, methodName, conversionService);
+            if (currentParentRoute != null) {
+                currentParentRoute.nestedRoutes.add(route);
+            }
+            uriRoutes.add(route);
+            routes.add(route);
+        }
+        return routes;
+    }
+
+    /**
+     * @param template A template of a route that is not nested
+     * @return The template under the mount of the assembly: the template itself without one
+     */
+    private RouteTemplate mount(RouteTemplate template) {
+        if (!mountKnown) {
+            if (template instanceof UriRouteTemplate uriTemplate) {
+                // the composition of the URI templates of this assembly
+                String uri = uriTemplate.expression();
+                String mounted = routeUri.apply(uri);
+                if (mounted.equals(uri)) {
+                    return template;
+                }
+                if (uriTemplate.matcher() == null) {
+                    throw new IllegalArgumentException("The route template " + uri + " of a subclass of UriMatchTemplate cannot be mounted at " + mounted
+                        + ": it would lose the rules of its class");
+                }
+                return UriRouteTemplate.of(mounted);
+            }
+            throw new IllegalArgumentException("The route template " + template.expression()
+                + " is not supported here: this route builder composes URI templates only");
+        }
+        return mountPrefix == null ? template : RouteTemplates.checked(template.mount(mountPrefix));
+    }
+
+    /**
+     * The route selector of a route: its own, or the one of its group, or {@code null}.
+     *
+     * @param settings The settings of the route
+     * @param group    The settings of the group of the route, or {@code null}
+     * @return The selector, or {@code null}
+     */
+    private static @Nullable RouteMatchSelector effectiveSelector(RouteSettings settings, @Nullable RouteGroup group) {
+        if (settings.isSelectorSet()) {
+            return settings.getSelector();
+        }
+        return group == null ? null : group.selector();
     }
 
     /**
@@ -334,20 +511,22 @@ public final class RouteAssembly {
      * Each {@code HEAD} route is a copy of the finished {@code GET} route.
      */
     public void addImplicitHeadRoutes() {
+        // keyed by the template, never by the text alone: the same text can be a different
+        // template of another language
         List<DefaultUriRoute> getRoutes = new ArrayList<>();
-        Set<UriMatchTemplate> headTemplates = new HashSet<>();
+        Set<Object> headTemplates = new HashSet<>();
         for (UriRoute route : uriRoutes) {
             // a route of any method has its own HEAD route, and does not hide the implicit HEAD route of a GET route
             if (route instanceof DefaultUriRoute defaultUriRoute && !defaultUriRoute.settings.isAnyMethod()) {
                 if (defaultUriRoute.httpMethod == HttpMethod.GET) {
                     getRoutes.add(defaultUriRoute);
                 } else if (defaultUriRoute.httpMethod == HttpMethod.HEAD) {
-                    headTemplates.add(defaultUriRoute.uriMatchTemplate);
+                    headTemplates.add(defaultUriRoute.headKey());
                 }
             }
         }
         for (DefaultUriRoute getRoute : getRoutes) {
-            if (!headTemplates.contains(getRoute.uriMatchTemplate)
+            if (!headTemplates.contains(getRoute.headKey())
                 && getRoute.targetMethod.booleanValue(Get.class, "headRoute").orElse(true)) {
                 uriRoutes.add(getRoute.implicitHeadCopy());
             }
@@ -965,7 +1144,7 @@ public final class RouteAssembly {
     @Internal
     public final class RouteGroup {
         private final @Nullable RouteGroup enclosing;
-        private final List<RouteCondition> conditions = new ArrayList<>(0);
+        private final List<RequestCondition> conditions = new ArrayList<>(0);
         private final List<Predicate<? super PathVariables>> constraints = new ArrayList<>(0);
         private final Map<String, Object> attributes = new LinkedHashMap<>(0);
         private final DefaultRouteAnnotations annotations;
@@ -975,6 +1154,8 @@ public final class RouteAssembly {
         private final Supplier<StatusRouteInfo<Object, Object>[]> statusRouteInfos = SupplierUtil.memoized(this::buildStatusRoutes);
         private @Nullable Integer port;
         private @Nullable Integer order;
+        private @Nullable RouteMatchSelector selector;
+        private boolean selectorSet;
         private boolean closed;
 
         /**
@@ -1130,11 +1311,23 @@ public final class RouteAssembly {
         }
 
         /**
+         * The route selector of the routes of the group, see
+         * {@link io.micronaut.web.router.builder.RouteSpec#selectedBy(RouteMatchSelector)}.
+         *
+         * @param selector The selector, or {@code null} for none, overriding the one of the enclosing groups
+         */
+        public void selectedBy(@Nullable RouteMatchSelector selector) {
+            checkOpen();
+            this.selector = selector;
+            this.selectorSet = true;
+        }
+
+        /**
          * A condition the requests of the routes of the group must meet.
          *
          * @param condition The condition
          */
-        public void where(RouteCondition condition) {
+        public void where(RequestCondition condition) {
             Objects.requireNonNull(condition, "condition");
             checkOpen();
             conditions.add(condition);
@@ -1172,6 +1365,24 @@ public final class RouteAssembly {
         }
 
         /**
+         * @return The route selector of the group, or of the closest enclosing group that sets one, or {@code null}
+         */
+        @Nullable RouteMatchSelector selector() {
+            if (selectorSet) {
+                return selector;
+            }
+            RouteGroup group = enclosing;
+            return group == null ? null : group.selector();
+        }
+
+        /**
+         * @return Whether the group, or an enclosing group, sets the route selector
+         */
+        boolean declaresSelector() {
+            return selectorSet || enclosing != null && enclosing.declaresSelector();
+        }
+
+        /**
          * @return The order of the group, or of the closest enclosing group that has one, or {@code null}
          */
         @Nullable Integer order() {
@@ -1201,7 +1412,7 @@ public final class RouteAssembly {
          *
          * @param routeConditions The conditions to add to
          */
-        void addConditions(List<RouteCondition> routeConditions) {
+        void addConditions(List<RequestCondition> routeConditions) {
             RouteGroup group = enclosing;
             if (group != null) {
                 group.addConditions(routeConditions);
@@ -1235,7 +1446,14 @@ public final class RouteAssembly {
     public final class DefaultUriRoute extends AbstractRoute implements UriRoute {
         final String httpMethodName;
         final HttpMethod httpMethod;
-        final UriMatchTemplate uriMatchTemplate;
+        /**
+         * The template.
+         */
+        final RouteTemplate template;
+        /**
+         * The URI match template of a route with a URI template, otherwise {@code null}.
+         */
+        final @Nullable UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
         /**
          * The settings of the route to a handler, and the port of a route to a bean method: the
@@ -1322,9 +1540,27 @@ public final class RouteAssembly {
                         MethodExecutionHandle<Object, Object> targetMethod,
                         String httpMethodName,
                         ConversionService conversionService) {
+            this(httpMethod, UriRouteTemplate.of(uriTemplate), mediaTypes, targetMethod, httpMethodName, conversionService);
+        }
+
+        /**
+         * @param httpMethod        The HTTP method
+         * @param template          The template
+         * @param mediaTypes        The media types
+         * @param targetMethod      The target method execution handle
+         * @param httpMethodName    The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
+         */
+        DefaultUriRoute(HttpMethod httpMethod,
+                        RouteTemplate template,
+                        List<MediaType> mediaTypes,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
             super(targetMethod, conversionService, mediaTypes);
             this.httpMethod = httpMethod;
-            this.uriMatchTemplate = uriTemplate;
+            this.template = template;
+            this.uriMatchTemplate = template instanceof UriRouteTemplate uriTemplate ? uriTemplate.getUriMatchTemplate() : null;
             this.httpMethodName = httpMethodName;
             // the handler is given the settings of the handler at once
             this.settings = new RouteSettings(RouteAssembly.this.exposedPorts::add, targetMethod instanceof HandlerMethod<?> handler ? handler : null);
@@ -1349,7 +1585,7 @@ public final class RouteAssembly {
             DefaultUrlRouteInfo<Object, Object> routeInfo = new DefaultUrlRouteInfo<>(
                 httpMethod,
                 httpMethodName,
-                uriMatchTemplate,
+                template,
                 defaultCharset,
                 targetMethod,
                 bodyArgumentName,
@@ -1371,7 +1607,8 @@ public final class RouteAssembly {
                 settings.isAnyMethod(),
                 constraints(group),
                 declaredSettings(),
-                null
+                null,
+                effectiveSelector(settings, group)
             );
             if (errorScope != null) {
                 // built now: a duplicate fails when the router is built
@@ -1394,6 +1631,10 @@ public final class RouteAssembly {
             }
             if (settings.getExecutorName() != null || settings.isNonBlocking()) {
                 declared |= DefaultUrlRouteInfo.DECLARED_EXECUTOR;
+            }
+            RouteGroup group = settings.getGroup();
+            if (settings.isSelectorSet() || group != null && group.declaresSelector()) {
+                declared |= DefaultUrlRouteInfo.DECLARED_SELECTOR;
             }
             return declared;
         }
@@ -1444,7 +1685,7 @@ public final class RouteAssembly {
 
         /**
          * The conditions of the route info: the conditions of the groups of the route, outer group
-         * first, and of the route, see {@link RouteSettings#where(RouteCondition)}, as one
+         * first, and of the route, see {@link RouteSettings#where(RequestCondition)}, as one
          * normalized condition, the {@code @RouteCondition} of the target method, the conditions
          * of the route given as predicates, and a request on the port of the route if it has one.
          * They are read when the route info is built: the annotations of a handler route may be
@@ -1455,17 +1696,17 @@ public final class RouteAssembly {
          */
         private List<Predicate<HttpRequest<?>>> predicates(@Nullable Integer effectivePort) {
             List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(conditions.size() + 3);
-            List<RouteCondition> declared = settings.getConditions();
+            List<RequestCondition> declared = settings.getConditions();
             RouteGroup routeGroup = settings.getGroup();
             if (routeGroup != null) {
-                List<RouteCondition> all = new ArrayList<>();
+                List<RequestCondition> all = new ArrayList<>();
                 routeGroup.addConditions(all);
                 all.addAll(declared);
                 declared = all;
             }
-            RouteCondition condition = RouteConditions.normalizeAll(declared);
-            if (!condition.equals(RouteConditions.ALWAYS)) {
-                predicates.add(RouteConditions.predicate(condition, conditionContext));
+            RequestCondition condition = RequestConditions.normalizeAll(declared);
+            if (!condition.equals(RequestConditions.ALWAYS)) {
+                predicates.add(RequestConditions.predicate(condition, conditionContext));
             }
             if (targetMethod.isPresent(io.micronaut.http.annotation.RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
                 // every @RouteCondition of the target: the annotations of a target may combine
@@ -1511,7 +1752,7 @@ public final class RouteAssembly {
          */
         @Internal
         public DefaultUriRoute implicitHeadCopy() {
-            DefaultUriRoute head = new DefaultUriRoute(HttpMethod.HEAD, uriMatchTemplate, consumesMediaTypes, targetMethod, HttpMethod.HEAD.name(), conversionService);
+            DefaultUriRoute head = new DefaultUriRoute(HttpMethod.HEAD, template, consumesMediaTypes, targetMethod, HttpMethod.HEAD.name(), conversionService);
             head.conditions.clear();
             head.conditions.addAll(conditions);
             head.producesMediaTypes = producesMediaTypes;
@@ -1539,7 +1780,7 @@ public final class RouteAssembly {
         @Override
         public String toString() {
             return getHttpMethodName() + ' '
-                    + uriMatchTemplate
+                    + (uriMatchTemplate != null ? uriMatchTemplate : template)
                     + " -> " + target(targetMethod)
                     + " (" + String.join(",", getConsumes()) + ')';
         }
@@ -1629,12 +1870,38 @@ public final class RouteAssembly {
 
         @Override
         public UriMatchTemplate getUriMatchTemplate() {
-            return this.uriMatchTemplate;
+            if (uriMatchTemplate == null) {
+                throw new UnsupportedOperationException("The route " + this + " has a template that is not a URI template: use getRouteTemplate()");
+            }
+            return uriMatchTemplate;
+        }
+
+        @Override
+        public RouteTemplate getRouteTemplate() {
+            return template;
+        }
+
+        /**
+         * @return The key of the template of the route for implicit {@code HEAD} routes: the
+         * {@link UriMatchTemplate} of a URI template, otherwise the template. A subclass of
+         * {@link UriMatchTemplate}, e.g. {@link io.micronaut.http.uri.UriTypeMatchTemplate}, has
+         * rules its equality does not compare: its template, equal to itself only
+         */
+        Object headKey() {
+            return uriMatchTemplate != null && uriMatchTemplate.getClass() == UriMatchTemplate.class ? uriMatchTemplate : template;
         }
 
         @Override
         public int compareTo(UriRoute o) {
-            return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
+            if (uriMatchTemplate != null && (!(o instanceof DefaultUriRoute other) || other.uriMatchTemplate != null)) {
+                return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
+            }
+            if (o instanceof DefaultUriRoute other) {
+                // the Micronaut selection policy: more literal text first, then fewer variables
+                int rawCompare = Integer.compare(other.template.rawLength(), template.rawLength());
+                return rawCompare != 0 ? rawCompare : Integer.compare(template.pathVariableCount(), other.template.pathVariableCount());
+            }
+            return 0;
         }
 
         /**

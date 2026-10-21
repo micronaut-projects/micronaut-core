@@ -82,15 +82,15 @@ import java.util.jar.Manifest;
  *     is tested on every name of the index.</li>
  *     <li>At most one index can be registered: registering a second one fails.</li>
  *     <li>A lookup that comes before {@link StaticOptimizations} is initialized, which runs the loaders, scans the
- *     class path. That is the case of the preload of the bean definition prefetch, whose one scan starts on a thread
- *     of the pool before the loaders run.</li>
+ *     class path.</li>
  *     <li>Setting the system property {@code micronaut.service.index.enabled} to {@code false} switches the index
  *     off, so that the class path is scanned. The property is read at the start of each lookup: when a
  *     {@link SoftServiceLoader.ServiceCollector} is created, which {@link SoftServiceLoader} does for each collection
  *     of a type, and on each call of
  *     {@link MicronautMetaServiceLoaderUtils#findMicronautMetaServiceEntries(ClassLoader, String)}. A collector that
  *     is reused keeps the answer it was created with.</li>
- *     <li>The first lookup that uses the index logs that at {@code INFO}, once.</li>
+ *     <li>Whether the index is used is logged once, at {@code INFO}, when the application context starts. A lookup
+ *     does not log, because the first one can come before logging is configured.</li>
  * </ul>
  *
  * <p>An index describes a closed world: a JAR added to the class path after the index was built is not seen for the
@@ -167,6 +167,10 @@ public final class ServiceIndex implements StaticOptimizations.SetOnce, StaticOp
     @SuppressWarnings("java:S3077") // a Check is an immutable record: publishing the reference publishes it
     @Nullable
     private static volatile Check lastCheck;
+
+    // the check that logCheck has not logged yet, guarded by CHECK_LOCK
+    @Nullable
+    private static Check unloggedCheck;
 
     private final ClassLoader classLoader;
     private final Map<String, Set<String>> micronautServices;
@@ -269,7 +273,7 @@ public final class ServiceIndex implements StaticOptimizations.SetOnce, StaticOp
 
     /**
      * Returns this index if it applies to a lookup. The first lookup that the index applies to checks it, as the
-     * class documents, and logs whether it is used.
+     * class documents, and {@link #logCheck()} logs the result.
      *
      * @param lookupClassLoader The class loader of the lookup
      * @return This index, or null if the class path must be scanned
@@ -491,23 +495,41 @@ public final class ServiceIndex implements StaticOptimizations.SetOnce, StaticOp
             }
             check = newCheck();
             lastCheck = check;
+            unloggedCheck = check;
         }
-        // Logged outside the lock, and only by the lookup that checked the index. The logger is not a static field
-        // because the class can be initialized while a native image is built
+        return check;
+    }
+
+    /**
+     * Logs, once, whether the index that was checked last is used. A lookup does not log it, because the first lookup
+     * can come before logging is configured, or on a thread of the common pool while it is configured. The application
+     * context calls this when it starts.
+     */
+    public static void logCheck() {
+        Check check;
+        synchronized (CHECK_LOCK) {
+            check = unloggedCheck;
+            unloggedCheck = null;
+        }
+        if (check == null || check.failure != null) {
+            // nothing was checked since the last call, or every lookup fails with the failure of the check
+            return;
+        }
+        // The logger is not a static field because the class can be initialized while a native image is built
         Logger log = LoggerFactory.getLogger(ServiceIndex.class);
+        ServiceIndex index = check.index;
         if (check.usable) {
             if (log.isInfoEnabled()) {
                 int entries = 0;
-                for (Set<String> names : micronautServices.values()) {
+                for (Set<String> names : index.micronautServices.values()) {
                     entries += names.size();
                 }
                 log.info("Using the service index registered for class loader {}: META-INF/micronaut ({} entries of {} service types) and the META-INF/services files of {} service types are not scanned ({}). Set the system property {} to false to scan the class path instead.",
-                    classLoader, entries, micronautServices.size(), standardServices.size(), check.detail, ENABLED_PROPERTY);
+                    index.classLoader, entries, index.micronautServices.size(), index.standardServices.size(), check.detail, ENABLED_PROPERTY);
             }
-        } else if (check.failure == null) {
-            log.warn("Not using the service index registered for class loader {}, and scanning the class path instead, because {}", classLoader, check.detail);
+        } else {
+            log.warn("Not using the service index registered for class loader {}, and scanning the class path instead, because {}", index.classLoader, check.detail);
         }
-        return check;
     }
 
     private Check newCheck() {
