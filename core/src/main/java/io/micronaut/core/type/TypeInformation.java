@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.AnsiColour;
 import io.micronaut.core.util.ArrayUtils;
@@ -243,11 +244,11 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      * {@link ParameterizedType} of the array class, and a nested type had no owner.</p>
      *
      * @return The {@link Type}
-     * @see ArgumentTypes to build a type from other types
+     * @see GenericTypeUtils#parameterizedType(Class, Type...) to build a parameterized type from other types
      * @since 3.5.2
      */
     default Type asType() {
-        return ArgumentTypes.toType(this);
+        return GenericTypeUtils.toType(this);
     }
 
     /**
@@ -267,7 +268,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
         for (int i = 0; i < arguments.length; i++) {
             arguments[i] = typeParameters[i].asType();
         }
-        return ArgumentTypes.parameterizedType(getType(), arguments);
+        return GenericTypeUtils.parameterizedType(getType(), arguments);
     }
 
     /**

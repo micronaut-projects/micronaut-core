@@ -19,8 +19,8 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.ArgumentTypes;
 import io.micronaut.core.type.GenericPlaceholder;
 import io.micronaut.core.type.WildcardArgument;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -414,9 +414,9 @@ public final class ReflectionArguments {
         Class<?> rawType = argument.getType();
         // a raw argument keeps the type arguments the type declares, and renders back as the bare type it
         // was written as, not as one parameterized by the variables it kept
-        Type type = arguments.length == 0 || argument.isRawType() ? rawType : ArgumentTypes.parameterizedType(rawType, arguments);
+        Type type = arguments.length == 0 || argument.isRawType() ? rawType : GenericTypeUtils.parameterizedType(rawType, arguments);
         if (typeVariables && argument instanceof GenericPlaceholder<?> placeholder) {
-            return ArgumentTypes.typeVariable(placeholder.getVariableName(), type);
+            return GenericTypeUtils.typeVariable(placeholder.getVariableName(), type);
         }
         return type;
     }
