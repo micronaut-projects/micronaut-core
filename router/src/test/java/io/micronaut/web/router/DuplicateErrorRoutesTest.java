@@ -22,6 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Produces;
@@ -135,6 +136,27 @@ class DuplicateErrorRoutesTest {
     }
 
     @Test
+    void aRouteProducingJsonOnlyAndADefaultRouteAnsweringAnyAcceptedTypeAreNotDuplicates() {
+        // both produce application/json, but only the default route answers text/plain
+        Router router = router(routes -> {
+            routes.error(IllegalStateException.class, new NamedError<>("json")).produces(MediaType.APPLICATION_JSON_TYPE);
+            routes.error(IllegalStateException.class, new NamedError<>("fallback"));
+            routes.status(HttpStatus.NOT_FOUND, new NamedStatus("json")).produces(MediaType.APPLICATION_JSON_TYPE);
+            routes.status(HttpStatus.NOT_FOUND, new NamedStatus("fallback"));
+        });
+        HttpRequest<?> text = HttpRequest.GET("/").accept(MediaType.TEXT_PLAIN_TYPE);
+        assertEquals("fallback", name(router.findErrorRoute(new IllegalStateException(), text).orElseThrow()));
+        assertEquals("fallback", name(router.findStatusRoute(HttpStatus.NOT_FOUND, text).orElseThrow()));
+        // an Accept of application/json, or none, does not tell them apart: the first route answers
+        // the same in a group
+        assertNotNull(router(routes -> routes.group(group -> {
+            group.GET("/x", DuplicateErrorRoutesTest::ok);
+            group.error(IllegalStateException.class, new NamedError<>("json")).produces(MediaType.APPLICATION_JSON_TYPE);
+            group.error(IllegalStateException.class, new NamedError<>("fallback"));
+        })));
+    }
+
+    @Test
     void errorRoutesWithConditionsAreNotDuplicates() {
         // a RouteBuilder route: ErrorRoute.where and StatusRoute.where
         RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
@@ -172,6 +194,15 @@ class DuplicateErrorRoutesTest {
     private static String statusTarget(Router router, MediaType accept) {
         return router.findStatusRoute(HttpStatus.GONE, HttpRequest.GET("/").accept(accept))
             .map(DuplicateErrorRoutesTest::methodName).orElseThrow();
+    }
+
+    private static HttpResponse<?> ok(HttpRequest<?> request, PathVariables pathVariables) {
+        return HttpResponse.ok();
+    }
+
+    private static String name(RouteMatch<?> match) {
+        Object target = ((HandlerMethod<?>) ((MethodBasedRouteInfo<?, ?>) match.getRouteInfo()).getTargetMethod()).getTarget();
+        return target instanceof NamedError<?> named ? named.name() : ((NamedStatus) target).name();
     }
 
     private static String methodName(RouteMatch<?> match) {

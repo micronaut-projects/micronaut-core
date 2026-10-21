@@ -24,13 +24,16 @@ import java.util.List;
  * What an error or a status route answers in its scope: two routes of a scope with the same key
  * are duplicates, as the lookup cannot tell them apart. The lookup also picks a route by the
  * {@code Accept} header of the request and by the conditions of the route, so routes producing
- * other media types are not duplicates, and a route with conditions has no key.
+ * other media types are not duplicates, nor is a route producing its media types only and one
+ * that also answers any other accepted type, e.g. a default route without {@code @Produces}, and
+ * a route with conditions has no key.
  *
  * @param handled The exception type of an error route, or the status code of a status route
  * @param originatingType The class the route is local to, or {@code null} for a global route
  * @param produces The media types the route produces
+ * @param producesAll Whether the route answers any accepted media type, see {@link RouteInfo#producesAll()}
  */
-record ErrorRouteKey(Object handled, @Nullable Class<?> originatingType, List<MediaType> produces) {
+record ErrorRouteKey(Object handled, @Nullable Class<?> originatingType, List<MediaType> produces, boolean producesAll) {
 
     /**
      * @param route The error route
@@ -40,7 +43,7 @@ record ErrorRouteKey(Object handled, @Nullable Class<?> originatingType, List<Me
         if (hasConditions(route)) {
             return null;
         }
-        return new ErrorRouteKey(route.exceptionType(), route.originatingType(), route.getProduces());
+        return new ErrorRouteKey(route.exceptionType(), route.originatingType(), route.getProduces(), route.producesAll());
     }
 
     /**
@@ -51,7 +54,7 @@ record ErrorRouteKey(Object handled, @Nullable Class<?> originatingType, List<Me
         if (hasConditions(route)) {
             return null;
         }
-        return new ErrorRouteKey(route.statusCode(), route.originatingType(), route.getProduces());
+        return new ErrorRouteKey(route.statusCode(), route.originatingType(), route.getProduces(), route.producesAll());
     }
 
     private static boolean hasConditions(RouteInfo<?> route) {
