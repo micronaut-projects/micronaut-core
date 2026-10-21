@@ -14,7 +14,7 @@ import java.nio.charset.StandardCharsets
 
 class AccessLogControlCharacterSpec extends Specification {
 
-    void "the access log escapes control characters of the request target and headers"() {
+    void "the access log escapes control characters of the request target"() {
         given:
         Logger logger = (Logger) LoggerFactory.getLogger('AccessLogControlCharacterSpec')
         logger.level = Level.INFO
@@ -25,13 +25,13 @@ class AccessLogControlCharacterSpec extends Specification {
                 'spec.name': 'AccessLogControlCharacterSpec',
                 'micronaut.server.netty.access-logger.enabled': true,
                 'micronaut.server.netty.access-logger.logger-name': 'AccessLogControlCharacterSpec',
-                'micronaut.server.netty.access-logger.log-format': '%r %{X-Test}i',
+                'micronaut.server.netty.access-logger.log-format': '%r',
         ])
 
         when:
         try (Socket socket = new Socket('127.0.0.1', server.port)) {
             socket.soTimeout = 5000
-            socket.outputStream.write("GET /hello\u001b[31mRED\u001b[0m\u0001x HTTP/1.1\r\nHost: localhost\r\nX-Test: a\u001bb\u0085c\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1))
+            socket.outputStream.write("GET /hello\u001b[31mRED\u001b[0m\u0001x HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1))
             socket.outputStream.flush()
             socket.inputStream.readAllBytes()
         }
@@ -41,11 +41,23 @@ class AccessLogControlCharacterSpec extends Specification {
             assert appender.list.any { it.formattedMessage.contains('/hello') }
         }
         def line = appender.list.find { it.formattedMessage.contains('/hello') }.formattedMessage
-        line == 'GET /hello\\x1b[31mRED\\x1b[0m\\x01x HTTP/1.1 a\\x1bb\\x85c'
+        line == 'GET /hello\\x1b[31mRED\\x1b[0m\\x01x HTTP/1.1'
 
         cleanup:
         logger.detachAppender(appender)
         server.close()
+    }
+
+    void "control characters are escaped"() {
+        expect:
+        AccessLog.escape(value) == escaped
+
+        where:
+        value              | escaped
+        'a\u001bb'        | 'a\\x1bb'
+        'a\r\nb'         | 'a\\x0d\\x0ab'
+        'a\u007fb\u0085c' | 'a\\x7fb\\x85c'
+        null               | null
     }
 
     void "printable values are logged unchanged"() {
