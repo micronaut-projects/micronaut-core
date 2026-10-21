@@ -26,7 +26,9 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.RequestTimeouts;
 import io.micronaut.http.client.internal.RawHttpRequestWrapper;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -39,6 +41,7 @@ import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
@@ -70,7 +73,6 @@ public final class HttpRequestFactory {
     ) {
         MutableHttpRequest<I> mutableHttpRequest = request.toMutableRequest();
         final HttpRequest.Builder builder = HttpRequest.newBuilder().uri(uri);
-        configuration.getReadTimeout().ifPresent(builder::timeout);
         boolean hasBody;
         if (mutableHttpRequest.getMethod() == HttpMethod.GET) {
             builder.GET();
@@ -87,7 +89,14 @@ public final class HttpRequestFactory {
         if (hasBody && mutableHttpRequest.getContentType().isEmpty()) {
             builder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
         }
-        configuration.getReadTimeout().ifPresent(builder::timeout);
+        // the read timeout of the request replaces the one of the client; the JDK applies it until
+        // the response headers are received
+        Duration readTimeout = ClientAttributes.getTimeouts(request).map(RequestTimeouts::getReadTimeout).orElse(null);
+        if (readTimeout != null) {
+            builder.timeout(readTimeout);
+        } else {
+            configuration.getReadTimeout().ifPresent(builder::timeout);
+        }
         return builder;
     }
 

@@ -63,4 +63,30 @@ public final class ClientAttributes {
     public static void setInvocationContext(HttpRequest<?> request, MethodInvocationContext<?, ?> invocationContext) {
         request.setAttribute(HttpAttributes.INVOCATION_CONTEXT, invocationContext);
     }
+
+    /**
+     * Set the timeouts of the exchange of a request, instead of the timeouts of the client
+     * configuration. The overall limit of the exchange is decided when the request is handed to
+     * the client, before the client filters run, so the timeouts must be set before then: a
+     * filter can still change the read timeout, but not the overall limit.
+     *
+     * @param request  The request
+     * @param timeouts The timeouts
+     * @since 5.3.0
+     */
+    public static void setTimeouts(HttpRequest<?> request, RequestTimeouts timeouts) {
+        request.setAttribute(AbstractHttpClient.TIMEOUTS, timeouts);
+    }
+
+    /**
+     * Get the timeouts of the exchange of a request.
+     *
+     * @param request The request
+     * @return The timeouts, if set
+     * @see #setTimeouts(HttpRequest, RequestTimeouts)
+     * @since 5.3.0
+     */
+    public static Optional<RequestTimeouts> getTimeouts(HttpRequest<?> request) {
+        return request.getAttribute(AbstractHttpClient.TIMEOUTS, RequestTimeouts.class);
+    }
 }

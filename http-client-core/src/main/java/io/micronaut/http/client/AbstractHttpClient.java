@@ -149,6 +149,12 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      */
     public static final String NO_FOLLOW_REDIRECTS = "micronaut.http.client.raw.no-follow-redirects";
 
+    /**
+     * Request attribute with the {@link RequestTimeouts} of an exchange, see
+     * {@link ClientAttributes#setTimeouts(HttpRequest, RequestTimeouts)}.
+     */
+    public static final String TIMEOUTS = "micronaut.http.client.timeouts";
+
     private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
 
     protected final HttpClientConfiguration configuration;
@@ -916,6 +922,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     protected void copyRedirectAttributes(MutableHttpRequest<?> request, MutableHttpRequest<?> redirect) {
         request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirect.setAttribute(NO_DECOMPRESSION, noDecompression));
         request.getAttribute(READ_IDLE_TIMEOUT).ifPresent(timeout -> redirect.setAttribute(READ_IDLE_TIMEOUT, timeout));
+        request.getAttribute(TIMEOUTS).ifPresent(timeouts -> redirect.setAttribute(TIMEOUTS, timeouts));
     }
 
     private void setRedirectHeaders(@Nullable HttpRequest<?> request,
@@ -1181,6 +1188,9 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                                                                     Argument<E> errorType,
                                                                     @Nullable Thread blockedThread) {
         setupConversionService(request);
+        // decided before the flow starts: a flow that runs synchronously would otherwise run the
+        // client filters, which may change the timeouts of the request, first
+        Duration requestTimeout = requestTimeout(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         // if a connection is available immediately, we can use its executor for the timeout
         // instead of a random executor for the whole group
@@ -1211,7 +1221,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             ).map(r -> (HttpResponse<O>) r);
         });
 
-        Duration requestTimeout = requestTimeout();
         if (requestTimeout != null) {
             if (!requestTimeout.isNegative()) {
                 flow = flow.timeout(requestTimeout, Objects.requireNonNull(scheduler.get()), null)
@@ -1229,18 +1238,44 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     /**
      * The timeout of an exchange whose response body is read whole: the
      * {@link HttpClientConfiguration#getRequestTimeout() request timeout}, or, when none is
-     * configured, for compatibility, the read timeout plus one second.
+     * configured, for compatibility, the read timeout plus one second. The
+     * {@link RequestTimeouts} of the request replace the timeouts of the configuration.
      *
+     * @param request The request
      * @return The timeout, or {@code null} for none
      */
-    protected @Nullable Duration requestTimeout() {
+    protected @Nullable Duration requestTimeout(HttpRequest<?> request) {
+        RequestTimeouts timeouts = ClientAttributes.getTimeouts(request).orElse(null);
+        if (timeouts != null && timeouts.getRequestTimeout() != null) {
+            return timeouts.getRequestTimeout();
+        }
         Duration requestTimeout = configuration.getRequestTimeout();
         if (requestTimeout != null) {
             return requestTimeout;
         }
+        if (timeouts != null && timeouts.getReadTimeout() != null) {
+            return timeouts.getReadTimeout().plusSeconds(1);
+        }
         return configuration.getReadTimeout()
             .filter(d -> !d.isNegative())
             .map(d -> d.plusSeconds(1)).orElse(null);
+    }
+
+    /**
+     * The read timeout of the exchange of a request that replaces the read timeout of the
+     * configuration: the {@link RawRequestOptions#getReadIdleTimeout() read idle timeout} of a
+     * raw exchange, or else the {@link RequestTimeouts#getReadTimeout() read timeout} of the
+     * {@link RequestTimeouts} of the request.
+     *
+     * @param request The request
+     * @return The read timeout, or {@code null} for the read timeout of the configuration
+     */
+    public static @Nullable Duration readTimeoutOverride(HttpRequest<?> request) {
+        Duration readIdleTimeout = request.getAttribute(READ_IDLE_TIMEOUT, Duration.class).orElse(null);
+        if (readIdleTimeout != null) {
+            return readIdleTimeout;
+        }
+        return ClientAttributes.getTimeouts(request).map(RequestTimeouts::getReadTimeout).orElse(null);
     }
 
     @Override

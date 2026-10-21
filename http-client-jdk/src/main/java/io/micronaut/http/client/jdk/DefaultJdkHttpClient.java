@@ -24,6 +24,7 @@ import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
@@ -34,11 +35,13 @@ import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.BlockingHttpClient;
+import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.RequestTimeouts;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
@@ -329,12 +332,18 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
      * {@link HttpRequestFactory}, and a body that keeps coming is read to its end, as before
      * the JDK client shared the pipeline: no overall timeout is derived from the read timeout,
      * and the request timeout only applies when the configuration opts in, see
-     * {@link JdkHttpClientConfiguration.JdkConfiguration#isApplyRequestTimeout()}.
+     * {@link JdkHttpClientConfiguration.JdkConfiguration#isApplyRequestTimeout()}. The
+     * {@link RequestTimeouts#getRequestTimeout() request timeout} of a request always applies.
      *
+     * @param request The request
      * @return The request timeout, or {@code null}
      */
     @Override
-    protected @Nullable Duration requestTimeout() {
+    protected @Nullable Duration requestTimeout(HttpRequest<?> request) {
+        Duration requestTimeout = ClientAttributes.getTimeouts(request).map(RequestTimeouts::getRequestTimeout).orElse(null);
+        if (requestTimeout != null) {
+            return requestTimeout;
+        }
         return transport.jdkConfiguration.isApplyRequestTimeout() ? configuration.getRequestTimeout() : null;
     }
 

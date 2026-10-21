@@ -37,9 +37,11 @@ import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.RequestBean;
+import io.micronaut.http.client.annotation.ClientTimeouts;
 import io.micronaut.http.client.bind.binders.AttributeClientRequestBinder;
 import io.micronaut.http.client.bind.binders.HeaderClientRequestBinder;
 import io.micronaut.http.client.bind.binders.QueryValueClientArgumentRequestBinder;
+import io.micronaut.http.client.bind.binders.TimeoutsClientRequestBinder;
 import io.micronaut.http.client.bind.binders.VersionClientRequestBinder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
@@ -148,6 +150,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
         methodByAnnotation.put(Header.class, new HeaderClientRequestBinder());
         methodByAnnotation.put(Version.class, new VersionClientRequestBinder(beanContext));
         methodByAnnotation.put(RequestAttribute.class, new AttributeClientRequestBinder());
+        methodByAnnotation.put(ClientTimeouts.class, new TimeoutsClientRequestBinder(conversionService));
 
         if (KOTLIN_COROUTINES_SUPPORTED) {
             //Clients should do nothing with the continuation
