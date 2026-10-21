@@ -1416,6 +1416,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         @Override
         protected void initChannel(Channel ch) throws Exception {
+            if (config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.UNIX) {
+                // the default routes are restricted by port, which this listener does not have
+                ch.attr(NettyHttpRequest.LISTENER_EXPOSES_DEFAULT_ROUTES).set(config.isExposeDefaultRoutes());
+            }
             HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextWrapper.takeRetained());
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
