@@ -55,9 +55,13 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     private UriMatchInfo rootMatchInfo;
     private UriMatchInfo exactMatchInfo;
     /**
-     * The number of variables with a regular expression, computed once, or -1.
+     * The facts of the order of templates, computed once, or {@code null}.
      */
-    private int patternVariableCount = -1;
+    private @Nullable OrderFacts orderFacts;
+    /**
+     * The variables by name, shared by the matches, computed once, or {@code null}.
+     */
+    private @Nullable Map<String, UriMatchVariable> variableMap;
 
     /**
      * Construct a new URI template for the given template.
@@ -300,7 +304,12 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         }
         Map<String, Object> variableMap = CollectionUtils.newLinkedHashMap(variables.size());
         collectVariables(uri, regexpMatcher, variableMap);
-        return new DefaultUriMatchInfo(uri, variableMap, variables);
+        Map<String, UriMatchVariable> byName = this.variableMap;
+        if (byName == null) {
+            byName = DefaultUriMatchInfo.variableMap(variables);
+            this.variableMap = byName;
+        }
+        return new DefaultUriMatchInfo(uri, variableMap, variables, byName);
     }
 
     /**
@@ -474,19 +483,16 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
             return 0;
         }
 
-        PathEvaluator thisEvaluator = new PathEvaluator();
-        PathEvaluator thatEvaluator = new PathEvaluator();
-
-        visitParts(parts, thisEvaluator);
-        visitParts(o.parts, thatEvaluator);
+        OrderFacts thisFacts = orderFacts();
+        OrderFacts thatFacts = o.orderFacts();
 
         // using that.compareTo because more raw length should have higher precedence
-        int rawCompare = Integer.compare(thatEvaluator.rawLength, thisEvaluator.rawLength);
+        int rawCompare = Integer.compare(thatFacts.rawLength(), thisFacts.rawLength());
         if (rawCompare == 0) {
-            int variableCompare = Integer.compare(thisEvaluator.variableCount, thatEvaluator.variableCount);
+            int variableCompare = Integer.compare(thisFacts.variableCount(), thatFacts.variableCount());
             if (variableCompare == 0) {
                 // fewer variables constrained by a regular expression is more specific
-                return Integer.compare(thisEvaluator.patternVariableCount, thatEvaluator.patternVariableCount);
+                return Integer.compare(thisFacts.patternVariableCount(), thatFacts.patternVariableCount());
             }
             return variableCompare;
         }
@@ -531,9 +537,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
      * @since 5.3.0
      */
     public int getRawLength() {
-        PathEvaluator evaluator = new PathEvaluator();
-        visitParts(parts, evaluator);
-        return evaluator.rawLength;
+        return orderFacts().rawLength();
     }
 
     /**
@@ -542,9 +546,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
      * @since 5.3.0
      */
     public int getPathVariableCount() {
-        PathEvaluator evaluator = new PathEvaluator();
-        visitParts(parts, evaluator);
-        return evaluator.variableCount;
+        return orderFacts().variableCount();
     }
 
     /**
@@ -560,15 +562,22 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
      * @since 5.3.0
      */
     public int getPatternVariableCount() {
-        int count = patternVariableCount;
-        if (count < 0) {
-            // computed once: the router reads it to order its routes
+        return orderFacts().patternVariableCount();
+    }
+
+    /**
+     * @return The facts of the order of templates, computed once: the router reads them to order its routes
+     */
+    private OrderFacts orderFacts() {
+        OrderFacts facts = orderFacts;
+        if (facts == null) {
+            // an immutable record: a race computes it twice, never half
             PathEvaluator evaluator = new PathEvaluator();
             visitParts(parts, evaluator);
-            count = evaluator.patternVariableCount;
-            patternVariableCount = count;
+            facts = new OrderFacts(evaluator.rawLength, evaluator.variableCount, evaluator.patternVariableCount);
+            orderFacts = facts;
         }
-        return count;
+        return facts;
     }
 
     /**
@@ -625,6 +634,16 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
      */
     public static UriTemplateMatcher of(String uri) {
         return new UriTemplateMatcher(uri);
+    }
+
+    /**
+     * The facts of the order of templates.
+     *
+     * @param rawLength            The length of the literal parts
+     * @param variableCount        The number of path variables
+     * @param patternVariableCount The number of path variables with a regular expression
+     */
+    private record OrderFacts(int rawLength, int variableCount, int patternVariableCount) {
     }
 
     private static final class PathEvaluator implements UriTemplateParser.PartVisitor {

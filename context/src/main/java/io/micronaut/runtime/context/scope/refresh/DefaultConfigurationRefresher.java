@@ -75,14 +75,16 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
         environment.refresh();
         Map<String, Object> after = resolvedProperties();
         lastResolved = after;
-        return apply(diff(before, after), true);
+        ConfigurationChange change = diff(before, after);
+        return apply(change, change, true);
     }
 
     @Override
     public synchronized RefreshResult refreshAll() {
+        Map<String, Object> before = lastResolved;
         environment.refresh();
         lastResolved = resolvedProperties();
-        return apply(ConfigurationChange.ofAll(), true);
+        return apply(ConfigurationChange.ofAll(), diff(before, lastResolved), true);
     }
 
     /**
@@ -151,8 +153,9 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
     public synchronized RefreshResult refresh(ConfigurationChange change) {
         // the caller updated the environment and knows the change: what the environment resolves now is the
         // baseline of the next refresh, or the same change would be found and applied again
+        Map<String, Object> before = lastResolved;
         lastResolved = resolvedProperties();
-        return apply(change, true);
+        return apply(change, change.all() ? diff(before, lastResolved) : change, true);
     }
 
     /**
@@ -166,8 +169,9 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
         Map<String, Object> source = event.getSource();
         ConfigurationChange change = source == RefreshEvent.ALL_KEYS ? ConfigurationChange.ofAll() : toChange(source);
         // the publisher refreshed the environment: what it resolves now is the next refresh's starting point
+        Map<String, Object> before = lastResolved;
         lastResolved = resolvedProperties();
-        return apply(change, false);
+        return apply(change, change.all() ? diff(before, lastResolved) : change, false);
     }
 
     /**
@@ -198,7 +202,16 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
         return new ConfigurationChange(false, reported.keySet(), previous, current);
     }
 
-    private synchronized RefreshResult apply(ConfigurationChange change, boolean publishLegacyEvent) {
+    /**
+     * Runs the phases.
+     *
+     * @param change The change to apply, every key for a forced refresh
+     * @param resolved The keys whose resolved values differ from the previous resolution, which is the change itself
+     *                 unless it is the change of every key
+     * @param publishLegacyEvent Whether to publish the legacy refresh event
+     * @return The result
+     */
+    private synchronized RefreshResult apply(ConfigurationChange change, ConfigurationChange resolved, boolean publishLegacyEvent) {
         if (!change.all() && change.changed().isEmpty()) {
             // nothing changed: no phase runs and no event is published, as before the refresher
             return new RefreshResult(change, List.of(), List.of(), 0, List.of());
@@ -207,7 +220,7 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
         try {
             List<BeanDefinition<?>> rebound = new ArrayList<>();
             List<BeanDefinition<?>> recreated = new ArrayList<>();
-            rebind(change, rebound, recreated);
+            rebind(change, resolved, rebound, recreated);
             int disposed = context.findBean(RefreshScope.class).map(scope -> scope.disposeAffected(change)).orElse(0);
             List<ReloadingConfigurationWatcher.Outcome> outcomes = context instanceof DefaultBeanContext defaultBeanContext
                 ? defaultBeanContext.notifyConfigurationChange(change)
@@ -241,7 +254,7 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
      * values are injected through setters and fields, by a new instance where the constructor binds
      * them or a key they held went away.
      */
-    private void rebind(ConfigurationChange change, List<BeanDefinition<?>> rebound, List<BeanDefinition<?>> recreated) {
+    private void rebind(ConfigurationChange change, ConfigurationChange resolved, List<BeanDefinition<?>> rebound, List<BeanDefinition<?>> recreated) {
         if (context instanceof DefaultBeanContext defaultBeanContext) {
             // an @EachProperty entry added or removed is a definition added or removed: the candidates are computed again
             defaultBeanContext.invalidateConfigurationCandidates();
@@ -275,7 +288,10 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
             // a removed key is reset to its default by a new instance only where the graph recreates the beans that
             // received the old one: without it, a holder that cached the old instance, as the router caches a filter,
             // would keep a configuration that no refresh reaches any more, so the bean is rebound in place as before
-            boolean recreate = bindsThroughConstructor(definition)
+            // a forced refresh recreates a constructor-bound bean only when a value under its prefix changed: a new
+            // instance with the same values gains nothing, and destroying the beans that received it would stop a
+            // running server whose configuration binds through its constructor in the middle of the request
+            boolean recreate = (bindsThroughConstructor(definition) && (!change.all() || prefix == null || resolved.touches(prefix)))
                 || (prefix != null && lostKeys(change, prefix) && dependencyGraph().isPresent());
             if (recreate && context instanceof DefaultBeanContext defaultBeanContext && bean != null) {
                 if (dependencyGraph().isEmpty()) {

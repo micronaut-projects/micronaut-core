@@ -21,7 +21,6 @@ import io.micronaut.context.processor.BeanDefinitionProcessor;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.context.ServerContextPathProvider;
@@ -98,13 +97,7 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
         String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
         if (contextPath != null) {
             for (int i = 0; i < values.length; i++) {
-                if (!values[i].startsWith(contextPath)) {
-                    String newValue = StringUtils.prependUri(contextPath, values[i]);
-                    if (newValue.charAt(0) != '/') {
-                        newValue = "/" + newValue;
-                    }
-                    values[i] = newValue;
-                }
+                values[i] = ServerFilterRouteBuilder.prependContextPath(contextPath, values[i]);
             }
         }
         return values;
