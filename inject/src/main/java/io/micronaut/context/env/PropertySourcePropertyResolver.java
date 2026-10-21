@@ -101,15 +101,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     @SuppressWarnings("java:S3077") // a thread reference, not a mutable object
     private volatile Thread refreshingThread;
-    /**
-     * Changed by every change of the properties the caches are filled from: a property source
-     * processed, the caches reset, the state reset or a refreshed state published. It is odd while
-     * a property source is being processed into the catalogs, and lookups neither read nor fill the
-     * caches then. A cached value is kept with the revision read before the catalogs, and is only
-     * used while the revision is the same, so a lookup that read the catalogs before a change
-     * cannot leave its value for the lookups after it.
-     */
-    private final AtomicLong revision = new AtomicLong();
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
 
     /**
@@ -171,7 +162,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             writeState = empty;
             if (refreshingThread == null) {
                 state = empty;
-                revision.addAndGet(2);
             }
         }
     }
@@ -214,7 +204,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             try {
                 rebuild.run();
                 state = writeState;
-                revision.addAndGet(2);
             } finally {
                 refreshingThread = null;
                 writeState = state;
@@ -345,8 +334,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (StringUtils.isEmpty(name)) {
             return false;
         }
-        long lookupRevision = revision.get();
         ResolverState currentState = readState();
+        long lookupRevision = currentState.revision.get();
         Boolean result = (Boolean) cached(currentState.containsCache, name, lookupRevision);
         if (result == null) {
             for (PropertyCatalog convention : CONVENTIONS) {
@@ -510,8 +499,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         ConversionCacheKey cacheKey = new ConversionCacheKey(name, requiredType);
         // A single read of the state, so the catalogs and the caches this lookup consults cannot be
         // replaced underneath it by a concurrent refresh.
-        long lookupRevision = revision.get();
         ResolverState currentState = readState();
+        long lookupRevision = currentState.revision.get();
         Object cached = cacheableType ? cached(currentState.resolvedValueCache, cacheKey, lookupRevision) : null;
         if (cached != null) {
             return cached == NO_VALUE ? Optional.empty() : Optional.of((T) cached);
@@ -857,18 +846,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     @SuppressWarnings("MagicNumber")
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
         synchronized (catalogLock) {
-            if (refreshingThread != null) {
-                // The writes go into the replacement a refresh publishes, which changes the revision: the published
-                // state and its caches are unchanged
-                processProperties(properties, convention);
-                return;
-            }
-            // odd while the catalogs change
-            revision.incrementAndGet();
+            // The state the writes go into: the published one, or the replacement a refresh publishes
+            ResolverState target = writeState;
+            // odd while its catalogs change
+            target.revision.incrementAndGet();
             try {
                 processProperties(properties, convention);
             } finally {
-                revision.incrementAndGet();
+                target.revision.incrementAndGet();
             }
         }
     }
@@ -1253,13 +1238,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     protected void resetCaches() {
         ResolverState currentState = readState();
+        // the values cached before, and the ones a lookup that read the catalogs before caches after, are not used
+        currentState.revision.addAndGet(2);
         currentState.containsCache.clear();
         currentState.resolvedValueCache.clear();
         currentState.placeholderResolutionCache.clear();
-        if (refreshingThread == null) {
-            // the caches of a replacement being refreshed are not the published ones
-            revision.addAndGet(2);
-        }
     }
 
     /**
@@ -1380,6 +1363,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     private static final class ResolverState {
 
+        /**
+         * Changed by every change of the catalogs of this state the caches are filled from: a property source
+         * processed into them, or the caches reset. It is odd while a property source is being processed, and
+         * lookups neither read nor fill the caches then. A cached value is kept with the revision read before the
+         * catalogs, and is only used while the revision is the same, so a lookup that read the catalogs before a
+         * change cannot leave its value for the lookups after it. A refresh publishes another state, with its own
+         * revision and caches: the values cached from the catalogs it publishes stay valid.
+         */
+        private final AtomicLong revision = new AtomicLong();
+
         // properties are stored in an array of maps organized by character in the alphabet
         // this allows optimization of searches by prefix
         @SuppressWarnings("MagicNumber")
@@ -1421,10 +1414,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             if (this == o) {
                 return true;
             }
-            if (o == null) {
+            if (!(o instanceof ConversionCacheKey that)) {
                 return false;
             }
-            ConversionCacheKey that = (ConversionCacheKey) o;
             return Objects.equals(name, that.name) && Objects.equals(requiredType, that.requiredType);
         }
 
