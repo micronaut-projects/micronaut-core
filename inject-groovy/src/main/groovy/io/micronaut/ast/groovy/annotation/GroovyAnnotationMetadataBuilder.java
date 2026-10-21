@@ -131,6 +131,11 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
+    public CachedAnnotationMetadata lookupOrBuildForParameter(AnnotatedNode owningType, AnnotatedNode declaringType, AnnotatedNode methodElement, AnnotatedNode parameterElement) {
+        return super.lookupOrBuildForParameter(owningType, declaringType, methodElement, new ExtendedParameter((MethodNode) methodElement, (Parameter) parameterElement));
+    }
+
+    @Override
     protected boolean isValidationRequired(AnnotatedNode member) {
         if (member != null) {
             final List<AnnotationNode> annotations = member.getAnnotations();
