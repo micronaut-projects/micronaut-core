@@ -17,6 +17,7 @@ package io.micronaut.http.server;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -47,6 +48,7 @@ import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.server.exceptions.NotAcceptableException;
 import io.micronaut.http.server.exceptions.response.Error;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.stream.ResponseStreams;
@@ -59,6 +61,7 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -77,6 +80,15 @@ import java.util.function.Function;
  */
 @Internal
 public abstract class ResponseLifecycle {
+    /**
+     * The arguments of the runtime classes of the bodies: created once, not for every response.
+     */
+    private static final ClassValue<Argument<?>> BODY_ARGUMENTS = new ClassValue<>() {
+        @Override
+        protected Argument<?> computeValue(Class<?> type) {
+            return Argument.of(type);
+        }
+    };
     private static final ConcatenatingSubscriber.Separators JSON_STREAM_SEPARATORS = LeakTracker.Factory.staticInitializer(() ->
         new ConcatenatingSubscriber.Separators(null, null, ReadBufferFactory.getJdkFactory().copyOf("\n", java.nio.charset.StandardCharsets.UTF_8), null));
     private final RouteExecutor routeExecutor;
@@ -202,9 +214,10 @@ public abstract class ResponseLifecycle {
             // the route executor moves the body of a HEAD response aside
             Object headBody = body != null ? body : RouteAttributes.getHeadBody(response).orElse(null);
             response.body(null);
-            if (headBody instanceof FileCustomizableResponseType || headBody instanceof InputStream) {
+            if (headBody != null && (headBody instanceof FileCustomizableResponseType || headBody instanceof InputStream || isFullHeadBody(headBody))) {
                 // the writer of a file sets the headers of a GET response and opens the file,
-                // so write it and discard the content
+                // and the writer of an object sets its type and length (RFC 9110 9.3.2), so write
+                // it and discard the content
                 ((MutableHttpResponse<Object>) response).body(headBody);
                 return encodeBody(nettyRequest, response, headBody).map(this::discardContent);
             }
@@ -286,22 +299,84 @@ public abstract class ResponseLifecycle {
                 responseMediaType = mediaTypeProvider.getMediaType();
             } else if (routeInfo != null) {
                 responseMediaType = routeExecutor.resolveDefaultResponseContentType(nettyRequest, routeInfo);
+                responseMediaType = writableResponseMediaType(nettyRequest, routeInfo, messageBodyWriter, responseBodyType, body, responseMediaType);
             } else {
                 responseMediaType = MediaType.APPLICATION_JSON_TYPE;
             }
         }
+        List<MediaType> responseMediaTypes = null;
         if (messageBodyWriter == null) {
             // lookup write to use, any logic that hits this path should consider setting
             // a body writer on the response before writing
+            responseMediaTypes = Collections.singletonList(responseMediaType);
             messageBodyWriter = messageBodyHandlerRegistry
-                .findWriter(responseBodyType, Collections.singletonList(responseMediaType))
+                .findWriter(responseBodyType, responseMediaTypes)
                 .orElse(null);
         }
         if (messageBodyWriter == null || !responseBodyType.isInstance(body) || !messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
-            responseBodyType = Argument.ofInstance(body);
-            messageBodyWriter = messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(responseMediaType));
+            // the route declares no type for the body, e.g. a handler route: the runtime class of the body
+            responseBodyType = (Argument<Object>) BODY_ARGUMENTS.get(body.getClass());
+            if (responseMediaTypes == null) {
+                responseMediaTypes = Collections.singletonList(responseMediaType);
+            }
+            messageBodyWriter = messageBodyHandlerRegistry.getWriter(responseBodyType, responseMediaTypes);
         }
         return buildFinalResponse(nettyRequest, (MutableHttpResponse<Object>) response, responseBodyType, responseMediaType, body, messageBodyWriter, false);
+    }
+
+    /**
+     * When the request rejects some types (the quality {@code 0}), the negotiated type might have
+     * no writer for the body, e.g. {@code text/plain} for a POJO of a route that produces all
+     * types: the next acceptable type with a writer is chosen instead, and when there is none the
+     * response is not acceptable. Requests without rejected types keep the negotiated type.
+     *
+     * @param request          The request
+     * @param routeInfo        The route
+     * @param writer           The writer of the route, if any
+     * @param responseBodyType The declared type of the body
+     * @param body             The body
+     * @param negotiated       The negotiated type
+     * @return The type to write the body in
+     */
+    private MediaType writableResponseMediaType(HttpRequest<?> request,
+                                                RouteInfo<Object> routeInfo,
+                                                @Nullable MessageBodyWriter<Object> writer,
+                                                Argument<Object> responseBodyType,
+                                                Object body,
+                                                MediaType negotiated) {
+        List<MediaType> acceptable = routeExecutor.acceptableResponseContentTypes(request, routeInfo);
+        if (acceptable == null || canWrite(writer, responseBodyType, body, negotiated)) {
+            return negotiated;
+        }
+        for (MediaType type : acceptable) {
+            if (!type.equals(negotiated) && canWrite(writer, responseBodyType, body, type)) {
+                return type;
+            }
+        }
+        List<String> accepted = new ArrayList<>();
+        for (MediaType type : request.accept()) {
+            accepted.add(type.toString());
+        }
+        List<String> produced = new ArrayList<>();
+        for (MediaType type : routeInfo.getProduces()) {
+            produced.add(type.toString());
+        }
+        throw new NotAcceptableException(accepted, produced);
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean canWrite(@Nullable MessageBodyWriter<Object> routeWriter, Argument<Object> responseBodyType, Object body, MediaType mediaType) {
+        // the same lookups as the encoding of the body, the registry caches them
+        List<MediaType> mediaTypes = List.of(mediaType);
+        if (responseBodyType.isInstance(body)) {
+            MessageBodyWriter<Object> writer = routeWriter != null ? routeWriter : messageBodyHandlerRegistry.findWriter(responseBodyType, mediaTypes).orElse(null);
+            if (writer != null && writer.isWriteable(responseBodyType, mediaType)) {
+                return true;
+            }
+        }
+        Argument<Object> bodyType = (Argument<Object>) BODY_ARGUMENTS.get(body.getClass());
+        MessageBodyWriter<Object> writer = messageBodyHandlerRegistry.findWriter(bodyType, mediaTypes).orElse(null);
+        return writer != null && writer.isWriteable(bodyType, mediaType);
     }
 
     /**
@@ -739,6 +814,21 @@ public abstract class ResponseLifecycle {
         // default error response
         return ExecutionFlow.just(wrap(messageBodyWriter)
             .write(byteBodyFactory, nettyRequest, response, responseBodyType, mediaType, body));
+    }
+
+    /**
+     * Whether the body that a route returned for a HEAD request is a single object, written
+     * whole: the writer gives the headers and the length a GET request would get. A stream is
+     * not written, and a reference counted body is released already.
+     *
+     * @param body The body moved aside by the route executor
+     * @return Whether to write the body to know the headers of the response
+     */
+    private static boolean isFullHeadBody(Object body) {
+        return !(body instanceof BodyElements<?>)
+            && !(body instanceof ReferenceCounted)
+            && !(body instanceof io.micronaut.http.body.ByteBody)
+            && !Publishers.isConvertibleToPublisher(body);
     }
 
     private static boolean isImplicitlyEmptyBody(Object body) {

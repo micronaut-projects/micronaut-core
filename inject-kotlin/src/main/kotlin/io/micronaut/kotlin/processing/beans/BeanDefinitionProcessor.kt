@@ -185,10 +185,9 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
                 val originatingElements = outputObjectDef.originatingElements
                 if (serviceClass != null) {
                     visitorContext.visitServiceDescriptor(
-                        serviceClass.name,
+                        serviceClass,
                         objectDef.getName(),
-                        originatingElements.getOriginatingElements()[0],
-                        outputObjectDef.serviceContent
+                        originatingElements.getOriginatingElements()[0]
                     )
                 }
                 visitorContext.visitClass(objectDef.getName(), *originatingElements.getOriginatingElements())
