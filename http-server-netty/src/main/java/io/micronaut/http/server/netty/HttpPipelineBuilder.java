@@ -44,10 +44,16 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpDecoderConfig;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
@@ -77,6 +83,8 @@ import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
+import io.netty.handler.timeout.IdleState;
+import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
 import io.netty.util.AttributeKey;
@@ -492,6 +500,7 @@ final class HttpPipelineBuilder {
                 specificGracefulShutdown = new Http2GracefulShutdown(pipeline.lastContext(), http2FrameCodec);
                 pipeline.addLast(createHttp2ConnectionWindow(http2FrameCodec));
                 pipeline.addLast(makeHttp2Handler());
+                pipeline.addLast(IdleCloseHandler.INSTANCE);
             } else {
                 Http2ConnectionHandler http2ServerHandler = createHttp2ServerHandler(true);
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, http2ServerHandler);
@@ -632,7 +641,7 @@ final class HttpPipelineBuilder {
                     if (frameCodec == null || multiplexHandler == null) {
                         return new Http2ServerUpgradeCodecImpl(connectionHandler);
                     } else {
-                        return new Http2ServerUpgradeCodecImpl(frameCodec, createHttp2ConnectionWindow(frameCodec), multiplexHandler);
+                        return new Http2ServerUpgradeCodecImpl(frameCodec, createHttp2ConnectionWindow(frameCodec), multiplexHandler, IdleCloseHandler.INSTANCE);
                     }
                 } else {
                     return null;
@@ -648,7 +657,7 @@ final class HttpPipelineBuilder {
             ChannelHandler priorKnowledgeHandler = frameCodec == null ? connectionHandler : new ChannelInitializer<>() {
                 @Override
                 protected void initChannel(Channel ch) {
-                    ch.pipeline().addLast(connectionHandler, createHttp2ConnectionWindow(frameCodec), multiplexHandler);
+                    ch.pipeline().addLast(connectionHandler, createHttp2ConnectionWindow(frameCodec), multiplexHandler, IdleCloseHandler.INSTANCE);
                 }
             };
             final CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =
@@ -658,6 +667,11 @@ final class HttpPipelineBuilder {
             pipeline.addLast(fallbackHandlerName, new SimpleChannelInboundHandler<HttpMessage>() {
                 @Override
                 public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                    if (evt instanceof IdleStateEvent idle && idle.state() == IdleState.ALL_IDLE) {
+                        // no request head yet, and no handler behind us that would close
+                        ctx.close();
+                        return;
+                    }
                     if (evt instanceof CleartextHttp2ServerUpgradeHandler.PriorKnowledgeUpgradeEvent) {
                         // the client spoke HTTP/2 straight away, so this fallback is not needed.
                         // The connection handler is already in the pipeline, but the rest of the
@@ -844,7 +858,7 @@ final class HttpPipelineBuilder {
             }
             if (server.getServerConfiguration().getServerType() != NettyHttpServerConfiguration.HttpServerType.STREAMED) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR,
-                    new HttpObjectAggregator(
+                    new ClosingHttpObjectAggregator(
                         (int) server.getServerConfiguration().getMaxRequestSize(),
                         server.getServerConfiguration().isCloseOnExpectationFailed()
                     )
@@ -977,6 +991,50 @@ final class HttpPipelineBuilder {
                 return ctx.close();
             }
             return controlStream.writeAndFlush(new DefaultHttp3GoAwayFrame(maxStreamId.get() + 4));
+        }
+    }
+
+    /**
+     * Closes the connection when it has been idle for the configured idle timeout. Used where no
+     * request handler that would act on the {@link IdleStateEvent} is on the connection channel.
+     */
+    @ChannelHandler.Sharable
+    private static final class IdleCloseHandler extends ChannelInboundHandlerAdapter {
+        static final IdleCloseHandler INSTANCE = new IdleCloseHandler();
+
+        @Override
+        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+            if (evt instanceof IdleStateEvent idle && idle.state() == IdleState.ALL_IDLE) {
+                ctx.close();
+                return;
+            }
+            super.userEventTriggered(ctx, evt);
+        }
+    }
+
+    /**
+     * {@link HttpObjectAggregator} that closes the connection after any response it writes
+     * itself (417, 413). Those responses bypass the ordering and backpressure of
+     * {@link PipeliningServerHandler}, so the connection must not be kept open after them.
+     */
+    private static final class ClosingHttpObjectAggregator extends HttpObjectAggregator {
+        ClosingHttpObjectAggregator(int maxContentLength, boolean closeOnExpectationFailed) {
+            super(maxContentLength, closeOnExpectationFailed);
+        }
+
+        @Override
+        protected boolean closeAfterContinueResponse(Object msg) {
+            return ignoreContentAfterContinueResponse(msg);
+        }
+
+        @Override
+        protected void handleOversizedMessage(ChannelHandlerContext ctx, HttpMessage oversized) throws Exception {
+            if (oversized instanceof HttpRequest) {
+                ctx.writeAndFlush(new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE, Unpooled.EMPTY_BUFFER, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, 0), EmptyHttpHeaders.INSTANCE))
+                    .addListener(ChannelFutureListener.CLOSE);
+            } else {
+                super.handleOversizedMessage(ctx, oversized);
+            }
         }
     }
 }
