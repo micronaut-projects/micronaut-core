@@ -1784,8 +1784,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         T beanToDestroy = registration.beanOrNull();
         BeanDefinition<T> definition = registration.getBeanDefinition();
         if (beanToDestroy != null) {
-            purgeCacheForBeanInstance(beanToDestroy);
             if (definition.isSingleton()) {
+                // only a singleton registration is cached; the candidates of the types of a dependent bean stay
+                purgeCacheForBeanInstance(beanToDestroy);
                 singletonScope.purgeCacheForBeanInstance(definition, beanToDestroy);
             }
             watches.closeOwnedBy(beanToDestroy);
@@ -2479,7 +2480,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             Argument<Object> indexedArgument = (Argument<Object>) filteringQualifier.getIndexedArgument();
             if (indexedArgument != null && isIndexExhaustive(indexedArgument, filteringQualifier)) {
                 // the compile-time index holds every bean this qualifier selects, so there is nothing to filter
-                return getBeanDefinitions(indexedArgument);
+                candidates = new ArrayList<>(getBeanDefinitions(indexedArgument));
+                removeReplacedBeans(candidates);
+                return candidates;
             }
             // Keep anonymous
             Predicate<BeanDefinitionReference<Object>> predicate = new Predicate<>() {
@@ -2489,16 +2492,52 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 }
             };
             candidates = beanDefinitionProvider.getBeanDefinitions(this, predicate, null);
+            // the qualifier decides on each definition alone, so removing what it kept is removing it before
+            removeReplacedBeans(candidates);
         } else {
-            Stream<BeanDefinition<Object>> beanDefinitionsClasses = StreamSupport.stream(
-                beanDefinitionProvider.getBeanDefinitions(this, Argument.OBJECT_ARGUMENT, null, null).spliterator(),
-                false);
-            candidates = qualifier.reduce(Object.class, beanDefinitionsClasses)
-                .toList();
+            List<BeanDefinition<Object>> definitions = new ArrayList<>();
+            beanDefinitionProvider.getBeanDefinitions(this, Argument.OBJECT_ARGUMENT, null, null).forEach(definitions::add);
+            // a qualifier that reduces may choose among the definitions, so it is given only those not replaced
+            removeReplacedBeans(definitions);
+            candidates = qualifier.reduce(Object.class, definitions.stream()).toList();
         }
-
-        filterReplacedBeans(candidates);
         return candidates;
+    }
+
+    /**
+     * Removes the definitions an enabled definition replaces, whether that one is among them or not, as
+     * {@link #getBeanDefinitions(Argument, Qualifier)} removes them from every candidate of the type before the qualifier.
+     *
+     * @param definitions The definitions
+     */
+    private void removeReplacedBeans(Collection<BeanDefinition<Object>> definitions) {
+        if (definitions.isEmpty()) {
+            return;
+        }
+        Iterator<BeanDefinition<Object>> replacing = beanDefinitionProvider.getReplacingBeans(this).iterator();
+        if (!replacing.hasNext()) {
+            return;
+        }
+        Set<BeanDefinition<Object>> replacingBeans = new LinkedHashSet<>();
+        while (replacing.hasNext()) {
+            BeanDefinition<Object> definition = replacing.next();
+            if (definition.isConfigurationProperties()) {
+                // as a lookup by type does, an each bean replaces only through the beans it produces
+                collectIterableBeans(null, definition, replacingBeans, Argument.OBJECT_ARGUMENT);
+            } else {
+                replacingBeans.add(definition);
+            }
+        }
+        List<Map.Entry<ReplacesDefinition<Object>, BeanDefinition<Object>>> replacements = new ArrayList<>(replacingBeans.size());
+        for (BeanDefinition<Object> definition : replacingBeans) {
+            ReplacesDefinition<Object> replacesDefinition = definition.getReplacesDefinition();
+            if (replacesDefinition != null) {
+                replacements.add(Map.entry(replacesDefinition, definition));
+            }
+        }
+        if (!replacements.isEmpty()) {
+            definitions.removeIf(definition -> checkIfReplacementExists(replacements, definition));
+        }
     }
 
     /**
@@ -3636,7 +3675,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             ReplacesDefinition<T> replacementCheck = replacement.getKey();
             if (isNotTheSameDefinition(beanDefinition, definitionToBeReplaced) &&
                 isNotTheTargetOfProxy(beanDefinition, definitionToBeReplaced) &&
-                replacementCheck.replaces(definitionToBeReplaced)) {
+                replacementCheck.replaces(beanDefinition, definitionToBeReplaced)) {
                 return true;
             }
         }
