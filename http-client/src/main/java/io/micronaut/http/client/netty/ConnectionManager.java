@@ -309,6 +309,13 @@ public class ConnectionManager {
     }
 
     /**
+     * @return The event loop group the connections of this manager run on
+     */
+    EventLoopGroup eventLoopGroup() {
+        return group;
+    }
+
+    /**
      * Allocator for this connection manager. Used by micronaut-oracle-cloud.
      *
      * @return The configured allocator
@@ -626,7 +633,7 @@ public class ConnectionManager {
                     SslContext sslContext = buildWebsocketSslContext(requestKey);
                     if (sslContext != null) {
                         try {
-                            ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
+                            addSslHandler(ch.pipeline(), null, sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort()));
                         } finally {
                             ReferenceCountUtil.release(sslContext);
                         }
@@ -762,10 +769,19 @@ public class ConnectionManager {
     private SslHandler configureSslHandler(SslHandler sslHandler) {
         sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
         SSLEngine engine = sslHandler.engine();
-        SSLParameters params = engine.getSSLParameters();
-        params.setEndpointIdentificationAlgorithm("HTTPS");
-        engine.setSSLParameters(params);
+        if (!(configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration acsc) || acsc.isEndpointIdentification()) {
+            SSLParameters params = engine.getSSLParameters();
+            params.setEndpointIdentificationAlgorithm("HTTPS");
+            engine.setSSLParameters(params);
+        }
         return sslHandler;
+    }
+
+    private void addSslHandler(ChannelPipeline pipeline, @Nullable String name, SslHandler sslHandler) {
+        pipeline.addLast(name, configureSslHandler(sslHandler));
+        if (configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.getHostnameVerifier() != null) {
+            pipeline.addLast(new HostnameVerifierHandler(acsc.getHostnameVerifier(), sslHandler.engine()));
+        }
     }
 
     /**
@@ -1045,7 +1061,7 @@ public class ConnectionManager {
             SslContext sslContext = this.sslContext.get();
             if (sslContext != null) {
                 try {
-                    ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)));
+                    addSslHandler(ch.pipeline(), ChannelPipelineCustomizer.HANDLER_SSL, sslContext.newHandler(ch.alloc(), host, port));
                 } finally {
                     ReferenceCountUtil.release(sslContext);
                 }
