@@ -460,6 +460,9 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 if (ctx != null) {
                     super.channelRead0(ctx, frame);
                 }
+            } catch (Throwable t) {
+                // not called from the inbound pipeline, so handle the error as it would
+                exceptionCaught(ctx, t);
             } finally {
                 frame.release();
             }
