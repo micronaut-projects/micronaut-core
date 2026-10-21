@@ -23,6 +23,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -64,13 +65,16 @@ public sealed interface LocatedHttpBodyRouteSpec<T, B extends @Nullable Object> 
     LocatedHttpBodyRouteSpec<T, B> attribute(String name, Object value);
 
     @Override
-    LocatedHttpBodyRouteSpec<T, B> where(RouteCondition condition);
+    LocatedHttpBodyRouteSpec<T, B> where(RequestCondition condition);
 
     @Override
     LocatedHttpBodyRouteSpec<T, B> constrain(Predicate<? super PathVariables> accepted);
 
     @Override
     LocatedHttpBodyRouteSpec<T, B> order(int order);
+
+    @Override
+    LocatedHttpBodyRouteSpec<T, B> selectedBy(@Nullable RouteMatchSelector selector);
 
     @Override
     LocatedHttpBodyRouteSpec<T, B> port(int port);

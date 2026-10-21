@@ -17,6 +17,7 @@ package io.micronaut.runtime;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
+import io.micronaut.context.BeanDefinitionsProvider;
 import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.RuntimeBeanDefinition;
@@ -30,6 +31,7 @@ import io.micronaut.context.env.EnvironmentPropertySource;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ShutdownEvent;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
@@ -57,20 +59,6 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 /**
  * <p>Main entry point for running a Micronaut application.</p>
  *
- * <p><b>Experimental:</b> starting the JVM with the system property
- * {@code micronaut.bean-definitions.prefetch=true} makes {@link #start()} use bean definitions
- * that the common {@link java.util.concurrent.ForkJoinPool} loaded while the main thread
- * configured logging, and read while it created the builder. It is off by default and may change
- * or be removed. It is read when this class is initialized, so only a JVM system property switches
- * it on, not the application's configuration. It stands down in a native image and when the common
- * pool has fewer than three threads. A context gets it only through {@code Micronaut.run(...)} or
- * {@code Micronaut.build(...).start()} with the default bean definitions provider. With it on,
- * {@code TypeConverterRegistrar} services and the static initializers of bean definitions can run
- * on a pool thread before {@link #start()}. Code that runs in between must not construct
- * {@code DefaultMutableConversionService} directly (use {@code MutableConversionService.create()})
- * or call {@code StaticOptimizations.set(...)}. Measure startup with and without it: it helps
- * mostly without a JDK AOT cache.</p>
- *
  * @author Graeme Rocher
  * @since 1.0
  */
@@ -78,27 +66,8 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
     static final String TRAINING_ENABLED_ENVIRONMENT_VARIABLE = "MICRONAUT_APPLICATION_TRAINING_ENABLED";
     private static final String BANNER_NAME = "micronaut-banner.txt";
-    /**
-     * The experimental bean definition prefetch, or {@code null} when it is off or stood down.
-     * Created before {@link #LOG}, whose creation usually configures logging: in the meantime the
-     * pool only loads the bean definition reference classes, which runs none of their code. The
-     * task itself is submitted once {@link #LOG} exists, so that no pool thread creates a logger
-     * while logging is being configured. With the property unset, the class of the task is not
-     * even loaded.
-     */
-    @Nullable
-    private static final BeanDefinitionPrefetch BEAN_DEFINITION_PREFETCH = Boolean.getBoolean(BeanDefinitionPrefetch.PROPERTY)
-        ? BeanDefinitionPrefetch.start(Micronaut.class.getClassLoader())
-        : null;
-    private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
     private static final long SHUTDOWN_MONITOR_INTERVAL_MS = 250;
-
-    static {
-        if (BEAN_DEFINITION_PREFETCH != null) {
-            BEAN_DEFINITION_PREFETCH.submit();
-        }
-    }
 
     private final Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
     /**
@@ -106,6 +75,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * an application that stops, stops the context and with it the environment, whose properties are then gone.
      */
     private @Nullable Boolean exitAllowed;
+    // No initializer, which would run after the constructor of the superclass, where the configurers may set it
+    private boolean beanDefinitionPrefetch;
 
     /**
      * The default constructor.
@@ -119,11 +90,18 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     @Override
     @SuppressWarnings({"java:S1181", "java:S3776", "java:S1141"})
     public ApplicationContext start() {
+        // Until this class creates its logger, which usually configures logging, the prefetch only loads classes on
+        // the pool, which runs none of their code. Its task starts once logging is configured
+        BeanDefinitionPrefetch prefetch = beanDefinitionPrefetch ? BeanDefinitionPrefetch.start(getClassLoader()) : null;
+        Logger _ = LogHolder.LOG;
+        if (prefetch != null) {
+            prefetch.submit();
+        }
         long start = System.nanoTime();
         // a launcher started again decides again: until its environment starts, a failure is judged by that environment
         exitAllowed = null;
         printBanner();
-        ApplicationContext applicationContext = buildContext();
+        ApplicationContext applicationContext = buildContext(prefetch);
         // set once handleStartupException handled a failure of the embedded application, whose exception is rethrown as is
         boolean embeddedFailureHandled = false;
         try {
@@ -164,15 +142,15 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
                     boolean keepAlive;
                     if (embeddedApplication instanceof Described described) {
-                        if (LOG.isInfoEnabled()) {
+                        if (LogHolder.LOG.isInfoEnabled()) {
                             long took = elapsedMillis(start);
                             String desc = described.getDescription();
-                            LOG.info("Startup completed in {}ms. Server Running: {}", took, desc);
+                            LogHolder.LOG.info("Startup completed in {}ms. Server Running: {}", took, desc);
                         }
                         keepAlive = embeddedApplication.isServer();
                     } else {
                         if (embeddedApplication instanceof EmbeddedServer embeddedServer) {
-                            if (LOG.isInfoEnabled()) {
+                            if (LogHolder.LOG.isInfoEnabled()) {
                                 long took = elapsedMillis(start);
                                 Object uri;
                                 try {
@@ -180,13 +158,13 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                                 } catch (UnsupportedOperationException e) {
                                     uri = "<URI display not available: " + e.getMessage() + ">";
                                 }
-                                LOG.info("Startup completed in {}ms. Server Running: {}", took, uri);
+                                LogHolder.LOG.info("Startup completed in {}ms. Server Running: {}", took, uri);
                             }
                             keepAlive = embeddedServer.isKeepAlive();
                         } else {
-                            if (LOG.isInfoEnabled()) {
+                            if (LogHolder.LOG.isInfoEnabled()) {
                                 long took = elapsedMillis(start);
-                                LOG.info("Startup completed in {}ms.", took);
+                                LogHolder.LOG.info("Startup completed in {}ms.", took);
                             }
                             keepAlive = embeddedApplication.isServer();
                         }
@@ -204,8 +182,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     if (embeddedApplication.isShutdownHookNeeded()) {
                         try {
                             Thread hook = new Thread(() -> {
-                                if (LOG.isInfoEnabled()) {
-                                    LOG.info("Embedded Application shutting down");
+                                if (LogHolder.LOG.isInfoEnabled()) {
+                                    LogHolder.LOG.info("Embedded Application shutting down");
                                 }
                                 try (applicationContext) {
                                 /* stop the application without checking if it is running,
@@ -224,9 +202,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                             try (applicationContext) {
                                 embeddedApplication.stop();
                             } catch (Throwable stopError) {
-                                LOG.error("Embedded Application shutting down", stopError);
+                                LogHolder.LOG.error("Embedded Application shutting down", stopError);
                             }
-                            LOG.warn("Failed to register shutdown hook", e);
+                            LogHolder.LOG.warn("Failed to register shutdown hook", e);
                         }
                     }
 
@@ -261,8 +239,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                         if (interrupted) {
                             Thread.currentThread().interrupt();
                         }
-                        if (LOG.isInfoEnabled()) {
-                            LOG.info("Embedded Application shutting down");
+                        if (LogHolder.LOG.isInfoEnabled()) {
+                            LogHolder.LOG.info("Embedded Application shutting down");
                         }
                         removeShutdownHook(shutdownHook);
                     }
@@ -278,8 +256,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                 }
             }
 
-            if (LOG.isInfoEnabled() && embeddedApplication == null) {
-                LOG.info("No embedded container found. Running as CLI application");
+            if (LogHolder.LOG.isInfoEnabled() && embeddedApplication == null) {
+                LogHolder.LOG.info("No embedded container found. Running as CLI application");
             }
             return applicationContext;
         } catch (Throwable e) {
@@ -303,15 +281,17 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * met, which the context would have met without it, is rethrown instead. When this thread
      * ran the initializer of the conversion service itself, its own error is kept.</p>
      *
+     * @param prefetch The prefetch that {@link #start()} started, if any
      * @return The application context, not started
      */
     @SuppressWarnings("java:S1181") // Rethrown, or replaced by what the prefetch met first
-    private ApplicationContext buildContext() {
-        BeanDefinitionPrefetch prefetch = BEAN_DEFINITION_PREFETCH;
+    private ApplicationContext buildContext(@Nullable BeanDefinitionPrefetch prefetch) {
         if (prefetch == null) {
             return super.build();
         }
-        if (getBeanDefinitionsProvider() instanceof DefaultBeanDefinitionsProvider) {
+        // A prefetch that an earlier start of this launcher handed over is not a provider of the application's own
+        BeanDefinitionsProvider provider = getBeanDefinitionsProvider();
+        if (provider instanceof DefaultBeanDefinitionsProvider || provider instanceof BeanDefinitionPrefetch) {
             beanDefinitionsProvider(prefetch);
         }
         try {
@@ -327,10 +307,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             if (failure != null) {
                 // The context read the references itself, beside the prefetch. A reference whose static initializer
                 // failed on the prefetch's thread reached it as a NoClassDefFoundError, which Micronaut skips
-                LOG.warn("The bean definition prefetch ({}=true) failed and was not handed to the application context, "
+                LogHolder.LOG.warn("The bean definition prefetch failed and was not handed to the application context, "
                         + "so Micronaut may have skipped a bean definition that would otherwise stop the application. "
-                        + "Start without {}=true to see Micronaut's own handling",
-                    BeanDefinitionPrefetch.PROPERTY, BeanDefinitionPrefetch.PROPERTY, failure);
+                        + "Start without the prefetch to see Micronaut's own handling", failure);
             }
         }
     }
@@ -453,16 +432,16 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @param hasEmbeddedApplication Whether the context has an {@link EmbeddedApplication} to stop
      */
     private static void announceTrainingRun(Environment environment, boolean hasEmbeddedApplication) {
-        if (!LOG.isWarnEnabled()) {
+        if (!LogHolder.LOG.isWarnEnabled()) {
             return;
         }
         if (hasEmbeddedApplication) {
-            LOG.warn("Training run ({}=true): this JVM is a training run and does not serve traffic. It stops the application as soon as startup has completed{}. "
+            LogHolder.LOG.warn("Training run ({}=true): this JVM is a training run and does not serve traffic. It stops the application as soon as startup has completed{}. "
                     + "Never set this property or {} on a deployment target",
                 ApplicationConfiguration.TRAINING_ENABLED, exitsAfterTrainingRun(environment) ? " and exits with status 0" : "", TRAINING_ENABLED_ENVIRONMENT_VARIABLE);
         } else {
             // The beans that require the switch are still created: only the stop and the exit are missing
-            LOG.warn("Training run ({}=true): the application is not stopped, because it has no EmbeddedApplication. The JVM exits when the application's own threads end",
+            LogHolder.LOG.warn("Training run ({}=true): the application is not stopped, because it has no EmbeddedApplication. The JVM exits when the application's own threads end",
                 ApplicationConfiguration.TRAINING_ENABLED);
         }
     }
@@ -482,8 +461,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     @SuppressWarnings("java:S1147") // Exiting the JVM is the point of a training run
     private static void finishTrainingRun(ApplicationContext applicationContext, EmbeddedApplication<?> embeddedApplication) {
         boolean exit = exitsAfterTrainingRun(applicationContext.getEnvironment());
-        if (LOG.isWarnEnabled()) {
-            LOG.warn("Training run ({}=true): startup completed, stopping the application{}. This JVM was a training run and served no traffic",
+        if (LogHolder.LOG.isWarnEnabled()) {
+            LogHolder.LOG.warn("Training run ({}=true): startup completed, stopping the application{}. This JVM was a training run and served no traffic",
                 ApplicationConfiguration.TRAINING_ENABLED, exit ? " and exiting with status 0" : "");
         }
         try (applicationContext) {
@@ -507,6 +486,13 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     @Override
     public Micronaut banner(boolean isEnabled) {
         return (Micronaut) super.banner(isEnabled);
+    }
+
+    @Override
+    @Experimental
+    public Micronaut beanDefinitionPrefetchEnabled(boolean enabled) {
+        this.beanDefinitionPrefetch = enabled;
+        return this;
     }
 
     /**
@@ -663,8 +649,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         Function<Throwable, Integer> exitCodeMapper = exitHandlers.computeIfAbsent(exception.getClass(), exceptionType -> (throwable -> 1));
         int code = exitCodeMapper.apply(exception);
         if (code > 0 && mayExit(environment)) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Error starting Micronaut server: {}", exception.getMessage(), exception);
+            if (LogHolder.LOG.isErrorEnabled()) {
+                LogHolder.LOG.error("Error starting Micronaut server: {}", exception.getMessage(), exception);
             }
             System.exit(code);
         }
@@ -721,6 +707,14 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         return getResourceLoader().getResource(BANNER_NAME)
             .map(resource -> (Banner) new ResourceBanner(resource, out))
             .orElseGet(() -> new MicronautBanner(out));
+    }
+
+    /**
+     * The logger of this class, created by {@link #start()} rather than with the class, so that a
+     * bean definition prefetch can start before logging is configured.
+     */
+    private static final class LogHolder {
+        static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     }
 
     /**

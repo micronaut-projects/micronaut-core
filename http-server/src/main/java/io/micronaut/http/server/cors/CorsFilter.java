@@ -27,6 +27,7 @@ import io.micronaut.core.order.Ordered;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -56,12 +57,15 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
@@ -104,9 +108,12 @@ public class CorsFilter implements Ordered, ConditionalFilter {
 
     /**
      * The {@link CrossOrigin} configuration per route, with the annotations it was built from.
-     * Routes are fixed at startup, so this stays bounded.
+     * Only the routes registered with the router are cached, so this stays bounded: a route locator builds new
+     * routes for every located target, and those are not kept.
      */
     private final Map<RouteInfo<?>, RouteCorsConfiguration> routeConfigurations = new ConcurrentHashMap<>();
+
+    private final Supplier<Set<RouteInfo<?>>> registeredRoutes = SupplierUtil.memoized(this::collectRegisteredRoutes);
 
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
@@ -445,12 +452,26 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      */
     private Optional<CorsOriginConfiguration> getCorsOriginConfiguration(RouteMatch<?> routeMatch) {
         AnnotationMetadata annotationMetadata = routeMatch.getAnnotationMetadata();
-        RouteCorsConfiguration cached = routeConfigurations.computeIfAbsent(routeMatch.getRouteInfo(),
-            routeInfo -> new RouteCorsConfiguration(annotationMetadata, CrossOriginUtil.getCorsOriginConfiguration(annotationMetadata)));
+        RouteInfo<?> routeInfo = routeMatch.getRouteInfo();
+        if (!isRegisteredRoute(routeInfo)) {
+            return CrossOriginUtil.getCorsOriginConfiguration(annotationMetadata);
+        }
+        RouteCorsConfiguration cached = routeConfigurations.computeIfAbsent(routeInfo,
+            ignored -> new RouteCorsConfiguration(annotationMetadata, CrossOriginUtil.getCorsOriginConfiguration(annotationMetadata)));
         if (cached.annotationMetadata() == annotationMetadata) {
             return cached.configuration();
         }
         return CrossOriginUtil.getCorsOriginConfiguration(annotationMetadata);
+    }
+
+    private boolean isRegisteredRoute(RouteInfo<?> routeInfo) {
+        return registeredRoutes.get().contains(routeInfo);
+    }
+
+    private Set<RouteInfo<?>> collectRegisteredRoutes() {
+        Set<RouteInfo<?>> routes = Collections.newSetFromMap(new IdentityHashMap<>());
+        router.uriRoutes().forEach(routes::add);
+        return routes;
     }
 
     private static boolean matchesOrigin(CorsOriginConfiguration config, String requestOrigin) {
