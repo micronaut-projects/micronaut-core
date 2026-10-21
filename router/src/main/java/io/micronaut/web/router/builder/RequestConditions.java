@@ -600,41 +600,65 @@ public final class RequestConditions {
     }
 
     /**
-     * Read a list of entity tags tag by tag: a quoted opaque tag may contain a comma, so the list
-     * is not split.
+     * Read a list of entity tags tag by tag, as RFC 9110 defines it: {@code *} only as the whole
+     * value, or tags separated by commas with optional whitespace. A quoted opaque tag may
+     * contain a comma, so the list is not split. Nothing after a malformed tag or separator is
+     * read.
      */
     private static boolean entityTag(CharSequence value, int from, int to, String opaqueTag) {
-        int i = from;
-        while (i < to) {
+        int first = skipWhitespace(value, from, to);
+        int last = to;
+        while (last > first && isWhitespace(value.charAt(last - 1))) {
+            last--;
+        }
+        if (last - first == 1 && value.charAt(first) == '*') {
+            return true;
+        }
+        int i = first;
+        while (i < last) {
             char c = value.charAt(i);
-            if (c == ' ' || c == '\t' || c == ',') {
+            if (c == ',' || isWhitespace(c)) {
+                // empty elements of the list
                 i++;
                 continue;
             }
-            if (c == '*') {
-                return true;
-            }
             int start = i;
-            if (c == 'W' && i + 1 < to && value.charAt(i + 1) == '/') {
+            if (c == 'W' && i + 1 < last && value.charAt(i + 1) == '/') {
                 start += 2;
             }
-            if (start >= to || value.charAt(start) != '"') {
-                // malformed: nothing after it is read
+            if (start >= last || value.charAt(start) != '"') {
+                // malformed, e.g. a * in a list: nothing after it is read
                 return false;
             }
             int end = start + 1;
-            while (end < to && value.charAt(end) != '"') {
+            while (end < last && value.charAt(end) != '"') {
                 end++;
             }
-            if (end >= to) {
+            if (end >= last) {
                 return false;
             }
             if (end + 1 - start == opaqueTag.length() && regionMatches(value, start, opaqueTag, false)) {
                 return true;
             }
-            i = end + 1;
+            i = skipWhitespace(value, end + 1, last);
+            if (i < last && value.charAt(i) != ',') {
+                // no separator after the tag: nothing after it is read
+                return false;
+            }
         }
         return false;
+    }
+
+    private static int skipWhitespace(CharSequence value, int from, int to) {
+        int i = from;
+        while (i < to && isWhitespace(value.charAt(i))) {
+            i++;
+        }
+        return i;
+    }
+
+    private static boolean isWhitespace(char c) {
+        return c == ' ' || c == '\t';
     }
 
     private static boolean contains(CharSequence value, int from, int to, String part, boolean ignoreCase) {
