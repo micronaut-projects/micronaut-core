@@ -220,7 +220,7 @@ abstract sealed class RouteResult {
      * {@code null}
      */
     @Nullable ExecutorService streamExecutor(RouteInfo<?> routeInfo) {
-        return owner.findExecutor(routeInfo);
+        return owner.streamExecutor(routeInfo);
     }
 
     static Argument<?> typeVariable(Argument<?> type) {
@@ -350,7 +350,7 @@ abstract sealed class RouteResult {
         final @Nullable ExecutorService streamExecutor(RouteInfo<?> routeInfo) {
             Object selected = streamExecutor;
             if (selected == null) {
-                ExecutorService executor = owner.findExecutor(this.routeInfo);
+                ExecutorService executor = owner.streamExecutor(this.routeInfo);
                 streamExecutor = executor == null ? NO_EXECUTOR : executor;
                 return executor;
             }
