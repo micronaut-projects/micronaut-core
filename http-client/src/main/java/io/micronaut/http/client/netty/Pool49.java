@@ -930,7 +930,7 @@ final class Pool49 implements Pool {
          * Context of the caller, the flow continuations must run in it rather than in the context
          * of whoever hands over the connection.
          */
-        private final PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        private final transient PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         /**
          * Pool that we prefer based on the caller.
          */
