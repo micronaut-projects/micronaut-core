@@ -49,6 +49,7 @@ public final class JakartaProviderBeanDefinition extends AbstractProviderDefinit
 
     @Override
     protected Provider<Object> buildProvider(BeanResolutionContext resolutionContext, BeanContext context, Argument<Object> argument, @Nullable Qualifier<Object> qualifier, boolean singleton) {
+        BeanResolutionContext retained = retain(resolutionContext);
         if (singleton) {
             return new Provider<>() {
                 @Nullable
@@ -56,13 +57,13 @@ public final class JakartaProviderBeanDefinition extends AbstractProviderDefinit
                 @Override
                 public Object get() {
                     if (bean == null) {
-                        bean = resolutionContext.copy().getBean(argument, qualifier);
+                        bean = retained.copy().getBean(argument, qualifier);
                     }
                     return bean;
                 }
             };
         }
-        return () -> resolutionContext.copy().getBean(argument, qualifier);
+        return () -> retained.copy().getBean(argument, qualifier);
     }
 
     static boolean isTypePresent() {

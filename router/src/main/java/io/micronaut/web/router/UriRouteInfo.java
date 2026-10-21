@@ -18,6 +18,8 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.RouteTemplate;
+import io.micronaut.http.uri.UriRouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatcher;
 
@@ -42,8 +44,28 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
 
     /**
      * @return The {@link UriMatchTemplate} used to match URIs
+     * @throws UnsupportedOperationException for a route whose template is not a URI template, see
+     * {@link #getRouteTemplate()}: since 5.3.0, a route declared with a template of another
+     * language, e.g. with {@code route(HttpMethod, RouteTemplate)}, in a group with
+     * {@code templates(RouteTemplateParser)}, or the locator route of such a prefix
      */
     UriMatchTemplate getUriMatchTemplate();
+
+    /**
+     * The template of the route, of any template language.
+     * Unlike {@link #getUriMatchTemplate()} it is available for every route; use it for labels,
+     * logging and metrics.
+     *
+     * <p>For a route with a URI template, it is a {@link UriRouteTemplate} of {@link #getUriMatchTemplate()}. The
+     * {@link UriMatchTemplate} of a route of another template is not available:
+     * {@link #getUriMatchTemplate()} throws an {@link UnsupportedOperationException} for it.</p>
+     *
+     * @return The template
+     * @since 5.3.0
+     */
+    default RouteTemplate getRouteTemplate() {
+        return UriRouteTemplate.of(getUriMatchTemplate());
+    }
 
     /**
      * Match this route within the given URI and produce a {@link RouteMatch} if a match is found.
@@ -137,17 +159,33 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
 
     /**
      * The declarative conditions of the route, of its groups and its own, see
-     * {@link io.micronaut.web.router.builder.RouteSpec#where(io.micronaut.web.router.builder.RouteCondition)}:
+     * {@link io.micronaut.web.router.builder.RouteSpec#where(io.micronaut.web.router.builder.RequestCondition)}:
      * normalized, the parts a request must all meet in the order the router evaluates them, e.g.
      * for the routes endpoint. A condition of a lambda is a
-     * {@link io.micronaut.web.router.builder.RouteCondition.Custom} part.
+     * {@link io.micronaut.web.router.builder.RequestCondition.Custom} part.
      *
      * @return The conditions, empty if the route has none
      * @since 5.3.0
      */
     @Internal
     @Experimental
-    default List<io.micronaut.web.router.builder.RouteCondition> getConditions() {
+    default List<io.micronaut.web.router.builder.RequestCondition> getConditions() {
+        return List.of();
+    }
+
+    /**
+     * The conditions on the body among the {@link #getConditions() conditions} of the route, see
+     * {@link io.micronaut.web.router.builder.RequestCondition.Body}. The router matches a request
+     * without its body: the routes whose body conditions decide the match are left pending, see
+     * {@link Router#findClosest(io.micronaut.http.HttpRequest, java.util.function.Consumer)}, and
+     * the server chooses among them once it read the body.
+     *
+     * @return The body conditions, empty if the route has none
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    default List<io.micronaut.web.router.builder.RequestCondition.Body<?>> getBodyConditions() {
         return List.of();
     }
 }

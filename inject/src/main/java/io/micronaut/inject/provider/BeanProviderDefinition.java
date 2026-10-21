@@ -59,6 +59,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             Argument<Object> argument,
             @Nullable Qualifier<Object> qualifier,
             boolean singleton) {
+        BeanResolutionContext retained = retain(resolutionContext);
         return new BeanProvider<>() {
 
             @Nullable
@@ -79,12 +80,12 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
             @Override
             public Object get() {
-                return resolutionContext.copy().getBean(argument, finalQualifier);
+                return retained.copy().getBean(argument, finalQualifier);
             }
 
             @Override
             public Optional<Object> find(@Nullable Qualifier<Object> qualifier) {
-                return resolutionContext.copy().findBean(argument, qualify(qualifier));
+                return retained.copy().findBean(argument, qualify(qualifier));
             }
 
             @Override
@@ -94,7 +95,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
             @Override
             public Object get(@Nullable Qualifier<Object> qualifier) {
-                return resolutionContext.copy().getBean(argument, qualify(qualifier));
+                return retained.copy().getBean(argument, qualify(qualifier));
             }
 
             @Override
@@ -120,12 +121,12 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
             @Override
             public Iterator<Object> iterator() {
-                return resolutionContext.copy().getBeansOfType(argument, finalQualifier).iterator();
+                return retained.copy().getBeansOfType(argument, finalQualifier).iterator();
             }
 
             @Override
             public Stream<Object> stream() {
-                return resolutionContext.copy().streamOfType(argument, finalQualifier);
+                return retained.copy().streamOfType(argument, finalQualifier);
             }
 
             @Override
