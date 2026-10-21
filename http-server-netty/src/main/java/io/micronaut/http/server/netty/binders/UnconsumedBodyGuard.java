@@ -151,8 +151,8 @@ public final class UnconsumedBodyGuard {
         private static final int SUBSCRIBED = 1;
         private static final int DISCARDED = 2;
 
-        private final CloseableByteBody body;
-        private final Function<? super CloseableByteBody, ? extends Publisher<T>> open;
+        private final transient CloseableByteBody body;
+        private final transient Function<? super CloseableByteBody, ? extends Publisher<T>> open;
 
         LazyBody(CloseableByteBody body, Function<? super CloseableByteBody, ? extends Publisher<T>> open) {
             this.body = body;
