@@ -39,6 +39,8 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
+import java.util.OptionalLong;
+
 /**
  * {@link ByteBodyFactory} implementation with netty-optimized bodies.
  *
@@ -117,10 +119,11 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         if (body instanceof StreamingNettyByteBody snbb && snbb.isCompatible(loop)) {
             return snbb;
         }
-        NettyBodyAdapter adapter = new NettyBodyAdapter(loop, body.toReadBufferPublisher(), null);
+        OptionalLong expectedLength = body.expectedLength();
+        AbstractBodyAdapter adapter = createClaimingBodyAdapter(body);
         StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb);
-        body.expectedLength().ifPresent(sb::setExpectedLength);
+        expectedLength.ifPresent(sb::setExpectedLength);
         return new StreamingNettyByteBody(sb);
     }
 }

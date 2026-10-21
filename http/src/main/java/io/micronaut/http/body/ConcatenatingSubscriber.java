@@ -164,9 +164,18 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
         }
 
         long preAcknowledged;
+        boolean cancelled;
         synchronized (this) {
+            cancelled = this.cancelled;
             preAcknowledged = consumed - forwarded;
-            currentComponent = component;
+            if (!cancelled) {
+                currentComponent = component;
+            }
+        }
+        if (cancelled) {
+            // allowDiscard was called before this item arrived, it will not discard the component
+            component.allowDiscard();
+            return;
         }
 
         component.start();
@@ -208,6 +217,10 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
 
             currentComponent = this.currentComponent;
             requestNewComponent = currentComponent == null && currentComponentDone && newConsumed >= forwarded;
+            if (requestNewComponent) {
+                // the declined request is made now, only once
+                currentComponentDone = false;
+            }
         }
         if (currentComponent != null && delta > 0) {
             currentComponent.onBytesConsumed(bytesConsumed);

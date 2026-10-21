@@ -21,6 +21,7 @@ import io.micronaut.core.async.subscriber.LazySendingSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -149,6 +150,13 @@ public abstract class ResponseLifecycle {
                 // so write it and discard the content
                 ((MutableHttpResponse<Object>) response).body(headBody);
                 return encodeBody(nettyRequest, response, headBody).map(this::discardContent);
+            }
+            if (headBody instanceof CloseableByteBody byteBody) {
+                // the body is not written, release it as the writer of a GET response does
+                byteBody.close();
+            } else if (body instanceof ReferenceCounted referenceCounted) {
+                // the route executor releases the bodies it moves aside, but not one set later
+                referenceCounted.release();
             }
             return encodeNoBody(response);
         } else if (body != null) {
@@ -312,12 +320,27 @@ public abstract class ResponseLifecycle {
                 });
         }
 
-        httpContentPublisher = httpContentPublisher.doOnDiscard(CloseableByteBody.class, CloseableByteBody::close);
+        // items dropped after a cancel are released: the pieces that were written already, and the
+        // items of the body publisher that were not written yet
+        httpContentPublisher = httpContentPublisher.doOnDiscard(Object.class, this::discardItem);
 
         return LazySendingSubscriber.create(httpContentPublisher).map(items -> {
             CloseableByteBody byteBody = isJson.getAsBoolean() ? concatenateJson(items) : concatenate(items);
             return ByteBodyHttpResponseWrapper.wrap(response, byteBody);
         }).onErrorResume(t -> (ExecutionFlow) handleStreamingError(request, t));
+    }
+
+    /**
+     * Release an item of a streamed response body that is dropped without being written.
+     *
+     * @param item The item, either an item of the body publisher or a written piece
+     */
+    protected void discardItem(Object item) {
+        if (item instanceof CloseableByteBody byteBody) {
+            byteBody.close();
+        } else if (item instanceof ReferenceCounted referenceCounted) {
+            referenceCounted.release();
+        }
     }
 
     /**
