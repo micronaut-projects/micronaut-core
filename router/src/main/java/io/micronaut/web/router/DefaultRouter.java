@@ -510,6 +510,15 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     /**
      * @param route A route
+     * @return Whether the route selector of the route selects by the media types itself, see
+     * {@link RouteMatchSelector#selectsMediaTypes()}
+     */
+    static boolean selectsMediaTypes(UriRouteInfo<?, ?> route) {
+        return route instanceof DefaultUrlRouteInfo<?, ?> info && info.routeMatchSelectorSelectsMediaTypes();
+    }
+
+    /**
+     * @param route A route
      * @return The order of the route selector of the route, read once when it was built, or {@code null}
      */
     static @Nullable Comparator<UriRouteInfo<?, ?>> selectorOrder(UriRouteInfo<?, ?> route) {

@@ -28,6 +28,7 @@ import io.micronaut.http.form.FormData;
 import io.micronaut.web.router.spi.RouteMatchSelector;
 import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
 import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
+import io.micronaut.web.router.websocket.WebSocketUpgradeCondition;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -249,11 +250,18 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
             route.drop();
             throw e;
         }
+        WebSocketUpgradeCondition.registered();
         // the upgrade request has no body and the connection no response body: the media types
         // of a group do not apply, its executor runs the handlers of the connections
         route.end(() -> HandlerMethod.webSocket(webSocket, metadata),
-            // the server finds the endpoint in the attribute of the route
-            settings -> settings.attribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, webSocket),
+            settings -> {
+                // only an upgrade request matches the route, like the route of a @ServerWebSocket:
+                // a plain request to its path is left to the other routes. The condition is the
+                // first of the route, before the conditions the route declares
+                settings.where(RequestCondition.custom(WebSocketUpgradeCondition.INSTANCE));
+                // the server finds the endpoint in the attribute of the route
+                settings.attribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, webSocket);
+            },
             RouteGroupDefaults.CONSUMES_SETTING | RouteGroupDefaults.PRODUCES_SETTING);
     }
 
