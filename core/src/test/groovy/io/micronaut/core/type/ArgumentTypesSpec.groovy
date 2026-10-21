@@ -109,7 +109,7 @@ class ArgumentTypesSpec extends Specification {
         rendered != reflected
 
         and: "the owner given is kept"
-        def built = ArgumentTypes.parameterizedType(
+        def built = ArgumentTypes.parameterizedTypeWithOwner(
             ArgumentTypes.parameterizedType(ArgumentTypesFixture.Outer, String),
             ArgumentTypesFixture.Outer.Inner,
             Integer)
