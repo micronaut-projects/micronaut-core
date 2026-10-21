@@ -24,6 +24,7 @@ import io.micronaut.http.annotation.Header;
 import io.micronaut.http.client.bind.AnnotatedClientRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
 import io.micronaut.inject.ExecutableMethod;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,12 +39,13 @@ public class HeaderClientRequestBinder implements AnnotatedClientRequestBinder<H
                      MutableHttpRequest<?> request) {
         // The headers of the method are kept by the method, unless their placeholders may resolve to another value
         // on every request (e.g. ${random.uuid})
-        List<String> headers = (context.hasPropertyExpressions() ? Headers.of(context) : context.getCachedValue(Headers.class, Headers::of))
-            .namesAndValues();
-        if (!headers.isEmpty()) {
+        // null, and kept as such, when the method has no header to set
+        Headers headers = context.hasPropertyExpressions() ? Headers.of(context) : context.getCachedValue(Headers.class, Headers::of);
+        if (headers != null) {
+            List<String> namesAndValues = headers.namesAndValues();
             MutableHttpHeaders requestHeaders = request.getHeaders();
-            for (int i = 0; i < headers.size(); i += 2) {
-                requestHeaders.setIfMissing(headers.get(i), headers.get(i + 1));
+            for (int i = 0; i < namesAndValues.size(); i += 2) {
+                requestHeaders.setIfMissing(namesAndValues.get(i), namesAndValues.get(i + 1));
             }
         }
     }
@@ -60,7 +62,7 @@ public class HeaderClientRequestBinder implements AnnotatedClientRequestBinder<H
      */
     private record Headers(List<String> namesAndValues) {
 
-        static Headers of(ExecutableMethod<?, ?> method) {
+        static @Nullable Headers of(ExecutableMethod<?, ?> method) {
             List<AnnotationValue<Header>> headerAnnotations = method.getAnnotationValuesByType(Header.class);
             List<String> namesAndValues = new ArrayList<>(headerAnnotations.size() * 2);
             for (AnnotationValue<Header> headerAnnotation : headerAnnotations) {
@@ -71,7 +73,7 @@ public class HeaderClientRequestBinder implements AnnotatedClientRequestBinder<H
                     namesAndValues.add(headerValue);
                 }
             }
-            return new Headers(List.copyOf(namesAndValues));
+            return namesAndValues.isEmpty() ? null : new Headers(List.copyOf(namesAndValues));
         }
     }
 

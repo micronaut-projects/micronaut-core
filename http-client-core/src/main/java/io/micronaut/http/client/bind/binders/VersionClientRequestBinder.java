@@ -50,11 +50,12 @@ public class VersionClientRequestBinder implements AnnotatedClientRequestBinder<
                      ClientRequestUriContext uriContext,
                      MutableHttpRequest<?> request) {
         // The version and the client of the method are kept by the method
+        // null, and kept as such, when the method has no version
         Plan plan = context.getCachedValue(Plan.class, Plan::of);
-        String version = plan.version();
-        if (version == null) {
+        if (plan == null) {
             return;
         }
+        String version = plan.version();
         ClientVersioningConfiguration configuration = getVersioningConfiguration(plan.clientId());
         configuration.getHeaders()
                 .forEach(header -> request.header(header, version));
@@ -80,15 +81,15 @@ public class VersionClientRequestBinder implements AnnotatedClientRequestBinder<
     /**
      * What the binder reads from the annotations of a client method.
      *
-     * @param version  The version, {@code null} when the method has none or it is empty
+     * @param version  The version
      * @param clientId The client of the method, if any
      */
-    private record Plan(@Nullable String version, @Nullable String clientId) {
+    private record Plan(String version, @Nullable String clientId) {
 
-        static Plan of(ExecutableMethod<?, ?> method) {
+        static @Nullable Plan of(ExecutableMethod<?, ?> method) {
             AnnotationValue<Version> version = method.getAnnotation(Version.class);
             String value = version != null ? version.stringValue().filter(StringUtils::isNotEmpty).orElse(null) : null;
-            return value != null ? new Plan(value, method.stringValue(Client.class).orElse(null)) : new Plan(null, null);
+            return value != null ? new Plan(value, method.stringValue(Client.class).orElse(null)) : null;
         }
     }
 }
