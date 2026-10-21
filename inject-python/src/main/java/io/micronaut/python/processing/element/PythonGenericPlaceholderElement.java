@@ -61,15 +61,16 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
                                            PythonProcessingEnvironment environment,
                                            List<ClassElement> bounds,
                                            Element declaringElement) {
-        this(typeVar, environment, bounds, declaringElement, null);
+        this(typeVar, environment, bounds, declaringElement, null, 0);
     }
 
     private PythonGenericPlaceholderElement(TypeVar typeVar,
                                             PythonProcessingEnvironment environment,
                                             List<ClassElement> bounds,
                                             Element declaringElement,
-                                            @Nullable ElementAnnotationMetadata typeUseAnnotationMetadata) {
-        super(new ClassDef(typeVar.name()), environment);
+                                            @Nullable ElementAnnotationMetadata typeUseAnnotationMetadata,
+                                            int arrayDimensions) {
+        super(new ClassDef(typeVar.name()), environment, arrayDimensions);
         this.typeVar = typeVar;
         this.bounds = bounds != null ? bounds : Collections.emptyList();
         this.declaringElement = declaringElement;
@@ -80,23 +81,27 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
      * The type variable used with type-use annotations, such as {@code Annotated[E, NotNull()]} as a type argument.
      * The copy stays a {@link GenericPlaceholderElement}, so the type argument keeps naming the type variable.
      *
-     * @param typeUseAnnotationMetadata The type-use annotation metadata of the type node
+     * @param metadata The type-use annotation metadata of the type node
      * @return The annotated type variable
      */
-    public PythonGenericPlaceholderElement withTypeUseAnnotationMetadata(ElementAnnotationMetadata typeUseAnnotationMetadata) {
-        PythonGenericPlaceholderElement copy = new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement, typeUseAnnotationMetadata);
+    public PythonGenericPlaceholderElement withTypeUseAnnotationMetadata(ElementAnnotationMetadata metadata) {
+        return copyWith(metadata, arrayDimensions);
+    }
+
+    @Override
+    protected ClassElement createWithArrayDimensions(int dimensions) {
+        return copyWith(typeUseAnnotationMetadata, dimensions);
+    }
+
+    private PythonGenericPlaceholderElement copyWith(@Nullable ElementAnnotationMetadata metadata, int dimensions) {
+        PythonGenericPlaceholderElement copy = new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement, metadata, dimensions);
         copyValues(copy);
         return copy;
     }
 
     @Override
-    protected ClassElement createWithArrayDimensions(int arrayDimensions) {
-        return new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement, typeUseAnnotationMetadata);
-    }
-
-    @Override
     protected AbstractPythonElement copyThis() {
-        return new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement, typeUseAnnotationMetadata);
+        return new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement, typeUseAnnotationMetadata, arrayDimensions);
     }
 
     @Override
@@ -110,10 +115,15 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
     @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        if (typeUseAnnotationMetadata == null || presetAnnotationMetadata != null) {
+        if (presetAnnotationMetadata != null) {
             return super.getAnnotationMetadata();
         }
-        return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), typeUseAnnotationMetadata);
+        AnnotationMetadata metadata = super.getAnnotationMetadata();
+        if (!bounds.isEmpty()) {
+            metadata = new AnnotationMetadataHierarchy(true, bounds.getFirst().getAnnotationMetadata(), metadata);
+        }
+        return typeUseAnnotationMetadata == null ? metadata
+            : new AnnotationMetadataHierarchy(true, metadata, typeUseAnnotationMetadata);
     }
 
     @Override
@@ -197,13 +207,23 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
     }
 
     @Override
+    public String getName() {
+        return GenericBindings.firstBound(this).getName();
+    }
+
+    @Override
+    public String getPackageName() {
+        return GenericBindings.firstBound(this).getPackageName();
+    }
+
+    @Override
     public Optional<Element> getDeclaringElement() {
         return Optional.ofNullable(declaringElement);
     }
 
     @Override
     public boolean isAssignable(String type) {
-        return Object.class.getName().equals(type) || getName().equals(type);
+        return getBounds().stream().anyMatch(bound -> bound.isAssignable(type));
     }
 
     @Override
