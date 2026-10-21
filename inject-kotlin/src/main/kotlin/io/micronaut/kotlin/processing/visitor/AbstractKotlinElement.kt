@@ -372,7 +372,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                         visitedTypes,
                         stripTypeArguments
                     )
-                if (upperBound is PrimitiveElement) {
+                if (upperBound is PrimitiveElement && !upperBound.isArray) {
                     return upperBound
                 }
                 val lowerBound = resolveLowerBound(
@@ -382,8 +382,12 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                     visitedTypes,
                     stripTypeArguments
                 )
-                if (lowerBound is PrimitiveElement) {
+                if (lowerBound is PrimitiveElement && !lowerBound.isArray) {
                     return upperBound
+                }
+                if (upperBound is PrimitiveElement || lowerBound is PrimitiveElement) {
+                    // A primitive array bound, such as out CharArray, has no Kotlin class element to build the wildcard on
+                    return WildcardElement.of(listOf(upperBound), listOfNotNull(lowerBound))
                 }
                 val upperBounds = listOf(upperBound as KotlinClassElement)
                 val lowerBounds = if (lowerBound == null) listOf() else  listOf(lowerBound as KotlinClassElement)

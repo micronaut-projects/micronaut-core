@@ -447,9 +447,10 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                 }
             }
         }
-        if (upperType.isPrimitive()) {
-            // Primitive wildcard bounds are not represented as wildcard elements.
-            return upperType;
+        if (upperBoundsAsElements.stream().anyMatch(ClassElement::isPrimitive)
+            || lowerBoundsAsElements.stream().anyMatch(ClassElement::isPrimitive)) {
+            // A primitive array bound, such as ? extends char[], has no Java class element to build the wildcard on
+            return WildcardElement.of(upperBoundsAsElements, lowerBoundsAsElements);
         }
         if (!(upperType instanceof JavaClassElement javaUpperType)
             || !upperBoundsAsElements.stream().allMatch(JavaClassElement.class::isInstance)

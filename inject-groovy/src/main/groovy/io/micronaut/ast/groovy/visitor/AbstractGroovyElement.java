@@ -466,9 +466,10 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
                 }
             }
         }
-        if (upperType.isPrimitive()) {
-            // Primitive wildcard bounds are not represented as wildcard elements.
-            return upperType;
+        if (upperBoundsAsElements.stream().anyMatch(ClassElement::isPrimitive)
+            || lowerBoundsAsElements.stream().anyMatch(ClassElement::isPrimitive)) {
+            // A primitive array bound, such as ? extends char[], has no Groovy class element to build the wildcard on
+            return WildcardElement.of(upperBoundsAsElements, lowerBoundsAsElements);
         }
         GroovyNativeElement wildcardNativeElement = new GroovyNativeElement.ClassWithOwner(genericsType.getType(), declaredElement);
         return new GroovyWildcardElement(
