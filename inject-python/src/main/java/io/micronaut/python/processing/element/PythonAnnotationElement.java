@@ -17,7 +17,13 @@ package io.micronaut.python.processing.element;
 
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.ast.AnnotationElement;
+import io.micronaut.inject.ast.AnnotationMemberElement;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.utils.DefaultAnnotationMemberElement;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.model.ClassDef;
@@ -27,10 +33,14 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Class element implementation for Python annotations, which are declared as decorators.
@@ -145,6 +155,34 @@ public final class PythonAnnotationElement extends PythonClassElement implements
             }
         }
         return environment.annotationMetadataBuilder().getRetentionPolicy(getNativeType());
+    }
+
+    @Override
+    public List<? extends AnnotationMemberElement> getMembers() {
+        // A Java annotation used from Python answers with its own declaration
+        AnnotationElement javaAnnotation = javaAnnotation();
+        if (javaAnnotation != null) {
+            return javaAnnotation.getMembers();
+        }
+        // the functions synthesized for the parameters of the decorator, in declaration order; the decorated
+        // target a bare decorator takes as its only parameter is no member, and the type of a member is the
+        // one the generated annotation stub declares
+        PythonAnnotationMetadataBuilder builder = environment.annotationMetadataBuilder();
+        DecoratorDef declaration = builder.decoratorDef(getName());
+        Supplier<Map<CharSequence, Object>> defaultValues = SupplierUtil.memoized(() ->
+            builder.getAnnotationDefaultValues(getName(), getNativeType()));
+        List<MethodElement> methods = getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared());
+        List<AnnotationMemberElement> members = new ArrayList<>(methods.size());
+        for (MethodElement method : methods) {
+            if (declaration != null && declaration.isTargetMember(method.getName())) {
+                continue;
+            }
+            ClassElement type = declaration == null
+                ? method.getReturnType()
+                : environment.visitorContext().getTypeResolver().annotationMemberType(declaration, method.getName());
+            members.add(new DefaultAnnotationMemberElement(method, type, defaultValues));
+        }
+        return members;
     }
 
     @Nullable

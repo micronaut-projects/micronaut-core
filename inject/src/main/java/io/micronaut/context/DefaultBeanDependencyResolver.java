@@ -86,6 +86,18 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     }
 
     @Override
+    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                       BeanResolutionContext.Segment<?, ?> lookupPoint) {
+        return dependencies.resolve(context, null, resolution -> {
+            // each call has a path of its own, so the segment is pushed for the whole of the resolution
+            resolution.getPath().push(lookupPoint);
+            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type);
+            resolution.require(registration);
+            return registration;
+        });
+    }
+
+    @Override
     public BeanDependencyGroup createGroup() {
         return dependencies.resolve(context, null, resolution -> {
             BeanRegistration<BeanDependencyResolver> child = context.newDependencyGroupRegistration(dependencies, dependencies.destructionContext);
@@ -140,9 +152,8 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public <T> Optional<BeanRegistration<T>> findRegistration(T bean) {
-        return Optional.ofNullable((BeanRegistration<T>) dependencies.findOwned(bean));
+    public <T> Optional<BeanRegistration<T>> findRegistration(@Nullable T bean) {
+        return bean == null ? Optional.empty() : Optional.ofNullable(dependencies.find(bean));
     }
 
     @Override

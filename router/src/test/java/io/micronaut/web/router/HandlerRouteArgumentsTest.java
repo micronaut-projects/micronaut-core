@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.web.router.builder.RouteCondition;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -131,7 +131,7 @@ class HandlerRouteArgumentsTest {
                 assertBlankExecutor(() -> group.beforeReplacing((ContextReplacingRouteRequestFilter) (request, context) -> null).executeOn(" "));
                 assertBlankExecutor(() -> group.afterReplacing((ContextReplacingRouteResponseFilter) (request, response, context) -> null).executeOn(""));
                 assertMissing("filter", () -> group.beforeReplacing((ContextReplacingRouteRequestFilter) null));
-                assertMissing("condition", () -> group.where((RouteCondition) null));
+                assertMissing("condition", () -> group.where((RequestCondition) null));
                 assertMissing("name", () -> group.attribute(null, "value"));
                 assertMissing("value", () -> group.attribute("name", null));
             });
@@ -169,7 +169,7 @@ class HandlerRouteArgumentsTest {
     @Test
     void aRouteByTheNameOfAStandardMethodIsARouteOfThatMethod() {
         Router router = router(routes -> {
-            assertMissing("uri", () -> routes.route("PROPFIND", null));
+            assertMissing("uri", () -> routes.route("PROPFIND", (String) null));
             routes.route("get", "/x").handle(HandlerRouteArgumentsTest::ok);
             routes.route("PROPFIND", "/y").handle(HandlerRouteArgumentsTest::ok);
         });
@@ -208,7 +208,7 @@ class HandlerRouteArgumentsTest {
         assertMissing("executorName", () -> route.afterReplacing((ContextReplacingRouteResponseFilter) (request, response, context) -> null).executeOn(null));
         assertMissing("filter", () -> route.afterReplacing((ContextReplacingRouteResponseFilter) null).executeOn("blocking"));
         assertMissing("filter", () -> route.afterReplacingAsync((AsyncContextReplacingRouteResponseFilter) null));
-        assertMissing("condition", () -> route.where((RouteCondition) null));
+        assertMissing("condition", () -> route.where((RequestCondition) null));
         assertMissing("name", () -> route.attribute(null, "value"));
         assertMissing("value", () -> route.attribute("name", null));
         // the route is still usable

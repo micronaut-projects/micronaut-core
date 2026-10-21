@@ -138,7 +138,8 @@ abstract class AbstractTypeElementSpec extends Specification {
             )
 
             def classElement = new JavaElementFactory(visitorContext).newClassElement(typeElement, visitorContext.getElementAnnotationMetadataFactory())
-            return closure.call(classElement)
+            // a closure of two parameters is given the visitor context as well
+            return closure.maximumNumberOfParameters == 2 ? closure.call(classElement, visitorContext) : closure.call(classElement)
         }
     }
 

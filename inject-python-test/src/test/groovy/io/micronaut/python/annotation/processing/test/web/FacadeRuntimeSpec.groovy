@@ -143,6 +143,7 @@ class Probe:
         entries = {
             "constant": http.CREATED == HttpStatus.CREATED and CREATED == HttpStatus.CREATED,
             "annotation_identity": http.Get is Get and Get is JavaGet,
+            "snake_case": http.get is Get and http.controller is http.Controller and "get" in http.__all__,
             "annotation_name": http.Get.java_class_name,
             "static": http.ok("x").getStatus().getCode(),
             "star": NotBlank.java_class_name,
@@ -164,6 +165,7 @@ class Probe:
         then:
         report.constant == "True"
         report.annotation_identity == "True"
+        report.snake_case == "True"
         report.annotation_name == "io.micronaut.http.annotation.Get"
         report.static == "200"
         report.star == "jakarta.validation.constraints.NotBlank"

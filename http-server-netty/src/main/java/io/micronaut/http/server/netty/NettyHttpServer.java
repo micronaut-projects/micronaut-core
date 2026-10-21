@@ -50,6 +50,9 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.context.WatchableBeanContext;
+import io.micronaut.context.watch.BeanWatch;
+import io.micronaut.context.watch.ReloadingConfigurationWatcher;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.runtime.graceful.GracefulShutdownListener;
@@ -92,6 +95,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.InetSocketAddress;
@@ -167,6 +171,27 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         || System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("bsd");
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
+    /**
+     * The properties a bound socket cannot follow: a change to them needs a restart.
+     */
+    private static final String[] BOUND_ADDRESS_PROPERTIES = {
+        HttpServerConfiguration.PREFIX + ".port",
+        HttpServerConfiguration.PREFIX + ".host",
+        HttpServerConfiguration.PREFIX + ".dual-protocol",
+        HttpServerConfiguration.PREFIX + ".ssl.port",
+        HttpServerConfiguration.PREFIX + ".ssl.enabled",
+        // the explicit listeners and the event loops are set up when the sockets are bound
+        HttpServerConfiguration.PREFIX + ".netty.listeners",
+        HttpServerConfiguration.PREFIX + ".netty.parent",
+        HttpServerConfiguration.PREFIX + ".netty.worker",
+        // the bootstrap options are set when the bootstraps are built, and a bound bootstrap keeps them
+        HttpServerConfiguration.PREFIX + ".netty.options",
+        HttpServerConfiguration.PREFIX + ".netty.child-options",
+        // the QUIC codec of an HTTP/3 listener is set up on its bound channel, with these settings
+        NettyHttpServerConfiguration.PREFIX + ".http3",
+        SslConfiguration.PREFIX + ".port",
+        SslConfiguration.PREFIX + ".enabled"
+    };
     private final NettyEmbeddedServices nettyEmbeddedServices;
     private final NettyHttpServerConfiguration serverConfiguration;
     @Nullable
@@ -194,6 +219,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
     @Nullable
     private volatile List<Listener> activeListeners = null;
+    /**
+     * The configuration watch: a change under the server's prefixes rebuilds the pipelines, and a change to
+     * what the sockets are bound to, the port or the host, answers that only a restart applies it.
+     */
+    private volatile @Nullable BeanWatch configurationWatch; // NOSONAR java:S3077 only the handle is published; the watch is thread-safe
     private final List<NettyHttpServerConfiguration.NettyListenerConfiguration> listenerConfigurations;
     private final CompositeNettyServerCustomizer rootCustomizer = new CompositeNettyServerCustomizer();
 
@@ -391,6 +421,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 listeners.add(bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig));
             }
             this.activeListeners = Collections.unmodifiableList(listeners);
+            watchConfiguration();
 
             if (isDefault) {
                 final Router router = this.nettyEmbeddedServices.getRouter();
@@ -621,7 +652,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return nettyEmbeddedServices.getEventLoopGroupRegistry()
                 .getEventLoopGroup(parent != null ? parent.getName() : NettyHttpServerConfiguration.Parent.NAME)
                 .orElseGet(() -> {
-                    final EventLoopGroup newGroup = newEventLoopGroup(acceptorConfiguration(parent));
+                    final EventLoopGroup newGroup = newEventLoopGroup(acceptorConfiguration(parent, resolveWorkerConfiguration()));
                     shutdownParent = true;
                     return newGroup;
                 });
@@ -634,24 +665,28 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * {@value #DEFAULT_PARENT_THREADS} thread rather than to the worker group default of
      * {@link EventLoopGroupConfiguration#getThreadCoreRatio()} threads per core.
      *
+     * <p>The acceptor group must use the same transport as the worker group: the server channel type is
+     * derived from the worker configuration, and a native channel (for example epoll) cannot be
+     * registered on a NIO event loop. The transport of the worker configuration is therefore used.</p>
+     *
      * @param parent The configured parent event loop group settings, if any
+     * @param workerConfig The resolved worker event loop group configuration, if any
      * @return The configuration to create the acceptor group from
      */
-    private static EventLoopGroupConfiguration acceptorConfiguration(NettyHttpServerConfiguration.@Nullable Parent parent) {
+    private static EventLoopGroupConfiguration acceptorConfiguration(NettyHttpServerConfiguration.@Nullable Parent parent,
+                                                                     @Nullable EventLoopGroupConfiguration workerConfig) {
         EventLoopGroupConfiguration source = parent == null ? new DefaultEventLoopGroupConfiguration() : parent;
-        if (source.getNumThreads() != 0) {
-            // explicitly configured, honour it as-is
-            return source;
-        }
+        // an explicitly configured thread count is honoured as-is
+        int threads = source.getNumThreads() != 0 ? source.getNumThreads() : DEFAULT_PARENT_THREADS;
         return new DefaultEventLoopGroupConfiguration(
             // keep a name the user configured; only the implicit acceptor group is called "parent"
             parent == null ? NettyHttpServerConfiguration.Parent.NAME : source.getName(),
-            DEFAULT_PARENT_THREADS,
+            threads,
             source.getThreadCoreRatio(),
             source.getIoRatio().orElse(null),
             // the transport list below already reflects the (deprecated) native preference
             false,
-            source.getTransport(),
+            workerConfig != null ? workerConfig.getTransport() : source.getTransport(),
             source.getExecutorName().orElse(null),
             source.getShutdownQuietPeriod(),
             source.getShutdownTimeout(),
@@ -996,6 +1031,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     listener.clean();
                 }
                 this.activeListeners = null;
+                BeanWatch watch = configurationWatch;
+                if (watch != null) {
+                    watch.close();
+                    configurationWatch = null;
+                }
             }
 
             // If we are only stopping the server, we need to wait for the futures to complete otherwise
@@ -1146,10 +1186,54 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public void onApplicationEvent(RefreshEvent event) {
-        // if anything under HttpServerConfiguration.PREFIX changes re-build
-        // the NettyHttpServerInitializer in the server bootstrap to apply changes
-        // this will ensure re-configuration to HTTPS settings, read-timeouts, logging etc. apply
-        // configuration properties are auto-refreshed so will be visible automatically
+        if (configurationWatch != null) {
+            // the configuration watch, which the refresh runs before this event, did the work
+            return;
+        }
+        refreshListeners();
+    }
+
+    /**
+     * Watches the server's configuration prefixes: anything under them rebuilds the pipelines, so that
+     * SSL settings, timeouts and logging apply; the port and the host cannot change under bound sockets.
+     */
+    private void watchConfiguration() {
+        if (!(applicationContext instanceof WatchableBeanContext watchable)) {
+            return;
+        }
+        ReloadingConfigurationWatcher watcher = change -> {
+            if (!change.all() && change.touchesAny(BOUND_ADDRESS_PROPERTIES)) {
+                // a refresh of everything names no key: it rebuilds the pipelines, as the refresh endpoint always has
+                return ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART;
+            }
+            ServerSslBuilder sslBuilder = nettyEmbeddedServices.getServerSslBuilder();
+            if (sslBuilder != null && (change.all() || change.touches(SslConfiguration.PREFIX) || change.touches(ServerSslConfiguration.PREFIX))) {
+                // before the pipelines are rebuilt, and not after, as the legacy listener used to: a store file
+                // replaced in place keeps its path, and must be read again
+                sslBuilder.invalidate();
+            }
+            refreshListeners();
+            return ReloadingConfigurationWatcher.Outcome.APPLIED;
+        };
+        BeanWatch serverWatch = watchable.configuration(HttpServerConfiguration.PREFIX).watchReloading(watcher);
+        BeanWatch sslWatch = watchable.configuration(SslConfiguration.PREFIX).watchReloading(watcher);
+        configurationWatch = new BeanWatch() {
+            @Override
+            public void close() {
+                serverWatch.close();
+                sslWatch.close();
+            }
+
+            @Override
+            public boolean isActive() {
+                return serverWatch.isActive() || sslWatch.isActive();
+            }
+        };
+    }
+
+    private void refreshListeners() {
+        // rebuild the NettyHttpServerInitializer in the server bootstrap to apply changes: re-configuration
+        // to HTTPS settings, read-timeouts, logging etc.; configuration properties are refreshed already
         List<Listener> listeners = activeListeners;
         if (listeners != null) {
             for (Listener listener : listeners) {
@@ -1265,6 +1349,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             @Override
             protected SslContextHolder createLegacy() {
                 return createLegacySslContextHolder(quic());
+            }
+
+            @Override
+            protected @Nullable SSLContext providedSslContext() {
+                ServerSslConfiguration ssl = Objects.requireNonNull(sslConfiguration);
+                SSLContext provided = ssl.getSslContext();
+                String contextName = ssl.getContextName();
+                if (provided == null && contextName != null) {
+                    provided = applicationContext.getBean(SSLContext.class, Qualifiers.byName(contextName));
+                }
+                return provided;
             }
 
             @Override

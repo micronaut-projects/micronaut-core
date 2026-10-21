@@ -20,6 +20,7 @@ import jakarta.inject.Named;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -33,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * when its stage completes, and returns a stage that completes with {@code null} after the filter
  * method returned.
  */
+@Timeout(value = 60, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class AsyncFilterMutablePropagatedContextTest {
     private static final String SPEC_NAME = "AsyncFilterMutablePropagatedContextTest";
 
@@ -40,6 +42,7 @@ class AsyncFilterMutablePropagatedContextTest {
     private final HttpClient httpClient = embeddedServer.getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
 
     @AfterEach
+    @Timeout(value = 60, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     void cleanup() {
         httpClient.close();
         embeddedServer.close();

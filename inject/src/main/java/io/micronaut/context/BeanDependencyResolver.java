@@ -20,6 +20,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Optional;
+
 /**
  * Resolves dependencies owned by the bean into which this resolver is injected.
  *
@@ -154,6 +156,32 @@ public interface BeanDependencyResolver {
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type);
 
     /**
+     * Resolves the registration of an exact definition as the given type at a point of the owner, with the same
+     * ownership rules as {@link #getBeanRegistration(BeanDefinition, Argument)}: a newly created dependent is owned
+     * by the owner of this resolver and destroyed with it.
+     *
+     * <p>The lookup point is pushed onto the resolution path before the definition is resolved, so a bean the
+     * resolution creates sees it as the point it is created for: an injected {@link io.micronaut.inject.InjectionPoint}
+     * is the one of the lookup point, and the dependency graph records the owner's bean as receiving the created
+     * bean there. This is for an object injected at a point of the owner, such as a provider, that creates a bean on
+     * behalf of that point later: it keeps the segment it was itself resolved at, from
+     * {@link BeanResolutionContext.Path#currentSegment()}, and passes it, or a segment of its own that
+     * narrows it, here. Each call resolves on a path of its own, so calls may be concurrent.</p>
+     *
+     * @param definition The bean definition
+     * @param type The type to resolve the definition as, including generic arguments; the definition may be of a
+     *             subtype of it
+     * @param lookupPoint The segment the resolution is made at, whose declaring type is the owner's definition
+     * @param <T> The bean type
+     * @return The registration
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the type
+     * @throws IllegalStateException if destruction or context shutdown has begun
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                BeanResolutionContext.Segment<?, ?> lookupPoint);
+
+    /**
      * Destroys and forgets a registration this resolver owns, before its owner is destroyed. A shared registration
      * is never destroyed. Registration identity, rather than equality of bean definitions or instances, identifies
      * ownership.
@@ -162,6 +190,30 @@ public interface BeanDependencyResolver {
      * @since 5.3.0
      */
     boolean destroy(BeanRegistration<?> registration);
+
+    /**
+     * Finds the registration of a bean this resolver created and still holds, as one of its registration lookups
+     * returned it, so that a caller holding only the bean can {@link #destroy(BeanRegistration) destroy} it early.
+     * Bean identity, rather than equality, selects the registration. A shared bean, a bean created by another resolver
+     * or group, including a child group of this one, and a bean already destroyed or released by closing are not
+     * found. A registration whose bean is {@code null} cannot be found by its bean: a {@code null} bean finds nothing.
+     * @param bean The bean instance
+     * @param <T> The bean type
+     * @return The registration, or empty when this resolver does not hold the bean
+     * @since 5.3.0
+     */
+    <T> Optional<BeanRegistration<T>> findRegistration(@Nullable T bean);
+
+    /**
+     * Returns whether this resolver created and still holds the given bean, by identity, see
+     * {@link #findRegistration(Object)}.
+     * @param bean The bean instance
+     * @return Whether this resolver holds the bean; false for {@code null}
+     * @since 5.3.0
+     */
+    default boolean owns(@Nullable Object bean) {
+        return findRegistration(bean).isPresent();
+    }
 
     /**
      * Creates a child group. The consumer closes it automatically, but the caller may close it earlier; closing it

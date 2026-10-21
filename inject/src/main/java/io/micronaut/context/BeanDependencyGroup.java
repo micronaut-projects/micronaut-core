@@ -18,8 +18,6 @@ package io.micronaut.context;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.core.annotation.Experimental;
 
-import java.util.Optional;
-
 /**
  * An explicitly owned group of dependencies. Close the group to destroy its owned beans, in reverse creation
  * order. Shared beans stay in their scopes. Closing is idempotent and attempts every dependent destruction.
@@ -39,17 +37,6 @@ import java.util.Optional;
  */
 @Experimental
 public sealed interface BeanDependencyGroup extends BeanDependencyResolver, AutoCloseable permits DefaultBeanDependencyResolver {
-    /**
-     * Finds the registration this group owns for a bean instance, such as one it created for a dependent lookup, so
-     * that the caller can {@link #destroy(BeanRegistration) destroy} it early without keeping its own index. A shared
-     * registration the group resolved is not owned and is not found. Instance identity, not equality, selects it.
-     * @param bean The bean instance
-     * @param <T> The bean type
-     * @return The owned registration, or empty when the group does not own one for the instance
-     * @since 5.3.0
-     */
-    <T> Optional<BeanRegistration<T>> findRegistration(T bean);
-
     /**
      * Creates and owns a fresh instance of an exact definition, bypassing that bean's scope.
      * @param definition The definition

@@ -841,7 +841,9 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         ExecutionFlow<R> sending = bufferedHeaders == null
             ? send(propagatedContext, preferredScheduler, blockedThread, request, selection)
             : sendBuffered(propagatedContext, preferredScheduler, blockedThread, request, selection, bufferedHeaders);
-        return sending.flatMap(byteBodyResponse -> {
+        // the response may complete on a thread without the context of the caller, e.g. the event
+        // loop of a new connection
+        return sending.flatMap(byteBodyResponse -> propagatedContext.propagate(() -> {
             // handle redirects or map the response bytes
             int code = byteBodyResponse.code();
             String location = byteBodyResponse.getHeaders().get(HttpHeaders.LOCATION);
@@ -889,7 +891,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 }
                 return readResponse.apply(request, byteBodyResponse);
             }
-        });
+        }));
     }
 
     /**
@@ -1434,7 +1436,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             // without Reactor: the pieces are split into elements as they are pulled
             PieceReader<O> pieceReader = PieceReaders.open(reader, type, mediaType, headers, maxElementSize);
             CloseableByteBody body = response.byteBody().move();
-            return ElementsResponse.of(response, new ByteBodyElements<>(body, pieceReader, Function.identity()));
+            return ElementsResponse.of(response, new ByteBodyElements<>(body, pieceReader, Function.identity(), true));
         });
     }
 

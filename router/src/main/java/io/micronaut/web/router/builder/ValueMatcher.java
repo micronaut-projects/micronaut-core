@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
 
 /**
  * A declarative matcher of a value: of a header, a query parameter, a cookie or the host of a
- * request, see {@link RouteCondition}, or of a path variable, see
+ * request, see {@link RequestCondition}, or of a path variable, see
  * {@link RouteSpec#constrain(String, ValueMatcher)}. A matcher is data: the router can read,
  * combine, reorder and index it, which a lambda does not allow.
  *
@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
  * import static io.micronaut.web.router.builder.ValueMatcher.*;
  *
  * routes.GET("/search")
- *     .where(RouteCondition.header("X-Channel", oneOf("beta", "canary").ignoringCase()))
+ *     .where(RequestCondition.header("X-Channel", oneOf("beta", "canary").ignoringCase()))
  *     .handle(betaHandler);
  * routes.GET("/files/{name}")
  *     .constrain("name", startsWith(".").negate())
@@ -185,7 +185,7 @@ public sealed interface ValueMatcher {
      * @return Whether it matches
      */
     default boolean matches(@Nullable CharSequence value) {
-        return RouteConditions.matches(this, value);
+        return RequestConditions.matches(this, value);
     }
 
     /**

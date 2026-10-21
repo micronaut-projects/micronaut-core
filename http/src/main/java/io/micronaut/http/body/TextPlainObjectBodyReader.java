@@ -107,6 +107,14 @@ public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReade
      * {@code Accept-Charset} header is a preference for the response and is not consulted.
      */
     private Charset getCharset(@Nullable MediaType mediaType) {
-        return mediaType == null ? defaultCharset : mediaType.getCharset().orElse(defaultCharset);
+        if (mediaType == null) {
+            return defaultCharset;
+        }
+        try {
+            return mediaType.getCharset().orElse(defaultCharset);
+        } catch (IllegalArgumentException e) {
+            // IllegalCharsetNameException or UnsupportedCharsetException: the client sent a bad charset
+            throw new CodecException("Unsupported charset in content type: " + mediaType, e);
+        }
     }
 }

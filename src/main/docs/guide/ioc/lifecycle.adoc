@@ -108,8 +108,9 @@ Use `group.destroy(registration)` for early destruction: it removes only a regis
 using registration identity. `group.createBeanRegistration(definition)` creates a fresh owned instance.
 A group returned by an injected `BeanDependencyResolver.createGroup()` also belongs to the consumer and is
 closed automatically with it; closing it earlier detaches it from the consumer, so a long-lived consumer can open a
-child group per operation. Independent groups must be closed by their callers. `group.findRegistration(bean)` returns
-the registration a group owns for an instance, so a caller that only kept the instance can still destroy it early.
+child group per operation. Independent groups must be closed by their callers. `findRegistration(bean)` on a group or an
+injected resolver returns the registration it holds for an instance, so a caller that only kept the instance can still
+destroy it early.
 
 For temporary method arguments, `BeanContext.withDependencies(group -> ...)` releases owned dependencies
 when the synchronous invocation ends, including when it fails. Cleanup attempts every dependent and suppresses
