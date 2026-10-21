@@ -217,7 +217,7 @@ class LocatedRoutesTableTest {
 
     @Test
     void theBuilderOfAnHttpRoutesBeanCannotLocateOnceClosed() {
-        DefaultHttpRouteBuilder routes = new DefaultHttpRouteBuilder(new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { }));
+        DefaultHttpRouteBuilder routes = new DefaultHttpRouteBuilder(new RouteAssembly(null, ConversionService.SHARED, uri -> uri));
         routes.GET("/declared", LocatedRoutesTableTest::ok);
         routes.close();
 
@@ -265,7 +265,7 @@ class LocatedRoutesTableTest {
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         return new DefaultRouter(List.of(), List.of(() -> assembly));
     }

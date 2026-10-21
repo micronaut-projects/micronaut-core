@@ -25,6 +25,9 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableByteBodyHttpResponse;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.cookie.Cookie;
@@ -296,6 +299,19 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
     @Override
     public io.netty.handler.codec.http.HttpResponse toHttpResponse() {
         return toFullHttpResponse();
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>The returned response keeps a copy of the received body bytes, so they can still be read
+     * or converted (e.g. the body of an error response that was not converted to the expected
+     * type), and are relayed unchanged if the response is returned by a server. Setting an object
+     * body replaces the bytes.
+     */
+    @Override
+    public MutableHttpResponse<?> toMutableResponse() {
+        byte[] bytes = ByteBufUtil.getBytes(unpooledContent, unpooledContent.readerIndex(), unpooledContent.readableBytes(), true);
+        return MutableByteBodyHttpResponse.of(this, ByteBodyFactory.createDefault(NettyByteBufferFactory.DEFAULT).adapt(bytes));
     }
 
     @Override

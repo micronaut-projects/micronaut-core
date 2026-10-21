@@ -325,7 +325,7 @@ class RouteGroupSettingsTest {
     }
 
     private static Router router(@Nullable ApplicationContext context, Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(context, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(context, ConversionService.SHARED, uri -> uri);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         return new DefaultRouter(List.of(), List.of(() -> assembly));
