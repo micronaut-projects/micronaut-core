@@ -115,7 +115,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * How long the rest of a request body is read at most after a response that closes the
      * connection, see {@link #closeAfterResponse()}.
      */
-    private static final long LINGER_MAX_MILLIS = 30_000;
+    private static final long LINGER_MAX_MILLIS = 20_000;
     /**
      * How much of the rest of a request body is read after a response that closes the
      * connection, see {@link #closeAfterResponse()}.
