@@ -22,6 +22,7 @@ import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -48,6 +49,7 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
+import io.micronaut.http.server.binding.UnconsumedArgumentRelease;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.util.HttpDateHeader;
@@ -496,7 +498,18 @@ public final class RouteExecutor {
                     coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext, executorService));
                 }
                 requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
-                Object body = routeMatch.execute();
+                Object body;
+                try {
+                    body = routeMatch.execute();
+                } catch (UnsatisfiedRouteException | ConversionErrorException e) {
+                    // the arguments could not be bound, the route was not invoked
+                    throw e;
+                } catch (Throwable e) {
+                    UnconsumedArgumentRelease.routeInvoked(httpRequest);
+                    throw e;
+                }
+                // the route was invoked and owns its argument values
+                UnconsumedArgumentRelease.routeInvoked(httpRequest);
                 if (body instanceof Optional optional) {
                     body = optional.orElse(null);
                 }

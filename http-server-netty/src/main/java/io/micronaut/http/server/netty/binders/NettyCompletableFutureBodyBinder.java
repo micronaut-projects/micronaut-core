@@ -85,7 +85,9 @@ final class NettyCompletableFutureBodyBinder
                     } catch (Throwable e) {
                         throw new RuntimeException(e);
                     }
-                    return value.orElseThrow(() -> NettyPublisherBodyBinder.extractError(null, context));
+                    Object result = value.orElseThrow(() -> NettyPublisherBodyBinder.extractError(null, context));
+                    NettyBodyAnnotationBinder.releaseIfRouteNotInvoked(nhr, result);
+                    return result;
                 }).toCompletableFuture();
             return () -> Optional.of(future);
         } else {

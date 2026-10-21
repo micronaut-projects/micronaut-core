@@ -16,6 +16,7 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.uri.UriMatchInfo;
 
@@ -85,6 +86,21 @@ public final class BasicHttpAttributes {
     public static ExecutionFlow<?> getRouteWaitsFor(HttpRequest<?> request) {
         @SuppressWarnings("rawtypes")
         Optional<ExecutionFlow> attr = request.getAttribute(ROUTE_WAITS_FOR, ExecutionFlow.class);
+        return attr.orElseGet(ExecutionFlow::empty);
+    }
+
+    /**
+     * Remove the conditions that must be awaited before executing controllers for the given
+     * request and return them.
+     *
+     * @param request The request
+     * @return The condition to wait for
+     * @since 5.2.18
+     */
+    @Internal
+    public static ExecutionFlow<?> takeRouteWaitsFor(HttpRequest<?> request) {
+        @SuppressWarnings("rawtypes")
+        Optional<ExecutionFlow> attr = request.removeAttribute(ROUTE_WAITS_FOR, ExecutionFlow.class);
         return attr.orElseGet(ExecutionFlow::empty);
     }
 
