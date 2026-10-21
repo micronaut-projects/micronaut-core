@@ -171,6 +171,17 @@ abstract class MultiplexedServerHandler {
          * Whether the stream was abandoned, guarded by this stream.
          */
         private boolean abandoned;
+        /**
+         * Set once the promise of the final write of the response is created, before the write
+         * is submitted.
+         */
+        private volatile boolean finalWriteIssued;
+        private volatile boolean recordFinalWrite;
+        /**
+         * The recorded promise of the final write, see {@link #recordFinalWrite()}. Confined to
+         * the event loop.
+         */
+        private @Nullable ChannelPromise finalWrite;
 
         MultiplexedStream(int streamId) {
             if (JfrSupport.isRecorderInitialized() && Http2RequestEvent.isTurnedOn()) {
@@ -404,7 +415,7 @@ abstract class MultiplexedServerHandler {
          * stream error, while the request waited for its route.
          */
         final void onStreamClosed() {
-            if (!finished) {
+            if (!finished || finalWritePending()) {
                 reset = true;
                 abandon();
             }
@@ -456,6 +467,11 @@ abstract class MultiplexedServerHandler {
                 executor.execute(callback);
             }
             return () -> { };
+        }
+
+        @Override
+        public final synchronized boolean isAbandoned() {
+            return abandoned;
         }
 
         private synchronized void removeAbandonCallback(Runnable callback) {
@@ -578,7 +594,16 @@ abstract class MultiplexedServerHandler {
             }
             if (!requiredCtx().executor().inEventLoop()) {
                 ByteBuf finalContent = content;
-                requiredCtx().executor().execute(() -> writeFull(response, finalContent));
+                requiredCtx().executor().execute(() -> {
+                    try {
+                        writeFull(response, finalContent);
+                    } catch (Throwable t) {
+                        // no caller to answer a fallback response: give up on the response
+                        LOG.warn("Failed to write the response: {}", t.getMessage(), t);
+                        requestHandler.responseFailed(attachment, t);
+                        abortWrittenResponse();
+                    }
+                });
                 return;
             }
             if (headersWritten) {
@@ -652,11 +677,42 @@ abstract class MultiplexedServerHandler {
             }
         }
 
+        @Override
+        public final boolean recordFinalWrite() {
+            // a volatile write before the read, the reverse of endPromise: one of them sees the other
+            recordFinalWrite = true;
+            return !finalWriteIssued;
+        }
+
+        @Override
+        public final @Nullable ChannelFuture finalWrite() {
+            return finalWrite;
+        }
+
+        /**
+         * @return Whether the recorded final write has not completed successfully yet
+         */
+        private boolean finalWritePending() {
+            ChannelPromise promise = finalWrite;
+            return promise != null && !promise.isSuccess();
+        }
+
         private ChannelPromise endPromise(HttpResponse response) {
+            finalWriteIssued = true;
+            boolean record = recordFinalWrite;
             if (jfrEvent == null) {
+                if (record) {
+                    ChannelPromise promise = requiredCtx().newPromise();
+                    finalWrite = promise;
+                    return promise;
+                }
                 return requiredCtx().voidPromise();
             }
-            return requiredCtx().newPromise().addListener((ChannelFutureListener) future -> {
+            ChannelPromise promise = requiredCtx().newPromise();
+            if (record) {
+                finalWrite = promise;
+            }
+            return promise.addListener((ChannelFutureListener) future -> {
                 jfrEvent.end();
                 if (jfrEvent.shouldCommit()) {
                     jfrEvent.populateChannel(requiredCtx().channel());
@@ -999,7 +1055,15 @@ abstract class MultiplexedServerHandler {
                             data = previous;
                         }
                     }
-                    writeEnd(data, body, response);
+                    try {
+                        writeEnd(data, body, response);
+                    } catch (Throwable t) {
+                        // e.g. trailers that cannot be converted: the writer still reports the
+                        // response as written, which cleans up the request
+                        LOG.warn("Failed to end the streamed response: {}", t.getMessage(), t);
+                        requestHandler.responseFailed(attachment, t);
+                        reset(t);
+                    }
                 }
                 flush();
             }
@@ -1050,6 +1114,7 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public void fail(Throwable e) {
+                requestHandler.responseFailed(attachment, e);
                 if (!reset(e)) {
                     LOG.warn("The streamed response body failed after some of it was written. The error cannot be forwarded to the client, and the response ends abruptly.", e);
                 }
