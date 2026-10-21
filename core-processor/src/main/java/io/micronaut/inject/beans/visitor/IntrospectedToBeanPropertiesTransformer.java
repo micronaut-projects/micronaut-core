@@ -61,6 +61,9 @@ public final class IntrospectedToBeanPropertiesTransformer implements TypedAnnot
         if (excludedAnnotations.length > 0) {
             beanPropertiesBuilder = beanPropertiesBuilder.member(BeanProperties.MEMBER_EXCLUDED_ANNOTATIONS, excludedAnnotations);
         }
+        if (annotation.isTrue(BeanProperties.MEMBER_INCLUDE_INJECTED)) {
+            beanPropertiesBuilder = beanPropertiesBuilder.member(BeanProperties.MEMBER_INCLUDE_INJECTED, true);
+        }
         return List.of(
                 annotation.mutate().stereotype(beanPropertiesBuilder.build()).build()
         );

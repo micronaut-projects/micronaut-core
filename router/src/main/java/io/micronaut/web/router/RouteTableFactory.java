@@ -67,7 +67,7 @@ public final class RouteTableFactory {
      * @param conversionService The conversion service
      */
     RouteTableFactory(@Nullable Object beanLocator, ConversionService conversionService) {
-        this(new RouteAssembly(beanLocator, conversionService, uri -> uri, route -> { }));
+        this(new RouteAssembly(beanLocator, conversionService, uri -> uri));
     }
 
     /**
