@@ -25,8 +25,10 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
 import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
+import io.micronaut.web.router.websocket.WebSocketUpgradeCondition;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -134,7 +136,13 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     }
 
     @Override
-    public HttpRouteSpec where(RouteCondition condition) {
+    public HttpRouteSpec selectedBy(@Nullable RouteMatchSelector selector) {
+        route.selectedBy(selector);
+        return this;
+    }
+
+    @Override
+    public HttpRouteSpec where(RequestCondition condition) {
         route.where(condition);
         return this;
     }
@@ -184,7 +192,17 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     @Override
     public void handle(RequestHandler handler) {
         RequestHandler checked = route.terminal(handler, HANDLER);
+        if (checked instanceof ResourceHandler resources) {
+            // the handler of resources at a route of its own: the executor and the media types of a route of resources
+            route.endResourceHandler(resources);
+            return;
+        }
         route.end(() -> HandlerMethod.of(checked), null, 0);
+    }
+
+    @Override
+    public void resources(ResourceHandler resources) {
+        route.endResources(route.terminal(resources, "resources"));
     }
 
     @Override
@@ -232,11 +250,18 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
             route.drop();
             throw e;
         }
+        WebSocketUpgradeCondition.registered();
         // the upgrade request has no body and the connection no response body: the media types
         // of a group do not apply, its executor runs the handlers of the connections
         route.end(() -> HandlerMethod.webSocket(webSocket, metadata),
-            // the server finds the endpoint in the attribute of the route
-            settings -> settings.attribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, webSocket),
+            settings -> {
+                // only an upgrade request matches the route, like the route of a @ServerWebSocket:
+                // a plain request to its path is left to the other routes. The condition is the
+                // first of the route, before the conditions the route declares
+                settings.where(RequestCondition.custom(WebSocketUpgradeCondition.INSTANCE));
+                // the server finds the endpoint in the attribute of the route
+                settings.attribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, webSocket);
+            },
             RouteGroupDefaults.CONSUMES_SETTING | RouteGroupDefaults.PRODUCES_SETTING);
     }
 

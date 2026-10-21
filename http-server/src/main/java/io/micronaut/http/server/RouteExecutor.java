@@ -35,6 +35,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -42,6 +43,7 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
@@ -64,7 +66,9 @@ import io.micronaut.inject.MethodReference;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.web.router.AcceptedMediaTypes;
 import io.micronaut.web.router.DefaultRouteInfo;
+import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.GroupErrorRoutes;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
@@ -89,8 +93,10 @@ import reactor.util.context.ContextView;
 
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -139,6 +145,10 @@ public final class RouteExecutor {
      * closed on an event loop.
      */
     private final Supplier<@Nullable ExecutorService> blockingExecutor;
+    /**
+     * Chooses a route by the body of a request, {@code null} if no route has body conditions.
+     */
+    private final @Nullable BodyRouteSelector bodyRouteSelector;
 
     /**
      * Default constructor.
@@ -166,6 +176,14 @@ public final class RouteExecutor {
         this.suspendedRoutesNeedReactorContext = coroutineHelper.isPresent() && coroutineHelper.get().isReactorContextPropagated();
         this.conversionService = beanContext.getConversionService();
         this.blockingExecutor = SupplierUtil.memoized(() -> executorSelector.select(TaskExecutors.BLOCKING).orElse(null));
+        if (router.hasBodyConditions()) {
+            // a body condition reads at most what the server may buffer
+            BodyRouteSelector.checkMaxBytes(router, serverConfiguration.getMaxRequestBufferSize());
+            this.bodyRouteSelector = new BodyRouteSelector(serverConfiguration, beanContext.getBean(MessageBodyHandlerRegistry.class),
+                requestArgumentSatisfier.getBinderRegistry(), conversionService);
+        } else {
+            this.bodyRouteSelector = null;
+        }
     }
 
     /**
@@ -209,6 +227,13 @@ public final class RouteExecutor {
         return router.findClosest(httpRequest);
     }
 
+    /**
+     * @return The step that chooses a route by the body of a request
+     */
+    BodyRouteSelector bodyRouteSelector() {
+        return Objects.requireNonNull(bodyRouteSelector, "No route has body conditions");
+    }
+
     static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
         setRouteAttributes(request, (RouteMatch<?>) route);
         // a located route has the template under the prefixes of its locator routes
@@ -221,6 +246,24 @@ public final class RouteExecutor {
     }
 
     /**
+     * Report the failure to the server request, also through the wrappers of the filters.
+     */
+    private static void recordResponseFailure(HttpRequest<?> httpRequest, Throwable cause) {
+        HttpRequest<?> current = httpRequest;
+        while (true) {
+            if (current instanceof ResponseFailureRecorder recorder) {
+                recorder.responseFailed(cause);
+                return;
+            }
+            if (current instanceof HttpRequestWrapper<?> wrapper) {
+                current = wrapper.getDelegate();
+            } else {
+                return;
+            }
+        }
+    }
+
+    /**
      * Creates a default error response. Should be used when a response could not be retrieved
      * from any other method.
      *
@@ -230,6 +273,7 @@ public final class RouteExecutor {
      */
     public MutableHttpResponse<?> createDefaultErrorResponse(HttpRequest<?> httpRequest,
                                                              Throwable cause) {
+        recordResponseFailure(httpRequest, cause);
         logException(cause);
         MutableHttpResponse<?> mutableHttpResponse = HttpResponse.serverError();
         RouteAttributes.setException(mutableHttpResponse, cause);
@@ -274,9 +318,21 @@ public final class RouteExecutor {
      * @return The default content type declared on the route
      */
     public MediaType resolveDefaultResponseContentType(@Nullable HttpRequest<?> request, RouteInfo<?> finalRoute) {
+        if (request != null && finalRoute instanceof DefaultUrlRouteInfo<?, ?> uriRoute && uriRoute.hasRouteMatchSelector()) {
+            // the media type the route selector of the kind of the template of the route negotiated
+            MediaType selected = selectedMediaType(request);
+            if (selected != null) {
+                return selected;
+            }
+        }
         final List<MediaType> producesList = finalRoute.getProduces();
+        Collection<MediaType> accepted = request != null ? request.accept() : List.of();
+        if (AcceptedMediaTypes.hasRejected(accepted)) {
+            // an accepted type of the quality 0 is not acceptable, RFC 9110 12.4.2
+            return acceptableResponseContentType(finalRoute, producesList, accepted);
+        }
         if (request != null) {
-            final Iterator<MediaType> i = request.accept().iterator();
+            final Iterator<MediaType> i = accepted.iterator();
             if (i.hasNext()) {
                 final MediaType mt = i.next();
                 if (producesList.contains(mt)) {
@@ -293,6 +349,49 @@ public final class RouteExecutor {
             defaultResponseMediaType = MediaType.APPLICATION_JSON_TYPE;
         }
         return MediaType.ALL_TYPE.equals(defaultResponseMediaType) ? MediaType.APPLICATION_JSON_TYPE : defaultResponseMediaType;
+    }
+
+    /**
+     * @param finalRoute   The route
+     * @param producesList The types the route produces
+     * @param accepted     The accepted types, some of the quality 0
+     * @return The negotiated type, else, when no type is acceptable, which routing excludes for the
+     * routes of a request (an error route answers anyway), the first produced type
+     */
+    private static MediaType acceptableResponseContentType(RouteInfo<?> finalRoute, List<MediaType> producesList, Collection<MediaType> accepted) {
+        List<MediaType> produces = producesList.isEmpty() ? List.of(MediaType.APPLICATION_JSON_TYPE) : producesList;
+        MediaType negotiated = AcceptedMediaTypes.negotiate(produces, finalRoute.producesAll(), accepted);
+        if (negotiated != null) {
+            return negotiated;
+        }
+        MediaType first = produces.get(0);
+        return MediaType.ALL_TYPE.equals(first) ? MediaType.APPLICATION_JSON_TYPE : first;
+    }
+
+    /**
+     * The acceptable response types of a request with accepted types of the quality {@code 0}, in
+     * the order of the negotiation: the first is {@link #resolveDefaultResponseContentType}, the
+     * others are the alternatives when the body cannot be written in it.
+     *
+     * @param request    The request
+     * @param finalRoute The route
+     * @return The acceptable types, empty when none is acceptable, or {@code null} when the
+     * request has no rejected type or a route selector negotiated the type
+     */
+    @Nullable List<MediaType> acceptableResponseContentTypes(HttpRequest<?> request, RouteInfo<?> finalRoute) {
+        Collection<MediaType> accepted = request.accept();
+        if (!AcceptedMediaTypes.hasRejected(accepted)
+            || finalRoute instanceof DefaultUrlRouteInfo<?, ?> uriRoute && uriRoute.hasRouteMatchSelector() && selectedMediaType(request) != null) {
+            return null;
+        }
+        List<MediaType> producesList = finalRoute.getProduces();
+        List<MediaType> produces = producesList.isEmpty() ? List.of(MediaType.APPLICATION_JSON_TYPE) : producesList;
+        return AcceptedMediaTypes.negotiateAll(produces, finalRoute.producesAll(), accepted);
+    }
+
+    private static @Nullable MediaType selectedMediaType(HttpRequest<?> request) {
+        RouteMatch<?> match = RouteAttributes.getRouteMatch(request).orElse(null);
+        return match instanceof UriRouteMatch<?, ?> uriMatch ? uriMatch.getSelectedMediaType().orElse(null) : null;
     }
 
     private MutableHttpResponse<?> notFoundErrorResponse(HttpRequest<?> request) {
