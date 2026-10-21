@@ -29,6 +29,11 @@ NOTE: 'micronaut.config.files' will be ignored in bootstrap.yml or application.y
 You can import additional configuration directly from a configuration file using `micronaut.config.import`.
 The value can be a single string, a list, or indexed entries (`micronaut.config.import[0]`, `micronaut.config.import[1]`, ...).
 
+Import locations and structured declaration values support property placeholders, including defaults and custom property expression resolvers.
+Placeholders are resolved before selecting the provider or parsing the connection string, using the current configuration and properties from imports already loaded.
+For example, `file://${CONFIG_DIRECTORY:/etc/myapp}/shared.properties` selects a directory from configuration or an environment variable, defaulting to `/etc/myapp`.
+A missing placeholder without a default fails configuration loading even when the import has the `optional:` prefix; that prefix permits a missing import target.
+
 [configuration,title="Importing additional configuration"]
 ----
 micronaut:

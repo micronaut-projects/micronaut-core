@@ -23,6 +23,7 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ConnectionString;
 import org.jspecify.annotations.Nullable;
@@ -30,6 +31,7 @@ import org.jspecify.annotations.Nullable;
 import java.io.Closeable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.LinkedHashMap;
@@ -37,6 +39,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -81,8 +84,10 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
         }
         importerByKindMap.putAll(toImporterByProvider(importers));
         List<PropertySource> result = new ArrayList<>();
-        for (PropertySource propertySource : environment.getPropertySources()) {
-            result.addAll(resolveConfigImports(environment, propertySource));
+        try (ImportPropertyResolver properties = new ImportPropertyResolver(environment)) {
+            for (PropertySource propertySource : environment.getPropertySources()) {
+                result.addAll(resolveConfigImports(environment, propertySource, properties));
+            }
         }
         return result;
     }
@@ -105,13 +110,14 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
         return importerByKindMap.get(provider.toLowerCase(Locale.ROOT));
     }
 
-    private List<PropertySource> resolveConfigImports(Environment environment, PropertySource root) {
+    private List<PropertySource> resolveConfigImports(Environment environment, PropertySource root, ImportPropertyResolver properties) {
         List<PropertySource> resolved = new ArrayList<>();
         Set<ConfigImportIdentity.ImportIdentity> visited = new LinkedHashSet<>();
         Deque<String> chain = new ArrayDeque<>();
-        ResolvedImportDeclarations parsed = normalize(root);
+        ResolvedImportDeclarations parsed = normalize(root, properties);
         resolveImports(
             environment,
+            properties,
             parsed.imports(),
             parsed.propertySource().getOrigin(),
             parsed.propertySource().getOrder(),
@@ -124,6 +130,7 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
     }
 
     private void resolveImports(Environment environment,
+                                ImportPropertyResolver properties,
                                 List<ImportDeclaration> imports,
                                 Origin parentOrigin,
                                 int tierOrder,
@@ -151,10 +158,11 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
 
                     chain.addLast(identityLocation);
                     try {
-                        ResolvedImportDeclarations parsedImported = normalize(imported.get());
+                        properties.addImportedSource(imported.get());
+                        ResolvedImportDeclarations parsedImported = normalize(imported.get(), properties);
                         PropertySource importedSource = parsedImported.propertySource();
                         resolved.add(importedSource);
-                        resolveImports(environment, parsedImported.imports(), importedSource.getOrigin(), tierOrder, importedSource.getConvention(), resolved, visited, chain);
+                        resolveImports(environment, properties, parsedImported.imports(), importedSource.getOrigin(), tierOrder, importedSource.getConvention(), resolved, visited, chain);
                     } finally {
                         chain.removeLast();
                     }
@@ -202,6 +210,10 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
     }
 
     ResolvedImportDeclarations normalize(PropertySource propertySource) {
+        return normalize(propertySource, null);
+    }
+
+    private ResolvedImportDeclarations normalize(PropertySource propertySource, @Nullable ImportPropertyResolver properties) {
         if (!(propertySource instanceof ImportCapablePropertySource)) {
             return new ResolvedImportDeclarations(propertySource, List.of());
         }
@@ -219,6 +231,10 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
             Object value = propertySource.get(key);
             if (value == null) {
                 continue;
+            }
+            if (properties != null && (CONFIG_IMPORT.equals(key) || key.startsWith(STRUCTURED_ROOT_PREFIX)
+                || INDEXED_PATTERN.matcher(key).matches() || INDEXED_PROPERTY_PATTERN.matcher(key).matches())) {
+                value = properties.resolveValue(value);
             }
             if (CONFIG_IMPORT.equals(key)) {
                 hasRoot = true;
@@ -383,6 +399,68 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
         }
         if (closeException != null) {
             throw closeException;
+        }
+    }
+
+    private static final class ImportPropertyResolver extends PropertySourcePropertyResolver {
+        private final List<PropertySource> sources;
+        private boolean initialized;
+
+        private ImportPropertyResolver(Environment environment) {
+            super(environment.getConversionService(), false, environment.getClassLoader());
+            sources = new ArrayList<>(environment.getPropertySources());
+        }
+
+        private void addImportedSource(PropertySource source) {
+            sources.add(source);
+            if (initialized) {
+                rebuild();
+            }
+        }
+
+        private void rebuild() {
+            OrderUtil.sortOrdered(sources);
+            reset();
+            for (PropertySource source : sources) {
+                super.addPropertySource(source);
+            }
+            initialized = true;
+        }
+
+        @Override
+        public void close() {
+            try {
+                super.close();
+            } catch (Exception e) {
+                throw new ConfigurationException("Error closing config import placeholder resolvers", e);
+            }
+        }
+
+        private @Nullable Object resolveValue(@Nullable Object value) {
+            if (value instanceof CharSequence sequence) {
+                String text = sequence.toString();
+                if (text.contains(propertyPlaceholderResolver.getPrefix())) {
+                    if (!initialized) {
+                        // Import declarations are read before the environment's catalogs are built.
+                        rebuild();
+                    }
+                    Object resolved = propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(text);
+                    return resolved instanceof CharSequence ? resolved : resolveValue(resolved);
+                }
+            } else if (value instanceof Map<?, ?> map) {
+                Map<Object, Object> resolved = new LinkedHashMap<>(map.size());
+                map.forEach((key, entry) -> resolved.put(key, resolveValue(entry)));
+                return resolved;
+            } else if (value instanceof Iterable<?> iterable) {
+                List<Object> resolved = new ArrayList<>();
+                iterable.forEach(entry -> resolved.add(resolveValue(entry)));
+                return resolved;
+            } else if (value instanceof String[] array) {
+                return Arrays.stream(array).map(entry -> Objects.toString(resolveValue(entry), null)).toArray(String[]::new);
+            } else if (value instanceof Object[] array) {
+                return Arrays.stream(array).map(this::resolveValue).toArray();
+            }
+            return value;
         }
     }
 
