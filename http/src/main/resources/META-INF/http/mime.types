@@ -149,7 +149,7 @@ application/javascript				mjs
 # application/jose
 # application/jose+json
 # application/jrd+json
-application/json				json
+application/json				json map
 # application/json-patch+json
 # application/json-seq
 application/jsonml+json				jsonml
@@ -168,6 +168,7 @@ application/lost+xml				lostxml
 application/mac-binhex40			hqx
 application/mac-compactpro			cpt
 # application/macwriteii
+application/manifest+json			webmanifest
 application/mads+xml				mads
 application/marc				mrc
 application/marcxml+xml				mrcx
@@ -1214,6 +1215,7 @@ application/vnd.yellowriver-custom-menu		cmp
 application/vnd.zul				zir zirz
 application/vnd.zzazz.deck+xml			zaz
 application/voicexml+xml			vxml
+application/wasm				wasm
 # application/vq-rtcpxr
 # application/watcherinfo+xml
 # application/whoispp-query
@@ -1539,6 +1541,7 @@ font/otf					otf
 font/ttf					ttf
 font/woff					woff
 font/woff2					woff2
+image/avif					avif
 image/bmp					bmp
 image/cgm					cgm
 # image/dicom-rle

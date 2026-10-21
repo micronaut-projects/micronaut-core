@@ -1172,11 +1172,10 @@ public final class ReflectionAnnotations {
         register(metadata, metaType);
         register(metadata, container);
         DefaultAnnotationMetadata.registerRepeatableAnnotations(Map.of(metaType.getName(), container.getName()));
-        AnnotationValue<?> value = valueOf(meta, values -> {
-            if (overrides != null) {
-                values.putAll(overrides);
-            }
-        });
+        // the overrides are applied while the values are read, as for a stereotype that is not repeatable, so
+        // that the retained tree of each occurrence in the container carries them down to its leaves
+        AnnotationValue<?> value = new AnnotationValue<>(metaType.getName(),
+            overridden(values(meta, new HashSet<>(), overrides), overrides), defaultValues(metaType));
         if (declared) {
             metadata.addDeclaredRepeatableStereotype(parents, container.getName(), value);
         } else {

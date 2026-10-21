@@ -23,6 +23,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Header;
@@ -292,6 +293,31 @@ public class FormArgumentsTest {
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
             assertEquals(HttpStatus.OK, missing.status(), missing.body());
             assertEquals("null empty null empty", missing.body());
+        }
+    }
+
+    @Test
+    void aCollectionOfATextFieldReadByNameGetsEveryValue() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (String uri : List.of(CTL + "/tags-by-name", CTL + "/tags-body")) {
+                Response response = call(server, HttpRequest.POST(uri, "tags=one&name=Fred&tags=two")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+                assertEquals(HttpStatus.OK, response.status(), response.body());
+                assertEquals("Fred [one, two]", response.body(), uri);
+            }
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void aCollectionOfATextFieldOfAMultipartFormReadByNameGetsEveryValue() throws IOException {
+        try (ServerUnderTest server = server()) {
+            MultipartBody tags = MultipartBody.builder().addPart("tags", "one").addPart("name", "Fred").addPart("tags", "two").build();
+            for (String uri : List.of(CTL + "/tags-by-name", CTL + "/tags-body")) {
+                Response response = call(server, multipart(uri, tags));
+                assertEquals(HttpStatus.OK, response.status(), response.body());
+                assertEquals("Fred [one, two]", response.body(), uri);
+            }
         }
     }
 
@@ -766,6 +792,16 @@ public class FormArgumentsTest {
                     @Part("tags") String @Nullable [] array,
                     @Part("tags") Optional<String[]> optionalArray) {
             return tagsResult(list, optionalList, array, optionalArray);
+        }
+
+        @Post(uri = "/tags-by-name", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
+        String tagsByName(String name, List<String> tags) {
+            return name + " " + tags;
+        }
+
+        @Post(uri = "/tags-body", consumes = {MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA}, produces = MediaType.TEXT_PLAIN)
+        String tagsBody(@Body("name") String name, @Body("tags") List<String> tags) {
+            return name + " " + tags;
         }
 
         private static String tagsResult(@Nullable List<String> list, Optional<List<String>> optionalList, String @Nullable [] array, Optional<String[]> optionalArray) {

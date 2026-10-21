@@ -36,7 +36,9 @@ internal class KotlinSimplePropertyElement(
     private val setterMethod: MethodElement?,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,
-    excluded: Boolean = false
+    excluded: Boolean = false,
+    private val readAccessKind: PropertyElement.AccessKind = PropertyElement.AccessKind.METHOD,
+    private val writeAccessKind: PropertyElement.AccessKind = PropertyElement.AccessKind.METHOD
 ) : AbstractKotlinPropertyElement<KotlinSimplePropertyNativeElement>(
     KotlinSimplePropertyNativeElement(type, internalFieldElement, getterMethod, setterMethod),
     ownerType,
@@ -102,8 +104,14 @@ internal class KotlinSimplePropertyElement(
         setterMethod,
         elementAnnotationMetadataFactory,
         visitorContext,
-        isExcluded
+        isExcluded,
+        readAccessKind,
+        writeAccessKind
     )
+
+    override fun getReadAccessKind() = readAccessKind
+
+    override fun getWriteAccessKind() = writeAccessKind
 
     override fun isPublic(): Boolean {
         if (fieldElement.isPresent && fieldElement.get().isPublic) {

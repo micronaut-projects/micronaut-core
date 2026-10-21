@@ -12,7 +12,6 @@ dependencies {
     testImplementation(projects.micronautContextPythonNetty)
     testImplementation(projects.micronautInjectPython)
     testImplementation(projects.micronautInjectPythonTest)
-    testImplementation(projects.micronautInjectTestUtils)
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(projects.micronautHttpClient)
     testImplementation(projects.micronautHttpClientCore)
