@@ -21,13 +21,13 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.QueryStringDecoder;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.DelegatingExecutableMethod;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
-import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.List;
@@ -163,7 +163,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
                 variables = CollectionUtils.newLinkedHashMap(matchVariables.size());
                 matchVariables.forEach((k, v) -> {
                     if (v instanceof CharSequence) {
-                        v = URLDecoder.decode(v.toString(), defaultCharset);
+                        v = QueryStringDecoder.decodePathComponent(v.toString(), defaultCharset);
                     }
                     variables.put(k, v);
                 });

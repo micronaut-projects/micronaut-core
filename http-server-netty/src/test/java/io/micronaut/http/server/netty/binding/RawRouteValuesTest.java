@@ -27,6 +27,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.FormOptions;
@@ -98,6 +99,13 @@ class RawRouteValuesTest {
     @Test
     void theDecodedValueIsStillDecoded() throws Exception {
         assertEquals("a/b été", get("/raw/decoded/a%2Fb%20%C3%A9t%C3%A9"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/raw/decoded-plus/", "/raw/fn-decoded/"})
+    void aDecodedPathVariableKeepsAPlusAsAPlus(String path) throws Exception {
+        // only form and query decoding treat a + as a space, RFC 3986 section 3.3
+        assertEquals("a+b c+", get(path + "a+b%20c%2B"));
     }
 
     @Test
@@ -359,6 +367,12 @@ class RawRouteValuesTest {
             return pathVariables.getString("name");
         }
 
+        @Get(uri = "/decoded-plus/{name:[^/]+}", produces = MediaType.TEXT_PLAIN)
+        String decodedPlus(@PathVariable String name, PathVariables pathVariables) {
+            assertEquals(name, pathVariables.getString("name"));
+            return name;
+        }
+
         @Get(uri = "/twice/{name}", produces = MediaType.TEXT_PLAIN)
         String twice(PathVariables pathVariables) {
             return pathVariables.raw().raw().getString("name");
@@ -556,6 +570,8 @@ class RawRouteValuesTest {
     static class RawRoutes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
+            routes.GET("/raw/fn-decoded/{name:[^/]+}", (request, pathVariables) ->
+                HttpResponse.ok(pathVariables.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.GET("/raw/fn/{name:[^/]+}", (request, pathVariables) ->
                 HttpResponse.ok(pathVariables.rawString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.locate("/raw/orgs/{id}", (request, pathVariables) -> pathVariables.rawString("id"), new OrgRoutes());
