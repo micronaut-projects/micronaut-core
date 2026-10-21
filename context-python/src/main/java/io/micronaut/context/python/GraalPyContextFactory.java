@@ -96,8 +96,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * Python code that completes the members of every Java object with what GraalPy host interop does not
      * resolve: the trailing-underscore aliases of members named after a Python keyword
      * ({@code builder.from_(...)} for {@code Builder.from(...)}, {@code spec.and_(other)} for
-     * {@code Specification.and(other)}), and the public methods a class inherits from a non-public
-     * superclass (see {@link PythonHostMembers}).
+     * {@code Specification.and(other)}), the public methods a class inherits from a non-public
+     * superclass (see {@link PythonHostMembers}), and the snake_case methods and read-only getter
+     * properties the compiler computed for the Java types the sources reference
+     * ({@code request.basic_auth(...)}, {@code server.port}).
      * <p>
      * The compiler rewrites keyword aliases only on names it can resolve statically (imported Java
      * classes and {@code java.type(...)} aliases). Objects that Java returns at runtime are plain GraalPy
@@ -105,7 +107,12 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * {@code polyglot.register_interop_type} for {@code java.lang.Object} enters the type of every host
      * object instance and its {@code __getattr__} runs only after the regular foreign member lookup has
      * failed, retrying with the underscore stripped (the rule the compiler applies, {@code keyword.iskeyword},
-     * so the same spelling works everywhere) and then asking the runtime for an inherited member.
+     * so the same spelling works everywhere), then asking the runtime for an inherited member, then
+     * looking the name up in the {@code __micronaut_members__} tables that {@code micronaut_java_imports}
+     * registers from the Java imports manifests as interop types of the referenced Java types: GraalPy
+     * puts the table of every registered supertype of the object's class into its type, so no Java
+     * member is inspected at run time, and a real member of the object always comes first. A name two
+     * tables define differently, or one table blocks as ambiguous, is no alias.
      * <p>
      * It makes every {@link Exception} an instance of the Python {@code Exception} class, so that
      * {@code except Exception} catches the exceptions of Java calls ({@link Error}s remain only a
@@ -121,6 +128,17 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             from polyglot import register_interop_type
             host_members = java.type('io.micronaut.context.python.PythonHostMembers')
 
+            def instance_member(java_type, name):
+                found = None
+                for registered in java_type.__mro__:
+                    members = registered.__dict__.get('__micronaut_members__')
+                    member = members.get(name) if members is not None else None
+                    if member is not None:
+                        if not member or (found is not None and found != member):
+                            return None
+                        found = member
+                return found
+
             class MicronautJavaObject:
                 __slots__ = ()
 
@@ -134,6 +152,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                         member = host_members.inheritedMember(self, name)
                         if member is not None:
                             return member
+                        alias = instance_member(type(self), name)
+                        if alias is not None:
+                            member = getattr(self, alias[0])
+                            return member() if alias[1] == 'property' else member
                     raise AttributeError(f"foreign object has no attribute '{name}'")
 
             register_interop_type(java.type('java.lang.Object'), MicronautJavaObject)

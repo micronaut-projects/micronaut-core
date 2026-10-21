@@ -9,7 +9,9 @@ Java packages, types and annotations every module imports in a manifest
 installed here serves them from the manifests of every compilation on the path. A package is a module
 object without a file whose attributes resolve to host classes on first access; an annotation is a
 callable that carries the annotation type and returns its target, as the compiler-generated decorators
-did; a class the run time class path lacks is a facade resolving it on first use.
+did; a class the run time class path lacks is a facade resolving it on first use. The snake_case methods
+and getter properties the manifests record for Java types are registered with GraalPy as interop types of
+those types, for the Java object fallback of the runtime to answer with.
 
 Loaded by PythonContextRuntime before the application modules import, and imported by the package
 initialisers of the application packages that share their name with a Java package. Kept apart from
@@ -222,6 +224,8 @@ class _MicronautJavaImports:
         self.types = {}
         # Python module name -> simple name -> (binary name, kind)
         self.members = {}
+        # binary name of a Java type -> Python name -> (Java method, 'property' or 'method'), () when ambiguous
+        self.instance_members = {}
         self.manifests = []
 
     def merge(self, manifest):
@@ -236,6 +240,12 @@ class _MicronautJavaImports:
                 existing = merged.get(simple_name)
                 if existing is None or (existing[1] != 'annotation' and _micronaut_host_class(existing[0]) is None):
                     merged[simple_name] = tuple(member)
+        for java_name, members in manifest.get('INSTANCE_MEMBERS', {}).items():
+            merged = self.instance_members.setdefault(java_name, {})
+            for python_name, member in members.items():
+                # computed from the same class path type by every compilation; a disagreement is no alias
+                existing = merged.get(python_name)
+                merged[python_name] = tuple(member) if existing is None or existing == tuple(member) else ()
 
     def java_name(self, python_name):
         return self.types.get(python_name) or self.packages.get(python_name)
@@ -303,8 +313,39 @@ def _micronaut_java_imports():
                             exec(_micronaut_importlib_machinery.SourceFileLoader(name, path).get_code(name), namespace)
                             imports.merge(namespace)
                             imports.manifests.append(path)
+                _micronaut_register_instance_members(imports.instance_members)
                 _micronaut_java_imports_cache = imports
     return imports
+
+
+# binary name -> the interop type registered for it in this context; kept across reloads of this module, as a
+# type registered again would join the Java type's classes a second time
+_micronaut_instance_member_types = globals().get('_micronaut_instance_member_types', {})
+
+
+def _micronaut_register_instance_members(instance_members):
+    """
+    Registers the instance member names of each Java type as the ``__micronaut_members__`` table of an interop
+    type of the type: GraalPy adds it to the type of every instance of the Java type and of its implementations,
+    where the Java object fallback (GraalPyContextFactory) looks the names up. A type registered before keeps its
+    interop type and gets the new table; a type the run time class path lacks is skipped.
+    """
+    for java_name, registered in _micronaut_instance_member_types.items():
+        registered.__micronaut_members__ = instance_members.get(java_name, {})
+    from polyglot import register_interop_type
+    for java_name, members in instance_members.items():
+        if java_name in _micronaut_instance_member_types:
+            continue
+        host_class = _micronaut_host_class(java_name)
+        if host_class is None:
+            continue
+        members_type = type(java_name.rsplit('.', 1)[-1].replace('$', '_') + 'Members', (),
+                            {'__slots__': (), '__micronaut_members__': members})
+        try:
+            register_interop_type(host_class, members_type)
+        except (KeyError, ImportError, TypeError):
+            continue  # not a class GraalPy gives an interop type to
+        _micronaut_instance_member_types[java_name] = members_type
 
 
 def __micronaut_reset_java_imports():
