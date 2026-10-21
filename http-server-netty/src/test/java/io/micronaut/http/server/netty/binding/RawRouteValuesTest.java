@@ -117,6 +117,19 @@ class RawRouteValuesTest {
         assertEquals("+ +", get(path + "%2B%20%2B"));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"/raw/decoded-plus/", "/raw/fn-decoded/"})
+    void aPlusInAPathVariableIsASpaceWhenConfigured(String path) throws Exception {
+        // the decoding before 5.3, like a form value
+        try (ApplicationContext plusAsSpace = ApplicationContext.run(Map.of("spec.name", SPEC_NAME, "micronaut.server.port", -1,
+            "micronaut.router.path-variable-plus-as-space", true))) {
+            int port = plusAsSpace.getBean(EmbeddedServer.class).start().getPort();
+            java.net.http.HttpResponse<String> response = client.send(java.net.http.HttpRequest.newBuilder(
+                URI.create("http://localhost:" + port + path + "a+b%20c%2B")).build(), BodyHandlers.ofString());
+            assertEquals("a b c+", response.body());
+        }
+    }
+
     @Test
     void aLocatedRouteReadsTheRawValuesOfThePrefixAndOfTheRoute() throws Exception {
         assertEquals("p%2Fq!|a+b%C3%A9|p/q!", get("/raw/located/p%2Fq!/items/a+b%C3%A9"));

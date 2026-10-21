@@ -90,10 +90,24 @@ import java.util.function.UnaryOperator;
 @Internal
 public final class RouteAssembly {
 
+    /**
+     * The property that, when {@code true}, decodes a {@code +} in a path variable as a space, like
+     * the router did before 5.3.0, which decoded path variables like form values. It is
+     * {@code false} by default: a {@code +} in a path variable is a plus sign (RFC 3986, Section
+     * 3.3), and a space is sent as {@code %20}.
+     *
+     * @since 5.3.0
+     */
+    public static final String PATH_VARIABLE_PLUS_AS_SPACE = "micronaut.router.path-variable-plus-as-space";
+
     private static final String NO_EXECUTOR = "No executor configured for name: ";
 
     final ConversionService conversionService;
     final Charset defaultCharset;
+    /**
+     * Whether a {@code +} in a path variable is decoded as a space, see {@link #PATH_VARIABLE_PLUS_AS_SPACE}.
+     */
+    final boolean pathVariablePlusAsSpace;
     final List<UriRoute> uriRoutes = new ArrayList<>();
     final List<StatusRoute> statusRoutes = new ArrayList<>();
     final List<ErrorRoute> errorRoutes = new ArrayList<>();
@@ -187,6 +201,7 @@ public final class RouteAssembly {
         if (beanLocator instanceof ApplicationContext applicationContext) {
             Environment environment = applicationContext.getEnvironment();
             defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
+            pathVariablePlusAsSpace = environment.get(PATH_VARIABLE_PLUS_AS_SPACE, Boolean.class, false);
             this.executorSelector = applicationContext.findBean(ExecutorSelector.class).orElse(null);
             // like HttpServerConfiguration, which the router does not depend on
             this.threadSelection = environment.get("micronaut.server.thread-selection", ThreadSelection.class).orElse(ThreadSelection.MANUAL);
@@ -197,6 +212,7 @@ public final class RouteAssembly {
         } else {
             this.conditionContext = RouteConditionContext.fallback();
             defaultCharset = StandardCharsets.UTF_8;
+            pathVariablePlusAsSpace = false;
             this.executorSelector = null;
             this.threadSelection = ThreadSelection.MANUAL;
             this.messageBodyHandlerRegistry = MessageBodyHandlerRegistry.EMPTY;
@@ -221,6 +237,7 @@ public final class RouteAssembly {
         this.mountKnown = true;
         this.mountPrefix = null;
         this.defaultCharset = resolved.defaultCharset;
+        this.pathVariablePlusAsSpace = resolved.pathVariablePlusAsSpace;
         this.executorSelector = resolved.executorSelector;
         this.threadSelection = resolved.threadSelection;
         this.messageBodyHandlerRegistry = resolved.messageBodyHandlerRegistry;
@@ -1637,7 +1654,8 @@ public final class RouteAssembly {
                 constraints(group),
                 declaredSettings(),
                 null,
-                effectiveSelector(settings, group)
+                effectiveSelector(settings, group),
+                pathVariablePlusAsSpace
             );
             if (errorScope != null) {
                 // built now: a duplicate fails when the router is built

@@ -28,6 +28,7 @@ import io.micronaut.inject.DelegatingExecutableMethod;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
+import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.List;
@@ -48,6 +49,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     private final UriMatchInfo matchInfo;
     private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
+    private final boolean plusAsSpace;
     private final @Nullable MediaType selectedMediaType;
     @Nullable
     private Map<String, Object> variables;
@@ -58,24 +60,29 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @param matchInfo The URI match info
      * @param routeInfo The URI route
      * @param defaultCharset The default charset
+     * @param plusAsSpace Whether a {@code +} in a path variable is decoded as a space, see {@link RouteAssembly#PATH_VARIABLE_PLUS_AS_SPACE}
      * @param conversionService The conversion service
      */
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
                          UriRouteInfo<T, R> routeInfo,
-                         Charset defaultCharset, ConversionService conversionService
+                         Charset defaultCharset,
+                         boolean plusAsSpace,
+                         ConversionService conversionService
     ) {
-        this(matchInfo, routeInfo, defaultCharset, conversionService, null);
+        this(matchInfo, routeInfo, defaultCharset, plusAsSpace, conversionService, null);
     }
 
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
                                  UriRouteInfo<T, R> routeInfo,
                                  Charset defaultCharset,
+                                 boolean plusAsSpace,
                                  ConversionService conversionService,
                                  @Nullable MediaType selectedMediaType) {
         super(routeInfo, conversionService);
         this.matchInfo = matchInfo;
         this.uriRouteInfo = routeInfo;
         this.defaultCharset = defaultCharset;
+        this.plusAsSpace = plusAsSpace;
         this.selectedMediaType = selectedMediaType;
     }
 
@@ -84,7 +91,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @return A new match of the same route and path with the media type
      */
     DefaultUriRouteMatch<T, R> withSelectedMediaType(MediaType mediaType) {
-        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, mediaType);
+        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, plusAsSpace, conversionService, mediaType);
     }
 
     /**
@@ -92,7 +99,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @return A new match with the match info and the negotiated media type of this match
      */
     DefaultUriRouteMatch<T, R> withMatchInfo(UriMatchInfo matchInfo) {
-        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, selectedMediaType);
+        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, plusAsSpace, conversionService, selectedMediaType);
     }
 
     @Override
@@ -163,7 +170,9 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
                 variables = CollectionUtils.newLinkedHashMap(matchVariables.size());
                 matchVariables.forEach((k, v) -> {
                     if (v instanceof CharSequence) {
-                        v = QueryStringDecoder.decodePathComponent(v.toString(), defaultCharset);
+                        v = plusAsSpace
+                            ? URLDecoder.decode(v.toString(), defaultCharset)
+                            : QueryStringDecoder.decodePathComponent(v.toString(), defaultCharset);
                     }
                     variables.put(k, v);
                 });

@@ -3,7 +3,7 @@ This section documents breaking changes between Micronaut versions
 
 === A plus sign in a path variable is a plus sign (5.3)
 
-The decoded value of a path variable, for example a api:http.annotation.PathVariable[] argument, `getString` of api:http.PathVariables[] or `getVariableValues()` of a route match, now keeps a `+` as a plus sign, as RFC 3986 defines for the path. Previously the router decoded the values like form data, so `/items/a+b` gave `a b`. A space in a path is percent-encoded as `%20`, which is still decoded to a space, and `%2B` is decoded to `+` as before. A client that sent `+` for a space in a path should send `%20`. Query parameters and form fields are not affected: they still decode a `+` to a space.
+The decoded value of a path variable, for example a api:http.annotation.PathVariable[] argument, `getString` of api:http.PathVariables[] or `getVariableValues()` of a route match, now keeps a `+` as a plus sign, as RFC 3986 defines for the path. Previously the router decoded the values like form data, so `/items/a+b` gave `a b`. A space in a path is percent-encoded as `%20`, which is still decoded to a space, and `%2B` is decoded to `+` as before. A client that sent `+` for a space in a path should send `%20`. Query parameters and form fields are not affected: they still decode a `+` to a space. To keep the previous decoding, where a `+` in a path variable is a space, set `micronaut.router.path-variable-plus-as-space: true`.
 
 === Buffered JSON stream responses require a list type (5.3)
 
