@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -72,6 +73,27 @@ class ConditionRoutesTest {
             http.retrieve(HttpRequest.GET<Any>("/downloads/app.txt").header("X-Channel", "beta"))
         }
         assertEquals(HttpStatus.NOT_FOUND, notAZip.status)
+    }
+
+    @Test
+    fun aConditionOnTheBodySelectsTheRoute() {
+        val http = client.toBlocking()
+        assertEquals("express order 1", http.retrieve(HttpRequest.POST("/orders", mapOf("kind" to "express", "id" to 1))))
+        assertEquals("order 2", http.retrieve(HttpRequest.POST("/orders", mapOf("kind" to "standard", "id" to 2))))
+        assertEquals("csv import", http.retrieve(HttpRequest.POST("/imports", "id,name\n1,lamp").contentType(MediaType.TEXT_PLAIN_TYPE)))
+        val notCsv = assertThrows<HttpClientResponseException> {
+            http.retrieve(HttpRequest.POST("/imports", "name,id").contentType(MediaType.TEXT_PLAIN_TYPE))
+        }
+        assertEquals(HttpStatus.NOT_FOUND, notCsv.status)
+        val tooLarge = assertThrows<HttpClientResponseException> {
+            http.retrieve(HttpRequest.POST("/imports", "id," + "x".repeat(2048)).contentType(MediaType.TEXT_PLAIN_TYPE))
+        }
+        assertEquals(HttpStatus.NOT_FOUND, tooLarge.status)
+        assertEquals("payment of alice", http.retrieve(HttpRequest.POST("/payments", mapOf("customer" to "alice"))))
+        val unknown = assertThrows<HttpClientResponseException> {
+            http.retrieve(HttpRequest.POST("/payments", mapOf("customer" to "bob")))
+        }
+        assertEquals(HttpStatus.NOT_FOUND, unknown.status)
     }
 
     @Test

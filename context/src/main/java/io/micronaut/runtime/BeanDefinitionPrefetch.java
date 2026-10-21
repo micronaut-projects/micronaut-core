@@ -41,10 +41,11 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 
 /**
- * The experimental bean definition prefetch, switched on with the system property
- * {@value #PROPERTY}{@code =true}: Micronaut's own {@link DefaultBeanDefinitionsProvider} runs on
- * the common pool while the main thread creates the builder, and {@link Micronaut#start()} hands
- * its result to the context it builds.
+ * The experimental bean definition prefetch, switched on with
+ * {@link io.micronaut.context.ApplicationContextBuilder#beanDefinitionPrefetchEnabled(boolean)}:
+ * Micronaut's own {@link DefaultBeanDefinitionsProvider} runs on the common pool while
+ * {@link Micronaut#start()} configures logging and builds the context, and the context gets its
+ * result.
  *
  * <p>The task never initializes a bean definition reference itself. It calls the provider that
  * the context would have called, and the first {@link #provide(ClassLoader)} with the task's class
@@ -53,20 +54,12 @@ import java.util.concurrent.RecursiveAction;
  * Micronaut, on the thread that met the failure first. Before the task starts, the prefetch only
  * loads and links the reference classes, which runs none of their code.</p>
  *
- * <p>This class must not use {@link Micronaut}: it is created inside the static initializer of
- * {@link Micronaut}, and a pool thread that needed that class would wait for the main thread.</p>
- *
  * @since 5.3.0
  */
 @Experimental
 @NullMarked
 @SuppressWarnings({"serial", "java:S1948"}) // A task that is never serialized
 final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefinitionsProvider {
-
-    /**
-     * The system property that switches the prefetch on when it is {@code true}.
-     */
-    static final String PROPERTY = "micronaut.bean-definitions.prefetch";
 
     /**
      * The fewest common pool threads the prefetch starts with: what a JVM with four processors
@@ -104,11 +97,10 @@ final class BeanDefinitionPrefetch extends RecursiveAction implements BeanDefini
     /**
      * Creates the prefetch, unless the application runs in a native image or the common pool has
      * fewer than {@value #MINIMUM_PARALLELISM} threads, and starts loading the bean definition
-     * reference classes on the common pool. The static initializer of {@link Micronaut} calls
-     * this once {@value #PROPERTY} is {@code true}, before it creates its logger, which usually
-     * configures logging, and calls {@link #submit()} after. In between, the pool only loads and
-     * links classes, which runs none of their code, so no pool thread creates a logger while
-     * logging is being configured.
+     * reference classes on the common pool. {@link Micronaut#start()} calls this when the prefetch
+     * is enabled, before it creates its logger, which usually configures logging, and calls
+     * {@link #submit()} after. In between, the pool only loads and links classes, which runs none
+     * of their code, so no pool thread creates a logger while logging is being configured.
      *
      * @param classLoader The class loader of the builder, which the context reads the references with
      * @return The task, not submitted yet, or {@code null} when the prefetch stands down
