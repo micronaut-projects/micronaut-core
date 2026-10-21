@@ -15,6 +15,7 @@
  */
 package io.micronaut.aop.internal;
 
+import io.micronaut.aop.InterceptorCandidateSelector;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.chain.DefaultInterceptorRegistry;
 import io.micronaut.context.BeanContext;
@@ -30,6 +31,7 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -59,6 +61,11 @@ public final class InterceptorRegistryBean implements InstantiatableBeanDefiniti
             InterceptorRegistry.class,
             DefaultInterceptorRegistry.class
         );
+    }
+
+    @Override
+    public Set<Class<?>> getRequiredComponents() {
+        return Set.of(InterceptorCandidateSelector.class);
     }
 
     @Override
@@ -118,7 +125,8 @@ public final class InterceptorRegistryBean implements InstantiatableBeanDefiniti
 
     @Override
     public InterceptorRegistry instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
-        return new DefaultInterceptorRegistry(context);
+        return new DefaultInterceptorRegistry(context,
+            List.copyOf(resolutionContext.getBeansOfType(InterceptorCandidateSelector.class)));
     }
 
     @Override

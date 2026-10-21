@@ -18,6 +18,7 @@ package io.micronaut.aop.chain;
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.ConstructorInterceptor;
 import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorCandidateSelector;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.MethodInterceptor;
@@ -28,6 +29,7 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanConstructor;
@@ -59,9 +61,27 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
     private static final MethodInterceptor<?, ?>[] ZERO_METHOD_INTERCEPTORS = new MethodInterceptor[0];
     private static final Interceptor[] ZERO_INTERCEPTORS = new Interceptor[0];
     private final BeanContext beanContext;
+    private final List<InterceptorCandidateSelector> candidateSelectors;
 
+    /**
+     * Creates a registry with the default candidate selection behavior.
+     *
+     * @param beanContext The bean context.
+     */
     public DefaultInterceptorRegistry(BeanContext beanContext) {
+        this(beanContext, List.of());
+    }
+
+    /**
+     * Creates a registry with additional candidate selectors.
+     *
+     * @param beanContext The bean context.
+     * @param candidateSelectors The selectors to apply in list order.
+     * @since 5.3.0
+     */
+    public DefaultInterceptorRegistry(BeanContext beanContext, List<InterceptorCandidateSelector> candidateSelectors) {
         this.beanContext = beanContext;
+        this.candidateSelectors = List.copyOf(candidateSelectors);
     }
 
     @Override
@@ -88,6 +108,7 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
             interceptorKind,
             applicableBindings,
             annotationMetadata,
+            method,
             true,
             false
         );
@@ -117,11 +138,13 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
         }
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private <T> Interceptor<T, ?>[] findInterceptors(Class<?> declaringType,
                                                      Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
                                                      InterceptorKind interceptorKind,
                                                      Collection<AnnotationValue<?>> interceptPointBindings,
                                                      AnnotationMetadata interceptPointMetadata,
+                                                     AnnotationMetadataProvider interceptionPoint,
                                                      boolean selectMethodInterceptor,
                                                      boolean selectConstructorInterceptor) {
         List<BeanRegistration<Interceptor<T, ?>>> selectedInterceptorRegistrations = new ArrayList<>(interceptors.size());
@@ -131,6 +154,22 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
             }
         }
         selectedInterceptorRegistrations.sort(OrderUtil.ORDERED_COMPARATOR);
+        if (!candidateSelectors.isEmpty()) {
+            if (selectConstructorInterceptor) {
+                selectedInterceptorRegistrations.removeIf(registration -> registration.getBean() instanceof MethodInterceptor
+                    && !(registration.getBean() instanceof ConstructorInterceptor));
+                for (InterceptorCandidateSelector selector : candidateSelectors) {
+                    selector.selectConstructorInterceptors((BeanConstructor<T>) interceptionPoint, interceptorKind,
+                        (List) selectedInterceptorRegistrations);
+                }
+            } else {
+                selectedInterceptorRegistrations.removeIf(registration -> registration.getBean() instanceof ConstructorInterceptor
+                    && !(registration.getBean() instanceof MethodInterceptor));
+                for (InterceptorCandidateSelector selector : candidateSelectors) {
+                    selector.selectInterceptors((Executable<T, ?>) interceptionPoint, interceptorKind, selectedInterceptorRegistrations);
+                }
+            }
+        }
 
         List<Interceptor<T, ?>> selectedInterceptors = new ArrayList<>(selectedInterceptorRegistrations.size());
         for (BeanRegistration<Interceptor<T, ?>> beanRegistration : selectedInterceptorRegistrations) {
@@ -262,6 +301,7 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
             InterceptorKind.AROUND_CONSTRUCT,
             applicableBindings,
             constructor.getAnnotationMetadata(),
+            constructor,
             false,
             true
         );
