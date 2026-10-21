@@ -54,6 +54,8 @@ final class PythonJavaInstanceMembersCollector {
     }
 
     /**
+     * The names collected so far.
+     *
      * @return The aliases by binary name of the Java type, then by Python name
      */
     Map<String, Map<String, JavaInstanceAliases.Alias>> members() {

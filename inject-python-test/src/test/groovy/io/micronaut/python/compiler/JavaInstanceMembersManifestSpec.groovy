@@ -135,6 +135,40 @@ str(request.get_uri()) + ":" + request.getHeaders().get("Authorization")
         context?.close()
     }
 
+    def "the values the static methods of a curated module return answer to their names without type checking"() {
+        given:
+        def source = '''
+from jakarta.inject import Singleton
+from facadetest.http.client import GET
+
+@Singleton
+class Caller:
+    def call(self):
+        request = GET("/curated")
+        request.basic_auth("user", "pass")
+        # request.uri is the real uri(URI) method of MutableHttpRequest, which comes before the getter property
+        return str(request.get_uri()) + ":" + request.getHeaders().get("Authorization")
+'''
+        def target = File.createTempDir('python-facade-instance-members', '')
+
+        when:
+        PyronautCompiler.builder().pythonCode(source).targetDir(target).build().compile()
+        def members = JavaImportsManifest.read(target).instanceMembers
+
+        then:
+        members['io.micronaut.http.MutableHttpRequest']['basic_auth'] == ['basicAuth', 'method']
+
+        when:
+        def context = buildContext(source)
+
+        then:
+        getBean(context, 'python.Caller').call() == '/curated:Basic dXNlcjpwYXNz'
+
+        cleanup:
+        context?.close()
+        target.deleteDir()
+    }
+
     def "plain Python sources record no instance member names"() {
         given:
         def target = File.createTempDir('python-no-instance-members', '')

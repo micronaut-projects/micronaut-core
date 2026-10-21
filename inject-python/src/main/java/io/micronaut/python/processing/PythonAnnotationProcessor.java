@@ -1450,9 +1450,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 }
             }
         }
+        // a facade member is a Java type, or a static method or constant of one: its type is referenced like an
+        // imported type, so the values its static methods return are covered too
         for (ResolvedModule facade : facades) {
             for (ResolvedModule.Member member : facade.members().values()) {
-                if (member.kind() != ResolvedModule.Kind.MODULE && member.memberName() == null) {
+                if (member.kind() != ResolvedModule.Kind.MODULE) {
                     collector.referenceImport(member.binaryName());
                 }
             }
