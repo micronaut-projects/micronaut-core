@@ -170,7 +170,7 @@ class HttpRoutesServerFiltersTest {
     }
 
     private static Router router(@Nullable String contextPath, Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { }, contextPath);
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> RouteAssembly.underContextPath(contextPath, uri), contextPath);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         return new DefaultRouter(List.of(), List.of(() -> assembly));
