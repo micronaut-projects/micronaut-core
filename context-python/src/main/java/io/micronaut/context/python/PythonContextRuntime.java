@@ -1450,28 +1450,6 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * The class of a compiled Python class in the Python context that calls this method, such as the
-     * dataclass of a generated wrapper the Java imports manifest records ({@code micronaut_java_imports}).
-     *
-     * @param packageName The Python package, {@code python} for a top-level class
-     * @param pythonName The class name, nested classes separated by dots
-     * @return The class Value, belonging to the calling context
-     * @since 5.3.0
-     */
-    @Internal
-    @UsedByGeneratedCode
-    public static Value callerClass(String packageName, String pythonName) {
-        Context caller = currentPolyglotContext();
-        if (caller == null) {
-            throw new IllegalStateException("Python class [" + pythonName + "] requested outside of a Python context");
-        }
-        String[] names = pythonName.split("\\.", -1);
-        PythonClassReference classReference = new PythonClassReference(packageName, names[0],
-            Arrays.copyOfRange(names, 1, names.length), pythonName, "class-instance:" + packageName + "." + pythonName);
-        return PythonContextRegistry.withExecutionFrame(caller, () -> findClass(classReference, caller));
-    }
-
-    /**
      * The key of a class in the per-context class cache.
      *
      * @param classReference The class reference

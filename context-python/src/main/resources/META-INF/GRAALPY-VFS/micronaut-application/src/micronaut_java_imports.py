@@ -302,32 +302,49 @@ def _micronaut_java_imports():
         with _micronaut_java_imports_lock:
             imports = _micronaut_java_imports_cache
             if imports is None:
-                imports = _MicronautJavaImports()
-                for entry in list(sys.path):
-                    try:
-                        files = _micronaut_os.listdir(entry) if entry else []
-                    except OSError:
-                        continue
-                    for file in sorted(files):
-                        if file.startswith(_MICRONAUT_JAVA_IMPORTS_MANIFEST_PREFIX) and file.endswith(_MICRONAUT_JAVA_IMPORTS_MANIFEST_SUFFIX):
-                            # a module of dict literals, run in a namespace of its own like a members module: the
-                            # loader uses the bytecode cache the compiler may have written next to it
-                            path = _micronaut_os.path.join(entry, file)
-                            name = file[:-3]
-                            namespace = {'__name__': name, '__file__': path}
-                            exec(_micronaut_importlib_machinery.SourceFileLoader(name, path).get_code(name), namespace)
-                            imports.merge(namespace)
-                            imports.manifests.append(path)
+                imports = _micronaut_read_java_imports()
                 _micronaut_register_interop_types(imports)
                 _micronaut_java_imports_cache = imports
     return imports
+
+
+def _micronaut_read_java_imports():
+    """The manifests of the path entries, merged."""
+    imports = _MicronautJavaImports()
+    for entry in list(sys.path):
+        try:
+            files = _micronaut_os.listdir(entry) if entry else []
+        except OSError:
+            continue
+        for file in sorted(files):
+            if file.startswith(_MICRONAUT_JAVA_IMPORTS_MANIFEST_PREFIX) and file.endswith(_MICRONAUT_JAVA_IMPORTS_MANIFEST_SUFFIX):
+                # a module of dict literals, run in a namespace of its own like a members module: the
+                # loader uses the bytecode cache the compiler may have written next to it
+                path = _micronaut_os.path.join(entry, file)
+                name = file[:-3]
+                namespace = {'__name__': name, '__file__': path}
+                exec(_micronaut_importlib_machinery.SourceFileLoader(name, path).get_code(name), namespace)
+                imports.merge(namespace)
+                imports.manifests.append(path)
+    return imports
+
+
+def __micronaut_register_interop_types():
+    """
+    Registers the interop types the manifests record once the application modules have loaded, for a context
+    whose bootstrap did not read the manifests through a Java import: a dataclass needs no Java import. The
+    manifests are read without being kept, so the first Java import still reads the path it then has.
+    """
+    with _micronaut_java_imports_lock:
+        if _micronaut_java_imports_cache is None:
+            _micronaut_register_interop_types(_micronaut_read_java_imports())
 
 
 # binary name -> the interop type registered for it in this context; kept across reloads of this module, as a
 # type registered again would join the Java type's classes a second time
 _micronaut_interop_types = globals().get('_micronaut_interop_types', {})
 _MICRONAUT_DATACLASS_ATTRIBUTES = ('__dataclass_fields__', '__dataclass_params__')
-_micronaut_context_runtime = None
+_micronaut_caller_classes = None
 
 
 class _MicronautDataclassAttribute:
@@ -344,11 +361,11 @@ class _MicronautDataclassAttribute:
         self._name = name
 
     def __get__(self, instance, owner=None):
-        global _micronaut_context_runtime
-        if _micronaut_context_runtime is None:
+        global _micronaut_caller_classes
+        if _micronaut_caller_classes is None:
             import java
-            _micronaut_context_runtime = java.type('io.micronaut.context.python.PythonContextRuntime')
-        return getattr(_micronaut_context_runtime.callerClass(*self._python_class), self._name)
+            _micronaut_caller_classes = java.type('io.micronaut.context.python.PythonCallerClasses')
+        return getattr(_micronaut_caller_classes.callerClass(*self._python_class), self._name)
 
 
 def _micronaut_register_interop_types(imports):

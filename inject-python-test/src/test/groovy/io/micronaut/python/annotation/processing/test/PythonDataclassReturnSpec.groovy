@@ -142,4 +142,31 @@ class Probe:
         where:
         caller << ["primary", "nested", "pooled"]
     }
+
+    void "a dataclass of sources that import no Java retains its protocol"() {
+        given:
+        def context = buildContext('''
+from dataclasses import dataclass, is_dataclass, replace
+
+
+@dataclass
+class Item:
+    name: str
+
+
+class Probe:
+    @staticmethod
+    def check(items) -> str:
+        items.add(Item("first"))
+        item = items.get(0)
+        assert is_dataclass(item) and is_dataclass(type(item))
+        return replace(item, name="second").name
+''', true)
+
+        expect:
+        context.getBean(Context).eval("python", "Probe").invokeMember("check", new ArrayList<Object>()).asString() == "second"
+
+        cleanup:
+        context?.close()
+    }
 }

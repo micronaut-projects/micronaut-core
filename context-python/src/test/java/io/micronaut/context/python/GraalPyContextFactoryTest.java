@@ -241,6 +241,20 @@ final class GraalPyContextFactoryTest {
     }
 
     @Test
+    void interopTypesAreRegisteredAtBootstrapWithoutAJavaImport() {
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            Context context = applicationContext.getBean(Context.class);
+            context.getBindings(PYTHON).putMember("members", new InstanceMembers());
+            // nothing in this context read the manifests through a Java import; the bootstrap registered them
+            assertTrue(context.eval(PYTHON, """
+                import sys
+                sys.modules['micronaut_java_imports']._micronaut_java_imports_cache is None
+                """).asBoolean());
+            assertEquals(8080, context.eval(PYTHON, "members.port").asInt());
+        }
+    }
+
+    @Test
     void javaInstancesOfferReadOnlyPropertiesAndSnakeCaseMethods() {
         // the names come from the Java imports manifest of the test virtual file system
         // (__micronaut_java_imports_instance_members_test.py), registered when a context reads its manifests;

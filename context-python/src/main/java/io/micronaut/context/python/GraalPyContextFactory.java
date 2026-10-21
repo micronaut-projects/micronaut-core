@@ -89,6 +89,13 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             spec.loader.exec_module(module)
         """, "micronaut-load-vfs-module.py").cached(true).buildLiteral();
     /**
+     * Registers the interop types of the Java imports manifests in a context whose bootstrap made no Java import
+     * (see {@code micronaut_java_imports}).
+     */
+    private static final Source REGISTER_INTEROP_TYPES_SOURCE = Source.newBuilder(PYTHON,
+        "__import__('micronaut_java_imports').__micronaut_register_interop_types()", "micronaut-register-interop-types.py")
+        .cached(true).buildLiteral();
+    /**
      * Python code that completes the members of every Java object with what GraalPy host interop does not
      * resolve: the trailing-underscore aliases of members named after a Python keyword
      * ({@code builder.from_(...)} for {@code Builder.from(...)}, {@code spec.and_(other)} for
@@ -484,6 +491,9 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             evaluateMain(classLoader, INTERNAL_MAIN, context, vfs);
             evaluateMain(classLoader, applicationMain, context, vfs);
             LOG.debug("GraalPy main.py evaluated in {}ms", System.currentTimeMillis() - now);
+            // the interop types the manifests record (dataclass wrappers, Java instance member names) are
+            // registered by the first Java import, which sources declaring only dataclasses may not make
+            context.eval(REGISTER_INTEROP_TYPES_SOURCE);
             bootstrapped = true;
             return context;
         } finally {
