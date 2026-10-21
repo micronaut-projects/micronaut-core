@@ -51,7 +51,7 @@ public class VersionClientRequestBinder implements AnnotatedClientRequestBinder<
                      MutableHttpRequest<?> request) {
         // The version and the client of the method are kept by the method
         // null, and kept as such, when the method has no version
-        Plan plan = context.getCachedValue(Plan.class, Plan::of);
+        @Nullable Plan plan = context.<@Nullable Plan>getCachedValue(Plan.class, Plan::of);
         if (plan == null) {
             return;
         }
