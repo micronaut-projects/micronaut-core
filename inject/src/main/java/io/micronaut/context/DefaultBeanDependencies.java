@@ -95,16 +95,20 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
     }
 
     /**
-     * Finds the dependent this owner created for the given bean. Identity selects it, not equality.
+     * Finds the dependent this owner created for the given bean. Identity selects it, not equality. A dependent whose
+     * destruction has begun, such as one closed directly rather than through this owner, is no longer found, although
+     * this owner keeps it until it is removed or the owner closes.
      *
      * @param bean The bean
      * @param <T> The bean type
      * @return The registration, or null when this owner does not hold the bean
      */
     @SuppressWarnings({"unchecked", "ReferenceEquality"}) // A lifecycle belongs to an instance, even when two beans compare equal.
-    synchronized <T> @Nullable BeanRegistration<T> find(T bean) {
-        for (BeanRegistration<?> candidate : owned) {
-            if (candidate.bean() == bean) {
+    <T> @Nullable BeanRegistration<T> find(T bean) {
+        // the list is immutable: the dependents' own state is read outside this owner's lock
+        for (BeanRegistration<?> candidate : dependentBeans()) {
+            DefaultBeanDependencies candidateDependencies = candidate.getDependencies();
+            if (candidate.bean() == bean && (candidateDependencies == null || !candidateDependencies.isClosing())) {
                 return (BeanRegistration<T>) candidate;
             }
         }
