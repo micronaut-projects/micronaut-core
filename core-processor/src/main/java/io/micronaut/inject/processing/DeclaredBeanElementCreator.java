@@ -571,10 +571,22 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
      * @return true if processed
      */
     protected boolean visitField(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, FieldElement fieldElement) {
-        if (fieldElement.isStatic() || fieldElement.isFinal()) {
+        if (fieldElement.isStatic()) {
             return false;
         }
         AnnotationMetadata fieldAnnotationMetadata = fieldElement.getAnnotationMetadata();
+        if (fieldElement.isFinal()) {
+            // Records and Kotlin constructor properties copy the parameter annotations to the final backing field
+            if (!classElement.isRecord()
+                && visitorContext.getLanguage() != VisitorContext.Language.KOTLIN
+                && (fieldAnnotationMetadata.hasStereotype(Value.class)
+                || fieldAnnotationMetadata.hasStereotype(Property.class)
+                || fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT))) {
+                throw new ProcessingException(fieldElement, "Cannot inject into final field [" + fieldElement.getName() + "] of ["
+                    + fieldElement.getDeclaringType().getName() + "]: use constructor injection or remove the final modifier");
+            }
+            return false;
+        }
         if (fieldAnnotationMetadata.hasStereotype(Value.class) || fieldAnnotationMetadata.hasStereotype(Property.class)) {
             beanDefinitionBuilder.addFieldPropertyInjection(fieldElement, fieldElement, fieldElement.isReflectionRequired(classElement), visitorContext);
             return true;

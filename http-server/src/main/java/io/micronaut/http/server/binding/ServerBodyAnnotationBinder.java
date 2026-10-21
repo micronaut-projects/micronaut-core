@@ -51,6 +51,7 @@ import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import org.jspecify.annotations.Nullable;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -247,7 +248,9 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
             var collector = new FormFieldFlows.Concat<RawFormField, Void>(field ->
                 InternalByteBody.bufferFlow(field.byteBody()).map(bytes -> {
                     try (bytes) {
-                        addFormValue(values, field.metadata().name(), bytes.toString(formRequest.getCharacterEncoding()));
+                        // decoded with the charset of the part, else of the request, like FormData
+                        Charset charset = UploadContent.charset(field.metadata(), formRequest.getCharacterEncoding());
+                        addFormValue(values, field.metadata().name(), bytes.toString(charset));
                     }
                     return null;
                 }), RawFormField::close,

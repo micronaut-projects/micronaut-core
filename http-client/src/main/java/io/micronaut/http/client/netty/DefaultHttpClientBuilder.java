@@ -178,6 +178,19 @@ public final class DefaultHttpClientBuilder {
         return this;
     }
 
+    /**
+     * Run the client on the event loop of another client instead of creating its own. The other
+     * client keeps owning the event loop: closing this client leaves it running, and closing the
+     * other client shuts it down, so the other client is closed after this one.
+     *
+     * @param client The client whose event loop to share
+     * @return This builder
+     * @since 5.3.0
+     */
+    public DefaultHttpClientBuilder eventLoopOf(DefaultHttpClient client) {
+        return eventLoopGroup(client.connectionManager().eventLoopGroup());
+    }
+
     DefaultHttpClientBuilder socketChannelFactory(ChannelFactory<? extends Channel> socketChannelFactory) {
         delegate.socketChannelFactory(socketChannelFactory);
         return this;

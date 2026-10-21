@@ -45,6 +45,7 @@ import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.web.router.DefaultRouter;
 import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteRejections;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
@@ -83,6 +84,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Handles WebSocket upgrade requests.
@@ -171,6 +173,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             final NettyHttpRequest<?> msg;
             try {
                 msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+                // the hooks of ServerHttpRequest need the connection, also while the filters run
+                msg.outboundAccess(outboundAccess);
             } catch (IllegalArgumentException e) {
                 body.close();
 
@@ -182,6 +186,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                     serverConfiguration
                 );
                 outboundAccess.attachment(errorRequest);
+                errorRequest.outboundAccess(outboundAccess);
                 outboundAccess.closeAfterWrite();
 
                 PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate(() -> {
@@ -210,6 +215,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                     .propagate(() -> requestLifecycle.handle(msg))
             );
             responseFlow.onComplete((r, throwable) -> {
+                // the upgrade does not read the body of its request, which is not empty when the
+                // request went through the h2c upgrade handler: that aggregates every request
+                // with an Upgrade header into a FullHttpRequest
+                body.close();
                 HttpResponse<?> response = r;
                 if (response == null) {
                     // the lifecycle answers failures itself, this is a last resort so that the
@@ -218,9 +227,9 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 }
                 HttpResponse<?> actualResponse = response;
                 if (ctx.executor().inEventLoop()) {
-                    writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, actualResponse, outboundAccess);
+                    writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, requestLifecycle.propagatedContext, actualResponse, outboundAccess);
                 } else {
-                    ctx.executor().execute(() -> writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, actualResponse, outboundAccess));
+                    ctx.executor().execute(() -> writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, requestLifecycle.propagatedContext, actualResponse, outboundAccess));
                 }
             });
         } else {
@@ -238,72 +247,120 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         Objects.requireNonNull(next).responseWritten(attachment);
     }
 
+    @Override
+    public void responseFailed(@Nullable Object attachment, Throwable cause) {
+        Objects.requireNonNull(next).responseFailed(attachment, cause);
+    }
+
     private void writeResponse(ChannelHandlerContext ctx,
                                NettyHttpRequest<?> msg,
                                boolean shouldProceedNormally,
+                               PropagatedContext propagatedContext,
                                HttpResponse<?> actualResponse,
                                OutboundAccess outboundAccess) {
+        Runnable releaseRequest = releaseOnce(msg);
         if (cancelUpgrade) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Cancelling websocket upgrade, handler was removed while request was processing");
             }
+            releaseRequest.run();
             return;
         }
 
-        if (shouldProceedNormally) {
-            UriRouteMatch<Object, Object> routeMatch = RouteAttributes.getRouteMatch(actualResponse)
-                .map(rm -> (UriRouteMatch<Object, Object>) rm)
-                .orElseThrow(() -> new IllegalStateException("Route match is required!"));
-            //Adding new handler to the existing pipeline to handle WebSocket Messages
-            // a WebSocket route of handler functions carries its endpoint, a @ServerWebSocket route is to a bean
-            WebSocketRouteEndpoint routeEndpoint = routeMatch.getRouteInfo()
-                .getAttribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, WebSocketRouteEndpoint.class)
-                .orElse(null);
-            WebSocketBean<?> webSocketBean = routeEndpoint != null
-                ? routeEndpoint
-                : webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
-
-            ChannelPipeline pipeline = ctx.pipeline();
-
-            installCompressionHandler(ctx, msg.getNativeRequest());
-            handleHandshake(ctx, msg, webSocketBean, actualResponse);
-
-            try {
-                // re-configure the pipeline
-                NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
-                    nettyEmbeddedServices,
-                    webSocketSessionRepository,
-                    Objects.requireNonNull(handshaker),
-                    webSocketBean,
-                    msg,
-                    routeMatch,
-                    ctx,
-                    serverConfiguration,
-                    routeExecutor.getExecutorSelector(),
-                    routeExecutor.getCoroutineHelper().orElse(null),
-                    routeEndpoint,
-                    // the handlers of a WebSocket route run on the executor of the route
-                    routeEndpoint == null ? null : routeMatch.getRouteInfo().getExecutor(serverConfiguration));
-                pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
-
-                pipeline.remove(ctx.name());
-                try {
-                    pipeline.remove(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER);
-                } catch (NoSuchElementException ignored) {
-                }
-
-                // the connection of a WebSocket route reads once its handlers are done, see
-                // NettyServerWebSocketHandler, the connection of a bean all the time
-                ctx.channel().config().setAutoRead(routeEndpoint == null);
-            } catch (Throwable e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error opening WebSocket: {}", e.getMessage(), e);
-                }
-                ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
-            }
-        } else {
+        if (!shouldProceedNormally) {
+            // not upgraded, answered like any other request: the request is released once the
+            // response was written
+            outboundAccess.attachment(msg);
             Objects.requireNonNull(next).writeResponse(outboundAccess, msg, actualResponse, null);
+            return;
         }
+
+        UriRouteMatch<Object, Object> routeMatch = RouteAttributes.getRouteMatch(actualResponse)
+            .map(rm -> (UriRouteMatch<Object, Object>) rm)
+            .orElseThrow(() -> new IllegalStateException("Route match is required!"));
+        //Adding new handler to the existing pipeline to handle WebSocket Messages
+        // a WebSocket route of handler functions carries its endpoint, a @ServerWebSocket route is to a bean
+        WebSocketRouteEndpoint routeEndpoint = routeMatch.getRouteInfo()
+            .getAttribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, WebSocketRouteEndpoint.class)
+            .orElse(null);
+        WebSocketBean<?> webSocketBean = routeEndpoint != null
+            ? routeEndpoint
+            : webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
+
+        ChannelPipeline pipeline = ctx.pipeline();
+
+        try {
+            installCompressionHandler(ctx, msg.getNativeRequest());
+            handleHandshake(ctx, msg, webSocketBean, actualResponse).addListener(future -> {
+                if (future.isSuccess()) {
+                    // the connection is no longer this request's: its close ends the session
+                    msg.responseUpgraded();
+                } else {
+                    msg.responseFailed(future.cause());
+                }
+            });
+        } catch (Throwable e) {
+            releaseRequest.run();
+            throw e;
+        }
+
+        NettyServerWebSocketHandler webSocketHandler = null;
+        try {
+            // re-configure the pipeline. The session releases the request when it ends
+            webSocketHandler = new NettyServerWebSocketHandler(
+                nettyEmbeddedServices,
+                webSocketSessionRepository,
+                Objects.requireNonNull(handshaker),
+                webSocketBean,
+                msg,
+                routeMatch,
+                ctx,
+                serverConfiguration,
+                routeExecutor.getExecutorSelector(),
+                routeExecutor.getCoroutineHelper().orElse(null),
+                routeEndpoint,
+                // the handlers of a WebSocket route run on the executor of the route
+                routeEndpoint == null ? null : routeMatch.getRouteInfo().getExecutor(serverConfiguration),
+                propagatedContext,
+                releaseRequest);
+            pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
+
+            pipeline.remove(ctx.name());
+            try {
+                pipeline.remove(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER);
+            } catch (NoSuchElementException ignored) {
+            }
+
+            // the connection of a WebSocket route reads once its handlers are done, see
+            // NettyServerWebSocketHandler, the connection of a bean all the time
+            ctx.channel().config().setAutoRead(routeEndpoint == null);
+        } catch (Throwable e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error opening WebSocket: {}", e.getMessage(), e);
+            }
+            if (webSocketHandler == null || pipeline.context(webSocketHandler) == null) {
+                // no session releases the request when it ends
+                releaseRequest.run();
+            }
+            ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
+        }
+    }
+
+    /**
+     * Releases the given upgrade request at most once: this runs its disposal resources and
+     * publishes the request terminated event, like for a request whose response was written.
+     *
+     * @param request The upgrade request
+     * @return The release, which may run more than once
+     */
+    private Runnable releaseOnce(NettyHttpRequest<?> request) {
+        RoutingInBoundHandler routingHandler = Objects.requireNonNull(next);
+        AtomicBoolean released = new AtomicBoolean();
+        return () -> {
+            if (released.compareAndSet(false, true)) {
+                routingHandler.responseWritten(request);
+            }
+        };
     }
 
     /**
@@ -409,7 +466,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             .filter(rm -> rm.getHttpMethod() == HttpMethod.GET && isFunctionalWebSocketRoute(rm))
             .toList();
         if (!functionalRoutes.isEmpty()) {
-            return DefaultRouter.resolveAmbiguity(request, functionalRoutes).stream()
+            // a route selector of the routes selects among them, as for the route of any other request
+            return DefaultRouter.selectClosest(request, functionalRoutes).stream()
                 .min(Comparator.comparingInt(rm -> rm.getRouteInfo().getOrder()));
         }
         return router.<Object, Object>find(HttpMethod.GET, request.getPath(), request)
@@ -480,6 +538,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
     private static final class WebsocketRequestLifecycle extends RequestLifecycle {
         boolean shouldProceedNormally;
+        /**
+         * The context of the upgrade request after the filters, e.g. with the elements added by
+         * a filter, that the handlers of the WebSocket run in.
+         */
+        PropagatedContext propagatedContext = PropagatedContext.empty();
 
         private final Router router;
         @Nullable
@@ -493,6 +556,14 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         }
 
         @Override
+        protected void onUnhandledError(Throwable cause) {
+            NettyHttpRequest<?> request = nettyRequest;
+            if (request != null) {
+                request.responseFailed(cause);
+            }
+        }
+
+        @Override
         protected void onFilteredRequest(HttpRequest<?> filteredRequest) {
             NettyHttpRequest<?> request = nettyRequest;
             if (request != null) {
@@ -502,6 +573,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
         @Override
         protected @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request) {
+            // the rejection of a route selector is the one of this routing
+            RouteRejections.clear(request);
             // the conditions of the route, e.g. a @RouteCondition, which reads the request of the
             // context, apply to the upgrade request. Router.find(HttpMethod, path, request) only
             // matches the method and the path, so the conditions are tested here, once
@@ -514,8 +587,14 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                                                                       @Nullable UriRouteMatch<Object, Object> routeMatch,
                                                                       PropagatedContext propagatedContext) {
             if (routeMatch == null) {
+                // a route selector that rejected the upgrade answers 406 or 415, as for other requests
+                ExecutionFlow<HttpResponse<?>> rejection = rejectionResponse(request, propagatedContext);
+                if (rejection != null) {
+                    return rejection;
+                }
                 return ExecutionFlow.error(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
             }
+            this.propagatedContext = propagatedContext;
             MutableHttpResponse<?> response = HttpResponse.ok();
             RouteAttributes.setRouteMatch(response, routeMatch);
             RouteAttributes.setRouteInfo(response, routeMatch.getRouteInfo());

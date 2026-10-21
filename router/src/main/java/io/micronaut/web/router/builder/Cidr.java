@@ -25,7 +25,7 @@ import java.util.Objects;
 
 /**
  * A range of IPv4 or IPv6 addresses in CIDR notation, e.g. {@code 10.0.0.0/8} or
- * {@code fd00::/8}, for {@link RouteCondition#remoteAddress(String...)}. A range is written with
+ * {@code fd00::/8}, for {@link RequestCondition#remoteAddress(String...)}. A range is written with
  * addresses, never host names: no name is ever looked up. An IPv4 address mapped to IPv6, e.g.
  * {@code ::ffff:10.0.0.1}, is an IPv4 address.
  *

@@ -72,6 +72,21 @@ interface DynamicRouteTarget {
     <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request, UriRouteMatch<T, R> match);
 
     /**
+     * The resolution to use instead of the closest match of the route: the closest match, none,
+     * or the matches that depend on the body of the request, see {@link Router#resolve(HttpRequest)}.
+     *
+     * @param request The request
+     * @param match   The match of the route
+     * @param filter  The filter of the candidates, applied to the resolved matches before their
+     *                ambiguity is resolved, or {@code null}
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The resolution
+     */
+    <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                         @Nullable Predicate<UriRouteMatch<T, R>> filter);
+
+    /**
      * The closest matches to use instead of a closest match of the route, see
      * {@link Router#findAllClosest(HttpRequest)}.
      *
@@ -87,17 +102,36 @@ interface DynamicRouteTarget {
                                                     @Nullable Predicate<UriRouteMatch<T, R>> filter);
 
     /**
-     * The matches of any method to use instead of a match of the route, see
-     * {@link Router#findAny(HttpRequest)}, e.g. to find the allowed methods of a path. The route
-     * set asks the most specific dynamic route of the request only.
+     * All the matches of the routes of the target that accept the request, among those the
+     * filter accepts, to use instead of a match of the route, without resolving their ambiguity:
+     * the candidates of a choice by the body, see {@link PendingRouteMatch}, which keeps the
+     * less specific routes the body falls through to.
      *
      * @param request The request
      * @param match   The match of the route
+     * @param filter  The filter of the candidates, or {@code null}
      * @param <T>     The target type
      * @param <R>     The result type
      * @return The matches
      */
-    <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, UriRouteMatch<T, R> match);
+    <T, R> List<UriRouteMatch<T, R>> findAll(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                             @Nullable Predicate<UriRouteMatch<T, R>> filter);
+
+    /**
+     * The matches of any method to use instead of a match of the route, see
+     * {@link Router#findAny(HttpRequest)}, e.g. to find the allowed methods of a path. The route
+     * set asks the most specific dynamic route of each method of the request only.
+     *
+     * @param request The request
+     * @param match   The match of the route
+     * @param filter  The filter of the candidates, applied to the resolved matches before a route
+     *                selector selects among them, or {@code null}
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The matches
+     */
+    <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                             @Nullable Predicate<UriRouteMatch<T, R>> filter);
 
     /**
      * The match info of a match a dynamic target answered.

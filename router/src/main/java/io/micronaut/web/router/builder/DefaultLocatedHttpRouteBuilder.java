@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
 
@@ -109,9 +110,25 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
     }
 
     @Override
+    public LocatedHttpRouteSpec<T> route(HttpMethod method, RouteTemplate template) {
+        return target.route(super.route(method, template));
+    }
+
+    @Override
+    public LocatedHttpRouteSpec<T> route(String httpMethodName, RouteTemplate template) {
+        return target.route(super.route(httpMethodName, template));
+    }
+
+    @Override
     public <U> void locate(String prefixUri, LocatedLocatorHandler<T, ? extends U> locator,
                            Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
         locate(prefixUri, target.<U>locator(locator), routesOf);
+    }
+
+    @Override
+    public <U> void locateOn(String executorName, String prefixUri, LocatedLocatorHandler<T, ? extends U> locator,
+                             Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
+        locateOn(executorName, prefixUri, target.<U>locator(locator), routesOf);
     }
 
     @Override
@@ -129,4 +146,5 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
     public void path(String prefix, Consumer<LocatedHttpRouteGroup<T>> routes) {
         declarePath(prefix, DefaultLocatedHttpRouteGroup.factory(target), routes);
     }
+
 }
