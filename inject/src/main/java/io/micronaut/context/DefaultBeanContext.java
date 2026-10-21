@@ -3675,7 +3675,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             ReplacesDefinition<T> replacementCheck = replacement.getKey();
             if (isNotTheSameDefinition(beanDefinition, definitionToBeReplaced) &&
                 isNotTheTargetOfProxy(beanDefinition, definitionToBeReplaced) &&
-                replacementCheck.replaces(definitionToBeReplaced)) {
+                replacementCheck.replaces(beanDefinition, definitionToBeReplaced)) {
                 return true;
             }
         }
