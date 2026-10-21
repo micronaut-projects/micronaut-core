@@ -16,13 +16,17 @@
 package io.micronaut.inject.configuration;
 
 import io.micronaut.context.annotation.BeanProperties;
+import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.PropertyElementQuery;
@@ -76,6 +80,8 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private static final String JV_MIN = "jakarta.validation.constraints.Min";
     private static final String JV_MAX = "jakarta.validation.constraints.Max";
     private static final String JV_DIGITS = "jakarta.validation.constraints.Digits";
+    private static final String JV_DIGITS_INTEGER = "integer";
+    private static final String JV_DIGITS_FRACTION = "fraction";
     private static final String JV_NEGATIVE = "jakarta.validation.constraints.Negative";
     private static final String JV_NEGATIVE_OR_ZERO = "jakarta.validation.constraints.NegativeOrZero";
     private static final String ATTR_EXCLUSIVE_MINIMUM = "exclusiveMinimum";
@@ -89,6 +95,17 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private static final String URL_JSON_SCHEMA = "https://json-schema.org/draft/2020-12/schema";
     private static final String STRING = "string";
     private static final String DURATION = "duration";
+    private static final String INTEGER = "integer";
+    private static final Set<String> INTEGRAL_TYPES = Set.of(
+        "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
+        "java.lang.Integer", "java.lang.Long", "java.math.BigInteger"
+    );
+    private static final String READABLE_BYTES = "readable-bytes";
+    /**
+     * The values {@link io.micronaut.core.convert.format.ReadableBytesTypeConverter} accepts:
+     * a whole number with an optional, case-insensitive KB, MB or GB suffix.
+     */
+    private static final String READABLE_BYTES_PATTERN = "^[+-]?[0-9]+([kKmMgG][bB])?$";
     private static final String ATTR_ADDITIONAL_PROPERTIES = "additionalProperties";
     private static final String BOOLEAN = "boolean";
 
@@ -485,11 +502,86 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 return;
             }
             // Plain type
+            if (isReadableBytesProperty(pe)) {
+                writeReadableBytesType(out);
+                return;
+            }
             writeSimpleTypeSchema(out, t);
             return;
         }
         // Fallback: map simple by name
         writeSimpleTypeName(out, fqcn);
+    }
+
+    /**
+     * A {@link ReadableBytes} property also accepts a size such as {@code 10MB}, so it is an
+     * integer or a string in that format.
+     */
+    private void writeReadableBytesType(Writer out) throws IOException {
+        attr(out, ATTR_TYPE);
+        out.write('[');
+        str(out, INTEGER);
+        out.write(',');
+        str(out, STRING);
+        out.write(']');
+        out.write(',');
+        attr(out, ATTR_FORMAT);
+        str(out, READABLE_BYTES);
+        out.write(',');
+        attr(out, ATTR_PATTERN);
+        str(out, READABLE_BYTES_PATTERN);
+    }
+
+    /**
+     * @param pe The property
+     * @return Whether the property is an integral type bound through {@link ReadableBytes}
+     */
+    private static boolean isReadableBytesProperty(PropertyElement pe) {
+        ClassElement type = pe.getGenericType();
+        if (type.isOptional()) {
+            type = type.getOptionalValueType().orElse(type);
+        }
+        return isIntegral(type.getName()) && isReadableBytes(pe);
+    }
+
+    private static boolean isReadableBytes(PropertyElement pe) {
+        if (pe.hasStereotype(ReadableBytes.class) || isReadableBytesConstructorParameter(pe)) {
+            return true;
+        }
+        MethodElement setter = pe.getWriteMethod().orElse(null);
+        if (setter != null) {
+            ParameterElement[] parameters = setter.getParameters();
+            if (setter.hasStereotype(ReadableBytes.class)
+                || (parameters.length == 1 && parameters[0].hasStereotype(ReadableBytes.class))) {
+                return true;
+            }
+        }
+        return pe.getField().map(field -> field.hasStereotype(ReadableBytes.class)).orElse(false);
+    }
+
+    /**
+     * Immutable configurations bind properties through the parameters of their
+     * {@link ConfigurationInject} or primary constructor.
+     */
+    private static boolean isReadableBytesConstructorParameter(PropertyElement pe) {
+        ClassElement owner = pe.getOwningType();
+        List<MethodElement> constructors = new ArrayList<>();
+        owner.getAccessibleConstructors().stream()
+            .filter(constructor -> constructor.hasStereotype(ConfigurationInject.class))
+            .forEach(constructors::add);
+        owner.getPrimaryConstructor().ifPresent(constructors::add);
+        for (MethodElement constructor : constructors) {
+            for (ParameterElement parameter : constructor.getParameters()) {
+                if (parameter.getName().equals(pe.getName()) && parameter.hasStereotype(ReadableBytes.class)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isIntegral(String typeName) {
+        return INTEGRAL_TYPES.contains(typeName);
     }
 
     private void writeChildTypeSchema(Writer out, ClassElement t) throws IOException {
@@ -550,10 +642,8 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     }
 
     private void writeSimpleTypeName(Writer out, String fqcn) throws IOException {
-        String type = switch (fqcn) {
+        String type = isIntegral(fqcn) ? INTEGER : switch (fqcn) {
             case BOOLEAN, "java.lang.Boolean" -> BOOLEAN;
-            case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
-                 "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" -> "integer";
             case "float", "double", "java.lang.Float", "java.lang.Double", "java.math.BigDecimal" ->
                 "number";
             default -> STRING;
@@ -564,11 +654,11 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
 
     private @Nullable Object coerceDefault(String value, String typeName) {
         try {
+            if (isIntegral(typeName)) {
+                return Long.parseLong(value);
+            }
             return switch (typeName) {
                 case BOOLEAN, "java.lang.Boolean" -> Boolean.parseBoolean(value);
-                case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
-                     "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" ->
-                    Long.parseLong(value);
                 case "float", "double", "java.lang.Float", "java.lang.Double",
                      "java.math.BigDecimal" -> Double.parseDouble(value);
                 default -> value; // string/enum/uri fall back to string
@@ -782,9 +872,13 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             attr(out, ATTR_MAX);
             out.write("0");
         }
-        // Digits -> regex
-        Integer intDigits = intValue(pe, JV_DIGITS, "integer");
-        Integer fracDigits = intValue(pe, JV_DIGITS, "fraction");
+        // Digits -> regex. A readable-bytes value is matched by the byte size grammar instead, and a
+        // second pattern would reject sizes such as 1KB.
+        if (isReadableBytesProperty(pe)) {
+            return;
+        }
+        Integer intDigits = intValue(pe, JV_DIGITS, JV_DIGITS_INTEGER);
+        Integer fracDigits = intValue(pe, JV_DIGITS, JV_DIGITS_FRACTION);
         if (intDigits != null || fracDigits != null) {
             StringBuilder re = new StringBuilder("^");
             int id = intDigits != null ? intDigits : 0;

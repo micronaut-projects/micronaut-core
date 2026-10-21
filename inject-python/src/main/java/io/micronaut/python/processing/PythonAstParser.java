@@ -539,6 +539,7 @@ public final class PythonAstParser {
             java.util.List<String> exportedTypes = map.containsKey("exportedTypes") ? (java.util.List<String>) map.get("exportedTypes") : new ArrayList<>();
             java.util.List<String> allClassNames = map.containsKey("allClassNames") ? (java.util.List<String>) map.get("allClassNames") : new ArrayList<>();
             java.util.List<String> validationErrors = map.containsKey("validationErrors") ? (java.util.List<String>) map.get("validationErrors") : new ArrayList<>();
+            java.util.List<String> validationWarnings = map.containsKey("validationWarnings") ? (java.util.List<String>) map.get("validationWarnings") : new ArrayList<>();
             TransformResult transformResult = new TransformResult(
                 source,
                 code,
@@ -547,7 +548,8 @@ public final class PythonAstParser {
                 javaClassImports,
                 exportedTypes,
                 allClassNames,
-                validationErrors
+                validationErrors,
+                validationWarnings
             );
             results.add(transformResult);
             runtimeArtifacts.put(
@@ -646,7 +648,8 @@ public final class PythonAstParser {
                 "javaClassImports": transformer.get_java_class_imports(),
                 "exportedTypes": transformer.get_exported_types(),
                 "allClassNames": transformer.all_class_names,
-                "validationErrors": transformer.validation_errors
+                "validationErrors": transformer.validation_errors,
+                "validationWarnings": transformer.validation_warnings
             }
             """;
     }
@@ -737,6 +740,7 @@ public final class PythonAstParser {
      * @param exportedTypes    The types that have Micronaut decorators
      * @param allClassNames    All class names defined in the source
      * @param validationErrors Validation errors found while transforming the source
+     * @param validationWarnings Diagnostics found while transforming the source that do not fail the compilation
      */
     @Experimental
     public record TransformResult(
@@ -747,7 +751,31 @@ public final class PythonAstParser {
         Map<String, java.util.List<Map<String, String>>> javaClassImports,
         java.util.List<String> exportedTypes,
         java.util.List<String> allClassNames,
-        java.util.List<String> validationErrors) {
+        java.util.List<String> validationErrors,
+        java.util.List<String> validationWarnings) {
+
+        /**
+         * A result without warnings.
+         *
+         * @param originalSource   The original source
+         * @param code             The transformed code
+         * @param runtimeCodeSupplier Produces the runtime code for diagnostics on demand
+         * @param decorators       The decorators
+         * @param javaClassImports The Java class imports
+         * @param exportedTypes    The types that have Micronaut decorators
+         * @param allClassNames    All class names defined in the source
+         * @param validationErrors Validation errors found while transforming the source
+         */
+        public TransformResult(Source originalSource,
+                               String code,
+                               Supplier<String> runtimeCodeSupplier,
+                               Map<String, String> decorators,
+                               Map<String, java.util.List<Map<String, String>>> javaClassImports,
+                               java.util.List<String> exportedTypes,
+                               java.util.List<String> allClassNames,
+                               java.util.List<String> validationErrors) {
+            this(originalSource, code, runtimeCodeSupplier, decorators, javaClassImports, exportedTypes, allClassNames, validationErrors, java.util.List.of());
+        }
 
         public Source transformedSource() {
             return sourceWithContent(code);

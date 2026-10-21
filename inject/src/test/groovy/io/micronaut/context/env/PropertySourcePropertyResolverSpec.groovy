@@ -989,6 +989,37 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.containsProperty("extra.listval")
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10030")
+    void "test resolving a property below an index in the middle of the name"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [
+                        'outer.items[0].name'               : 'first',
+                        'outer.items[0].nested-items[0].foo': 'a',
+                        'outer.items[0].nested-items[1].foo': 'b',
+                        'outer.items[1].nested-items[0].foo': 'c',
+                        'outer.items[1].map[key].foo'       : 'd',
+                        'outer.items[1].inner.list[0].foo'  : 'e',
+                ])
+        )
+
+        expect:
+        resolver.getProperty('outer.items[0].nested-items', List).get() == [[foo: 'a'], [foo: 'b']]
+        resolver.getProperty('outer.items[1].nested-items', List).get() == [[foo: 'c']]
+        resolver.getProperty('outer.items[0].nested-items[1]', Map).get() == [foo: 'b']
+        resolver.getProperty('outer.items[0].nested-items[1].foo', String).get() == 'b'
+        resolver.getProperty('outer.items[1].map[key].foo', String).get() == 'd'
+        resolver.getProperty('outer.items[0].name', String).get() == 'first'
+        !resolver.getProperty('outer.items[2].nested-items', List).isPresent()
+        !resolver.getProperty('outer.items[0].missing', List).isPresent()
+        !resolver.getProperty('outer.items[0].name.foo', String).isPresent()
+        resolver.getProperty('outer.items[1].inner.list', List).get() == [[foo: 'e']]
+        resolver.getProperty('outer.items[1].inner.list[0].foo', String).get() == 'e'
+        resolver.containsProperties('outer.items[0].nested-items')
+        resolver.containsProperties('outer.items[1].inner.list')
+        !resolver.containsProperties('outer.items[0].missing')
+    }
+
     void "test expression resolver"() {
         given:
         Map<String, Object> parameters = [foo: "bar"]

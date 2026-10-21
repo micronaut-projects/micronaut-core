@@ -144,6 +144,17 @@ class Service:
                 and error.args == (7, "empty", "native"))
 
     @Executable
+    def exception_state(self, error: OutOfStockError) -> bool:
+        # the wrapper is a java.lang.Exception: its exception state is that of the wrapped Python exception
+        error.add_note("noted")
+        return (error.__context__ is None
+                and error.__suppress_context__
+                and error.__traceback__ is not None
+                and self.error.__notes__ == ["noted"]
+                and error.with_traceback(None) is self.error
+                and isinstance(error, Exception))
+
+    @Executable
     def saved_error(self) -> OutOfStockError:
         return self.error
 ''')
@@ -160,6 +171,7 @@ class Service:
         context.classLoader.loadClass("python.CauseError").isInstance(error.cause)
         error.cause.message == "inner"
         service.same(error)
+        service.exception_state(error)
         service.saved_error().asPolyglotValue() == error.asPolyglotValue()
         error.asPolyglotValue().getMember("__cause__") == error.cause.asPolyglotValue()
 

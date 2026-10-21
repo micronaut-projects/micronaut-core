@@ -40,6 +40,16 @@ micronaut:
 
 `enabled` defaults to `true`. `size` is the target number of additional GraalPy contexts; a value of `0` selects the default, which is half the number of available processors, at least `2` and at most `8`. Contexts are created lazily and each one consumes memory and requires initialization work. Compiled Python code is shared across contexts where possible. `warn-wait`, `2s` by default, is how long a request waits for an available context before a warning is logged, and is the signal to use when tuning `size`; set it to `0s` to turn the warning off.
 
+Preparing a pooled context is most of the cost of the first request an application serves: it initializes a GraalPy interpreter and imports the runtime module that every Python call goes through, which in turn imports `asyncio` and other modules that are slow to load. `prestart` moves that work off the request path: once the application has started, a background thread creates and warms up that many pooled contexts, so the first requests find one ready. It defaults to `1`, which removes the wait from the first request without filling a pool that an idle application may never need, and to `0` in the `test` environment, where many short-lived application contexts would each build a context that their tests compete with for processors. Set it to `0` to create every context on demand, or up to `size` to have the whole pool ready before load arrives. A request that arrives while a context is being pre-started waits for that context rather than building a second one, and an application that stops meanwhile closes the context once it is built.
+
+[configuration]
+----
+micronaut:
+  python:
+    pool:
+      prestart: 2
+----
+
 ==== Choosing a pool size
 
 More contexts are not straightforwardly better, and the size that suits an application depends on something under its own control: whether the Python beans its routes reach are themselves pooled.

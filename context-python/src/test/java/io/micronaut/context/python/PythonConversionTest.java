@@ -268,8 +268,8 @@ class PythonConversionTest {
                 import datetime
 
                 parameter.accept(datetime.time(12, tzinfo=datetime.timezone.utc))
-                parameter.accept(datetime.datetime(2026, 9, 24, 12, tzinfo=datetime.timezone.utc))
                 parameter.accept(datetime.timezone(datetime.timedelta(microseconds=1500)))
+                parameter.accept(datetime.datetime(2026, 9, 24, 12, tzinfo=datetime.timezone(datetime.timedelta(microseconds=1500))))
                 """);
         }
 
