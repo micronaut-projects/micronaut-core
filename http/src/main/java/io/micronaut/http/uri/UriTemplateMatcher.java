@@ -21,8 +21,6 @@ import io.micronaut.core.util.StringUtils;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -348,15 +346,11 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         if (value.indexOf('%') == -1) {
             return false;
         }
-        String decoded = decode(value);
-        return decoded != null && decoded.indexOf('/') != -1;
+        return decodeSeparators(value).indexOf('/') != -1;
     }
 
     private static boolean matchesDecoded(Segment segment, String uri, Matcher rawMatcher) {
-        String decodedUri = decode(uri);
-        if (decodedUri == null) {
-            return true;
-        }
+        String decodedUri = decodeSeparators(uri);
         Matcher decodedMatcher = segment.pattern.matcher(decodedUri);
         if (!decodedMatcher.matches()) {
             return false;
@@ -365,7 +359,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         for (int i = 0; i < segment.regexpVariables.length; i++) {
             String rawGroup = rawMatcher.group(groupInx);
             String decodedGroup = decodedMatcher.group(groupInx);
-            if (rawGroup == null ? decodedGroup != null : !Objects.equals(decode(rawGroup), decodedGroup)) {
+            if (rawGroup == null ? decodedGroup != null : !Objects.equals(decodeSeparators(rawGroup), decodedGroup)) {
                 return false;
             }
             groupInx += 2;
@@ -374,18 +368,14 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     }
 
     /**
-     * Percent-decode a path value. Unlike form decoding, a {@code '+'} stays a {@code '+'}.
+     * Decode the percent-encoded path separators of a value, which a template must not see
+     * encoded when the handler receives them decoded.
      *
      * @param value The raw value
-     * @return The decoded value, or {@code null} if the value has an invalid escape
+     * @return The value with {@code %2F} and {@code %5C} decoded
      */
-    @Nullable
-    private static String decode(String value) {
-        try {
-            return URLDecoder.decode(value.replace("+", "%2B"), StandardCharsets.UTF_8);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
+    private static String decodeSeparators(String value) {
+        return value.replace("%2F", "/").replace("%2f", "/").replace("%5C", "\\").replace("%5c", "\\");
     }
 
     private static int readText(String input, boolean requiresSlash) {

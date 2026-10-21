@@ -35,6 +35,12 @@ class PathVariableDecodingSpec extends Specification {
         raw('/pv/re2/a+b').contains('var=[a+b]')
     }
 
+    void "other escapes in a regex variable are still decoded"() {
+        expect:
+        raw('/pv/re/a%2Bb').contains('var=[a+b]')
+        raw('/pv/re/a%20b').contains('var=[a b]')
+    }
+
     private String raw(String path) {
         try (Socket socket = new Socket('127.0.0.1', server.port)) {
             socket.soTimeout = 5000
