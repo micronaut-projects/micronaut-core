@@ -70,6 +70,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
@@ -259,7 +260,7 @@ final class NettyDirectRoutes {
         stage.whenComplete((response, error) -> {
             // on the thread that completed the stage
             if (error != null || response == null) {
-                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, error, null));
+                onEventLoop(ctx, body, null, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, error, null));
                 return;
             }
             MutableHttpResponse<?> mutable;
@@ -268,7 +269,7 @@ final class NettyDirectRoutes {
                 mutable = mutable(response);
                 writer = writer(mutable, true);
             } catch (Throwable e) {
-                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, e, null));
+                onEventLoop(ctx, body, null, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, e, null));
                 return;
             }
             Runnable prepare = () -> {
@@ -277,20 +278,20 @@ final class NettyDirectRoutes {
                     prepared = prepare(ctx, request, mutable, writer);
                 } catch (Throwable t) {
                     // e.g. an allocation error
-                    onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, t, null));
+                    onEventLoop(ctx, body, null, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, t, null));
                     return;
                 }
-                onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, null, prepared));
+                onEventLoop(ctx, body, prepared, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, null, prepared));
             };
             if (writer == null || !writer.blocking()) {
                 // bytes, text and the writers that do not block are written on the event loop
-                onEventLoop(ctx, prepare);
+                onEventLoop(ctx, body, null, prepare);
             } else if (Thread.currentThread() instanceof FastThreadLocalThread) {
                 // a blocking writer never runs on an event loop, e.g. of a client that completed the stage
                 try {
                     ioExecutor.get().execute(prepare);
                 } catch (RuntimeException e) {
-                    onEventLoop(ctx, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, e, null));
+                    onEventLoop(ctx, body, null, () -> complete(ctx, request, body, outboundAccess, cancelOnAbandon, response, e, null));
                 }
             } else {
                 // e.g. the executor of the route
@@ -335,11 +336,26 @@ final class NettyDirectRoutes {
         }
     }
 
-    private static void onEventLoop(ChannelHandlerContext ctx, Runnable task) {
+    /**
+     * Run a task on the event loop of the channel.
+     *
+     * @param body     The body of the request, closed if the event loop rejects the task, e.g.
+     *                 as it shut down: the task never completes the request then
+     * @param prepared The response the task writes, released if the event loop rejects the task
+     */
+    private static void onEventLoop(ChannelHandlerContext ctx, CloseableByteBody body, @Nullable Prepared prepared, Runnable task) {
         if (ctx.executor().inEventLoop()) {
             task.run();
-        } else {
+            return;
+        }
+        try {
             ctx.executor().execute(task);
+        } catch (RejectedExecutionException e) {
+            LOG.debug("The event loop rejected the response of a direct route: {}", e.getMessage());
+            body.close();
+            if (prepared != null) {
+                prepared.content().release();
+            }
         }
     }
 
