@@ -150,6 +150,38 @@ class Product { }
         ctx.close()
     }
 
+    void "a dependent destroyed outside the group is no longer found - #description"() {
+        given:
+        def ctx = buildContext(HEADER)
+        def log = ctx.classLoader.loadClass('findreg.Log')
+        def group = ctx.createDependencyGroup()
+        def registration = group.getBeanRegistration(ctx.classLoader.loadClass('findreg.Resource'))
+        def other = group.getBeanRegistration(ctx.classLoader.loadClass('findreg.Resource'))
+
+        when:
+        destroy(ctx, registration)
+
+        then:
+        log.events == ['resource']
+        !group.findRegistration(registration.bean()).isPresent()
+        !group.owns(registration.bean())
+        group.findRegistration(other.bean()).get().is(other)
+
+        when:
+        group.close()
+
+        then:
+        log.events == ['resource', 'resource']
+
+        cleanup:
+        ctx.close()
+
+        where:
+        description                  | destroy
+        'closing the registration'   | { c, reg -> reg.close() }
+        'destroying in the context'  | { c, reg -> c.destroyBean(reg) }
+    }
+
     void "a null bean registration is not found by null"() {
         given:
         def ctx = buildContext(HEADER)
