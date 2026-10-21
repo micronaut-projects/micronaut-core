@@ -1405,7 +1405,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         @Override
         protected void initChannel(Channel ch) throws Exception {
-            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextWrapper.takeRetained());
+            SslContextHolder contextHolder = contextWrapper.takeRetained();
+            if (contextHolder == null && config.isSsl()) {
+                // never serve plaintext on a TLS listener while its SSL context is pending or failed
+                LOG.warn("Closing connection on TLS listener {}: SSL context not available", serverChannel);
+                ch.close();
+                return;
+            }
+            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextHolder);
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
             cp.initChannel();
