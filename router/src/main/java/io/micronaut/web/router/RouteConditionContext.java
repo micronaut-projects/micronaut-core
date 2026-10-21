@@ -29,9 +29,9 @@ import java.util.function.Supplier;
 /**
  * What the router asks the server for a request, to evaluate the conditions of a route on the
  * host, the client address and the time of the request, see
- * {@link io.micronaut.web.router.builder.RouteCondition.Host},
- * {@link io.micronaut.web.router.builder.RouteCondition.RemoteAddress} and
- * {@link io.micronaut.web.router.builder.RouteCondition.TimeWindow}. The HTTP server provides a
+ * {@link io.micronaut.web.router.builder.RequestCondition.Host},
+ * {@link io.micronaut.web.router.builder.RequestCondition.RemoteAddress} and
+ * {@link io.micronaut.web.router.builder.RequestCondition.TimeWindow}. The HTTP server provides a
  * bean that resolves them with its host and client address resolvers and its configuration;
  * without one, the router reads the {@code Host} header, the peer of the connection and the
  * system clock, see {@link #fallback()}.

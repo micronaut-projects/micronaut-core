@@ -18,13 +18,16 @@ on:
       # stacked PRs target each other's branches
       - 'python/**'
       - 'python-*'
+      - 'stack/**'
     types: [opened, synchronize, reopened, ready_for_review]
 # A new push to a pull request cancels its older run, freeing the shared runner
-# pool. Pushes to branches get a group of their own and are never cancelled:
-# they publish snapshots and docs.
+# pool. Pushes to a branch share one group per branch and never cancel a run in
+# progress, as it may be publishing snapshots and docs. GitHub keeps only the
+# newest pending run of a group, so when several commits land while a run is
+# in progress, only the latest of them is built and published.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   build:
     name: "build"
