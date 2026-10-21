@@ -9,10 +9,9 @@ Java packages, types and annotations every module imports in a manifest
 installed here serves them from the manifests of every compilation on the path. A package is a module
 object without a file whose attributes resolve to host classes on first access; an annotation is a
 callable that carries the annotation type and returns its target, as the compiler-generated decorators
-did; a class the run time class path lacks is a facade resolving it on first use. The snake_case methods
-and getter properties the manifests record for Java types are registered with GraalPy as interop types of
-those types, for the Java object fallback of the runtime to answer with, and so are the dataclass
-attributes of the Java wrappers generated for Python dataclasses.
+did; a class the run time class path lacks is a facade resolving it on first use. The Java wrappers
+generated for Python dataclasses get the dataclass attributes of their Python class, registered with
+GraalPy as interop types of the wrappers.
 
 Loaded by PythonContextRuntime before the application modules import, and imported by the package
 initialisers of the application packages that share their name with a Java package. Kept apart from
@@ -225,8 +224,6 @@ class _MicronautJavaImports:
         self.types = {}
         # Python module name -> simple name -> (binary name, kind)
         self.members = {}
-        # binary name of a Java type -> Python name -> (Java method, 'property' or 'method'), () when ambiguous
-        self.instance_members = {}
         # binary name of the Java wrapper of a Python dataclass -> (Python package, dotted class name)
         self.dataclasses = {}
         self.manifests = []
@@ -243,12 +240,6 @@ class _MicronautJavaImports:
                 existing = merged.get(simple_name)
                 if existing is None or (existing[1] != 'annotation' and _micronaut_host_class(existing[0]) is None):
                     merged[simple_name] = tuple(member)
-        for java_name, members in manifest.get('INSTANCE_MEMBERS', {}).items():
-            merged = self.instance_members.setdefault(java_name, {})
-            for python_name, member in members.items():
-                # computed from the same class path type by every compilation; a disagreement is no alias
-                existing = merged.get(python_name)
-                merged[python_name] = tuple(member) if existing is None or existing == tuple(member) else ()
         for java_name, python_class in manifest.get('DATACLASSES', {}).items():
             self.dataclasses.setdefault(java_name, tuple(python_class))
 
@@ -370,22 +361,19 @@ class _MicronautDataclassAttribute:
 
 def _micronaut_register_interop_types(imports):
     """
-    Registers what the manifests record for Java types as attributes of an interop type of each type, which
-    GraalPy adds to the type of every instance of the Java type and of its implementations: the instance member
-    names of a referenced Java type as its ``__micronaut_members__`` table, which the Java object fallback
-    (GraalPyContextFactory) looks names up in, and the dataclass attributes of the Java wrapper of a Python
-    dataclass. A type registered before keeps its interop type, with the attributes the manifests now record; a
-    type the run time class path lacks is skipped.
+    Registers the dataclass attributes of the Java wrapper of each Python dataclass the manifests record as an
+    interop type of the wrapper, which GraalPy adds to the type of its instances. A wrapper registered before
+    keeps its interop type, with the attributes the manifests now record; a wrapper the run time class path
+    lacks is skipped. Only the compilation's own dataclass wrappers are registered, so a context loads few
+    host classes for them.
     """
-    attributes = {}
-    for java_name, members in imports.instance_members.items():
-        attributes.setdefault(java_name, {})['__micronaut_members__'] = members
-    for java_name, python_class in imports.dataclasses.items():
-        attributes.setdefault(java_name, {}).update(
-            {name: _MicronautDataclassAttribute(python_class, name) for name in _MICRONAUT_DATACLASS_ATTRIBUTES})
+    attributes = {
+        java_name: {name: _MicronautDataclassAttribute(python_class, name) for name in _MICRONAUT_DATACLASS_ATTRIBUTES}
+        for java_name, python_class in imports.dataclasses.items()
+    }
     for java_name, registered in _micronaut_interop_types.items():
         recorded = attributes.get(java_name, {})
-        for name in ('__micronaut_members__', *_MICRONAUT_DATACLASS_ATTRIBUTES):
+        for name in _MICRONAUT_DATACLASS_ATTRIBUTES:
             if name in registered.__dict__ and name not in recorded:
                 delattr(registered, name)
     from polyglot import register_interop_type

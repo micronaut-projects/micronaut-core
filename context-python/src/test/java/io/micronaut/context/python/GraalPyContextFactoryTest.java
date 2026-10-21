@@ -48,12 +48,6 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class GraalPyContextFactoryTest {
-    // reads the Java imports manifests of the context, as its first Java import does
-    private static final String READ_JAVA_IMPORTS = """
-        import micronaut_java_imports
-        getattr(micronaut_java_imports, '__micronaut_java_imports')()
-        """;
-
     @TempDir
     Path temporaryDirectory;
 
@@ -242,29 +236,34 @@ final class GraalPyContextFactoryTest {
 
     @Test
     void interopTypesAreRegisteredAtBootstrapWithoutAJavaImport() {
+        // the dataclass wrapper comes from __micronaut_java_imports_dataclasses_test.py of the test virtual file system
         try (ApplicationContext applicationContext = ApplicationContext.run()) {
             Context context = applicationContext.getBean(Context.class);
-            context.getBindings(PYTHON).putMember("members", new InstanceMembers());
             // nothing in this context read the manifests through a Java import; the bootstrap registered them
             assertTrue(context.eval(PYTHON, """
                 import sys
-                sys.modules['micronaut_java_imports']._micronaut_java_imports_cache is None
+                imports = sys.modules['micronaut_java_imports']
+                imports._micronaut_java_imports_cache is None and \\
+                    'io.micronaut.context.python.GraalPyContextFactoryTest$DataclassWrapper' in imports._micronaut_interop_types
                 """).asBoolean());
-            assertEquals(8080, context.eval(PYTHON, "members.port").asInt());
         }
+    }
+
+    /**
+     * Stands for the Java wrapper of a Python dataclass in the test manifest.
+     */
+    public static final class DataclassWrapper {
     }
 
     @Test
     void javaInstancesOfferReadOnlyPropertiesAndSnakeCaseMethods() {
-        // the names come from the Java imports manifest of the test virtual file system
-        // (__micronaut_java_imports_instance_members_test.py), registered when a context reads its manifests;
-        // the manifest also names a class the class path lacks, which is skipped
+        // the names come from META-INF/pyronaut/java-instance-members.tsv of the test resources, read once
+        // for the class loader; it also names a class the class path lacks, which matches no receiver
         try (ApplicationContext applicationContext = ApplicationContext.builder().properties(Map.of(
             "micronaut.python.pool.enabled", true,
             "micronaut.python.pool.size", 1
         )).start()) {
             Context context = applicationContext.getBean(Context.class);
-            context.eval(PYTHON, READ_JAVA_IMPORTS);
             context.getBindings(PYTHON).putMember("members", new InstanceMembers());
             context.getBindings(PYTHON).putMember("request", HttpRequest.GET("/"));
             context.getBindings(PYTHON).putMember("original_request", HttpRequest.GET("/"));
@@ -294,15 +293,11 @@ final class GraalPyContextFactoryTest {
             // a name a registered subtype blocks is no alias of its implementations; the other names still are
             assertEquals("GET", context.eval(PYTHON, "request.method_name").asString());
             assertFalse(context.eval(PYTHON, "hasattr(request, 'path')").asBoolean());
-            // reading the manifests again keeps one interop type per Java type
-            context.eval(PYTHON, "getattr(micronaut_java_imports, '__micronaut_reset_java_imports')()");
-            context.eval(PYTHON, READ_JAVA_IMPORTS);
-            assertEquals(1, context.eval(PYTHON,
-                "sum(1 for t in type(members).__mro__ if '__micronaut_members__' in t.__dict__)").asInt());
-            assertEquals(8080, context.eval(PYTHON, "members.port").asInt());
+            // the names are shared by the contexts of the class loader, not held by each one
+            assertSame(PythonJavaInstanceMembers.of(applicationContext.getClassLoader()),
+                PythonJavaInstanceMembers.of(applicationContext.getClassLoader()));
 
             int pooled = applicationContext.getBean(PythonContextExecutor.class).withContext(pooledContext -> {
-                pooledContext.eval(PYTHON, READ_JAVA_IMPORTS);
                 pooledContext.getBindings(PYTHON).putMember("members", new InstanceMembers());
                 return pooledContext.eval(PYTHON, "members.port").asInt();
             });
