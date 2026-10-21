@@ -40,7 +40,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -1680,25 +1679,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Nullable
     private Object getRawSingleValue(String annotation, String member, @Nullable Function<Object, Object> valueMapper) {
-        Object rawValue = getRawValue(annotation, member);
-        if (rawValue != null) {
-            if (rawValue instanceof Object[] array) {
-                // The common String[]/AnnotationValue[]/AnnotationClassValue[] members, without reflective access
-                if (array.length > 0) {
-                    rawValue = array[0];
-                }
-            } else if (rawValue.getClass().isArray()) {
-                int len = Array.getLength(rawValue);
-                if (len > 0) {
-                    rawValue = Array.get(rawValue, 0);
-                }
-            } else if (rawValue instanceof Iterable<?> iterable) {
-                Iterator<?> i = iterable.iterator();
-                if (i.hasNext()) {
-                    rawValue = i.next();
-                }
-            }
-        }
+        Object rawValue = AnnotationValue.firstValue(getRawValue(annotation, member));
         if (valueMapper != null && rawValue instanceof CharSequence) {
             return valueMapper.apply(rawValue);
         } else {

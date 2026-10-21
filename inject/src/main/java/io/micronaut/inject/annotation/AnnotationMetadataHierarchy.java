@@ -1053,6 +1053,17 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      * @param annotationClass The annotation
      * @return The container of the first layer that considers the annotation repeatable, or {@code null}
      */
+    /**
+     * The name the layers store the annotation under: its container when a layer considers it repeatable.
+     *
+     * @param annotationClass The annotation
+     * @return The name to look up
+     */
+    private String lookupName(Class<? extends Annotation> annotationClass) {
+        String container = repeatableContainer(annotationClass);
+        return container != null ? container : annotationClass.getName();
+    }
+
     @Nullable
     private String repeatableContainer(Class<? extends Annotation> annotationClass) {
         boolean registryChecked = false;
@@ -1077,38 +1088,22 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
-        if (annotation == null) {
-            return false;
-        }
-        String container = repeatableContainer(annotation);
-        return hasAnnotation(container != null ? container : annotation.getName());
+        return annotation != null && hasAnnotation(lookupName(annotation));
     }
 
     @Override
     public boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
-        if (annotation == null) {
-            return false;
-        }
-        String container = repeatableContainer(annotation);
-        return hasStereotype(container != null ? container : annotation.getName());
+        return annotation != null && hasStereotype(lookupName(annotation));
     }
 
     @Override
     public boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
-        if (annotation == null) {
-            return false;
-        }
-        String container = repeatableContainer(annotation);
-        return hasDeclaredAnnotation(container != null ? container : annotation.getName());
+        return annotation != null && hasDeclaredAnnotation(lookupName(annotation));
     }
 
     @Override
     public boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
-        if (stereotype == null) {
-            return false;
-        }
-        String container = repeatableContainer(stereotype);
-        return hasDeclaredStereotype(container != null ? container : stereotype.getName());
+        return stereotype != null && hasDeclaredStereotype(lookupName(stereotype));
     }
 
     /**
