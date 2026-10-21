@@ -33,6 +33,36 @@ snippet::io.micronaut.docs.aop.around.AroundSpec[tags="test", indent=0, title="A
 
 NOTE: Since Micronaut injection happens at compile time, generally the advice should be packaged in a dependent JAR file that is on the classpath when the above test is compiled. It should not be in the same codebase since you don't want the test to be compiled before the advice itself is compiled.
 
+== Binding Interceptors by Annotation Members
+
+By default an interceptor applies wherever its binding annotation is declared, whatever the annotation's members. Declaring ann:aop.InterceptorBinding[] with `bindMembers = true` on the binding annotation makes the members part of the binding: an interceptor annotated with the binding annotation only applies where the annotation is declared with the same member values. Members annotated with ann:context.annotation.NonBinding[] are left out of the comparison.
+
+A repeatable binding annotation can be declared several times on the interceptor and on the target. By default the interceptor applies when any one of its occurrences matches any one of the target's, and the occurrences on a method are added to those on its class. Setting `matchAllOccurrences = true` matches the occurrences as one group, which is how Jakarta Interceptors and CDI bind repeatable interceptor bindings:
+
+* every occurrence declared on the interceptor must be declared on the target, which may declare more;
+* the occurrences declared on a method replace those declared on its class, and a method declaring none uses those of its class.
+
+snippet::io.micronaut.docs.aop.binding.Audit[tags="imports,annotation", indent=0, title="Repeatable Binding Annotation Example"]
+
+<1> The annotation is repeatable
+<2> The members bind interceptors, and every occurrence must match
+<3> The `value` member is compared
+<4> The `reason` member is left out of the comparison
+
+snippet::io.micronaut.docs.aop.binding.PaymentAuditInterceptor[tags="imports,interceptor", indent=0, title="Interceptor Requiring Two Occurrences"]
+
+<1> The interceptor applies only where both `security` and `billing` are declared
+
+snippet::io.micronaut.docs.aop.binding.PaymentService[tags="example", indent=0, title="Repeatable Binding Usage Example"]
+
+<1> The class declares both occurrences; `reason` differs from the interceptor's but is not compared
+<2> `pay()` uses the occurrences of its class and is intercepted
+<3> `refund()` declares its own occurrences, which replace those of the class, so it is not intercepted
+
+snippet::io.micronaut.docs.aop.binding.AuditBindingSpec[tags="test", indent=0, title="Repeatable Binding Test"]
+
+NOTE: `matchAllOccurrences` is experimental. It only changes the selection of interceptors bound by an annotation that sets it, so existing bindings behave as before.
+
 == Customizing Proxy Generation
 
 The default behaviour of the link:{api}/io/micronaut/aop/Around.html[Around] annotation is to generate a proxy at compile time that is a subclass of the proxied class. In other words, in the previous example a compile-time subclass of the `NotNullExample` class will be produced where proxied methods are decorated with interceptor handling, and the original behaviour is invoked via a call to `super`.
