@@ -19,9 +19,11 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
@@ -93,10 +95,13 @@ class WebSocketRoutesTest {
         assertNull(endpoint.pongArgument());
         assertThrows(UnsupportedOperationException.class, endpoint::getBeanDefinition);
 
-        // the implicit HEAD route is a WebSocket route too: a plain request to it is an error
+        // the implicit HEAD route is a WebSocket route too, which only an upgrade request matches
         UriRouteInfo<?, ?> head = route(router, HttpRequest.HEAD("/chat/lobby"));
         assertTrue(head.isWebSocketRoute());
         assertSame(endpoint, endpoint(head));
+        // a plain request matches neither
+        assertNull(router.findClosest(HttpRequest.GET("/chat/lobby")));
+        assertNull(router.findClosest(HttpRequest.HEAD("/chat/lobby")));
     }
 
     @Test
@@ -271,7 +276,7 @@ class WebSocketRoutesTest {
             });
             assertTrue(error.get().getMessage().contains("no media types or response type"), error.get().getMessage());
             // the route is dropped
-            assertNull(router.findClosest(HttpRequest.GET("/typed")));
+            assertNull(router.findClosest(upgrade(HttpRequest.GET("/typed"))));
         }
     }
 
@@ -285,7 +290,7 @@ class WebSocketRoutesTest {
         Router router = router(routes -> routes.locate("/targets/{id}", (request, pathVariables) -> "target", target -> located));
         // the located routes are declared, the WebSocket route is dropped
         assertNotNull(router.findClosest(HttpRequest.GET("/targets/1/plain")));
-        assertNull(router.findClosest(HttpRequest.GET("/targets/1/ws")));
+        assertNull(router.findClosest(upgrade(HttpRequest.GET("/targets/1/ws"))));
         assertTrue(error.get().getMessage().contains("is a located route"), error.get().getMessage());
     }
 
@@ -335,10 +340,59 @@ class WebSocketRoutesTest {
         return (WebSocketRouteEndpoint) bean;
     }
 
-    private static UriRouteInfo<?, ?> route(Router router, HttpRequest<?> request) {
-        UriRouteMatch<Object, Object> match = router.findClosest(request);
+    @Test
+    void aPlainRequestToTheRouteIsLeftToTheOtherRoutesOfItsPath() {
+        Router router = router(routes -> {
+            routes.GET("/push").webSocket(ws -> ws.onMessage(String.class, (session, message) -> null));
+            routes.GET("/{+path}").respond(io.micronaut.http.HttpResponse.ok());
+            routes.GET("/push").handle((request, pathVariables) -> io.micronaut.http.HttpResponse.ok());
+        });
+
+        // an upgrade request matches both routes of the path: the server upgrades it with the
+        // WebSocket route, see NettyServerWebSocketUpgradeHandler
+        assertEquals(List.of(true, false), router.<Object, Object>findAny(upgrade(HttpRequest.GET("/push")))
+            .stream()
+            .filter(match -> match.getHttpMethod() == HttpMethod.GET
+                && match.getRouteInfo().getUriMatchTemplate().toString().equals("/push"))
+            .map(match -> match.getRouteInfo().isWebSocketRoute())
+            .sorted(java.util.Comparator.reverseOrder())
+            .toList());
+
+        // a plain request is left to the route of the same path, and not to the broader route
+        UriRouteMatch<Object, Object> plain = router.findClosest(HttpRequest.GET("/push"));
+        assertNotNull(plain);
+        assertFalse(plain.getRouteInfo().isWebSocketRoute());
+        assertEquals("/push", plain.getRouteInfo().getUriMatchTemplate().toString());
+    }
+
+    @Test
+    void aPlainRequestToTheRouteFallsThroughToABroaderRoute() {
+        Router router = router(routes -> {
+            routes.GET("/push").webSocket(ws -> ws.onMessage(String.class, (session, message) -> null));
+            routes.GET("/{+path}").respond(io.micronaut.http.HttpResponse.ok());
+        });
+
+        assertTrue(route(router, HttpRequest.GET("/push")).isWebSocketRoute());
+        UriRouteMatch<Object, Object> plain = router.findClosest(HttpRequest.GET("/push"));
+        assertNotNull(plain);
+        assertFalse(plain.getRouteInfo().isWebSocketRoute());
+        assertEquals("/{+path}", plain.getRouteInfo().getUriMatchTemplate().toString());
+    }
+
+    /**
+     * The route of a request, which is sent as a WebSocket upgrade request: only an upgrade request
+     * matches a WebSocket route, and it matches the other routes as a plain request does.
+     */
+    private static UriRouteInfo<?, ?> route(Router router, MutableHttpRequest<?> request) {
+        UriRouteMatch<Object, Object> match = router.findClosest(upgrade(request));
         assertNotNull(match, request.getPath());
         return match.getRouteInfo();
+    }
+
+    private static <T extends MutableHttpRequest<?>> T upgrade(T request) {
+        request.header(HttpHeaders.CONNECTION, "Upgrade");
+        request.header(HttpHeaders.UPGRADE, "websocket");
+        return request;
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes) {
