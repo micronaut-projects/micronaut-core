@@ -43,6 +43,7 @@ import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
+import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
@@ -63,7 +64,6 @@ import javax.net.ssl.SSLParameters;
 import java.io.IOException;
 import java.net.Authenticator;
 import java.net.CookieManager;
-import java.net.HttpCookie;
 import java.net.InetSocketAddress;
 import java.net.PasswordAuthentication;
 import java.net.ProxySelector;
@@ -73,9 +73,11 @@ import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.populateServiceId;
@@ -102,6 +104,11 @@ abstract class AbstractJdkHttpClient {
     @Nullable
     protected final String contextPath;
     protected final HttpClient client;
+    /**
+     * Not used by the client: the cookies of a request are sent in its {@code Cookie} header,
+     * and the cookies a response sets are not kept, because a client is shared by the requests
+     * of different users.
+     */
     protected final CookieManager cookieManager;
     protected final RequestBinderRegistry requestBinderRegistry;
     @Nullable
@@ -118,8 +125,7 @@ abstract class AbstractJdkHttpClient {
     @Nullable
     protected MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     /**
-     * The client for raw exchanges: it keeps no cookies, because the exchanges a raw client
-     * relays belong to different users. Built on first use.
+     * The client for raw exchanges. Built on first use.
      */
     final Supplier<HttpClient> rawClient;
 
@@ -206,11 +212,11 @@ abstract class AbstractJdkHttpClient {
             this.contextPath = null;
         }
 
-        this.client = buildClient(true);
-        this.rawClient = SupplierUtil.memoized(() -> buildClient(false));
+        this.client = buildClient();
+        this.rawClient = SupplierUtil.memoized(this::buildClient);
     }
 
-    private HttpClient buildClient(boolean cookies) {
+    private HttpClient buildClient() {
         HttpClient.Builder builder = HttpClient.newBuilder();
         configuration.getConnectTimeout().ifPresent(builder::connectTimeout);
 
@@ -240,9 +246,6 @@ abstract class AbstractJdkHttpClient {
         }
 
         builder.followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER);
-        if (cookies) {
-            builder.cookieHandler(cookieManager);
-        }
 
         Optional<SocketAddress> proxyAddress = configuration.getProxyAddress();
         if (proxyAddress.isPresent()) {
@@ -270,16 +273,23 @@ abstract class AbstractJdkHttpClient {
         );
     }
 
-    private static HttpCookie toJdkCookie(Cookie cookie,
-                                          io.micronaut.http.HttpRequest<?> request,
-                                          String host) {
-        HttpCookie newCookie = new HttpCookie(cookie.getName(), cookie.getValue());
-        newCookie.setMaxAge(cookie.getMaxAge());
-        newCookie.setDomain(host);
-        newCookie.setHttpOnly(cookie.isHttpOnly());
-        newCookie.setSecure(cookie.isSecure());
-        newCookie.setPath(cookie.getPath() == null ? request.getPath() : cookie.getPath());
-        return newCookie;
+    private static String cookieHeader(@Nullable String existing, Collection<Cookie> cookies) {
+        StringBuilder value = new StringBuilder();
+        if (existing != null) {
+            // the cookies of the request replace those of the same name in the header
+            for (String pair : existing.split(";")) {
+                String trimmed = pair.trim();
+                int eq = trimmed.indexOf('=');
+                String name = eq < 0 ? trimmed : trimmed.substring(0, eq).trim();
+                if (!trimmed.isEmpty() && cookies.stream().noneMatch(c -> c.getName().equals(name))) {
+                    value.append(trimmed).append("; ");
+                }
+            }
+        }
+        for (Cookie cookie : cookies) {
+            value.append(ClientCookieEncoder.INSTANCE.encode(cookie)).append("; ");
+        }
+        return value.substring(0, value.length() - 2);
     }
 
     private HttpClient.Builder configureProxy(
@@ -296,7 +306,11 @@ abstract class AbstractJdkHttpClient {
             if (username != null && password != null) {
                 builder = builder.authenticator(new Authenticator() {
                     @Override
-                    protected PasswordAuthentication getPasswordAuthentication() {
+                    protected @Nullable PasswordAuthentication getPasswordAuthentication() {
+                        // the proxy credentials are only for the proxy, never for an origin server challenge
+                        if (getRequestorType() != RequestorType.PROXY) {
+                            return null;
+                        }
                         return new PasswordAuthentication(username, password.toCharArray());
                     }
                 });
@@ -363,12 +377,16 @@ abstract class AbstractJdkHttpClient {
     protected <I> Mono<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> bodyType) {
         return resolveRequestUri(request)
             .map(uri -> {
-                cookieDecoder.decode(request).ifPresent(cookies -> cookies.getAll().forEach(cookie -> {
-                    HttpCookie newCookie = toJdkCookie(cookie, request, uri.getHost());
-                    cookieManager.getCookieStore().add(uri, newCookie);
-                }));
-
-                return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry).build();
+                HttpRequest.Builder builder = HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
+                // the cookies go in the Cookie header of this request only: a cookie store would
+                // send them, and the cookies a response sets, with the later requests of other users
+                cookieDecoder.decode(request).ifPresent(cookies -> {
+                    Set<Cookie> all = cookies.getAll();
+                    if (!all.isEmpty()) {
+                        builder.setHeader(io.micronaut.http.HttpHeaders.COOKIE, cookieHeader(request.getHeaders().get(io.micronaut.http.HttpHeaders.COOKIE), all));
+                    }
+                });
+                return builder.build();
             });
     }
 
