@@ -50,6 +50,7 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpStatusClass;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.QueryStringDecoder;
@@ -392,6 +393,14 @@ final class NettyDirectRoutes {
     private void write(HttpRequest request, HttpResponse head, ByteBuf content, OutboundAccess outboundAccess) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Direct response {} - {} {}", head.status().code(), request.method(), request.uri());
+        }
+        if (head.status().codeClass() == HttpStatusClass.INFORMATIONAL) {
+            // e.g. 103: an interim response is never the response of a request
+            LOG.error("The direct route of {} {} answered with the informational status {}, which is not a final response",
+                request.method(), request.uri(), head.status().code());
+            content.release();
+            writeServerError(outboundAccess);
+            return;
         }
         HttpHeaders headers = head.headers();
         addConfiguredHeaders(headers);
