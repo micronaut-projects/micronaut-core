@@ -21,9 +21,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -33,7 +34,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  */
 class HttpDatesTest {
 
-    private static final ZonedDateTime SUNDAY = ZonedDateTime.of(1994, 11, 6, 8, 49, 37, 0, ZoneId.of("GMT"));
+    private static final ZoneId GMT = ZoneId.of("GMT");
+    private static final ZonedDateTime SUNDAY = ZonedDateTime.of(1994, 11, 6, 8, 49, 37, 0, GMT);
+    private static final ZonedDateTime NOW = ZonedDateTime.of(2026, 10, 21, 0, 0, 0, 0, GMT);
 
     @Test
     void formatsTheImfFixdateWithATwoDigitDay() {
@@ -60,13 +63,30 @@ class HttpDatesTest {
     }
 
     @Test
-    void aTwoDigitYearMoreThanFiftyYearsInTheFutureIsInThePast() {
-        int year = LocalDate.now(ZoneId.of("GMT")).getYear();
-        int future = year + 51;
-        ZonedDateTime parsed = HttpDates.parse(rfc850(future - 100));
-        assertEquals(future - 100, parsed.getYear());
-        int near = year + 10;
-        assertEquals(near, HttpDates.parse(rfc850(near)).getYear());
+    void aDateMoreThanFiftyYearsInTheFutureIsInThePast() {
+        // the cutoff is 2076-10-21T00:00:00Z: a date of 1976 one second after it, not 2076
+        ZonedDateTime beyond = ZonedDateTime.of(1976, 10, 21, 0, 0, 1, 0, GMT);
+        assertEquals(beyond, HttpDates.parse(rfc850(beyond), NOW));
+        ZonedDateTime november = ZonedDateTime.of(1976, 11, 6, 8, 49, 37, 0, GMT);
+        assertEquals(november, HttpDates.parse(rfc850(november), NOW));
+    }
+
+    @Test
+    void aDateAtMostFiftyYearsInTheFutureIsInTheFuture() {
+        ZonedDateTime atCutoff = ZonedDateTime.of(2076, 10, 21, 0, 0, 0, 0, GMT);
+        assertEquals(atCutoff, HttpDates.parse(rfc850(atCutoff), NOW));
+        ZonedDateTime inside = ZonedDateTime.of(2076, 10, 20, 23, 59, 59, 0, GMT);
+        assertEquals(inside, HttpDates.parse(rfc850(inside), NOW));
+        ZonedDateTime past = ZonedDateTime.of(1994, 11, 6, 8, 49, 37, 0, GMT);
+        assertEquals(past, HttpDates.parse(rfc850(past), NOW));
+    }
+
+    @Test
+    void aDayOfTheWeekOfAnotherCenturyIsInvalid() {
+        // 21-Nov-76 is a Sunday in 1976 and a Saturday in 2076, which is beyond the cutoff
+        assertNull(HttpDates.parse("Saturday, 21-Nov-76 00:00:00 GMT", NOW));
+        assertEquals(ZonedDateTime.of(1976, 11, 21, 0, 0, 0, 0, GMT),
+            HttpDates.parse("Sunday, 21-Nov-76 00:00:00 GMT", NOW));
     }
 
     @ParameterizedTest
@@ -91,9 +111,7 @@ class HttpDatesTest {
         assertNull(headers.getDate(HttpHeaders.IF_MODIFIED_SINCE));
     }
 
-    private static String rfc850(int year) {
-        ZonedDateTime date = ZonedDateTime.of(year, 1, 2, 3, 4, 5, 0, ZoneId.of("GMT"));
-        return date.getDayOfWeek().getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
-            + String.format(java.util.Locale.ENGLISH, ", 02-Jan-%02d 03:04:05 GMT", year % 100);
+    private static String rfc850(ZonedDateTime date) {
+        return DateTimeFormatter.ofPattern("EEEE, dd-MMM-yy HH:mm:ss 'GMT'", Locale.ENGLISH).format(date);
     }
 }

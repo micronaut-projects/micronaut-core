@@ -18,12 +18,12 @@ package io.micronaut.http;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.format.TextStyle;
 import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
 import java.util.Locale;
@@ -53,6 +53,20 @@ public final class HttpDates {
         .ofPattern("EEE MMM ppd HH:mm:ss yyyy", Locale.ENGLISH)
         .withZone(GMT);
 
+    /**
+     * The RFC 850 format without the day of the week, which is checked once the century of the
+     * two-digit year is known.
+     */
+    private static final DateTimeFormatter RFC_850_DATE = new DateTimeFormatterBuilder()
+        .appendPattern("dd-MMM-")
+        .appendValueReduced(ChronoField.YEAR, 2, 2, 2000)
+        .appendPattern(" HH:mm:ss 'GMT'")
+        .toFormatter(Locale.ENGLISH)
+        .withZone(GMT);
+
+    private static final int FUTURE_YEARS = 50;
+    private static final int CENTURY = 100;
+
     private HttpDates() {
     }
 
@@ -75,6 +89,18 @@ public final class HttpDates {
      * @return The date in GMT, or {@code null} if the text is not an HTTP date
      */
     public static @Nullable ZonedDateTime parse(@Nullable CharSequence text) {
+        return parse(text, ZonedDateTime.now(GMT));
+    }
+
+    /**
+     * Parse an HTTP date, see {@link #parse(CharSequence)}, relative to the given current time,
+     * which decides the century of the two-digit year of an RFC 850 date.
+     *
+     * @param text The text
+     * @param now  The current time
+     * @return The date in GMT, or {@code null} if the text is not an HTTP date
+     */
+    static @Nullable ZonedDateTime parse(@Nullable CharSequence text, ZonedDateTime now) {
         if (text == null) {
             return null;
         }
@@ -83,33 +109,39 @@ public final class HttpDates {
             return null;
         }
         try {
-            DateTimeFormatter formatter;
             int comma = value.indexOf(',');
             if (comma < 0) {
-                formatter = ASCTIME;
-            } else if (comma > 3) {
-                formatter = rfc850();
-            } else {
-                formatter = DateTimeFormatter.RFC_1123_DATE_TIME;
+                return ZonedDateTime.from(ASCTIME.parse(value));
             }
-            return ZonedDateTime.from(formatter.parse(value)).withZoneSameInstant(GMT);
+            if (comma > 3) {
+                return parseRfc850(value, comma, now);
+            }
+            return ZonedDateTime.from(DateTimeFormatter.RFC_1123_DATE_TIME.parse(value)).withZoneSameInstant(GMT);
         } catch (DateTimeParseException e) {
             return null;
         }
     }
 
     /**
-     * The RFC 850 format. A two-digit year that appears to be more than 50 years in the future
-     * is the most recent year in the past with the same last two digits.
+     * Parse an RFC 850 date. A date with a two-digit year that appears to be more than 50 years
+     * in the future is in the most recent year in the past with the same last two digits
+     * (RFC 9110, section 5.6.7).
      *
-     * @return The formatter
+     * @param value The text
+     * @param comma The index of the comma after the day of the week
+     * @param now   The current time
+     * @return The date, or {@code null} if the day of the week does not match it
      */
-    private static DateTimeFormatter rfc850() {
-        return new DateTimeFormatterBuilder()
-            .appendPattern("EEEE, dd-MMM-")
-            .appendValueReduced(ChronoField.YEAR, 2, 2, LocalDate.now(GMT).minusYears(49))
-            .appendPattern(" HH:mm:ss 'GMT'")
-            .toFormatter(Locale.ENGLISH)
-            .withZone(GMT);
+    private static @Nullable ZonedDateTime parseRfc850(String value, int comma, ZonedDateTime now) {
+        ZonedDateTime cutoff = now.withZoneSameInstant(GMT).plusYears(FUTURE_YEARS);
+        ZonedDateTime date = ZonedDateTime.from(RFC_850_DATE.parse(value.substring(comma + 1).trim()));
+        // the latest year with the two digits that is not after the year of the cutoff
+        int year = cutoff.getYear() - Math.floorMod(cutoff.getYear() - date.getYear(), CENTURY);
+        date = date.withYear(year);
+        if (date.isAfter(cutoff)) {
+            date = date.minusYears(CENTURY);
+        }
+        String dayOfWeek = date.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+        return dayOfWeek.equals(value.substring(0, comma)) ? date : null;
     }
 }
