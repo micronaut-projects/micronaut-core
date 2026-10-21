@@ -2,9 +2,12 @@ package io.micronaut.context
 
 import io.micronaut.context.annotation.BootstrapContextCompatible
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.env.ActiveEnvironment
 import io.micronaut.context.env.BootstrapPropertySourceLocator
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.env.PropertySourceLoader
+import io.micronaut.core.io.ResourceLoader
 import jakarta.annotation.PreDestroy
 import jakarta.inject.Singleton
 import spock.lang.Specification
@@ -12,6 +15,7 @@ import spock.lang.Specification
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 
 class BootstrapContextRefreshSpec extends Specification {
 
@@ -19,6 +23,7 @@ class BootstrapContextRefreshSpec extends Specification {
         CountingLocator.instances.clear()
         CountingLocator.failure = null
         CountingLocator.remoteValue = null
+        OnceLoader.instances.set(0)
     }
 
     void "a refresh reuses the bootstrap context, and closing the context closes it"() {
@@ -198,6 +203,41 @@ class BootstrapContextRefreshSpec extends Specification {
         ctx.close()
     }
 
+    void "a refresh reads the bootstrap configuration with new property source loaders"() {
+        given: "a property source loader, visible only to this context, that returns its property source on its first call only"
+        Path servicesDir = Files.createTempDirectory("bootstrap-context-loaders-")
+        Path services = servicesDir.resolve("META-INF/services/" + PropertySourceLoader.name)
+        Files.createDirectories(services.parent)
+        services.toFile().text = OnceLoader.name
+        URLClassLoader classLoader = new URLClassLoader([servicesDir.toUri().toURL()] as URL[], getClass().classLoader)
+        ApplicationContext ctx = ApplicationContext.builder()
+                .classLoader(classLoader)
+                .properties(['spec.name': 'BootstrapContextRefreshSpec'])
+                .bootstrapEnvironment(true)
+                .start()
+
+        expect:
+        ctx.getProperty('once.value', String).get() == 'once'
+
+        when:
+        3.times { ctx.environment.refresh() }
+
+        then: "each refresh of the bootstrap environment has new loaders, as when each refresh created a bootstrap context, so the property source is still there"
+        ctx.getProperty('once.value', String).get() == 'once'
+        CountingLocator.created() == 1
+
+        and: "one loader for the application environment, which keeps it, and one for each read of the bootstrap configuration"
+        OnceLoader.instances.get() == 1 + 4
+
+        cleanup:
+        ctx.close()
+        classLoader.close()
+        Files.deleteIfExists(services)
+        Files.deleteIfExists(services.parent)
+        Files.deleteIfExists(services.parent.parent)
+        Files.deleteIfExists(servicesDir)
+    }
+
     private static ApplicationContext startContext() {
         ApplicationContext.builder()
                 .properties(['spec.name': 'BootstrapContextRefreshSpec'])
@@ -207,6 +247,43 @@ class BootstrapContextRefreshSpec extends Specification {
 
     private static PropertySource contextSource(ApplicationContext ctx) {
         ctx.environment.propertySources.find { it.name == PropertySource.CONTEXT }
+    }
+
+    /**
+     * A loader that ignores the resource it is asked for and returns its property source on its
+     * first call only.
+     */
+    static class OnceLoader implements PropertySourceLoader {
+        static final AtomicInteger instances = new AtomicInteger()
+        private boolean loaded
+
+        OnceLoader() {
+            instances.incrementAndGet()
+        }
+
+        @Override
+        Set<String> getExtensions() {
+            Set.of('once')
+        }
+
+        @Override
+        synchronized Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader) {
+            if (loaded) {
+                return Optional.empty()
+            }
+            loaded = true
+            return Optional.of(PropertySource.of('once', ['once.value': 'once']))
+        }
+
+        @Override
+        Optional<PropertySource> loadEnv(String resourceName, ResourceLoader resourceLoader, ActiveEnvironment activeEnvironment) {
+            Optional.empty()
+        }
+
+        @Override
+        Map<String, Object> read(String name, InputStream input) {
+            [:]
+        }
     }
 
     @BootstrapContextCompatible
