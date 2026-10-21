@@ -479,6 +479,13 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         public boolean requiresMethodProcessing() {
             return generated.requiresMethodProcessing();
         }
+
+        @Override
+        protected <R> @Nullable ExecutableMethod<T, R> getMethod(String name, Class<?>... argumentTypes) {
+            // The generated definition looks the method up by name, then the copy returns its own method at that index
+            ExecutableMethod<T, R> method = generated.getMethod(name, argumentTypes);
+            return method instanceof DispatchedExecutableMethod<T, R> dispatched ? getExecutableMethodByIndex(dispatched.index) : null;
+        }
     }
 
     /**
