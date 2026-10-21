@@ -242,6 +242,13 @@ public final class RouteAssembly {
     }
 
     /**
+     * @return What a route locator that reads the body needs: the server and the body readers
+     */
+    public LocatorSupport locatorSupport() {
+        return new LocatorSupport(conditionContext, messageBodyHandlerRegistry);
+    }
+
+    /**
      * @return The URI routes
      */
     public List<UriRoute> uriRoutes() {
