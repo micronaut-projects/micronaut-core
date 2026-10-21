@@ -116,8 +116,9 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.messageBodyWriter = messageBodyHandlerRegistry.findWriter(argBodyType, producesMediaTypes)
             .map(w -> w.createSpecific(argBodyType))
             .orElse(null);
+        // a publisher of responses is answered by its first response; the field reactive is not set yet
         single = returnType.isSingleResult() ||
-            (isReactive() && returnType.getFirstTypeVariable()
+            (returnType.isReactive() && returnType.getFirstTypeVariable()
                 .filter(t -> HttpResponse.class.isAssignableFrom(t.getType())).isPresent()) ||
             returnType.isAsync() ||
             returnType.isSuspended();
