@@ -11,6 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ByteBuddyNoProxyTargetTest {
@@ -28,6 +30,23 @@ class ByteBuddyNoProxyTargetTest {
         try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "RuntimeProxyTest"))) {
             ByteBuddyNoProxyTargetWithConstructorProxyingClass<String> proxyingClass = context.getBean(ByteBuddyNoProxyTargetWithConstructorProxyingClass.class);
             assertBean(proxyingClass);
+        }
+    }
+
+    @Test
+    void testProxyCreatedTwiceInTheSameClassLoader() {
+        // Two contexts sharing a class loader, as any two contexts in one test JVM do, must each be able
+        // to create the proxy without tripping over a duplicate class definition
+        ClassLoader classLoader = ByteBuddyNoProxyTargetTest.class.getClassLoader();
+        try (ApplicationContext first = ApplicationContext.builder(classLoader).properties(Map.of("spec.name", "RuntimeProxyTest")).start();
+             ApplicationContext second = ApplicationContext.builder(classLoader).properties(Map.of("spec.name", "RuntimeProxyTest")).start()) {
+            ByteBuddyNoProxyTargetWithConstructorProxyingClass<String> firstProxy = first.getBean(ByteBuddyNoProxyTargetWithConstructorProxyingClass.class);
+            ByteBuddyNoProxyTargetWithConstructorProxyingClass<String> secondProxy = second.getBean(ByteBuddyNoProxyTargetWithConstructorProxyingClass.class);
+            assertSame(classLoader, firstProxy.getClass().getClassLoader());
+            assertSame(classLoader, secondProxy.getClass().getClassLoader());
+            assertNotSame(firstProxy.getClass(), secondProxy.getClass());
+            assertBean(firstProxy);
+            assertBean(secondProxy);
         }
     }
 
