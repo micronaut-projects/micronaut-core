@@ -1049,21 +1049,39 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public void close() {
+        // Everything is closed and the environment is stopped even when something fails to close:
+        // the first failure is thrown at the end, with the later ones suppressed by it.
+        RuntimeException failure = null;
         try {
             propertyPlaceholderResolver.close();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to close property placeholder resolver: " + e.getMessage(), e);
+            failure = new RuntimeException("Failed to close property placeholder resolver: " + e.getMessage(), e);
         }
         for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
             if (propertySourcesLocator instanceof Closeable closeable) {
                 try {
                     closeable.close();
                 } catch (Exception e) {
-                    throw new RuntimeException("Failed to close property sources locator " + propertySourcesLocator.getClass() + ": " + e.getMessage(), e);
+                    failure = addFailure(failure, new RuntimeException("Failed to close property sources locator " + propertySourcesLocator.getClass() + ": " + e.getMessage(), e));
                 }
             }
         }
-        stop();
+        try {
+            stop();
+        } catch (RuntimeException e) {
+            failure = addFailure(failure, e);
+        }
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    private static RuntimeException addFailure(@Nullable RuntimeException failure, RuntimeException next) {
+        if (failure == null) {
+            return next;
+        }
+        failure.addSuppressed(next);
+        return failure;
     }
 
     @Override
