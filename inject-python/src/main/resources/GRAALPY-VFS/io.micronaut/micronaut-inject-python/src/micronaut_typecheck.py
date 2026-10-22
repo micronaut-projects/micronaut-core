@@ -125,6 +125,7 @@ class TypeChecker:
         self.scope = TypeCheckScope(mode, annotation_names)
         self._modules = {}
         self.diagnostics = []
+        self._java_alias_types = set()
 
     # ---------------------------------------------------------------- pass one
 
@@ -200,6 +201,7 @@ class TypeChecker:
         Run the checks over the checked definitions and return the diagnostics found, as Java
         PythonDiagnostic values.
         """
+        self._java_alias_types.clear()
         self.facts = TypeFacts(visitor_context)
         self.python_classes = PythonClasses(self)
         self.inference = {}
@@ -1209,6 +1211,12 @@ class JavaReceiverRules:
             return Typed(JAVA, description.name())
         if receiver.kind == JAVA_REF and self.facts.describe(f"{description.name()}${member}") is not None:
             return Typed(JAVA_REF, f"{description.name()}${member}")
+        alias = self._instance_alias(receiver, description, member)
+        if alias is not None:
+            if not alias.property():
+                return Typed(CALLABLE, alias.target()) if not calling else None
+            return self._return_type([signature for signature in methods.get(alias.target())
+                                      if not signature.isStatic() and len(signature.parameterTypes()) == 0])
         if description.open() or receiver.open:
             return None  # a hidden supertype or the actual implementation may contribute the member
         candidates = list(methods.keySet()) + list(fields.keySet()) + list(nested.keySet())
@@ -1225,6 +1233,24 @@ class JavaReceiverRules:
                          f"Java type [{description.name()}] has no member named [{member}]{_did_you_mean(suggestions)}",
                          node, suggestions)
         return None
+
+    def _instance_alias(self, receiver, description, name):
+        """
+        The snake_case method or getter property a Java instance answers to under ``name``
+        (JavaInstanceAliases, the names the compiler registers for the runtime), or None. A real member
+        of the name comes first, as it does at run time.
+        """
+        if receiver.kind != JAVA or description.pythonDefined():
+            return None
+        if (description.methods().containsKey(name) or description.fields().containsKey(name)
+                or description.nestedTypes().containsKey(name) or description.enumConstants().contains(name)):
+            return None
+        alias = description.instanceAliases().get(name)
+        if alias is None or alias.isBlocked():
+            return None
+        # registered for the runtime as well, so the alias also works on deeper call chains
+        self.checker._java_alias_types.add(description.name())
+        return alias
 
     def call(self, node):
         function = node.func
@@ -1265,6 +1291,11 @@ class JavaReceiverRules:
             return None
         member = name[:-1] if name.endswith("_") and keyword.iskeyword(name[:-1]) else name
         methods = description.methods()
+        alias = self._instance_alias(receiver, description, member)
+        if alias is not None:
+            if alias.property():
+                return None  # calling the value returned by a getter, rather than the getter itself
+            member = alias.target()
         if member in OBJECT_METHODS and not methods.containsKey(member):
             return None
         if description.anEnum() and not methods.containsKey(member):

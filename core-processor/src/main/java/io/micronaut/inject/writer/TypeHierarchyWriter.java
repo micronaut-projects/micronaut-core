@@ -318,8 +318,12 @@ public final class TypeHierarchyWriter {
     /**
      * Whether every class a type names, itself, its type arguments and the bounds of its variables and wildcards, can
      * be named from a package: it is public, or of that package.
+     *
+     * @param element     The type
+     * @param packageName The package
+     * @return Whether a class of the package can name the type
      */
-    private static boolean isNameableFrom(ClassElement element, String packageName) {
+    static boolean isNameableFrom(ClassElement element, String packageName) {
         // a non-public class is nameable from its own package only
         return !namesNonPublicTypeMatching(element, aClass -> !aClass.getPackageName().equals(packageName), new HashSet<>(), 0);
     }
