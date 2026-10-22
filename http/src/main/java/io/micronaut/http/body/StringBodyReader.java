@@ -18,11 +18,11 @@ package io.micronaut.http.body;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -32,7 +32,11 @@ import org.reactivestreams.Publisher;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.CharBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
+import java.util.ArrayDeque;
 
 /**
  * The body reader for {@link String}.
@@ -79,13 +83,79 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
 
     @Override
     public Publisher<String> readChunked(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return BodyPublishers.map(input, byteBuffer -> read0(byteBuffer, getCharset(mediaType)));
+        Charset charset = getCharset(mediaType);
+        return PieceReaders.publisherOfBuffers(input, new DecodingPieceReader(charset), PieceReaders::adapt);
     }
 
     @Override
     public PieceReader<String> openPieceReader(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
-        Charset charset = getCharset(mediaType);
-        return PieceReaders.eachPiece(byteBuffer -> read0(byteBuffer, charset));
+        return new DecodingPieceReader(getCharset(mediaType));
+    }
+
+    /**
+     * Decodes consecutive pieces with one decoder: a multi-byte character can span pieces, so an
+     * incomplete trailing character is carried over to the next piece.
+     */
+    private static final class DecodingPieceReader implements PieceReader<String> {
+        private static final java.nio.ByteBuffer EMPTY = java.nio.ByteBuffer.allocate(0);
+
+        private final CharsetDecoder decoder;
+        private final ArrayDeque<String> decoded = new ArrayDeque<>(1);
+        private java.nio.ByteBuffer leftover = EMPTY;
+        private boolean closed;
+
+        DecodingPieceReader(Charset charset) {
+            decoder = charset.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPLACE)
+                .onUnmappableCharacter(CodingErrorAction.REPLACE);
+        }
+
+        @Override
+        public void read(ReadBuffer piece) {
+            byte[] bytes;
+            try (piece) {
+                if (closed) {
+                    return;
+                }
+                bytes = piece.toArray();
+            }
+            decode(java.nio.ByteBuffer.wrap(bytes), false);
+        }
+
+        @Override
+        public void complete() {
+            if (!closed) {
+                decode(EMPTY, true);
+            }
+        }
+
+        @Override
+        public @Nullable String poll() {
+            return decoded.poll();
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+            decoded.clear();
+            leftover = EMPTY;
+        }
+
+        private void decode(java.nio.ByteBuffer chunk, boolean endOfInput) {
+            java.nio.ByteBuffer in = chunk;
+            if (leftover.hasRemaining()) {
+                in = java.nio.ByteBuffer.allocate(leftover.remaining() + chunk.remaining()).put(leftover).put(chunk).flip();
+            }
+            CharBuffer out = CharBuffer.allocate((int) Math.ceil(in.remaining() * (double) decoder.maxCharsPerByte()) + 2);
+            decoder.decode(in, out, endOfInput);
+            if (endOfInput) {
+                decoder.flush(out);
+            }
+            leftover = in.hasRemaining() ? java.nio.ByteBuffer.allocate(in.remaining()).put(in).flip() : EMPTY;
+            if (out.position() > 0) {
+                decoded.add(out.flip().toString());
+            }
+        }
     }
 
     /**
