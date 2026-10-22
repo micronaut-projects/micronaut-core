@@ -59,6 +59,7 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
     public static final String META_BINDING_VALUES = "$bindingValues";
     public static final String META_MEMBER_INTERCEPTOR_TYPE = "interceptorType";
     private static final String META_BIND_MEMBERS = "bindMembers";
+    private static final String META_MATCH_ALL_OCCURRENCES = "matchAllOccurrences";
     private final Map<String, List<AnnotationValue<?>>> supportedAnnotationNames;
     private final Set<String> supportedInterceptorTypes;
 
@@ -231,7 +232,10 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
      * @param annotationMetadata The metadata of the element the binding was declared on
      * @param declaredOverrides  Whether, for a hierarchy such as a method under its class, an occurrence declared
      *                           on the most specific element replaces the ones above it, the way the bindings
-     *                           themselves are resolved for an interception point
+     *                           themselves are resolved for an interception point. A repeatable binding annotation
+     *                           is resolved this way only when its binding sets {@code matchAllOccurrences}, which
+     *                           also reads the occurrences from the metadata as compiled, without resolving
+     *                           placeholders or evaluating expressions.
      * @return The occurrences to compare, or {@code null} to compare by name
      * @see #resolveBoundOccurrences(AnnotationValue, AnnotationMetadata)
      * @since 5.2.0
@@ -249,16 +253,23 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
         if (annotationName == null || annotationMetadata == null || !binding.booleanValue(META_BIND_MEMBERS).orElse(false)) {
             return null;
         }
+        final boolean matchAllOccurrences = binding.booleanValue(META_MATCH_ALL_OCCURRENCES).orElse(false);
+        // the metadata of a bean or method can be wrapped to resolve placeholders or evaluate expressions, and such
+        // a wrapper hides the hierarchy of the element and does not know which annotations repeat: a binding
+        // matching every occurrence reads the occurrences as compiled, on the interceptor and the interception point
+        final AnnotationMetadata metadata = matchAllOccurrences
+            ? annotationMetadata.getTargetAnnotationMetadata()
+            : annotationMetadata;
         final Set<AnnotationValue<?>> occurrences = new LinkedHashSet<>(4);
         if (declaredOverrides
-            && annotationMetadata instanceof AnnotationMetadataHierarchy hierarchy
-            && !annotationMetadata.isRepeatableAnnotation(annotationName)) {
+            && metadata instanceof AnnotationMetadataHierarchy hierarchy
+            && (matchAllOccurrences || !metadata.isRepeatableAnnotation(annotationName))) {
             collectOccurrences(hierarchy.getDeclaredMetadata(), annotationName, occurrences);
             if (occurrences.isEmpty()) {
                 collectOccurrences(hierarchy.getRootMetadata(), annotationName, occurrences);
             }
         } else {
-            collectOccurrences(annotationMetadata, annotationName, occurrences);
+            collectOccurrences(metadata, annotationName, occurrences);
         }
         return occurrences.isEmpty() ? null : new ArrayList<>(occurrences);
     }
