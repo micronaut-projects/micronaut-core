@@ -94,11 +94,11 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     }
 
     /**
-     * Releases the environment and the context that the methods were configured with last, if they still are: a
+     * Detaches the methods from the environment and the context that configured them last, if they still are: a
      * definition of the parent tier holds these methods statically, for every context that loads it, and a stopped
      * context must not stay reachable from them. A context that configured them since keeps them.
      * <p>Synchronized with the two {@code configure} methods, so that a context configuring these methods while
-     * another one stops, as in tests run in parallel in development mode, is not released between the check and the
+     * another one stops, as in tests run in parallel in development mode, is not detached between the check and the
      * writes. These run once per context start and stop; a method created lazily by
      * {@link #getExecutableMethodByIndex(int)}, on the invocation path, reads the configuration without the lock, as it
      * did before.</p>
@@ -106,7 +106,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      * @param environment The environment of the context that stops
      * @param beanContext The context that stops
      */
-    final synchronized void release(Environment environment, BeanContext beanContext) {
+    final synchronized void detach(Environment environment, BeanContext beanContext) {
         BeanContext configuredContext = this.beanContext;
         if (this.environment != environment || configuredContext != null && configuredContext != beanContext) {
             return;
@@ -115,7 +115,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         this.beanContext = null;
         for (DispatchedExecutableMethod<T, ?> executableMethod : executableMethods) {
             if (executableMethod != null) {
-                executableMethod.release();
+                executableMethod.detach();
             }
         }
     }
@@ -512,7 +512,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          * Forgets the environment and the bean context configured last, and the metadata wrapped for them.
          */
         @SuppressWarnings("NullAway") // an evaluation context takes a null bean context, which is what it starts with
-        void release() {
+        void detach() {
             environment = null;
             beanContext = null;
             annotationMetadata = sourceAnnotationMetadata;

@@ -412,13 +412,13 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     @Override
-    public void releaseExecutableMethods(Environment environment, BeanContext beanContext) {
+    public void detachExecutableMethods(Environment environment, BeanContext beanContext) {
         Beans loaded = beans;
         if (loaded == null) {
             return;
         }
         for (BeanDefinitionProducer producer : loaded.all) {
-            producer.releaseExecutableMethods(environment, beanContext);
+            producer.detachExecutableMethods(environment, beanContext);
         }
     }
 
@@ -891,15 +891,15 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         }
 
         /**
-         * Releases the configuration of the executable methods of the definition class: through the definition when it
-         * was loaded, or else through the reference, as a definition loaded and then discarded, such as one its own
-         * conditions disabled, configured them all the same.
+         * Detaches the executable methods of the definition class from the stopping context: through the definition
+         * when it was loaded, or else through the reference, as a definition loaded and then discarded, such as one
+         * its own conditions disabled, configured them all the same.
          */
-        void releaseExecutableMethods(Environment environment, BeanContext beanContext) {
+        void detachExecutableMethods(Environment environment, BeanContext beanContext) {
             if (definition instanceof AbstractInitializableBeanDefinition<?> loaded) {
-                loaded.releaseExecutableMethods(environment, beanContext);
+                loaded.detachExecutableMethods(environment, beanContext);
             } else if (reference instanceof AbstractInitializableBeanDefinition<?> definitionAndReference) {
-                definitionAndReference.releaseExecutableMethods(environment, beanContext);
+                definitionAndReference.detachExecutableMethods(environment, beanContext);
             }
         }
 
