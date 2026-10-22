@@ -47,9 +47,14 @@ import java.util.concurrent.ExecutorService;
 abstract sealed class RouteExecution {
 
     final RouteExecutor owner;
+    /**
+     * Adapts the result of the route.
+     */
+    final RouteResult result;
 
-    RouteExecution(RouteExecutor owner) {
+    RouteExecution(RouteExecutor owner, RouteResult result) {
         this.owner = owner;
+        this.result = result;
     }
 
     /**
@@ -107,11 +112,9 @@ abstract sealed class RouteExecution {
      * The execution of any route, which reads the route on every request.
      */
     private static final class Compatibility extends RouteExecution {
-        private final RouteResult result;
 
         Compatibility(RouteExecutor owner, RouteResult result) {
-            super(owner);
-            this.result = result;
+            super(owner, result);
         }
 
         @Override
@@ -142,11 +145,9 @@ abstract sealed class RouteExecution {
      * A route that runs on the thread of the request.
      */
     private static final class Direct extends RouteExecution {
-        private final RouteResult result;
 
         Direct(RouteExecutor owner, RouteResult result) {
-            super(owner);
-            this.result = result;
+            super(owner, result);
         }
 
         @Override
@@ -160,11 +161,9 @@ abstract sealed class RouteExecution {
      * request: the Reactor context never reaches the coroutine.
      */
     private static final class DirectSuspend extends RouteExecution {
-        private final RouteResult result;
 
         DirectSuspend(RouteExecutor owner, RouteResult result) {
-            super(owner);
-            this.result = result;
+            super(owner, result);
         }
 
         @Override
@@ -183,11 +182,9 @@ abstract sealed class RouteExecution {
      * subscriber becomes the coroutine's {@code ReactorContext}.
      */
     private static final class DirectSuspendInReactorContext extends RouteExecution {
-        private final RouteResult result;
 
         DirectSuspendInReactorContext(RouteExecutor owner, RouteResult result) {
-            super(owner);
-            this.result = result;
+            super(owner, result);
         }
 
         @Override
@@ -208,12 +205,10 @@ abstract sealed class RouteExecution {
      * to on the executor thread as well, the result is converted in the task.
      */
     private static final class Offloaded extends RouteExecution {
-        private final RouteResult result;
         private final ExecutorService executor;
 
         Offloaded(RouteExecutor owner, RouteResult result, ExecutorService executor) {
-            super(owner);
-            this.result = result;
+            super(owner, result);
             this.executor = executor;
         }
 
@@ -234,12 +229,10 @@ abstract sealed class RouteExecution {
      * that filter subscribes.
      */
     private static final class OffloadedReactive extends RouteExecution {
-        private final RouteResult result;
         private final ExecutorService executor;
 
         OffloadedReactive(RouteExecutor owner, RouteResult result, ExecutorService executor) {
-            super(owner);
-            this.result = result;
+            super(owner, result);
             this.executor = executor;
         }
 
@@ -263,12 +256,10 @@ abstract sealed class RouteExecution {
      * coroutine context keeps the continuation on the executor.
      */
     private static final class OffloadedSuspend extends RouteExecution {
-        private final RouteResult result;
         private final ExecutorService executor;
 
         OffloadedSuspend(RouteExecutor owner, RouteResult result, ExecutorService executor) {
-            super(owner);
-            this.result = result;
+            super(owner, result);
             this.executor = executor;
         }
 
@@ -292,12 +283,10 @@ abstract sealed class RouteExecution {
      * the blocking routes get from {@link ExecutionFlow#async}.
      */
     private static final class OffloadedSuspendInReactorContext extends RouteExecution {
-        private final RouteResult result;
         private final ExecutorService executor;
 
         OffloadedSuspendInReactorContext(RouteExecutor owner, RouteResult result, ExecutorService executor) {
-            super(owner);
-            this.result = result;
+            super(owner, result);
             this.executor = executor;
         }
 

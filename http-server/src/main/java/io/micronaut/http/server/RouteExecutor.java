@@ -1013,7 +1013,7 @@ public final class RouteExecutor {
             Publisher<HttpResponse<?>> bodyPublisher = (Publisher) publisher;
             Flux<MutableHttpResponse<?>> response = Flux.from(bodyPublisher)
                 .map(HttpResponse::toMutableResponse);
-            if (result.streamedResponseBodyAsyncOrReactive(routeInfo)) {
+            if (result.nestedResponseBodyAsyncOrReactive(routeInfo)) {
                 response = response.flatMap(resp ->
                     ReactiveExecutionFlow.toPublisher(processPublisherBody(propagatedContext, request, resp, routeInfo, result)));
             }
@@ -1203,10 +1203,6 @@ public final class RouteExecutor {
             serverConfiguration.getServerHeader()
                 .ifPresent(header -> headers.add(HttpHeaders.SERVER, header));
         }
-    }
-
-    private MutableHttpResponse<Object> forStatus(RouteInfo<?> routeMatch) {
-        return forStatus(routeMatch, HttpStatus.OK);
     }
 
     MutableHttpResponse<Object> forStatus(RouteInfo<?> routeMatch, @Nullable HttpStatus defaultStatus) {
