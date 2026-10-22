@@ -45,6 +45,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -81,6 +82,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private final AtomicReference<@Nullable Set<Integer>> ports = new AtomicReference<>();
     private final List<FilterRoute> alwaysMatchesFilterRoutes;
     private final List<FilterRoute> preconditionFilterRoutes;
+    private final Map<HttpMethod, List<FilterRoute>> applicationFiltersByMethod;
+    private final boolean applicationFilterOrderFixed;
     private final List<FilterRoute> preMatchingAlwaysMatchesFilterRoutes;
     private final List<FilterRoute> preMatchingPreconditionFilterRoutes;
     // ArrayList to avoid interface checkcast
@@ -181,6 +184,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         this.statusRoutes = statusRoutes.toArray(StatusRouteInfo[]::new);
         this.errorRoutes = errorRoutes.toArray(ErrorRouteInfo[]::new);
         this.localErrorRouteTypes = localErrorRouteTypes(this.errorRoutes);
+        List<FilterRoute> fixed = fixedOrderFilters(alwaysMatchesFilterRoutes, preconditionFilterRoutes);
+        this.applicationFilterOrderFixed = fixed != null;
+        this.applicationFiltersByMethod = filtersByMethod(fixed != null ? fixed : preconditionFilterRoutes);
         this.alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
             if (alwaysMatchesFilterRoutes.isEmpty()) {
                 return new ArrayList<>(0);
@@ -203,6 +209,56 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             FilterRunner.sort(httpFilters);
             return httpFilters;
         });
+    }
+
+    private static @Nullable List<FilterRoute> fixedOrderFilters(List<FilterRoute> always, List<FilterRoute> conditional) {
+        if (conditional.isEmpty() || always.size() + conditional.size() < 2) {
+            return null;
+        }
+        var filters = new ArrayList<FilterRoute>(always.size() + conditional.size());
+        filters.addAll(always);
+        filters.addAll(conditional);
+        for (FilterRoute route : filters) {
+            if (!(route instanceof DefaultFilterRoute candidate) || candidate.fixedOrder() == null) {
+                return null;
+            }
+        }
+        for (FilterRoute route : always) {
+            ((DefaultFilterRoute) route).matchAlways();
+        }
+        // Stable sorting before matching preserves the original category order for equal orders.
+        filters.sort(Comparator.comparingInt(route -> Objects.requireNonNull(((DefaultFilterRoute) route).fixedOrder())));
+        return filters;
+    }
+
+    private static Map<HttpMethod, List<FilterRoute>> filtersByMethod(List<FilterRoute> filters) {
+        if (filters.size() < 2) {
+            return Map.of();
+        }
+        boolean prepared = false;
+        for (FilterRoute route : filters) {
+            if (route instanceof DefaultFilterRoute candidate && candidate.fixedOrder() != null) {
+                prepared = true;
+                break;
+            }
+        }
+        if (!prepared) {
+            return Map.of();
+        }
+        Map<HttpMethod, List<FilterRoute>> byMethod = CollectionUtils.newEnumMap(HttpMethod.values());
+        List<FilterRoute> all = List.copyOf(filters);
+        for (HttpMethod method : HttpMethod.values()) {
+            var candidates = new ArrayList<FilterRoute>();
+            for (FilterRoute route : filters) {
+                // Only assembly-owned functional routes have a fixed publication snapshot.
+                if (!(route instanceof DefaultFilterRoute candidate) || candidate.fixedOrder() == null
+                    || route.getFilterMethods().isEmpty() || route.getFilterMethods().contains(method)) {
+                    candidates.add(route);
+                }
+            }
+            byMethod.put(method, candidates.size() == filters.size() ? all : List.copyOf(candidates));
+        }
+        return byMethod;
     }
 
     private boolean isMatchesAll(FilterRoute filterRoute) {
@@ -813,21 +869,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             ArrayList<GenericHttpFilter> always = alwaysMatchesHttpFilters.get();
             return always;
         }
-        var httpFilters = new ArrayList<GenericHttpFilter>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
-        httpFilters.addAll(alwaysMatchesHttpFilters.get());
         var routeMatch = RouteAttributes.getRouteMatch(request).orElse(null);
-        HttpMethod method = request.getMethod();
-        String path = request.getPath();
-        for (FilterRoute filterRoute : preconditionFilterRoutes) {
-            if (routeMatch != null) {
-                if (!matchesFilterMatcher(filterRoute, routeMatch)) {
-                    continue;
-                }
-            }
-            filterRoute.match(method, path).ifPresent(httpFilters::add);
-        }
-        FilterRunner.sort(httpFilters);
-        return Collections.unmodifiableList(httpFilters);
+        return findApplicationFilters(request, routeMatch);
     }
 
     @Override
@@ -870,17 +913,27 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             ArrayList<GenericHttpFilter> always = alwaysMatchesHttpFilters.get();
             return always;
         }
-        var httpFilters = new ArrayList<GenericHttpFilter>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
-        httpFilters.addAll(alwaysMatchesHttpFilters.get());
         HttpMethod method = request.getMethod();
+        List<FilterRoute> candidates = applicationFiltersByMethod.getOrDefault(method, preconditionFilterRoutes);
+        int capacity = candidates.size() + (applicationFilterOrderFixed ? 0 : alwaysMatchesFilterRoutes.size());
+        var httpFilters = new ArrayList<GenericHttpFilter>(capacity);
+        if (!applicationFilterOrderFixed) {
+            httpFilters.addAll(alwaysMatchesHttpFilters.get());
+        }
         String path = request.getPath();
-        for (FilterRoute filterRoute : preconditionFilterRoutes) {
+        for (FilterRoute filterRoute : candidates) {
+            if (applicationFilterOrderFixed && ((DefaultFilterRoute) filterRoute).isAlwaysMatch()) {
+                httpFilters.add(filterRoute.getFilter());
+                continue;
+            }
             if (routeMatch != null && !matchesFilterMatcher(filterRoute, routeMatch)) {
                 continue;
             }
             filterRoute.match(method, path).ifPresent(httpFilters::add);
         }
-        FilterRunner.sort(httpFilters);
+        if (!applicationFilterOrderFixed) {
+            FilterRunner.sort(httpFilters);
+        }
         return Collections.unmodifiableList(httpFilters);
     }
 
