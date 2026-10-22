@@ -30,7 +30,6 @@ import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.LifecycleHttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.ServerHttpRequest;
-import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
@@ -851,8 +850,9 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         if (lastError.isPresent()) {
             throw new ConversionErrorException(argument, lastError.get());
         }
-        if (!(result instanceof PendingRequestBindingResult<T> pending && pending.isPending()) && result.isPresentAndSatisfied()) {
-            Object value = result.get();
+        Optional<T> bound = !result.isPending() && result.isSatisfied() ? result.getValue() : Optional.empty();
+        if (bound.isPresent()) {
+            Object value = bound.get();
             if (value instanceof ConversionError error) {
                 throw new ConversionErrorException(argument, error);
             }

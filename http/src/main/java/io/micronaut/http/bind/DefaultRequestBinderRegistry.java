@@ -284,7 +284,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 return new PendingRequestBindingResult<>() {
                     @Override
                     public boolean isPending() {
-                        return bodyBound instanceof PendingRequestBindingResult<Object> p && p.isPending();
+                        return bodyBound.isPending();
                     }
 
                     @Override
