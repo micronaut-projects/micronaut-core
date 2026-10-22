@@ -140,6 +140,7 @@ abstract sealed class RouteResult {
                 explicitResponse = true;
             } else if (asyncBody instanceof HttpStatus status) {
                 mutableResponse = owner.forStatus(routeInfo, status);
+                explicitResponse = true;
             } else {
                 mutableResponse = owner.forStatus(routeInfo, null)
                     .body(asyncBody);

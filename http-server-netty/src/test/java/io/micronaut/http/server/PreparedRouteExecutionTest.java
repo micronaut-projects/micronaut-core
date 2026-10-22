@@ -144,9 +144,7 @@ class PreparedRouteExecutionTest {
         assertEquals("ok", response.body());
         assertEquals("yes", response.header("X-Explicit"));
         assertBody("/shapes/stage-response-stage", "ok");
-        // the baseline answers a status completed by a stage like a missing body, unlike a
-        // status returned directly or by a Mono
-        assertStatus("/shapes/stage-status", HttpStatus.NOT_FOUND);
+        assertEmpty("/shapes/stage-status", HttpStatus.ACCEPTED);
     }
 
     @ParameterizedTest
