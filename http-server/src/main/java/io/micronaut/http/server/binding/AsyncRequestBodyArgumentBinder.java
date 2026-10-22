@@ -15,24 +15,16 @@
  */
 package io.micronaut.http.server.binding;
 
-import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.ServerHttpRequest;
-import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.body.AsyncRequestBody;
-import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.server.multipart.FormFactory;
 import jakarta.inject.Singleton;
 
 import java.util.Optional;
-import java.util.function.Supplier;
 
 /**
  * Binds the {@link AsyncRequestBody} of an asynchronous handler: the body of the request,
@@ -49,21 +41,10 @@ import java.util.function.Supplier;
 final class AsyncRequestBodyArgumentBinder implements TypedRequestArgumentBinder<AsyncRequestBody> {
     private static final Argument<AsyncRequestBody> ARGUMENT = Argument.of(AsyncRequestBody.class);
 
-    final ConversionService conversionService;
-    // the beans are looked up on first use, as the providers break a dependency cycle, and then kept:
-    // a provider resolves the bean again at every call, which allocates for each body read
-    private final Supplier<RequestBinderRegistry> binderRegistry;
-    private final Supplier<MessageBodyHandlerRegistry> bodyHandlerRegistry;
-    private final Supplier<FormFactory> formFactory;
+    private final AsyncRequestBodyFactory factory;
 
-    AsyncRequestBodyArgumentBinder(BeanProvider<RequestArgumentSatisfier> argumentSatisfier,
-                                   BeanProvider<MessageBodyHandlerRegistry> bodyHandlerRegistry,
-                                   BeanProvider<FormFactory> formFactory,
-                                   ConversionService conversionService) {
-        this.binderRegistry = SupplierUtil.memoized(() -> argumentSatisfier.get().getBinderRegistry());
-        this.bodyHandlerRegistry = SupplierUtil.memoized(bodyHandlerRegistry::get);
-        this.formFactory = SupplierUtil.memoized(formFactory::get);
-        this.conversionService = conversionService;
+    AsyncRequestBodyArgumentBinder(AsyncRequestBodyFactory factory) {
+        this.factory = factory;
     }
 
     @Override
@@ -73,39 +54,13 @@ final class AsyncRequestBodyArgumentBinder implements TypedRequestArgumentBinder
 
     @Override
     public BindingResult<AsyncRequestBody> bind(ArgumentConversionContext<AsyncRequestBody> context, HttpRequest<?> source) {
-        // the request a filter continued with reads the body of the server request it wraps
-        ServerHttpRequest<?> server = ServerRequestBody.isBodySet(source)
-            // the body is the object a filter set, even none: the server request makes the empty body
-            ? ServerRequestBody.serverRequest(source)
-            : ServerRequestBody.of(source);
-        if (server == null) {
+        DefaultAsyncRequestBody body = factory.create(source);
+        if (body == null) {
             return BindingResult.unsatisfied();
         }
-        DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(source, server, this);
         // released when the route completed; a filter method binds its arguments outside the
         // binding of the route, and releases its body itself, see BasicHttpAttributes.detachRouteWaitsFor
         BasicHttpAttributes.addRouteBody(source, body);
         return () -> Optional.of(body);
-    }
-
-    /**
-     * @return The binders of the arguments of the routes, which bind the {@code @Body} arguments
-     */
-    RequestBinderRegistry binderRegistry() {
-        return binderRegistry.get();
-    }
-
-    /**
-     * @return The message body readers
-     */
-    MessageBodyHandlerRegistry bodyHandlerRegistry() {
-        return bodyHandlerRegistry.get();
-    }
-
-    /**
-     * @return The form factory
-     */
-    FormFactory formFactory() {
-        return formFactory.get();
     }
 }
