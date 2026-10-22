@@ -78,6 +78,55 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         e.response.status == HttpStatus.BAD_REQUEST
     }
 
+    void "test object body preserves empty form values"() {
+        when:
+        String result = client.exchange(HttpRequest.POST('/form/object', 'empty=&value=present')
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).body()
+
+        then:
+        result == '[empty:, value:present]'
+    }
+
+    void "test optional string property treats an empty form value as absent"() {
+        when:
+        String result = client.exchange(HttpRequest.POST('/form/optional-pojo', 'name=')
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).body()
+
+        then:
+        result == 'absent'
+    }
+
+    void "test optional string property still binds a non-empty form value"() {
+        when:
+        String result = client.exchange(HttpRequest.POST('/form/optional-pojo', 'name=Fred')
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).body()
+
+        then:
+        result == '[Fred]'
+    }
+
+    void "test empty form values are elided when the content type carries parameters"() {
+        when:
+        HttpResponse<?> response = client.exchange(HttpRequest.POST('/form/pojo', 'name=Fred&age=')
+                .contentType(MediaType.of('application/x-www-form-urlencoded;charset=UTF-8')), String)
+
+        then:
+        response.status == HttpStatus.OK
+        response.body.get() == 'name: Fred, age: null'
+    }
+
+    void "test multipart bean preserves an empty text field"() {
+        given:
+        MultipartBody body = MultipartBody.builder().addPart('name', '').build()
+
+        when:
+        String result = client.exchange(HttpRequest.POST('/multipart-form/pojo', body)
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String).body()
+
+        then:
+        result == '[]'
+    }
+
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10446")
     @Unroll
     void "test application/x-www-form-urlencoded String #body is parsed to #parsedMapString"() {
@@ -290,10 +339,24 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
             formData.toMapString()
         }
 
+        @Post('/object')
+        String object(@Body Object formData) {
+            ((Map<String, Object>) formData).toMapString()
+        }
+
+        @Post('/optional-pojo')
+        String optionalPojo(@Body OptionalPerson person) {
+            person.name == null ? 'absent' : "[${person.name.orElse('empty')}]"
+        }
+
         @EqualsAndHashCode
         static class Person {
             String name
             Integer age
+        }
+
+        static class OptionalPerson {
+            Optional<String> name
         }
     }
 
@@ -333,6 +396,19 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     static class UrlEncodedPogo {
         String aaa0123456789
         String bbb0123456789
+    }
+
+    @Controller(value = '/multipart-form', consumes = MediaType.MULTIPART_FORM_DATA)
+    @Requires(property = "spec.name", value = "FormDataBindingSpec")
+    static class MultipartFormController {
+        @Post('/pojo')
+        String pojo(@Body MultipartPerson person) {
+            person.name == null ? 'null' : "[$person.name]"
+        }
+
+        static class MultipartPerson {
+            String name
+        }
     }
 
     @Client('/form/saml/test')
