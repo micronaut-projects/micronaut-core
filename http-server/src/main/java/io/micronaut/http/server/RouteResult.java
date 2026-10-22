@@ -15,6 +15,16 @@
  */
 package io.micronaut.http.server;
 
+import io.micronaut.core.async.propagation.ReactivePropagation;
+import io.micronaut.core.async.propagation.ReactorPropagation;
+import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.context.ServerRequestContext;
+import io.micronaut.http.filter.ReactiveFilterChainElement;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import reactor.core.Fuseable;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import java.util.function.Supplier;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -40,6 +50,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 
+import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
 import static io.micronaut.inject.beans.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
 
 /**
@@ -57,6 +68,11 @@ import static io.micronaut.inject.beans.KotlinExecutableMethodUtils.isKotlinFunc
  * @since 5.3.0
  */
 abstract sealed class RouteResult {
+
+    /**
+     * The value of an empty single-valued publisher, the flows do not carry {@code null}.
+     */
+    private static final Object EMPTY = new Object();
 
     final RouteExecutor owner;
 
@@ -86,7 +102,7 @@ abstract sealed class RouteResult {
         }
 
         if (responseBodyAsyncOrReactive(routeInfo)) {
-            return owner.processPublisherBody(propagatedContext, request, outgoingResponse, routeInfo, this);
+            return processPublisherBody(propagatedContext, request, outgoingResponse, routeInfo);
         }
         return ExecutionFlow.just(outgoingResponse);
     }
@@ -170,6 +186,181 @@ abstract sealed class RouteResult {
             return response.contentType(MediaType.APPLICATION_JSON_TYPE);
         }
         return response;
+    }
+
+    ExecutionFlow<MutableHttpResponse<?>> fromKotlinCoroutineExecute(PropagatedContext propagatedContext, HttpRequest<?> request,
+                                                                     @Nullable Object body, RouteInfo<?> routeInfo) {
+        boolean isKotlinFunctionReturnTypeUnit = kotlinUnit(routeInfo);
+        if (isKotlinCoroutineSuspended(body)) {
+            final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(request);
+            if (supplier == null) {
+                return ExecutionFlow.error(new IllegalStateException("Missing coroutine continuation for suspended route"));
+            }
+            boolean notFoundOnMissingBody = owner.serverConfiguration.isNotFoundOnMissingBody();
+            // the result is wrapped so that an empty (null) result still reaches the transformer
+            CompletionStage<Optional<Object>> completion = ((CompletableFuture<Object>) supplier.get()).thenApply(Optional::ofNullable);
+            return CompletableFutureExecutionFlow.just(completion).flatMap(optional -> {
+                Object obj = optional.orElse(null);
+                if (obj == null) {
+                    return notFoundOnMissingBody ? ExecutionFlow.just(notFoundErrorResponse(request)) : ExecutionFlow.empty();
+                }
+                MutableHttpResponse<?> response;
+                if (obj instanceof HttpResponse<?> httpResponse) {
+                    response = httpResponse.toMutableResponse();
+                    if (responseBodyAsyncOrReactive(routeInfo)) {
+                        return processPublisherBody(propagatedContext, request, response, routeInfo);
+                    }
+                } else {
+                    response = owner.forStatus(routeInfo, null);
+                    if (!isKotlinFunctionReturnTypeUnit) {
+                        response = response.body(obj);
+                    }
+                }
+                return ExecutionFlow.just(response);
+            });
+        }
+        Object suspendedBody = isKotlinFunctionReturnTypeUnit ? null : body;
+        return fromImperativeExecute(propagatedContext, request, routeInfo, suspendedBody);
+    }
+
+    ExecutionFlow<MutableHttpResponse<?>> fromReactiveExecute(PropagatedContext propagatedContext,
+                                                              HttpRequest<?> request,
+                                                              Publisher<Object> publisher,
+                                                              RouteInfo<?> routeInfo) {
+        boolean isSingle = declaredSingle(routeInfo) || Publishers.isSingle(publisher.getClass());
+        boolean isCompletable = !isSingle && routeInfo.isVoid() && routeInfo.isCompletable();
+        if (isSingle || isCompletable) {
+            // full response case: the publisher is subscribed to right away, a publisher that
+            // completes synchronously yields an imperative flow and the rest of the lifecycle
+            // stays free of Reactor operators
+            return subscribeSingle(propagatedContext, request, publisher, routeInfo)
+                .<MutableHttpResponse<?>>flatMap(o -> {
+                    if (o instanceof Optional<?> optional) {
+                        o = optional.isPresent() ? optional.get() : EMPTY;
+                    }
+                    if (o == EMPTY) {
+                        // empty publisher, or empty Optional
+                        return ExecutionFlow.just(emptyResponse(request, routeInfo));
+                    }
+                    MutableHttpResponse<?> singleResponse;
+                    if (o instanceof HttpResponse<?> httpResponse) {
+                        singleResponse = httpResponse.toMutableResponse();
+                        // Mono<HttpResponse<Mono<T>>>
+                        if (nestedResponseBodyAsyncOrReactive(routeInfo)) {
+                            return processPublisherBody(propagatedContext, request, singleResponse, routeInfo);
+                        }
+                    } else if (o instanceof HttpStatus status) {
+                        singleResponse = owner.forStatus(routeInfo, status);
+                    } else {
+                        singleResponse = owner.forStatus(routeInfo, null)
+                            .body(o);
+                    }
+                    return ExecutionFlow.just(singleResponse);
+                });
+        }
+        // streaming case
+        if (streamOfResponses(routeInfo)) {
+            // a response stream
+            Publisher<HttpResponse<?>> bodyPublisher = (Publisher) publisher;
+            Flux<MutableHttpResponse<?>> response = Flux.from(bodyPublisher)
+                .map(HttpResponse::toMutableResponse);
+            if (nestedResponseBodyAsyncOrReactive(routeInfo)) {
+                response = response.flatMap(resp ->
+                    ReactiveExecutionFlow.toPublisher(processPublisherBody(propagatedContext, request, resp, routeInfo)));
+            }
+            // the outer publisher sees the request and the propagated context, whether or not the
+            // bodies of its responses are reactive
+            response = response.contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
+            return ReactiveExecutionFlow.fromPublisher(ReactivePropagation.propagate(propagatedContext, response));
+        }
+        // a streamed response keeps the bodies of the route until its stream ends
+        return processPublisherBody(propagatedContext, request, owner.forStatus(routeInfo, null), false, RouteExecutor.releaseWhenStreamEnds(request, publisher), routeInfo);
+    }
+
+    /**
+     * The flow of the first value of a single-valued publisher, {@link #EMPTY} if there is none. The
+     * request and the propagated context are available in the Reactor context of the publisher, and
+     * the propagated context is bound as a thread-local for the subscription and the signals.
+     * <p>The publisher is subscribed to right away, so a publisher that completes synchronously
+     * yields an imperative flow. A value that arrives during the subscription is only seen once
+     * the subscription returns, which is soon on the event loop, where nothing may block. There
+     * are two exceptions, where the publisher stays lazy and is subscribed to by the consumer of
+     * the response, so its value is passed on as it arrives:
+     * <ul>
+     *     <li>A filter that subscribes to the response publisher itself
+     *     ({@link ReactiveFilterChainElement}): it may add values to the Reactor context.</li>
+     *     <li>A route on an executor: it may block. A publisher that emits the response and then
+     *     keeps the thread, e.g. a {@code Mono.create} that emits the first event of a streamed
+     *     body and goes on working, would hold the response until it is done.</li>
+     * </ul>
+     *
+     * @param propagatedContext The propagated context
+     * @param request           The request
+     * @param publisher         The publisher
+     * @param routeInfo         The route
+     * @return The flow of the first value, immediate if the publisher completed synchronously
+     */
+    ExecutionFlow<Object> subscribeSingle(PropagatedContext propagatedContext, HttpRequest<?> request, Publisher<Object> publisher,
+                                                  RouteInfo<?> routeInfo) {
+        if (publisher instanceof Fuseable.ScalarCallable<?>) {
+            // Mono.just, Mono.empty, Mono.error: nothing observes the context
+            return ReactiveExecutionFlow.fromPublisherEager(publisher, propagatedContext)
+                .map(o -> o == null ? EMPTY : o);
+        }
+        if (ReactiveFilterChainElement.isPresent(propagatedContext) || hasExecutor(routeInfo)) {
+            Mono<Object> lazy = Mono.from(publisher)
+                .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request))
+                .defaultIfEmpty(EMPTY);
+            return ReactiveExecutionFlow.fromPublisher(ReactivePropagation.propagate(propagatedContext, lazy));
+        }
+        Mono<Object> mono = Mono.from(publisher)
+            .contextWrite(context -> context.put(ServerRequestContext.KEY, request));
+        return ReactiveExecutionFlow.fromPublisherEager(mono, propagatedContext)
+            .map(o -> o == null ? EMPTY : o);
+    }
+
+    ExecutionFlow<MutableHttpResponse<?>> processPublisherBody(PropagatedContext propagatedContext,
+                                                                       HttpRequest<?> request,
+                                                                       MutableHttpResponse<?> response,
+                                                                       RouteInfo<?> routeInfo) {
+        Object body = response.body();
+        if (body == null) {
+            return ExecutionFlow.just(response);
+        }
+        Publisher<Object> bodyPublisher = Publishers.convertToPublisher(owner.conversionService, body);
+        boolean isSinglePublisher = Publishers.isSingle(body.getClass());
+        if (!isSinglePublisher) {
+            // a streamed response keeps the bodies of the route until its stream ends
+            bodyPublisher = RouteExecutor.releaseWhenStreamEnds(request, bodyPublisher);
+        }
+        return processPublisherBody(propagatedContext, request, response, isSinglePublisher, bodyPublisher, routeInfo);
+    }
+
+    ExecutionFlow<MutableHttpResponse<?>> processPublisherBody(PropagatedContext propagatedContext,
+                                                                       HttpRequest<?> request,
+                                                                       MutableHttpResponse<?> response,
+                                                                       boolean isSinglePublisher,
+                                                                       Publisher<Object> bodyPublisher,
+                                                                       RouteInfo<?> routeInfo) {
+        if (isSinglePublisher) {
+            // the single value is the body, an empty publisher is a missing body
+            return subscribeSingle(propagatedContext, request, bodyPublisher, routeInfo)
+                .map(b -> b == EMPTY ? emptyResponse(request, routeInfo) : response.body(b));
+        }
+        MediaType mediaType = response.getContentType().orElseGet(() -> owner.resolveDefaultResponseContentType(request, routeInfo));
+
+        // the streaming body is subscribed to by the response writer: the request and the
+        // propagated context are in its Reactor context, and the propagated context is bound for
+        // the subscription and the signals
+        Flux<Object> streamingBody = owner.applyExecutorToPublisher(
+            bodyPublisher,
+            streamExecutor(routeInfo),
+            propagatedContext
+        ).contextWrite(cv -> ReactorPropagation.addPropagatedContext(cv, propagatedContext).put(ServerRequestContext.KEY, request));
+
+        return ExecutionFlow.just(response
+            .contentType(mediaType)
+            .body(ReactivePropagation.propagate(propagatedContext, streamingBody)));
     }
 
     /**
@@ -362,10 +553,10 @@ abstract sealed class RouteResult {
             boolean isReactive = routeInfo.isReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
             if (isReactive) {
                 Publisher<Object> publisher = Publishers.convertToPublisher(owner.conversionService, body);
-                return owner.fromReactiveExecute(propagatedContext, request, publisher, routeInfo, this);
+                return fromReactiveExecute(propagatedContext, request, publisher, routeInfo);
             }
             if (routeInfo.isSuspended()) {
-                return owner.fromKotlinCoroutineExecute(propagatedContext, request, body, routeInfo, this);
+                return fromKotlinCoroutineExecute(propagatedContext, request, body, routeInfo);
             }
             return fromImperativeExecute(propagatedContext, request, routeInfo, body);
         }
@@ -502,7 +693,7 @@ abstract sealed class RouteResult {
         @Override
         ExecutionFlow<MutableHttpResponse<?>> adapt(PropagatedContext propagatedContext, HttpRequest<?> request, Object body, RouteInfo<?> routeInfo) {
             Publisher<Object> publisher = Publishers.convertToPublisher(owner.conversionService, body);
-            return owner.fromReactiveExecute(propagatedContext, request, publisher, routeInfo, this);
+            return fromReactiveExecute(propagatedContext, request, publisher, routeInfo);
         }
     }
 
@@ -519,9 +710,9 @@ abstract sealed class RouteResult {
             // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
             if (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>)) {
                 Publisher<Object> publisher = Publishers.convertToPublisher(owner.conversionService, body);
-                return owner.fromReactiveExecute(propagatedContext, request, publisher, routeInfo, this);
+                return fromReactiveExecute(propagatedContext, request, publisher, routeInfo);
             }
-            return owner.fromKotlinCoroutineExecute(propagatedContext, request, body, routeInfo, this);
+            return fromKotlinCoroutineExecute(propagatedContext, request, body, routeInfo);
         }
     }
 
@@ -540,7 +731,7 @@ abstract sealed class RouteResult {
             // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
             if (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>)) {
                 Publisher<Object> publisher = Publishers.convertToPublisher(owner.conversionService, body);
-                return owner.fromReactiveExecute(propagatedContext, request, publisher, routeInfo, this);
+                return fromReactiveExecute(propagatedContext, request, publisher, routeInfo);
             }
             return fromImperativeExecute(propagatedContext, request, routeInfo, body);
         }
