@@ -157,6 +157,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
 
     @Override
     @Nullable
+    @SuppressWarnings("unchecked")
     public Object handleResult(@Nullable Object result) {
         CompletionStage<?> completionStageResult;
         if (result instanceof CompletionStage<?> stage) {
@@ -172,7 +173,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
                 )
             );
         }
-        return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, (Continuation<? super Object>) continuation);
+        return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, (Continuation<Object>) continuation);
     }
 
     @Override
