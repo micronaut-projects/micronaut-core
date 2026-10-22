@@ -6,6 +6,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.server.RouteExecutionModes;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
@@ -59,6 +60,13 @@ public class ExecutionShapesBenchmark {
         })
         String scenario = "STRING";
 
+        /**
+         * {@code PREPARED}, the execution prepared for each route, or {@code COMPATIBILITY}, which
+         * reads the route on every request: the same routes, filters and responses.
+         */
+        @Param({"PREPARED", "COMPATIBILITY"})
+        String mode = "PREPARED";
+
         ApplicationContext ctx;
         EmbeddedChannel channel;
         Scenario[] scenarios;
@@ -69,6 +77,7 @@ public class ExecutionShapesBenchmark {
         @Setup
         public void setUp() {
             ctx = ApplicationContext.run(BenchOptions.serverProperties("ExecutionShapesBenchmark"));
+            RouteExecutionModes.select(ctx, mode.equals("COMPATIBILITY"));
             channel = ((NettyHttpServer) ctx.getBean(EmbeddedServer.class)).buildEmbeddedChannel(false);
             channel.freezeTime();
             scenarios = scenario.equals("MIXED") ? Scenario.values() : new Scenario[]{Scenario.valueOf(scenario)};
