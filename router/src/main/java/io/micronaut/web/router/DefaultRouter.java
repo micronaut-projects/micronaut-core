@@ -346,10 +346,16 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 UriRouteInfo<T, R> routeInfo = match.getRouteInfo();
                 long variable;
                 long raw;
-                if (routeInfo instanceof DefaultUrlRouteInfo<?, ?> info && !info.isMicronautTemplate()) {
-                    // the facts the template describes for this policy
-                    variable = info.getPathVariableCount();
-                    raw = info.getRawLength();
+                if (routeInfo instanceof DefaultUrlRouteInfo<?, ?> info) {
+                    if (info.isMicronautTemplate()) {
+                        // read once, when the route was built
+                        variable = info.getAmbiguityVariableSegments();
+                        raw = info.getAmbiguityRawSegmentLength();
+                    } else {
+                        // the facts the template describes for this policy
+                        variable = info.getPathVariableCount();
+                        raw = info.getRawLength();
+                    }
                 } else {
                     UriMatchTemplate template = routeInfo.getUriMatchTemplate();
                     variable = template.getPathVariableSegmentCount();
