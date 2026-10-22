@@ -205,6 +205,10 @@ public final class MethodGenUtils {
         ClassTypeDef beanType = (ClassTypeDef) TypeDef.erasure(constructor.getOwningType());
 
         boolean isConstructor = constructor.getName().equals("<init>");
+        if (isConstructor && constructor.getDeclaringType().isSingletonObject()) {
+            // the constructor of an object is private: the bean is the static INSTANCE field
+            return beanType.getStaticField("INSTANCE", beanType);
+        }
         boolean isCompanion = constructor.getOwningType().getSimpleName().endsWith("$Companion");
         List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
         boolean allowKotlinDefaults = allowDefaults && hasKotlinDefaultsParameters(constructorArguments);
