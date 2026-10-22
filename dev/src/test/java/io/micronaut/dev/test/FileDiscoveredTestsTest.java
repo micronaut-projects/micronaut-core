@@ -59,8 +59,61 @@ class FileDiscoveredTestsTest {
                 TestSelection.ofClasses(Set.of("tests/test_b.py"), "failed"), onlyFiles), gone, new Cancellation());
             assertEquals(0, none.total());
             assertTrue(none.complete());
+
+            // an engine that names a test's class by its file's absolute path, as pytest's does, is reported by the file
+            // relative to its test source root, and that name runs the file again
+            Files.writeString(tests.resolve("test_b.py"), "fails");
+            Map<String, String> absolute = Map.of("junit.jupiter.extensions.autodetection.enabled", "false", FileTestEngine.ABSOLUTE, "true");
+            RecordingListener named = new RecordingListener();
+            runner.run(new TestRunRequest("run-4", loader, List.of(classes), sources, TestSelection.all(), absolute), named, new Cancellation());
+            assertEquals(Set.of("test_a.py.test_a.py", "test_b.py.test_b.py"), named.outcomes.keySet());
+            RecordingListener byRelativeName = new RecordingListener();
+            TestRunSummary relativeRerun = runner.run(new TestRunRequest("run-5", loader, List.of(classes), sources,
+                TestSelection.ofClasses(Set.of("test_b.py"), "failed"), absolute), byRelativeName, new Cancellation());
+            assertEquals(1, relativeRerun.total());
+            assertEquals(TestStatus.FAILED, byRelativeName.status("test_b.py.test_b.py"));
         }
     }
+    @Test
+    void aFileNamedByItsRealPathIsReportedRelativeToTheRootItsLinkedRootLeadsTo() throws Exception {
+        Path tests = Files.createDirectories(directory.resolve("project/tests"));
+        Files.writeString(tests.resolve("test_a.py"), "ok");
+        // the test source root is a link, as /var is on macOS, and the engine names each file by its real path
+        Path linked = Files.createSymbolicLink(directory.resolve("project/linked"), tests);
+        Path classes = Files.createDirectories(directory.resolve("project/test-classes"));
+        Path services = Files.createDirectories(directory.resolve("services/META-INF/services"));
+        Files.writeString(services.resolve("org.junit.platform.engine.TestEngine"), FileTestEngine.class.getName());
+        Map<String, String> real = Map.of("junit.jupiter.extensions.autodetection.enabled", "false", FileTestEngine.REAL, "true");
+
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {directory.resolve("services").toUri().toURL()}, getClass().getClassLoader())) {
+            RecordingListener named = new RecordingListener();
+            new JUnitPlatformTestRunner().run(new TestRunRequest("run-1", loader, List.of(classes), List.of(new SourceRoot(SourceKind.PYTHON, linked)),
+                TestSelection.all(), real), named, new Cancellation());
+            assertEquals(Set.of("test_a.py.test_a.py"), named.outcomes.keySet());
+        }
+    }
+
+    @Test
+    void aClassNameThatIsNoFileOfATestRootIsReportedAsItIs() throws Exception {
+        Path tests = Files.createDirectories(directory.resolve("project/tests"));
+        Files.writeString(tests.resolve("test_a.py"), "ok");
+        Path classes = Files.createDirectories(directory.resolve("project/test-classes"));
+        Path services = Files.createDirectories(directory.resolve("services/META-INF/services"));
+        Files.writeString(services.resolve("org.junit.platform.engine.TestEngine"), FileTestEngine.class.getName());
+        JUnitPlatformTestRunner runner = new JUnitPlatformTestRunner();
+        List<SourceRoot> sources = List.of(new SourceRoot(SourceKind.PYTHON, tests));
+
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {directory.resolve("services").toUri().toURL()}, getClass().getClassLoader())) {
+            // an absolute path outside every test root, to a file that is not there, and a name no path can have
+            for (String name : List.of(directory.resolve("elsewhere/test_x.py").toString(), "bad\0name")) {
+                Map<String, String> named = Map.of("junit.jupiter.extensions.autodetection.enabled", "false", FileTestEngine.NAMED, name);
+                RecordingListener listener = new RecordingListener();
+                runner.run(new TestRunRequest("named", loader, List.of(classes), sources, TestSelection.all(), named), listener, new Cancellation());
+                assertEquals(Set.of(name + ".test_a.py"), listener.outcomes.keySet(), name);
+            }
+        }
+    }
+
     @Test
     void aFileIsSelectedByItsPathRelativeToItsRootOrAbsoluteAndNothingElse() throws Exception {
         Path tests = Files.createDirectories(directory.resolve("project/tests"));

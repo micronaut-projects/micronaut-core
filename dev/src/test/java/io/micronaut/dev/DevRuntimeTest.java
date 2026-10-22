@@ -277,8 +277,8 @@ class DevRuntimeTest {
             assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
             refuseRedefinitions(runtime);
             GenerationClassLoader generation = runtime.classLoader().current();
-            byte[] greeterBefore = DevRuntime.classFile(generation.roots(), "app.Greeter");
-            byte[] otherBefore = DevRuntime.classFile(generation.roots(), "app.Other");
+            byte[] greeterBefore = InPlaceUpdates.classFile(generation.roots(), "app.Greeter");
+            byte[] otherBefore = InPlaceUpdates.classFile(generation.roots(), "app.Other");
 
             // two body-only edits the JVM refuses to redefine: the restart applies both
             Files.writeString(greeter, greeter("two"));
@@ -291,8 +291,8 @@ class DevRuntimeTest {
             Class<?> otherType = second.getClassLoader().loadClass("app.Other");
             assertEquals("two", otherType.getMethod("value").invoke(null));
             // the retired generation's snapshot holds the class files it ran with, not the refused ones
-            assertArrayEquals(greeterBefore, DevRuntime.classFile(generation.roots(), "app.Greeter"));
-            assertArrayEquals(otherBefore, DevRuntime.classFile(generation.roots(), "app.Other"));
+            assertArrayEquals(greeterBefore, InPlaceUpdates.classFile(generation.roots(), "app.Greeter"));
+            assertArrayEquals(otherBefore, InPlaceUpdates.classFile(generation.roots(), "app.Other"));
         } finally {
             runtime.close();
         }
