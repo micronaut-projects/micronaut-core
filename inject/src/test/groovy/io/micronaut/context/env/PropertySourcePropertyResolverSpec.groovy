@@ -32,6 +32,7 @@ import spock.lang.Unroll
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * @author Graeme Rocher
@@ -374,6 +375,300 @@ class PropertySourcePropertyResolverSpec extends Specification {
         and:
         resolver.getProperty('random.shortuuid', String).isPresent()
         resolver.getProperty('random.shortuuid', String).get().length() == 10
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "the random values of a text that also names a property stay the same when another property source is processed"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of('a', [
+                        'app.host': 'localhost',
+                        'app.url' : 'http://${app.host}:${random.port}/',
+                        'app.name': '${app.host}-${random.shortuuid}-${random.shortuuid}'
+                ])
+        )
+        String url = resolver.getProperty('app.url', String).get()
+        String name = resolver.getProperty('app.name', String).get()
+
+        when:
+        resolver.addPropertySource(PropertySource.of('b', ['other.value': 'x']))
+
+        then:
+        resolver.getProperty('app.url', String).get() == url
+        resolver.getProperty('app.name', String).get() == name
+
+        when: "a property source changes the property the texts name"
+        resolver.addPropertySource(PropertySource.of('c', ['app.host': 'example.com']))
+
+        then: "the property is resolved again, and the random values stay"
+        resolver.getProperty('app.url', String).get() == url.replace('localhost', 'example.com')
+        resolver.getProperty('app.name', String).get() == name.replace('localhost', 'example.com')
+
+        when: "a property source replaces a text with another one"
+        resolver.addPropertySource(PropertySource.of('d', ['app.name': '${app.host}+${random.shortuuid}']))
+        String renamed = resolver.getProperty('app.name', String).get()
+
+        then: "the random value of the new text is drawn"
+        renamed.startsWith('example.com+')
+        !name.contains(renamed.substring('example.com+'.length()))
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "the random values in a list stay the same when another property source is processed"() {
+        given:
+        List<String> declaredIds = ['${random.uuid}', 'id-${random.shortuuid}', 'fixed']
+        List<Map<String, String>> declaredServers = [['url': 'http://${app.host}:${random.port}/']]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of('a', [
+                        'app.host'   : 'localhost',
+                        'app.ids'    : declaredIds,
+                        'app.servers': declaredServers
+                ])
+        )
+        List ids = resolver.getProperty('app.ids', List).get()
+        List servers = resolver.getProperty('app.servers', List).get()
+
+        when:
+        resolver.addPropertySource(PropertySource.of('b', ['other.value': 'x']))
+
+        then:
+        resolver.getProperty('app.ids', List).get() == ids
+        resolver.getProperty('app.servers', List).get() == servers
+        ids[2] == 'fixed'
+
+        and: "the declared list and map are left as they were"
+        declaredIds == ['${random.uuid}', 'id-${random.shortuuid}', 'fixed']
+        declaredServers == [['url': 'http://${app.host}:${random.port}/']]
+
+        and: "a text that is one random expression keeps the type of its value"
+        ids[0] instanceof UUID
+
+        when: "a property source changes the property a text in the list names"
+        resolver.addPropertySource(PropertySource.of('c', ['app.host': 'example.com']))
+
+        then: "the property is resolved again, and the random value stays"
+        resolver.getProperty('app.servers', List).get() == [['url': servers[0].url.replace('localhost', 'example.com')]]
+
+        when: "a property source replaces one element of the list"
+        resolver.addPropertySource(PropertySource.of('d', ['app.ids[1]': 'other-${random.shortuuid}']))
+        List replaced = resolver.getProperty('app.ids', List).get()
+
+        then: "that element gets a new random value, and the others keep theirs"
+        replaced[0] == ids[0]
+        replaced[1].startsWith('other-')
+        replaced[2] == 'fixed'
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "a lookup of a list that a property source adds to meanwhile gets the list it read: #first"() {
+        given: "a list whose first text stops the lookup thread once it has read it"
+        AtomicReference<Thread> lookupThread = new AtomicReference<>()
+        CountDownLatch read = new CountDownLatch(1)
+        CountDownLatch release = new CountDownLatch(1)
+        List<Object> ids = new ArrayList<>([stoppingText(first, lookupThread, read, release), 'b'])
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(PropertySource.of('a', ['app.ids': ids]))
+        AtomicReference<Object> found = new AtomicReference<>()
+        AtomicReference<Throwable> failure = new AtomicReference<>()
+        Thread thread = new Thread({
+            try {
+                found.set(resolver.getProperty('app.ids', List).orElse(null))
+            } catch (Throwable e) {
+                failure.set(e)
+            }
+        })
+        lookupThread.set(thread)
+        thread.start()
+        assert read.await(10, TimeUnit.SECONDS)
+
+        when: "a property source adds an element to the list while the lookup is stopped"
+        resolver.addPropertySource(PropertySource.of('b', ['app.ids[3]': 'd']))
+        release.countDown()
+        thread.join(10_000)
+
+        then:
+        !thread.alive
+        failure.get() == null
+        found.get().size() == 2
+
+        where:
+        first << ['${random.uuid}', 'a']
+    }
+
+    /**
+     * A text that stops the given thread the first time the thread reads it, until it is released.
+     */
+    private static CharSequence stoppingText(String value, AtomicReference<Thread> thread, CountDownLatch read, CountDownLatch release) {
+        new CharSequence() {
+            @Override
+            int length() { value.length() }
+
+            @Override
+            char charAt(int index) { value.charAt(index) }
+
+            @Override
+            CharSequence subSequence(int start, int end) { value.subSequence(start, end) }
+
+            @Override
+            String toString() {
+                if (Thread.currentThread() == thread.get() && read.count > 0) {
+                    read.countDown()
+                    release.await(10, TimeUnit.SECONDS)
+                }
+                value
+            }
+        }
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "the random values of a map in a list are kept by key, for keys that read the same too"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of('a', [
+                        'app.servers': [[
+                                (1)    : '${random.uuid}',
+                                '1'    : '${random.uuid}',
+                                'id'   : ['${random.shortuuid}'],
+                                'id[0]': 'x-${random.shortuuid}'
+                        ]]
+                ])
+        )
+        Map server = resolver.getProperty('app.servers', List).get()[0]
+
+        when:
+        resolver.addPropertySource(PropertySource.of('b', ['other.value': 'x']))
+
+        then: "each key has its own random value, and keeps it"
+        server[1] != server['1']
+        resolver.getProperty('app.servers', List).get()[0] == server
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "a list in a list is returned as it was declared, as its placeholders are not resolved"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of('a', [
+                        'app.host'   : 'localhost',
+                        'app.matrix' : [['${random.port}', 'http://${app.host}:${random.port}/']],
+                        'app.servers': [['ports': [['${random.port}']]]]
+                ])
+        )
+
+        expect:
+        resolver.getProperty('app.matrix', List).get() == [['${random.port}', 'http://${app.host}:${random.port}/']]
+        resolver.getProperty('app.servers', List).get() == [['ports': [['${random.port}']]]]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "the random expressions of a text are found as its placeholders are resolved: #text"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of('a', ['app.host': 'localhost', 'app.value': text])
+        )
+        String value = resolver.getProperty('app.value', String).get()
+
+        when:
+        resolver.addPropertySource(PropertySource.of('b', ['other.value': 'x']))
+
+        then:
+        resolver.getProperty('app.value', String).get() == value
+
+        where:
+        text << ['${ RANDOM.UUID }', '${random.int:5}-${app.host}', 'x-${ random.shortuuid }-${app.host}']
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "a random expression that a placeholder falls back to keeps its value, and the property named first still wins: #text"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of('a', ['app.host': 'localhost', 'app.value': text])
+        )
+        String value = resolver.getProperty('app.value', String).get()
+
+        when:
+        resolver.addPropertySource(PropertySource.of('b', ['other.value': 'x']))
+
+        then:
+        resolver.getProperty('app.value', String).get() == value
+
+        when: "the property the placeholder names first is defined"
+        resolver.addPropertySource(PropertySource.of('c', ['app.port': '9000']))
+
+        then:
+        resolver.getProperty('app.value', String).get() == expected
+
+        where:
+        text                                               | expected
+        '${app.port:random.uuid:8080}'                     | '9000'
+        'http://${app.host}:${app.port:random.port:8080}/' | 'http://localhost:9000/'
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "a random fallback is not resolved while the property named first is set: #text"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of('a', ['app.port': '9000', 'app.value': text])
+        )
+
+        expect:
+        resolver.getProperty('app.value', String).get() == '9000'
+
+        where:
+        text << ['${app.port:random.int(0):8080}', '${app.port:random.bogus:8080}']
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "a random fallback keeps the type of its value"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of('a', [
+                        'app.value': '${missing:random.uuid:default}',
+                        'app.list' : ['${missing:random.int[1,2]:default}']
+                ])
+        )
+
+        when:
+        Object value = resolver.getProperty('app.value', Object).get()
+
+        then:
+        value instanceof UUID
+        resolver.getProperty('app.list', Object).get() == [1]
+
+        when: "a property source is processed"
+        resolver.addPropertySource(PropertySource.of('b', ['other.value': 'x']))
+
+        then: "the same value, of the same type"
+        resolver.getProperty('app.value', Object).get() == value
+        resolver.getProperty('app.list', Object).get() == [1]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "a text with a missing property before an invalid random expression reports the property, as before"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of('a', ['app.value': '${app.missing}-${random.bogus}'])
+        )
+
+        when:
+        resolver.getProperty('app.value', String)
+
+        then:
+        ConfigurationException e = thrown()
+        e.message.contains('app.missing')
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "a text with a random expression and an incomplete placeholder still fails to resolve"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of('a', ['app.value': '${random.uuid}-${app.host'])
+        )
+
+        when:
+        resolver.getProperty('app.value', String)
+
+        then:
+        ConfigurationException e = thrown()
+        e.message.contains('${random.uuid}-${app.host')
     }
 
     void "test random integer placeholders in range for properties"() {
