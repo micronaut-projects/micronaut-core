@@ -31,6 +31,7 @@ import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.context.reload.ClassChange;
 import io.micronaut.dev.agent.DynamicAttach;
 import io.micronaut.dev.change.ChangeSet;
@@ -97,6 +98,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 /**
@@ -154,6 +156,11 @@ public final class DevRuntime implements Closeable {
     private volatile int retainedCount;
     private volatile boolean closed;
     /**
+     * Whether the runtime closed because its generation budget was spent, for its launcher to relaunch the process.
+     */
+    private volatile boolean relaunchRequested;
+    private final Consumer<DevRuntime> relaunch;
+    /**
      * Whether the last generation failed to start, so that the next batch must launch one whether or not a class changed.
      */
     private volatile boolean startFailed;
@@ -185,7 +192,22 @@ public final class DevRuntime implements Closeable {
      * @param compilers The compilers, by language
      */
     DevRuntime(DevManifest manifest, DevClassLoader classLoader, ApplicationLauncher launcher, Map<SourceKind, SourceCompiler> compilers) {
+        this(manifest, classLoader, launcher, compilers, runtime -> { });
+    }
+
+    /**
+     * Creates the runtime; {@link #start(String[])} runs it.
+     *
+     * @param manifest The manifest
+     * @param classLoader The reloadable loader, over the manifest's roots
+     * @param launcher How the application's main is run
+     * @param compilers The compilers, by language
+     * @param relaunch What the launcher does once the runtime closed because its generation budget is spent
+     */
+    DevRuntime(DevManifest manifest, DevClassLoader classLoader, ApplicationLauncher launcher, Map<SourceKind, SourceCompiler> compilers,
+               Consumer<DevRuntime> relaunch) {
         listIntrospectionsOfTheReloadableTier();
+        this.relaunch = relaunch;
         this.manifest = manifest;
         this.classLoader = classLoader;
         this.launcher = launcher;
@@ -257,8 +279,9 @@ public final class DevRuntime implements Closeable {
         ApplicationContext first;
         try {
             snapshot = OutputSnapshot.of(manifest.reloadableRoots());
-            if (manifest.strategy() != DevReloadStrategy.RESTART) {
-                // the fast path needs an agent: the launcher's, or one attached now
+            if (manifest.strategy() != DevReloadStrategy.RESTART && !NativeImageUtils.inImageRuntimeCode()) {
+                // the fast path needs an agent: the launcher's, or one attached now. A native image has none: its
+                // Instrumentation cannot redefine a class, and it cannot attach one
                 instrumentation = DynamicAttach.instrumentation();
                 if (instrumentation != null && !instrumentation.isRedefineClassesSupported()) {
                     instrumentation = null;
@@ -765,6 +788,50 @@ public final class DevRuntime implements Closeable {
         lastFailure = null;
     }
 
+    /**
+     * Whether the generation budget, {@link DevManifest#maxGenerations()}, is spent: one more generation would exceed it.
+     *
+     * @return True when the next reload must relaunch the process instead
+     */
+    public boolean isGenerationBudgetSpent() {
+        int budget = manifest.maxGenerations();
+        return budget > 0 && classLoader.generation() >= budget;
+    }
+
+    /**
+     * @return Whether the runtime closed because its generation budget was spent, for its launcher to relaunch the process
+     */
+    public boolean isRelaunchRequested() {
+        return relaunchRequested;
+    }
+
+    /**
+     * Closes the runtime because its generation budget is spent, then tells the launcher, which relaunches the
+     * process. The change that found the budget spent was compiled already: the next process starts from it.
+     */
+    void requestRelaunch() {
+        synchronized (lifecycle) {
+            if (closed || relaunchRequested) {
+                return;
+            }
+            relaunchRequested = true;
+        }
+        LOG.info("Generation {} reached the budget of {} generations ({}): closing for the process to be relaunched",
+            classLoader.generation(), manifest.maxGenerations(), DevManifest.MAX_GENERATIONS);
+        // not on the reload thread, which close() interrupts and which may hold the lock of a batch
+        Thread thread = new Thread(() -> {
+            try {
+                close();
+            } catch (RuntimeException | LinkageError e) {
+                LOG.warn("The runtime did not close cleanly before the relaunch: {}", e.getMessage(), e);
+            } finally {
+                relaunch.accept(this);
+            }
+        }, "micronaut-dev-relaunch");
+        thread.setDaemon(false);
+        thread.start();
+    }
+
     @Override
     public void close() {
         synchronized (lifecycle) {
@@ -773,39 +840,43 @@ public final class DevRuntime implements Closeable {
             }
             closed = true;
         }
-        TestSession session = tests;
-        if (session != null) {
-            session.cancelRun();
-        }
-        Thread thread = worker;
-        if (thread != null) {
-            // a reload in progress ends before the generation it launched is stopped
-            thread.interrupt();
+        try {
+            TestSession session = tests;
+            if (session != null) {
+                session.cancelRun();
+            }
+            Thread thread = worker;
+            if (thread != null) {
+                // a reload in progress ends before the generation it launched is stopped
+                thread.interrupt();
+                RuntimeThreads.join(thread, APP_STOP_TIMEOUT);
+            }
+            DirectoryWatcher directoryWatcher = watcher;
+            if (directoryWatcher != null) {
+                directoryWatcher.close();
+            }
+            LiveReloadServer server = liveReload;
+            if (server != null) {
+                server.close();
+            }
+            synchronized (lifecycle) {
+                thread = contextClaimed ? null : applicationThread;
+            }
+            // a generation's main yet to create its context: what it creates is refused while this runtime runs the process
             RuntimeThreads.join(thread, APP_STOP_TIMEOUT);
+            ApplicationContext current = context;
+            if (current != null && (current.isRunning() || started.isDone())) {
+                // a context whose startup listeners still run is stopped once they ran: stop waits for start
+                stopGeneration(current);
+            }
+            for (SourceCompiler compiler : new LinkedHashSet<>(compilers.values())) {
+                compiler.close();
+            }
+        } finally {
+            // whatever failed to stop, whoever waits for the runtime to close is released
+            CURRENT.compareAndSet(this, null);
+            closedLatch.countDown();
         }
-        DirectoryWatcher directoryWatcher = watcher;
-        if (directoryWatcher != null) {
-            directoryWatcher.close();
-        }
-        LiveReloadServer server = liveReload;
-        if (server != null) {
-            server.close();
-        }
-        synchronized (lifecycle) {
-            thread = contextClaimed ? null : applicationThread;
-        }
-        // a generation's main yet to create its context: what it creates is refused while this runtime runs the process
-        RuntimeThreads.join(thread, APP_STOP_TIMEOUT);
-        ApplicationContext current = context;
-        if (current != null && (current.isRunning() || started.isDone())) {
-            // a context whose startup listeners still run is stopped once they ran: stop waits for start
-            stopGeneration(current);
-        }
-        for (SourceCompiler compiler : new LinkedHashSet<>(compilers.values())) {
-            compiler.close();
-        }
-        CURRENT.compareAndSet(this, null);
-        closedLatch.countDown();
     }
 
     /**
@@ -1513,6 +1584,11 @@ public final class DevRuntime implements Closeable {
     }
 
     private void restart(ChangeSet changeSet, @Nullable ConfigurationChange configurationChange, long startNanos) {
+        if (isGenerationBudgetSpent()) {
+            // the compiled classes stay in the class output: the relaunched process starts from them
+            requestRelaunch();
+            return;
+        }
         ApplicationContext old = context;
         classLoader.swap();
         Collection<BeanRegistration<?>> retained = List.of();
@@ -1763,6 +1839,10 @@ public final class DevRuntime implements Closeable {
     }
 
     void detectLeaks() {
+        if (NativeImageUtils.inImageRuntimeCode()) {
+            // a native image never unloads a class it defined at runtime: every retired generation stays, as the budget expects
+            return;
+        }
         if (oldRetiredGenerations().isEmpty() || !leakCheckPending.compareAndSet(false, true)) {
             // nothing older than the tolerance is reachable even before a collection, or a check pending covers this reload
             return;
@@ -1853,77 +1933,4 @@ public final class DevRuntime implements Closeable {
         }
     }
 
-    /**
-     * A batch waiting for the reload thread.
-     */
-    private static class Pending {
-        final Map<SourceKind, SourceChanges> sources;
-        final Map<SourceKind, SourceChanges> testSources;
-        final Map<ResourceKind, SourceChanges> resources;
-        final boolean full;
-        final @Nullable TestRequest requested;
-        long sequence;
-
-        Pending(Map<SourceKind, SourceChanges> sources, Map<ResourceKind, SourceChanges> resources, boolean full) {
-            this(sources, Map.of(), resources, full, null);
-        }
-
-        Pending(Map<SourceKind, SourceChanges> sources, Map<SourceKind, SourceChanges> testSources, Map<ResourceKind, SourceChanges> resources,
-                boolean full, @Nullable TestRequest requested) {
-            this.sources = sources;
-            this.testSources = testSources;
-            this.resources = resources;
-            this.full = full;
-            this.requested = requested;
-        }
-
-        boolean forcesRestart() {
-            return false;
-        }
-
-        boolean isEmpty() {
-            return !full && !forcesRestart() && requested == null
-                && sources.values().stream().allMatch(changes -> changes.changed().isEmpty() && changes.deleted().isEmpty())
-                && testSources.values().stream().allMatch(changes -> changes.changed().isEmpty() && changes.deleted().isEmpty())
-                && resources.values().stream().allMatch(changes -> changes.changed().isEmpty() && changes.deleted().isEmpty());
-        }
-
-        /**
-         * How many tests a request runs, for merging two of them: the widest wins, every test, then the last run's
-         * again, which holds the failures, then the failures alone.
-         */
-        private static int breadth(TestRequest request) {
-            return switch (request) {
-                case ALL -> 2;
-                case RERUN -> 1;
-                case FAILED -> 0;
-            };
-        }
-
-        static Pending merge(List<Pending> batches) {
-            Map<SourceKind, SourceChanges> sources = new EnumMap<>(SourceKind.class);
-            Map<SourceKind, SourceChanges> testSources = new EnumMap<>(SourceKind.class);
-            Map<ResourceKind, SourceChanges> resources = new EnumMap<>(ResourceKind.class);
-            boolean full = false;
-            boolean restart = false;
-            TestRequest requested = null;
-            for (Pending batch : batches) {
-                batch.sources.forEach((kind, changes) -> sources.merge(kind, changes, SourceChanges::merge));
-                batch.testSources.forEach((kind, changes) -> testSources.merge(kind, changes, SourceChanges::merge));
-                batch.resources.forEach((kind, changes) -> resources.merge(kind, changes, SourceChanges::merge));
-                full |= batch.full;
-                restart |= batch.forcesRestart();
-                if (batch.requested != null && (requested == null || breadth(batch.requested) > breadth(requested))) {
-                    requested = batch.requested;
-                }
-            }
-            boolean forced = restart;
-            return new Pending(sources, testSources, resources, full, requested) {
-                @Override
-                boolean forcesRestart() {
-                    return forced;
-                }
-            };
-        }
-    }
 }
