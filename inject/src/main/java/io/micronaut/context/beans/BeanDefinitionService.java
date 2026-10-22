@@ -239,15 +239,16 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
     void reset();
 
     /**
-     * Releases what the context configured the executable methods of its definitions with, its environment and itself,
-     * where those methods are shared by every context that loads the definition class. Called by an application context
-     * in development mode as it stops, before {@link #reset()}.
+     * Detaches the executable methods of its definitions from what the context configured them with, its environment
+     * and itself, where those methods are shared by every context that loads the definition class. Called by an
+     * application context in development mode as it stops, before {@link #reset()}.
      *
      * @param environment The environment of the context that stops
      * @param beanContext The context that stops
      * @since 5.3.0
      */
-    default void releaseExecutableMethods(Environment environment, BeanContext beanContext) {
+    @Internal
+    default void detachExecutableMethods(Environment environment, BeanContext beanContext) {
         // nothing shared
     }
 
