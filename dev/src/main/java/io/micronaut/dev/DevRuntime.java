@@ -53,7 +53,6 @@ import io.micronaut.dev.manifest.DevReloadStrategy;
 import io.micronaut.dev.manifest.ResourceRoot;
 import io.micronaut.dev.test.TestRunSummary;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
 import io.micronaut.runtime.context.scope.refresh.RefreshResult;
 import io.micronaut.runtime.EmbeddedApplication;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
@@ -1362,7 +1361,7 @@ public final class DevRuntime implements Closeable {
             // rebound, the refreshable beans disposed of, the watches told; a watch that cannot apply its change
             // answers REQUIRES_RESTART, and a bean retained across restarts that watched a touched prefix is not
             // kept when the restart comes
-            RefreshResult refresh = refreshConfiguration(current);
+            RefreshResult refresh = ConfigurationStaleness.refreshConfiguration(current);
             if (refresh == null) {
                 configurationChange = ConfigurationChange.ofAll();
             } else {
@@ -1395,24 +1394,6 @@ public final class DevRuntime implements Closeable {
             return;
         }
         restart(changeSet, configurationChange, start);
-    }
-
-    /**
-     * Refreshes the configuration of the running context.
-     *
-     * @return The result, or null when the context is not running or has no refresher, which restarts instead
-     */
-    @Nullable
-    static RefreshResult refreshConfiguration(@Nullable ApplicationContext current) {
-        if (current == null || !current.isRunning()) {
-            return null;
-        }
-        try {
-            return current.findBean(ConfigurationRefresher.class).map(ConfigurationRefresher::refresh).orElse(null);
-        } catch (RuntimeException e) {
-            LOG.warn("The configuration could not be refreshed in place ({}): restarting instead", e.getMessage());
-            return null;
-        }
     }
 
     /**
@@ -1501,13 +1482,7 @@ public final class DevRuntime implements Closeable {
      * @return Whether the change was applied this way
      */
     private boolean patchInPlace(ChangeSet changeSet, OutputSnapshot previous, long startNanos) {
-        Set<String> changed = changeSet.changedResources();
-        if (!manifest.patchInPlace() || changeSet.hasClassChanges() || changed.isEmpty() || !changeSet.removedResources().isEmpty()) {
-            return false;
-        }
-        Set<String> before = previous.resourcePaths();
-        if (!before.containsAll(changed)) {
-            // a resource added: a reloader reads an index of the resources it knows, a Python file system its file list
+        if (!isPatchable(changeSet, previous.resourcePaths())) {
             return false;
         }
         ApplicationContext current = context;
@@ -1515,40 +1490,17 @@ public final class DevRuntime implements Closeable {
             return false;
         }
         GenerationClassLoader generation = classLoader.current();
-        InPlaceResourceReloader reloader = null;
+        List<InPlaceResourceReloader> reloaders;
         try {
-            List<InPlaceResourceReloader> reloaders = new ArrayList<>(current.getBeansOfType(InPlaceResourceReloader.class));
-            OrderUtil.sort(reloaders);
-            for (InPlaceResourceReloader candidate : reloaders) {
-                if (candidate.canReload(changed, Set.of())) {
-                    reloader = candidate;
-                    break;
-                }
-            }
+            reloaders = new ArrayList<>(current.getBeansOfType(InPlaceResourceReloader.class));
         } catch (RuntimeException e) {
             LOG.debug("Cannot look up the in-place reloaders: restarting instead", e);
             return false;
         }
-        if (reloader == null) {
+        InPlaceResourceReloader.Result result = patchGeneration(changeSet, reloaders, "restarting instead");
+        if (result == null) {
             return false;
         }
-        InPlaceResourceReloader.Result result;
-        try {
-            // the snapshot first: the reloader reads the new contents through the generation's loader
-            for (String resource : changed) {
-                byte[] contents = resourceFile(manifest.reloadableRoots(), resource);
-                if (contents == null || !generation.replaceResource(resource, contents)) {
-                    LOG.info("Cannot patch {} in place, the generation does not hold it: restarting instead", resource);
-                    return false;
-                }
-            }
-            result = reloader.reload(changed);
-        } catch (Exception | LinkageError e) {
-            LOG.info("Cannot patch {} resource(s) in place ({}): restarting instead", changed.size(), e.getMessage());
-            LOG.debug("The in-place patch failed", e);
-            return false;
-        }
-        inPlacePatches.incrementAndGet();
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         ClassChangeEvent event = new ClassChangeEvent(this, Set.of(), generation, List.of(), ReloadStrategy.RELOAD);
         try {
@@ -1563,6 +1515,86 @@ public final class DevRuntime implements Closeable {
             server.reload("/", false);
         }
         return true;
+    }
+
+    /**
+     * Whether a change of the class output is one an {@link InPlaceResourceReloader} may take: resources changed,
+     * none added or removed, and no class changed. {@link DevManifest#patchInPlace()} turns this off.
+     *
+     * @param changeSet The change
+     * @param before The resources the output held before it
+     * @return True if the change may be patched in place
+     */
+    boolean isPatchable(ChangeSet changeSet, Set<String> before) {
+        Set<String> changed = changeSet.changedResources();
+        // nor a resource added: a reloader reads an index of the resources it knows, a Python file system its file list
+        return manifest.patchInPlace() && !changeSet.hasClassChanges() && !changed.isEmpty() && changeSet.removedResources().isEmpty()
+            && before.containsAll(changed);
+    }
+
+    /**
+     * Patches a {@link #isPatchable patchable} change into the current generation: the first of the reloaders, in
+     * order, that takes the whole change gets the new contents in the generation's snapshot, then applies them. A
+     * refusal, by answering no or by throwing, leaves it to the caller to start a new generation, which discards a
+     * half-applied patch.
+     *
+     * @param changeSet The change
+     * @param reloaders The reloaders that may take it
+     * @param otherwise What the caller does when the change is not patched, for the log
+     * @return What was patched, or null when nothing was
+     */
+    InPlaceResourceReloader.@Nullable Result patchGeneration(ChangeSet changeSet, List<InPlaceResourceReloader> reloaders, String otherwise) {
+        Set<String> changed = changeSet.changedResources();
+        GenerationClassLoader generation = classLoader.current();
+        InPlaceResourceReloader reloader = null;
+        try {
+            List<InPlaceResourceReloader> sorted = new ArrayList<>(reloaders);
+            OrderUtil.sort(sorted);
+            for (InPlaceResourceReloader candidate : sorted) {
+                if (candidate.canReload(changed, Set.of())) {
+                    reloader = candidate;
+                    break;
+                }
+            }
+        } catch (RuntimeException | LinkageError e) {
+            LOG.debug("An in-place reloader failed to answer: {}", otherwise, e);
+            return null;
+        }
+        if (reloader == null) {
+            return null;
+        }
+        InPlaceResourceReloader.Result result;
+        try {
+            // the snapshot first: the reloader reads the new contents through the generation's loader
+            for (String resource : changed) {
+                byte[] contents = resourceFile(manifest.reloadableRoots(), resource);
+                if (contents == null || !generation.replaceResource(resource, contents)) {
+                    LOG.info("Cannot patch {} in place, the generation does not hold it: {}", resource, otherwise);
+                    return null;
+                }
+            }
+            result = reloader.reload(changed);
+        } catch (Exception | LinkageError e) {
+            LOG.info("Cannot patch {} resource(s) in place ({}): {}", changed.size(), e.getMessage(), otherwise);
+            LOG.debug("The in-place patch failed", e);
+            return null;
+        }
+        inPlacePatches.incrementAndGet();
+        return result;
+    }
+
+    /**
+     * @return The resources of the reloadable roots as they were last compared, which the next change is compared with
+     */
+    Set<String> outputResources() {
+        return snapshot.resourcePaths();
+    }
+
+    /**
+     * @return The current generation's loader
+     */
+    ClassLoader currentGeneration() {
+        return classLoader.current();
     }
 
     static byte @Nullable [] classFile(List<Path> roots, String className) {
@@ -1627,7 +1659,7 @@ public final class DevRuntime implements Closeable {
         }
         startFailed = false;
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
-        List<BeanDefinition<?>> added = definitionsNamed(fresh, changeSet.classNames());
+        List<BeanDefinition<?>> added = ConfigurationStaleness.definitionsNamed(fresh, changeSet.classNames());
         fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
         LOG.info("Reloaded: generation {} started in {} ms ({} class(es) changed, {} bean(s) retained)", classLoader.generation(), elapsed.toMillis(), changeSet.classes().size(), retainedCount);
         LiveReloadServer server = liveReload;
@@ -1823,19 +1855,6 @@ public final class DevRuntime implements Closeable {
             }
             defaultBeanContext.notifyResourceChange(new ResourceChange(kind, roots, files, List.of(), true));
         }
-    }
-
-    private static List<BeanDefinition<?>> definitionsNamed(ApplicationContext applicationContext, Set<String> classNames) {
-        List<BeanDefinition<?>> definitions = new ArrayList<>();
-        if (classNames.isEmpty()) {
-            return definitions;
-        }
-        for (BeanDefinition<?> definition : applicationContext.getAllBeanDefinitions()) {
-            if (classNames.contains(definition.getBeanType().getName())) {
-                definitions.add(definition);
-            }
-        }
-        return definitions;
     }
 
     void detectLeaks() {

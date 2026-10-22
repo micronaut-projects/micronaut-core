@@ -497,7 +497,7 @@ class DevRuntimeTest {
 
     @Test
     void noRunningContextHasNoRefresh() {
-        assertNull(DevRuntime.refreshConfiguration(null));
+        assertNull(ConfigurationStaleness.refreshConfiguration(null));
     }
 
     /**

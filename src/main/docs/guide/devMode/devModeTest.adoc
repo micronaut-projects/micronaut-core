@@ -56,6 +56,20 @@ A run of every test selects the test class outputs and, for a language whose tes
 
 The events become JUnit XML reports, one `TEST-<class>.xml` per class in the Surefire shape, which every CI server and IDE reads. They also go to every `TestReportListener` registered as a service, such as an HTML report.
 
+== Changes taken in place
+
+A runner that keeps state built over a generation between runs, such as an interpreter, can take a change in place instead. `TestRunner.inPlaceReloader(ClassLoader)` answers with an api:context.reload.InPlaceResourceReloader[] for the loader of its last run.
+
+A change of the class output that holds no class and only changes resources that generation already holds, as a Python edit that changes only bodies, is offered to it. When it takes the change:
+
+. the generation's snapshot gets the new contents;
+. the reloader applies them;
+. the tests the change owes run on the same generation, so the change takes no generation from the budget.
+
+A run that no change preceded, as one asked for from the console, uses that generation too while the runner keeps state built over it. Anything else, a refusal or a failure included, runs on a new generation.
+
+`micronaut.dev.patch-in-place=false` turns this off, as it does in development mode.
+
 == HTML Report
 
 Add `micronaut-dev-test-report` to the development runtime classpath, as the build plugins do for `mnTest` and `mn:test`, and test mode also writes a page of the latest result of every test. The page goes to `micronaut.dev.test.html-report`, by default `build/micronaut-dev/test-report/index.html`. On the page:
