@@ -455,14 +455,14 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
         if (upperBoundsAsElements.isEmpty()) {
             upperBoundsAsElements = Collections.singletonList(getObjectClassElement());
         }
-        ClassElement upperType = WildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
+        ClassElement upperType = WildcardElement.findUpperTypeRequired(upperBoundsAsElements, lowerBoundsAsElements);
         if (upperType.getType().getName().equals("java.lang.Object")) {
             // Not bounded wildcard: <?>
             if (redirectType != null && redirectType != genericsType) {
                 ClassElement definedTypeBound = newClassElement(declaredElement, genericsOwner, redirectType, redirectType, parentTypeArguments, visitedTypes, false);
                 // Use originating parameter to extract the bound defined
                 if (definedTypeBound instanceof GroovyGenericPlaceholderElement groovyGenericPlaceholderElement) {
-                    upperType = WildcardElement.findUpperType(groovyGenericPlaceholderElement.getBounds(), Collections.emptyList());
+                    upperType = WildcardElement.findUpperTypeRequired(groovyGenericPlaceholderElement.getBounds(), Collections.emptyList());
                 }
             }
         }
