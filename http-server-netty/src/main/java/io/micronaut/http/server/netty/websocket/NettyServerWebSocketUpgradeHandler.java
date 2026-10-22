@@ -45,6 +45,7 @@ import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.web.router.DefaultRouter;
 import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteRejections;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
@@ -172,6 +173,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             final NettyHttpRequest<?> msg;
             try {
                 msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+                // the hooks of ServerHttpRequest need the connection, also while the filters run
+                msg.outboundAccess(outboundAccess);
             } catch (IllegalArgumentException e) {
                 body.close();
 
@@ -183,6 +186,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                     serverConfiguration
                 );
                 outboundAccess.attachment(errorRequest);
+                errorRequest.outboundAccess(outboundAccess);
                 outboundAccess.closeAfterWrite();
 
                 PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate(() -> {
@@ -243,6 +247,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         Objects.requireNonNull(next).responseWritten(attachment);
     }
 
+    @Override
+    public void responseFailed(@Nullable Object attachment, Throwable cause) {
+        Objects.requireNonNull(next).responseFailed(attachment, cause);
+    }
+
     private void writeResponse(ChannelHandlerContext ctx,
                                NettyHttpRequest<?> msg,
                                boolean shouldProceedNormally,
@@ -282,7 +291,14 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
         try {
             installCompressionHandler(ctx, msg.getNativeRequest());
-            handleHandshake(ctx, msg, webSocketBean, actualResponse);
+            handleHandshake(ctx, msg, webSocketBean, actualResponse).addListener(future -> {
+                if (future.isSuccess()) {
+                    // the connection is no longer this request's: its close ends the session
+                    msg.responseUpgraded();
+                } else {
+                    msg.responseFailed(future.cause());
+                }
+            });
         } catch (Throwable e) {
             releaseRequest.run();
             throw e;
@@ -540,6 +556,14 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         }
 
         @Override
+        protected void onUnhandledError(Throwable cause) {
+            NettyHttpRequest<?> request = nettyRequest;
+            if (request != null) {
+                request.responseFailed(cause);
+            }
+        }
+
+        @Override
         protected void onFilteredRequest(HttpRequest<?> filteredRequest) {
             NettyHttpRequest<?> request = nettyRequest;
             if (request != null) {
@@ -549,6 +573,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
         @Override
         protected @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request) {
+            // the rejection of a route selector is the one of this routing
+            RouteRejections.clear(request);
             // the conditions of the route, e.g. a @RouteCondition, which reads the request of the
             // context, apply to the upgrade request. Router.find(HttpMethod, path, request) only
             // matches the method and the path, so the conditions are tested here, once
@@ -561,6 +587,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                                                                       @Nullable UriRouteMatch<Object, Object> routeMatch,
                                                                       PropagatedContext propagatedContext) {
             if (routeMatch == null) {
+                // a route selector that rejected the upgrade answers 406 or 415, as for other requests
+                ExecutionFlow<HttpResponse<?>> rejection = rejectionResponse(request, propagatedContext);
+                if (rejection != null) {
+                    return rejection;
+                }
                 return ExecutionFlow.error(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
             }
             this.propagatedContext = propagatedContext;
