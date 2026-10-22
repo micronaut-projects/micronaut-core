@@ -185,8 +185,8 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
             if (!(matchInfo instanceof DynamicRouteTarget.ResolvedMatchInfo resolved) || resolved.annotationMetadata().isEmpty()) {
                 return null;
             }
-            AnnotationMetadata metadata = RouteLocator.layered(resolved.annotationMetadata(), executableMethod.getAnnotationMetadata());
-            inheriting = new InheritingExecutableMethod<>(executableMethod, metadata);
+            AnnotationMetadata metadata = RouteLocator.layered(resolved.annotationMetadata(), super.getExecutableMethod().getAnnotationMetadata());
+            inheriting = new InheritingExecutableMethod<>(super.getExecutableMethod(), metadata);
             inheritingMethod = inheriting;
         }
         return inheriting;

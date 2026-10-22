@@ -41,7 +41,6 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.context.ServerRequestContext;
@@ -287,7 +286,7 @@ record MethodFilter<T>(FilterOrder order,
                             ExecutionFlow<?> waitsFor = null;
                             try {
                                 result = argumentBinder.bind(conversionContext, request);
-                                if (result instanceof PendingRequestBindingResult<Object> pending && pending.isPending()) {
+                                if (result.isPending()) {
                                     waitsFor = BasicHttpAttributes.getRouteWaitsFor(request);
                                 }
                             } finally {
@@ -367,8 +366,10 @@ record MethodFilter<T>(FilterOrder order,
             Object value = result.isSatisfied() ? result.getValue().orElse(null) : null;
             return value instanceof Optional<?> optional ? optional : Optional.ofNullable(value);
         }
-        if (result.isPresentAndSatisfied() || (argument.isNullable() && result.isSatisfied())) {
-            return result.getValue().orElse(null);
+        boolean satisfied = result.isSatisfied();
+        Optional<Object> value = satisfied ? result.getValue() : Optional.empty();
+        if (satisfied && (value.isPresent() || argument.isNullable())) {
+            return value.orElse(null);
         } else {
             List<ConversionError> conversionErrors = result.getConversionErrors();
             if (!conversionErrors.isEmpty()) {

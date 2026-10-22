@@ -294,6 +294,9 @@ public abstract class AbstractArgumentBinder<T> {
             if (result.isPresent() && context.getArgument().getType() == Optional.class) {
                 result = (Optional<T>) result.get();
             }
+            if (result.isPresent() && lastError.isEmpty() && context.getArgument().getType() != Optional.class) {
+                return BindingResult.converted(result.get());
+            }
             Optional<T> finalResult = result;
             return new BindingResult<>() {
                 @Override
