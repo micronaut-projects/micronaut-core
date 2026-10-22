@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -25,6 +26,7 @@ import io.micronaut.web.router.builder.HttpRouteBuilder;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -104,6 +106,54 @@ class RouteAmbiguityStatisticsTest {
             routes.GET("/items/{key}", (request, pathVariables) -> HttpResponse.ok("b"));
         });
         assertEquals(2, router.findAllClosest(HttpRequest.GET("/items/1")).size());
+    }
+
+    @Test
+    void mediaPreferencePreservesInputAndOrderForAllNoneAndSomeExplicitCandidates() {
+        for (int count : List.of(0, 1, 2, 8, 32)) {
+            for (int preference : List.of(0, 1, 2, 3)) {
+                Router router = router(routes -> {
+                    for (int i = 0; i < count; i++) {
+                        boolean explicit = preference == 1 || preference == 2 && i % 2 == 0 || preference == 3 && i % 2 != 0;
+                        var route = routes.POST("/items/{id" + i + "}");
+                        if (explicit) {
+                            route.produces(MediaType.TEXT_PLAIN_TYPE).consumes(MediaType.TEXT_PLAIN_TYPE);
+                        } else {
+                            route.produces(MediaType.ALL_TYPE).consumesAll();
+                        }
+                        route.handle((request, variables) -> HttpResponse.ok());
+                    }
+                });
+                List<UriRouteMatch<Object, Object>> input = List.copyOf(router.<Object, Object>find(HttpMethod.POST, "/items/1", null).toList());
+                var request = HttpRequest.POST("/items/1", "body").contentType(MediaType.TEXT_PLAIN_TYPE).accept(MediaType.TEXT_PLAIN_TYPE);
+                var expected = new ArrayList<UriRouteMatch<Object, Object>>();
+                for (var match : input) {
+                    if (match.getRouteInfo().explicitlyProduces(MediaType.TEXT_PLAIN_TYPE)) {
+                        expected.add(match);
+                    }
+                }
+                if (expected.isEmpty()) {
+                    expected.addAll(input);
+                }
+                for (int repeat = 0; repeat < 2; repeat++) {
+                    assertEquals(expected, DefaultRouter.resolveAmbiguity(request, input));
+                    assertEquals(count, input.size());
+                }
+            }
+        }
+    }
+
+    @Test
+    void specificityNarrowingDoesNotModifyTheCandidateList() {
+        Router router = router(routes -> {
+            routes.GET("/items/latest").handle((request, variables) -> HttpResponse.ok());
+            routes.GET("/items/{id}").handle((request, variables) -> HttpResponse.ok());
+        });
+        var input = router.<Object, Object>find(HttpMethod.GET, "/items/latest", null).toList();
+        var expected = List.of(input.get(0));
+        assertEquals(expected, DefaultRouter.resolveAmbiguity(HttpRequest.GET("/items/latest"), input));
+        assertEquals(expected, DefaultRouter.resolveAmbiguity(HttpRequest.GET("/items/latest"), input));
+        assertEquals(2, input.size());
     }
 
     private static String closest(Router router, HttpRequest<?> request) {

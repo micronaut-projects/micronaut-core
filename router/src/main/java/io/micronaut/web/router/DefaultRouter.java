@@ -345,8 +345,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             long variableCount = 0;
             long rawLength = 0;
 
-            var closestMatches = new ArrayList<UriRouteMatch<T, R>>(routeCount);
-
+            int closestCount = 0;
             for (int i = 0; i < routeCount; i++) {
                 UriRouteMatch<T, R> match = uriRoutes.get(i);
                 UriRouteInfo<T, R> routeInfo = match.getRouteInfo();
@@ -374,9 +373,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 if (variable > variableCount || raw < rawLength) {
                     break;
                 }
-                closestMatches.add(match);
+                closestCount++;
             }
-            uriRoutes = closestMatches;
+            if (closestCount != routeCount) {
+                uriRoutes = copyPrefix(uriRoutes, closestCount, closestCount);
+            }
         }
         return uriRoutes;
     }
@@ -397,36 +398,52 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             // take the highest priority accepted type, a type of the quality 0 is not acceptable
             final MediaType mediaType = preferredAcceptedType(acceptedProducedTypes);
             if (mediaType != null) {
-                var mostSpecific = new ArrayList<UriRouteMatch<T, R>>(uriRoutes.size());
-                for (UriRouteMatch<T, R> routeMatch : uriRoutes) {
-                    if (routeMatch.getRouteInfo().explicitlyProduces(mediaType)) {
-                        mostSpecific.add(routeMatch);
-                    }
-                }
-                if (!mostSpecific.isEmpty()) {
-                    uriRoutes = mostSpecific;
-                }
+                uriRoutes = preferExplicitMediaType(uriRoutes, mediaType, true);
             }
         }
         boolean permitsBody = request.getMethod().permitsRequestBody();
         int routeCount = uriRoutes.size();
         if (routeCount > 1 && permitsBody) {
             final MediaType contentType = request.getContentType().orElse(MediaType.ALL_TYPE);
-            var explicitlyConsumedRoutes = new ArrayList<UriRouteMatch<T, R>>(routeCount);
-            var consumesRoutes = new ArrayList<UriRouteMatch<T, R>>(routeCount);
-
-            for (UriRouteMatch<T, R> match : uriRoutes) {
-                if (match.getRouteInfo().explicitlyConsumes(contentType)) {
-                    explicitlyConsumedRoutes.add(match);
-                }
-                if (explicitlyConsumedRoutes.isEmpty()) {
-                    consumesRoutes.add(match);
-                }
-            }
-
-            uriRoutes = explicitlyConsumedRoutes.isEmpty() ? consumesRoutes : explicitlyConsumedRoutes;
+            uriRoutes = preferExplicitMediaType(uriRoutes, contentType, false);
         }
         return uriRoutes;
+    }
+
+    /**
+     * Prefer explicit media types, retaining the candidates when all or none are explicit.
+     */
+    private static <T, R> List<UriRouteMatch<T, R>> preferExplicitMediaType(List<UriRouteMatch<T, R>> matches,
+                                                                          MediaType type, boolean produces) {
+        int count = matches.size();
+        int prefix = 0;
+        ArrayList<UriRouteMatch<T, R>> explicit = null;
+        for (int i = 0; i < count; i++) {
+            UriRouteMatch<T, R> match = matches.get(i);
+            boolean accepts = produces ? match.getRouteInfo().explicitlyProduces(type) : match.getRouteInfo().explicitlyConsumes(type);
+            if (accepts) {
+                if (explicit != null) {
+                    explicit.add(match);
+                } else if (prefix == i) {
+                    prefix++;
+                } else {
+                    explicit = copyPrefix(matches, prefix, count);
+                    explicit.add(match);
+                }
+            }
+        }
+        if (explicit != null) {
+            return explicit;
+        }
+        return prefix == 0 || prefix == count ? matches : copyPrefix(matches, prefix, prefix);
+    }
+
+    private static <T> ArrayList<T> copyPrefix(List<T> input, int size, int capacity) {
+        var copy = new ArrayList<T>(capacity);
+        for (int i = 0; i < size; i++) {
+            copy.add(input.get(i));
+        }
+        return copy;
     }
 
     private static @Nullable MediaType preferredAcceptedType(Collection<MediaType> acceptedTypes) {
