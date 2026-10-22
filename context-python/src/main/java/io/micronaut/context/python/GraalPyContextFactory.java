@@ -177,6 +177,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 except (KeyError, ImportError, TypeError):
                     pass  # absent, or excluded by graalpy.context.host-class-lookup
 
+        # the value of the source: the function, no longer bound in __main__
+        globals().pop('__micronaut_register_java_object_members')
         """, "micronaut-java-object-members.py").cached(true).buildLiteral();
     /**
      * Installs the Python view of the generated Java wrappers ({@link ValueCoercible}). A wrapper a
@@ -266,8 +268,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * @param classLoader The class loader of the application, whose compilations recorded the names
      */
     static void registerJavaObjectMembers(Context context, ClassLoader classLoader) {
-        PythonContextRuntime.helper(context, "__micronaut_register_java_object_members", JAVA_OBJECT_MEMBERS_SOURCE)
-            .executeVoid(PythonJavaInstanceMembers.of(classLoader));
+        context.eval(JAVA_OBJECT_MEMBERS_SOURCE).executeVoid(PythonJavaInstanceMembers.of(classLoader));
     }
 
     /**
