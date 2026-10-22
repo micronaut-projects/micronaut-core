@@ -118,6 +118,16 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      */
     private final @Nullable UriMatchTemplate uriMatchTemplate;
     /**
+     * The path variable segments of the Micronaut template, which resolve the ambiguous
+     * requests, read once, see {@link UriMatchTemplate#getPathVariableSegmentCount()}.
+     */
+    private final long ambiguityVariableSegments;
+    /**
+     * The length of the raw segments of the Micronaut template, read once, see
+     * {@link UriMatchTemplate#getRawSegmentLength()}.
+     */
+    private final int ambiguityRawSegmentLength;
+    /**
      * The matcher of a route with a URI template, otherwise {@code null}: such routes match
      * with it directly.
      */
@@ -374,9 +384,13 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         if (template instanceof UriRouteTemplate uriTemplate) {
             this.uriTemplateMatcher = uriTemplate.matcher();
             this.uriMatchTemplate = uriTemplate.getUriMatchTemplate();
+            this.ambiguityVariableSegments = uriMatchTemplate.getPathVariableSegmentCount();
+            this.ambiguityRawSegmentLength = uriMatchTemplate.getRawSegmentLength();
         } else {
             this.uriTemplateMatcher = null;
             this.uriMatchTemplate = null;
+            this.ambiguityVariableSegments = 0;
+            this.ambiguityRawSegmentLength = 0;
         }
         if (uriTemplateMatcher == null) {
             // read once: they order the routes and resolve the ambiguous requests
@@ -625,6 +639,20 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Override
     public int getPathVariableCount() {
         return uriTemplateMatcher != null ? uriTemplateMatcher.getPathVariableCount() : pathVariableCount;
+    }
+
+    /**
+     * @return The path variable segments of the Micronaut template of the route
+     */
+    long getAmbiguityVariableSegments() {
+        return ambiguityVariableSegments;
+    }
+
+    /**
+     * @return The length of the raw segments of the Micronaut template of the route
+     */
+    int getAmbiguityRawSegmentLength() {
+        return ambiguityRawSegmentLength;
     }
 
     /**
