@@ -48,7 +48,6 @@ import java.util.Optional;
 public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements UriRouteMatch<T, R> {
 
     private final UriMatchInfo matchInfo;
-    private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
     private final boolean plusAsSpace;
     private final @Nullable MediaType selectedMediaType;
@@ -96,7 +95,6 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
                                  @Nullable HttpStatus rejectionStatus) {
         super(routeInfo, conversionService);
         this.matchInfo = matchInfo;
-        this.uriRouteInfo = routeInfo;
         this.defaultCharset = defaultCharset;
         this.plusAsSpace = plusAsSpace;
         this.selectedMediaType = selectedMediaType;
@@ -108,7 +106,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @return A new match of the same route and path with the media type
      */
     DefaultUriRouteMatch<T, R> withSelectedMediaType(MediaType mediaType) {
-        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, plusAsSpace, conversionService, mediaType);
+        return new DefaultUriRouteMatch<>(matchInfo, getRouteInfo(), defaultCharset, plusAsSpace, conversionService, mediaType);
     }
 
     /**
@@ -116,7 +114,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @return A new match with the match info and the negotiated media type of this match
      */
     DefaultUriRouteMatch<T, R> withMatchInfo(UriMatchInfo matchInfo) {
-        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, plusAsSpace, conversionService, selectedMediaType, rejectionStatus);
+        return new DefaultUriRouteMatch<>(matchInfo, getRouteInfo(), defaultCharset, plusAsSpace, conversionService, selectedMediaType, rejectionStatus);
     }
 
     /**
@@ -124,7 +122,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @return A new match of the same route and path, rejected with the status
      */
     DefaultUriRouteMatch<T, R> withRejectionStatus(HttpStatus status) {
-        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, plusAsSpace, conversionService, selectedMediaType, status);
+        return new DefaultUriRouteMatch<>(matchInfo, getRouteInfo(), defaultCharset, plusAsSpace, conversionService, selectedMediaType, status);
     }
 
     /**
@@ -257,18 +255,20 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public UriRouteInfo<T, R> getRouteInfo() {
-        return uriRouteInfo;
+        // the route info of the superclass, which the constructors only take as a URI route
+        return (UriRouteInfo<T, R>) routeInfo;
     }
 
     @Override
     public HttpMethod getHttpMethod() {
-        return uriRouteInfo.getHttpMethod();
+        return getRouteInfo().getHttpMethod();
     }
 
     @Override
     public String toString() {
-        return uriRouteInfo.getHttpMethod() + " - " + matchInfo.getUri();
+        return getRouteInfo().getHttpMethod() + " - " + matchInfo.getUri();
     }
 
     /**
