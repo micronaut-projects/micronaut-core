@@ -35,6 +35,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -245,6 +246,24 @@ public final class RouteExecutor {
     }
 
     /**
+     * Report the failure to the server request, also through the wrappers of the filters.
+     */
+    private static void recordResponseFailure(HttpRequest<?> httpRequest, Throwable cause) {
+        HttpRequest<?> current = httpRequest;
+        while (true) {
+            if (current instanceof ResponseFailureRecorder recorder) {
+                recorder.responseFailed(cause);
+                return;
+            }
+            if (current instanceof HttpRequestWrapper<?> wrapper) {
+                current = wrapper.getDelegate();
+            } else {
+                return;
+            }
+        }
+    }
+
+    /**
      * Creates a default error response. Should be used when a response could not be retrieved
      * from any other method.
      *
@@ -254,6 +273,7 @@ public final class RouteExecutor {
      */
     public MutableHttpResponse<?> createDefaultErrorResponse(HttpRequest<?> httpRequest,
                                                              Throwable cause) {
+        recordResponseFailure(httpRequest, cause);
         logException(cause);
         MutableHttpResponse<?> mutableHttpResponse = HttpResponse.serverError();
         RouteAttributes.setException(mutableHttpResponse, cause);
@@ -346,6 +366,27 @@ public final class RouteExecutor {
         }
         MediaType first = produces.get(0);
         return MediaType.ALL_TYPE.equals(first) ? MediaType.APPLICATION_JSON_TYPE : first;
+    }
+
+    /**
+     * The acceptable response types of a request with accepted types of the quality {@code 0}, in
+     * the order of the negotiation: the first is {@link #resolveDefaultResponseContentType}, the
+     * others are the alternatives when the body cannot be written in it.
+     *
+     * @param request    The request
+     * @param finalRoute The route
+     * @return The acceptable types, empty when none is acceptable, or {@code null} when the
+     * request has no rejected type or a route selector negotiated the type
+     */
+    @Nullable List<MediaType> acceptableResponseContentTypes(HttpRequest<?> request, RouteInfo<?> finalRoute) {
+        Collection<MediaType> accepted = request.accept();
+        if (!AcceptedMediaTypes.hasRejected(accepted)
+            || finalRoute instanceof DefaultUrlRouteInfo<?, ?> uriRoute && uriRoute.hasRouteMatchSelector() && selectedMediaType(request) != null) {
+            return null;
+        }
+        List<MediaType> producesList = finalRoute.getProduces();
+        List<MediaType> produces = producesList.isEmpty() ? List.of(MediaType.APPLICATION_JSON_TYPE) : producesList;
+        return AcceptedMediaTypes.negotiateAll(produces, finalRoute.producesAll(), accepted);
     }
 
     private static @Nullable MediaType selectedMediaType(HttpRequest<?> request) {

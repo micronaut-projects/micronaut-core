@@ -948,7 +948,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
         loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(beanDefinitionTypeDef, loadTypeMethods);
 
-        typeArguments = beanType.getAllTypeArguments();
+        typeArguments = nameableTypeArguments(beanType.getAllTypeArguments());
 
         visitAnnotationMetadata(this.annotationMetadata);
     }
@@ -965,8 +965,28 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         if (typeArguments == null) {
             this.typeArguments = typeArguments;
         } else {
-            this.typeArguments.putAll(typeArguments);
+            this.typeArguments.putAll(nameableTypeArguments(typeArguments));
         }
+    }
+
+    /**
+     * The type arguments the definition can be written with: those of a type are left out when one of them names a
+     * class the package of the definition cannot name, a package-private class of another package or a nested class
+     * of one, which the definition could not load with. The type is then without arguments, as a raw use of it is,
+     * which is how its type hierarchy record leaves it out too.
+     *
+     * @param typeArguments The type arguments by type name
+     * @return The type arguments the definition can name
+     */
+    private Map<String, Map<String, ClassElement>> nameableTypeArguments(Map<String, Map<String, ClassElement>> typeArguments) {
+        Map<String, Map<String, ClassElement>> nameable = CollectionUtils.newLinkedHashMap(typeArguments.size());
+        for (Map.Entry<String, Map<String, ClassElement>> entry : typeArguments.entrySet()) {
+            Map<String, ClassElement> arguments = entry.getValue();
+            if (arguments.values().stream().allMatch(argument -> TypeHierarchyWriter.isNameableFrom(argument, beanDefinitionPackageName))) {
+                nameable.put(entry.getKey(), arguments);
+            }
+        }
+        return nameable;
     }
 
     private void visitAnnotationMetadata(AnnotationMetadata annotationMetadata) {

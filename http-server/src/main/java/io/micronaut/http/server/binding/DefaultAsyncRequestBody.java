@@ -50,6 +50,7 @@ import io.micronaut.http.form.FormPart;
 import io.micronaut.http.form.FormParts;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.server.exceptions.UnsupportedMediaException;
+import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
@@ -748,11 +749,15 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
     }
 
     /**
-     * @return The context of the body: the text is in the charset of the request of the route,
-     * like its content type
+     * @return The context of the body: the text is in the charset of the content type of the
+     * request of the route, else the default charset, like a {@code String} body
      */
     private UploadContext uploadContext() {
-        return UploadContext.of(binder.formFactory(), server, request.getCharacterEncoding());
+        FormFactory formFactory = binder.formFactory();
+        Charset charset = request.getContentType()
+            .flatMap(MediaType::getCharset)
+            .orElseGet(() -> formFactory.getConfiguration().getDefaultCharset());
+        return UploadContext.of(formFactory, server, charset);
     }
 
     /**

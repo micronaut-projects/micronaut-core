@@ -52,6 +52,7 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
 
     private final ConversionService conversionService;
     private final CompletedFileUploadBinder completedFileUploadBinder;
+    private final StreamingFileUploadBinder streamingFileUploadBinder;
     private final PublisherPartUploadBinder publisherPartUploadBinder;
     private final BeanProvider<FormFactory> formFactory;
 
@@ -65,8 +66,24 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
                                     CompletedFileUploadBinder completedFileUploadBinder,
                                     PublisherPartUploadBinder publisherPartUploadBinder,
                                     BeanProvider<FormFactory> formFactory) {
+        this(conversionService, completedFileUploadBinder, new StreamingFileUploadBinder(formFactory), publisherPartUploadBinder, formFactory);
+    }
+
+    /**
+     * @param conversionService Conversion service
+     * @param completedFileUploadBinder Completed upload binder
+     * @param streamingFileUploadBinder Streaming upload binder
+     * @param publisherPartUploadBinder Publisher part binder
+     * @param formFactory Form utilities
+     */
+    public PartUploadAnnotationBinder(ConversionService conversionService,
+                                    CompletedFileUploadBinder completedFileUploadBinder,
+                                    StreamingFileUploadBinder streamingFileUploadBinder,
+                                    PublisherPartUploadBinder publisherPartUploadBinder,
+                                    BeanProvider<FormFactory> formFactory) {
         this.conversionService = conversionService;
         this.completedFileUploadBinder = completedFileUploadBinder;
+        this.streamingFileUploadBinder = streamingFileUploadBinder;
         this.publisherPartUploadBinder = publisherPartUploadBinder;
         this.formFactory = formFactory;
     }
@@ -90,6 +107,9 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
         }
         if (completedFileUploadBinder.matches(context.getArgument().getType())) {
             return completedFileUploadBinder.bind((ArgumentConversionContext) context, request);
+        }
+        if (streamingFileUploadBinder.matches(context.getArgument().getType())) {
+            return streamingFileUploadBinder.bind((ArgumentConversionContext) context, request);
         }
         if (publisherPartUploadBinder.matches(context.getArgument().getType())) {
             return publisherPartUploadBinder.bind((ArgumentConversionContext) context, request);
