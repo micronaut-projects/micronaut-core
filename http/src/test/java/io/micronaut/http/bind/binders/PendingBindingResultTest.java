@@ -71,6 +71,53 @@ class PendingBindingResultTest {
         assertTrue(empty.getValue().isEmpty());
     }
 
+    @Test
+    void coreAndHttpCompositionKeepAbsenceErrorsAndRetryBehavior() {
+        ConversionError error = () -> new IllegalArgumentException("bad value");
+        for (boolean http : List.of(false, true)) {
+            for (String state : List.of("empty", "unsatisfied", "error", "value")) {
+                BindingResult<String> source = http ? new PendingRequestBindingResult<>() {
+                    @Override
+                    public boolean isPending() { return false; }
+                    @Override
+                    public boolean isSatisfied() { return !state.equals("unsatisfied") && !state.equals("error"); }
+                    @Override
+                    public Optional<String> getValue() { return state.equals("value") ? Optional.of("ready") : Optional.empty(); }
+                    @Override
+                    public List<ConversionError> getConversionErrors() { return state.equals("error") ? List.of(error) : List.of(); }
+                } : new BindingResult<>() {
+                    @Override
+                    public boolean isSatisfied() { return !state.equals("unsatisfied") && !state.equals("error"); }
+                    @Override
+                    public Optional<String> getValue() { return state.equals("value") ? Optional.of("ready") : Optional.empty(); }
+                    @Override
+                    public List<ConversionError> getConversionErrors() { return state.equals("error") ? List.of(error) : List.of(); }
+                };
+                AtomicInteger calls = new AtomicInteger();
+                var mapped = source.flatMap(value -> {
+                    if (calls.incrementAndGet() == 1) {
+                        throw new IllegalStateException("retry");
+                    }
+                    return BindingResult.converted(Optional.of(List.of(value)));
+                });
+                if (state.equals("value")) {
+                    assertThrows(IllegalStateException.class, mapped::getValue);
+                    var value = mapped.getValue();
+                    assertSame(value, mapped.getValue());
+                    assertEquals(Optional.of(Optional.of(List.of("ready"))), value);
+                    assertTrue(mapped.isConvertedToArgumentType());
+                    assertEquals(2, calls.get());
+                } else {
+                    assertTrue(mapped.getValue().isEmpty());
+                    assertEquals(!state.equals("unsatisfied") && !state.equals("error"), mapped.isSatisfied());
+                    assertEquals(state.equals("error") ? List.of(error) : List.of(), mapped.getConversionErrors());
+                    assertEquals(0, calls.get());
+                }
+                assertEquals(http, mapped instanceof PendingRequestBindingResult<?>);
+            }
+        }
+    }
+
     static final class PendingValue implements PendingRequestBindingResult<String> {
         boolean ready;
         @Override
