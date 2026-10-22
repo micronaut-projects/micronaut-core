@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.util;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ReflectionUtils;
 import org.jetbrains.annotations.Contract;
@@ -308,6 +309,29 @@ public final class ArrayUtils {
                 input[pos] = temp;
             }
         }
+    }
+
+    /**
+     * The first element of an array or an iterable, or the value itself when it is neither or is empty.
+     *
+     * @param value The value
+     * @return The first element, or the value
+     * @since 5.3.0
+     */
+    @Internal
+    public static @Nullable Object firstElement(@Nullable Object value) {
+        if (value instanceof Object[] array) {
+            // The common object arrays, without reflective access
+            return array.length > 0 ? array[0] : value;
+        }
+        if (value != null && value.getClass().isArray()) {
+            return Array.getLength(value) > 0 ? Array.get(value, 0) : value;
+        }
+        if (value instanceof Iterable<?> iterable) {
+            Iterator<?> i = iterable.iterator();
+            return i.hasNext() ? i.next() : value;
+        }
+        return value;
     }
 
     /**

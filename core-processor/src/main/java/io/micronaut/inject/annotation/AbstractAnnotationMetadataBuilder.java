@@ -161,6 +161,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * {@link #clearProcessedAnnotationTypes()}.</p>
      */
     private final Map<String, T> processedAnnotationTypes = new HashMap<>();
+    /**
+     * Whether the stereotypes of an annotation type, computed for an occurrence nested in a member or in a
+     * repeatable container, retain anything, so that the annotations that do not are not computed again.
+     */
+    private final Map<String, Boolean> retainingAnnotationTypes = new HashMap<>();
 
     /**
      * Default constructor.
@@ -806,6 +811,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         final String annotationTypeName = getAnnotationTypeName(annotationType);
         Map<? extends T, ?> annotationValues = readAnnotationRawValues(annotationType);
         T theType = getTypeForAnnotation(annotationType);
+        // A nested annotation carries no native type, the retention of what it composes resolves it by name
+        processedAnnotationTypes.putIfAbsent(annotationTypeName, theType);
         if (annotationValues.isEmpty()) {
             Map<CharSequence, Object> annotationDefaults = resolveAnnotationDefaults(theType, annotationTypeName, resolvedDefaults);
             return new AnnotationValue<>(annotationTypeName, Collections.emptyMap(), annotationDefaults);
@@ -1945,43 +1952,154 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * The values of an annotation composing {@link Retainable} annotations, with those occurrences moved into the
-     * reserved {@link AnnotationUtil#STEREOTYPES_MEMBER} member, where they are read back with
-     * {@link AnnotationValue#getStereotypes()}. Each retained occurrence keeps its own retainable stereotypes in
-     * turn; the marker itself and annotations that are not retainable are left out.
+     * The values of an annotation as they are stored: the {@link Retainable} annotations composing it moved into
+     * the reserved {@link AnnotationUtil#STEREOTYPES_MEMBER} member, where they are read back with
+     * {@link AnnotationValue#getStereotypes()}, and every annotation nested in its members, alone or in an array,
+     * retained by the same rules. Each retained occurrence keeps its own retainable stereotypes in turn; the
+     * marker itself and annotations that are not retainable are left out.
      *
-     * @param annotationValue The annotation value, with its stereotypes computed
-     * @return The values carrying the retained stereotypes, or {@code null} when nothing is retainable
+     * @param annotationValue The annotation value
+     * @return The values carrying the retained stereotypes, or {@code null} when nothing is retained
      */
     @Nullable
     private Map<CharSequence, Object> withRetainedStereotypes(AnnotationValue<?> annotationValue) {
-        List<AnnotationValue<?>> stereotypes = annotationValue.getStereotypes();
-        if (stereotypes == null || stereotypes.isEmpty()) {
-            return null;
-        }
-        List<AnnotationValue<?>> retained = new ArrayList<>(stereotypes.size());
-        for (AnnotationValue<?> stereotype : stereotypes) {
-            if (!RETAINABLE.equals(stereotype.getAnnotationName()) && isRetainable(stereotype)) {
-                retained.add(retainedStereotype(stereotype));
-            }
-        }
-        if (retained.isEmpty()) {
-            return null;
-        }
-        Map<CharSequence, Object> values = new LinkedHashMap<>(annotationValue.getValues());
-        values.put(AnnotationUtil.STEREOTYPES_MEMBER, retained.toArray(AnnotationValue[]::new));
-        return values;
+        return withRetainedStereotypes(annotationValue, new HashSet<>());
     }
 
-    private AnnotationValue<?> retainedStereotype(AnnotationValue<?> stereotype) {
-        Map<CharSequence, Object> values = withRetainedStereotypes(stereotype);
+    /**
+     * The values of an annotation with the retained stereotypes, see {@link #withRetainedStereotypes(AnnotationValue)}.
+     * An occurrence whose stereotypes were not computed, the contents of a repeatable container and annotations
+     * nested in members, has them computed from its annotation type, with its own member values applied through
+     * aliases, as for an occurrence declared on an element.
+     *
+     * @param annotationValue The annotation value
+     * @param enclosing       The names of the annotations the value is retained in, which an annotation nested in
+     *                        an occurrence of its own type does not retain again
+     * @return The values carrying the retained stereotypes, or {@code null} when nothing is retained
+     */
+    @Nullable
+    private Map<CharSequence, Object> withRetainedStereotypes(AnnotationValue<?> annotationValue, Set<String> enclosing) {
+        String annotationName = annotationValue.getAnnotationName();
+        if (!enclosing.add(annotationName)) {
+            return null;
+        }
+        try {
+            Map<CharSequence, Object> values = null;
+            List<AnnotationValue<?>> stereotypes = annotationValue.getStereotypes();
+            if (stereotypes == null) {
+                stereotypes = computeStereotypes(annotationValue);
+            }
+            List<AnnotationValue<?>> retained = new ArrayList<>(stereotypes.size());
+            for (AnnotationValue<?> stereotype : stereotypes) {
+                if (!RETAINABLE.equals(stereotype.getAnnotationName()) && isRetainable(stereotype)) {
+                    retained.add(retainedValue(stereotype, enclosing));
+                }
+            }
+            if (!retained.isEmpty()) {
+                values = new LinkedHashMap<>(annotationValue.getValues());
+                values.put(AnnotationUtil.STEREOTYPES_MEMBER, retained.toArray(AnnotationValue[]::new));
+            }
+            for (Map.Entry<CharSequence, Object> entry : annotationValue.getValues().entrySet()) {
+                Object member = entry.getValue();
+                Object retainedMember = retainedMember(member, enclosing);
+                if (retainedMember != member) {
+                    if (values == null) {
+                        values = new LinkedHashMap<>(annotationValue.getValues());
+                    }
+                    values.put(entry.getKey(), retainedMember);
+                }
+            }
+            return values;
+        } finally {
+            enclosing.remove(annotationName);
+        }
+    }
+
+    /**
+     * A member value with the annotations it holds retained.
+     *
+     * @param member    The member value
+     * @param enclosing The names of the enclosing annotations
+     * @return The retained member value, or the given one when nothing is retained
+     */
+    private Object retainedMember(Object member, Set<String> enclosing) {
+        if (member instanceof AnnotationValue<?> nested) {
+            return retainedValue(nested, enclosing);
+        }
+        if (member instanceof AnnotationValue<?>[] nestedValues) {
+            AnnotationValue<?>[] retained = null;
+            for (int i = 0; i < nestedValues.length; i++) {
+                AnnotationValue<?> nested = retainedValue(nestedValues[i], enclosing);
+                if (nested != nestedValues[i]) {
+                    if (retained == null) {
+                        retained = Arrays.copyOf(nestedValues, nestedValues.length);
+                    }
+                    retained[i] = nested;
+                }
+            }
+            return retained == null ? member : retained;
+        }
+        return member;
+    }
+
+    private AnnotationValue<?> retainedValue(AnnotationValue<?> annotationValue, Set<String> enclosing) {
+        Map<CharSequence, Object> values = withRetainedStereotypes(annotationValue, enclosing);
+        if (values == null && annotationValue.getStereotypes() == null) {
+            return annotationValue;
+        }
         return new AnnotationValue<>(
-            stereotype.getAnnotationName(),
-            values == null ? stereotype.getValues() : values,
-            stereotype.getDefaultValues(),
-            stereotype.getRetentionPolicy(),
+            annotationValue.getAnnotationName(),
+            values == null ? annotationValue.getValues() : values,
+            annotationValue.getDefaultValues(),
+            annotationValue.getRetentionPolicy(),
             null
         );
+    }
+
+    /**
+     * The stereotypes of an annotation that was not processed as an occurrence of its own, such as one held by a
+     * member, computed as {@link #processAnnotation(ProcessingContext, ProcessedAnnotation)} computes them: from
+     * the annotation type, with the aliases of the annotation applied. An annotation type whose stereotypes were
+     * found to retain nothing is not computed again.
+     *
+     * @param annotationValue The annotation value
+     * @return The stereotypes
+     */
+    private List<AnnotationValue<?>> computeStereotypes(AnnotationValue<?> annotationValue) {
+        String annotationName = annotationValue.getAnnotationName();
+        if (Boolean.FALSE.equals(retainingAnnotationTypes.get(annotationName))) {
+            return List.of();
+        }
+        // The native type the nested annotation was read with, which is the one an occurrence declared on an
+        // element is processed with; resolving it by name gives another view of the type in some implementations
+        T readType = processedAnnotationTypes.get(annotationName);
+        ProcessedAnnotation processedAnnotation = addDefaults(
+            readType == null ? toProcessedAnnotation(annotationValue) : new ProcessedAnnotation(readType, annotationValue)
+        );
+        if (processedAnnotation.annotationType == null) {
+            return List.of();
+        }
+        List<IntroducedAlias> introducedAliases = new ArrayList<>(3);
+        processedAnnotation = processAliases(processedAnnotation, introducedAliases);
+        ProcessingContext context = new ProcessingContext(getVisitorContext()).withParent(annotationValue);
+        List<AnnotationValue<?>> computed = addStereotypes(context, processedAnnotation, false, introducedAliases)
+            .getAnnotationValue()
+            .getStereotypes();
+        List<AnnotationValue<?>> stereotypes = computed == null ? List.of() : computed;
+        // Decided from the computed tree, as for an occurrence declared on an element: the metadata of the
+        // annotation type is not reliably resolved by name in every implementation
+        retainingAnnotationTypes.computeIfAbsent(annotationName, name -> containsRetainable(stereotypes));
+        return stereotypes;
+    }
+
+    private static boolean containsRetainable(List<AnnotationValue<?>> stereotypes) {
+        for (AnnotationValue<?> stereotype : stereotypes) {
+            List<AnnotationValue<?>> nested = stereotype.getStereotypes();
+            if (RETAINABLE.equals(stereotype.getAnnotationName()) || nested != null && containsRetainable(nested)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -2237,6 +2355,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Internal
     public void clearProcessedAnnotationTypes() {
         processedAnnotationTypes.clear();
+        retainingAnnotationTypes.clear();
     }
 
     /**

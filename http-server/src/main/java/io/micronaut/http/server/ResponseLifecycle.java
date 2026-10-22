@@ -48,6 +48,7 @@ import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.server.exceptions.NotAcceptableException;
 import io.micronaut.http.server.exceptions.response.Error;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.stream.ResponseStreams;
@@ -60,6 +61,7 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -297,6 +299,7 @@ public abstract class ResponseLifecycle {
                 responseMediaType = mediaTypeProvider.getMediaType();
             } else if (routeInfo != null) {
                 responseMediaType = routeExecutor.resolveDefaultResponseContentType(nettyRequest, routeInfo);
+                responseMediaType = writableResponseMediaType(nettyRequest, routeInfo, messageBodyWriter, responseBodyType, body, responseMediaType);
             } else {
                 responseMediaType = MediaType.APPLICATION_JSON_TYPE;
             }
@@ -319,6 +322,61 @@ public abstract class ResponseLifecycle {
             messageBodyWriter = messageBodyHandlerRegistry.getWriter(responseBodyType, responseMediaTypes);
         }
         return buildFinalResponse(nettyRequest, (MutableHttpResponse<Object>) response, responseBodyType, responseMediaType, body, messageBodyWriter, false);
+    }
+
+    /**
+     * When the request rejects some types (the quality {@code 0}), the negotiated type might have
+     * no writer for the body, e.g. {@code text/plain} for a POJO of a route that produces all
+     * types: the next acceptable type with a writer is chosen instead, and when there is none the
+     * response is not acceptable. Requests without rejected types keep the negotiated type.
+     *
+     * @param request          The request
+     * @param routeInfo        The route
+     * @param writer           The writer of the route, if any
+     * @param responseBodyType The declared type of the body
+     * @param body             The body
+     * @param negotiated       The negotiated type
+     * @return The type to write the body in
+     */
+    private MediaType writableResponseMediaType(HttpRequest<?> request,
+                                                RouteInfo<Object> routeInfo,
+                                                @Nullable MessageBodyWriter<Object> writer,
+                                                Argument<Object> responseBodyType,
+                                                Object body,
+                                                MediaType negotiated) {
+        List<MediaType> acceptable = routeExecutor.acceptableResponseContentTypes(request, routeInfo);
+        if (acceptable == null || canWrite(writer, responseBodyType, body, negotiated)) {
+            return negotiated;
+        }
+        for (MediaType type : acceptable) {
+            if (!type.equals(negotiated) && canWrite(writer, responseBodyType, body, type)) {
+                return type;
+            }
+        }
+        List<String> accepted = new ArrayList<>();
+        for (MediaType type : request.accept()) {
+            accepted.add(type.toString());
+        }
+        List<String> produced = new ArrayList<>();
+        for (MediaType type : routeInfo.getProduces()) {
+            produced.add(type.toString());
+        }
+        throw new NotAcceptableException(accepted, produced);
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean canWrite(@Nullable MessageBodyWriter<Object> routeWriter, Argument<Object> responseBodyType, Object body, MediaType mediaType) {
+        // the same lookups as the encoding of the body, the registry caches them
+        List<MediaType> mediaTypes = List.of(mediaType);
+        if (responseBodyType.isInstance(body)) {
+            MessageBodyWriter<Object> writer = routeWriter != null ? routeWriter : messageBodyHandlerRegistry.findWriter(responseBodyType, mediaTypes).orElse(null);
+            if (writer != null && writer.isWriteable(responseBodyType, mediaType)) {
+                return true;
+            }
+        }
+        Argument<Object> bodyType = (Argument<Object>) BODY_ARGUMENTS.get(body.getClass());
+        MessageBodyWriter<Object> writer = messageBodyHandlerRegistry.findWriter(bodyType, mediaTypes).orElse(null);
+        return writer != null && writer.isWriteable(bodyType, mediaType);
     }
 
     /**
