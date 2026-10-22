@@ -222,6 +222,17 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Whether this element is a singleton object: a type whose only instance is the public static
+     * {@code INSTANCE} field and that has no accessible constructor, such as a Kotlin {@code object}.
+     *
+     * @return True if this is a singleton object
+     * @since 5.3.0
+     */
+    default boolean isSingletonObject() {
+        return false;
+    }
+
+    /**
      * Is this type an inner class.
      *
      * @return True if it is an inner class
