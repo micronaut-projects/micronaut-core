@@ -32,7 +32,7 @@ public class RouteAmbiguityBenchmark {
 
     @Setup
     public void setUp() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
         // every route matches /items/1/details with the same template shape: all stay ambiguous
         for (int i = 0; i < candidates; i++) {
