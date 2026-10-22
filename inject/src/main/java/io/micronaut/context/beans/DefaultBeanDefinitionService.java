@@ -412,6 +412,9 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     @Override
     public void reset() {
         beans = null;
+        // the lookup caches hold the definitions of the beans dropped above, and so the beans they supply
+        producersByDefinitionName = null;
+        replacingProducers = null;
         disabledBeans.clear();
         additionalBeanDefinitions.clear();
         additionalBeanConfigurations.clear();
