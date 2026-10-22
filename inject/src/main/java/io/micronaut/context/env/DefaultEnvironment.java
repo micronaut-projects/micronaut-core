@@ -218,7 +218,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             noteChangeWhileRefreshing(propertySource.getName(), propertySource);
         }
         if (isRunning() && !reading.get()) {
-            propertyPlaceholderResolver.resetCaches();
+            propertyPlaceholderResolver.resetCachesAndRememberedValues();
             internalProcessPropertySource(propertySource);
         }
         return this;
@@ -231,7 +231,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             noteChangeWhileRefreshing(propertySource.getName(), null);
         }
         if (isRunning() && !reading.get()) {
-            propertyPlaceholderResolver.resetCaches();
+            propertyPlaceholderResolver.resetCachesAndRememberedValues();
         }
         return this;
     }
