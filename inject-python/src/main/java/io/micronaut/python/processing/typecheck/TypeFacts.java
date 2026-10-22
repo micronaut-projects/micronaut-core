@@ -288,9 +288,11 @@ public final class TypeFacts {
         // the host exposes the public members; a Python subclass reaches the protected ones as well
         Map<String, List<MethodSignature>> methods = new LinkedHashMap<>();
         Set<String> protectedMethods = new LinkedHashSet<>();
+        List<MethodElement> publicMethods = new ArrayList<>();
         for (MethodElement method : element.getEnclosedElements(ElementQuery.ALL_METHODS)) {
             if (method.isPublic()) {
                 methods.computeIfAbsent(method.getName(), name -> new ArrayList<>()).add(signature(method));
+                publicMethods.add(method);
             } else if (method.isProtected()) {
                 protectedMethods.add(method.getName());
             }
@@ -319,13 +321,15 @@ public final class TypeFacts {
                 constructors.add(signature(constructor));
             }
         }
+        boolean pythonDefined = PythonJavaTypes.isPythonClass(element);
         return new TypeDescription(
             element.getName(),
             element.isInterface(),
             element.isAbstract(),
             element.isEnum(),
-            PythonJavaTypes.isPythonClass(element),
+            pythonDefined,
             methods,
+            pythonDefined ? Map.of() : JavaInstanceAliases.of(publicMethods),
             protectedMethods,
             fields,
             staticFields,
@@ -520,6 +524,8 @@ public final class TypeFacts {
      * @param anEnum        Whether the type is an enum
      * @param pythonDefined Whether the type is generated from a Python class of the compilation
      * @param methods       The public methods by name, inherited ones included, each with its signatures
+     * @param instanceAliases The Python names of the public instance methods (see {@link JavaInstanceAliases}),
+     *                      none for a type generated from a Python class
      * @param protectedMethods The names of the protected methods, which a Python subclass reaches
      * @param fields        The public fields by name with their types, enum constants included
      * @param staticFields  The names of the static fields
@@ -535,6 +541,7 @@ public final class TypeFacts {
                                   boolean anEnum,
                                   boolean pythonDefined,
                                   Map<String, List<MethodSignature>> methods,
+                                  Map<String, JavaInstanceAliases.Alias> instanceAliases,
                                   Set<String> protectedMethods,
                                   Map<String, String> fields,
                                   Set<String> staticFields,
