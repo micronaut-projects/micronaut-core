@@ -92,7 +92,7 @@ class RouteAssemblyRetentionTest {
      * Builds the router in a frame of its own, so only the router stays reachable.
      */
     private static Router router(WeakReference<RouteAssembly>[] assemblyRef, Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         DefaultRouter router = new DefaultRouter(List.of(), List.of(() -> assembly));
