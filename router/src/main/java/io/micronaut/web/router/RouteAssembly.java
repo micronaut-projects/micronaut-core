@@ -1030,7 +1030,7 @@ public final class RouteAssembly {
 
         private DefaultFilterRoute filterRoute(GenericHttpFilter filter, List<String> patterns, boolean isPreMatching) {
             GenericHttpFilter ordered = GenericHttpFilter.withOrder(filter, order);
-            DefaultFilterRoute route = new DefaultFilterRoute(() -> ordered, AnnotationMetadata.EMPTY_METADATA, isPreMatching);
+            DefaultFilterRoute route = new DefaultFilterRoute(() -> ordered, AnnotationMetadata.EMPTY_METADATA, isPreMatching).fixedOrder(order);
             route.patternStyle(patternStyle);
             for (String pattern : patterns) {
                 route.pattern(pattern);
