@@ -43,15 +43,21 @@ final class DefaultMutableByteBodyHttpResponse<B> implements MutableByteBodyHttp
 
     DefaultMutableByteBodyHttpResponse(ByteBodyHttpResponse<?> original) {
         this.original = original;
-        MutableHttpResponse<B> copy = HttpResponse.status(original.code(), original.reason());
-        MutableHttpHeaders headers = copy.getHeaders();
-        original.getHeaders().forEach((name, values) -> {
-            for (String value : values) {
-                headers.add(name, value);
-            }
-        });
-        copy.getAttributes().putAll(original.getAttributes());
-        this.delegate = copy;
+        try {
+            MutableHttpResponse<B> copy = HttpResponse.status(original.code(), original.reason());
+            MutableHttpHeaders headers = copy.getHeaders();
+            original.getHeaders().forEach((name, values) -> {
+                for (String value : values) {
+                    headers.add(name, value);
+                }
+            });
+            copy.getAttributes().putAll(original.getAttributes());
+            this.delegate = copy;
+        } catch (RuntimeException e) {
+            // the original was handed over and no response is returned to close it through
+            original.close();
+            throw e;
+        }
     }
 
     @Override

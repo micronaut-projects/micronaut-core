@@ -20,6 +20,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Optional;
+
 /**
  * Resolves dependencies owned by the bean into which this resolver is injected.
  *
@@ -187,6 +189,30 @@ public interface BeanDependencyResolver {
      * @since 5.3.0
      */
     boolean destroy(BeanRegistration<?> registration);
+
+    /**
+     * Finds the registration of a bean this resolver created and still holds, as one of its registration lookups
+     * returned it, so that a caller holding only the bean can {@link #destroy(BeanRegistration) destroy} it early.
+     * Bean identity, rather than equality, selects the registration. A shared bean, a bean created by another resolver
+     * or group, including a child group of this one, and a bean already destroyed or released by closing are not
+     * found. A registration whose bean is {@code null} cannot be found by its bean: a {@code null} bean finds nothing.
+     * @param bean The bean instance
+     * @param <T> The bean type
+     * @return The registration, or empty when this resolver does not hold the bean
+     * @since 5.3.0
+     */
+    <T> Optional<BeanRegistration<T>> findRegistration(@Nullable T bean);
+
+    /**
+     * Returns whether this resolver created and still holds the given bean, by identity, see
+     * {@link #findRegistration(Object)}.
+     * @param bean The bean instance
+     * @return Whether this resolver holds the bean; false for {@code null}
+     * @since 5.3.0
+     */
+    default boolean owns(@Nullable Object bean) {
+        return findRegistration(bean).isPresent();
+    }
 
     /**
      * Creates a child group. The consumer closes it automatically, but the caller may close it earlier.
