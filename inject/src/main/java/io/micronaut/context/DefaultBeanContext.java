@@ -659,7 +659,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             if (releasing != null) {
                 // the executable methods of a definition loaded by a parent tier are shared by every context, generations
                 // included, and would keep this one reachable from the last configuration it gave them
-                beanDefinitionProvider.releaseExecutableMethods(releasing, this);
+                beanDefinitionProvider.detachExecutableMethods(releasing, this);
             }
             beanDefinitionProvider.reset();
             // a restarted context reads its configurations and validator again, as it does its definitions
