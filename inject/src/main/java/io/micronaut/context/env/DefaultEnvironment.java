@@ -605,6 +605,20 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         return currentPropertySourceLoaders;
     }
 
+    /**
+     * Drops the property source loaders, so that the next read of the property sources creates new
+     * instances. The bootstrap context, which refreshes its environment rather than being created
+     * again, calls this before each refresh: a loader then sees a refresh as it did when every read
+     * of the bootstrap configuration had a new environment, and one that returns its property source
+     * only once keeps returning it.
+     */
+    void resetPropertySourceLoaders() {
+        synchronized (this) {
+            propertySourceLoaderList = null;
+            loaderByFormatMap.clear();
+        }
+    }
+
     private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
         SoftServiceLoader<PropertySourceLoader> definitions = SoftServiceLoader.load(PropertySourceLoader.class, getClassLoader());
         List<PropertySourceLoader> propertySourceLoaders = definitions.collectAll();
