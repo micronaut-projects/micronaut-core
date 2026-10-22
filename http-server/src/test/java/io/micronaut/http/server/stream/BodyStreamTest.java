@@ -84,6 +84,53 @@ class BodyStreamTest {
     }
 
     @Test
+    void smallWritesTheConnectionDidNotTakeAreMerged() {
+        Consumer consumer = new Consumer();
+        BodyStream stream = open(64 * 1024, consumer);
+        StringBuilder expected = new StringBuilder();
+        for (int i = 0; i < 10_000; i++) {
+            String data = String.valueOf(i % 10);
+            write(stream, data);
+            expected.append(data);
+        }
+        assertTrue(stream.isWritable(), "10000 bytes queued, below the mark");
+        assertEquals(BodyStream.MAX_QUEUED_WRITES, consumer.buffers,
+            "the writes after those the connection has not taken wait to be merged");
+        consumer.upstream().onBytesConsumed(1);
+        assertEquals(BodyStream.MAX_QUEUED_WRITES + 1, consumer.buffers, "the waiting writes follow as one");
+        assertEquals(expected.toString(), consumer.received());
+        consumer.upstream().onBytesConsumed(10_000);
+        write(stream, "x");
+        assertEquals(BodyStream.MAX_QUEUED_WRITES + 2, consumer.buffers, "nothing waits, the write goes at once");
+    }
+
+    @Test
+    void aBurstOfSmallWritesIsBoundedByItsBytes() {
+        Consumer consumer = new Consumer();
+        BodyStream stream = open(64 * 1024, consumer);
+        for (int i = 0; i < 200_000; i++) {
+            assertFalse(write(stream, "x").isCompletedExceptionally());
+        }
+        assertTrue(stream.isOpen(), "200000 bytes queued, below sixteen times the mark");
+        assertTrue(consumer.buffers <= BodyStream.MAX_QUEUED_WRITES + 1);
+        assertTrue(stream.complete());
+        assertEquals(200_000, consumer.received().length(), "the waiting writes are written before the end");
+        assertTrue(consumer.complete);
+    }
+
+    @Test
+    void waitingWritesAreDroppedWhenTheConnectionCloses() {
+        Consumer consumer = new Consumer();
+        BodyStream stream = open(64 * 1024, consumer);
+        for (int i = 0; i < BodyStream.MAX_QUEUED_WRITES + 10; i++) {
+            write(stream, "x");
+        }
+        consumer.upstream().allowDiscard();
+        assertFalse(stream.isOpen());
+        assertEquals(BodyStream.MAX_QUEUED_WRITES, consumer.buffers);
+    }
+
+    @Test
     void completionSettlesThePendingWrites() {
         Consumer consumer = new Consumer();
         BodyStream stream = open(1, consumer);
@@ -170,6 +217,7 @@ class BodyStreamTest {
         private final ByteArrayOutputStream received = new ByteArrayOutputStream();
         private BufferConsumer.@Nullable Upstream upstream;
         private boolean complete;
+        private int buffers;
         private @Nullable Throwable error;
 
         BufferConsumer.Upstream upstream() {
@@ -186,6 +234,7 @@ class BodyStreamTest {
 
         @Override
         public void add(ReadBuffer rb) {
+            buffers++;
             try (rb) {
                 received.writeBytes(rb.toArray());
             }
