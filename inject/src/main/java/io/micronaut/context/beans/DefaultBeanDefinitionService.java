@@ -132,6 +132,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     @Nullable
     @SuppressWarnings("java:S3077")
     private volatile ReplacingProducers replacingProducers;
+    /**
+     * Guards the publication of {@link #producersByDefinitionName} and {@link #replacingProducers} against {@link #reset()}.
+     */
+    private final Object lookupCachesLock = new Object();
 
     private final BeanResolutionCustomizer beanResolutionCustomizer;
 
@@ -278,7 +282,12 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         indexByDefinitionName(index, current.all);
         // A proxied bean is disabled in the main list and its target is kept apart, see createBeans
         indexByDefinitionName(index, current.proxyTargetBeans);
-        producersByDefinitionName = new ProducersByDefinitionName(current, index);
+        synchronized (lookupCachesLock) {
+            // not after a reset dropped the beans read, see reset
+            if (beans == current) {
+                producersByDefinitionName = new ProducersByDefinitionName(current, index);
+            }
+        }
         return index;
     }
 
@@ -425,6 +434,12 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     @Override
     public void reset() {
         beans = null;
+        // the lookup caches hold the definitions of the beans dropped above, and so the beans they supply;
+        // under the lock, a lookup that read those beans before cannot publish a cache of them after
+        synchronized (lookupCachesLock) {
+            producersByDefinitionName = null;
+            replacingProducers = null;
+        }
         disabledBeans.clear();
         additionalBeanDefinitions.clear();
         additionalBeanConfigurations.clear();
@@ -513,7 +528,12 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                 producers.add(producer);
             }
         }
-        replacingProducers = new ReplacingProducers(current, count, producers);
+        synchronized (lookupCachesLock) {
+            // not after a reset dropped the beans read, see reset
+            if (beans == current) {
+                replacingProducers = new ReplacingProducers(current, count, producers);
+            }
+        }
         return producers;
     }
 
