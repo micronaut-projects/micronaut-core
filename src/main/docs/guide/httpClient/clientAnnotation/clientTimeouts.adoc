@@ -1,0 +1,21 @@
+The api:http.client.annotation.ClientTimeouts[] annotation sets the timeouts of the exchanges of a declarative client, instead of the timeouts of the <<clientConfiguration, client configuration>>, see <<clientRequestTimeouts, Timeouts of a Single Request>>. On the client it applies to all of its methods, and on a method to that method only:
+
+[source,java]
+----
+@Client("/reports")
+@ClientTimeouts(read = "${reports.read-timeout:30s}") // <1>
+public interface ReportClient {
+
+    @Get("/daily")
+    String daily();
+
+    @Get("/yearly")
+    @ClientTimeouts(read = "5m", request = "10m") // <2>
+    String yearly();
+}
+----
+
+<1> The read timeout of every method, which can be a property placeholder
+<2> A timeout set on a method overrides the same timeout set on its client
+
+A method takes the timeouts it does not set from its client, and the timeouts set on neither come from the client configuration.

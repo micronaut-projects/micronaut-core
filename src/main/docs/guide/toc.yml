@@ -276,6 +276,7 @@ httpClient:
     clientUploads: Multipart Client Uploads
     clientStreaming: Streaming JSON over HTTP
     clientConfiguration: Configuring HTTP clients
+    clientRequestTimeouts: Timeouts of a Single Request
     lowLevelClientError: Error Responses
     bindErrors: Bind Errors
   proxyClient: Proxying Requests with ProxyHttpClient
@@ -286,6 +287,7 @@ httpClient:
     clientAnnotationStreaming: Streaming with @Client
     clientError: Error Responses
     clientHeaders: Customizing Request Headers
+    clientTimeouts: Timeouts of a Declarative Client
     clientJackson: Customizing Jackson Settings
     clientRetry: Retry and Circuit Breaker
     clientFallback: Client Fallbacks
