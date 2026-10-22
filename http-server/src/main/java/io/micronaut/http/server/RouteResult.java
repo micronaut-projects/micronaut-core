@@ -190,14 +190,6 @@ abstract sealed class RouteResult {
     }
 
     /**
-     * @param routeInfo The route, which returns a stream of responses
-     * @return Whether the bodies of the responses are stages or publishers
-     */
-    boolean streamedResponseBodyAsyncOrReactive(RouteInfo<?> routeInfo) {
-        return nestedResponseBodyAsyncOrReactive(routeInfo);
-    }
-
-    /**
      * @param routeInfo The route, a suspend function
      * @return Whether the Kotlin function returns {@code Unit}
      */
@@ -329,11 +321,6 @@ abstract sealed class RouteResult {
         @Override
         final boolean streamOfResponses(RouteInfo<?> routeInfo) {
             return streamOfResponses;
-        }
-
-        @Override
-        final boolean streamedResponseBodyAsyncOrReactive(RouteInfo<?> routeInfo) {
-            return nestedResponseBodyAsyncOrReactive;
         }
 
         @Override

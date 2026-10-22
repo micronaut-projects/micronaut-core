@@ -289,9 +289,8 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             }
             argumentValues[i] = null;
         }
-        if (methodExecutionHandle instanceof UnsafeExecutionHandle) {
-            UnsafeExecutionHandle<T, R> unsafeExecutionHandle = (UnsafeExecutionHandle<T, R>) methodExecutionHandle;
-            return unsafeExecutionHandle.invokeUnsafe(argumentValues);
+        if (unsafeMethodExecutionHandle != null) {
+            return unsafeMethodExecutionHandle.invokeUnsafe(argumentValues);
         }
         return methodExecutionHandle.invoke(argumentValues);
     }

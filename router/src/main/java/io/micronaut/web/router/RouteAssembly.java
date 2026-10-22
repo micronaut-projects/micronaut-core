@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.SupplierUtil;
@@ -43,12 +42,10 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
-import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.builder.FilterRegistration;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.http.PathVariables;
@@ -68,10 +65,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -91,7 +86,7 @@ import java.util.function.UnaryOperator;
 @Internal
 public final class RouteAssembly {
 
-    private static final String NO_EXECUTOR = "No executor configured for name: ";
+    static final String NO_EXECUTOR = "No executor configured for name: ";
 
     final ConversionService conversionService;
     final Charset defaultCharset;
@@ -1936,71 +1931,6 @@ public final class RouteAssembly {
                 return rawCompare != 0 ? rawCompare : Integer.compare(template.pathVariableCount(), other.template.pathVariableCount());
             }
             return 0;
-        }
-
-        /**
-         * Selects the executor of a route info, with the choice of the route when the route info
-         * was built. It holds the executor selector of the services, the method and the choice,
-         * not the route: the route info, which lives as long as the router, must not keep the
-         * route, and through it the assembly and the other routes, reachable.
-         */
-        private static final class RouteExecutorSelector implements ExecutorSelector {
-            private final @Nullable ExecutorSelector executorSelector;
-            private final ExecutableMethod<?, ?> method;
-            private final @Nullable String executorName;
-            private final boolean eventLoop;
-
-            RouteExecutorSelector(@Nullable ExecutorSelector executorSelector,
-                                  ExecutableMethod<?, ?> method,
-                                  @Nullable String executorName,
-                                  boolean eventLoop) {
-                this.executorSelector = executorSelector;
-                this.method = method;
-                this.executorName = executorName;
-                this.eventLoop = eventLoop;
-            }
-
-            @Override
-            public Optional<ExecutorService> select(@Nullable MethodReference<?, ?> method, ThreadSelection threadSelection) {
-                // like @ExecuteOn and @NonBlocking on the method
-                String name = executorName;
-                if (name != null) {
-                    return Optional.of(select(name).orElseThrow(() -> new SchedulerConfigurationException(
-                        this.method, NO_EXECUTOR + name)));
-                }
-                if (eventLoop && threadSelection == ThreadSelection.AUTO) {
-                    return Optional.empty();
-                }
-                if (executorSelector != null) {
-                    // the handler of a located route has the annotations it inherits, e.g. an @ExecuteOn of a group of its locator route
-                    MethodReference<?, ?> annotated = method instanceof HandlerMethod<?> handler ? handler : this.method;
-                    return executorSelector.select(annotated, threadSelection);
-                } else {
-                    return Optional.empty();
-                }
-            }
-
-            @Override
-            public Optional<ExecutorService> select(String name) {
-                if (executorSelector != null) {
-                    return executorSelector.select(name);
-                } else {
-                    return Optional.empty();
-                }
-            }
-
-            @Override
-            public Executor selectExecutor(@Nullable MethodReference<?, ?> method, ThreadSelectionConfiguration configuration) {
-                if (executorName != null || eventLoop) {
-                    // selects with the route's choice, see select(MethodReference, ThreadSelection)
-                    return ExecutorSelector.super.selectExecutor(method, configuration);
-                }
-                if (executorSelector != null) {
-                    return executorSelector.selectExecutor(method, configuration);
-                } else {
-                    return ImmediateExecutor.INSTANCE;
-                }
-            }
         }
     }
 
