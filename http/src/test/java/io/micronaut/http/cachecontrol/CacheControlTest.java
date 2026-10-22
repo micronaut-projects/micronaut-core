@@ -3,6 +3,7 @@ package io.micronaut.http.cachecontrol;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -68,5 +69,24 @@ class CacheControlTest {
             .staleIfError(Duration.ofDays(1))
             .build();
         assertEquals("max-age=604800, stale-if-error=86400", cacheControl.toString());
+    }
+
+    @Test
+    void testToStringRegardlessOfDefaultLocale() {
+        // The directives are sent on the wire; under a Turkish default locale "PRIVATE".toLowerCase()
+        // would be "prıvate" (dotless ı), which caches do not recognise
+        Locale defaultLocale = Locale.getDefault();
+        Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+        try {
+            CacheControl cacheControl = CacheControl.builder()
+                .privateDirective()
+                .mustRevalidate()
+                .inmutable()
+                .staleIfError(Duration.ofSeconds(60))
+                .build();
+            assertEquals("private, must-revalidate, immutable, stale-if-error=60", cacheControl.toString());
+        } finally {
+            Locale.setDefault(defaultLocale);
+        }
     }
 }
