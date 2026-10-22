@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MutableByteBodyHttpResponseTest {
@@ -160,6 +161,19 @@ class MutableByteBodyHttpResponseTest {
         assertEquals(1, original.closed);
 
         ((ByteBodyHttpResponse<?>) mutable).close();
+        assertEquals(1, original.closed);
+    }
+
+    @Test
+    void closesTheOriginalWhenTheCopyFails() {
+        HttpResponse<Object> failing = new HttpResponseWrapper<>(HttpResponse.ok()) {
+            @Override
+            public String reason() {
+                throw new IllegalStateException("no reason");
+            }
+        };
+        TrackingResponse<Object> original = new TrackingResponse<>(failing, bytes("hello"));
+        assertThrows(IllegalStateException.class, () -> MutableByteBodyHttpResponse.of(original));
         assertEquals(1, original.closed);
     }
 

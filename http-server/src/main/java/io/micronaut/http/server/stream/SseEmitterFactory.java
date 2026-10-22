@@ -16,6 +16,7 @@
 package io.micronaut.http.server.stream;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -96,17 +97,36 @@ final class SseEmitterFactory {
     }
 
     /**
+     * The annotations the data of the events of a route is written with: those of the response
+     * body type of the route, like any other response body of the route (e.g. a {@code @JsonView}).
+     *
+     * @param request The request the route runs with
+     * @return The annotations, empty without a route
+     */
+    AnnotationMetadata dataAnnotations(HttpRequest<?> request) {
+        return RouteAttributes.getRouteInfo(request)
+            .map(routeInfo -> routeInfo.getResponseBodyType().getAnnotationMetadata())
+            .orElse(AnnotationMetadata.EMPTY_METADATA);
+    }
+
+    /**
      * Encode an event like the {@code text/event-stream} writer encodes the events of a
      * {@code Publisher<Event>} body.
      *
-     * @param bodyFactory The body factory of the response
-     * @param event       The event
+     * @param bodyFactory     The body factory of the response
+     * @param dataAnnotations The annotations the data is written with, see {@link #dataAnnotations}
+     * @param event           The event
      * @return The bytes of the event
      */
-    ReadBuffer encode(ByteBodyFactory bodyFactory, Event<?> event) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    ReadBuffer encode(ByteBodyFactory bodyFactory, AnnotationMetadata dataAnnotations, Event<?> event) {
         MessageBodyWriter<Event<?>> writer = eventWriter.get();
+        Object data = event.getData();
+        // the writer takes the type of the data from the type argument of the event type
+        Argument<Event<?>> eventType = dataAnnotations.isEmpty() || data == null ? EVENT
+            : (Argument) Argument.of(Event.class, Argument.ofInstance(data).withAnnotationMetadata(dataAnnotations));
         return bodyFactory.readBufferFactory().buffer(out -> writer.writeTo(
-            EVENT,
+            eventType,
             MediaType.TEXT_EVENT_STREAM_TYPE,
             event,
             new CaseInsensitiveMutableHttpHeaders(conversionService),

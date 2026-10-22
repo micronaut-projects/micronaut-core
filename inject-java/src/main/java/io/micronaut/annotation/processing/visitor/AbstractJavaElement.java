@@ -320,8 +320,16 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                     }
                     resolvedTypeArguments = resolved;
                 } else {
+                    // The type is visited while its own arguments are resolved, which is what stops at the
+                    // Comparable<T> within the bounds of T extends Comparable<T>. It is not visited for what is
+                    // resolved after it, so that the T within the bounds of a sibling V extends List<? extends T>
+                    // keeps its own bounds rather than Comparable<Object>
                     visitedTypes.add(dt);
-                    resolvedTypeArguments = resolveTypeArguments(typeElement.getTypeParameters(), typeMirrorArguments, declaredTypeArguments, visitedTypes);
+                    try {
+                        resolvedTypeArguments = resolveTypeArguments(typeElement.getTypeParameters(), typeMirrorArguments, declaredTypeArguments, visitedTypes);
+                    } finally {
+                        visitedTypes.remove(dt);
+                    }
                 }
                 if (type.getKind() == TypeKind.ERROR) {
                     throw new PostponeToNextRoundException(typeElement, getName() + " " + typeElement);

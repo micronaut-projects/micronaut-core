@@ -24,7 +24,6 @@ import io.micronaut.core.annotation.Order;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.web.router.AssembledRoutes;
 import io.micronaut.web.router.DefaultRouteBuilder;
 import io.micronaut.web.router.DefaultRouter;
 import io.micronaut.web.router.FilterRoute;
@@ -54,9 +53,8 @@ import java.util.List;
 @Singleton
 @Requires(beans = HttpRoutes.class)
 @Order(Ordered.LOWEST_PRECEDENCE)
-final class HttpRoutesAssembly extends DefaultRouteBuilder implements AssembledRoutes {
+final class HttpRoutesAssembly extends DefaultRouteBuilder {
 
-    private final RouteAssembly routeAssembly;
     private final List<FilterRoute> filterRoutes;
 
     /**
@@ -71,7 +69,7 @@ final class HttpRoutesAssembly extends DefaultRouteBuilder implements AssembledR
                        List<HttpRoutes> routes,
                        @Nullable @Value("${micronaut.server.context-path}") String contextPath) {
         this(executionHandleLocator, conversionService, routes, new RouteAssembly(executionHandleLocator, conversionService,
-            contextPath, route -> { }));
+            contextPath));
     }
 
     private HttpRoutesAssembly(ExecutionHandleLocator executionHandleLocator,
@@ -79,7 +77,6 @@ final class HttpRoutesAssembly extends DefaultRouteBuilder implements AssembledR
                                List<HttpRoutes> routes,
                                RouteAssembly assembly) {
         super(executionHandleLocator, conversionService, assembly);
-        this.routeAssembly = assembly;
         // the ports given as strings are resolved like the port of a @Controller
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly,
             executionHandleLocator instanceof ApplicationContext context ? context.getEnvironment().getPlaceholderResolver() : null);
@@ -105,10 +102,5 @@ final class HttpRoutesAssembly extends DefaultRouteBuilder implements AssembledR
     @Override
     public List<FilterRoute> getFilterRoutes() {
         return filterRoutes;
-    }
-
-    @Override
-    public RouteAssembly routes() {
-        return routeAssembly;
     }
 }
