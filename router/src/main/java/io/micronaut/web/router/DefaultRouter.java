@@ -69,6 +69,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private final UriRouteSet routes;
     private final StatusRouteInfo<Object, Object>[] statusRoutes;
     private final ErrorRouteInfo<Object, Object>[] errorRoutes;
+    /**
+     * The types that have local error routes, or {@code null} if unknown: no local error route
+     * is looked up for another type, e.g. the class of a handler function.
+     */
+    private final @Nullable Set<Class<?>> localErrorRouteTypes;
     private final Set<Integer> exposedPorts;
     /**
      * The default ports: an unmodifiable snapshot, replaced as a whole.
@@ -175,6 +180,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         this.routes = uriRoutes.build();
         this.statusRoutes = statusRoutes.toArray(StatusRouteInfo[]::new);
         this.errorRoutes = errorRoutes.toArray(ErrorRouteInfo[]::new);
+        this.localErrorRouteTypes = localErrorRouteTypes(this.errorRoutes);
         this.alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
             if (alwaysMatchesFilterRoutes.isEmpty()) {
                 return new ArrayList<>(0);
@@ -510,6 +516,15 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     /**
      * @param route A route
+     * @return Whether the route selector of the route selects by the media types itself, see
+     * {@link RouteMatchSelector#selectsMediaTypes()}
+     */
+    static boolean selectsMediaTypes(UriRouteInfo<?, ?> route) {
+        return route instanceof DefaultUrlRouteInfo<?, ?> info && info.routeMatchSelectorSelectsMediaTypes();
+    }
+
+    /**
+     * @param route A route
      * @return The order of the route selector of the route, read once when it was built, or {@code null}
      */
     static @Nullable Comparator<UriRouteInfo<?, ?>> selectorOrder(UriRouteInfo<?, ?> route) {
@@ -571,7 +586,37 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         Class<?> originatingClass,
         Throwable error,
         HttpRequest<?> request) {
+        if (!mayHaveLocalErrorRoutes(originatingClass)) {
+            // a local error route only matches the type it is local to
+            return Optional.empty();
+        }
         return findErrorRouteInternal(originatingClass, error, request);
+    }
+
+    /**
+     * @param originatingClass The class the error originates from, {@code null} for the global error routes
+     * @return Whether to look up the error routes: always for {@code null}, and when an error route may be local to the class
+     */
+    private boolean mayHaveLocalErrorRoutes(@Nullable Class<?> originatingClass) {
+        return originatingClass == null || localErrorRouteTypes == null || localErrorRouteTypes.contains(originatingClass);
+    }
+
+    /**
+     * @param errorRoutes The error routes
+     * @return The types the error routes are local to, or {@code null} if one of them is not a {@link DefaultErrorRouteInfo}
+     */
+    private static @Nullable Set<Class<?>> localErrorRouteTypes(ErrorRouteInfo<Object, Object>[] errorRoutes) {
+        Set<Class<?>> types = new HashSet<>();
+        for (ErrorRouteInfo<Object, Object> errorRoute : errorRoutes) {
+            if (!(errorRoute instanceof DefaultErrorRouteInfo)) {
+                return null;
+            }
+            Class<?> originatingType = errorRoute.originatingType();
+            if (originatingType != null) {
+                types.add(originatingType);
+            }
+        }
+        return types;
     }
 
     private <R> Optional<RouteMatch<R>> findErrorRouteInternal(

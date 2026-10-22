@@ -25,7 +25,7 @@ import java.util.Set;
 /**
  * What changed between two {@link OutputSnapshot}s.
  *
- * @param classes The classes added, modified or removed
+ * @param classes The classes added, modified or removed, ordered by class name when computed by {@link OutputSnapshot#diff(OutputSnapshot)}
  * @param changedResources The relative paths of resources added or modified
  * @param removedResources The relative paths of resources removed
  * @author graemerocher

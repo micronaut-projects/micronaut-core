@@ -175,7 +175,8 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
             Class<?> beanClass = beanType.getType();
             if (len == 0) {
                 if (isContainerType()) {
-                    if (getBeanType().isAssignableFrom(beanClass)) {
+                    // a raw lookup of a type the container exposes finds the container itself
+                    if (getBeanType().isAssignableFrom(beanClass) || beanClass.isAssignableFrom(getBeanType())) {
                         return true;
                     }
                     final Optional<Argument<?>> containerElement = getContainerElement();

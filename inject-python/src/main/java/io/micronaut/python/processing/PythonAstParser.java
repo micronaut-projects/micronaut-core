@@ -110,6 +110,7 @@ public final class PythonAstParser {
         """, "micronaut-typecheck-init.py").cached(true).buildLiteral();
     private static final Source TYPE_CHECK_SOURCE = Source.newBuilder(PYTHON, """
         diagnostics = [] if type_checker is None else type_checker.check(visitor_context)
+        java_instance_alias_types = [] if type_checker is None else sorted(type_checker._java_alias_types)
         """, "micronaut-typecheck-driver.py").cached(true).buildLiteral();
     private static final Source STATIC_PLAN_SOURCE = Source.newBuilder(PYTHON, """
         static_decisions = [] if static_planner is None else static_planner.plan(type_checker, visitor_context)
@@ -499,6 +500,15 @@ public final class PythonAstParser {
             decisions == null ? List.of() : List.copyOf(decisions.as(List.class)),
             diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class))
         );
+    }
+
+    /** The Java receiver types whose aliases the checker accepted, including deeper call chains. */
+    @SuppressWarnings("unchecked")
+    List<String> javaInstanceAliasTypes() {
+        Value bindings = context.getBindings(PYTHON);
+        Value checker = bindings.getMember("type_checker");
+        Value types = bindings.getMember("java_instance_alias_types");
+        return checker == null || checker.isNull() || types == null ? List.of() : List.copyOf(types.as(List.class));
     }
 
     private TransformArtifacts artifacts(TransformResult transformResult) {
