@@ -63,6 +63,13 @@ public final class WebSocketTckTags {
     public static final String WEBSOCKET_PING_PONG = "websocket-ping-pong";
 
     /**
+     * A route or endpoint handler receiving the pings of the client. A server whose WebSocket
+     * container answers pings itself, and never hands them to the endpoint, cannot do this.
+     * Excluding it skips those tests and keeps the other ping and pong tests.
+     */
+    public static final String WEBSOCKET_PING_HANDLER = "websocket-ping-handler";
+
+    /**
      * The maximum payload length of a message: a larger message closes the connection with
      * 1009. Excluding it skips those tests.
      */
