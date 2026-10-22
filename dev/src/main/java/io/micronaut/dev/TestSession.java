@@ -39,10 +39,12 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -193,6 +195,14 @@ final class TestSession {
         if (!removedTests.isEmpty()) {
             testClassesRemoved(removedTests);
         }
+        // a file of tests discovered from their files, deleted, or failed and deleted since: its results go, and its failure
+        Set<String> goneFiles;
+        synchronized (this) {
+            goneFiles = goneTestFiles(tests.sourceRoots(), allTestSources, failedClasses);
+        }
+        if (!goneFiles.isEmpty()) {
+            testClassesRemoved(goneFiles);
+        }
         ChangeSet changes = runtime.takeOutputChanges();
         Set<String> changed = new LinkedHashSet<>(application.affectedClasses());
         changed.addAll(testRound.affectedClasses());
@@ -200,11 +210,12 @@ final class TestSession {
             changed.add(ClassDependencyIndex.topLevelOf(className));
         }
         changed.removeAll(removedTests);
+        boolean fileTestsChanged = fileTestsChanged(tests.sourceRoots(), allSources, allTestSources, changed);
         boolean resourcesChanged = resources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty())
             || !changes.changedResources().isEmpty() || !changes.removedResources().isEmpty();
         synchronized (this) {
             owedChanges.addAll(changed);
-            owedAll |= full || resourcesChanged || constants || !settings.affectedOnly() && !changed.isEmpty();
+            owedAll |= full || resourcesChanged || fileTestsChanged || constants || !settings.affectedOnly() && !changed.isEmpty();
         }
         if (requested != null) {
             run(requested(requested), requested != TestRequest.FAILED);
@@ -371,12 +382,120 @@ final class TestSession {
         }
         synchronized (this) {
             for (String failed : failedClasses) {
-                if (testClasses.contains(failed)) {
+                // a class of the outputs, or a file of tests an engine discovers from their source files, as pytest's
+                if (testClasses.contains(failed) || isTestFile(tests.sourceRoots(), failed)) {
                     selected.add(failed);
                 }
             }
         }
         return selected.isEmpty() ? null : TestSelection.ofClasses(selected, description);
+    }
+
+    /**
+     * The names of results of files of tests discovered from their files, as pytest's, that are gone: those of the
+     * files a batch deleted, and the failed ones whose files are no longer there.
+     *
+     * @param roots The test source roots
+     * @param testSources The batch's changes of the test sources
+     * @param failed The names of the failed results
+     * @return The names whose results go
+     */
+    static Set<String> goneTestFiles(List<SourceRoot> roots, Map<SourceKind, DevRuntime.SourceChanges> testSources, Collection<String> failed) {
+        Set<String> gone = new LinkedHashSet<>();
+        testSources.forEach((kind, change) -> {
+            if (!isJvmKind(kind)) {
+                for (Path deleted : change.deleted()) {
+                    gone.addAll(resultNamesOf(roots, deleted));
+                }
+            }
+        });
+        for (String name : failed) {
+            if (isTestFileName(roots, name) && !isTestFile(roots, name)) {
+                gone.add(name);
+            }
+        }
+        return gone;
+    }
+
+    /**
+     * Whether a batch runs every test for tests discovered from their files, as pytest's: such a test has no class
+     * whose change can be followed, nor can a change of the application be followed to it, so a change of one of
+     * them, or with any of them, of the application, runs every test.
+     *
+     * @param roots The test source roots
+     * @param sources The batch's changes of the application's sources
+     * @param testSources The batch's changes of the test sources
+     * @param changed The classes the batch changed
+     * @return Whether every test runs
+     */
+    static boolean fileTestsChanged(List<SourceRoot> roots, Map<SourceKind, DevRuntime.SourceChanges> sources,
+                                    Map<SourceKind, DevRuntime.SourceChanges> testSources, Set<String> changed) {
+        boolean testFileChanged = testSources.entrySet().stream()
+            .anyMatch(entry -> !isJvmKind(entry.getKey()) && (!entry.getValue().changed().isEmpty() || !entry.getValue().deleted().isEmpty()));
+        if (testFileChanged) {
+            return true;
+        }
+        boolean fileTests = roots.stream().anyMatch(root -> !isJvmKind(root.kind()));
+        return fileTests && (!changed.isEmpty() || sources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty()));
+    }
+
+    /**
+     * Whether results are grouped under a file of a test source root whose tests are discovered from their files, as
+     * pytest's, rather than under a class: the file is selected again by that name.
+     */
+    static boolean isTestFile(List<SourceRoot> roots, String name) {
+        for (SourceRoot root : roots) {
+            SourceKind kind = root.kind();
+            if (isJvmKind(kind)) {
+                continue;
+            }
+            for (String extension : kind.extensions()) {
+                if (name.endsWith("." + extension)
+                    && (Files.isRegularFile(root.path().resolve(name).normalize()) || Files.isRegularFile(root.path().resolveSibling(name).normalize()))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a name of results names a file of tests discovered from their files, whether or not it is there.
+     */
+    static boolean isTestFileName(List<SourceRoot> roots, String name) {
+        for (SourceRoot root : roots) {
+            if (!isJvmKind(root.kind())) {
+                for (String extension : root.kind().extensions()) {
+                    if (name.endsWith("." + extension)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The names the results of a file of tests discovered from their files may be grouped under: its path relative to
+     * its test source root, or to the directory holding the root.
+     */
+    static Set<String> resultNamesOf(List<SourceRoot> roots, Path file) {
+        Set<String> names = new LinkedHashSet<>();
+        Path absolute = file.toAbsolutePath().normalize();
+        for (SourceRoot root : roots) {
+            Path base = root.path().toAbsolutePath().normalize();
+            if (!isJvmKind(root.kind()) && absolute.startsWith(base)) {
+                names.add(base.relativize(absolute).toString().replace('\\', '/'));
+                if (base.getParent() != null) {
+                    names.add(base.getParent().relativize(absolute).toString().replace('\\', '/'));
+                }
+            }
+        }
+        return names;
+    }
+
+    private static boolean isJvmKind(SourceKind kind) {
+        return kind == SourceKind.JAVA || kind == SourceKind.KOTLIN || kind == SourceKind.GROOVY;
     }
 
     private static List<Path> outputs(DevManifest target, List<SourceRoot> roots) {
