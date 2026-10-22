@@ -1436,7 +1436,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             // without Reactor: the pieces are split into elements as they are pulled
             PieceReader<O> pieceReader = PieceReaders.open(reader, type, mediaType, headers, maxElementSize);
             CloseableByteBody body = response.byteBody().move();
-            return ElementsResponse.of(response, new ByteBodyElements<>(body, pieceReader, Function.identity()));
+            return ElementsResponse.of(response, new ByteBodyElements<>(body, pieceReader, Function.identity(), true));
         });
     }
 
