@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.websocket;
+package io.micronaut.web.router.websocket;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
@@ -54,7 +54,7 @@ public enum WebSocketUpgradeCondition implements Predicate<HttpRequest<?>> {
     /**
      * Mark that a route of a WebSocket is registered with this condition.
      */
-    static void registered() {
+    public static void registered() {
         registered = true;
     }
 
