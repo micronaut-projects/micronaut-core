@@ -23,6 +23,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
@@ -32,27 +33,33 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Body conditions and route results that complete after the routing returned, with the
- * execution prepared for the route and with the compatibility execution: each route is invoked
- * once, a rejected or failed condition falls through or fails like before, and a shared stage a
- * route returns is not cancelled when the client abandons the request.
+ * execution prepared for the route and with the compatibility execution. Each pending step is a
+ * future the test completes once the server entered it, after checking that the response is
+ * still pending: each route is invoked once, a condition rejected later falls through, a result
+ * that fails later reaches the error route, and the shared stage of a request the client
+ * abandoned is not cancelled once the server saw its connection closed.
  */
 class PendingRouteExecutionTest {
 
     private static final String SPEC = "PendingRouteExecutionTest";
+    private static final long WAIT = 10;
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -63,27 +70,38 @@ class PendingRouteExecutionTest {
             Routes routes = ctx.getBean(Routes.class);
             try (HttpClient client = ctx.createBean(HttpClient.class, server.getURL())) {
                 // a condition accepted later selects its route, invoked once
-                assertEquals("accepted", client.toBlocking().retrieve(HttpRequest.POST("/conditions", "accept").contentType(MediaType.TEXT_PLAIN_TYPE)));
+                CompletableFuture<String> accepted = text(client, HttpRequest.POST("/conditions", "accept").contentType(MediaType.TEXT_PLAIN_TYPE));
+                pending(routes.condition.entered(), accepted).complete(true);
+                assertEquals("accepted", accepted.get(WAIT, TimeUnit.SECONDS));
                 assertEquals(1, routes.accepted.get());
+
                 // a condition rejected later falls through to the route without conditions
-                assertEquals("fallback", client.toBlocking().retrieve(HttpRequest.POST("/conditions", "reject").contentType(MediaType.TEXT_PLAIN_TYPE)));
+                CompletableFuture<String> rejected = text(client, HttpRequest.POST("/conditions", "reject").contentType(MediaType.TEXT_PLAIN_TYPE));
+                pending(routes.condition.entered(), rejected).complete(false);
+                assertEquals("fallback", rejected.get(WAIT, TimeUnit.SECONDS));
                 assertEquals(1, routes.accepted.get());
                 assertEquals(1, routes.fallback.get());
 
-                // a stage completed later answers once
-                assertEquals("later", client.toBlocking().retrieve(HttpRequest.GET("/later")));
-                assertEquals(1, routes.later.get());
-                // a stage that fails later is answered by the error route
-                HttpClientResponseException failed = assertThrows(HttpClientResponseException.class,
-                    () -> client.toBlocking().exchange(HttpRequest.GET("/failing"), String.class));
-                assertEquals(HttpStatus.CONFLICT, failed.getStatus());
+                // a result completed later answers once
+                CompletableFuture<String> later = text(client, HttpRequest.GET("/later"));
+                pending(routes.later.entered(), later).complete(HttpResponse.ok("later"));
+                assertEquals("later", later.get(WAIT, TimeUnit.SECONDS));
+                assertEquals(1, routes.laterInvocations.get());
 
-                // an abandoned request does not cancel the shared stage its route returned
-                Mono<?> abandoned = Mono.from(client.exchange(HttpRequest.GET("/shared"), String.class))
-                    .timeout(Duration.ofMillis(200))
-                    .onErrorResume(e -> Mono.empty());
-                abandoned.block(Duration.ofSeconds(10));
-                assertTrue(routes.sharedInvoked.await(), "the route was invoked");
+                // a result that fails later is answered by the error route
+                CompletableFuture<String> failing = text(client, HttpRequest.GET("/failing"));
+                pending(routes.failing.entered(), failing).completeExceptionally(new IllegalStateException("later"));
+                ExecutionException failed = assertThrows(ExecutionException.class, () -> failing.get(WAIT, TimeUnit.SECONDS));
+                assertEquals(HttpStatus.CONFLICT, assertInstanceOf(HttpClientResponseException.class, failed.getCause()).getStatus());
+
+                // the server sees the abandonment of a request, which does not cancel the shared stage of its route
+                // the client closes the connection: a cancelled exchange of the client drains it instead
+                try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+                    socket.getOutputStream().write(("GET /shared HTTP/1.1\r\nHost: localhost\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+                    socket.getOutputStream().flush();
+                    routes.sharedInvoked.get(WAIT, TimeUnit.SECONDS);
+                }
+                routes.sharedClosed.get(WAIT, TimeUnit.SECONDS);
                 assertFalse(routes.shared.isCancelled());
                 assertFalse(routes.shared.isDone());
                 routes.shared.complete(HttpResponse.ok("shared"));
@@ -92,15 +110,50 @@ class PendingRouteExecutionTest {
         }
     }
 
-    static final class Invoked {
-        private final CompletableFuture<Boolean> invoked = new CompletableFuture<>();
+    private static CompletableFuture<String> text(HttpClient client, HttpRequest<?> request) {
+        return Mono.from(client.retrieve(request)).toFuture();
+    }
 
-        void signal() {
-            invoked.complete(true);
+    /**
+     * Wait until the server entered the pending step, and check that the response still waits
+     * for it.
+     *
+     * @param entered  Completes with the pending step when the server entered it
+     * @param response The response
+     * @param <T>      The type of the step
+     * @return The pending step, to complete
+     */
+    private static <T> CompletableFuture<T> pending(CompletableFuture<CompletableFuture<T>> entered, CompletableFuture<String> response) throws Exception {
+        CompletableFuture<T> step = entered.get(WAIT, TimeUnit.SECONDS);
+        assertFalse(response.isDone(), "the response waits for the pending step");
+        return step;
+    }
+
+    /**
+     * A step of a route that the test completes: each time the server enters it, it is a new
+     * future, handed to the test.
+     *
+     * @param <T> The type of the step
+     */
+    static final class Pending<T> {
+        private final AtomicReference<CompletableFuture<CompletableFuture<T>>> entered = new AtomicReference<>(new CompletableFuture<>());
+
+        CompletableFuture<T> enter() {
+            CompletableFuture<T> step = new CompletableFuture<>();
+            entered.get().complete(step);
+            return step;
         }
 
-        boolean await() throws Exception {
-            return invoked.get(10, TimeUnit.SECONDS);
+        CompletableFuture<CompletableFuture<T>> entered() {
+            CompletableFuture<CompletableFuture<T>> current = entered.get();
+            try {
+                current.get(WAIT, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                throw new AssertionError("the server did not enter the pending step", e);
+            }
+            // the next request enters a fresh step
+            entered.set(new CompletableFuture<>());
+            return current;
         }
     }
 
@@ -109,19 +162,18 @@ class PendingRouteExecutionTest {
     static final class Routes implements HttpRoutes {
         final AtomicInteger accepted = new AtomicInteger();
         final AtomicInteger fallback = new AtomicInteger();
-        final AtomicInteger later = new AtomicInteger();
+        final AtomicInteger laterInvocations = new AtomicInteger();
+        final Pending<Boolean> condition = new Pending<>();
+        final Pending<HttpResponse<?>> later = new Pending<>();
+        final Pending<HttpResponse<?>> failing = new Pending<>();
         final CompletableFuture<HttpResponse<?>> shared = new CompletableFuture<>();
-        final Invoked sharedInvoked = new Invoked();
-        private final RouteTestTimer timer;
-
-        Routes(RouteTestTimer timer) {
-            this.timer = timer;
-        }
+        final CompletableFuture<Boolean> sharedInvoked = new CompletableFuture<>();
+        final CompletableFuture<Boolean> sharedClosed = new CompletableFuture<>();
 
         @Override
         public void routes(HttpRouteBuilder routes) {
             routes.POST("/conditions")
-                .where(RequestCondition.bodyAsync(String.class, text -> timer.later(text.equals("accept")).toFuture()))
+                .where(RequestCondition.bodyAsync(String.class, text -> condition.enter()))
                 .order(-1).consumes(MediaType.TEXT_PLAIN_TYPE)
                 .produces(MediaType.TEXT_PLAIN_TYPE)
                 .handle((request, pathVariables) -> {
@@ -133,21 +185,22 @@ class PendingRouteExecutionTest {
                 return HttpResponse.ok("fallback");
             });
             routes.GET("/later").produces(MediaType.TEXT_PLAIN_TYPE).handleAsync((request, pathVariables) -> {
-                later.incrementAndGet();
-                return timer.<HttpResponse<?>>later(HttpResponse.ok("later")).toFuture();
+                laterInvocations.incrementAndGet();
+                return later.enter();
             });
-            routes.GET("/failing").handleAsync((request, pathVariables) -> timer.later("x")
-                .<HttpResponse<?>>flatMap(x -> Mono.error(new IllegalStateException("later")))
-                .toFuture());
+            routes.GET("/failing").handleAsync((request, pathVariables) -> failing.enter());
             routes.error(IllegalStateException.class, (request, error) -> HttpResponse.status(HttpStatus.CONFLICT));
             routes.GET("/shared").produces(MediaType.TEXT_PLAIN_TYPE).handleAsync((request, pathVariables) -> {
-                sharedInvoked.signal();
+                // the server sees the connection of the request closed
+                ((NettyHttpRequest<?>) request).getChannelHandlerContext().channel().closeFuture()
+                    .addListener(future -> sharedClosed.complete(true));
+                sharedInvoked.complete(true);
                 return shared(shared);
             });
         }
 
         /**
-         * The stage the routes share, not a copy: cancelling it would cancel it for every route.
+         * The stage the requests share, not a copy: cancelling it would cancel it for every request.
          */
         private static CompletionStage<HttpResponse<?>> shared(CompletableFuture<HttpResponse<?>> shared) {
             return shared;
