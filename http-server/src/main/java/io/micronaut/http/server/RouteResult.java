@@ -21,16 +21,22 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 
@@ -56,6 +62,114 @@ abstract sealed class RouteResult {
 
     RouteResult(RouteExecutor owner) {
         this.owner = owner;
+    }
+
+    ExecutionFlow<MutableHttpResponse<?>> fromImperativeExecute(PropagatedContext propagatedContext,
+                                                                HttpRequest<?> request,
+                                                                RouteInfo<?> routeInfo,
+                                                                @Nullable Object body) {
+        // performance optimization: check for common body types
+        boolean shortCircuit = body instanceof String || body instanceof byte[];
+
+        // this is a bit messy to avoid type pollution performance issues
+        MutableHttpResponse<?> outgoingResponse;
+        if (!shortCircuit && body instanceof MutableHttpResponse<?> mut) {
+            outgoingResponse = mut;
+        } else if (!shortCircuit && body instanceof HttpResponse<?> httpResponse) {
+            outgoingResponse = httpResponse.toMutableResponse();
+        } else {
+            MutableHttpResponse<Object> mutableHttpResponse = owner.forStatus(routeInfo, null);
+            if (body != null) {
+                mutableHttpResponse = mutableHttpResponse.body(body);
+            }
+            return ExecutionFlow.just(mutableHttpResponse);
+        }
+
+        if (responseBodyAsyncOrReactive(routeInfo)) {
+            return owner.processPublisherBody(propagatedContext, request, outgoingResponse, routeInfo, this);
+        }
+        return ExecutionFlow.just(outgoingResponse);
+    }
+
+    CompletionStage<MutableHttpResponse<?>> fromCompletionStage(HttpRequest<?> request,
+                                                                CompletionStage<Object> completionStage,
+                                                                RouteInfo<?> routeInfo) {
+        return completionStage.thenCompose(asyncBody -> {
+            MutableHttpResponse<?> mutableResponse;
+            if (asyncBody instanceof Optional<?> optional) {
+                if (optional.isPresent()) {
+                    asyncBody = optional.get();
+                } else if (owner.serverConfiguration.isNotFoundOnMissingBody()) {
+                    return CompletableFuture.completedStage(notFoundErrorResponse(request));
+                } else {
+                    return CompletableFuture.completedStage(noContentResponse(routeInfo));
+                }
+            }
+            boolean explicitResponse = false;
+            if (asyncBody instanceof HttpResponse<?> httpResponse) {
+                mutableResponse = httpResponse.toMutableResponse();
+                // CompletionStage<HttpResponse<CompletionStage<T>>>
+                if (nestedResponseBodyAsync(routeInfo)) {
+                    CompletionStage<@Nullable Object> inner = (CompletionStage<Object>) mutableResponse.body();
+                    if (inner == null) {
+                        inner = CompletableFuture.completedFuture(null);
+                    }
+                    return inner.thenApply(innerBody -> {
+                        if (innerBody == null) {
+                            return notFoundErrorResponse(request);
+                        }
+                        return mutableResponse.body(innerBody);
+                    });
+                }
+                explicitResponse = true;
+            } else if (asyncBody instanceof HttpStatus status) {
+                mutableResponse = owner.forStatus(routeInfo, status);
+            } else {
+                mutableResponse = owner.forStatus(routeInfo, null)
+                    .body(asyncBody);
+            }
+            if (mutableResponse.body() == null && !explicitResponse) {
+                if (routeInfo.isVoid()) {
+                    return CompletableFuture.completedStage(voidResponse(routeInfo));
+                } else if (owner.serverConfiguration.isNotFoundOnMissingBody()) {
+                    return CompletableFuture.completedStage(notFoundErrorResponse(request));
+                } else {
+                    return CompletableFuture.completedStage(noContentResponse(routeInfo));
+                }
+            }
+            return CompletableFuture.completedStage(mutableResponse);
+        });
+    }
+
+    MutableHttpResponse<?> emptyResponse(HttpRequest<?> request, RouteInfo<?> routeInfo) {
+        if (routeInfo.isVoid()) {
+            return voidResponse(routeInfo);
+        } else if (owner.serverConfiguration.isNotFoundOnMissingBody()) {
+            return notFoundErrorResponse(request);
+        } else {
+            return noContentResponse(routeInfo);
+        }
+    }
+
+    MutableHttpResponse<Object> voidResponse(RouteInfo<?> routeInfo) {
+        return owner.forStatus(routeInfo, HttpStatus.OK)
+            .header(HttpHeaders.CONTENT_LENGTH, "0");
+    }
+
+    MutableHttpResponse<Object> noContentResponse(RouteInfo<?> routeInfo) {
+        return owner.forStatus(routeInfo, HttpStatus.NO_CONTENT)
+            .header(HttpHeaders.CONTENT_LENGTH, "0");
+    }
+
+    MutableHttpResponse<?> notFoundErrorResponse(HttpRequest<?> request) {
+        MutableHttpResponse<?> response = owner.errorResponseProcessor.processResponse(
+            ErrorContext.builder(request)
+                .errorMessage("Page Not Found")
+                .build(), HttpResponse.notFound());
+        if (response.getContentType().isEmpty() && request.getMethod() != HttpMethod.HEAD) {
+            return response.contentType(MediaType.APPLICATION_JSON_TYPE);
+        }
+        return response;
     }
 
     /**
@@ -112,7 +226,7 @@ abstract sealed class RouteResult {
                                                  RouteInfo<?> routeInfo,
                                                  @Nullable RouteMatch<?> routeMatch) {
         if (body == null) {
-            return ExecutionFlow.just(owner.finaliseResponse(request, routeInfo, routeMatch, owner.emptyResponse(request, routeInfo)));
+            return ExecutionFlow.just(owner.finaliseResponse(request, routeInfo, routeMatch, emptyResponse(request, routeInfo)));
         }
         MutableHttpResponse<?> response = null;
         if (body instanceof String) {
@@ -237,11 +351,11 @@ abstract sealed class RouteResult {
         @Override
         ExecutionFlow<MutableHttpResponse<?>> adapt(PropagatedContext propagatedContext, HttpRequest<?> request, Object body, RouteInfo<?> routeInfo) {
             if (routeInfo.isImperative()) {
-                return owner.fromImperativeExecute(propagatedContext, request, routeInfo, body, this);
+                return fromImperativeExecute(propagatedContext, request, routeInfo, body);
             }
             if (routeInfo.isAsync()) {
                 return CompletableFutureExecutionFlow.just(
-                    owner.fromCompletionStage(request, (CompletionStage<Object>) body, routeInfo, this)
+                    fromCompletionStage(request, (CompletionStage<Object>) body, routeInfo)
                 );
             }
             // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
@@ -253,7 +367,7 @@ abstract sealed class RouteResult {
             if (routeInfo.isSuspended()) {
                 return owner.fromKotlinCoroutineExecute(propagatedContext, request, body, routeInfo, this);
             }
-            return owner.fromImperativeExecute(propagatedContext, request, routeInfo, body, this);
+            return fromImperativeExecute(propagatedContext, request, routeInfo, body);
         }
     }
 
@@ -357,7 +471,7 @@ abstract sealed class RouteResult {
 
         @Override
         ExecutionFlow<MutableHttpResponse<?>> adapt(PropagatedContext propagatedContext, HttpRequest<?> request, Object body, RouteInfo<?> routeInfo) {
-            return owner.fromImperativeExecute(propagatedContext, request, routeInfo, body, this);
+            return fromImperativeExecute(propagatedContext, request, routeInfo, body);
         }
     }
 
@@ -372,7 +486,7 @@ abstract sealed class RouteResult {
         @Override
         ExecutionFlow<MutableHttpResponse<?>> adapt(PropagatedContext propagatedContext, HttpRequest<?> request, Object body, RouteInfo<?> routeInfo) {
             return CompletableFutureExecutionFlow.just(
-                owner.fromCompletionStage(request, (CompletionStage<Object>) body, routeInfo, this)
+                fromCompletionStage(request, (CompletionStage<Object>) body, routeInfo)
             );
         }
     }
@@ -428,7 +542,7 @@ abstract sealed class RouteResult {
                 Publisher<Object> publisher = Publishers.convertToPublisher(owner.conversionService, body);
                 return owner.fromReactiveExecute(propagatedContext, request, publisher, routeInfo, this);
             }
-            return owner.fromImperativeExecute(propagatedContext, request, routeInfo, body, this);
+            return fromImperativeExecute(propagatedContext, request, routeInfo, body);
         }
     }
 }
