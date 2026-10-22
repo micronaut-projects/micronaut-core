@@ -67,6 +67,7 @@ import static io.micronaut.http.server.tck.WebSocketTckTags.WEBSOCKET_FRAGMENTAT
 import static io.micronaut.http.server.tck.WebSocketTckTags.WEBSOCKET_FUNCTIONAL_ROUTES;
 import static io.micronaut.http.server.tck.WebSocketTckTags.WEBSOCKET_HANDSHAKE_ERRORS;
 import static io.micronaut.http.server.tck.WebSocketTckTags.WEBSOCKET_MAX_PAYLOAD;
+import static io.micronaut.http.server.tck.WebSocketTckTags.WEBSOCKET_PING_HANDLER;
 import static io.micronaut.http.server.tck.WebSocketTckTags.WEBSOCKET_PING_PONG;
 import static io.micronaut.http.server.tck.WebSocketTckTags.WEBSOCKET_REQUEST_SCOPE;
 import static io.micronaut.http.server.tck.WebSocketTckTags.WEBSOCKET_SUBPROTOCOL;
@@ -300,6 +301,7 @@ public class FunctionalWebSocketRouteTest {
 
     @Test
     @Tag(WEBSOCKET_PING_PONG)
+    @Tag(WEBSOCKET_PING_HANDLER)
     void thePingHandlerReceivesThePingsWhichAreAnswered() throws Exception {
         WebSocketTestClient.Connection connection = client.connect("/ws/tck/ping");
         connection.ws.sendPing(ByteBuffer.wrap("ping-data".getBytes(StandardCharsets.UTF_8))).get(TIMEOUT, TimeUnit.SECONDS);

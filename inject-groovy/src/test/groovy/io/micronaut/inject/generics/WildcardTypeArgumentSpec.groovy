@@ -336,4 +336,41 @@ class Bean {
         upper(bean.getRequiredProperty('map', Map).asArgument().typeParameters[0]) == [bean.getRequiredProperty('map', Map).asArgument().typeParameters[0].type.name] && lower(bean.getRequiredProperty('map', Map).asArgument().typeParameters[0]) == []
         lower(bean.getRequiredProperty('map', Map).asArgument().typeParameters[1]) == [bean.getRequiredProperty('map', Map).asArgument().typeParameters[1].type.name] && upper(bean.getRequiredProperty('map', Map).asArgument().typeParameters[1]) == ['java.lang.Object']
     }
+
+    void "a wildcard bounded by a primitive array is recorded"() {
+        given:
+        BeanIntrospection<?> introspection = buildBeanIntrospection('test.Arrays', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Arrays {
+    List<? extends char[]> upper
+    Map<?, ? super double[][]> lower
+    List<? super Integer[][]> objectLower
+}
+''')
+        Argument<?> upperArgument = introspection.getRequiredProperty('upper', List).asArgument().typeParameters[0]
+        Argument<?> lowerArgument = introspection.getRequiredProperty('lower', Map).asArgument().typeParameters[1]
+        Argument<?> objectLowerArgument = introspection.getRequiredProperty('objectLower', List).asArgument().typeParameters[0]
+
+        expect:
+        upperArgument instanceof WildcardArgument
+        upperArgument.type == char[]
+        wildcard(upperArgument).upperBounds*.type == [char[]]
+        wildcard(upperArgument).lowerBounds.empty
+
+        and:
+        lowerArgument instanceof WildcardArgument
+        lowerArgument.type == double[][]
+        wildcard(lowerArgument).upperBounds*.type == [Object]
+        wildcard(lowerArgument).lowerBounds*.type == [double[][]]
+
+        and: 'an object array bound is recorded the same way'
+        objectLowerArgument instanceof WildcardArgument
+        objectLowerArgument.type == Integer[][]
+        wildcard(objectLowerArgument).upperBounds*.type == [Object]
+        wildcard(objectLowerArgument).lowerBounds*.type == [Integer[][]]
+    }
 }
