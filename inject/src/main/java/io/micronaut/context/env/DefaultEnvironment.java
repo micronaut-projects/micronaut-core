@@ -286,7 +286,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public Collection<PropertySource> getPropertySources() {
-        return Collections.unmodifiableCollection(propertySources.values());
+        // A copy taken under the monitor of the map: property sources are added and removed while
+        // the environment runs, and iterating a view of the map would then fail
+        synchronized (propertySources) {
+            return List.copyOf(propertySources.values());
+        }
     }
 
     @Override
@@ -408,7 +412,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private void loadProperties() {
         refreshablePropertySources.clear();
         List<PropertySource> propertySources = new ArrayList<>(configLocations.size());
-        Set<String> preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
+        Set<String> preExistingSourceNames;
+        synchronized (this.propertySources) {
+            // copied under the monitor: another thread can add or remove a property source meanwhile
+            preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
+        }
         if (configuration.isEnableDefaultPropertySources()) {
             propertySources.addAll(readPropertySourceList(applicationName));
             List<PropertySource> defaultPropertySources = new ArrayList<>(4);
@@ -426,7 +434,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         } else {
             propertySources = new ArrayList<>(this.propertySources.size());
         }
-        for (PropertySource propertySource : this.propertySources.values()) {
+        for (PropertySource propertySource : getPropertySources()) {
             if (!propertySources.contains(propertySource)) {
                 propertySources.add(propertySource);
             }
