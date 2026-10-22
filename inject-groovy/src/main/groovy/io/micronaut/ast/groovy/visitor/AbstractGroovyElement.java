@@ -403,6 +403,12 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
                     return (GroovyClassElement) newClassElement(groovyPlaceholderNativeElement, classNode, parentTypeArguments, visitedTypes, true, finalIsRawType, stripTypeArguments);
                 })
                 .toList();
+            if (!alreadyVisitedPlaceholder) {
+                // The variable is visited while its own bounds are resolved, which is what stops at the T within
+                // the bounds of T extends Comparable<T>. It is not visited for what is resolved after it, so that
+                // the T within the bounds of a sibling V extends List<? extends T> keeps its own bounds
+                visitedTypes.remove(placeholderEntry);
+            }
             if (bounds.isEmpty()) {
                 bounds = Collections.singletonList((GroovyClassElement) getObjectClassElement());
             }
