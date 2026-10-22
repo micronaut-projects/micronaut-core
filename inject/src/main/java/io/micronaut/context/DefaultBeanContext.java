@@ -589,7 +589,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 awaitParallelStartupTermination();
 
                 // dedup by identity: identity hash codes are not unique across live objects
-                Set<Object> processed = Collections.newSetFromMap(new IdentityHashMap<>());
+                DestroyedSingletons processed = new DestroyedSingletons();
                 destroySingletons(singletonScope.getBeanRegistrations(), processed);
 
                 // a @PreDestroy hook is free to resolve beans, which may create brand-new singletons
@@ -599,7 +599,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 for (int pass = 0; ; pass++) {
                     List<BeanRegistration> stragglers = singletonScope.getBeanRegistrations()
                         .stream()
-                        .filter(br -> !processed.contains(br.bean))
+                        .filter(br -> !processed.contains(br))
                         .toList();
                     if (stragglers.isEmpty() && shutdownDependents.isEmpty()) {
                         break;
@@ -5680,19 +5680,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * Destroys the given singleton registrations, skipping any bean already present in {@code processed}.
      *
      * @param registrations The registrations to destroy
-     * @param processed     The identity set of already destroyed beans, added to as beans are destroyed
+     * @param processed     The singletons already destroyed, added to as beans are destroyed
      */
-    private void destroySingletons(Collection<BeanRegistration> registrations, Set<Object> processed) {
+    private void destroySingletons(Collection<BeanRegistration> registrations, DestroyedSingletons processed) {
         // need to sort registered singletons so that beans with that require other beans appear first
         List<BeanRegistration> objects = (List) BeanDestructionOrder.sort((Collection) registrations);
 
         Set<Object> retainedBeans = retainedBeans(objects);
         for (BeanRegistration beanRegistration : objects) {
             Object bean = beanRegistration.bean;
-            if (!processed.add(bean)) {
+            if (!processed.add(beanRegistration)) {
                 continue;
             }
-            if (retainedBeans.contains(bean)) {
+            if (bean != null && retainedBeans.contains(bean)) {
                 // kept alive for the context that comes next: no @PreDestroy, no destruction event
                 continue;
             }
@@ -5708,6 +5708,25 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     LOG.error(e.getMessage(), e);
                 }
             }
+        }
+    }
+
+    /**
+     * The singletons a stop destroyed: each bean once, by identity, however many registrations share it, and each
+     * registration a nullable factory produced no bean for, which has no instance to share and releases what it holds.
+     */
+    private static final class DestroyedSingletons {
+        private final Set<Object> beans = Collections.newSetFromMap(new IdentityHashMap<>());
+        private final Set<BeanRegistration<?>> nullRegistrations = Collections.newSetFromMap(new IdentityHashMap<>());
+
+        boolean add(BeanRegistration<?> registration) {
+            Object bean = registration.bean;
+            return bean != null ? beans.add(bean) : nullRegistrations.add(registration);
+        }
+
+        boolean contains(BeanRegistration<?> registration) {
+            Object bean = registration.bean;
+            return bean != null ? beans.contains(bean) : nullRegistrations.contains(registration);
         }
     }
 
