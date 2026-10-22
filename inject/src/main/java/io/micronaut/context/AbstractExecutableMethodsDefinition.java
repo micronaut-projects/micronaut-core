@@ -74,7 +74,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     }
 
     @Override
-    public void configure(Environment environment) {
+    public synchronized void configure(Environment environment) {
         this.environment = environment;
         for (DispatchedExecutableMethod<T, ?> executableMethod : executableMethods) {
             if (executableMethod != null) {
@@ -84,7 +84,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     }
 
     @Override
-    public void configure(BeanContext beanContext) {
+    public synchronized void configure(BeanContext beanContext) {
         this.beanContext = beanContext;
         for (DispatchedExecutableMethod<T, ?> executableMethod : executableMethods) {
             if (executableMethod != null) {
@@ -97,11 +97,16 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      * Releases the environment and the context that the methods were configured with last, if they still are: a
      * definition of the parent tier holds these methods statically, for every context that loads it, and a stopped
      * context must not stay reachable from them. A context that configured them since keeps them.
+     * <p>Synchronized with the two {@code configure} methods, so that a context configuring these methods while
+     * another one stops, as in tests run in parallel in development mode, is not released between the check and the
+     * writes. These run once per context start and stop; a method created lazily by
+     * {@link #getExecutableMethodByIndex(int)}, on the invocation path, reads the configuration without the lock, as it
+     * did before.</p>
      *
      * @param environment The environment of the context that stops
      * @param beanContext The context that stops
      */
-    final void release(Environment environment, BeanContext beanContext) {
+    final synchronized void release(Environment environment, BeanContext beanContext) {
         BeanContext configuredContext = this.beanContext;
         if (this.environment != environment || configuredContext != null && configuredContext != beanContext) {
             return;

@@ -247,6 +247,7 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param beanContext The context that stops
      * @since 5.3.0
      */
+    @Internal
     default void releaseExecutableMethods(Environment environment, BeanContext beanContext) {
         // nothing shared
     }
