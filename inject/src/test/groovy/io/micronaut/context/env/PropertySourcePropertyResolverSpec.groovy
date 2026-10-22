@@ -42,6 +42,156 @@ import java.util.function.Function
  */
 class PropertySourcePropertyResolverSpec extends Specification {
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13914")
+    void "indexed overrides do not mutate the list held by a property source"() {
+        given:
+        List<Object> sourceList = new ArrayList<>(['a', 'b'])
+        def resolver = new PropertySourcePropertyResolver(
+            PropertySource.of('base', ['app.list': sourceList])
+        )
+        def originalCatalogValue = resolver.resolveEntriesForKey('app.list', false, PropertyCatalog.GENERATED)['app.list'].value()
+        assert originalCatalogValue.is(sourceList)
+
+        when:
+        resolver.addPropertySource(PropertySource.of('override', ['app.list[0]': 'z']))
+
+        then:
+        sourceList == ['a', 'b']
+        resolver.getRequiredProperty('app.list', List) == ['z', 'b']
+        !resolver.resolveEntriesForKey('app.list', false, PropertyCatalog.GENERATED)['app.list'].value().is(sourceList)
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13914")
+    void "indexed overrides of immutable lists work without changing the source"() {
+        given:
+        def sourceList = List.of('a', 'b')
+        def resolver = new PropertySourcePropertyResolver(
+            PropertySource.of('base', ['app.list': sourceList]),
+            PropertySource.of('override', ['app.list[0]': 'z'])
+        )
+
+        expect:
+        sourceList == ['a', 'b']
+        resolver.getRequiredProperty('app.list', List) == ['z', 'b']
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13914")
+    void "indexed nested map overrides leave the source and RAW spelling untouched"() {
+        given:
+        def sourceList = [[name: 'x']]
+        def values = new LinkedHashMap()
+        values.put('app.items', sourceList)
+        values.put('app.items[0].myKey', 'y')
+        def source = PropertySource.of('base', values)
+
+        when:
+        def first = new PropertySourcePropertyResolver(source)
+        def firstRaw = first.getProperties('app', StringConvention.RAW)['items']
+        def second = new PropertySourcePropertyResolver(source)
+
+        then:
+        sourceList == [[name: 'x']]
+        firstRaw == [[name: 'x', myKey: 'y']]
+        second.getProperties('app', StringConvention.RAW)['items'] == firstRaw
+        first.getProperties('app')['items'] == [[name: 'x', 'my-key': 'y']]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13914")
+    void "a structured value supplied at an indexed key is not modified by a later indexed key"() {
+        given:
+        def sourceMap = [name: 'x']
+        def values = new LinkedHashMap()
+        values.put('app.items[0]', sourceMap)
+        values.put('app.items[0].myKey', 'y')
+        def resolver = new PropertySourcePropertyResolver(PropertySource.of('base', values))
+
+        expect:
+        sourceMap == [name: 'x']
+        resolver.getRequiredProperty('app.items', List) == [[name: 'x', 'my-key': 'y']]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13914")
+    void "an in-progress refresh does not leak an indexed override into the published catalog"() {
+        given:
+        List<Object> sourceList = new ArrayList<>(['a', 'b'])
+        def base = PropertySource.of('base', ['app.list': sourceList, 'app.scalar': 'old'])
+        def resolver = new PropertySourcePropertyResolver(base)
+        CountDownLatch entered = new CountDownLatch(1)
+        CountDownLatch release = new CountDownLatch(1)
+        def backgroundFailure = new java.util.concurrent.atomic.AtomicReference<Throwable>()
+        Thread thread = Thread.start {
+            try {
+                resolver.refresh({
+                    resolver.reset()
+                    resolver.addPropertySource(base)
+                    resolver.addPropertySource(PropertySource.of('override', [
+                        'app.list[0]': 'z',
+                        'app.scalar': 'new'
+                    ]))
+                    entered.countDown()
+                    assert release.await(10, TimeUnit.SECONDS)
+                } as Runnable)
+            } catch (Throwable failure) {
+                backgroundFailure.set(failure)
+                entered.countDown()
+            }
+        }
+
+        when: "a refresh has built but not published the replacement catalog"
+        String duringScalar
+        List duringList
+        try {
+            assert entered.await(10, TimeUnit.SECONDS)
+            assert backgroundFailure.get() == null
+            duringScalar = resolver.getRequiredProperty('app.scalar', String)
+            duringList = resolver.getRequiredProperty('app.list', List)
+        } finally {
+            release.countDown()
+            thread.join(10_000)
+        }
+
+        then: "both values come from the same previously published state"
+        !thread.alive
+        backgroundFailure.get() == null
+        duringScalar == 'old'
+        duringList == ['a', 'b']
+        sourceList == ['a', 'b']
+        resolver.getRequiredProperty('app.scalar', String) == 'new'
+        resolver.getRequiredProperty('app.list', List) == ['z', 'b']
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13914")
+    void "removing an indexed override and refreshing restores the declaring list"() {
+        given:
+        List<Object> sourceList = new ArrayList<>(['a', 'b'])
+        def base = PropertySource.of('base', ['app.list': sourceList], 1)
+        def overlay = PropertySource.of('overlay', ['app.list[0]': 'z'], 2)
+        def env = ApplicationContext.builder()
+            .deduceEnvironment(false)
+            .enableDefaultPropertySources(false)
+            .propertySources(base, overlay)
+            .build()
+            .getEnvironment()
+
+        when:
+        env.start()
+
+        then:
+        env.getRequiredProperty('app.list', List) == ['z', 'b']
+        sourceList == ['a', 'b']
+
+        when:
+        env.removePropertySource(overlay)
+        env.refresh()
+
+        then:
+        env.getRequiredProperty('app.list', List) == ['a', 'b']
+        sourceList == ['a', 'b']
+
+        cleanup:
+        env.stop()
+    }
+
     void "placeholder lookup does not retain a missing value observed during catalog reinitialization"() {
         given:
         PropertySource source = PropertySource.of("test", ["test.value": "resolved"])

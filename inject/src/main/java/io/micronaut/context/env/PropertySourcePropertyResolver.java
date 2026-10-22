@@ -870,6 +870,19 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                         String propertyName = resolvedProperty.substring(0, i);
                         Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(propertyName, true, PropertyCatalog.GENERATED);
                         if (entries != null) {
+                            // Expand into our own containers, never those held by a property source.
+                            // A bare structured property can have re-aliased this base at any time.
+                            if (writeState.generatedOwnedBases.add(propertyName)) {
+                                DefaultPropertyEntry existing = entries.get(propertyName);
+                                if (existing != null) {
+                                    entries.put(propertyName, new DefaultPropertyEntry(
+                                        propertyName,
+                                        deepCopyForRawExpansion(existing.value()),
+                                        existing.raw(),
+                                        existing.origin()
+                                    ));
+                                }
+                            }
                             entries.put(resolvedProperty, new DefaultPropertyEntry(
                                 resolvedProperty,
                                 value,
@@ -880,7 +893,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                                 entries,
                                 propertyName,
                                 resolvedProperty.substring(i),
-                                value,
+                                deepCopyForRawExpansion(value),
                                 property,
                                 properties.getOrigin()
                             );
@@ -900,6 +913,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                     } else {
                         Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.GENERATED);
                         if (entries != null) {
+                            // A new bare value may be shared with the declaring source.
+                            writeState.generatedOwnedBases.remove(resolvedProperty);
                             if (value instanceof List || value instanceof Map) {
                                 collapseProperty(property, resolvedProperty, entries, value, properties.getOrigin());
                             }
@@ -1015,9 +1030,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * Recursively duplicates the {@link List} and {@link Map} spine of a value, so that RAW can
-     * expand into its own copy without mutating the property source's value or the instance the
-     * GENERATED catalog serves.
+     * Recursively duplicates the {@link List} and {@link Map} spine of a value so that
+     * indexed expansion never mutates a property source's containers or another catalog's values.
      *
      * <p>Every other value is shared rather than copied, which is safe because expansion only ever
      * mutates a {@code List} by index or a {@code Map} by key: an array, a {@code Set} or a leaf
@@ -1356,6 +1370,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         // place. A bare key stores its value by reference and clears the name; the next indexed key
         // targeting that base copies the value once and records it here. Guarded by `catalogLock`.
         private final Set<String> rawOwnedBases = new HashSet<>();
+        // GENERATED also starts with source-owned structured values. Only the first indexed
+        // write after a bare assignment needs a private copy of the container spine.
+        private final Set<String> generatedOwnedBases = new HashSet<>();
 
         private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
         /**
