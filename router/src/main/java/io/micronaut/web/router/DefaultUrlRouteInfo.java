@@ -381,8 +381,14 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         if (template instanceof UriRouteTemplate uriTemplate) {
             this.uriTemplateMatcher = uriTemplate.matcher();
             this.uriMatchTemplate = uriTemplate.getUriMatchTemplate();
-            this.ambiguityVariableSegments = uriMatchTemplate.getPathVariableSegmentCount();
-            this.ambiguityRawSegmentLength = uriMatchTemplate.getRawSegmentLength();
+            if (uriTemplateMatcher != null) {
+                // a Micronaut template: a subclass of the template keeps computing them, see DefaultRouter
+                this.ambiguityVariableSegments = uriMatchTemplate.getPathVariableSegmentCount();
+                this.ambiguityRawSegmentLength = uriMatchTemplate.getRawSegmentLength();
+            } else {
+                this.ambiguityVariableSegments = 0;
+                this.ambiguityRawSegmentLength = 0;
+            }
         } else {
             this.uriTemplateMatcher = null;
             this.uriMatchTemplate = null;
