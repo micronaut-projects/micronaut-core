@@ -659,7 +659,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 Optional<T> converted;
                 if (entries != null) {
                     // iff entries is null, the value is from placeholderResolutionCache and doesn't need this step
-                    value = resolvePlaceHoldersIfNecessary(currentState, value);
+                    value = resolvePlaceHoldersIfNecessary(currentState, value, name, lookupRevision);
                     cache(currentState.placeholderResolutionCache, name, value, lookupRevision);
                 }
                 if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
@@ -1357,6 +1357,98 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
+     * Resets the caches, and forgets what the expressions of the properties have resolved to, as a
+     * property source added to or removed from a running environment does.
+     */
+    void resetCachesAndRememberedValues() {
+        // Forgotten before the revision changes: a lookup that reads the new revision then finds the
+        // values forgotten, so what it caches for that revision is what is remembered again.
+        readState().rememberedValues.clear();
+        resetCaches();
+    }
+
+    /**
+     * Resolves the placeholders of a property's text, with the memory of its expressions.
+     *
+     * @param resolverState  The state the text was read from
+     * @param text           The text
+     * @param place          Where the text was found: the name it was looked up by, a {@link ListElement} or a {@link MapValue}
+     * @param lookupRevision The revision read before the catalogs
+     * @return The text with its placeholders resolved
+     */
+    private Object resolvePlaceholders(ResolverState resolverState, String text, Object place, long lookupRevision) {
+        if (propertyPlaceholderResolver instanceof DefaultPropertyPlaceholderResolver placeholderResolver) {
+            return placeholderResolver.resolveRequiredPlaceholdersObject(text, (placeholder, expression) ->
+                value -> remember(resolverState, place, text, new ExpressionPosition(placeholder, expression), value, lookupRevision));
+        }
+        return propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(text);
+    }
+
+    /**
+     * What an expression of a property's text resolves to, the value remembered for it if there is one.
+     *
+     * <p>Some expressions, such as {@code random.port}, resolve to another value every time, and the
+     * cache of resolved values is not used after a property source is processed. A property source
+     * that reads such a value while the property sources are being processed would be left with one
+     * that no later lookup returns. So the resolvers of such expressions, the
+     * {@link RememberingPropertyExpressionResolver}s, remember what an expression has resolved to
+     * here, with the text, by the place the text was found at and the position of the expression in
+     * it. It is used again for as long as a lookup finds the same text there. The other expressions
+     * of the text, such as the property that {@code http://${app.host}:${random.port}/} names, are
+     * resolved as before, by every lookup that does not find the value cached.</p>
+     *
+     * <p>A lookup that read the text before a property source replaced it can finish after a later
+     * lookup has remembered the replacement. Like the caches, the memory only takes a text from a
+     * lookup that has read the catalogs as they still are, or from the thread that is changing them,
+     * which holds their lock and so reads them as they are. It also takes it when nothing is
+     * remembered at the place: what is remembered for a text is only used by a lookup that finds the
+     * same text.</p>
+     *
+     * @param resolverState  The state the text was read from
+     * @param place          Where the text was found, see {@link #resolvePlaceholders(ResolverState, String, Object, long)}
+     * @param text           The text
+     * @param position       The position of the expression in the text
+     * @param value          Resolves the expression
+     * @param lookupRevision The revision read before the catalogs
+     * @return What the expression resolves to
+     */
+    private Object remember(ResolverState resolverState, Object place, String text, ExpressionPosition position,
+                            Supplier<Object> value, long lookupRevision) {
+        RememberedText remembered = resolverState.rememberedValues.get(place);
+        if (remembered != null && remembered.text().equals(text)) {
+            Object rememberedValue = remembered.values().get(position);
+            if (rememberedValue != null) {
+                return rememberedValue;
+            }
+        }
+        Object resolved = value.get();
+        boolean changingCatalogs = Thread.holdsLock(catalogLock);
+        Object[] result = {resolved};
+        // Checked within compute, which a lookup at the place by another thread waits for: by the time
+        // another lookup can read a text that this one has not read, the revision has changed.
+        resolverState.rememberedValues.compute(place, (key, earlier) -> {
+            if (earlier != null && earlier.text().equals(text)) {
+                // what a lookup of another thread may have remembered for the expression meanwhile
+                Object other = earlier.values().putIfAbsent(position, resolved);
+                if (other != null) {
+                    result[0] = other;
+                }
+                return earlier;
+            }
+            boolean current = earlier == null
+                || changingCatalogs
+                || ((lookupRevision & 1) == 0 && resolverState.revision.get() == lookupRevision);
+            if (!current) {
+                return earlier;
+            }
+            Map<ExpressionPosition, Object> values = new ConcurrentHashMap<>(2);
+            values.put(position, resolved);
+            return new RememberedText(text, values);
+        });
+        return result[0];
+    }
+
+    /**
      * Reads a cached value.
      *
      * @param cache          The cache
@@ -1425,10 +1517,28 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @return The value with its placeholders resolved
      */
     private Object resolvePlaceHoldersIfNecessary(ResolverState resolverState, Object value) {
+        return resolvePlaceHoldersIfNecessary(resolverState, value, null, 0);
+    }
+
+    /**
+     * Resolves the placeholders of a value. The expressions that remember what they resolve to,
+     * such as the random ones, keep it for the place the text was found at.
+     *
+     * @param resolverState  The state the value was read from, which the properties the
+     *                       placeholders name are read from too
+     * @param value          The value
+     * @param place          Where the value was found: the name it was looked up by, a {@link ListElement}
+     *                       or a {@link MapValue}; {@code null} if nothing is remembered
+     * @param lookupRevision The revision read before the catalogs
+     * @return The value with its placeholders resolved
+     */
+    private Object resolvePlaceHoldersIfNecessary(ResolverState resolverState, Object value, @Nullable Object place, long lookupRevision) {
         if (value instanceof CharSequence) {
             String str = value.toString();
             if (str.contains(propertyPlaceholderResolver.getPrefix())) {
-                return onState(resolverState, () -> propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(str));
+                return onState(resolverState, () -> place != null
+                    ? resolvePlaceholders(resolverState, str, place, lookupRevision)
+                    : propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(str));
             }
             // without a placeholder there is nothing to resolve
             return str;
@@ -1436,15 +1546,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             List<?> newList = new ArrayList<>(list);
             final ListIterator i = newList.listIterator();
             while (i.hasNext()) {
+                Object elementPlace = place != null ? new ListElement(place, i.nextIndex()) : null;
                 final Object o = i.next();
                 if (o instanceof CharSequence) {
-                    i.set(resolvePlaceHoldersIfNecessary(resolverState, o));
+                    i.set(resolvePlaceHoldersIfNecessary(resolverState, o, elementPlace, lookupRevision));
                 } else if (o instanceof Map<?,?> submap) {
                     Map<Object, Object> newMap = CollectionUtils.newLinkedHashMap(submap.size());
                     for (Map.Entry<?, ?> entry : submap.entrySet()) {
                         final Object k = entry.getKey();
                         final Object v = entry.getValue();
-                        newMap.put(k, resolvePlaceHoldersIfNecessary(resolverState, v));
+                        Object valuePlace = elementPlace != null ? new MapValue(elementPlace, k) : null;
+                        newMap.put(k, resolvePlaceHoldersIfNecessary(resolverState, v, valuePlace, lookupRevision));
                     }
                     i.set(newMap);
                 }
@@ -1512,14 +1624,60 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
         private final Map<String, CachedValue> containsCache = new ConcurrentHashMap<>(20);
         /**
-         * Cache for values <i>before</i> conversion. This avoids recomputing placeholders, which keeps
-         * random values (e.g. {@code ${random.port}} stable).
+         * Cache for values <i>before</i> conversion. This avoids recomputing placeholders. What
+         * expressions such as {@code ${random.port}} resolve to is kept in
+         * {@link #rememberedValues} as well, which keeps them stable for the lookups of a property.
          */
         private final Map<String, CachedValue> placeholderResolutionCache = new ConcurrentHashMap<>(20);
+        /**
+         * What the {@link RememberingPropertyExpressionResolver}s have resolved the expressions of
+         * the texts to, by the place the text was found at: the name it was looked up by, a
+         * {@link ListElement} or a {@link MapValue}. Unlike the caches it is kept when a property
+         * source is processed. It holds one entry per looked-up name, or place in a list, whose text
+         * holds, or held, such an expression. A refresh publishes another state, so the expressions
+         * are resolved again after a refresh.
+         */
+        private final Map<Object, RememberedText> rememberedValues = new ConcurrentHashMap<>(4);
         /**
          * Cache for values <i>after</i> conversion.
          */
         private final Map<ConversionCacheKey, CachedValue> resolvedValueCache = new ConcurrentHashMap<>(20);
+    }
+
+    /**
+     * What the expressions of a text have resolved to.
+     *
+     * @param text   The text
+     * @param values What its expressions have resolved to, by their position in the text
+     */
+    private record RememberedText(String text, Map<ExpressionPosition, Object> values) {
+    }
+
+    /**
+     * The position of an expression in a text.
+     *
+     * @param placeholder The index of its placeholder among the segments of the text
+     * @param expression  Its index among the expressions of the placeholder
+     */
+    private record ExpressionPosition(int placeholder, int expression) {
+    }
+
+    /**
+     * The place of an element of a list, the key of what its expressions have resolved to.
+     *
+     * @param list  The place of the list
+     * @param index The index of the element
+     */
+    private record ListElement(Object list, int index) {
+    }
+
+    /**
+     * The place of a value of a map, the key of what its expressions have resolved to.
+     *
+     * @param map The place of the map
+     * @param key The key of the value, compared with {@code equals}
+     */
+    private record MapValue(Object map, @Nullable Object key) {
     }
 
     /**
