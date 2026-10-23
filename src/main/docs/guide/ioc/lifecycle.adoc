@@ -41,6 +41,8 @@ snippet::io.micronaut.docs.lifecycle.Connection[tags="class", indent=0]
 
 NOTE: Simply implementing the `Closeable` or `AutoCloseable` interface is not enough for a bean to be closed with the context. One of the above methods must be used.
 
+NOTE: For a bean produced by a ann:context.annotation.Factory[], the `preDestroy` value on the producing element is the only one of these that applies: a `@PreDestroy` or `@PostConstruct` method declared by the produced type is not invoked, because the instance is constructed by the factory and is not a managed instance of the produced type. See <<factories, Bean Factories>>.
+
 === Destruction Order
 
 When the context is closed, singletons are destroyed in dependency order: a bean is always destroyed before the beans injected into it, whether they were injected through the constructor, a method or a field. This lets a bean use its dependencies from its `@PreDestroy` method.
