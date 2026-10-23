@@ -7,6 +7,8 @@ import io.netty.handler.codec.compression.Brotli;
 import io.netty.handler.codec.compression.SnappyFrameDecoder;
 import io.netty.handler.codec.compression.SnappyFrameEncoder;
 import io.netty.handler.codec.compression.Zstd;
+import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
+import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -14,9 +16,19 @@ import java.nio.charset.StandardCharsets;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NettyZlibCodecFactoryTest {
+    @Test
+    void legacyImplementationInheritsStockWebSocketHandlers() {
+        NettyZlibCodecFactory factory = DefaultNettyZlibCodecFactory.INSTANCE;
+        var server = factory.newWebSocketServerCompressionHandler(12345);
+        assertInstanceOf(WebSocketServerCompressionHandler.class, server);
+        assertNotSame(server, factory.newWebSocketServerCompressionHandler(12345));
+        assertSame(WebSocketClientCompressionHandler.INSTANCE, factory.newWebSocketClientCompressionHandler(23456));
+    }
+
     @Test
     void legacyImplementationInheritsStockCodecs() {
         NettyZlibCodecFactory factory = DefaultNettyZlibCodecFactory.INSTANCE;
