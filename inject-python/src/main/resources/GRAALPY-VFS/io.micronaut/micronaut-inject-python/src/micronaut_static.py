@@ -13,8 +13,9 @@ function of the compilation as Java ``StaticCompilationDecision`` values:
   ``__slots__`` or ``__getattr__``), an ``async`` or generator function or a special method
   (property accessors are properties of the model, not functions, and get no decision);
 * ``SKIPPED`` with every reason the author can address: a signature without a fixed Java layout
-  (``*args``, ``**kwargs``, keyword-only parameters, an unhinted or unresolvable parameter or
-  return), a statement or expression kind that has no lowering;
+  (``*args``, ``**kwargs``, keyword-only parameters, an unhinted or unresolvable parameter, a return
+  hint that resolves to no type), a statement or expression kind that has no lowering. A missing
+  return hint is no reason: the stub declares an ``Object`` return;
 * ``COMPILED`` when every check passes and the body lowers to the IR the Java side generates code
   from (:mod:`micronaut_lowering`); a body the checker's inference flags, or that uses a construct
   without a lowering, is ``SKIPPED`` with those reasons.
@@ -28,7 +29,7 @@ import ast
 
 import java
 
-from micronaut_typecheck import Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, _function_node, _switch_value
+from micronaut_typecheck import Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, function_node, switch_value
 from micronaut_lowering import JAVA_RESERVED_NAMES, Lowering, stub_type_name, _decorated_with
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
@@ -79,7 +80,7 @@ class CompileScope:
             if decorator.annotationName() in self.annotation_names:
                 members = decorator.members()
                 value = members.get("value") if members is not None else None
-                return True if value is None else _switch_value(value)
+                return True if value is None else switch_value(value)
         return None
 
     def resolve(self, module_decorators, class_decorators, function_decorators):
@@ -131,7 +132,7 @@ class StaticPlanner:
                     members.append(class_def.constructor())
                 members.sort(key=lambda function_def: function_def.span().line() if function_def.span() is not None else 0)
                 for function_def in members:
-                    self._decide(module, class_def, class_node, function_def, _function_node(class_node, function_def.name()))
+                    self._decide(module, class_def, class_node, function_def, function_node(class_node, function_def.name()))
         return list(self.decisions)
 
     def module_function(self, module, name):
@@ -241,6 +242,14 @@ class StaticPlanner:
                             java_layout=java_layout, planner=self, static=static)
         body = lowering.lower()
         return body, lowering.reasons
+
+    def _first_report(self, class_def):
+        """Whether the class is reported for the first time in this plan."""
+        name = class_def.qualifiedName()
+        if name in self._reported_classes:
+            return False
+        self._reported_classes.add(name)
+        return True
 
     def _record(self, qualified, span, outcome, scope, reasons, statements, explicit=False, stats=None):
         java_reasons = [Reason(rule, message, reason_span) for rule, message, reason_span in reasons]
@@ -658,16 +667,6 @@ def _yields(function_node):
 
 def _describe(node):
     return _NAMES.get(type(node), f"a {type(node).__name__} node")
-
-
-def _decorator_name(decorator):
-    if isinstance(decorator, ast.Name):
-        return decorator.id
-    if isinstance(decorator, ast.Attribute):
-        return decorator.attr
-    if isinstance(decorator, ast.Call):
-        return _decorator_name(decorator.func)
-    return None
 
 
 def _generates_class(script):
