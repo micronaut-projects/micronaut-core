@@ -29,11 +29,15 @@ import io.netty.handler.codec.compression.ZstdEncoder;
 import io.netty.handler.codec.compression.ZlibDecoder;
 import io.netty.handler.codec.compression.ZlibEncoder;
 import io.netty.handler.codec.compression.ZlibWrapper;
+import io.netty.handler.codec.http.websocketx.extensions.WebSocketClientExtensionHandler;
+import io.netty.handler.codec.http.websocketx.extensions.WebSocketServerExtensionHandler;
+import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
+import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 
 /**
- * Creates streaming HTTP compression handlers for HTTP connections and streams.
+ * Creates compression handlers for HTTP connections, streams, and WebSocket extensions.
  * Calls may arrive concurrently from different event loops. Each call must return a fresh
- * handler whose resources are released when it is removed.
+ * handler whose resources are released when it is removed, except for sharable WebSocket handlers.
  * A replacement bean applies independently of the configured channel transport.
  *
  * @since 5.3.0
@@ -61,6 +65,32 @@ public interface NettyZlibCodecFactory {
      * @since 5.3.0
      */
     ZlibDecoder newZlibDecoder(ZlibWrapper wrapper, int maxAllocation);
+
+    /**
+     * Creates a server handler that negotiates WebSocket compression extensions. The default
+     * retains Netty's compression settings and allocation policy. Overrides may enforce the
+     * endpoint's payload limit on decompressed messages.
+     *
+     * @param maxMessageBytes The endpoint's configured maximum message payload length
+     * @return A fresh extension handler, or a sharable handler
+     * @since 5.3.0
+     */
+    default WebSocketServerExtensionHandler newWebSocketServerCompressionHandler(int maxMessageBytes) {
+        return new WebSocketServerCompressionHandler();
+    }
+
+    /**
+     * Creates a client handler that negotiates WebSocket compression extensions. The default
+     * retains Netty's compression settings and allocation policy and returns its sharable singleton.
+     * Overrides may enforce the endpoint's payload limit on decompressed messages.
+     *
+     * @param maxMessageBytes The endpoint's configured maximum message payload length
+     * @return A fresh extension handler, or a sharable handler
+     * @since 5.3.0
+     */
+    default WebSocketClientExtensionHandler newWebSocketClientCompressionHandler(int maxMessageBytes) {
+        return WebSocketClientCompressionHandler.INSTANCE;
+    }
 
     /**
      * Reports whether this provider supports Brotli encoding and decoding. Overrides need not
