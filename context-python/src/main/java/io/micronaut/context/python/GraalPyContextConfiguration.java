@@ -75,6 +75,7 @@ public final class GraalPyContextConfiguration {
     );
     private Map<String, String> options = Map.of();
     private List<String> hostClassLookup = List.of();
+    private Map<String, String> environment = Map.of();
     private String polyglotLogLevel = GraalPySlf4jLogHandler.polyglotRootLevel();
 
     GraalPyContextConfiguration() {
@@ -215,7 +216,17 @@ public final class GraalPyContextConfiguration {
             if (CollectionUtils.isNotEmpty(env)) {
                 LOG.debug("Using GraalPy context env {}", env);
                 builder.environment(env);
+                this.environment = Map.copyOf(env);
             }
         }
+    }
+
+    /**
+     * The environment variables configured with {@code graalpy.context.environment}.
+     *
+     * @return The configured environment, empty when none is configured
+     */
+    Map<String, String> environment() {
+        return environment;
     }
 }
