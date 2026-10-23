@@ -17,13 +17,14 @@ package io.micronaut.http.netty.compression;
 
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.channel.ChannelHandler;
 import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Retains Netty HTTP framing and optional codecs while replacing zlib construction.
+ * Retains Netty HTTP framing while replacing streaming codec construction.
  */
 @Internal
 public class ZlibContentDecompressor extends HttpContentDecompressor {
@@ -39,14 +40,20 @@ public class ZlibContentDecompressor extends HttpContentDecompressor {
 
     @Override
     protected @Nullable EmbeddedChannel newContentDecoder(String contentEncoding) throws Exception {
-        ZlibWrapper wrapper;
+        ChannelHandler decoder;
         if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) || HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
-            wrapper = ZlibWrapper.GZIP;
+            decoder = factory.newZlibDecoder(ZlibWrapper.GZIP, 0);
         } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) || HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
-            wrapper = ZlibWrapper.ZLIB_OR_NONE;
+            decoder = factory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE, 0);
+        } else if (HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding) && factory.isBrotliAvailable()) {
+            decoder = factory.newBrotliDecoder(0);
+        } else if (HttpHeaderValues.ZSTD.contentEqualsIgnoreCase(contentEncoding) && factory.isZstdAvailable()) {
+            decoder = factory.newZstdDecoder(0);
+        } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
+            decoder = factory.newSnappyFrameDecoder();
         } else {
-            return super.newContentDecoder(contentEncoding);
+            return null;
         }
-        return new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(), ctx.channel().config(), factory.newZlibDecoder(wrapper, 0));
+        return new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(), ctx.channel().config(), decoder);
     }
 }

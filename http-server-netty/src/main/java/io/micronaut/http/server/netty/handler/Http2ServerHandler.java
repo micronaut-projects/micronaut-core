@@ -30,6 +30,7 @@ import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListe
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
@@ -496,10 +497,20 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                         wrapper = ZlibWrapper.GZIP;
                     } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) || HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
                         wrapper = ZlibWrapper.ZLIB_OR_NONE;
+                    } else if (HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding) && zlibCodecFactory.isBrotliAvailable()) {
+                        return newDecoderChannel(ctx, zlibCodecFactory.newBrotliDecoder(0));
+                    } else if (HttpHeaderValues.ZSTD.contentEqualsIgnoreCase(contentEncoding) && zlibCodecFactory.isZstdAvailable()) {
+                        return newDecoderChannel(ctx, zlibCodecFactory.newZstdDecoder(0));
+                    } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
+                        return newDecoderChannel(ctx, zlibCodecFactory.newSnappyFrameDecoder());
                     } else {
-                        return super.newContentDecompressor(ctx, contentEncoding);
+                        return null;
                     }
-                    return new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(), ctx.channel().config(), zlibCodecFactory.newZlibDecoder(wrapper, 0));
+                    return newDecoderChannel(ctx, zlibCodecFactory.newZlibDecoder(wrapper, 0));
+                }
+
+                private EmbeddedChannel newDecoderChannel(ChannelHandlerContext ctx, ChannelHandler decoder) {
+                    return new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(), ctx.channel().config(), decoder);
                 }
             } : frameListener;
             if (accessLogManagerFactory != null) {
