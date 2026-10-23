@@ -23,8 +23,10 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -61,6 +63,10 @@ public record StaticCompilationConfiguration(StaticCompilationMode mode,
      * No static compilation at all.
      */
     public static final StaticCompilationConfiguration OFF = new StaticCompilationConfiguration(StaticCompilationMode.OFF, null, false, DEFAULT_ANNOTATION_NAMES, false);
+
+    // the patterns depend on a name only, so they are compiled once for every configuration and source
+    private static final Map<String, Pattern> ALIAS_PATTERNS = new ConcurrentHashMap<>();
+    private static final Map<String, Pattern> SWITCH_PATTERNS = new ConcurrentHashMap<>();
 
     public StaticCompilationConfiguration {
         Objects.requireNonNull(mode, "mode");
@@ -111,7 +117,7 @@ public record StaticCompilationConfiguration(StaticCompilationMode mode,
             CharSequence text = source.getCharacters();
             Set<String> names = new LinkedHashSet<>(simpleNames);
             for (String simpleName : simpleNames) {
-                Matcher alias = Pattern.compile("\\b" + Pattern.quote(simpleName) + "[ \\t]+as[ \\t]+([A-Za-z_]\\w*)").matcher(text);
+                Matcher alias = aliasPattern(simpleName).matcher(text);
                 while (alias.find()) {
                     names.add(alias.group(1));
                 }
@@ -126,10 +132,22 @@ public record StaticCompilationConfiguration(StaticCompilationMode mode,
     }
 
     /**
+     * An import of the switch named {@code simpleName} under another name ({@code ... as Alias}),
+     * whose group 1 is the alias.
+     */
+    private static Pattern aliasPattern(String simpleName) {
+        return ALIAS_PATTERNS.computeIfAbsent(simpleName, name -> Pattern.compile("\\b" + Pattern.quote(name) + "[ \\t]+as[ \\t]+([A-Za-z_]\\w*)"));
+    }
+
+    /**
      * The forms that apply a switch named {@code name}: a decorator, possibly qualified by a module,
      * or a module-level statement, the name starting the line and called or standing alone.
      */
     private static Pattern switchPattern(String name) {
+        return SWITCH_PATTERNS.computeIfAbsent(name, StaticCompilationConfiguration::compileSwitchPattern);
+    }
+
+    private static Pattern compileSwitchPattern(String name) {
         String qualified = "(?:[A-Za-z_][\\w.]*\\.)?" + Pattern.quote(name);
         return Pattern.compile("(?m)^[ \\t]*@[ \\t]*" + qualified + "\\b|^" + qualified + "[ \\t]*(?:\\(|#|$)");
     }
