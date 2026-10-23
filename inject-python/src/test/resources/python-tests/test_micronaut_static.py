@@ -984,6 +984,42 @@ class WarningTest(unittest.TestCase):
         self.assertEqual(first_diagnostics, [diagnostic.message() for diagnostic in planner.diagnostics])
         self.assertEqual(2, len(planner.diagnostics))
 
+    def test_a_class_switch_on_a_class_that_can_never_be_compiled_is_flagged_once(self):
+        source = '''
+from enum import Enum
+from micronaut.context.python.annotation import CompileStatic
+
+@CompileStatic
+class Colour(Enum):
+    RED = 1
+
+    def label(self) -> str:
+        return "red"
+
+    def code(self) -> int:
+        return 1
+
+@CompileStatic
+class Slotted:
+    __slots__ = ("value",)
+
+    def run(self, value: int) -> int:
+        return value
+
+    def twice(self, value: int) -> int:
+        return value * 2
+'''
+        _, planner = plan(source, MODE_ANNOTATED)
+        messages = [diagnostic.message() for diagnostic in planner.diagnostics]
+        self.assertEqual(["[Colour.label] cannot be compiled statically: [class-not-eligible] [Colour] is an enum",
+                          "[Slotted.run] cannot be compiled statically: [class-not-eligible] [Slotted] declares __slots__"], messages)
+        # planned again, the classes are flagged again, once each
+        planner.plan(planner.checker)
+        self.assertEqual(messages, [diagnostic.message() for diagnostic in planner.diagnostics])
+        # mode all does not warn for a class-level switch
+        _, planner = plan(source, MODE_ALL)
+        self.assertEqual([], [diagnostic.message() for diagnostic in planner.diagnostics])
+
 
 LOWERED = '''
 from typing import Annotated, Optional, Protocol
