@@ -70,7 +70,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
+import io.netty.handler.codec.http.websocketx.extensions.WebSocketServerExtensionHandler;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AsciiString;
 import io.netty.util.Attribute;
@@ -291,8 +291,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         ChannelPipeline pipeline = ctx.pipeline();
 
         try {
-            installCompressionHandler(ctx, msg.getNativeRequest());
-            handleHandshake(ctx, msg, webSocketBean, actualResponse).addListener(future -> {
+            int maxFramePayloadLength = webSocketBean.messageMethod()
+                .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
+                    .orElse(65536)).orElse(65536);
+            installCompressionHandler(ctx, msg.getNativeRequest(), maxFramePayloadLength);
+            handleHandshake(ctx, msg, webSocketBean, actualResponse, maxFramePayloadLength).addListener(future -> {
                 if (future.isSuccess()) {
                     // the connection is no longer this request's: its close ends the session
                     msg.responseUpgraded();
@@ -352,6 +355,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
      * publishes the request terminated event, like for a request whose response was written.
      *
      * @param request The upgrade request
+     * @param maxFramePayloadLength The configured maximum payload length
      * @return The release, which may run more than once
      */
     private Runnable releaseOnce(NettyHttpRequest<?> request) {
@@ -365,7 +369,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     }
 
     /**
-     * Add the {@link WebSocketServerCompressionHandler} that negotiates the {@code permessage-deflate}
+     * Add the {@link WebSocketServerExtensionHandler} that negotiates the {@code permessage-deflate}
      * extension. It is only added to the pipeline once a connection is actually upgraded, so that
      * plain HTTP requests do not pay for it. The netty handler picks the extensions offered by the
      * client up from the upgrade request as it passes through {@code channelRead}, and then answers
@@ -375,10 +379,12 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
      *
      * @param ctx The context of the HTTP request handler
      * @param request The upgrade request
+     * @param maxFramePayloadLength The configured maximum payload length
      */
-    private void installCompressionHandler(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request) {
+    private void installCompressionHandler(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, int maxFramePayloadLength) {
         ChannelPipeline pipeline = ctx.pipeline();
-        WebSocketServerCompressionHandler compressionHandler = new WebSocketServerCompressionHandler();
+        WebSocketServerExtensionHandler compressionHandler = nettyEmbeddedServices.getZlibCodecFactory()
+            .newWebSocketServerCompressionHandler(maxFramePayloadLength);
         pipeline.addBefore(ctx.name(), COMPRESSION_HANDLER, compressionHandler);
         pipeline.addBefore(ctx.name(), UpgradeRequestSink.ID, UpgradeRequestSink.INSTANCE);
         try {
@@ -402,12 +408,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
      * @param req           The request
      * @param webSocketBean The web socket bean
      * @param response      The response
+     * @param maxFramePayloadLength The configured maximum payload length
      * @return The channel future
      **/
-    private ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, WebSocketBean<?> webSocketBean, HttpResponse<?> response) {
-        int maxFramePayloadLength = webSocketBean.messageMethod()
-                .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
-                .orElse(65536)).orElse(65536);
+    private ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, WebSocketBean<?> webSocketBean, HttpResponse<?> response, int maxFramePayloadLength) {
         WebSocketServerHandshakerFactory wsFactory =
                 new WebSocketServerHandshakerFactory(
                         getWebSocketURL(ctx, req),
@@ -456,6 +460,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
      *
      * @param router The router
      * @param request The upgrade request
+     * @param maxFramePayloadLength The configured maximum payload length
      * @return The WebSocket route, if any
      */
     private static Optional<UriRouteMatch<Object, Object>> findWebSocketRoute(Router router, HttpRequest<?> request) {
