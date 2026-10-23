@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.netty.compression.NettyZlibCodecFactory
 import io.micronaut.runtime.server.EmbeddedServer
+import io.netty.channel.ChannelHandler
 import io.netty.handler.codec.compression.ZlibCodecFactory
 import io.netty.handler.codec.compression.ZlibDecoder
 import io.netty.handler.codec.compression.ZlibEncoder
@@ -28,6 +29,11 @@ class ZlibCodecFactorySpec extends Specification {
             'spec.name': 'ZlibCodecFactorySpec',
             'micronaut.server.netty.compression-threshold': 0,
         ]
+        if (encoding in ['br', 'zstd', 'snappy']) {
+            options['codec.extra'] = true
+            options['micronaut.server.netty.compression-level'] = 4
+            options['micronaut.server.netty.max-zstd-encode-size'] = 1048576
+        }
         if (protocol != 'http1') {
             options += [
                 'micronaut.http.client.alpn-modes': protocol,
@@ -44,10 +50,10 @@ class ZlibCodecFactorySpec extends Specification {
         }
         def server = ApplicationContext.run(EmbeddedServer, options)
         def client = server.applicationContext.createBean(HttpClient, server.URI)
-        def factory = server.applicationContext.getBean(CountingFactory)
+        def factory = server.applicationContext.getBean(NettyZlibCodecFactory)
         String body = 'streaming codec construction '.repeat(128)
         def bytes = new ByteArrayOutputStream()
-        (encoding == 'gzip' ? new GZIPOutputStream(bytes) : new java.util.zip.DeflaterOutputStream(bytes))
+        (encoding == 'deflate' ? new java.util.zip.DeflaterOutputStream(bytes) : new GZIPOutputStream(bytes))
             .withCloseable { it.write(body.getBytes('UTF-8')) }
 
         expect:
@@ -60,13 +66,19 @@ class ZlibCodecFactorySpec extends Specification {
         factory.encoders.get() == 3
         factory.decoders.get() == 6
         factory.handlers.size() == 9
+        if (factory instanceof ExtraFactory) {
+            // Test providers use gzip internally to exercise routing without optional JNI libraries.
+            assert getClass().classLoader.getResource('com/aayushatharva/brotli4j/Brotli4jLoader.class') == null
+            assert getClass().classLoader.getResource('com/github/luben/zstd/Zstd.class') == null
+            assert factory.calls == ["decode:$encoding", "encode:$encoding", "decode:$encoding"] * 3
+        }
 
         cleanup:
         client?.close()
         server?.close()
 
         where:
-        [protocol, encoding] << [['http1', 'h2', 'h3'], ['gzip', 'deflate']].combinations()
+        [protocol, encoding] << [['http1', 'h2', 'h3'], ['gzip', 'deflate', 'br', 'zstd', 'snappy']].combinations()
     }
 
     def 'disabled compression and identity bodies do not construct codecs'() {
@@ -114,6 +126,7 @@ class ZlibCodecFactorySpec extends Specification {
 
     @Singleton
     @Requires(property = 'spec.name', value = 'ZlibCodecFactorySpec')
+    @Requires(missingProperty = 'codec.extra')
     static class CountingFactory implements NettyZlibCodecFactory {
         final AtomicInteger encoders = new AtomicInteger()
         final AtomicInteger decoders = new AtomicInteger()
@@ -134,6 +147,52 @@ class ZlibCodecFactorySpec extends Specification {
             assert handlers.add(handler)
             handler
         }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'ZlibCodecFactorySpec')
+    @Requires(property = 'codec.extra', value = 'true')
+    static class ExtraFactory extends CountingFactory {
+        final List<String> calls = Collections.synchronizedList(new ArrayList<>())
+
+        @Override
+        boolean isBrotliAvailable() { true }
+
+        @Override
+        boolean isZstdAvailable() { true }
+
+        private ChannelHandler encode(String encoding) {
+            calls.add("encode:$encoding".toString())
+            newZlibEncoder(ZlibWrapper.GZIP, 6, 15, 8)
+        }
+
+        private ChannelHandler decode(String encoding, int maxAllocation) {
+            assert maxAllocation == 0
+            calls.add("decode:$encoding".toString())
+            newZlibDecoder(ZlibWrapper.GZIP, maxAllocation)
+        }
+
+        @Override
+        ChannelHandler newBrotliEncoder() { encode('br') }
+
+        @Override
+        ChannelHandler newBrotliDecoder(int maxAllocation) { decode('br', maxAllocation) }
+
+        @Override
+        ChannelHandler newZstdEncoder(int compressionLevel, int maxEncodeSize) {
+            assert compressionLevel == 4
+            assert maxEncodeSize == 1048576
+            encode('zstd')
+        }
+
+        @Override
+        ChannelHandler newZstdDecoder(int maxAllocation) { decode('zstd', maxAllocation) }
+
+        @Override
+        ChannelHandler newSnappyFrameEncoder() { encode('snappy') }
+
+        @Override
+        ChannelHandler newSnappyFrameDecoder() { decode('snappy', 0) }
     }
 
     @Controller('/codec')
