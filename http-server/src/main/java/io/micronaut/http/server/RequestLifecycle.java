@@ -306,15 +306,17 @@ public class RequestLifecycle {
             );
         }
         Supplier<ExecutionFlow<HttpResponse<?>>> responseSupplier = () -> {
-            ExceptionHandler<Throwable, ?> handler = routeExecutor.beanContext.getBean(handlerDefinition);
-            try {
-                if (routeExecutor.serverConfiguration.isLogHandledExceptions()) {
-                    routeExecutor.logException(cause);
+            try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                ExceptionHandler<Throwable, ?> handler = routeExecutor.beanContext.getBean(handlerDefinition);
+                try {
+                    if (routeExecutor.serverConfiguration.isLogHandledExceptions()) {
+                        routeExecutor.logException(cause);
+                    }
+                    Object result = handler.handle(request, cause);
+                    return routeExecutor.createResponseForBody(propagatedContext, request, result, routeInfo, null);
+                } catch (Throwable e) {
+                    return createDefaultErrorResponseFlow(request, e);
                 }
-                Object result = handler.handle(request, cause);
-                return routeExecutor.createResponseForBody(propagatedContext, request, result, routeInfo, null);
-            } catch (Throwable e) {
-                return createDefaultErrorResponseFlow(request, e);
             }
         };
         ExecutionFlow<HttpResponse<?>> responseFlow;
