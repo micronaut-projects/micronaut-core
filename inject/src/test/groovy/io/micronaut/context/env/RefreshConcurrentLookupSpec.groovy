@@ -251,6 +251,9 @@ class RefreshConcurrentLookupSpec extends Specification {
         env.getProperty('copy.mixed', String).get().contains('-early-')
         env.getProperty('app.mixed', String).get().contains('-late-')
 
+        and: "the random values of a text that also names a property stay the ones the property source read"
+        env.getProperty('app.mixed', String).get() == env.getProperty('copy.mixed', String).get().replace('-early-', '-late-')
+
         when:
         String token = env.getProperty('app.token', String).get()
         env.refresh()
@@ -261,6 +264,7 @@ class RefreshConcurrentLookupSpec extends Specification {
         env.getProperty('app.overridden', String).get() == 'late'
         env.getProperty('app.changed', String).get().length() == 10
         env.getProperty('app.mixed', String).get().contains('-late-')
+        env.getProperty('app.mixed', String).get() == env.getProperty('copy.mixed', String).get().replace('-early-', '-late-')
 
         cleanup:
         env.stop()
@@ -282,6 +286,29 @@ class RefreshConcurrentLookupSpec extends Specification {
 
         then:
         resolver.getProperty('app.token', String).get() == 'fixed'
+    }
+
+    void "a property source added to a running environment draws new random values, for a text that also names a property and in a list too"() {
+        given:
+        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
+        env.addPropertySource(PropertySource.of('declares', [
+                'app.host': 'localhost',
+                'app.name': '${app.host}-${random.uuid2}',
+                'app.ids' : ['${random.uuid2}']
+        ], 10))
+        env.start()
+        String name = env.getProperty('app.name', String).get()
+        List ids = env.getProperty('app.ids', List).get()
+
+        when:
+        env.addPropertySource(PropertySource.of('unrelated', ['other.key': 'value'], 20))
+
+        then:
+        env.getProperty('app.name', String).get() != name
+        env.getProperty('app.ids', List).get() != ids
+
+        cleanup:
+        env.stop()
     }
 
     void "a random text read while the environment is stopped is the one it has once started again"() {

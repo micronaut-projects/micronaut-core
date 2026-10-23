@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.env.exp;
 
-import io.micronaut.context.env.PropertyExpressionResolver;
+import io.micronaut.context.env.RememberingPropertyExpressionResolver;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
@@ -27,6 +27,7 @@ import java.security.SecureRandom;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,19 +38,28 @@ import java.util.regex.Pattern;
  * @since 4.0.0
  */
 @Internal
-public final class RandomPropertyExpressionResolver implements PropertyExpressionResolver {
+public final class RandomPropertyExpressionResolver implements RememberingPropertyExpressionResolver {
 
     private static final String RANDOM_PREFIX = "random.";
     private static final String MSG_INVALID_RANGE = "Invalid range: `";
 
     @Override
     public <T> Optional<T> resolve(PropertyResolver propertyResolver, ConversionService conversionService, String expression, Class<T> requiredType) {
-        expression = expression.toLowerCase(Locale.ROOT);
-        if (!expression.startsWith(RANDOM_PREFIX)) {
+        // nothing to remember the value for: a new one every time
+        return resolve(propertyResolver, conversionService, expression, requiredType, Supplier::get);
+    }
+
+    @Override
+    public <T> Optional<T> resolve(PropertyResolver propertyResolver, ConversionService conversionService, String expression, Class<T> requiredType, Memory memory) {
+        String randomExpression = expression.toLowerCase(Locale.ROOT);
+        if (!randomExpression.startsWith(RANDOM_PREFIX)) {
             return Optional.empty();
         }
-        String value = expression.substring(RANDOM_PREFIX.length()).toLowerCase();
-        return Optional.of(conversionService.convertRequired(resolveRandomValue(value, expression), requiredType));
+        String value = randomExpression.substring(RANDOM_PREFIX.length()).toLowerCase();
+        // The value drawn, not the converted one, so that each lookup converts it to the type it asks for.
+        // An expression that cannot be resolved fails here, and nothing is remembered.
+        Object random = memory.remember(() -> resolveRandomValue(value, randomExpression));
+        return Optional.of(conversionService.convertRequired(random, requiredType));
     }
 
     private Object resolveRandomValue(String value, String expression) {
