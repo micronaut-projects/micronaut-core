@@ -145,6 +145,18 @@ public interface NettyEmbeddedServices {
     EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration config);
 
     /**
+     * Creates an event loop group with the configured transport and executor.
+     *
+     * @param config The event loop configuration
+     * @param executorService The executor service
+     * @return The event loop group
+     * @since 5.3.0
+     */
+    default EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration config, ExecutorService executorService) {
+        return createEventLoopGroup(config.getNumThreads(), executorService, config.getIoRatio().orElse(null));
+    }
+
+    /**
      * Creates the event loop group configuration.
      * @param numThreads The number of threads
      * @param executorService The executor service

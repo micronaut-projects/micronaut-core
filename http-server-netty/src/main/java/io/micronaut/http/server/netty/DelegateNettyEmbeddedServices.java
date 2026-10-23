@@ -115,6 +115,11 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     }
 
     @Override
+    default EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration config, ExecutorService executorService) {
+        return getDelegate().createEventLoopGroup(config, executorService);
+    }
+
+    @Override
     default EventLoopGroup createEventLoopGroup(int numThreads, ExecutorService executorService, @Nullable Integer ioRatio) {
         return getDelegate().createEventLoopGroup(numThreads, executorService, ioRatio);
     }
