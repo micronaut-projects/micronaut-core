@@ -107,6 +107,8 @@ class StaticPlanner:
         self._ineligibility = {}  # id(class_def) -> why the class generates no stub, or None: asked once per class
         self._decided = {}        # id(node) -> the decision, or None while it is being made
         self._bodies = {}         # id(node) -> the compiled body
+        # the classes already reported for a class-level switch they can never honour
+        self._reported_classes = set()
 
     def plan(self, checker, visitor_context=None):
         """
@@ -119,6 +121,7 @@ class StaticPlanner:
         self.diagnostics = []
         self._decided = {}
         self._bodies = {}
+        self._reported_classes = set()
         if getattr(checker, "facts", None) is None and visitor_context is not None:
             checker.facts = TypeFacts(visitor_context)
             checker.python_classes = PythonClasses(checker)
@@ -190,7 +193,9 @@ class StaticPlanner:
         java_layout = self._java_layout(module, class_def, function_def, node, bindings) if class_def is not None else None
         reasons = self._candidate_reasons(module, class_def, class_node, function_def, node, span, java_layout)
         if reasons:
-            return self._record(qualified, span, "NOT_CANDIDATE", scope, reasons, 0, explicit=scope == "FUNCTION")
+            # a class-level switch on a class that can never be compiled is flagged once for the class
+            ineligible_class = scope == "CLASS" and reasons[0][0] == "class-not-eligible" and self._first_report(class_def)
+            return self._record(qualified, span, "NOT_CANDIDATE", scope, reasons, 0, explicit=scope == "FUNCTION" or ineligible_class)
         reasons = self._signature_reasons(module, class_def, function_def, node, span, java_layout, bindings)
         statements = 0
         if node is not None:
