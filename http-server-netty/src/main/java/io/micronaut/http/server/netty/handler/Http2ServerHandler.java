@@ -448,7 +448,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
 
         public ConnectionHandlerBuilder compressor(HttpCompressionStrategy compressionStrategy) {
-            return compressor(Compressor.create(compressionStrategy));
+            return compressor(Compressor.create(compressionStrategy, zlibCodecFactory));
         }
 
         /**
@@ -490,7 +490,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
             Http2FrameListener fl = decompress ? new DelegatingDecompressorFrameListener(connection(), frameListener, false) {
                 @Override
-                protected EmbeddedChannel newContentDecompressor(ChannelHandlerContext ctx, CharSequence contentEncoding) throws Http2Exception {
+                protected @Nullable EmbeddedChannel newContentDecompressor(ChannelHandlerContext ctx, CharSequence contentEncoding) throws Http2Exception {
                     ZlibWrapper wrapper;
                     if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) || HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
                         wrapper = ZlibWrapper.GZIP;

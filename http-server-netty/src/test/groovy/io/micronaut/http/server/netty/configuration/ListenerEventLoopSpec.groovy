@@ -117,6 +117,44 @@ class ListenerEventLoopSpec extends Specification {
         server?.close()
     }
 
+    def 'incompatible worker channel fails at startup with group and channel details'() {
+        given:
+        def context = ApplicationContext.builder().properties([
+            'micronaut.netty.event-loops.bad.num-threads': 1,
+            'micronaut.netty.event-loops.bad.transport': ['fixture'],
+            'micronaut.server.netty.listeners.custom.port': -1,
+            'micronaut.server.netty.listeners.custom.event-loop-group': 'bad',
+        ]).build()
+        def factory = new io.micronaut.http.netty.channel.NioEventLoopGroupFactory() {
+            @Override
+            io.netty.channel.Channel channelInstance(io.micronaut.http.netty.channel.NettyChannelType type,
+                                                    io.micronaut.http.netty.channel.EventLoopGroupConfiguration config) {
+                if (type == io.micronaut.http.netty.channel.NettyChannelType.CLIENT_SOCKET) {
+                    return new io.netty.channel.socket.nio.NioSocketChannel() {
+                        @Override
+                        protected boolean isCompatible(io.netty.channel.EventLoop loop) { false }
+                    }
+                }
+                super.channelInstance(type, config)
+            }
+        }
+        context.registerSingleton(io.micronaut.http.netty.channel.EventLoopGroupFactory, factory,
+            io.micronaut.inject.qualifiers.Qualifiers.byName('fixture'))
+        context.start()
+
+        when:
+        context.getBean(NettyEmbeddedServer).start()
+
+        then:
+        def e = thrown(ServerStartupException)
+        e.cause.message.contains('custom')
+        e.cause.message.contains('bad')
+        e.cause.message.contains('CLIENT_SOCKET')
+
+        cleanup:
+        context.close()
+    }
+
     @Controller('/listener-thread')
     @Requires(property = 'spec.name', value = 'ListenerEventLoopSpec')
     static class ThreadController {
