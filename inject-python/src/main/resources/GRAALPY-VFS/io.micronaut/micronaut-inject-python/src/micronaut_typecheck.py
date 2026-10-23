@@ -27,7 +27,7 @@ MODE_ERROR = "error"
 MODES = (MODE_OFF, MODE_WARN, MODE_ERROR)
 
 
-def _switch_value(value):
+def switch_value(value):
     """The boolean a ``TypeChecked`` member value denotes; a string spelling of the literal counts too."""
     if isinstance(value, str):
         return value.strip().lower() not in ("false", "0", "")
@@ -59,7 +59,7 @@ class TypeCheckScope:
             if decorator.annotationName() in self.annotation_names:
                 members = decorator.members()
                 value = members.get("value") if members is not None else None
-                return True if value is None else _switch_value(value)
+                return True if value is None else switch_value(value)
         return None
 
     def severity(self, decorators, enclosing):
@@ -179,7 +179,7 @@ class TypeChecker:
                 for function_def in members:
                     severity = self.scope.severity(function_def.decorators(), class_severity)
                     qualified_name = f"{class_name}.{function_def.name()}"
-                    units.append(CheckUnit(module.source_path, qualified_name, function_def, _function_node(node, function_def.name(), function_def), class_def, severity, module))
+                    units.append(CheckUnit(module.source_path, qualified_name, function_def, function_node(node, function_def.name(), function_def), class_def, severity, module))
         return units
 
     def check(self, visitor_context):
@@ -512,7 +512,7 @@ def _environment_name(value):
     return "".join(out).upper()
 
 
-def _function_node(class_node, name, function_def=None):
+def function_node(class_node, name, function_def=None):
     """
     The AST node of the method of the given name in a class body, or None. A name defined more than once (a
     property and its setter, @overload stubs and their implementation) is told apart by the line of the
@@ -1482,9 +1482,9 @@ class PythonClassModel:
         self.qualified = class_def.qualifiedName()
         self.methods = {}
         for function_def in class_def.functions():
-            self.methods[function_def.name()] = (function_def, _function_node(node, function_def.name()))
+            self.methods[function_def.name()] = (function_def, function_node(node, function_def.name()))
         constructor = class_def.constructor()
-        self.constructor = (constructor, _function_node(node, "__init__")) if constructor is not None else None
+        self.constructor = (constructor, function_node(node, "__init__")) if constructor is not None else None
         self.properties = {prop.name(): prop for prop in class_def.properties()}
         self.attributes = {attribute.name(): attribute for attribute in class_def.attributes()}
         self.instance_attributes = _self_attributes(node)
