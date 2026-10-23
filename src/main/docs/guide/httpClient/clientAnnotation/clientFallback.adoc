@@ -20,33 +20,7 @@ Of course, the actual behaviour of the fallback is up to you. You can for exampl
 
 The api:retry.intercept.RecoveryInterceptor[] performs the recovery: it calls the fallback when a `@Recoverable` method fails. To customize it, for example to change how the fallback is looked up, replace it with a subclass that is also bound to `@Recoverable`:
 
-[source,java]
-----
-import io.micronaut.aop.InterceptorBean;
-import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.Replaces;
-import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.retry.annotation.Recoverable;
-import io.micronaut.retry.intercept.RecoveryInterceptor;
-
-import java.util.Optional;
-
-@InterceptorBean(Recoverable.class) // <1>
-@Replaces(RecoveryInterceptor.class) // <2>
-public class CustomRecoveryInterceptor extends RecoveryInterceptor {
-
-    public CustomRecoveryInterceptor(BeanContext beanContext) {
-        super(beanContext);
-    }
-
-    @Override
-    public Optional<? extends MethodExecutionHandle<?, Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
-        // look up the fallback differently, or delegate to the default lookup
-        return super.findFallbackMethod(context);
-    }
-}
-----
+snippet::io.micronaut.docs.annotation.retry.CustomRecoveryInterceptor[tags="class", indent=0, title="Replacing the RecoveryInterceptor"]
 
 <1> The ann:aop.InterceptorBean[] annotation binds the interceptor to `@Recoverable`
 <2> The ann:context.annotation.Replaces[] annotation removes the default `RecoveryInterceptor`
