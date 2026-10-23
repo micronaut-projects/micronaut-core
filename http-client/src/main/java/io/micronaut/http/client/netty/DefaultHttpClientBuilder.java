@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
@@ -142,6 +143,18 @@ public final class DefaultHttpClientBuilder {
 
     public DefaultHttpClientBuilder sslFactory(NettyClientSslFactory sslFactory, BeanProvider<CertificateProvider> certificateProviders) {
         delegate.sslFactory(sslFactory, certificateProviders);
+        return this;
+    }
+
+    /**
+     * Sets the factory for fresh gzip and deflate response decoders.
+     *
+     * @param zlibCodecFactory The codec factory
+     * @return This builder
+     * @since 5.3.0
+     */
+    public DefaultHttpClientBuilder zlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
+        delegate.zlibCodecFactory(zlibCodecFactory);
         return this;
     }
 

@@ -32,7 +32,8 @@ import io.netty.handler.codec.compression.DeflateOptions;
 import io.netty.handler.codec.compression.GzipOptions;
 import io.netty.handler.codec.compression.SnappyFrameEncoder;
 import io.netty.handler.codec.compression.StandardCompressionOptions;
-import io.netty.handler.codec.compression.ZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
 import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.compression.Zstd;
 import io.netty.handler.codec.compression.ZstdEncoder;
@@ -59,6 +60,7 @@ import java.util.Set;
  */
 @Internal
 public final class Compressor {
+    private final NettyZlibCodecFactory zlibCodecFactory;
     private final HttpCompressionStrategy strategy;
     @Nullable
     private final BrotliOptions brotliOptions;
@@ -72,6 +74,11 @@ public final class Compressor {
     private final Set<Algorithm> available;
 
     Compressor(HttpCompressionStrategy strategy) {
+        this(strategy, DefaultNettyZlibCodecFactory.INSTANCE);
+    }
+
+    Compressor(HttpCompressionStrategy strategy, NettyZlibCodecFactory zlibCodecFactory) {
+        this.zlibCodecFactory = zlibCodecFactory;
         assert strategy.isEnabled();
 
         this.strategy = strategy;
@@ -106,7 +113,7 @@ public final class Compressor {
      */
     @Nullable
     public static Compressor create(HttpCompressionStrategy strategy) {
-        return strategy.isEnabled() ? new Compressor(strategy) : null;
+        return create(strategy, DefaultNettyZlibCodecFactory.INSTANCE);
     }
 
     @Nullable
@@ -139,14 +146,26 @@ public final class Compressor {
             case BR -> makeBrotliEncoder();
             case ZSTD -> new ZstdEncoder(Objects.requireNonNull(zstdOptions, "ZSTD not available").compressionLevel(), zstdOptions.blockSize(), strategy.getMaxZstdEncodeSize());
             case SNAPPY -> new SnappyFrameEncoder();
-            case GZIP -> ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP, gzipOptions.compressionLevel(), gzipOptions.windowBits(), gzipOptions.memLevel());
-            case DEFLATE -> ZlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB, deflateOptions.compressionLevel(), deflateOptions.windowBits(), deflateOptions.memLevel());
+            case GZIP -> zlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP, gzipOptions.compressionLevel(), gzipOptions.windowBits(), gzipOptions.memLevel());
+            case DEFLATE -> zlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB, deflateOptions.compressionLevel(), deflateOptions.windowBits(), deflateOptions.memLevel());
         };
         return new Session(ctx, handler);
     }
 
     private BrotliEncoder makeBrotliEncoder() {
         return new BrotliEncoder(Objects.requireNonNull(brotliOptions, "Brotli not available").parameters());
+    }
+
+    /**
+     * Creates a compressor using the given streaming codec factory.
+     *
+     * @param strategy The compression policy
+     * @param zlibCodecFactory The codec factory
+     * @return The compressor, or {@code null} if disabled
+     */
+    @Nullable
+    public static Compressor create(HttpCompressionStrategy strategy, NettyZlibCodecFactory zlibCodecFactory) {
+        return strategy.isEnabled() ? new Compressor(strategy, zlibCodecFactory) : null;
     }
 
     /**

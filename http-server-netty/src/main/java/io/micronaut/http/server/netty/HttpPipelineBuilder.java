@@ -154,7 +154,7 @@ final class HttpPipelineBuilder {
         this.hostResolver = hostResolver;
         this.serverCustomizer = serverCustomizer;
         this.quic = quic;
-        this.compressor = Compressor.create(embeddedServices.getHttpCompressionStrategy());
+        this.compressor = Compressor.create(embeddedServices.getHttpCompressionStrategy(), embeddedServices.getZlibCodecFactory());
 
         Optional<LogLevel> logLevel = server.getServerConfiguration().getLogLevel();
         loggingHandler = logLevel.map(level -> new LoggingHandler(NettyHttpServer.class, level)).orElse(null);
@@ -503,6 +503,7 @@ final class HttpPipelineBuilder {
             NettyHttpServerConfiguration.Http2Settings http2 = server.getServerConfiguration().getHttp2();
             Http2ServerHandler.ConnectionHandlerBuilder builder = new Http2ServerHandler.ConnectionHandlerBuilder(makeRequestHandler(embeddedServices.getWebSocketUpgradeHandler(server), ssl))
                 .decompress(server.getServerConfiguration().isRequestDecompressionEnabled())
+                .zlibCodecFactory(embeddedServices.getZlibCodecFactory())
                 .compressor(compressor)
                 .bodySizeLimits(bodySizeLimits())
                 .accessLogManagerFactory(accessLogManagerFactory)
@@ -827,6 +828,7 @@ final class HttpPipelineBuilder {
 
             RequestHandler requestHandler = makeRequestHandler(webSocketUpgradeHandler, sslHandler != null);
             PipeliningServerHandler pipeliningServerHandler = new PipeliningServerHandler(requestHandler, quic);
+            pipeliningServerHandler.setZlibCodecFactory(embeddedServices.getZlibCodecFactory());
             pipeliningServerHandler.setCompressor(compressor);
             pipeliningServerHandler.setBodySizeLimits(bodySizeLimits());
             pipeliningServerHandler.setRequestDecompressionEnabled(server.getServerConfiguration().isRequestDecompressionEnabled());
