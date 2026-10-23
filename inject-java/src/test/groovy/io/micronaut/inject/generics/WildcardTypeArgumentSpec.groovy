@@ -481,4 +481,43 @@ class Fields {
         and: 'field access'
         upper(fields.getRequiredProperty('numbers', List).asArgument().typeParameters[0]) == [fields.getRequiredProperty('numbers', List).asArgument().typeParameters[0].type.name] && lower(fields.getRequiredProperty('numbers', List).asArgument().typeParameters[0]) == []
     }
+
+    void "a wildcard bounded by a primitive array is recorded"() {
+        given:
+        BeanIntrospection<?> introspection = buildBeanIntrospection('test.Arrays', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.util.List;
+import java.util.Map;
+
+@Introspected(accessKind = Introspected.AccessKind.FIELD)
+class Arrays {
+    public List<? extends char[]> upper;
+    public Map<?, ? super double[][]> lower;
+    public List<? super Integer[][]> objectLower;
+}
+''')
+        Argument<?> upperArgument = introspection.getRequiredProperty('upper', List).asArgument().typeParameters[0]
+        Argument<?> lowerArgument = introspection.getRequiredProperty('lower', Map).asArgument().typeParameters[1]
+        Argument<?> objectLowerArgument = introspection.getRequiredProperty('objectLower', List).asArgument().typeParameters[0]
+
+        expect:
+        upperArgument instanceof WildcardArgument
+        upperArgument.type == char[]
+        wildcard(upperArgument).upperBounds*.type == [char[]]
+        wildcard(upperArgument).lowerBounds.empty
+
+        and:
+        lowerArgument instanceof WildcardArgument
+        lowerArgument.type == double[][]
+        wildcard(lowerArgument).upperBounds*.type == [Object]
+        wildcard(lowerArgument).lowerBounds*.type == [double[][]]
+
+        and: 'an object array bound is recorded the same way'
+        objectLowerArgument instanceof WildcardArgument
+        objectLowerArgument.type == Integer[][]
+        wildcard(objectLowerArgument).upperBounds*.type == [Object]
+        wildcard(objectLowerArgument).lowerBounds*.type == [Integer[][]]
+    }
 }

@@ -39,6 +39,9 @@ import java.util.Objects;
 @Internal
 public final class PythonBytecodeCompiler implements AutoCloseable {
     private static final String PYTHON = "python";
+    // PEP 552: the magic number, the flags (hash-based, check the source), then the hash of the source
+    private static final int CHECKED_HEADER_SIZE = 16;
+    private static final int CHECKED_SOURCE_FLAGS = 0x03;
     private static final Source COMPILE_SOURCE = Source.newBuilder(PYTHON, """
         import importlib.util as _mn_importlib_util
         import marshal as _mn_marshal
@@ -140,8 +143,10 @@ public final class PythonBytecodeCompiler implements AutoCloseable {
                 Result result = compiler.compile(Files.readString(source, StandardCharsets.UTF_8), entry);
                 String cacheFileName = Path.of(result.cachePath()).getFileName().toString();
                 Path cache = source.getParent().resolve("__pycache__").resolve(cacheFileName);
-                Files.createDirectories(cache.getParent());
-                Files.write(cache, result.bytes());
+                if (!isCheckedAgainstSameSource(cache, result.bytes())) {
+                    Files.createDirectories(cache.getParent());
+                    Files.write(cache, result.bytes());
+                }
                 String cacheEntry = entry.substring(0, entry.lastIndexOf('/') + 1)
                     + "__pycache__/" + cacheFileName;
                 if (!entries.contains(cacheEntry) && !generatedEntries.contains(cacheEntry)) {
@@ -154,6 +159,22 @@ public final class PythonBytecodeCompiler implements AutoCloseable {
             updated.addAll(generatedEntries);
             Files.write(fileList, updated, StandardCharsets.UTF_8);
         }
+    }
+
+    /**
+     * Whether a bytecode cache exists that checks its source against the same hash as freshly compiled bytecode: the
+     * annotation processor writes such a cache, of the transformed code, for a module the runtime transformer
+     * rewrites, which compiling the source again would replace with untransformed code.
+     */
+    private static boolean isCheckedAgainstSameSource(Path cache, byte[] compiled) throws IOException {
+        if (!Files.isRegularFile(cache) || compiled.length < CHECKED_HEADER_SIZE) {
+            return false;
+        }
+        byte[] existing = Files.readAllBytes(cache);
+        return existing.length >= CHECKED_HEADER_SIZE
+            && Arrays.equals(existing, 0, 4, compiled, 0, 4)
+            && (existing[4] & CHECKED_SOURCE_FLAGS) == CHECKED_SOURCE_FLAGS
+            && Arrays.equals(existing, 8, CHECKED_HEADER_SIZE, compiled, 8, CHECKED_HEADER_SIZE);
     }
 
     @Override

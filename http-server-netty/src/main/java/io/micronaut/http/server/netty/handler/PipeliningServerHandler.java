@@ -106,10 +106,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
     private static final String DECOMPRESSOR_HANDLER = "decompressor";
     /**
-     * How long the rest of a request body is read after a response that closes the connection,
-     * see {@link #closeAfterResponse()}.
+     * How long the connection waits for more of the rest of a request body after a response
+     * that closes the connection, see {@link #closeAfterResponse()}. Each read restarts the
+     * wait, so a client that is still sending the body is not reset.
      */
-    private static final long LINGER_MILLIS = 5_000;
+    private static final long LINGER_IDLE_MILLIS = 5_000;
+    /**
+     * How long the rest of a request body is read at most after a response that closes the
+     * connection, see {@link #closeAfterResponse()}.
+     */
+    private static final long LINGER_MAX_MILLIS = 20_000;
     /**
      * How much of the rest of a request body is read after a response that closes the
      * connection, see {@link #closeAfterResponse()}.
@@ -121,6 +127,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     // these three handlers can be reused and are cached here
     private final DroppingInboundHandler droppingInboundHandler = new DroppingInboundHandler();
+    /**
+     * The state after a request that has no body, while its empty end marker is still to be
+     * read. Nothing but that marker can follow, so it is not a reason to read on after a
+     * response that closes the connection, see {@link #closeAfterResponse()}.
+     */
+    private final DroppingInboundHandler noBodyInboundHandler = new DroppingInboundHandler();
     private final InboundHandler baseInboundHandler = new MessageInboundHandler();
     private final OptimisticBufferingInboundHandler optimisticBufferingInboundHandler = new OptimisticBufferingInboundHandler();
 
@@ -587,26 +599,32 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * Close the connection after the last response was written. When the request body has not
-     * been received in full, closing the socket with unread bytes makes the transport reset the
+     * Close the connection after the last response was written. When the request has no body, or
+     * its body has been received in full, the connection is closed right away. When the request body
+     * has not been received in full, closing the socket with unread bytes makes the transport reset the
      * connection, and the client may see the reset instead of the response. In that case only
      * the output is shut down, and the rest of the body is read and dropped before the
-     * connection is closed, within {@link #LINGER_MILLIS} and {@link #LINGER_MAX_BYTES}.
+     * connection is closed, within {@link #LINGER_IDLE_MILLIS} of the last read,
+     * {@link #LINGER_MAX_MILLIS} and {@link #LINGER_MAX_BYTES}.
      */
     private void closeAfterResponse() {
         ChannelHandlerContext context = requiredCtx();
-        if (inboundHandler == baseInboundHandler || removed
-            || !(context.channel() instanceof DuplexChannel channel) || !channel.isActive()) {
+        if (inboundHandler == baseInboundHandler || inboundHandler == noBodyInboundHandler) {
+            // the decoder may still fire requests that arrived in the same read, drop them
+            inboundHandler = new ClosedInboundHandler();
+            context.close();
+            return;
+        }
+        if (removed || !(context.channel() instanceof DuplexChannel channel) || !channel.isActive()) {
             context.close();
             return;
         }
         // fail or release what the reader of the body did not take
         inboundHandler.discard();
-        inboundHandler = new LingeringInboundHandler();
-        ScheduledFuture<?> timeout = context.executor().schedule(() -> {
-            context.close();
-        }, LINGER_MILLIS, TimeUnit.MILLISECONDS);
-        channel.closeFuture().addListener(f -> timeout.cancel(false));
+        LingeringInboundHandler lingering = new LingeringInboundHandler(context);
+        inboundHandler = lingering;
+        lingering.scheduleTimeout(LINGER_IDLE_MILLIS);
+        channel.closeFuture().addListener(f -> lingering.cancelTimeout());
         SslHandler ssl = context.pipeline().get(SslHandler.class);
         if (ssl == null) {
             channel.shutdownOutput();
@@ -697,7 +715,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 CloseableByteBody body = byteBodyFactory().withTrailers(byteBodyFactory().createChecked(bodySizeLimits, fullRequest.content()), fullRequest.trailingHeaders());
                 requestHandler.accept(requiredCtx(), request, body, outboundAccess);
             } else if (!hasBody(request)) {
-                inboundHandler = droppingInboundHandler;
+                // a request that failed to decode may be followed by arbitrary bytes
+                inboundHandler = request.decoderResult().isFailure() ? droppingInboundHandler : noBodyInboundHandler;
                 if (full) {
                     inboundHandler.read(message);
                 }
@@ -1106,14 +1125,65 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
+     * Handler after the connection was closed by a response: whatever the client sent after the
+     * request that closed it is released and never reaches the request handler.
+     */
+    private static final class ClosedInboundHandler extends InboundHandler {
+        @Override
+        void read(Object message) {
+            ReferenceCountUtil.release(message);
+        }
+
+        @Override
+        void handleUpstreamError(Throwable cause) {
+            // the connection is already being closed by closeAfterResponse; nothing reads this
+            // handler's state again, so an error from the decoder on the way out is ignored
+        }
+    }
+
+    /**
      * Handler that drops the rest of a request body after a response that closes the
      * connection, and closes the connection when the body ended.
      */
     private final class LingeringInboundHandler extends InboundHandler {
+        private final ChannelHandlerContext context;
+        private final long start = System.nanoTime();
+        private long lastRead = start;
         private long dropped;
+        private @Nullable ScheduledFuture<?> timeout;
+        private boolean closed;
+
+        LingeringInboundHandler(ChannelHandlerContext context) {
+            this.context = context;
+        }
+
+        void scheduleTimeout(long delayMillis) {
+            if (!closed) {
+                timeout = context.executor().schedule(this::checkTimeout, delayMillis, TimeUnit.MILLISECONDS);
+            }
+        }
+
+        void cancelTimeout() {
+            closed = true;
+            if (timeout != null) {
+                timeout.cancel(false);
+            }
+        }
+
+        private void checkTimeout() {
+            long now = System.nanoTime();
+            long idleLeft = LINGER_IDLE_MILLIS - TimeUnit.NANOSECONDS.toMillis(now - lastRead);
+            long totalLeft = LINGER_MAX_MILLIS - TimeUnit.NANOSECONDS.toMillis(now - start);
+            if (idleLeft <= 0 || totalLeft <= 0) {
+                context.close();
+            } else {
+                scheduleTimeout(Math.min(idleLeft, totalLeft));
+            }
+        }
 
         @Override
         void read(Object message) {
+            lastRead = System.nanoTime();
             if (message instanceof HttpContent content) {
                 dropped += content.content().readableBytes();
             }

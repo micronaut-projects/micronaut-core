@@ -18,6 +18,7 @@ package io.micronaut.aop.chain;
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.ConstructorInterceptor;
 import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.MethodInterceptor;
@@ -192,7 +193,10 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
      * Whether a binding declared on an interceptor applies to one of the bindings of an interception point: the
      * binding annotation is the same and, when the interceptor binds members, one of the occurrences it was declared
      * through is the same annotation as one of the occurrences at the interception point, with the occurrence
-     * declared on the method replacing the one on its class.
+     * declared on the method replacing the one on its class. A binding with
+     * {@link InterceptorBinding#matchAllOccurrences()} requires every occurrence declared on the interceptor to be
+     * among those at the interception point, with the occurrences declared on the method replacing those of its
+     * class, see {@link InterceptorBindingQualifier#resolveBoundOccurrences(AnnotationValue, AnnotationMetadata, boolean)}.
      */
     private boolean matches(AnnotationValue<?> interceptorAnnotationValue,
                             AnnotationMetadata interceptorMetadata,
@@ -205,6 +209,7 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
         }
         final List<AnnotationValue<?>> interceptorOccurrences =
             InterceptorBindingQualifier.resolveBoundOccurrences(interceptorAnnotationValue, interceptorMetadata);
+        final boolean matchAllOccurrences = interceptorAnnotationValue.booleanValue(InterceptorBinding.META_MATCH_ALL_OCCURRENCES).orElse(false);
         boolean boundByOccurrences = false;
         boolean boundByNoOccurrences = false;
         for (AnnotationValue<?> applicableValue : interceptPointBindings) {
@@ -225,12 +230,35 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
                 continue;
             }
             boundByOccurrences = true;
-            if (InterceptorBindingQualifier.anyMatch(interceptorOccurrences, interceptPointOccurrences)) {
+            if (matchAllOccurrences
+                ? allMatch(interceptorOccurrences, interceptPointOccurrences)
+                : InterceptorBindingQualifier.anyMatch(interceptorOccurrences, interceptPointOccurrences)) {
                 return true;
             }
         }
         // an intercept point binding no members at all is one compiled before the interceptor bound by them
         return boundByNoOccurrences && !boundByOccurrences;
+    }
+
+    /**
+     * Whether every occurrence declared on an interceptor is the same annotation as one of the occurrences at the
+     * interception point, which may declare more.
+     */
+    private static boolean allMatch(List<AnnotationValue<?>> interceptorOccurrences,
+                                    List<AnnotationValue<?>> interceptPointOccurrences) {
+        for (AnnotationValue<?> required : interceptorOccurrences) {
+            boolean found = false;
+            for (AnnotationValue<?> present : interceptPointOccurrences) {
+                if (required.matches(present)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private <T> boolean isApplicableByType(BeanRegistration<Interceptor<T, ?>> beanRegistration,

@@ -15,8 +15,10 @@
  */
 package io.micronaut.dev;
 
+import com.sun.nio.file.SensitivityWatchEventModifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,13 +28,16 @@ import java.nio.file.FileSystems;
 import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchService;
+import java.time.Duration;
 import java.util.Locale;
 
 /**
- * The watch service the launcher watches with. On macOS the JDK's service polls, every ten seconds
- * by default, so the native FSEvents service of {@code micronaut-runtime-osx} is used when that
- * module is on the development runtime classpath, which the build plugins put there on macOS;
- * without it the JDK's service is registered at its highest sensitivity, two seconds.
+ * The watch service the launcher watches with. On macOS the JDK's service polls, every ten seconds by default and
+ * every two at its highest sensitivity, so the native FSEvents service of {@code micronaut-runtime-osx} is used when
+ * that module is on the development runtime classpath, which the build plugins put there on macOS. Without it, and in a
+ * native image, which cannot load that module's service at runtime because it uses JNA, the launcher compares the
+ * watched directories every {@value #POLL_MILLIS} milliseconds ({@link PollingWatchService}). Elsewhere the JDK's
+ * service is native, and is registered at its highest sensitivity.
  *
  * @param service The service
  * @param registrar How directories are registered with it
@@ -43,26 +48,61 @@ import java.util.Locale;
 @Internal
 record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar registrar, boolean closeOnClose) {
 
+    /**
+     * How often the launcher compares the watched directories on macOS without the native service, in milliseconds.
+     */
+    static final int POLL_MILLIS = 250;
+
     private static final Logger LOG = LoggerFactory.getLogger(DevWatchService.class);
     private static final String MAC_SERVICE = "io.methvin.watchservice.MacOSXListeningWatchService";
-    private static final String SENSITIVITY_MODIFIER = "com.sun.nio.file.SensitivityWatchEventModifier";
 
     /**
      * @return The best service this JVM offers
      * @throws IOException if no service can be created
      */
     static DevWatchService create() throws IOException {
-        ClassLoader loader = DevWatchService.class.getClassLoader();
-        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac") && ClassUtils.isPresent(MAC_SERVICE, loader)) {
-            try {
-                return MacOs.create();
-            } catch (Exception | LinkageError e) {
-                LOG.warn("The native macOS watch service could not be started ({}): polling instead", e.getMessage());
+        boolean mac = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
+        return create(mac, NativeImageUtils.inImageRuntimeCode(), ClassUtils.isPresent(MAC_SERVICE, DevWatchService.class.getClassLoader()));
+    }
+
+    /**
+     * The service for a platform.
+     *
+     * @param mac Whether the platform is macOS
+     * @param nativeImage Whether this runs in a native image, which cannot load the native macOS service
+     * @param macServicePresent Whether the native macOS service is on the classpath
+     * @return The service
+     * @throws IOException if no service can be created
+     */
+    static DevWatchService create(boolean mac, boolean nativeImage, boolean macServicePresent) throws IOException {
+        if (mac) {
+            if (!nativeImage && macServicePresent) {
+                try {
+                    return MacOs.create();
+                } catch (Exception | LinkageError e) {
+                    LOG.warn("The native macOS watch service could not be started ({}): polling instead", e.getMessage());
+                }
             }
+            // the JDK's own service would notice a save two seconds later at best
+            return polling();
         }
         WatchService service = FileSystems.getDefault().newWatchService();
-        DirectoryWatcher.WatchKeyRegistrar registrar = ClassUtils.isPresent(SENSITIVITY_MODIFIER, loader) ? HighSensitivity.registrar() : DirectoryWatcher.defaultRegistrar();
+        DirectoryWatcher.WatchKeyRegistrar registrar;
+        try {
+            // linked rather than looked up by name: a native image finds by name only the classes registered for reflection
+            registrar = HighSensitivity.registrar();
+        } catch (LinkageError e) {
+            registrar = DirectoryWatcher.defaultRegistrar();
+        }
         return new DevWatchService(service, registrar, true);
+    }
+
+    /**
+     * @return A service comparing the watched directories every {@value #POLL_MILLIS} milliseconds
+     */
+    static DevWatchService polling() {
+        PollingWatchService polling = new PollingWatchService(Duration.ofMillis(POLL_MILLIS));
+        return new DevWatchService(polling, (directory, service) -> polling.register(directory), true);
     }
 
     /**
@@ -83,10 +123,12 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     private static final class HighSensitivity {
         static DirectoryWatcher.WatchKeyRegistrar registrar() {
+            // resolved now, so that a JDK without the modifier fails here rather than at the first registration
+            WatchEvent.Modifier high = SensitivityWatchEventModifier.HIGH;
             return (directory, service) -> directory.register(
                 service,
                 new WatchEvent.Kind<?>[] {StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY},
-                com.sun.nio.file.SensitivityWatchEventModifier.HIGH
+                high
             );
         }
     }
