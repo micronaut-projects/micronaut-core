@@ -42,8 +42,10 @@ class EventLoopGroupCreationSpec extends Specification {
         given:
         def transport = Mock(io.micronaut.http.netty.channel.EventLoopGroupFactory)
         def executor = java.util.concurrent.Executors.newThreadPerTaskExecutor(new io.netty.util.concurrent.DefaultThreadFactory('custom-executor'))
-        def context = ApplicationContext.builder().singletons(transport).start()
-        def configuration = config('external', 1, 1.0d)
+        def context = ApplicationContext.builder().build()
+        context.registerSingleton(io.micronaut.http.netty.channel.EventLoopGroupFactory, transport, io.micronaut.inject.qualifiers.Qualifiers.byName('external'))
+        context.start()
+        def configuration = new DefaultEventLoopGroupConfiguration('external', 1, 1, null, false, ['external'], null, null, null, false)
         EventLoopGroup group
 
         when:
