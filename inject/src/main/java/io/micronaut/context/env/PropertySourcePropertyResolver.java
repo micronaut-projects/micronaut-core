@@ -290,6 +290,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
+     * Runs the given action under the lock that every change of the catalogs takes, so a property
+     * source that another thread processes meanwhile is processed before or after it, not during
+     * it. A refresh that the action runs keeps the lock until the action ends. Lookups do not wait
+     * for it.
+     *
+     * @param action The action to run
+     */
+    void withCatalogLock(Runnable action) {
+        synchronized (catalogLock) {
+            action.run();
+        }
+    }
+
+    /**
      * Runs a change of the catalogs, such as a refresh, and returns what it has changed.
      *
      * @param change The change to run
@@ -298,9 +312,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     public Map<String, Object> diff(Runnable change) {
         // Under the lock of the catalogs, which the refresh takes itself: the difference is between
         // what was published before this change and what it has published. A property source that
-        // another thread adds, or another refresh, waits until the difference has been taken. The
-        // lock is taken before the change runs, as a refresh takes it before the environment locks
-        // its property sources, so the two locks are always taken in the same order.
+        // another thread processes, or another refresh, waits until the difference has been taken.
+        // The lock is taken before the change runs, as a refresh takes it before the environment
+        // locks its property sources, so the two locks are always taken in the same order.
         synchronized (catalogLock) {
             Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(state.catalog);
             change.run();

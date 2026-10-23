@@ -121,6 +121,13 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean reading = new AtomicBoolean(false);
     /**
+     * While the environment starts or refreshes, what {@link #addPropertySource(PropertySource)}
+     * adds, which the read of the property sources processes when it ends rather than the thread
+     * that adds it, so that thread does not wait for the read. {@code null} at any other time.
+     * Guarded by the monitor of {@link #propertySources}.
+     */
+    private @Nullable AddedWhileReading addedWhileReading;
+    /**
      * While a refresh runs, what {@link #addPropertySource(PropertySource)} and
      * {@link #removePropertySource(PropertySource)} have changed since it started. A refresh that
      * fails puts back the property sources it started with, and then these changes. Guarded by
@@ -216,11 +223,19 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         synchronized (propertySources) {
             internalAddPropertySource(propertySource);
             noteChangeWhileRefreshing(propertySource.getName(), propertySource);
+            AddedWhileReading added = addedWhileReading;
+            if (added != null) {
+                // The read may have taken the registered property sources before this one was
+                // added, so it is left to the read, which processes it when it ends
+                added.add(propertySource);
+                return this;
+            }
+            if (!isRunning()) {
+                return this;
+            }
         }
-        if (isRunning() && !reading.get()) {
-            propertyPlaceholderResolver.resetCachesAndRememberedValues();
-            internalProcessPropertySource(propertySource);
-        }
+        propertyPlaceholderResolver.resetCachesAndRememberedValues();
+        internalProcessPropertySource(propertySource);
         return this;
     }
 
@@ -229,10 +244,17 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         synchronized (propertySources) {
             propertySources.remove(propertySource.getName());
             noteChangeWhileRefreshing(propertySource.getName(), null);
+            AddedWhileReading added = addedWhileReading;
+            if (added != null) {
+                // if it was added while the read runs, the read no longer processes it
+                added.remove(propertySource.getName());
+                return this;
+            }
+            if (!isRunning()) {
+                return this;
+            }
         }
-        if (isRunning() && !reading.get()) {
-            propertyPlaceholderResolver.resetCachesAndRememberedValues();
-        }
+        propertyPlaceholderResolver.resetCachesAndRememberedValues();
         return this;
     }
 
@@ -295,9 +317,24 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public Environment start() {
-        if (running.compareAndSet(false, true)) {
+        AddedWhileReading added;
+        synchronized (propertySources) {
+            // In one step with noting what is added from now on, so that a property source added
+            // meanwhile is either noted or registered before the environment runs
+            if (!running.compareAndSet(false, true)) {
+                return this;
+            }
+            added = new AddedWhileReading();
+            addedWhileReading = added;
+        }
+        try {
             LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
             readProperties();
+            // Under the lock of the catalogs: a property source added once the read has stopped
+            // noting them is processed by its thread after these
+            propertyPlaceholderResolver.withCatalogLock(() -> processAddedWhileReading(added));
+        } finally {
+            stopNoting(added);
         }
         return this;
     }
@@ -320,25 +357,36 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     private void refreshProperties() {
-        // Rebuild into a replacement catalog and publish it in one step, so a concurrent lookup
-        // sees the properties either as they were before the refresh or as they are after it.
-        propertyPlaceholderResolver.refresh(() -> {
+        // Under the lock of the catalogs, which the refresh takes itself, until a refresh that fails
+        // has processed what was added meanwhile into the properties that stay published: a property
+        // source added once the refresh has stopped noting them is processed by its thread after it.
+        propertyPlaceholderResolver.withCatalogLock(() -> {
             Map<String, PropertySource> previousSources;
             RefreshChanges changes;
+            AddedWhileReading added;
             synchronized (propertySources) {
                 previousSources = new LinkedHashMap<>(propertySources);
                 changes = new RefreshChanges(previousSources);
                 changedWhileRefreshing = changes;
+                added = new AddedWhileReading();
+                addedWhileReading = added;
             }
             List<PropertySource> previousRefreshable = new ArrayList<>(refreshablePropertySources);
             boolean completed = false;
             try {
-                dropProperties();
-                readProperties();
+                // Rebuild into a replacement catalog and publish it in one step, so a concurrent lookup
+                // sees the properties either as they were before the refresh or as they are after it.
+                propertyPlaceholderResolver.refresh(() -> {
+                    dropProperties();
+                    readProperties();
+                    // published with the rest of what the refresh has read
+                    processAddedWhileReading(added);
+                });
                 completed = true;
             } finally {
                 synchronized (propertySources) {
                     changedWhileRefreshing = null;
+                    stopNoting(added);
                     if (!completed) {
                         // The resolver keeps the catalog it published when the rebuild fails. Put back the
                         // property sources that catalog was built from, so the next refresh drops and reads
@@ -352,9 +400,71 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 if (!completed) {
                     refreshablePropertySources.clear();
                     refreshablePropertySources.addAll(previousRefreshable);
+                    processAddedWhileFailedRefresh(added);
                 }
             }
         });
+    }
+
+    /**
+     * Stops noting what is added, and then processes, after what the read has processed, the
+     * property sources added since the read took the registered ones that are still registered, in
+     * the order they were added. One added before that was taken by the read, which has processed
+     * it in its order, so it is not processed again. Called with the lock of the catalogs held.
+     *
+     * @param added What was added while the property sources were read
+     */
+    private void processAddedWhileReading(AddedWhileReading added) {
+        List<PropertySource> addedSinceTaken;
+        synchronized (propertySources) {
+            addedSinceTaken = List.copyOf(added.sinceTaken.values());
+            stopNoting(added);
+        }
+        processIfRegistered(addedSinceTaken);
+    }
+
+    /**
+     * Processes what was added while a refresh that has failed ran into the properties that stay
+     * published, as it would have been processed outside a refresh. Called with the lock of the
+     * catalogs held.
+     *
+     * @param added What was added while the refresh ran, until it stopped noting it
+     */
+    private void processAddedWhileFailedRefresh(AddedWhileReading added) {
+        if (added.changed) {
+            propertyPlaceholderResolver.resetCachesAndRememberedValues();
+            processIfRegistered(added.sinceStart.values());
+        }
+    }
+
+    /**
+     * Processes the given property sources, in order, that are still registered. One that has been
+     * replaced or removed since it was added is skipped: what replaced it is processed on its own.
+     * Called with the lock of the catalogs held, so a property source that replaces one of them
+     * from now on is processed after it.
+     *
+     * @param added The property sources added
+     */
+    private void processIfRegistered(Collection<PropertySource> added) {
+        for (PropertySource propertySource : added) {
+            if (propertySources.get(propertySource.getName()) == propertySource) {
+                internalProcessPropertySource(propertySource);
+            }
+        }
+    }
+
+    /**
+     * Stops noting what is added, if what is noted is still the given one. Takes the monitor of
+     * {@link #propertySources}, which the caller may already hold.
+     *
+     * @param added What the read has noted
+     */
+    private void stopNoting(AddedWhileReading added) {
+        synchronized (propertySources) {
+            if (addedWhileReading == added) {
+                addedWhileReading = null;
+            }
+        }
     }
 
     @Override
@@ -412,11 +522,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private void loadProperties() {
         refreshablePropertySources.clear();
         List<PropertySource> propertySources = new ArrayList<>(configLocations.size());
-        Set<String> preExistingSourceNames;
-        synchronized (this.propertySources) {
-            // copied under the monitor: another thread can add or remove a property source meanwhile
-            preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
-        }
         if (configuration.isEnableDefaultPropertySources()) {
             propertySources.addAll(readPropertySourceList(applicationName));
             List<PropertySource> defaultPropertySources = new ArrayList<>(4);
@@ -434,7 +539,22 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         } else {
             propertySources = new ArrayList<>(this.propertySources.size());
         }
-        for (PropertySource propertySource : getPropertySources()) {
+        List<PropertySource> registeredSources;
+        Set<String> preExistingSourceNames;
+        synchronized (this.propertySources) {
+            // Copied under the monitor, as another thread can add or remove a property source
+            // meanwhile. The names are copied with them, so that one added while the read ran is
+            // not taken for a property source of the read's own, which the next refresh drops. What
+            // was added until now is the read's to process; one added from now on is processed
+            // when the read ends.
+            registeredSources = List.copyOf(this.propertySources.values());
+            preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
+            AddedWhileReading added = addedWhileReading;
+            if (added != null) {
+                added.taken();
+            }
+        }
+        for (PropertySource propertySource : registeredSources) {
             if (!propertySources.contains(propertySource)) {
                 propertySources.add(propertySource);
             }
@@ -1087,6 +1207,50 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     @Override
     public MutableConversionService getConversionService() {
         return mutableConversionService;
+    }
+
+    /**
+     * The property sources added while the environment reads its property sources, on start or on
+     * refresh: by name, the one added last, in the order of the last additions. A name removed
+     * meanwhile is dropped, so it holds one entry per name however often a name is added.
+     */
+    private static final class AddedWhileReading {
+        /**
+         * Added since the read started, which a refresh that fails processes into the properties
+         * that stay published.
+         */
+        private final Map<String, PropertySource> sinceStart = new LinkedHashMap<>();
+        /**
+         * Added since the read took the registered property sources, which it processes after them.
+         */
+        private final Map<String, PropertySource> sinceTaken = new LinkedHashMap<>();
+        /**
+         * Whether a property source was added or removed since the read started.
+         */
+        private boolean changed;
+
+        void add(PropertySource source) {
+            String name = source.getName();
+            // goes last: the one it replaces is no longer registered and is not processed
+            sinceStart.remove(name);
+            sinceStart.put(name, source);
+            sinceTaken.remove(name);
+            sinceTaken.put(name, source);
+            changed = true;
+        }
+
+        void remove(String name) {
+            sinceStart.remove(name);
+            sinceTaken.remove(name);
+            changed = true;
+        }
+
+        /**
+         * Marks what was added until now as taken by the read with the registered property sources.
+         */
+        void taken() {
+            sinceTaken.clear();
+        }
     }
 
     /**
