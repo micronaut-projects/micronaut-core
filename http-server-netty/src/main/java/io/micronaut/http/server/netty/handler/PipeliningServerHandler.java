@@ -42,10 +42,7 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.channel.socket.DuplexChannel;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.handler.codec.compression.Brotli;
-import io.netty.handler.codec.compression.BrotliDecoder;
 import io.netty.handler.codec.compression.DecompressionException;
-import io.netty.handler.codec.compression.SnappyFrameDecoder;
 import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
 import io.netty.handler.codec.compression.ZlibWrapper;
@@ -702,10 +699,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
                     decompressionChannel = newDecompressionChannel(
                         zlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE, maxZlibAllocation()));
-                } else if (Brotli.isAvailable() && HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = newDecompressionChannel(new BrotliDecoder());
+                } else if (HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding) && zlibCodecFactory.isBrotliAvailable()) {
+                    decompressionChannel = newDecompressionChannel(zlibCodecFactory.newBrotliDecoder(0));
+                } else if (HttpHeaderValues.ZSTD.contentEqualsIgnoreCase(contentEncoding) && zlibCodecFactory.isZstdAvailable()) {
+                    decompressionChannel = newDecompressionChannel(zlibCodecFactory.newZstdDecoder(0));
                 } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = newDecompressionChannel(new SnappyFrameDecoder());
+                    decompressionChannel = newDecompressionChannel(zlibCodecFactory.newSnappyFrameDecoder());
                 } else {
                     decompressionChannel = null;
                 }
