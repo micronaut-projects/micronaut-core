@@ -94,6 +94,7 @@ import io.micronaut.python.processing.element.PythonParameterElement;
 import io.micronaut.python.processing.element.PythonPropertyElement;
 import io.micronaut.python.processing.element.PythonScriptElement;
 import io.micronaut.python.processing.model.ScriptDef;
+import io.micronaut.python.processing.model.TypeRef;
 import io.micronaut.sourcegen.generator.SourceGenerator;
 import io.micronaut.sourcegen.generator.SourceGenerators;
 import io.micronaut.sourcegen.model.ClassDef;
@@ -128,6 +129,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String GENERATED_PROPERTY_MEMBERS = "io.micronaut.context.python.ValueCoercible$GeneratedPropertyMembers";
     private static final String GENERATED_PROPERTY_MEMBERS_CANONICAL = "io.micronaut.context.python.ValueCoercible.GeneratedPropertyMembers";
     private static final String MEMBER_PRE_DESTROY = "preDestroy";
+    private static final String OVERLOAD_ADVICE = "the other overloads keep their inherited implementation.";
     private static final String PUT_MEMBER = "putMember";
     private static final String CLASS_FIELD = "class";
     public static final TypeDef POLYGLOT_CONTEXT = TypeDef.of(Context.class);
@@ -2517,6 +2519,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         List<MethodElement> matches = overloads.stream()
             .filter(overload -> matchesHostOverload(declaredMethod, overload, false))
             .toList();
+        if (matches.size() > 1) {
+            // a base declaring f(int) and f(Integer) has both matched by either hint once boxing is allowed:
+            // the overload the hints name without boxing is the one meant
+            List<MethodElement> identical = matches.stream()
+                .filter(overload -> namesHostOverloadIdentically(declaredMethod, overload))
+                .toList();
+            if (identical.size() == 1) {
+                return identical.getFirst();
+            }
+        }
         if (matches.isEmpty()) {
             matches = overloads.stream()
                 .filter(overload -> matchesHostOverload(declaredMethod, overload, true))
@@ -2525,13 +2537,35 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (matches.size() == 1) {
             return matches.getFirst();
         }
-        String signatures = overloads.stream()
+        String prefix = "Python method [" + declaredMethod.getName() + "] of class [" + classElement.getSimpleName() + "] ";
+        String hints = "The type hints of the Python method are [" + declaredOverloadSignature(declaredMethod) + "]";
+        if (matches.isEmpty()) {
+            long hinted = Arrays.stream(declaredMethod.getParameters())
+                .filter(parameter -> pythonTypeHint(parameter) != null)
+                .count();
+            String fix;
+            if (hinted == 0) {
+                fix = "add a type hint";
+            } else if (hinted == declaredMethod.getParameters().length) {
+                fix = "change the type hints";
+            } else {
+                fix = "add or change the type hints";
+            }
+            throw new ProcessingException(declaredMethod, prefix + "matches none of the overloads of ["
+                + superType.getName() + "]: " + overloadSignatures(overloads) + ". " + hints
+                + ". Python has no overloading: " + fix
+                + " to name the parameter types of the one overload to override, " + OVERLOAD_ADVICE);
+        }
+        throw new ProcessingException(declaredMethod, prefix + "matches several overloads of ["
+            + superType.getName() + "]: " + overloadSignatures(matches) + ". " + hints
+            + ". Python has no overloading: narrow the type hint to name the parameter types of the one overload to"
+            + " override exactly, " + OVERLOAD_ADVICE);
+    }
+
+    private static String overloadSignatures(List<MethodElement> overloads) {
+        return overloads.stream()
             .map(PythonStubGenerator::hostOverloadSignature)
             .collect(Collectors.joining(", "));
-        throw new ProcessingException(declaredMethod, "Python method [" + declaredMethod.getName() + "] of class ["
-            + classElement.getSimpleName() + "] matches several overloads of [" + superType.getName() + "]: " + signatures
-            + ". Python has no overloading: add a type hint naming the parameter types of the one overload to override,"
-            + " the others keep their inherited implementation.");
     }
 
     /**
@@ -2560,10 +2594,61 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return true;
     }
 
+    /**
+     * Whether the type hints of a Python method name the parameter types of a base overload identically,
+     * without boxing a primitive or unboxing a wrapper.
+     *
+     * @param declaredMethod The Python method
+     * @param hostMethod     The base overload
+     * @return Whether every hinted type is the parameter type
+     */
+    private static boolean namesHostOverloadIdentically(MethodElement declaredMethod, MethodElement hostMethod) {
+        ParameterElement[] parameters = declaredMethod.getParameters();
+        ParameterElement[] hostParameters = hostMethod.getParameters();
+        for (int i = 0; i < parameters.length; i++) {
+            ClassElement type = parameters[i].getType();
+            ClassElement hostType = hostParameters[i].getType();
+            if (type.getArrayDimensions() != hostType.getArrayDimensions() || !type.getName().equals(hostType.getName())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static String hostOverloadSignature(MethodElement hostMethod) {
         return Arrays.stream(hostMethod.getParameters())
             .map(parameter -> parameter.getType().getName())
             .collect(Collectors.joining(", ", hostMethod.getName() + "(", ")"));
+    }
+
+    /**
+     * The signature a Python method's type hints name, for the message of an unresolved overload, written
+     * as the Python source writes it: a hint as annotated, an unhinted parameter as its bare name.
+     *
+     * @param declaredMethod The Python method
+     * @return The signature the hints name
+     */
+    private static String declaredOverloadSignature(MethodElement declaredMethod) {
+        return Arrays.stream(declaredMethod.getParameters())
+            .map(parameter -> {
+                String hint = pythonTypeHint(parameter);
+                return hint == null ? parameter.getName() : parameter.getName() + ": " + hint;
+            })
+            .collect(Collectors.joining(", ", declaredMethod.getName() + "(", ")"));
+    }
+
+    /**
+     * The type hint of a parameter of a Python method, as annotated in the source.
+     *
+     * @param parameter The parameter, always of a Python method: only a Python method selects a base overload
+     * @return The hint, or {@code null} when the parameter is unhinted
+     */
+    private static @Nullable String pythonTypeHint(ParameterElement parameter) {
+        if (!(parameter instanceof PythonParameterElement pythonParameter)) {
+            throw new IllegalStateException("Parameter [" + parameter.getName() + "] is not a parameter of a Python method");
+        }
+        TypeRef typeAnnotation = pythonParameter.getNativeType().typeAnnotation();
+        return typeAnnotation == null ? null : typeAnnotation.toString();
     }
 
     private static Map<String, ClassElement> resolvedTypeArguments(ClassElement classElement) {
