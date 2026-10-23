@@ -89,6 +89,29 @@ class ZlibCodecFactorySpec extends Specification {
         server?.close()
     }
 
+    def 'direct client builder can select its own factory'() {
+        given:
+        def server = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'ZlibCodecFactorySpec',
+            'micronaut.server.netty.compression-threshold': 0,
+        ])
+        def factory = new CountingFactory()
+        def builder = io.micronaut.http.client.netty.DefaultHttpClient.builder()
+        def client = builder.uri(server.URI).zlibCodecFactory(factory).build()
+        String body = 'direct client '.repeat(128)
+
+        expect:
+        client.toBlocking().retrieve(HttpRequest.POST('/codec', body)
+            .contentType(MediaType.TEXT_PLAIN_TYPE).header('Accept-Encoding', 'gzip'), String) == body
+        factory.encoders.get() == 0
+        factory.decoders.get() == 1
+
+        cleanup:
+        client?.close()
+        server?.close()
+
+    }
+
     @Singleton
     @Requires(property = 'spec.name', value = 'ZlibCodecFactorySpec')
     static class CountingFactory implements NettyZlibCodecFactory {
