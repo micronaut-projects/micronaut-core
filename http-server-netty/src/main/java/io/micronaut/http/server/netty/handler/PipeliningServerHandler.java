@@ -197,10 +197,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     private NettyZlibCodecFactory zlibCodecFactory = DefaultNettyZlibCodecFactory.INSTANCE;
 
-    public void setZlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
-        this.zlibCodecFactory = zlibCodecFactory;
-    }
-
     public PipeliningServerHandler(RequestHandler requestHandler) {
         this(requestHandler, false);
     }
@@ -208,6 +204,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     public PipeliningServerHandler(RequestHandler requestHandler, boolean quic) {
         this.requestHandler = requestHandler;
         this.quic = quic;
+    }
+
+    /**
+     * @param zlibCodecFactory The streaming request decoder factory
+     */
+    public void setZlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
+        this.zlibCodecFactory = zlibCodecFactory;
     }
 
     private ChannelHandlerContext requiredCtx() {

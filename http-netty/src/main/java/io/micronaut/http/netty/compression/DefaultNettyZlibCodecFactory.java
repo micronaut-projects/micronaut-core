@@ -32,6 +32,7 @@ import jakarta.inject.Singleton;
 @BootstrapContextCompatible
 @Requires(missingBeans = NettyZlibCodecFactory.class)
 public final class DefaultNettyZlibCodecFactory implements NettyZlibCodecFactory {
+    /** Stock construction for clients outside an application context. */
     public static final NettyZlibCodecFactory INSTANCE = new DefaultNettyZlibCodecFactory();
 
     @Override

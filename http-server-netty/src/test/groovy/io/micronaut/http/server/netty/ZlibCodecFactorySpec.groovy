@@ -68,6 +68,26 @@ class ZlibCodecFactorySpec extends Specification {
         protocol << ['http1', 'h2', 'h3']
     }
 
+    def 'disabled compression and identity bodies do not construct codecs'() {
+        given:
+        def server = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'ZlibCodecFactorySpec',
+            'micronaut.server.netty.compression-threshold': -1,
+        ])
+        def client = server.applicationContext.createBean(HttpClient, server.URI)
+        def factory = server.applicationContext.getBean(CountingFactory)
+
+        expect:
+        client.toBlocking().retrieve(HttpRequest.POST('/codec', 'identity')
+            .contentType(MediaType.TEXT_PLAIN_TYPE).header('Accept-Encoding', 'gzip'), String) == 'identity'
+        factory.encoders.get() == 0
+        factory.decoders.get() == 0
+
+        cleanup:
+        client?.close()
+        server?.close()
+    }
+
     @Singleton
     @Requires(property = 'spec.name', value = 'ZlibCodecFactorySpec')
     static class CountingFactory implements NettyZlibCodecFactory {

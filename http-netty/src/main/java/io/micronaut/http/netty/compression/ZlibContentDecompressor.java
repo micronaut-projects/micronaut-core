@@ -29,6 +29,9 @@ import org.jspecify.annotations.Nullable;
 public class ZlibContentDecompressor extends HttpContentDecompressor {
     private final NettyZlibCodecFactory factory;
 
+    /**
+     * @param factory The streaming codec factory
+     */
     public ZlibContentDecompressor(NettyZlibCodecFactory factory) {
         super(false, 0);
         this.factory = factory;

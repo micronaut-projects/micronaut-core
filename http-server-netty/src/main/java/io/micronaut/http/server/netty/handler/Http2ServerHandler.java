@@ -411,15 +411,20 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         private boolean decompress = true;
         private NettyZlibCodecFactory zlibCodecFactory = DefaultNettyZlibCodecFactory.INSTANCE;
 
-        public ConnectionHandlerBuilder zlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
-            this.zlibCodecFactory = zlibCodecFactory;
-            return this;
-        }
         @Nullable
         private Integer initialConnectionWindowSize;
 
         public ConnectionHandlerBuilder(RequestHandler requestHandler) {
             frameListener = new Http2ServerHandler(requestHandler);
+        }
+
+        /**
+         * @param zlibCodecFactory The streaming request decoder factory
+         * @return This builder
+         */
+        public ConnectionHandlerBuilder zlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
+            this.zlibCodecFactory = zlibCodecFactory;
+            return this;
         }
 
         @Override
