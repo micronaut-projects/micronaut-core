@@ -23,6 +23,9 @@ import io.micronaut.context.reload.AnnotatedBeanRetentionPolicy
 import io.micronaut.context.reload.PolicyRetentionCriteria
 import spock.lang.Specification
 
+import static io.micronaut.context.reload.BeanRetentionPolicy.Decision.ABSTAIN
+import static io.micronaut.context.reload.BeanRetentionPolicy.Decision.RETAIN
+
 /**
  * A module declares with {@link Retain} which of its beans survive a restart, on the bean's class or on its factory
  * method, and the annotated policy reads it from the definition.
@@ -43,7 +46,7 @@ class RetainAnnotationSpec extends Specification {
         PlainPool plain = first.getBean(PlainPool)
 
         when: "it stops retaining what the annotated policy retains"
-        Collection<BeanRegistration<?>> retained = ((DefaultBeanContext) first).stopRetaining(AnnotatedBeanRetentionPolicy.INSTANCE::retain)
+        Collection<BeanRegistration<?>> retained = ((DefaultBeanContext) first).stopRetaining({ AnnotatedBeanRetentionPolicy.INSTANCE.decide(it) == RETAIN })
 
         then: "the annotated class and the annotated factory method's product are retained, undestroyed"
         retained*.bean.any { it.is(pool) }
@@ -76,10 +79,10 @@ class RetainAnnotationSpec extends Specification {
         AnnotatedPool pool = first.getBean(AnnotatedPool)
 
         expect: "the policy asks for it"
-        AnnotatedBeanRetentionPolicy.INSTANCE.retain(first.getBeanRegistration(ContextHoldingPool, null))
+        AnnotatedBeanRetentionPolicy.INSTANCE.decide(first.getBeanRegistration(ContextHoldingPool, null)) == RETAIN
 
         when:
-        Collection<BeanRegistration<?>> retained = ((DefaultBeanContext) first).stopRetaining(AnnotatedBeanRetentionPolicy.INSTANCE::retain)
+        Collection<BeanRegistration<?>> retained = ((DefaultBeanContext) first).stopRetaining({ AnnotatedBeanRetentionPolicy.INSTANCE.decide(it) == RETAIN })
 
         then: "the context refuses it, and retains the safe one"
         !retained*.bean.any { it.is(holding) }
@@ -102,9 +105,9 @@ class RetainAnnotationSpec extends Specification {
         context.getBean(FactoryProduct)
 
         expect:
-        AnnotatedBeanRetentionPolicy.INSTANCE.retain(context.getBeanRegistration(RetainedFactory, null))
-        !AnnotatedBeanRetentionPolicy.INSTANCE.retain(context.getBeanRegistration(FactoryProduct, null))
-        !AnnotatedBeanRetentionPolicy.INSTANCE.retain(context.getBeanRegistration(PlainPool, null))
+        AnnotatedBeanRetentionPolicy.INSTANCE.decide(context.getBeanRegistration(RetainedFactory, null)) == RETAIN
+        AnnotatedBeanRetentionPolicy.INSTANCE.decide(context.getBeanRegistration(FactoryProduct, null)) == ABSTAIN
+        AnnotatedBeanRetentionPolicy.INSTANCE.decide(context.getBeanRegistration(PlainPool, null)) == ABSTAIN
 
         cleanup:
         context.close()

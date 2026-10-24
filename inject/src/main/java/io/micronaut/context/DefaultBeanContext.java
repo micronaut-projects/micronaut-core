@@ -5786,8 +5786,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     private Set<Object> decideRetainedBeans(List<BeanRegistration> registrations) {
         RetentionCriteria criteria = Objects.requireNonNull(retentionCriteria.get());
         Map<Object, AtomicBoolean> beans = new IdentityHashMap<>();
+        Refusals refusals = new Refusals(criteria, registrations);
         for (BeanRegistration<?> registration : registrations) {
             if (registration.bean == null || !criteria.retain(registration)) {
+                continue;
+            }
+            // a policy refusing the bean, under any of its registrations, overrides any that retains it
+            if (refusals.isRefused(registration, List.of(registration))) {
                 continue;
             }
             // a retained bean keeps the singletons it holds, so they are retained with it; one of them bound to
@@ -5799,8 +5804,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             if (bound != null) {
                 if (LOG_LIFECYCLE.isWarnEnabled()) {
                     LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {} holds a provider, a proxy, a scope or the context, which are bound to this context",
-                        registration.bean, bound == registration ? "it" : "the bean [" + bound.bean + "] it holds");
+                        registration.bean, bound == registration ? "it" : theBean(bound) + " it holds");
                 }
+                continue;
+            }
+            // as does one refusing a singleton it holds, which would be retained with the closure otherwise
+            if (refusals.isRefused(registration, closure.subList(1, closure.size()))) {
                 continue;
             }
             // what it received is what it runs: a class the restart replaces, anywhere in the closure, would keep the old
@@ -5818,7 +5827,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             if (replacing != null && replaced != null) {
                 if (LOG_LIFECYCLE.isWarnEnabled()) {
                     LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {} bound to the class [{}], which the restart replaces",
-                        registration.bean, replacing == registration ? "it is" : "the bean [" + replacing.bean + "] it holds is", replaced.getName());
+                        registration.bean, replacing == registration ? "it is" : theBean(replacing) + " it holds is", replaced.getName());
                 }
                 continue;
             }
@@ -5841,6 +5850,66 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
         }
         return beans.keySet();
+    }
+
+    /**
+     * A bean as a retention message names it.
+     */
+    private static String theBean(BeanRegistration<?> registration) {
+        return "the bean [" + registration.bean + "]";
+    }
+
+    /**
+     * What the criteria of a {@link #stopRetaining(RetentionCriteria)} in progress refuse, by instance: an instance
+     * registered under several definitions is refused when any of its registrations is, as it is retained when any of
+     * them is accepted, so that retaining it under another registration cannot bypass the refusal.
+     */
+    private static final class Refusals {
+        private final RetentionCriteria criteria;
+        private final List<BeanRegistration> registrations;
+        // the refuser of each instance examined, null when nothing refused it
+        private final Map<Object, @Nullable Object> refusedBy = new IdentityHashMap<>();
+
+        Refusals(RetentionCriteria criteria, List<BeanRegistration> registrations) {
+            this.criteria = criteria;
+            this.registrations = registrations;
+        }
+
+        /**
+         * Whether the criteria refuse a bean they retain, or one of the given members of its closure, which keeps the
+         * whole closure from being retained. A refusal is deliberate, so it is logged at debug, naming what refused.
+         */
+        boolean isRefused(BeanRegistration<?> registration, List<BeanRegistration<?>> members) {
+            for (BeanRegistration<?> member : members) {
+                Object refuser = refuserOf(member);
+                if (refuser != null) {
+                    if (LOG_LIFECYCLE.isDebugEnabled()) {
+                        LOG_LIFECYCLE.debug("Bean [{}] is not retained across the restart: {} refused by [{}]",
+                            registration.bean, member.bean == registration.bean ? "it is" : theBean(member) + " it holds is", refuser.getClass().getName());
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Nullable
+        private Object refuserOf(BeanRegistration<?> member) {
+            if (refusedBy.containsKey(member.bean)) {
+                return refusedBy.get(member.bean);
+            }
+            Object refuser = criteria.refusedBy(member);
+            for (BeanRegistration<?> other : registrations) {
+                if (refuser != null) {
+                    break;
+                }
+                if (other != member && other.bean == member.bean) {
+                    refuser = criteria.refusedBy(other);
+                }
+            }
+            refusedBy.put(member.bean, refuser);
+            return refuser;
+        }
     }
 
     /**

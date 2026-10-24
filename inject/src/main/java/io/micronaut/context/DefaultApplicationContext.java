@@ -23,7 +23,6 @@ import io.micronaut.context.env.BootstrapLocatorMarker;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.ConfigurationPath;
-import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
@@ -321,7 +320,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     @Override
     boolean isBeanDependencyTrackingEnabledOnStart() {
         boolean switchedOff = configuration instanceof DefaultApplicationContextBuilder builder && builder.isBeanDependencyTrackingSwitchedOff();
-        return !switchedOff && DevelopmentMode.isEnabled(environment);
+        return !switchedOff && environment.isDevelopmentMode();
     }
 
     @Override

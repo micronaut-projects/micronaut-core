@@ -19,6 +19,7 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Set;
 
@@ -62,5 +63,18 @@ public interface RetentionCriteria {
      */
     default boolean isReplaced(Class<?> type) {
         return false;
+    }
+
+    /**
+     * What refuses a singleton, so that it is not retained whatever {@link #retain(BeanRegistration)} answers for
+     * it, nor is a singleton that holds it: a {@link BeanRetentionPolicy} that
+     * {@link BeanRetentionPolicy.Decision#REFUSE refuses} it. It is asked about every singleton of the closure of a
+     * bean {@link #retain(BeanRegistration) retained}, and the log names it by its class.
+     *
+     * @param registration The singleton's registration
+     * @return What refuses it, or null when nothing does
+     */
+    default @Nullable Object refusedBy(BeanRegistration<?> registration) {
+        return null;
     }
 }
