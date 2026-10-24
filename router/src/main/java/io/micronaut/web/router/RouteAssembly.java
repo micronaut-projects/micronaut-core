@@ -442,6 +442,8 @@ public final class RouteAssembly {
             // routes of its method, or of any method
             String methodName = method == HttpMethod.CUSTOM ? AnyMethodRoutes.CUSTOM_METHODS : method.name();
             DefaultUriRoute route = new DefaultUriRoute(method, composed, mediaTypes, executableHandle, methodName, conversionService);
+            // the locator has its own HEAD route
+            route.settings().declaresHead();
             if (currentParentRoute != null) {
                 currentParentRoute.nestedRoutes.add(route);
             }
@@ -523,30 +525,27 @@ public final class RouteAssembly {
     }
 
     /**
-     * Add an implicit {@code HEAD} route for every {@code GET} route that has no {@code HEAD} route
-     * for the same URI, like {@link AnnotatedMethodRouteBuilder} does for {@code @Get} methods.
-     * Each {@code HEAD} route is a copy of the finished {@code GET} route.
+     * Add an implicit {@code HEAD} route for every {@code GET} route, like
+     * {@link AnnotatedMethodRouteBuilder} does for {@code @Get} methods. Each {@code HEAD} route is
+     * a copy of the finished {@code GET} route, marked as implicit. An explicit {@code HEAD} route
+     * of the same URI does not suppress it: the two can differ by port, media types, conditions or
+     * version, and only when they tie at match time does the explicit one win
+     * ({@code ImplicitHeadRoutes.preferExplicit}).
      */
     public void addImplicitHeadRoutes() {
-        // keyed by the template, never by the text alone: the same text can be a different
-        // template of another language
         List<DefaultUriRoute> getRoutes = new ArrayList<>();
-        Set<Object> headTemplates = new HashSet<>();
         for (UriRoute route : uriRoutes) {
-            // a route of any method has its own HEAD route, and does not hide the implicit HEAD route of a GET route
-            if (route instanceof DefaultUriRoute defaultUriRoute && !defaultUriRoute.settings.isAnyMethod()) {
-                if (defaultUriRoute.httpMethod == HttpMethod.GET) {
-                    getRoutes.add(defaultUriRoute);
-                } else if (defaultUriRoute.httpMethod == HttpMethod.HEAD) {
-                    headTemplates.add(defaultUriRoute.headKey());
-                }
+            // a route of any method, or declared with a HEAD route, has its own HEAD route
+            if (route instanceof DefaultUriRoute defaultUriRoute
+                && !defaultUriRoute.settings.isAnyMethod()
+                && !defaultUriRoute.settings.isDeclaresHead()
+                && defaultUriRoute.httpMethod == HttpMethod.GET
+                && defaultUriRoute.targetMethod.booleanValue(Get.class, "headRoute").orElse(true)) {
+                getRoutes.add(defaultUriRoute);
             }
         }
         for (DefaultUriRoute getRoute : getRoutes) {
-            if (!headTemplates.contains(getRoute.headKey())
-                && getRoute.targetMethod.booleanValue(Get.class, "headRoute").orElse(true)) {
-                uriRoutes.add(getRoute.implicitHeadCopy());
-            }
+            uriRoutes.add(getRoute.implicitHeadCopy());
         }
     }
 
@@ -1897,16 +1896,6 @@ public final class RouteAssembly {
         @Override
         public RouteTemplate getRouteTemplate() {
             return template;
-        }
-
-        /**
-         * @return The key of the template of the route for implicit {@code HEAD} routes: the
-         * {@link UriMatchTemplate} of a URI template, otherwise the template. A subclass of
-         * {@link UriMatchTemplate}, e.g. {@link io.micronaut.http.uri.UriTypeMatchTemplate}, has
-         * rules its equality does not compare: its template, equal to itself only
-         */
-        Object headKey() {
-            return uriMatchTemplate != null && uriMatchTemplate.getClass() == UriMatchTemplate.class ? uriMatchTemplate : template;
         }
 
         @Override

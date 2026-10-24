@@ -183,7 +183,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         return pending(names.toString(), uri, get, (template, handler) -> {
             List<RouteSettings> routes = new ArrayList<>(declared.size());
             for (HttpMethod method : declared) {
-                routes.add(add(method.name(), method, template, handler.get()));
+                RouteSettings route = add(method.name(), method, template, handler.get());
+                if (declared.contains(HttpMethod.HEAD)) {
+                    route.declaresHead();
+                }
+                routes.add(route);
             }
             return routes;
         });
@@ -512,7 +516,10 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
                 if (method != HttpMethod.CUSTOM) {
                     // the routes of the target decide which media types they consume and produce, inheriting
                     // the ones of the groups; the located route carries the filters of the groups of the locator route
-                    grouped(assembly.addMountedRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
+                    RouteSettings settings = assembly.addMountedRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings();
+                    // the locator has its own HEAD route
+                    settings.declaresHead();
+                    grouped(settings).consumesAll();
                 }
             }
             // a request with a custom method is located too, and matched against the located
