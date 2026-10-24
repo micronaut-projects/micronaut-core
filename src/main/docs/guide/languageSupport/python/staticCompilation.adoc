@@ -343,7 +343,7 @@ The totals per reason at the end of `summary.txt` put the most common blocker on
 
 `decisions.jsonl` is the input of a build tool's own rendering of the report: its first record is the plan (`mode`, `coverage`), with no timestamp, so the report is the same for the same decisions and a build cache can reuse it; every other one a decision with its `name`, `source`, `line`, `column`, `outcome`, `scope`, `reasons` (`rule`, `message`, `location`, `hint`) and `stats`. Pyronaut renders it as a page in the design of its test report.
 
-The output of a compilation depends on its sources only: the same sources give the same bytes, the generated classes and Java sources (the compiled bodies of a class in source order) and the report alike, whatever JVM compiles them and whatever order the file system lists the sources in, which are read in the order of their paths. `StaticCompilationReproducibilityTest` in `test-suite-python-corpus` compiles the corpus twice, in JVMs of their own, and compares every file.
+The output of a compilation depends on its sources only: the same sources give the same bytes, the generated classes and Java sources and the report alike, whatever JVM compiles them and whatever order the file system lists the sources in, which are read in the order of their paths. `StaticCompilationReproducibilityTest` in `test-suite-python-corpus` compiles the corpus twice, in JVMs of their own, and compares every file.
 
 == Running the Existing Tests with Compilation On
 
