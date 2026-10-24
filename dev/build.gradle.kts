@@ -82,6 +82,8 @@ noReflection {
     allowIn("io.micronaut.dev.compile.CompileMode", "ENUM_CONSTANTS")
     // MicronautDevMain.launchApplication, which looks up and invokes the application's main, suppresses the check itself
     allowIn("io.micronaut.dev.DevRuntime", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.dev.Compilations", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.dev.Pending", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.DevRuntime", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.DevRuntime", "CLASS_LOADING")
     allowIn("io.micronaut.dev.ManifestRetentionPolicy", "CLASS_LOADING")
@@ -106,5 +108,6 @@ noReflection {
     allowIn("io.micronaut.dev.agent.DynamicAttach", "CLASS_LOADING")
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
+    allowIn("io.micronaut.dev.InPlaceUpdates", "INSTRUMENTATION")
     allowIn("io.micronaut.dev.DevWatchService", "CLASS_LOADING")
 }

@@ -20,6 +20,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.logging.LoggingSystem;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.graalvm.python.embedding.GraalPyResources;
@@ -28,8 +29,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
@@ -47,6 +50,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 final class GraalPyContextFactoryTest {
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void wrapperMetadataDoesNotRediscoverTargetTypeMappings() throws IOException {
+        ClassLoader classLoader = new ClassLoader(getClass().getClassLoader()) {
+            @Override
+            public Enumeration<URL> getResources(String name) throws IOException {
+                assertFalse(name.contains(TargetTypeMapping.class.getName()),
+                    "TargetTypeMapping discovery belongs to host access setup, not wrapper metadata");
+                return super.getResources(name);
+            }
+        };
+        try (Engine engine = GraalPyEngineFactory.buildPythonEngine();
+             Context context = GraalPyContextFactory.buildContext(HostAccess.ALL, engine, classLoader)) {
+            assertEquals(2, context.eval(PYTHON, "1 + 1").asInt());
+        }
+    }
 
     @Test
     void loadsMainFromTheConfiguredVfsMountPoint() throws IOException {
@@ -213,6 +232,27 @@ final class GraalPyContextFactoryTest {
             });
             assertEquals("p|q", pooled);
         }
+    }
+
+    @Test
+    void interopTypesAreRegisteredAtBootstrapWithoutAJavaImport() {
+        // the dataclass wrapper comes from __micronaut_java_imports_dataclasses_test.py of the test virtual file system
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            Context context = applicationContext.getBean(Context.class);
+            // nothing in this context read the manifests through a Java import; the bootstrap registered them
+            assertTrue(context.eval(PYTHON, """
+                import sys
+                imports = sys.modules['micronaut_java_imports']
+                imports._micronaut_java_imports_cache is None and \\
+                    'io.micronaut.context.python.GraalPyContextFactoryTest$DataclassWrapper' in imports._micronaut_interop_types
+                """).asBoolean());
+        }
+    }
+
+    /**
+     * Stands for the Java wrapper of a Python dataclass in the test manifest.
+     */
+    public static final class DataclassWrapper {
     }
 
     @Test
