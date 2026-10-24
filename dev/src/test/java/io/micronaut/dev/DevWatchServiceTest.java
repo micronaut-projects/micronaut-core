@@ -7,6 +7,7 @@ import java.nio.file.WatchService;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DevWatchServiceTest {
 
@@ -34,12 +35,12 @@ class DevWatchServiceTest {
     void onMacOsTheNativeServiceReportsTheEventsAfterAFirstOneWithin50Ms() throws Exception {
         DevWatchService watch = DevWatchService.create(true, false, true);
         try {
-            assertEquals("MacOSXListeningWatchService", watch.service().getClass().getSimpleName());
+            assertInstanceOf(FsEventsWatchService.class, watch.service());
             assertEquals(java.time.Duration.ofMillis(50), watch.detectionDelay());
+            // closing it is safe: its streams are released on their run loop's thread, outside the run loop
+            assertTrue(watch.closeOnClose());
         } finally {
-            if (watch.closeOnClose()) {
-                watch.service().close();
-            }
+            watch.service().close();
         }
     }
 
