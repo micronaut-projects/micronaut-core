@@ -3132,7 +3132,8 @@ class FixedAttributeTest(unittest.TestCase):
     def test_dict_access_anywhere_in_the_compilation_fixes_nothing(self):
         for escape in ("vars(service)", "service.__dict__", "object.__setattr__(service, attribute, 1)", "setattr(service, attribute, 1)",
                        "Service.__getattribute__ = None", "del Service.__setattr__", "setattr(Service, \"__delattr__\", None)", "Service.__bases__ = ()", "getattr(service, \"__dict__\")[attribute] = 1",
-                       "object.__setattr__(service, attribute, \"new\")", "setattr(service, attribute, \"new\")"):
+                       "object.__setattr__(service, attribute, \"new\")", "setattr(service, attribute, \"new\")",
+                       "mock.patch.object(Service, attribute, \"new\")", "mock.patch(attribute, \"new\")", "__setattr__(service, attribute)"):
             source = FIXED + f"\n\ndef escape(service: Service, attribute: str) -> None:\n    {escape}\n"
             decisions, planner = plan(source, MODE_ALL, facts=FixedFacts())
             bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}

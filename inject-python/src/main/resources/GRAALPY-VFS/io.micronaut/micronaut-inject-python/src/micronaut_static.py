@@ -898,11 +898,17 @@ class AttributeWrites:
             self.named.update(keyword.arg for keyword in call.keywords if keyword.arg is not None)
             if any(keyword.arg in PROTOCOL_CHANGES for keyword in call.keywords):
                 self.everything = True
+        if _is_patch(function, name):
+            # mock.patch(target, ...), patch.object(target, attribute, ...): a computed name may be any attribute
+            named = call.args[1 if name == "object" else 0] if len(call.args) > (1 if name == "object" else 0) else None
+            if named is not None and not (isinstance(named, ast.Constant) and isinstance(named.value, str)):
+                self.everything = True
+            return
         if name not in COMPUTED_WRITERS:
             return
         # the object written and the name it is written by: setattr(o, name, v), monkeypatch.setattr(o, name, v),
         # object.__setattr__(o, name, v), or o.__setattr__(name, v) bound; a string anywhere else is a value
-        if name in ("__setattr__", "__delattr__") and not (isinstance(function.value, ast.Name) and function.value.id in ("object", "type")):
+        if name in ("__setattr__", "__delattr__") and isinstance(function, ast.Attribute) and not (isinstance(function.value, ast.Name) and function.value.id in ("object", "type")):
             target, named = function.value, call.args[0] if call.args else None
         else:
             target, named = (call.args[0] if call.args else None), (call.args[1] if len(call.args) > 1 else None)
@@ -923,6 +929,18 @@ class AttributeWrites:
             self.classes_written.add(id(owner[0]))
             return
         self.everything = True
+
+
+def _is_patch(function, name):
+    """Whether a call is mock.patch(...) or patch.object(...): patch, mock.patch, unittest.mock.patch, and their object."""
+    if name == "patch":
+        return isinstance(function, ast.Name) or (isinstance(function, ast.Attribute) and _names(function.value, "mock"))
+    return name == "object" and isinstance(function, ast.Attribute) and _names(function.value, "patch")
+
+
+def _names(node, name):
+    """Whether the expression is the name, or an attribute of that name (mock, unittest.mock)."""
+    return (isinstance(node, ast.Name) and node.id == name) or (isinstance(node, ast.Attribute) and node.attr == name)
 
 
 def _scope_nodes(function):
