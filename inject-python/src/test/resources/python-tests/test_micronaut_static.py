@@ -418,6 +418,18 @@ class ModuleFunctionTest(unittest.TestCase):
         self.assertEqual("append", append.name())
         self.assertEqual("LocalRef", _uncast(statements[-1].value()).getClass().getSimpleName())
 
+    def test_each_statement_carries_the_python_line_it_is_lowered_from(self):
+        # the generated Java maps its lines to them, so stack traces show the Python line
+        line = MODULE.splitlines().index("    return [v * 2 for v in values if v % 2 == 0]") + 1
+        body = self._compiled("evens").body()
+        statements = list(body.statements())
+        self.assertEqual(len(statements), len(list(body.lines())))
+        # the loop the comprehension is hoisted into belongs to the statement it is part of
+        self.assertEqual([line] * 3, list(body.lines())[-3:])
+        self.assertEqual([line], list(statements[-2].body().lines()))
+        twice_of = MODULE.splitlines().index("    return n * RATE") + 1
+        self.assertEqual([twice_of], list(self._compiled("twice_of").body().lines()))
+
     def test_dict_comprehensions_and_any_and_all_lower_alike(self):
         statements = list(self._compiled("lengths").body().statements())
         self.assertEqual("java.util.Map<java.lang.String,long>", statements[-3].type())
@@ -874,6 +886,122 @@ class Service:
     def test_unknown_modes_are_rejected(self):
         with self.assertRaises(ValueError):
             CompileScope("fast", NAMES)
+
+    def test_type_checking_and_static_compilation_share_one_scope_resolver(self):
+        from micronaut_typecheck import ScopeResolver, TypeCheckScope, MODE_ERROR as CHECK_ERROR, MODE_OFF as CHECK_OFF, MODE_WARN as CHECK_WARN
+        checked = ["io.micronaut.context.python.annotation.TypeChecked"]
+        planner = StaticPlanner(MODE_ALL, NAMES)
+        checker = TypeChecker(CHECK_WARN, checked)
+        self.assertIs(ScopeResolver, type(planner.scope))
+        self.assertIs(ScopeResolver, type(checker.scope))
+        self.assertIs(ScopeResolver, type(CompileScope(MODE_OFF, NAMES)))
+        self.assertIs(ScopeResolver, type(TypeCheckScope(CHECK_OFF, checked)))
+
+        class Decorator:
+            def __init__(self, name, value=None):
+                self._name = name
+                self._value = value
+
+            def annotationName(self):
+                return self._name
+
+            def members(self):
+                return {} if self._value is None else {"value": self._value}
+
+        # the same declarations resolve through the same rules: the nearest switch wins
+        def switched(names, value=None):
+            return [Decorator(name, value) for name in names]
+
+        for mode, expected in ((MODE_ALL, (True, "MODE")), (MODE_ANNOTATED, (False, "MODE")), (MODE_OFF, (False, "MODE"))):
+            self.assertEqual(expected, CompileScope(mode, NAMES).resolve([], None, []))
+        self.assertEqual((False, "MODULE"), CompileScope(MODE_ALL, NAMES).resolve(switched(NAMES[:1], "false"), None, []))
+        self.assertEqual((True, "CLASS"), CompileScope(MODE_OFF, NAMES).resolve(switched(NAMES[:1], False), switched(NAMES[1:]), []))
+        self.assertEqual((False, "FUNCTION"), CompileScope(MODE_OFF, NAMES).resolve([], switched(NAMES[:1]), switched(NAMES[:1], False)))
+        for mode, expected in ((CHECK_OFF, (None, "MODE")), (CHECK_WARN, (CHECK_WARN, "MODE")), (CHECK_ERROR, (CHECK_ERROR, "MODE"))):
+            self.assertEqual(expected, TypeCheckScope(mode, checked).resolve([], None, []))
+        self.assertEqual((None, "MODULE"), TypeCheckScope(CHECK_WARN, checked).resolve(switched(checked, "False"), None, []))
+        self.assertEqual((CHECK_ERROR, "CLASS"), TypeCheckScope(CHECK_OFF, checked).resolve(switched(checked, False), switched(checked), []))
+        self.assertEqual((None, "FUNCTION"), TypeCheckScope(CHECK_OFF, checked).resolve([], switched(checked), switched(checked, 0)))
+        # a switch of the other feature is no switch
+        self.assertEqual((True, "MODE"), CompileScope(MODE_ALL, NAMES).resolve(switched(checked, False), None, []))
+
+
+NESTED_CLASSES = '''
+from micronaut.context.python.annotation import CompileStatic
+
+
+@CompileStatic(False)
+class Legacy:
+    def run(self, value: int) -> int:
+        return value
+
+    class Inner:
+        def m(self, value: int) -> int:
+            return value
+
+        @CompileStatic
+        def fast(self, value: int) -> int:
+            return value
+
+        @CompileStatic
+        class Switched:
+            def deep(self, value: int) -> int:
+                return value
+
+
+@CompileStatic
+class Opted:
+    class Inner:
+        def m(self, value: int) -> int:
+            return value
+
+        @CompileStatic(False)
+        class Excluded:
+            def deep(self, value: int) -> int:
+                return value
+
+
+class Plain:
+    class Inner:
+        def m(self, value: int) -> int:
+            return value
+'''
+
+
+class NestedClassCompileScopeTest(unittest.TestCase):
+    """A nested class takes the CompileStatic switch of the class around it, as it takes its TypeChecked switch."""
+
+    def outcomes(self, mode):
+        decisions, _ = plan(NESTED_CLASSES, mode)
+        return {name.replace("$", "."): (decision.outcome().name(), decision.scope().name()) for name, decision in decisions.items()}
+
+    def test_an_outer_switch_off_excludes_the_nested_classes_under_mode_all(self):
+        outcomes = self.outcomes(MODE_ALL)
+        self.assertEqual(("EXCLUDED", "CLASS"), outcomes["Legacy.run"])
+        self.assertEqual(("EXCLUDED", "CLASS"), outcomes["Legacy.Inner.m"])
+        self.assertEqual(("CANDIDATE", "FUNCTION"), outcomes["Legacy.Inner.fast"])
+        self.assertEqual(("CANDIDATE", "MODE"), outcomes["Plain.Inner.m"])
+
+    def test_an_outer_switch_on_compiles_the_nested_classes_under_modes_annotated_and_off(self):
+        for mode in (MODE_ANNOTATED, MODE_OFF):
+            outcomes = self.outcomes(mode)
+            self.assertEqual(("CANDIDATE", "CLASS"), outcomes["Opted.Inner.m"], mode)
+            self.assertEqual(("EXCLUDED", "MODE"), outcomes["Plain.Inner.m"], mode)
+
+    def test_a_nested_class_switch_overrides_the_outer_one(self):
+        for mode in (MODE_ALL, MODE_ANNOTATED, MODE_OFF):
+            outcomes = self.outcomes(mode)
+            self.assertEqual(("CANDIDATE", "CLASS"), outcomes["Legacy.Inner.Switched.deep"], mode)
+            self.assertEqual(("EXCLUDED", "CLASS"), outcomes["Opted.Inner.Excluded.deep"], mode)
+
+    def test_the_planner_and_the_checker_resolve_the_same_classes_alike(self):
+        from micronaut_typecheck import MODE_WARN as CHECK_WARN
+        checker = TypeChecker(CHECK_WARN, NAMES)  # the CompileStatic names, so both read the same switches
+        visitor = MicronautAstVisitor(Callback(), "pkg", "module.py", None, None, source_path="module.py", source_text=NESTED_CLASSES, type_checker=checker)
+        visitor.visit(ast.parse(NESTED_CLASSES))
+        checked = {unit.qualified_name: unit.severity is not None for unit in checker.units() if unit.function_def is not None}
+        compiled = {name: outcome == "CANDIDATE" for name, (outcome, _) in self.outcomes(MODE_ALL).items()}
+        self.assertEqual(checked, compiled)
 
 
 class ClassificationTest(unittest.TestCase):

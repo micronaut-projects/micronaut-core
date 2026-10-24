@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.compiler;
 
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.staticcompile.StaticCompilationDecision;
 import io.micronaut.python.processing.staticcompile.StaticCompilationDecision.Outcome;
@@ -26,6 +27,15 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.lang.classfile.Attributes;
+import java.lang.classfile.ClassFile;
+import java.lang.classfile.ClassModel;
+import java.lang.classfile.MethodModel;
+import java.lang.classfile.instruction.LineNumber;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,6 +77,20 @@ class PyronautCompilerStaticCompilationTest {
             @CompileStatic(False)
             def legacy(self, payload) -> str:
                 return str(payload)
+        """;
+
+    private static final String LINE_MAPPED_SOURCE = """
+        from jakarta.inject import Singleton
+        from java.lang import IllegalArgumentException
+
+
+        @Singleton
+        class Checks:
+            def check(self, n: int) -> int:
+                doubled = n * 2
+                if doubled > 10:
+                    raise IllegalArgumentException("too big: " + str(doubled))
+                return doubled
         """;
 
     @Test
@@ -344,6 +368,75 @@ class PyronautCompilerStaticCompilationTest {
         // the incremental build may plan more than the changed source; it never keeps a removed function
         assertEquals(Set.of("Pricing.total", "Orders.place"), Set.copyOf(reportedNames(report)));
         assertEquals(2, reportedNames(report).size());
+    }
+
+    @Test
+    void aStackTraceOfACompiledBodyShowsThePythonFileAndLine(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python/example"));
+        Path output = Files.createDirectories(directory.resolve("classes"));
+        Files.writeString(python.resolve("checks.py"), LINE_MAPPED_SOURCE);
+        PyronautCompiler.builder()
+            .pythonSrc(python.getParent().toString())
+            .targetDir(output.toFile())
+            .staticCompilation(StaticCompilationMode.ALL)
+            .build()
+            .compile();
+
+        Path classFile;
+        Path source;
+        try (var paths = Files.walk(output)) {
+            List<Path> files = paths.toList();
+            classFile = files.stream().filter(path -> path.getFileName().toString().equals("Checks.class")).findFirst().orElseThrow();
+            source = files.stream().filter(path -> path.getFileName().toString().equals("Checks.java")).findFirst().orElseThrow();
+        }
+        // the generated Java says which Python line each statement comes from
+        String generated = Files.readString(source);
+        assertTrue(generated.contains("// Python line 10"), generated);
+        assertFalse(generated.contains("__mnPythonLine"), generated);
+        assertPythonLines(Files.readAllBytes(classFile));
+
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[]{output.toUri().toURL()});
+             ApplicationContext context = ApplicationContext.builder().classLoader(classLoader).build().start()) {
+            Class<?> checks = classLoader.loadClass("example.Checks");
+            Object bean = context.getBean(checks);
+            Method check = checks.getMethod("check", int.class);
+            assertEquals(8, check.invoke(bean, 4));
+            InvocationTargetException failure = assertThrows(InvocationTargetException.class, () -> check.invoke(bean, 6));
+            assertEquals(IllegalArgumentException.class, failure.getCause().getClass());
+            StackTraceElement frame = failure.getCause().getStackTrace()[0];
+            assertEquals("example.Checks", frame.getClassName(), frame.toString());
+            assertEquals("checks.py", frame.getFileName(), frame.toString());
+            assertEquals(10, frame.getLineNumber(), frame.toString());
+        }
+
+        // the classes of an in-memory compilation are mapped as well
+        ClassLoader inMemory = PyronautCompiler.builder()
+            .pythonSrc(python.getParent().toString())
+            .staticCompilation(StaticCompilationMode.ALL)
+            .build()
+            .buildClassLoader();
+        try (var stream = inMemory.getResourceAsStream("example/Checks.class")) {
+            assertNotNull(stream);
+            assertPythonLines(stream.readAllBytes());
+        }
+    }
+
+    /**
+     * The class file names the Python file, and the lines of the compiled method are the lines of its
+     * Python body, the raise among them.
+     */
+    private static void assertPythonLines(byte[] bytes) {
+        ClassModel model = ClassFile.of().parse(bytes);
+        assertEquals("checks.py", model.findAttribute(Attributes.sourceFile()).orElseThrow().sourceFile().stringValue());
+        MethodModel check = model.methods().stream()
+            .filter(method -> method.methodName().equalsString("check") && method.methodTypeSymbol().parameterCount() == 1)
+            .findFirst().orElseThrow();
+        Set<Integer> lines = check.code().orElseThrow().elementStream()
+            .filter(LineNumber.class::isInstance)
+            .map(element -> ((LineNumber) element).line())
+            .collect(Collectors.toSet());
+        assertTrue(lines.contains(10), lines.toString());
+        assertTrue(lines.stream().allMatch(line -> line >= 7 && line <= 11), lines.toString());
     }
 
     private static void compileIncrementally(Path python, Path java, Path output, Path cache, Path report) {

@@ -41,8 +41,10 @@ import io.micronaut.python.processing.model.ScriptDef;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.PolyglotAccess;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.io.IOAccess;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.intellij.lang.annotations.Language;
@@ -202,10 +204,19 @@ public final class PythonAstParser {
     }
 
     private static Context.Builder newContextBuilder(ClassLoader classLoader) {
-        Context.Builder builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
-                .resourceDirectory(INJECT_RESOURCES)
-                .resourceLoadingClass(PythonAstParser.class)
-                .build())
+        VirtualFileSystem vfs = VirtualFileSystem.newBuilder()
+            .resourceDirectory(INJECT_RESOURCES)
+            .resourceLoadingClass(PythonAstParser.class)
+            .build();
+        // The settings GraalPyResources.contextBuilder(vfs) applied before it was deprecated
+        Context.Builder builder = Context.newBuilder()
+            .allowExperimentalOptions(false)
+            .allowAllAccess(false)
+            .allowCreateThread(true)
+            .allowNativeAccess(true)
+            .allowPolyglotAccess(PolyglotAccess.ALL)
+            .apply(GraalPyResources.forVirtualFileSystem(vfs))
+            .extendIO(IOAccess.NONE, io -> io.allowHostSocketAccess(true))
             // Future hardening should constrain host access to the required Micronaut API surface.
             .allowHostAccess(HostAccess.ALL)
             .hostClassLoader(classLoader)

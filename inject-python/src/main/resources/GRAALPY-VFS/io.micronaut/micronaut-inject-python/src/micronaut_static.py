@@ -29,7 +29,8 @@ import ast
 
 import java
 
-from micronaut_typecheck import Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, function_node, switch_value, TRANSPARENT_BASES
+from micronaut_typecheck import (Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, ScopeModes,
+                                ScopeResolver, SCOPE_CLASS, SCOPE_FUNCTION, SCOPE_MODE, class_key, function_node, TRANSPARENT_BASES)
 from micronaut_lowering import JAVA_RESERVED_NAMES, Lowering, stub_type_name, _decorated_with
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
@@ -86,34 +87,22 @@ PROTOCOL_CHANGES = ATTRIBUTE_PROTOCOL | {"__bases__", "__mro__"}
 COMPUTED_WRITERS = {"setattr", "delattr", "__setattr__", "__delattr__"}
 
 
-class CompileScope:
+# static compilation: a function is compiled under mode all or when switched on; mode annotated
+# decides as mode off does
+COMPILE_MODES = ScopeModes(
+    "static compilation", MODES,
+    default=lambda mode: mode == MODE_ALL,
+    on=lambda mode: True,
+    off=False)
+
+
+def CompileScope(mode, annotation_names):
     """
-    Resolves whether a definition is compiled from its decorators and its enclosing scopes, and
-    which declaration decided: the nearest ``CompileStatic`` switch, else the compilation's mode.
+    The :class:`micronaut_typecheck.ScopeResolver` of static compilation: resolves whether a
+    definition is compiled and which declaration decided, the nearest ``CompileStatic`` switch, else
+    the compilation's mode.
     """
-
-    def __init__(self, mode, annotation_names):
-        if mode not in MODES:
-            raise ValueError(f"Unknown static compilation mode [{mode}]; expected one of {', '.join(MODES)}")
-        self.mode = mode
-        self.annotation_names = frozenset(annotation_names or ())
-
-    def switch(self, decorators):
-        """True or False when one of the decorators is an accepted switch, None otherwise; a bare decorator switches on."""
-        for decorator in decorators or ():
-            if decorator.annotationName() in self.annotation_names:
-                members = decorator.members()
-                value = members.get("value") if members is not None else None
-                return True if value is None else switch_value(value)
-        return None
-
-    def resolve(self, module_decorators, class_decorators, function_decorators):
-        """(compiled, scope name) for a function under the given declarations."""
-        for decorators, scope in ((function_decorators, "FUNCTION"), (class_decorators, "CLASS"), (module_decorators, "MODULE")):
-            switch = self.switch(decorators)
-            if switch is not None:
-                return switch, scope
-        return self.mode == MODE_ALL, "MODE"
+    return ScopeResolver(mode, annotation_names, COMPILE_MODES)
 
 
 class StaticPlanner:
@@ -131,6 +120,7 @@ class StaticPlanner:
         self._ineligibility = {}  # id(class_def) -> why the class generates no stub, or None: asked once per class
         self._decided = {}        # id(node) -> the decision, or None while it is being made
         self._bodies = {}         # id(node) -> the compiled body
+        self._class_scopes = {}   # id(module) -> the resolution of each of its classes
         # the classes already reported for a class-level switch they can never honour
         self._reported_classes = set()
         self._fixed = {}          # id(class model) -> the names of its attributes fixed at construction
@@ -147,6 +137,7 @@ class StaticPlanner:
         self.diagnostics = []
         self._decided = {}
         self._bodies = {}
+        self._class_scopes = {}
         self._reported_classes = set()
         self._fixed = {}
         self._writes = None
@@ -333,7 +324,9 @@ class StaticPlanner:
 
     def _decision(self, module, class_def, class_node, function_def, node):
         qualified = f"{class_def.name()}.{function_def.name()}" if class_def is not None else function_def.name()
-        compiled, scope = self.scope.resolve(module.decorators, class_def.decorators() if class_def is not None else None, function_def.decorators())
+        # a method is declared within its class, which is declared within the class around it or the module
+        enclosing = self._class_scope(module, class_def, class_node) if class_def is not None else self.scope.module(module)
+        compiled, scope = self.scope.within(function_def.decorators(), SCOPE_FUNCTION, enclosing)
         span = function_def.span()
         if not compiled:
             return self._record(qualified, span, "EXCLUDED", scope, [], 0)
@@ -345,8 +338,8 @@ class StaticPlanner:
         reasons = self._candidate_reasons(module, class_def, class_node, function_def, node, span, java_layout)
         if reasons:
             # a class-level switch on a class that can never be compiled is flagged once for the class
-            ineligible_class = scope == "CLASS" and reasons[0][0] == "class-not-eligible" and self._first_report(class_def)
-            return self._record(qualified, span, "NOT_CANDIDATE", scope, reasons, 0, explicit=scope == "FUNCTION" or ineligible_class)
+            ineligible_class = scope == SCOPE_CLASS and reasons[0][0] == "class-not-eligible" and self._first_report(class_def)
+            return self._record(qualified, span, "NOT_CANDIDATE", scope, reasons, 0, explicit=scope == SCOPE_FUNCTION or ineligible_class)
         reasons = self._signature_reasons(module, class_def, function_def, node, span, java_layout, bindings)
         statements = 0
         if node is not None:
@@ -354,15 +347,15 @@ class StaticPlanner:
             reasons.extend(self._body_reasons(module, node))
         if reasons or node is None or getattr(self.checker, "facts", None) is None:
             outcome = "SKIPPED" if reasons else "CANDIDATE"
-            return self._record(qualified, span, outcome, scope, reasons, statements, explicit=scope != "MODE")
+            return self._record(qualified, span, outcome, scope, reasons, statements, explicit=scope != SCOPE_MODE)
         body, reasons = self._lower(module, class_def, function_def, node, java_layout)
         if body is None:
-            return self._record(qualified, span, "SKIPPED", scope, reasons, statements, explicit=scope != "MODE")
+            return self._record(qualified, span, "SKIPPED", scope, reasons, statements, explicit=scope != SCOPE_MODE)
         if class_def is None and body.stats().bridgeCalls() > 0 and self._pooled_module(module):
             # a module served by a context pool: a body of its generated class runs outside any
             # Python context, so it cannot reach a Python object
             reason = ("pooled-module", "the module is served by a context pool; a body reaching a Python object has no context to reach it in", span)
-            return self._record(qualified, span, "SKIPPED", scope, [reason], statements, explicit=scope != "MODE")
+            return self._record(qualified, span, "SKIPPED", scope, [reason], statements, explicit=scope != SCOPE_MODE)
         if class_def is None and body.staticMethod() and not _generates_class(getattr(module, "script", None)):
             # a module without a generated class gets one for its compiled functions
             self._add_script(module)
@@ -370,6 +363,15 @@ class StaticPlanner:
         if node is not None:
             self._bodies[id(node)] = body
         return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats())
+
+    def _class_scope(self, module, class_def, class_node):
+        """The resolution of a class of the module, the classes around it included: resolved once per module and plan."""
+        resolutions = self._class_scopes.get(id(module))
+        if resolutions is None:
+            resolutions = self._class_scopes[id(module)] = self.scope.classes(module)
+        resolved = resolutions.get(class_key(class_def, class_node))
+        # a class the module does not record is declared within the module only
+        return resolved if resolved is not None else self.scope.within(class_def.decorators(), SCOPE_CLASS, self.scope.module(module))
 
     def _add_script(self, module):
         visitor = module.visitor
@@ -411,7 +413,7 @@ class StaticPlanner:
         java_reasons = [Reason(rule, message, reason_span) for rule, message, reason_span in reasons]
         decision = Decision(qualified, span, Outcome.valueOf(outcome), Scope.valueOf(scope), java_reasons, stats or Stats(statements, 0, 0, 0))
         self.decisions.append(decision)
-        if explicit and reasons and (self.scope.mode != MODE_ALL or scope == "FUNCTION"):
+        if explicit and reasons and (self.scope.mode != MODE_ALL or scope == SCOPE_FUNCTION):
             rule, message, reason_span = reasons[0]
             rest = f" (and {len(reasons) - 1} more, see the report)" if len(reasons) > 1 else ""
             text = f"[{qualified}] cannot be compiled statically: [{rule}] {message}{rest}"

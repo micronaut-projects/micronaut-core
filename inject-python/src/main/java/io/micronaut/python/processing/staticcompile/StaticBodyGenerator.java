@@ -66,6 +66,8 @@ public final class StaticBodyGenerator {
     // every name the body uses: a temporary of the generator takes a name none of them has
     private final java.util.Set<String> names = new java.util.HashSet<>();
     private int temporaries;
+    // the Python line of the statement being generated, 0 when it is not known
+    private int line;
 
     private StaticBodyGenerator(SelfAccess self, List<VariableDef.MethodParameter> methodParameters) {
         this.self = self;
@@ -267,24 +269,37 @@ public final class StaticBodyGenerator {
     // ---------------------------------------------------------------- statements
 
     private StatementDef statements(Ir.Body body) {
-        return statements(body.statements());
+        return statements(body.statements(), body.lines());
     }
 
     /**
      * The statements of a block. Inside a loop, the statements following one that may break or
      * continue the loop run only when it did not: SourceGen has no break or continue node, so both
-     * are flags the loop condition and the rest of the body consult.
+     * are flags the loop condition and the rest of the body consult. The first statement of each
+     * Python line is preceded by the marker of the line (see {@link StaticLineMap}).
      */
-    private StatementDef statements(List<Ir.Statement> body) {
+    private StatementDef statements(List<Ir.Statement> body, List<Integer> lines) {
         Loop loop = loops.peekLast();
         List<StatementDef> statements = new ArrayList<>(body.size());
-        for (int i = 0; i < body.size(); i++) {
-            Ir.Statement statement = body.get(i);
-            statements.add(statement(statement));
-            if (loop != null && i < body.size() - 1 && exits(statement, loop.id())) {
-                statements.add(loop.notExited().doIf(statements(body.subList(i + 1, body.size()))));
-                break;
+        int enclosing = line;
+        int marked = 0;
+        try {
+            for (int i = 0; i < body.size(); i++) {
+                Ir.Statement statement = body.get(i);
+                int statementLine = lines.isEmpty() ? 0 : lines.get(i);
+                if (statementLine > 0 && statementLine != marked) {
+                    statements.add(StaticLineMap.marker(statementLine));
+                    marked = statementLine;
+                }
+                line = statementLine > 0 ? statementLine : enclosing;
+                statements.add(statement(statement));
+                if (loop != null && i < body.size() - 1 && exits(statement, loop.id())) {
+                    statements.add(loop.notExited().doIf(statements(body.subList(i + 1, body.size()), lines.isEmpty() ? lines : lines.subList(i + 1, body.size()))));
+                    break;
+                }
             }
+        } finally {
+            line = enclosing;
         }
         return StatementDef.multi(statements);
     }
@@ -328,6 +343,10 @@ public final class StaticBodyGenerator {
             statements.add(new StatementDef.DefineAndAssign(loop.continued(), ExpressionDef.falseValue()));
         }
         statements.add(statements(body));
+        if (!perIteration.isEmpty() && line > 0) {
+            // the step of a range belongs to the line of the loop
+            statements.add(StaticLineMap.marker(line));
+        }
         statements.addAll(perIteration);
         loops.removeLast();
         return StatementDef.multi(statements);

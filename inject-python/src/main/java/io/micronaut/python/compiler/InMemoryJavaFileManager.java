@@ -50,6 +50,7 @@ import java.util.function.Function;
  */
 final class InMemoryJavaFileManager extends ForwardingJavaFileManager<JavaFileManager> {
     private final Map<URI, JavaFileObject> inMemoryFileObjects = new LinkedHashMap<>();
+    private final PythonLineMapping lineMapping = new PythonLineMapping();
 
     InMemoryJavaFileManager(JavaFileManager fileManager) {
         super(fileManager);
@@ -135,12 +136,13 @@ final class InMemoryJavaFileManager extends ForwardingJavaFileManager<JavaFileMa
     public JavaFileObject getJavaFileForOutput(Location location, String className, final Kind kind,
                                                FileObject sibling) throws IOException {
         URI uri = uriForJavaFileObject(location, className, kind);
-        return inMemoryFileObjects.computeIfAbsent(uri, new Function<URI, JavaFileObject>() {
+        JavaFileObject output = inMemoryFileObjects.computeIfAbsent(uri, new Function<URI, JavaFileObject>() {
             @Override
             public JavaFileObject apply(URI uri) {
                 return new InMemoryJavaFileManager.InMemoryJavaFileObject(uri);
             }
         });
+        return lineMapping.output(output, kind, sibling);
     }
 
     Iterable<JavaFileObject> getOutputFiles() {

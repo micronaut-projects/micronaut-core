@@ -55,7 +55,7 @@ PyronautCompiler.builder()
 
 == Switching Compilation On or Off for a Scope
 
-The `CompileStatic` annotation switches compilation for a class, a function or, applied as a bare statement, a module, with the scope rules of `TypeChecked`: the nearest declaration wins.
+The `CompileStatic` annotation switches compilation for a class, a function or, applied as a bare statement, a module, with the scope rules of `TypeChecked`: the nearest declaration wins: a function over its class, a nested class over the class around it, a class over its module, a module over the compilation's mode.
 
 [source,python]
 .shop/PricingService.py
@@ -224,7 +224,7 @@ Refused as well, where the Java code would behave differently: a `for` loop whos
 [[staticCompilationOneImplementation]]
 == One Implementation
 
-The Python object of a compiled class still exists: the generated class creates it, and Python code, the interceptor chains and the event loop call the Python class's own functions. So that a Python caller runs the same code as a Java caller, the generated class binds every Python object it creates or wraps to the compiled bodies of each class of its MRO that has some, and the runtime tree of the module is rewritten before its bytecode is compiled: a compiled function runs the Java body of the class it is defined in when its object is bound, so `super().label(...)` from a subclass runs the base's body, not the override; otherwise it runs its original body, which keeps objects created in Python (`Calc().label(...)`) on the Python implementation. The binding is kept outside the object: a copy of a bound object is not bound, and `vars()`, `copy` and `pickle` see the object's own attributes only.
+The Python object of a compiled class still exists: the generated class creates it, and Python code, the interceptor chains and the event loop call the Python class's own functions. So that a Python caller runs the same code as a Java caller, the generated class binds every Python object it creates or wraps to the compiled bodies of each class of its MRO that has some, and the runtime tree of the module is rewritten before its bytecode is compiled: a compiled function runs the Java body of the class it is defined in when its object is bound, so `super().label(...)` from a subclass runs the base's body, not the override; otherwise it runs its original body, which keeps objects created in Python (`Calc().label(...)`) on the Python implementation. The binding is kept outside the object: a copy of a bound object is not bound, and `vars()`, `copy` and `pickle` see the object's own attributes only. An object the generated class creates again because the application it was created in has shut down (an instance held across applications, such as a JVM-wide singleton) is bound again in the application now running, to the compiled bodies of every class of its MRO, so its Python callers keep running the Java bodies.
 
 A Python caller runs the Java body only when it gets what the Python body would give it:
 
@@ -264,6 +264,13 @@ The compiler fixes an attribute when the whole compilation shows that the Python
 * the value converts to the same Java value every time: a number, a boolean, a string, a Java object (handed over as itself) or an object of a plain class of the compilation (which its generated class wraps); not a collection, which is copied, nor an object of an introspected class, which copies the Python object's state. A value of a Java type the Python object converts to (a value a target type mapping may build anew) is kept only when the Python value is a Java object, a string, a number, a boolean, a date or a time, and read every time otherwise.
 
 The first read makes the class report changes: the runtime gives the class a `+__setattr__+` and a `+__delattr__+` that do what `object` does and tell the stubs when an attribute an object already has is assigned again or deleted (a first assignment cannot change a value read before), so an assignment the compiler does not see (a test's `monkeypatch.setattr(controller, "items", fake)`, code outside the compilation, a Java caller's `putMember`) makes the stubs read the attribute again. An object whose class serves its attributes itself at run time (a subclass created at run time with a `+__getattribute__+` of its own, a class attribute of the name) is read through the Python object every time. Objects created in Python are unaffected, and the Python bodies read the attributes as they always do.
+
+[[staticCompilationStackTraces]]
+== Stack Traces and Debugging
+
+The generated Java of a compiled method notes where each statement comes from: a `Compiled from` javadoc gives the Python file and the line of the `def`, and a `// Python line N` comment precedes the Java of each Python statement. When `PyronautCompiler` compiles the application (the `pyronaut` CLI and the build tasks that run it, to a directory or in memory), it rewrites the class files of such a generated class to these positions: the class names the Python file as its source, and each line of a compiled method is the line of the Python statement it runs, or the line of the `def` for the code the generated class adds around the statements. A stack trace of an exception raised in a compiled body therefore shows the Python position (`at shop.PricingService.total(pricing.py:12)`), and so does a debugger, which reads the same attributes. The other methods of the class, which call into Python, have no Python statement of their own: their frames show the Python file without a line, followed by the frames of the Python code they run.
+
+A class compiled by `javac` without `PyronautCompiler` (the annotation processor on the processor path of a plain Java compilation) keeps the positions of the generated Java, with the comments as the map to the Python source.
 
 [[staticCompilationAssumptions]]
 == Assumptions and Limitations
