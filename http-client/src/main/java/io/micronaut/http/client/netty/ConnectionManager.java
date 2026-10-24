@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
@@ -196,6 +197,7 @@ public class ConnectionManager {
      */
     private final Object wsContextLock;
     private boolean wsContextLoaded;
+    private final NettyZlibCodecFactory zlibCodecFactory;
     @Nullable
     private final String informationalServiceId;
 
@@ -205,6 +207,7 @@ public class ConnectionManager {
      * @param from Original connection manager
      */
     ConnectionManager(ConnectionManager from) {
+        this.zlibCodecFactory = from.zlibCodecFactory;
         this.httpVersion = from.httpVersion;
         this.log = from.log;
         this.group = from.group;
@@ -235,6 +238,7 @@ public class ConnectionManager {
         HttpClientConfiguration configuration,
         NettyHttpClientBuilder builder) {
 
+        this.zlibCodecFactory = builder.zlibCodecFactory;
         this.httpVersion = builder.explicitHttpVersion == null ? HttpVersionSelection.forClientConfiguration(configuration) : builder.explicitHttpVersion;
         this.log = log;
         this.threadFactory = builder.threadFactory == null ? new DefaultThreadFactory(MultithreadEventLoopGroup.class) : builder.threadFactory;
@@ -798,7 +802,7 @@ public class ConnectionManager {
             configuration.getMaxHeaderSize(),
             configuration.getMaxChunkSize()));
         if (configuration.isDecompressionEnabled()) {
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new ResponseContentDecompressor());
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new ResponseContentDecompressor(zlibCodecFactory));
         }
     }
 
@@ -1901,7 +1905,7 @@ public class ConnectionManager {
                             })
                             .addLast(createFrameToHttpObjectCodec());
                         if (configuration.isDecompressionEnabled()) {
-                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new ResponseContentDecompressor());
+                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new ResponseContentDecompressor(zlibCodecFactory));
                         }
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         // after the customizer, so that handlers it appended see the response first

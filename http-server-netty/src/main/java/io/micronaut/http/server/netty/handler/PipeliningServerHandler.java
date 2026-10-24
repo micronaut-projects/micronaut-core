@@ -49,7 +49,8 @@ import io.netty.handler.codec.compression.Brotli;
 import io.netty.handler.codec.compression.BrotliDecoder;
 import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.compression.SnappyFrameDecoder;
-import io.netty.handler.codec.compression.ZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
 import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -197,6 +198,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Nullable
     private Boolean exposeResponseRequest;
 
+    private NettyZlibCodecFactory zlibCodecFactory = DefaultNettyZlibCodecFactory.INSTANCE;
+
     public PipeliningServerHandler(RequestHandler requestHandler) {
         this(requestHandler, false);
     }
@@ -206,12 +209,19 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         this.quic = quic;
     }
 
+    /**
+     * @param zlibCodecFactory The streaming request decoder factory
+     */
+    public void setZlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
+        this.zlibCodecFactory = zlibCodecFactory;
+    }
+
     private ChannelHandlerContext requiredCtx() {
         return Objects.requireNonNull(ctx, "ctx");
     }
 
     public void setCompressionStrategy(HttpCompressionStrategy compressionStrategy) {
-        setCompressor(Compressor.create(compressionStrategy));
+        setCompressor(Compressor.create(compressionStrategy, zlibCodecFactory));
     }
 
     /**
@@ -794,11 +804,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 } else if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) ||
                     HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
                     decompressionChannel = newDecompressionChannel(
-                        ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP, maxZlibAllocation()));
+                        zlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP, maxZlibAllocation()));
                 } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) ||
                     HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
                     decompressionChannel = newDecompressionChannel(
-                        ZlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE, maxZlibAllocation()));
+                        zlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE, maxZlibAllocation()));
                 } else if (Brotli.isAvailable() && HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding)) {
                     decompressionChannel = newDecompressionChannel(new BrotliDecoder());
                 } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
