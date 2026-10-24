@@ -102,7 +102,7 @@ class StaticCompilationHintsTest {
         assertTrue(paths.contains("Return a value on every path"), paths);
         assertEquals("Pass a default to dict.get (d.get(key, 0)), or hint the values of the dict as objects.",
             StaticCompilationHints.hint("python-builtin-not-lowered", "dict.get without a default may answer None, which a [long] cannot hold"));
-        assertTrue(StaticCompilationHints.hint("unsupported-expression", "an Optional hint has no static lowering yet").startsWith("Replace Optional[T]"));
+        assertEquals("Write the hint as T | None instead of Optional[T].", StaticCompilationHints.hint("unsupported-expression", "an Optional hint has no static lowering yet"));
         assertTrue(StaticCompilationHints.hint("unsupported-expression", "a Lambda node has no static lowering").startsWith("Rewrite with the compiled expressions"));
         // the refusals of the Java iterators and of Python's numeric equality in dicts and sets
         assertTrue(StaticCompilationHints.hint("unsupported-statement", "the loop body may change the [xs] it iterates, which Python goes on iterating while the Java iterator throws ConcurrentModificationException")

@@ -135,7 +135,7 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 
 |`python-builtin-not-lowered`, `unsupported-statement`, `unsupported-expression`
 |A builtin, a method of a Python value, a statement kind or an expression kind outside the supported subset below, or a form of a supported statement that is not (see the list after the table).
-|Rewrite with the supported subset below: a compiled builtin or the Java method of the value, the compiled statements and expressions; pass a default to `dict.get`; replace `Optional[T]` with `T` and test for `None`.
+|Rewrite with the supported subset below: a compiled builtin or the Java method of the value, the compiled statements and expressions; pass a default to `dict.get`; write the hint as `T | None` instead of `Optional[T]`.
 
 |`unbounded-integer-op`, `equality-on-object`, `truthiness-of-java-object`, `python-exception`
 |An operation whose Python semantics the lowering does not reproduce: `**` on integers or an integer literal outside `long`, `==` between Java objects, `if x:` on a Java object that is not a collection or a string, raising or catching a Python exception that is neither a Java exception nor an exception class of the compilation (a builtin `ValueError` itself, a bare `except`), or an exception class of the compilation where the generated Java class would not behave as the Python exception does (see `raise OwnError(...)` below).

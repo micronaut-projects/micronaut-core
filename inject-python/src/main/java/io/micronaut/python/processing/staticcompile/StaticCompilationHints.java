@@ -264,7 +264,7 @@ public final class StaticCompilationHints {
                 break;
             case "unsupported-expression":
                 if (text.contains("Optional")) {
-                    return "Replace Optional[T] or T | None with T and test for None in the body.";
+                    return "Write the hint as T | None instead of Optional[T].";
                 }
                 if (text.contains("type arguments")) {
                     return "Hint the return with the raw type: the generated class of a subclass extends the raw base.";
