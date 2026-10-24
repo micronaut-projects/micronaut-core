@@ -683,6 +683,9 @@ public final class PythonAstParser {
     }
 
     static boolean isWithinSourceDir(String srcDir, String path) {
+        if (srcDir == null || path == null) {
+            return false;
+        }
         String normalizedSrcDir = normalizePath(srcDir);
         String normalizedPath = normalizePath(path);
         return normalizedPath.startsWith(normalizedSrcDir) || normalizedPath.startsWith("/private" + normalizedSrcDir);
