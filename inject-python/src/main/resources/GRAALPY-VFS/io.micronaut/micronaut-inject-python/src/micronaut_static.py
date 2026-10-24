@@ -30,7 +30,7 @@ import ast
 import java
 
 from micronaut_typecheck import (Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, ScopeModes,
-                                ScopeResolver, SCOPE_CLASS, SCOPE_FUNCTION, SCOPE_MODE, function_node)
+                                ScopeResolver, SCOPE_CLASS, SCOPE_FUNCTION, SCOPE_MODE, class_key, function_node)
 from micronaut_lowering import JAVA_RESERVED_NAMES, Lowering, stub_type_name, _decorated_with
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
@@ -96,6 +96,7 @@ class StaticPlanner:
         self._ineligibility = {}  # id(class_def) -> why the class generates no stub, or None: asked once per class
         self._decided = {}        # id(node) -> the decision, or None while it is being made
         self._bodies = {}         # id(node) -> the compiled body
+        self._class_scopes = {}   # id(module) -> the resolution of each of its classes
         # the classes already reported for a class-level switch they can never honour
         self._reported_classes = set()
 
@@ -110,6 +111,7 @@ class StaticPlanner:
         self.diagnostics = []
         self._decided = {}
         self._bodies = {}
+        self._class_scopes = {}
         self._reported_classes = set()
         if getattr(checker, "facts", None) is None and visitor_context is not None:
             checker.facts = TypeFacts(visitor_context)
@@ -171,7 +173,9 @@ class StaticPlanner:
 
     def _decision(self, module, class_def, class_node, function_def, node):
         qualified = f"{class_def.name()}.{function_def.name()}" if class_def is not None else function_def.name()
-        compiled, scope = self.scope.resolve(module.decorators, class_def.decorators() if class_def is not None else None, function_def.decorators())
+        # a method is declared within its class, which is declared within the class around it or the module
+        enclosing = self._class_scope(module, class_def, class_node) if class_def is not None else self.scope.module(module)
+        compiled, scope = self.scope.within(function_def.decorators(), SCOPE_FUNCTION, enclosing)
         span = function_def.span()
         if not compiled:
             return self._record(qualified, span, "EXCLUDED", scope, [], 0)
@@ -208,6 +212,15 @@ class StaticPlanner:
         if node is not None:
             self._bodies[id(node)] = body
         return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats())
+
+    def _class_scope(self, module, class_def, class_node):
+        """The resolution of a class of the module, the classes around it included: resolved once per module and plan."""
+        resolutions = self._class_scopes.get(id(module))
+        if resolutions is None:
+            resolutions = self._class_scopes[id(module)] = self.scope.classes(module)
+        resolved = resolutions.get(class_key(class_def, class_node))
+        # a class the module does not record is declared within the module only
+        return resolved if resolved is not None else self.scope.within(class_def.decorators(), SCOPE_CLASS, self.scope.module(module))
 
     def _add_script(self, module):
         visitor = module.visitor

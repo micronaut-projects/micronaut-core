@@ -914,6 +914,84 @@ class Service:
         self.assertEqual((True, "MODE"), CompileScope(MODE_ALL, NAMES).resolve(switched(checked, False), None, []))
 
 
+NESTED_CLASSES = '''
+from micronaut.context.python.annotation import CompileStatic
+
+
+@CompileStatic(False)
+class Legacy:
+    def run(self, value: int) -> int:
+        return value
+
+    class Inner:
+        def m(self, value: int) -> int:
+            return value
+
+        @CompileStatic
+        def fast(self, value: int) -> int:
+            return value
+
+        @CompileStatic
+        class Switched:
+            def deep(self, value: int) -> int:
+                return value
+
+
+@CompileStatic
+class Opted:
+    class Inner:
+        def m(self, value: int) -> int:
+            return value
+
+        @CompileStatic(False)
+        class Excluded:
+            def deep(self, value: int) -> int:
+                return value
+
+
+class Plain:
+    class Inner:
+        def m(self, value: int) -> int:
+            return value
+'''
+
+
+class NestedClassCompileScopeTest(unittest.TestCase):
+    """A nested class takes the CompileStatic switch of the class around it, as it takes its TypeChecked switch."""
+
+    def outcomes(self, mode):
+        decisions, _ = plan(NESTED_CLASSES, mode)
+        return {name.replace("$", "."): (decision.outcome().name(), decision.scope().name()) for name, decision in decisions.items()}
+
+    def test_an_outer_switch_off_excludes_the_nested_classes_under_mode_all(self):
+        outcomes = self.outcomes(MODE_ALL)
+        self.assertEqual(("EXCLUDED", "CLASS"), outcomes["Legacy.run"])
+        self.assertEqual(("EXCLUDED", "CLASS"), outcomes["Legacy.Inner.m"])
+        self.assertEqual(("CANDIDATE", "FUNCTION"), outcomes["Legacy.Inner.fast"])
+        self.assertEqual(("CANDIDATE", "MODE"), outcomes["Plain.Inner.m"])
+
+    def test_an_outer_switch_on_compiles_the_nested_classes_under_modes_annotated_and_off(self):
+        for mode in (MODE_ANNOTATED, MODE_OFF):
+            outcomes = self.outcomes(mode)
+            self.assertEqual(("CANDIDATE", "CLASS"), outcomes["Opted.Inner.m"], mode)
+            self.assertEqual(("EXCLUDED", "MODE"), outcomes["Plain.Inner.m"], mode)
+
+    def test_a_nested_class_switch_overrides_the_outer_one(self):
+        for mode in (MODE_ALL, MODE_ANNOTATED, MODE_OFF):
+            outcomes = self.outcomes(mode)
+            self.assertEqual(("CANDIDATE", "CLASS"), outcomes["Legacy.Inner.Switched.deep"], mode)
+            self.assertEqual(("EXCLUDED", "CLASS"), outcomes["Opted.Inner.Excluded.deep"], mode)
+
+    def test_the_planner_and_the_checker_resolve_the_same_classes_alike(self):
+        from micronaut_typecheck import MODE_WARN as CHECK_WARN
+        checker = TypeChecker(CHECK_WARN, NAMES)  # the CompileStatic names, so both read the same switches
+        visitor = MicronautAstVisitor(Callback(), "pkg", "module.py", None, None, source_path="module.py", source_text=NESTED_CLASSES, type_checker=checker)
+        visitor.visit(ast.parse(NESTED_CLASSES))
+        checked = {unit.qualified_name: unit.severity is not None for unit in checker.units() if unit.function_def is not None}
+        compiled = {name: outcome == "CANDIDATE" for name, (outcome, _) in self.outcomes(MODE_ALL).items()}
+        self.assertEqual(checked, compiled)
+
+
 class ClassificationTest(unittest.TestCase):
     def test_functions_that_can_never_be_compiled_are_not_candidates(self):
         decisions, _ = plan(SOURCE, MODE_ALL)

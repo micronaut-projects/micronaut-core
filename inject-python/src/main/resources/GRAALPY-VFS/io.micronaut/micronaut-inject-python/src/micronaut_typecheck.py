@@ -102,11 +102,43 @@ class ScopeResolver:
             return enclosing
         return (self.modes.on(self.mode) if switch else self.modes.off), scope
 
+    def module(self, module):
+        """The resolution of a module record: its own switch, else the mode's."""
+        return self.within(module.decorators, SCOPE_MODULE, self.default)
+
+    def classes(self, module):
+        """
+        The resolution of every class of a module record, by :func:`class_key`. A nested class is
+        declared within the class around it, a top-level class within its module, so an outer
+        class's switch applies to the classes nested in it unless they switch themselves.
+        """
+        module_scope = self.module(module)
+        enclosing = _enclosing_classes([node for _, node in module.classes if node is not None])
+        by_node = {id(node): class_def for class_def, node in module.classes if node is not None}
+        resolved = {}
+
+        def resolve_class(class_def, node):
+            key = class_key(class_def, node)
+            if key not in resolved:
+                outer_node = enclosing.get(id(node)) if node is not None else None
+                outer = resolve_class(by_node[id(outer_node)], outer_node) if outer_node is not None and id(outer_node) in by_node else module_scope
+                resolved[key] = self.within(class_def.decorators(), SCOPE_CLASS, outer)
+            return resolved[key]
+
+        for class_def, node in module.classes:
+            resolve_class(class_def, node)
+        return resolved
+
     def resolve(self, module_decorators, class_decorators, function_decorators):
         """The resolution of a function under the declarations of its module, its class (None for a module-level function) and its own."""
         resolution = self.within(module_decorators, SCOPE_MODULE, self.default)
         resolution = self.within(class_decorators, SCOPE_CLASS, resolution)
         return self.within(function_decorators, SCOPE_FUNCTION, resolution)
+
+
+def class_key(class_def, node):
+    """The key of a recorded class in :meth:`ScopeResolver.classes`: its AST node, else its model."""
+    return id(node) if node is not None else id(class_def)
 
 
 # type checking: unchecked (None) under mode off, else checked at the mode's severity; switching on
@@ -214,26 +246,16 @@ class TypeChecker:
         """
         units = []
         for module in self._modules.values():
-            module_scope = self.scope.within(module.decorators, SCOPE_MODULE, self.scope.default)
+            module_scope = self.scope.module(module)
             for function_def, node in module.functions:
                 severity, _ = self.scope.within(function_def.decorators(), SCOPE_FUNCTION, module_scope)
                 units.append(CheckUnit(module.source_path, function_def.name(), function_def, node, None, severity, module))
             # a nested class takes the switch of the class around it, the nearest declaration winning
-            enclosing = _enclosing_classes([node for _, node in module.classes if node is not None])
-            by_node = {id(node): class_def for class_def, node in module.classes if node is not None}
-            class_scopes = {}
-
-            def class_scope(class_def, node):
-                key = id(node) if node is not None else id(class_def)
-                if key not in class_scopes:
-                    outer_node = enclosing.get(id(node)) if node is not None else None
-                    outer_scope = class_scope(by_node[id(outer_node)], outer_node)[0] if outer_node is not None and id(outer_node) in by_node else module_scope
-                    # a nested class is modelled by its binary name (Outer$Inner): its source name is Outer.Inner
-                    class_scopes[key] = (self.scope.within(class_def.decorators(), SCOPE_CLASS, outer_scope), class_def.name().replace("$", "."))
-                return class_scopes[key]
-
+            class_scopes = self.scope.classes(module)
             for class_def, node in module.classes:
-                resolved, class_name = class_scope(class_def, node)
+                resolved = class_scopes[class_key(class_def, node)]
+                # a nested class is modelled by its binary name (Outer$Inner): its source name is Outer.Inner
+                class_name = class_def.name().replace("$", ".")
                 units.append(CheckUnit(module.source_path, class_name, None, node, class_def, resolved[0], module))
                 members = list(class_def.functions())
                 if class_def.constructor() is not None:
