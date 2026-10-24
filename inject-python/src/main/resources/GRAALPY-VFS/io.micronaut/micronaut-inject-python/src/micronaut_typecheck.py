@@ -854,11 +854,12 @@ class JavaReceiverRules:
         self.facts = checker.facts
         self.bindings = Bindings(checker, unit)
         self.span_of = unit.module.span_of
-        # a silent run records what it infers instead of reporting: the type of every expression, which
-        # the inference of an unhinted return or of an attribute reads, and the problems found
+        # a silent run records what it infers for the static compiler instead of reporting: the
+        # type of every expression, the target of every resolved call, and the problems found
         self.silent = silent
         self.problems = []
         self.node_types = {}
+        self.targets = {}
         # a probe walk of a loop body (see _rebound_in) reports nothing
         self._probing = 0
 
@@ -1123,10 +1124,12 @@ class JavaReceiverRules:
                              f"[{description.simpleName()}.{member}] is an instance field; read it on an instance of [{description.name()}]",
                              node)
                 return None
+            self.targets[id(node)] = ("field", description.name(), member, fields.get(member), description.staticFields().contains(member))
             return of_java_type(fields.get(member))
         if nested.containsKey(member):
             return Typed(JAVA_REF, nested.get(member))
         if description.enumConstants().contains(member):
+            self.targets[id(node)] = ("field", description.name(), member, description.name(), True)
             return Typed(JAVA, description.name())
         if receiver.kind == JAVA_REF and self.facts.describe(f"{description.name()}${member}") is not None:
             return Typed(JAVA_REF, f"{description.name()}${member}")
@@ -1257,6 +1260,7 @@ class JavaReceiverRules:
                          f"no overload of [{description.simpleName()}.{member}] accepts ({self._render_arguments(argument_types)}); candidates: {rendered}",
                          node)
             return None
+        self.targets[id(node)] = ("method", description.name(), member, matching, receiver.kind == JAVA_REF)
         return self._return_type(matching)
 
     def _java_construction(self, target, node, argument_types, star_args, kwargs):
@@ -1274,11 +1278,15 @@ class JavaReceiverRules:
             if not description.pythonDefined():
                 kind = "an enum" if description.anEnum() else "a type without an accessible constructor"
                 self._report("unknown-constructor", f"[{description.name()}] is {kind} and cannot be instantiated", node)
-        elif not self._matching(constructors, argument_types):
-            rendered = ", ".join(signature.render(description.simpleName()) for signature in constructors)
-            self._report("unknown-constructor",
-                         f"no constructor of [{description.name()}] accepts ({self._render_arguments(argument_types)}); candidates: {rendered}",
-                         node)
+        else:
+            matching = self._matching(constructors, argument_types)
+            if not matching:
+                rendered = ", ".join(signature.render(description.simpleName()) for signature in constructors)
+                self._report("unknown-constructor",
+                             f"no constructor of [{description.name()}] accepts ({self._render_arguments(argument_types)}); candidates: {rendered}",
+                             node)
+            else:
+                self.targets[id(node)] = ("constructor", description.name(), None, matching, False)
         return Typed(JAVA, description.name())
 
     def _matching(self, signatures, argument_types):
