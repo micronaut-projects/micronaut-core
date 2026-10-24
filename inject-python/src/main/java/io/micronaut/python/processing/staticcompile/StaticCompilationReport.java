@@ -24,7 +24,7 @@ import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.UncheckedIOException;
-import java.io.Writer;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,10 +39,10 @@ import java.util.TreeMap;
 
 /**
  * Writes the decisions of a compilation as {@code decisions.jsonl} (one JSON object per line, the
- * first one describing the plan) and {@code summary.txt} (the decisions grouped by outcome with
- * totals per outcome and per reason), and keeps them as {@code decisions.properties}, the state
- * an incremental build reads back to complete its own decisions with those of the sources it did
- * not plan.
+ * first one describing the plan, the input of the page a build tool renders) and {@code summary.txt}
+ * (the decisions grouped by outcome with totals per outcome and per reason), every reason carrying
+ * a hint of what to change, and keeps them as {@code decisions.properties}, the state an incremental
+ * build reads back to complete its own decisions with those of the sources it did not plan.
  *
  * @author Graeme Rocher
  * @since 5.3.0
@@ -213,14 +213,26 @@ public final class StaticCompilationReport {
         for (int i = 0; i < decisions.size(); i++) {
             decisions.get(i).writeTo(properties, "decision." + i + '.');
         }
-        try (Writer writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
-            properties.store(writer, "The decisions of the last static compilation, read back by an incremental build");
+        StringWriter stored = new StringWriter();
+        properties.store(stored, "The decisions of the last static compilation, read back by an incremental build");
+        // Properties.store writes the date as a second comment line: without it the file is the same for the same decisions
+        String[] lines = stored.toString().split("\\R", -1);
+        StringBuilder content = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            if (i == 1 && lines[i].startsWith("#")) {
+                continue;
+            }
+            content.append(lines[i]);
+            if (i < lines.length - 1) {
+                content.append('\n');
+            }
         }
+        Files.writeString(file, content, StandardCharsets.UTF_8);
     }
 
     /**
-     * The human-readable summary: the decisions grouped by outcome, each with its reasons, then the
-     * totals per outcome and per reason rule.
+     * The human-readable summary: the decisions grouped by outcome, each with its reasons and what to
+     * change for each, then the totals per outcome and per reason rule.
      *
      * @param decisions The decisions
      * @return The summary
@@ -251,6 +263,10 @@ public final class StaticCompilationReport {
                         out.append(reason.span().location()).append("  ");
                     }
                     out.append(reason.message()).append('\n');
+                    String hint = StaticCompilationHints.hint(reason);
+                    if (hint != null) {
+                        out.append("              fix: ").append(hint).append('\n');
+                    }
                 }
             }
         }
