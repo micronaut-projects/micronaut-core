@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.MediaType;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketClientException;
@@ -77,7 +78,7 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
         } else {
             String methodName = context.getMethodName();
             if (methodName.startsWith("send") || methodName.startsWith("broadcast")) {
-                MediaType mediaType = context.stringValue(Produces.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
+                MediaType mediaType = context.getCachedValue(SendPlan.class, SendPlan::of).mediaType();
                 validateSession();
 
                 InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
@@ -133,4 +134,17 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
             throw new WebSocketClientException("No available and open WebSocket session");
         }
     }
+
+    /**
+     * The media type a send method of a WebSocket client sends, kept by the method.
+     *
+     * @param mediaType The media type
+     */
+    private record SendPlan(MediaType mediaType) {
+
+        static SendPlan of(ExecutableMethod<?, ?> method) {
+            return new SendPlan(method.stringValue(Produces.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE));
+        }
+    }
+
 }
