@@ -1,5 +1,6 @@
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.context.python.PythonStatic
 import io.micronaut.python.compiler.PyronautCompiler
 import io.micronaut.python.processing.staticcompile.StaticCompilationDecision
 import io.micronaut.python.processing.staticcompile.StaticCompilationMode
@@ -16,13 +17,15 @@ class StaticCompilationParitySpec extends AbstractPythonTypeElementSpec {
 
     @Override
     protected void configureCompiler(PyronautCompiler.Builder compilerBuilder) {
-        compilerBuilder.staticCompilation(mode).staticCompilationDecisionCallback { decisions << it }
+        compilerBuilder.staticCompilation(mode)
+            .options(["-A${StaticCompilationMode.TRACE_OPTION}=true".toString()])
+            .staticCompilationDecisionCallback { decisions << it }
     }
 
     static final String SOURCE = '''
 from dataclasses import dataclass, field
 from jakarta.inject import Singleton
-from java.lang import IllegalArgumentException
+from java.lang import IllegalArgumentException, RuntimeException
 from java.lang import Integer, Math, StringBuilder
 from io.micronaut.python.annotation.processing.test import StaticOverloads
 from java.net import URL, MalformedURLException
@@ -44,6 +47,36 @@ def module_lengths(values: list[str]) -> dict[str, int]:
 
 def module_any(values: list[int], limit: int) -> bool:
     return any(v > limit for v in values)
+
+
+class Rejected(Exception):
+    """A Python exception class: generated as a RuntimeException, raised and caught as one by compiled bodies."""
+
+
+class Invalid(ValueError):
+    """A class extending another builtin exception: generated as a RuntimeException too."""
+
+
+class Coded(Exception):
+    def __init__(self, code: int):
+        super().__init__(f"code {code}")
+        self.code = code
+
+
+class CodedSub(Coded):
+    """Inherits the hinted __init__ of Coded."""
+
+
+def module_rejecting(n: int) -> int:
+    if n < 0:
+        raise Rejected(f"module {n}")
+    return n
+
+
+def module_named(key: str) -> str:
+    if key == "":
+        raise Rejected("module empty")
+    return key
 
 
 MODULE_RATE = 2
@@ -100,6 +133,145 @@ def module_shadow(module_twice: Scaler, n: int) -> int:
 class Calc:
     rate: float = 1.5
     count: int = 0
+
+    def rejecting(self, n: int) -> int:
+        if n < 0:
+            raise Rejected(f"negative {n}")
+        return n
+
+    def coded(self, n: int) -> int:
+        if n < 0:
+            raise Coded(n)
+        return n * 2
+
+    def caught(self, n: int) -> int:
+        try:
+            return self.rejecting(n)
+        except Rejected:
+            return -1
+
+    def caught_from_python(self, n: int) -> int:
+        try:
+            return self.python_rejecting(n)
+        except Rejected:
+            return -1
+
+    def misordered(self, n: int) -> int:
+        try:
+            return self.rejecting(n)
+        except RuntimeException:
+            return -2
+        except Rejected:
+            return -1
+
+    def java_catching(self, n: int) -> int:
+        try:
+            return self.rejecting(n)
+        except RuntimeException:
+            return -2
+
+    def coded_sub(self, n: int) -> int:
+        if n < 0:
+            raise CodedSub(n)
+        return n
+
+    def python_error(self, n: int) -> Rejected:
+        make = lambda v: Rejected(f"made {v}")
+        return make(n)
+
+    def raises_returned(self, n: int) -> int:
+        if n < 0:
+            raise self.python_error(n)
+        return n
+
+    @staticmethod
+    def static_rejecting(n: int) -> int:
+        if n < 0:
+            raise Rejected(f"static {n}")
+        return n
+
+    def python_catching_delegated(self, n: int) -> str:
+        check = lambda v: v
+        try:
+            return str(check(module_rejecting(n))) + "|" + str(check(Calc.static_rejecting(n)))
+        except Rejected as rejected:
+            return "rejected: " + str(rejected)
+
+    def java_message(self, n: int) -> int:
+        if n < 0:
+            raise Rejected(StringBuilder("java").toString())
+        return n
+
+    def ordered(self, n: int) -> int:
+        try:
+            return self.rejecting(n)
+        except Rejected:
+            return -1
+        except RuntimeException:
+            return -2
+
+    def python_rejecting(self, n: int) -> int:
+        check = lambda v: v < 0
+        if check(n):
+            raise Rejected(f"python {n}")
+        return n
+
+    def python_catching(self, n: int) -> str:
+        check = lambda v: v
+        try:
+            return str(check(self.rejecting(n)))
+        except Rejected as rejected:
+            return "rejected: " + str(rejected)
+
+    def python_catching_coded(self, n: int) -> str:
+        check = lambda v: v
+        try:
+            return str(check(self.coded(n)))
+        except Coded as coded:
+            return f"{coded} {coded.code} {coded.args}"
+
+    def invalid(self, key: str) -> int:
+        if key == "":
+            raise Invalid(key, None, 1.5, True)
+        return len(key)
+
+    def caught_invalid(self, key: str) -> int:
+        try:
+            return self.invalid(key)
+        except Invalid:
+            return -1
+
+    def reraised(self, n: int) -> int:
+        try:
+            return self.rejecting(n)
+        except Rejected as rejected:
+            raise rejected
+
+    def delegated_rejecting(self, key: str) -> str:
+        return module_named(key)
+
+    def python_catching_once(self, key: str) -> str:
+        check = lambda v: v
+        try:
+            return check(self.delegated_rejecting(key))
+        except Rejected as rejected:
+            return "rejected: " + str(rejected)
+
+    def mixed_crossing(self, key: str) -> str:
+        return module_named(key) if Objects.nonNull("java") else key
+
+    def python_catching_mixed(self, key: str) -> str:
+        check = lambda v: v
+        try:
+            return check(self.mixed_crossing(key))
+        except Rejected as rejected:
+            return "rejected: " + str(rejected)
+
+    def java_in_try(self, n: int) -> int:
+        try:
+            return module_rejecting(n) if Objects.nonNull("java") else n
+        except Rejected:
+            return -1
 
     def total(self, quantity: int, unit_price: float) -> float:
         subtotal = quantity * unit_price
@@ -536,6 +708,25 @@ class Bag:
         ["sized", 3], ["sized", 0], ["spelled_size", 3], ["spelled_size", 0], ["spelled_limit", 1],
         ["branch_local", true], ["branch_local", false],
         ["guarded", 3], ["guarded", 0],
+        ["rejecting", 3], ["rejecting", -1],
+        ["coded", 3], ["coded", -2],
+        ["caught", 3], ["caught", -1],
+        ["ordered", 3], ["ordered", -1],
+        ["misordered", -1],
+        ["caught_from_python", 3], ["caught_from_python", -1],
+        ["python_catching", 3], ["python_catching", -1],
+        ["python_catching_coded", 3], ["python_catching_coded", -2],
+        ["java_catching", 3], ["java_catching", -1],
+        ["coded_sub", 3], ["coded_sub", -2],
+        ["raises_returned", 3], ["raises_returned", -1],
+        ["python_catching_delegated", 3], ["python_catching_delegated", -1],
+        ["java_message", 3], ["java_message", -1],
+        ["invalid", "ab"], ["invalid", ""], ["caught_invalid", "ab"], ["caught_invalid", ""],
+        ["reraised", 3], ["reraised", -1],
+        ["python_catching_once", "a"], ["python_catching_once", ""],
+        ["mixed_crossing", "a"], ["mixed_crossing", ""],
+        ["python_catching_mixed", "a"], ["python_catching_mixed", ""],
+        ["java_in_try", 3], ["java_in_try", -1],
         ["boxed_none", "no.such.property"], ["boxed_none", "micronaut.static.parity"],
         ["boxed_local", "no.such.property"], ["boxed_local", "micronaut.static.parity"],
         ["boxed_branch", "no.such.property"], ["boxed_branch", "micronaut.static.parity"],
@@ -588,13 +779,41 @@ class Bag:
                 results[m]['merged'] = calc.merged(new LinkedHashMap<>([b: '2', a: '3'])).collectEntries { k, v -> [(k.toString()): v.toString()] }
                 results[m]['viewed'] = calc.viewed('v').collectEntries { k, v -> [(k.toString()): v.toString()] }
                 results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
+                results[m]['rejected'] = raisedBy { calc.rejecting(-1) }
+                results[m]['coded-thrown'] = raisedBy { calc.coded(-2) }
+                results[m]['coded-sub-thrown'] = raisedBy { calc.coded_sub(-2) }
+                results[m]['returned-thrown'] = raisedBy { calc.raises_returned(-1) }
+                results[m]['invalid-thrown'] = raisedBy { calc.invalid('') }
+                results[m]['reraised-thrown'] = raisedBy { calc.reraised(-1) }
+                results[m]['java-message-thrown'] = raisedBy { calc.java_message(-1) }
+                PythonStatic.resetEntries()
+                results[m]['once'] = calc.python_catching_once('')
+                results[m]['mixed'] = calc.python_catching_mixed('')
+                if (m == StaticCompilationMode.ALL) {
+                    // a Python caller runs the Java body calling only the compilation, which raises the Python exception
+                    // the Java one carries; a body calling Java code too keeps the Python body for Python callers
+                    assert PythonStatic.entries('python.Calc#delegated_rejecting') == 1
+                    assert PythonStatic.entries('python.Calc#mixed_crossing') == 0
+                }
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
                     assert !compiled.contains('Calc.via_python'), 'the lambda keeps via_python in Python, where module_twice delegates to its static Java method'
+                    assert !compiled.containsAll(['Calc.python_rejecting', 'Calc.python_catching', 'Calc.python_catching_coded']), 'the lambdas keep the Python raisers and catchers in Python'
+                    // a Java catch of RuntimeException would catch the Python exception classes, which Python lets through
+                    for (String name : ['misordered', 'ordered', 'java_catching']) {
+                        def refused = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
+                        assert refused.reasons()*.rule() == ['python-exception'] && refused.reasons()[0].message().contains('an except clause for [java.lang.RuntimeException] would catch ['), refused.toString()
+                    }
+                    // a Python exception that crossed the Java call is the Java class in Python, which the clause would not catch
+                    def javaInTry = decisions.find { it.qualifiedName() == 'Calc.java_in_try' }
+                    assert javaInTry.reasons()*.rule() == ['python-exception'] && javaInTry.reasons()[0].message().contains('the Java call [java.util.Objects.nonNull] of the try block'), javaInTry.toString()
+                    // a value of a Python exception class has no Java layout: only a raise constructing it compiles
+                    def returned = decisions.find { it.qualifiedName() == 'Calc.raises_returned' }
+                    assert returned.reasons()*.rule() == ['python-exception'] && returned.reasons()[0].message().contains('that the raise statement does not construct'), returned.toString()
                     // what may be rebound or overridden while the program runs is not bound at compile time
                     assert !compiled.any { it in ['module_rated', 'module_dup', 'module_shadow', 'Scaler.run', 'Calc.calls_rebound'] }, decisions.toString()
                     assert compiled.contains('module_wrapped'), 'the decorated function compiles; its wrapper calls it, and it delegates to its static Java method'
-                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.twice', 'module_twice', 'module_upper', 'module_lengths', 'module_any']), decisions.toString()
+                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet() - ['misordered', 'ordered', 'java_catching', 'java_in_try', 'raises_returned', 'python_catching', 'python_catching_coded', 'python_catching_delegated', 'python_catching_once', 'python_catching_mixed']).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.twice', 'module_twice', 'module_upper', 'module_lengths', 'module_any']), decisions.toString()
                     REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
@@ -658,6 +877,28 @@ class Bag:
         results[StaticCompilationMode.OFF][["summed", 10, 3, 7].toString()] == 18
         results[StaticCompilationMode.OFF][["countdown", 9, -3].toString()] == '9,6,3,'
         results[StaticCompilationMode.OFF][["countdown", 3, 0].toString()] == 'raised'
+        results[StaticCompilationMode.OFF][["rejecting", -1].toString()] == 'raised'
+        results[StaticCompilationMode.OFF][["java_catching", -1].toString()] == 'raised'
+        results[StaticCompilationMode.OFF][["coded_sub", -2].toString()] == 'raised'
+        results[StaticCompilationMode.OFF][["raises_returned", -1].toString()] == 'raised'
+        results[StaticCompilationMode.OFF][["python_catching_delegated", 3].toString()] == '3|3'
+        results[StaticCompilationMode.OFF][["python_catching_delegated", -1].toString()] == 'rejected: module -1'
+        results[StaticCompilationMode.OFF][["caught", -1].toString()] == -1
+        results[StaticCompilationMode.OFF][["caught_from_python", -1].toString()] == -1
+        results[StaticCompilationMode.OFF][["python_catching", -1].toString()] == 'rejected: negative -1'
+        results[StaticCompilationMode.OFF][["python_catching_coded", -2].toString()] == "code -2 -2 ('code -2',)"
+        results[StaticCompilationMode.OFF]['rejected'] == 'python.Rejected: negative -1'
+        results[StaticCompilationMode.OFF]['coded-thrown'] == 'python.Coded: code -2'
+        results[StaticCompilationMode.OFF]['coded-sub-thrown'] == 'python.CodedSub: code -2'
+        results[StaticCompilationMode.OFF][["invalid", ""].toString()] == 'raised'
+        results[StaticCompilationMode.OFF][["caught_invalid", ""].toString()] == -1
+        results[StaticCompilationMode.OFF]['invalid-thrown'] == "python.Invalid: ('', None, 1.5, True)"
+        results[StaticCompilationMode.OFF]['reraised-thrown'] == 'python.Rejected: negative -1'
+        results[StaticCompilationMode.OFF]['java-message-thrown'] == 'python.Rejected: java'
+        results[StaticCompilationMode.OFF]['once'] == 'rejected: module empty'
+        results[StaticCompilationMode.OFF]['mixed'] == 'rejected: module empty'
+        results[StaticCompilationMode.OFF][["java_in_try", -1].toString()] == -1
+        results[StaticCompilationMode.OFF]['returned-thrown'] == 'python.Rejected: made -1'
         results[StaticCompilationMode.OFF][["collatz", 27].toString()] == 111
         results[StaticCompilationMode.OFF][["safe_host", "not a url"].toString()].startsWith('bad: ')
         results[StaticCompilationMode.OFF][["strict_host", ""].toString()] == 'raised'
@@ -672,6 +913,16 @@ class Bag:
             return bean."${row[0]}"(*row.tail())
         } catch (Exception ignored) {
             return "raised"
+        }
+    }
+
+    /** The class and message of the exception a call throws to its Java caller. */
+    private static String raisedBy(Closure call) {
+        try {
+            call()
+            return "nothing"
+        } catch (Exception e) {
+            return e.class.name + ": " + e.message
         }
     }
 }

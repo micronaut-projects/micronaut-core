@@ -30,6 +30,9 @@ class FakeFacts:
             "java.util.List": {"java.util.Collection", "java.lang.Iterable"},
             "java.util.Set": {"java.util.Collection", "java.lang.Iterable"},
             "java.util.Collection": {"java.lang.Iterable"},
+            "java.lang.RuntimeException": {"java.lang.Exception", "java.lang.Throwable"},
+            "java.lang.IllegalStateException": {"java.lang.RuntimeException", "java.lang.Exception", "java.lang.Throwable"},
+            "java.lang.Exception": {"java.lang.Throwable"},
         }
         return source == target or target in supertypes.get(source, ())
 
@@ -1359,6 +1362,337 @@ def helper_only(n: int) -> int:
 '''
 
 
+RAISED = '''
+from jakarta.inject import Singleton
+
+
+class Rejected(Exception):
+    """Raised for a negative count."""
+
+
+class Coded(Exception):
+    def __init__(self, code: int):
+        super().__init__(f"code {code}")
+        self.code = code
+
+
+class Narrow(Rejected):
+    pass
+
+
+class Plain:
+    pass
+
+
+class Outer:
+    class Nested(Exception):
+        pass
+
+
+@Singleton
+class Gate:
+    def raises_own(self, n: int) -> int:
+        if n < 0:
+            raise Rejected(f"negative {n}")
+        return n
+
+    def raises_coded(self, n: int) -> int:
+        if n < 0:
+            raise Coded(n)
+        return n
+
+    def raises_bare(self, n: int) -> int:
+        if n < 0:
+            raise Rejected()
+        return n
+
+    def raises_class(self, n: int) -> int:
+        if n < 0:
+            raise Rejected
+        return n
+
+    def raises_narrow(self, n: int) -> int:
+        if n < 0:
+            raise Narrow(f"narrow {n}")
+        return n
+
+    def numbered(self, n: int) -> int:
+        raise Rejected(n, 2.5, True, None)
+
+    def catches_own(self, n: int) -> int:
+        try:
+            return self.raises_own(n)
+        except Rejected as rejected:
+            return -1
+
+    def catches_both(self, n: int) -> int:
+        try:
+            return self.raises_own(n)
+        except Rejected:
+            return -1
+        except Coded:
+            return -2
+
+    def reraises(self, n: int) -> int:
+        try:
+            return self.raises_own(n)
+        except Rejected as rejected:
+            raise rejected
+
+    def shadowed_by_base(self, n: int) -> int:
+        try:
+            return self.raises_own(n)
+        except Rejected:
+            return -1
+        except Narrow:
+            return -3
+
+    def narrowed(self, n: int) -> int:
+        try:
+            return self.raises_own(n)
+        except Narrow:
+            return -3
+        except Rejected:
+            return -1
+
+    def raises_plain(self, n: int) -> int:
+        raise Plain()
+
+    def spelled(self, n: int) -> str:
+        try:
+            return str(self.raises_own(n))
+        except Rejected as rejected:
+            return str(rejected)
+
+    def keywords(self, n: int) -> int:
+        raise Coded(code=n)
+
+    def listed(self, n: int) -> int:
+        raise Rejected([n])
+
+    def chained(self, n: int) -> int:
+        try:
+            return self.raises_own(n)
+        except Rejected:
+            raise Coded(n)
+
+    def finally_raising(self, n: int) -> int:
+        try:
+            return self.raises_own(n)
+        finally:
+            raise Rejected("finally")
+
+    def reraised_inside(self, n: int) -> int:
+        try:
+            return self.raises_own(n)
+        except Rejected as rejected:
+            try:
+                return self.raises_coded(n)
+            except Coded:
+                raise rejected
+
+    def made(self, n: int) -> Rejected:
+        return Rejected(f"made {n}")
+
+    def raises_made(self, n: int) -> int:
+        raise self.made(n)
+
+    def raises_nested(self, n: int) -> int:
+        raise Outer.Nested("nested")
+
+    def catches_nested(self, n: int) -> int:
+        try:
+            return self.raises_own(n)
+        except Outer.Nested:
+            return -1
+'''
+
+
+class ExceptionClassTest(unittest.TestCase):
+    """A raise of an exception class of the compilation creates the Python exception through its class, as the generated Java class throws it."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.decisions, cls.planner = plan(RAISED, MODE_ALL, facts=FakeFacts())
+        cls.bodies = {body.methodName(): body for body in cls.planner.bodies}
+
+    def _thrown(self, name):
+        return list(list(self.bodies[name].body().statements())[0].then().statements())[0]
+
+    def test_raising_the_class_throws_the_generated_exception(self):
+        for name in ("raises_own", "raises_coded", "raises_bare", "raises_class", "raises_narrow", "numbered"):
+            self.assertEqual("COMPILED", self.decisions[f"Gate.{name}"].outcome().name(), f"{name}: {rules(self.decisions[f'Gate.{name}'])}")
+        thrown = self._thrown("raises_own")
+        self.assertEqual("Throw", thrown.getClass().getSimpleName())
+        construction = thrown.exception()
+        # the Python class called with the arguments, wrapped in the generated class as the runtime wraps it
+        self.assertEqual("NewPythonException", construction.getClass().getSimpleName())
+        self.assertEqual("pkg.Rejected", construction.type())
+        self.assertEqual(1, len(construction.arguments()))
+        coded = self._thrown("raises_coded").exception()
+        self.assertEqual(("NewPythonException", "pkg.Coded", 1), (coded.getClass().getSimpleName(), coded.type(), len(coded.arguments())))
+        self.assertEqual(0, len(self._thrown("raises_bare").exception().arguments()))
+        self.assertEqual(0, len(self._thrown("raises_class").exception().arguments()))  # raise Rejected calls the class
+        self.assertEqual("pkg.Narrow", self._thrown("raises_narrow").exception().type())
+        numbered = list(self.bodies["numbered"].body().statements())[0].exception()
+        self.assertEqual(4, len(numbered.arguments()))  # an int, a float, a bool and None reach Python as themselves
+        # the Python class creates the exception as a generated constructor creates its Python object
+        self.assertEqual((1, 0), (self.bodies["raises_own"].stats().javaCalls(), self.bodies["raises_own"].stats().bridgeCalls()))
+
+    def test_catching_the_class_catches_the_generated_exception(self):
+        for name in ("catches_own", "catches_both", "reraises", "narrowed"):
+            self.assertEqual("COMPILED", self.decisions[f"Gate.{name}"].outcome().name(), f"{name}: {rules(self.decisions[f'Gate.{name}'])}")
+        attempt = list(self.bodies["catches_own"].body().statements())[0]
+        self.assertEqual("Try", attempt.getClass().getSimpleName())
+        handler = list(attempt.catches())[0]
+        self.assertEqual("pkg.Rejected", handler.type())
+        self.assertEqual("rejected", handler.variable())
+        both = [handler.type() for handler in list(self.bodies["catches_both"].body().statements())[0].catches()]
+        self.assertEqual(["pkg.Rejected", "pkg.Coded"], both)
+        narrowed = [handler.type() for handler in list(self.bodies["narrowed"].body().statements())[0].catches()]
+        self.assertEqual(["pkg.Narrow", "pkg.Rejected"], narrowed)
+        rethrown = list(list(list(self.bodies["reraises"].body().statements())[0].catches())[0].body().statements())[0]
+        self.assertEqual("Throw", rethrown.getClass().getSimpleName())
+        self.assertEqual(("LocalRef", "pkg.Rejected"), (rethrown.exception().getClass().getSimpleName(), rethrown.exception().type()))
+
+    def test_a_body_calling_no_java_code_raises_the_python_exception_to_python_callers(self):
+        self.assertEqual("TRANSLATED", self.bodies["raises_own"].exceptions().name())
+        self.assertEqual("TRANSLATED", self.bodies["catches_own"].exceptions().name())
+
+    def test_a_clause_a_python_base_already_catches_is_refused_as_java_would(self):
+        # the Java exception types of a clause are unknown without Java facts: the parity spec covers the mixed order
+        decision = self.decisions["Gate.shadowed_by_base"]
+        self.assertEqual("SKIPPED", decision.outcome().name())
+        self.assertEqual("unsupported-statement", decision.reasons()[0].rule(), rules(decision))
+        self.assertIn("already catches it", decision.reasons()[0].message())
+
+    def test_what_python_does_otherwise_is_refused(self):
+        expectations = {
+            "raises_plain": "is not an exception class",
+            "spelled": "holds the exception of a Python exception class an except clause caught",
+            "keywords": "with keyword arguments has no static lowering",
+            "listed": "with a [java.util.List] has no static lowering",
+            "chained": "inside an except or finally block has no static lowering: Python chains the exception being handled as its context",
+            "finally_raising": "inside an except or finally block",
+            "reraised_inside": "raising [rejected] again outside the except clause that caught it",
+            "made": "is a Python exception class; a value of it has no Java layout",
+            "raises_made": "that the raise statement does not construct, nor an except clause around it catch",
+            "raises_nested": "is a nested class: the runtime does not wrap a Python exception of it in its generated class",
+            "catches_nested": "is a nested class",
+        }
+        for name, message in expectations.items():
+            decision = self.decisions[f"Gate.{name}"]
+            self.assertEqual("SKIPPED", decision.outcome().name(), name)
+            self.assertEqual("python-exception", decision.reasons()[0].rule(), f"{name}: {rules(decision)}")
+            self.assertIn(message, decision.reasons()[0].message(), name)
+
+
+HIERARCHY = '''
+from jakarta.inject import Singleton
+
+
+class Base(Exception):
+    pass
+
+
+class Mixin:
+    pass
+
+
+class Other(Exception):
+    pass
+
+
+class Mixed(Other, Base):
+    """A Python subclass of Base whose generated class extends the one of Other, not the one of Base."""
+
+
+class Leading(Exception, Mixin):
+    pass
+
+
+class Invalid(ValueError):
+    pass
+
+
+class Missing(KeyError):
+    """str() of a KeyError is the repr of its argument: the Python class decides, as it creates the exception."""
+
+
+class Stop(KeyboardInterrupt):
+    """A BaseException that is no Exception: its generated class is no Throwable."""
+
+
+class Plain:
+    pass
+
+
+@Singleton
+class Gate:
+    def catches_base(self, n: int) -> int:
+        try:
+            return n
+        except Base:
+            return -1
+
+    def raises_invalid(self, n: int) -> int:
+        raise Invalid("x")
+
+    def raises_missing(self, key: str) -> int:
+        raise Missing(key)
+
+    def catches_invalid(self, n: int) -> int:
+        try:
+            return self.raises_invalid(n)
+        except Invalid:
+            return -1
+
+    def raises_stop(self, n: int) -> int:
+        raise Stop()
+
+    def raises_leading(self, n: int) -> int:
+        raise Leading("x")
+'''
+
+
+class ExceptionHierarchyTest(unittest.TestCase):
+    """The generated class of an exception class extends the first base that resolves, which compiled catches follow."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.decisions, cls.planner = plan(HIERARCHY, MODE_ALL, facts=FakeFacts())
+
+    def test_the_superclass_is_the_one_the_generated_class_extends(self):
+        classes = self.planner.checker.python_classes
+        mixed, leading, base, other = (classes.by_qualified[f"pkg.{name}"] for name in ("Mixed", "Leading", "Base", "Other"))
+        self.assertIs(other, mixed.superclass())
+        self.assertTrue(mixed.is_subclass_of(base))
+        self.assertFalse(mixed.extends(base))
+        self.assertTrue(mixed.extends_python_exception())
+        self.assertIsNone(leading.superclass())  # Exception comes first: the generated class extends RuntimeException, Mixin is a Python base only
+        self.assertTrue(leading.extends_python_exception())
+        self.assertEqual("java.lang.RuntimeException", leading.throwable_base())
+        self.assertFalse(classes.by_qualified["pkg.Plain"].is_throwable())
+        # every builtin exception extending Exception is a RuntimeException in Java, not a BaseException that is none
+        invalid, stop = classes.by_qualified["pkg.Invalid"], classes.by_qualified["pkg.Stop"]
+        self.assertEqual("java.lang.RuntimeException", invalid.throwable_base())
+        self.assertTrue(invalid.is_open())  # the members a ValueError adds are unknown to the checker
+        self.assertFalse(stop.is_throwable())
+
+    def test_a_clause_a_python_subclass_reaches_through_another_base_is_refused(self):
+        decision = self.decisions["Gate.catches_base"]
+        self.assertEqual("SKIPPED", decision.outcome().name())
+        self.assertEqual(["python-exception"], rules(decision))
+        self.assertIn("would not catch [Mixed] in Java", decision.reasons()[0].message())
+
+    def test_classes_extending_any_builtin_exception_are_raised_and_caught(self):
+        for name in ("raises_invalid", "raises_missing", "catches_invalid", "raises_leading"):
+            self.assertEqual("COMPILED", self.decisions[f"Gate.{name}"].outcome().name(), f"{name}: {rules(self.decisions[f'Gate.{name}'])}")
+        decision = self.decisions["Gate.raises_stop"]
+        self.assertEqual(("SKIPPED", ["python-exception"]), (decision.outcome().name(), rules(decision)))
+        self.assertIn("[Stop] is not an exception class", decision.reasons()[0].message())
+
+
 ADVISED = '''
 from jakarta.inject import Singleton
 
@@ -1909,7 +2243,7 @@ class Calc:
         def run(self, n: int) -> int:
             return n
 ''')
-        targets = ["Calc#label#owner=app.Calc#kinds=int,str#retry", "Calc$Inner#run#owner=app.Calc$Inner#kinds=long#once",
+        targets = ["Calc#label#owner=app.Calc#kinds=int,str#retry#python-exceptions", "Calc$Inner#run#owner=app.Calc$Inner#kinds=long#once",
                    "Missing#nothing#owner=app.Missing#kinds=#retry", "Calc#other#owner=app.Calc"]
         self.assertEqual(2, apply_delegation(tree, targets))
         self.assertEqual(0, apply_delegation(tree, targets))  # already rewritten
@@ -1919,7 +2253,14 @@ class Calc:
         self.assertIn("return __mn_java[0]", source)
         self.assertIn("__mn_java = __mn_java.call(self, 'app.Calc$Inner', 'run', (n,), ('long',), False)", source)
         self.assertNotIn("__dict__", source)
-        calc = tree.body[0]
+        # the Java exception of a compiled body reaches the Python caller as the Python exception it carries,
+        # when the target says so (#python-exceptions: the body calls no Java code outside the compilation)
+        self.assertEqual(1, source.count("except BaseException as __mn_java_e:"))
+        self.assertIn("__mn_java_p = _mn_python_exception(__mn_java_e)", source)
+        self.assertNotRegex(source, r"raise .* from ")  # the Python exception keeps its own cause and context
+        self.assertIn("def _mn_python_exception(error):", source)
+        self.assertEqual("_mn_python_exception", tree.body[3].name)  # the helpers precede the class
+        calc = next(node for node in tree.body if isinstance(node, ast.ClassDef))
         self.assertIsInstance(calc.body[0], ast.Expr)  # the class docstring stays first
         self.assertEqual("__micronaut_compiled__", calc.body[1].targets[0].id)
         self.assertEqual(1, sum(1 for statement in calc.body if isinstance(statement, ast.Assign)))
@@ -1927,9 +2268,14 @@ class Calc:
         self.assertIsInstance(label.body[0], ast.Expr)  # the docstring stays first
         self.assertIsInstance(label.body[1], ast.Assign)
         self.assertIsInstance(label.body[2], ast.If)
+        self.assertIsInstance(label.body[2].body[0], ast.Assign)  # the Python exception, None until a Java one carries it
+        self.assertIsInstance(label.body[2].body[1], ast.Try)  # the call of the registry, translating its exception
         self.assertEqual(label.lineno, label.body[1].lineno)
         other = calc.body[3]
         self.assertIsInstance(other.body[0], ast.Return)  # a target without its kinds is not delegated
+        inner = next(node for node in calc.body if isinstance(node, ast.ClassDef)).body[1]
+        self.assertIsInstance(inner.body[1].body[0], ast.Assign)  # untranslated: the call of the registry as it is
+        self.assertIsInstance(inner.body[1].body[1], ast.If)
         compile(tree, "delegated.py", "exec")
 
     def test_static_methods_and_module_functions_delegate_to_the_generated_class(self):
@@ -2015,6 +2361,77 @@ class Calc:
                 del sys.modules["micronaut_runtime"]
             else:
                 sys.modules["micronaut_runtime"] = previous
+
+    def test_the_python_exception_of_a_java_body_keeps_its_cause_and_context(self):
+        from micronaut_static import apply_delegation
+        # a body with side effects is not run again in Python: its failure reaches the caller
+        tree = ast.parse("class Calc:\n    def helper(self, n: int) -> int:\n        return n\n")
+        apply_delegation(tree, ["Calc#helper#owner=pkg.Calc#kinds=long#once#python-exceptions"])
+        namespace = {}
+        exec(compile(tree, "raised.py", "exec"), namespace)
+
+        class Carrier(Exception):
+            """A Java exception carrying the Python exception it was created from."""
+
+            def __init__(self, carried):
+                super().__init__()
+                self.carried = carried
+
+            def asPolyglotValue(self):
+                return self.carried
+
+        cause = KeyError("cause")
+
+        class Registry:
+            """Every object is bound; its Java body fails with the Java exception of a Python one."""
+
+            def call(self, instance, owner, method, arguments, kinds, retry):
+                carried = ValueError(f"boom {arguments[0]}")
+                if arguments[0] > 1:
+                    carried.__cause__ = cause
+                raise Carrier(carried)
+
+        namespace["Calc"].__micronaut_compiled__ = Registry()
+        calc = namespace["Calc"]()
+        with self.assertRaises(ValueError) as raised:
+            calc.helper(1)
+        self.assertEqual("boom 1", str(raised.exception))
+        self.assertIsNone(raised.exception.__context__)  # not the Java exception it crossed in
+        self.assertFalse(raised.exception.__suppress_context__)
+        with self.assertRaises(ValueError) as raised:
+            calc.helper(2)
+        self.assertIs(cause, raised.exception.__cause__)
+        handled = IndexError("handled")
+        try:
+            try:
+                raise handled
+            except IndexError:
+                calc.helper(1)
+        except ValueError as error:
+            self.assertIs(handled, error.__context__)  # raised while the caller handles another exception, as in Python
+
+    def test_a_body_calling_java_code_raises_the_java_exception_as_it_is(self):
+        from micronaut_static import apply_delegation
+        # without #python-exceptions the body calls Java code outside the compilation: a Python exception
+        # raised behind it crossed Java code, which a Python caller of the Python body sees as the Java class
+        tree = ast.parse("class Calc:\n    def helper(self, n: int) -> int:\n        return n\n")
+        apply_delegation(tree, ["Calc#helper#owner=pkg.Calc#kinds=long#once"])
+        namespace = {}
+        exec(compile(tree, "crossed.py", "exec"), namespace)
+
+        class Carrier(Exception):
+            """A Java exception carrying the Python exception it was created from."""
+
+            def asPolyglotValue(self):
+                return ValueError("carried")
+
+        class Registry:
+            def call(self, instance, owner, method, arguments, kinds, retry):
+                raise Carrier()
+
+        namespace["Calc"].__micronaut_compiled__ = Registry()
+        with self.assertRaises(Carrier):
+            namespace["Calc"]().helper(1)
 
     def test_the_temporary_of_the_rewrite_never_shadows_a_name_of_the_function(self):
         from micronaut_static import apply_delegation

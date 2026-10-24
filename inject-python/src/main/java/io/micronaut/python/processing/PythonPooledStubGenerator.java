@@ -481,7 +481,7 @@ final class PythonPooledStubGenerator {
             bridged.add(methodElement.getName());
         }
         // the plain functions the plan compiled: static methods, reaching no instance and no context
-        PythonStubGenerator.addCompiledModuleFunctions(builder, typeName, bridged, context, PythonStubGenerator.pooledStaticAccess());
+        PythonStubGenerator.addCompiledModuleFunctions(builder, typeName, bridged, context, PythonStubGenerator.pooledStaticAccess(context));
 
         List<PropertyElement> beanProperties = scriptElement.getBeanProperties();
         for (PropertyElement beanProperty : beanProperties) {
@@ -631,7 +631,7 @@ final class PythonPooledStubGenerator {
                 methodBuilder.addJavadoc("Compiled from " + compiledBody.span().location());
             }
             builder.addMethod(methodBuilder.build((aThis, methodParameters) ->
-                StaticBodyGenerator.generate(compiledBody, methodParameters, PythonStubGenerator.pooledScriptAccess(aThis), plan.trace())));
+                StaticBodyGenerator.generate(compiledBody, methodParameters, PythonStubGenerator.pooledScriptAccess(context, aThis), plan.trace())));
             return;
         }
 
