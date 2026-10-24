@@ -48,6 +48,13 @@ def plan(source, mode, strict=False, path="module.py", facts=None):
     return {decision.qualifiedName(): decision for decision in decisions}, planner
 
 
+def _uncast(expression):
+    """The expression under its casts."""
+    while expression.getClass().getSimpleName() == "Cast":
+        expression = expression.operand()
+    return expression
+
+
 def rules(decision):
     return [reason.rule() for reason in decision.reasons()]
 
@@ -78,6 +85,9 @@ class Finder:
 
     def unhinted(self, flag: bool):
         return "x" if flag else "y"
+
+    def uses(self, flag: bool) -> str:
+        return self.unhinted(flag)
 
     def maybe(self, flag: bool) -> str:
         if flag:
@@ -150,6 +160,21 @@ class CorpusFindingsTest(unittest.TestCase):
 
     def test_an_unhinted_return_compiles_as_object(self):
         self.assertEqual("java.lang.Object", self._compiled("unhinted").returnType())
+
+    def test_a_collection_of_another_element_type_is_cast_through_the_raw_type(self):
+        # listed() -> list returns mapped() -> list[dict]: the sibling's List<Map<Object,Object>> reaches the raw List through a cast
+        self.assertEqual("COMPILED", self.decisions["Finder.listed"].outcome().name(), rules(self.decisions["Finder.listed"]))
+        self.assertEqual("java.util.List<java.lang.Object>", self.bodies["listed"].returnType())
+        returned = list(self.bodies["listed"].body().statements())[0].value()
+        self.assertEqual("Cast", returned.getClass().getSimpleName())
+        self.assertEqual("java.util.List<java.lang.Object>", returned.type())
+        self.assertEqual("java.util.List<java.util.Map<java.lang.Object,java.lang.Object>>", returned.operand().type())
+
+    def test_a_caller_of_an_unhinted_sibling_learns_the_type_its_body_returns(self):
+        returned = self._returned("uses")
+        self.assertEqual("Cast", returned.getClass().getSimpleName())
+        self.assertEqual("java.lang.String", returned.type())
+        self.assertEqual("java.lang.Object", returned.operand().type())
 
     def test_a_dict_unpacking_builds_the_map_in_order(self):
         returned = self._returned("merged")
@@ -513,6 +538,15 @@ class Pricing:
     def sibling(self, n: int) -> int:
         return self.truncate(n)
 
+    def hidden_call(self, n: int) -> int:
+        return self._secret(n) + self.defaulted()
+
+    def _secret(self, n: int) -> int:
+        return n
+
+    def defaulted(self, n: int = 1) -> int:
+        return n
+
     def builtin(self, name: str) -> int:
         return round(len(name) / 2)
 
@@ -783,22 +817,38 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("Cast", returned.getClass().getSimpleName())
         self.assertEqual("java.util.List<java.lang.Object>", returned.operand().type())
 
+    def test_sibling_calls_dispatch_to_the_stub_or_the_python_object(self):
+        for name in ("sibling", "hidden_call", "via_property"):
+            self.assertEqual("COMPILED", self.decisions[f"Pricing.{name}"].outcome().name(), f"{name}: {[(r.rule(), r.message()) for r in self.decisions[f'Pricing.{name}'].reasons()]}")
+        sibling = _uncast(list(self.bodies["sibling"].body().statements())[0].value())
+        self.assertEqual("truncate", sibling.name())
+        self.assertEqual("java", sibling.dispatch())
+        self.assertEqual(["int"], list(sibling.parameterTypes()))
+        self.assertEqual(1, self.bodies["sibling"].stats().javaCalls())
+        hidden = _uncast(list(self.bodies["hidden_call"].body().statements())[0].value())
+        self.assertEqual("python", _uncast(hidden.left()).dispatch())  # not bridged: the stub has no Java method for it
+        self.assertEqual("python", _uncast(hidden.right()).dispatch())  # the call relies on a default argument
+        self.assertEqual(2, self.bodies["hidden_call"].stats().bridgeCalls())
+        via_property = _uncast(list(self.bodies["via_property"].body().statements())[0].value())
+        self.assertEqual("doubled", via_property.left().property())
+        self.assertEqual("double", via_property.left().type())
+        self.assertTrue(via_property.left().accessor())  # read through the Python object, never a Java field
+
     def test_self_properties_are_read_through_the_stub(self):
         with_rate = self.bodies["with_rate"]
         product = list(with_rate.body().statements())[0].value()
         self.assertEqual("rate", product.right().property())
         self.assertEqual("double", product.right().type())
+        self.assertFalse(product.right().accessor())
         self.assertEqual(1, with_rate.stats().bridgeCalls())
 
     def test_constructs_without_a_lowering_are_skipped_with_their_reason(self):
         expectations = {
-            "sibling": "sibling-call",
             "builtin": "python-builtin-not-lowered",
             "power": "unbounded-integer-op",
             "retyped": "unknown-type",
             "falls_through": "unknown-type",
             "maybe_unbound": "unsupported-statement",
-            "via_property": "sibling-call",
             "maybe": "unsupported-expression",
             "switched": "java-reserved-name",
             "reserved_each": "java-reserved-name",
@@ -1081,6 +1131,79 @@ class Calc:
         namespace["Calc"].__micronaut_compiled__ = Registry()
         self.assertEqual(["java"], calc.names())
         self.assertEqual({"java": 2}, calc.prices())
+    def test_a_private_method_delegates_by_the_name_the_java_delegate_has(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class Calc:
+    def __helper(self, n: int) -> int:
+        return n
+''')
+        self.assertEqual(1, apply_delegation(tree, ["Calc#__helper#owner=app.Calc#kinds=long#once"]))
+        source = ast.unparse(tree)
+        # the registry looks the Java method up by its name: an attribute read would be mangled to
+        # _Calc__helper inside the class body
+        self.assertIn("__mn_java.call(self, 'app.Calc', '__helper', (n,), ('long',), False)", source)
+        self.assertNotIn("__mn_java.__helper", source)
+
+
+SIBLINGS = '''
+from jakarta.inject import Singleton
+
+
+@Singleton
+class Base:
+    def __secret(self, n: int) -> int:
+        return n
+
+    def helper(self, n: int) -> int:
+        return n + 1
+
+    def kept(self, n: int) -> int:
+        return n
+
+    def run(self, n: int) -> int:
+        return self.__secret(n) + self.helper(n) + self.kept(n)
+
+    def checked(self, n: int) -> bool:
+        return self.helper(n) is None
+
+    def counted(self) -> int:
+        return self.__count
+
+
+class Inheriting(Base):
+    pass
+
+
+class Overriding(Inheriting):
+    def helper(self, n: int) -> int:
+        return n * 2
+'''
+
+
+class SiblingTest(unittest.TestCase):
+    def setUp(self):
+        self.decisions, self.planner = plan(SIBLINGS, MODE_ALL, facts=FakeFacts())
+        self.bodies = {(body.className().split(".")[-1], body.methodName()): body for body in self.planner.bodies}
+        decision = self.decisions["Base.run"]
+        self.assertEqual("COMPILED", decision.outcome().name(), [(r.rule(), r.message()) for r in decision.reasons()])
+
+    def test_a_private_method_is_invoked_by_its_mangled_name(self):
+        run = self.bodies[("Base", "run")]
+        total = _uncast(list(run.body().statements())[0].value())
+        secret = _uncast(_uncast(total.left()).left())
+        self.assertEqual("_Base__secret", secret.name())
+        self.assertEqual("python", secret.dispatch())
+
+    def test_only_a_subclass_that_overrides_a_method_sends_it_through_python(self):
+        run = self.bodies[("Base", "run")]
+        total = _uncast(list(run.body().statements())[0].value())
+        self.assertEqual("python", _uncast(_uncast(total.left()).right()).dispatch())  # Overriding.helper, a grandchild's
+        self.assertEqual("java", _uncast(total.right()).dispatch())  # inherited by every subclass, overridden by none
+
+    def test_a_none_test_of_a_sibling_result_and_a_mangled_attribute_are_refused(self):
+        self.assertEqual(["unsupported-expression"], rules(self.decisions["Base.checked"]))
+        self.assertEqual(["unsupported-expression"], rules(self.decisions["Base.counted"]))
 
 
 if __name__ == "__main__":

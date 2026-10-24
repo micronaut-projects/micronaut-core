@@ -25,6 +25,7 @@ from java.lang import IllegalArgumentException
 from java.lang import Integer, Math, StringBuilder
 from io.micronaut.python.annotation.processing.test import StaticOverloads
 from java.net import URL, MalformedURLException
+from java.time import DateTimeException
 from java.util import AbstractMap, Objects
 
 @Singleton
@@ -40,6 +41,19 @@ class Calc:
 
     def label(self, count: int, name: str) -> str:
         return f"{count} x {name}: {count * 2.5}"
+
+    def helper(self, n: int) -> int:
+        return n + 1
+
+    def _hidden(self, n: int) -> int:
+        return n - 1
+
+    @property
+    def factor(self) -> float:
+        return self.rate * 2
+
+    def chained(self, n: int) -> str:
+        return str(self.helper(n) * 2 + self._hidden(n)) + "|" + str(self.factor * n) + "|" + self.label(n, "z")
 
     def ratio(self, a: int, b: int) -> float:
         return a / b
@@ -221,6 +235,12 @@ class Calc:
         result.append("z")
         return result
 
+    def unhinted_name(self, name: str):
+        return "<" + name + ">"
+
+    def described(self, name: str) -> str:
+        return self.unhinted_name(name) + "!"
+
     def rows(self) -> list:
         return self.mapped()
 
@@ -236,13 +256,13 @@ class Calc:
     def guarded(self, n: int) -> int:
         try:
             value = self.risky(n)
-        except IllegalArgumentException:
+        except DateTimeException:  # an IllegalArgumentException handler would catch what compiled helpers throw: refused
             return -1
         return value + 1
 
     def risky(self, n: int) -> int:
         if n == 0:
-            raise IllegalArgumentException("zero")
+            raise DateTimeException("zero")
         return n * 2
 
     def edge(self, broken0: int) -> int:
@@ -326,6 +346,8 @@ class Pair:
     static final List<List> CASES = [
         ["total", 3, 2.5d], ["total", 50, 2.5d],
         ["label", 2, "pen"],
+        ["chained", 3], ["chained", 0],
+        ["described", "ab"],
         ["ratio", 1, 4], ["ratio", 1, 0],
         ["parity", 3], ["parity", 8],
         ["unicode", "\uD83D\uDE00ab"], ["unicode", "i\u00DF"],
@@ -406,8 +428,7 @@ class Pair:
                 results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    // guarded and rows call sibling methods, which have no static lowering yet: they run in Python in both modes
-                    assert compiled.containsAll((CASES*.get(0).unique() - ['guarded'] - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied']), decisions.toString()
+                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name']), decisions.toString()
                     REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
@@ -451,6 +472,7 @@ class Pair:
         results[StaticCompilationMode.OFF]['copied'] == ['a', 'z']
         results[StaticCompilationMode.OFF][["parsed", "1, 2,3"].toString()] == '6 6 6 3.0'
         results[StaticCompilationMode.OFF][["parsed", "x"].toString()] == 'raised'
+        results[StaticCompilationMode.OFF][["described", "ab"].toString()] == '<ab>!'
         results[StaticCompilationMode.OFF]['edge'] == 1
         results[StaticCompilationMode.OFF][["guarded", 0].toString()] == -1
         results[StaticCompilationMode.OFF][["branch_local", true].toString()] == 'tTrue'
