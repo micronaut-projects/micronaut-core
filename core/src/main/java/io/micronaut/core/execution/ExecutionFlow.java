@@ -185,6 +185,11 @@ public interface ExecutionFlow<T> {
      * @return A new flow that will produce either the same value or a {@link java.util.concurrent.TimeoutException}
      */
     default ExecutionFlow<T> timeout(Duration timeout, ScheduledExecutorService scheduler, @Nullable BiConsumer<T, @Nullable Throwable> onDiscard) {
+        ImperativeExecutionFlow<T> completedFlow = tryComplete();
+        if (completedFlow != null) {
+            // A completed flow cannot time out: no task to schedule and cancel on the scheduler
+            return completedFlow;
+        }
         DelayedExecutionFlow<T> delayed = DelayedExecutionFlow.create();
         AtomicBoolean completed = new AtomicBoolean(false);
         // schedule the timeout
