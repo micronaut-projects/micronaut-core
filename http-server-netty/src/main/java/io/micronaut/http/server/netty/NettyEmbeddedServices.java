@@ -25,6 +25,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
+import io.micronaut.http.netty.channel.DefaultEventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
@@ -163,7 +164,7 @@ public interface NettyEmbeddedServices {
      * @since 5.3.0
      */
     default EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration config, ExecutorService executorService) {
-        return createEventLoopGroup(config.getNumThreads(), executorService, config.getIoRatio().orElse(null));
+        return createEventLoopGroup(DefaultEventLoopGroupRegistry.numThreads(config), executorService, config.getIoRatio().orElse(null));
     }
 
     /**

@@ -239,6 +239,7 @@ httpServer:
       atBlocking: '@Blocking'
     nettyClientPipeline: Configuring the Netty Client Pipeline
     nettyServerPipeline: Configuring the Netty Server Pipeline
+    nettyExtensions: Netty Transport and Codec Extensions
     listener: Advanced Listener Configuration
     corsCrossOriginEmbedderPolicy: Cross-Origin-Embedder-Policy
     corsCrossOriginResourcePolicy: Cross-Origin-Resource-Policy

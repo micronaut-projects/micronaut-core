@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.GZIPOutputStream
 
 class ZlibCodecFactorySpec extends Specification {
-    def 'replacement handles request and response streams for #protocol'(String protocol) {
+    def 'replacement handles #encoding request and response streams for #protocol'(String protocol, String encoding) {
         given:
         Map options = [
             'spec.name': 'ZlibCodecFactorySpec',
@@ -47,14 +47,15 @@ class ZlibCodecFactorySpec extends Specification {
         def factory = server.applicationContext.getBean(CountingFactory)
         String body = 'streaming codec construction '.repeat(128)
         def bytes = new ByteArrayOutputStream()
-        new GZIPOutputStream(bytes).withCloseable { it.write(body.getBytes('UTF-8')) }
+        (encoding == 'gzip' ? new GZIPOutputStream(bytes) : new java.util.zip.DeflaterOutputStream(bytes))
+            .withCloseable { it.write(body.getBytes('UTF-8')) }
 
         expect:
         3.times {
             assert client.toBlocking().retrieve(HttpRequest.POST('/codec', bytes.toByteArray())
                 .contentType(MediaType.TEXT_PLAIN_TYPE)
-                .header('Content-Encoding', 'gzip')
-                .header('Accept-Encoding', 'gzip'), String) == body
+                .header('Content-Encoding', encoding)
+                .header('Accept-Encoding', encoding), String) == body
         }
         factory.encoders.get() == 3
         factory.decoders.get() == 6
@@ -65,7 +66,7 @@ class ZlibCodecFactorySpec extends Specification {
         server?.close()
 
         where:
-        protocol << ['http1', 'h2', 'h3']
+        [protocol, encoding] << [['http1', 'h2', 'h3'], ['gzip', 'deflate']].combinations()
     }
 
     def 'disabled compression and identity bodies do not construct codecs'() {
@@ -86,6 +87,29 @@ class ZlibCodecFactorySpec extends Specification {
         cleanup:
         client?.close()
         server?.close()
+    }
+
+    def 'direct client builder can select its own factory'() {
+        given:
+        def server = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'ZlibCodecFactorySpec',
+            'micronaut.server.netty.compression-threshold': 0,
+        ])
+        def factory = new CountingFactory()
+        def builder = io.micronaut.http.client.netty.DefaultHttpClient.builder()
+        def client = builder.uri(server.URI).zlibCodecFactory(factory).build()
+        String body = 'direct client '.repeat(128)
+
+        expect:
+        client.toBlocking().retrieve(HttpRequest.POST('/codec', body)
+            .contentType(MediaType.TEXT_PLAIN_TYPE).header('Accept-Encoding', 'gzip'), String) == body
+        factory.encoders.get() == 0
+        factory.decoders.get() == 1
+
+        cleanup:
+        client?.close()
+        server?.close()
+
     }
 
     @Singleton

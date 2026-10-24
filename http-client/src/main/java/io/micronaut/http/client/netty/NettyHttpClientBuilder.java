@@ -203,7 +203,7 @@ final class NettyHttpClientBuilder {
      * @return This builder
      * @since 5.3.0
      */
-    public NettyHttpClientBuilder zlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
+    NettyHttpClientBuilder zlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
         this.zlibCodecFactory = Objects.requireNonNull(zlibCodecFactory);
         return this;
     }
