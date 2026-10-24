@@ -341,7 +341,7 @@ class LocatorBodyTest {
     @Test
     void withoutAServerTheBodyIsNotProvided() {
         LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.POST("/", (request, pathVariables) -> HttpResponse.ok()));
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         new DefaultHttpRouteBuilder(assembly).locator("/orders").body(String.class).locate((request, pathVariables, body) -> body, target -> items);
         assembly.addImplicitHeadRoutes();
         Router router = new DefaultRouter(List.of(), List.of(() -> assembly));
@@ -385,7 +385,7 @@ class LocatorBodyTest {
                 return body;
             }
         });
-        RouteAssembly assembly = new RouteAssembly(ctx, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(ctx, ConversionService.SHARED, uri -> uri);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         return new DefaultRouter(List.of(), List.of(() -> assembly));
