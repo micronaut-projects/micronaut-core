@@ -79,6 +79,9 @@ CONTAINER_TYPES = ("java.lang.Iterable", "java.util.Map", "java.util.Iterator", 
 # the calls writing the attribute their string argument names: setattr(o, "x", v), delattr(o, "x"),
 # object.__setattr__(o, "x", v), monkeypatch.setattr(o, "x", v), patch.object(o, "x"), patch("m.C.x"), patch.multiple(o, x=v)
 NAMED_WRITERS = {"setattr", "delattr", "__setattr__", "__delattr__", "object", "multiple", "patch"}
+# the attributes whose assignment changes what reading any attribute of an object gives: its class,
+# the bases of a class, the members of the attribute protocol
+PROTOCOL_CHANGES = ATTRIBUTE_PROTOCOL | {"__bases__", "__mro__"}
 # the calls among them that write the attribute a computed name says when no string names it
 COMPUTED_WRITERS = {"setattr", "delattr", "__setattr__", "__delattr__"}
 
@@ -832,8 +835,9 @@ class AttributeWrites:
     ``patch.object(C, "x")``, ``patch("app.m.C.x")``, ``patch.multiple(o, x=v)``); the classes whose
     methods write attributes of ``self`` by a computed name (``setattr(self, name, value)``); and
     ``everything`` when a write may reach any attribute: ``__dict__``, ``vars()``, a computed
-    ``setattr`` on another object, an assignment of ``__class__``, a reference to ``__setattr__`` that
-    is not called, or a source whose tree is not known.
+    ``setattr`` on another object, an assignment of ``__class__``, ``__bases__`` or a member of the
+    attribute protocol (``Cls.__getattribute__ = f``, ``setattr(Cls, "__setattr__", f)``), a reference
+    to ``__setattr__`` that is not called, or a source whose tree is not known.
     """
 
     def __init__(self, trees):
@@ -863,7 +867,8 @@ class AttributeWrites:
         for node in ast.walk(tree):
             if not isinstance(node, ast.Attribute):
                 continue
-            if node.attr == "__dict__" or (node.attr == "__class__" and isinstance(node.ctx, (ast.Store, ast.Del))):
+            if node.attr == "__dict__" or (node.attr in PROTOCOL_CHANGES and isinstance(node.ctx, (ast.Store, ast.Del))):
+                # the class or the attribute protocol of objects changed: what an attribute reads may change with it
                 self.everything = True
             elif node.attr in ("__setattr__", "__delattr__") and id(node) not in callees:
                 self.everything = True  # a reference kept to write with later
@@ -884,8 +889,12 @@ class AttributeWrites:
                    if isinstance(argument, ast.Constant) and isinstance(argument.value, str)]
         for string in strings:
             self.named.add(string.rsplit(".", 1)[-1])
+            if string.rsplit(".", 1)[-1] in PROTOCOL_CHANGES:
+                self.everything = True  # setattr(Cls, "__getattribute__", f), patch.object(Cls, "__setattr__")
         if name == "multiple":
             self.named.update(keyword.arg for keyword in call.keywords if keyword.arg is not None)
+            if any(keyword.arg in PROTOCOL_CHANGES for keyword in call.keywords):
+                self.everything = True
         if strings or name not in COMPUTED_WRITERS:
             return
         if isinstance(function, ast.Attribute) and isinstance(function.value, ast.Call) and isinstance(function.value.func, ast.Name) and function.value.func.id == "super":
