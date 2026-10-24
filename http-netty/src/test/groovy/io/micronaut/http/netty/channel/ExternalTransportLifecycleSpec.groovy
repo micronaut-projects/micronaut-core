@@ -25,6 +25,8 @@ class ExternalTransportLifecycleSpec extends Specification {
         def factory = new EventLoopGroupFactory() {
             @Override
             IoHandlerFactory createIoHandlerFactory(EventLoopGroupConfiguration configuration) {
+                assert configuration.name == 'external'
+                assert configuration.transport == ['fixture']
                 new IoHandlerFactory() {
                     @Override
                     IoHandler newHandler(ThreadAwareExecutor executor) {

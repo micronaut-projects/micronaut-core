@@ -4,11 +4,16 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.netty.channel.EventLoopGroup
+import io.netty.channel.IoHandlerFactory
+import io.netty.channel.nio.NioIoHandler
 import io.netty.util.NettyRuntime
 import io.netty.util.ResourceLeakDetector
+import io.netty.util.concurrent.DefaultThreadFactory
 import spock.lang.Specification
 
 import java.time.Duration
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.TimeUnit
 
 class EventLoopGroupSpec extends Specification {
 
@@ -72,26 +77,83 @@ class EventLoopGroupSpec extends Specification {
         1 * nativeFactory.createIoHandlerFactory()
     }
 
-    void "configuration overload passes configuration to io handler factory"() {
+    void "configuration overload retains legacy group creation overrides"(boolean throughDefault, int threads, Integer ioRatio, int expectedThreads) {
         given:
-        def configuration = config(['external'])
-        def factory = new EventLoopGroupFactory() {
+        def configuration = new DefaultEventLoopGroupConfiguration('external', threads, 0.0001, ioRatio, false, ['external'], null, null, null, false)
+        def threadFactory = new DefaultThreadFactory('configured')
+        def customGroup = Mock(EventLoopGroup)
+        def legacyFactory = new EventLoopGroupFactory() {
             @Override
-            io.netty.channel.IoHandlerFactory createIoHandlerFactory(EventLoopGroupConfiguration supplied) {
-                assert supplied.is(configuration)
-                return io.netty.channel.nio.NioIoHandler.newFactory()
+            EventLoopGroup createEventLoopGroup(int suppliedThreads, ThreadFactory suppliedThreadFactory, Integer suppliedRatio) {
+                assert suppliedThreads == expectedThreads
+                assert suppliedThreadFactory.is(threadFactory)
+                assert suppliedRatio == ioRatio
+                return customGroup
             }
         }
+        def factory = throughDefault ? new DefaultEventLoopGroupFactory([external: legacyFactory], null) : legacyFactory
+
+        expect:
+        factory.createEventLoopGroup(configuration, threadFactory).is(customGroup)
+
+        where:
+        throughDefault | threads | ioRatio | expectedThreads
+        false          | 3       | 37      | 3
+        false          | 0       | null    | 1
+        true           | 3       | 37      | 3
+        true           | 0       | null    | 1
+    }
+
+    void "legacy groups and configured handlers remain independent extension points"() {
+        given:
+        def configuration = config(['external'])
+        def threadFactory = new DefaultThreadFactory('configured')
+        def customGroup = Mock(EventLoopGroup)
+        def handler = NioIoHandler.newFactory()
+        def external = new EventLoopGroupFactory() {
+            @Override
+            EventLoopGroup createEventLoopGroup(int threads, ThreadFactory supplied, Integer ioRatio) {
+                assert threads == 1
+                assert supplied.is(threadFactory)
+                return customGroup
+            }
+
+            @Override
+            IoHandlerFactory createIoHandlerFactory(EventLoopGroupConfiguration supplied) {
+                assert supplied.is(configuration)
+                return handler
+            }
+        }
+        def factory = new DefaultEventLoopGroupFactory([external: external], null)
 
         when:
-        def group = factory.createEventLoopGroup(configuration, new io.netty.util.concurrent.DefaultThreadFactory('configured'))
+        def group = factory.createEventLoopGroup(configuration, threadFactory)
 
         then:
-        group.executorCount() == 1
-        group.next().submit({ Thread.currentThread().name } as java.util.concurrent.Callable<String>).get().startsWith('configured-')
+        group.is(customGroup)
+        factory.createIoHandlerFactory(configuration).is(handler)
 
         cleanup:
-        group?.shutdownGracefully(0, 1, java.util.concurrent.TimeUnit.SECONDS)?.sync()
+        if (group != null && !group.is(customGroup)) {
+            group.shutdownGracefully(0, 1, TimeUnit.SECONDS).sync()
+        }
+    }
+
+    void "selected concrete factories retain configured custom group creation"() {
+        given:
+        def configuration = config(['external'])
+        def threadFactory = new DefaultThreadFactory('configured')
+        def customGroup = Mock(EventLoopGroup)
+        def external = Mock(EventLoopGroupFactory)
+        def factory = new DefaultEventLoopGroupFactory([external: external], null)
+
+        when:
+        def group = factory.createEventLoopGroup(configuration, threadFactory)
+
+        then:
+        group.is(customGroup)
+        1 * external.createEventLoopGroup(configuration, threadFactory) >> customGroup
+        0 * external._
     }
 
     private static EventLoopGroupConfiguration config(List<String> transports) {
