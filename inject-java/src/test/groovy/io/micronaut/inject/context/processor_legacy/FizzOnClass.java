@@ -24,5 +24,6 @@ import jakarta.inject.Singleton;
 @Requires(property = "spec.name", value = "ExecutableMethodProcessorSpec")
 public class FizzOnClass {
     public void third() {
+        // only its processing at startup is tested
     }
 }
