@@ -834,7 +834,7 @@ class AttributeWrites:
     a call writes by a string (``setattr(o, "x", v)``, ``monkeypatch.setattr(o, "x", v)``,
     ``patch.object(C, "x")``, ``patch("app.m.C.x")``, ``patch.multiple(o, x=v)``); the classes whose
     methods write attributes of ``self`` by a computed name (``setattr(self, name, value)``); and
-    ``everything`` when a write may reach any attribute: ``__dict__``, ``vars()``, a computed
+    ``everything`` when a write may reach any attribute: ``__dict__`` (or the string), ``vars()``, a computed
     ``setattr`` on another object, an assignment of ``__class__``, ``__bases__`` or a member of the
     attribute protocol (``Cls.__getattribute__ = f``, ``setattr(Cls, "__setattr__", f)``), a reference
     to ``__setattr__`` that is not called, or a source whose tree is not known.
@@ -865,6 +865,9 @@ class AttributeWrites:
                 self._call(node, receivers)
                 callees.add(id(node.func))
         for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and node.value == "__dict__":
+                # getattr(o, "__dict__"), object.__getattribute__(o, "__dict__"): the dictionary itself
+                self.everything = True
             if not isinstance(node, ast.Attribute):
                 continue
             if node.attr == "__dict__" or (node.attr in PROTOCOL_CHANGES and isinstance(node.ctx, (ast.Store, ast.Del))):
