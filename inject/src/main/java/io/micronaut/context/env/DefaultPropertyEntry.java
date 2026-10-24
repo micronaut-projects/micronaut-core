@@ -16,6 +16,7 @@
 package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.Experimental;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A property entry models
@@ -28,7 +29,7 @@ import io.micronaut.core.annotation.Experimental;
 @Experimental
 record DefaultPropertyEntry(
     String property,
-    Object value,
+    @Nullable Object value,
     String raw,
     PropertySource.Origin origin
 ) implements PropertyEntry {
