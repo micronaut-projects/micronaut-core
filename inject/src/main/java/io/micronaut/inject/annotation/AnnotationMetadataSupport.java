@@ -254,7 +254,7 @@ public final class AnnotationMetadataSupport {
         );
         coreAnnotationsDefaults.put(
             "io.micronaut.aop.InterceptorBinding",
-            Map.of("bindMembers", false, "kind", "AROUND", "value", Annotation.class)
+            Map.of("bindMembers", false, "kind", "AROUND", "matchAllOccurrences", false, "value", Annotation.class)
         );
         coreAnnotationsDefaults.put(
             "io.micronaut.aop.InterceptorBean",

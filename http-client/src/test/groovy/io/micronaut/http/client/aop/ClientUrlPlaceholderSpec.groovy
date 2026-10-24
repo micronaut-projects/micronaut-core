@@ -6,6 +6,7 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.netty.DefaultNettyHttpClientRegistry
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -33,6 +34,26 @@ class ClientUrlPlaceholderSpec extends Specification {
         then:
         client.name() == 'b'
         client.name() == 'b'
+    }
+
+    void "disposing the client of a placeholder URL closes the client it had before the property changed"() {
+        given:
+        ApplicationContext ctx = server.applicationContext
+        ctx.environment.addPropertySource(PropertySource.of("client-url-dispose-a", ['client-url.target': "${server.URL}/client-url-a"], 2000))
+        ctx.getBean(UrlPlaceholderClient)
+        def metadata = ctx.getBeanDefinition(UrlPlaceholderClient).getRequiredMethod("name").annotationMetadata
+        def registry = ctx.getBean(DefaultNettyHttpClientRegistry)
+        def first = registry.getClient(metadata)
+
+        when:
+        ctx.environment.addPropertySource(PropertySource.of("client-url-dispose-b", ['client-url.target': "${server.URL}/client-url-b"], 2001))
+        def second = registry.getClient(metadata)
+        registry.disposeClient(metadata)
+
+        then:
+        !first.is(second)
+        !first.running
+        !second.running
     }
 
     void "a client with a fixed URL keeps its client"() {
