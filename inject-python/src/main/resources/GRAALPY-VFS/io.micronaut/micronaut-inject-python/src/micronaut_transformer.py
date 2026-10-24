@@ -621,6 +621,8 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
 '''
                 try:
                     micronaut_annotation_ast = ast.parse(micronaut_annotation_code)
+                    for index, generated_node in enumerate(micronaut_annotation_ast.body):
+                        generated_node._mn_snippet = (micronaut_annotation_code, index)
                     generated_nodes.extend(micronaut_annotation_ast.body)
                 except SyntaxError as e:
                     raise RuntimeError(f"Error parsing micronaut_annotation (generated code is not valid Python): {e}") from e
@@ -632,12 +634,14 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                 try:
                     # Parse the generated decorator code
                     decorator_ast = ast.parse(decorator_code)
-                    for generated_node in decorator_ast.body:
+                    for index, generated_node in enumerate(decorator_ast.body):
                         if (isinstance(generated_node, ast.FunctionDef)
                                 and generated_node.name == 'micronaut_annotation'):
                             if micronaut_annotation_emitted:
                                 continue
                             micronaut_annotation_emitted = True
+                        # the same statement of the same snippet in every module: what scans it once goes by this
+                        generated_node._mn_snippet = (decorator_code, index)
                         generated_nodes.append(generated_node)
                 except SyntaxError as e:
                     raise RuntimeError(f"Error parsing generated decorator (generated code is not valid Python): {e}") from e

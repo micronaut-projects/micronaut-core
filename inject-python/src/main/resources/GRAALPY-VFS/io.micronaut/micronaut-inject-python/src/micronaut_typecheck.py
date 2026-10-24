@@ -640,6 +640,8 @@ def _enclosing_classes(class_nodes):
 
     def visit(node, outer):
         for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.expr):
+                continue  # an expression holds no class
             if isinstance(child, ast.ClassDef):
                 if outer is not None:
                     enclosing[id(child)] = outer
@@ -1679,6 +1681,7 @@ class PythonClassModel:
         self._bases = None
         self._subclasses = None
         self._python_exception = False
+        self._assigned_outside = None  # the attributes of self a method other than __init__ assigns, collected once
 
     @property
     def bases(self):
@@ -1893,8 +1896,26 @@ class PythonClassModel:
     def subclasses(self):
         """The classes of the compilation extending this one: a value of the class may be any of them."""
         if self._subclasses is None:
-            self._subclasses = [model for model in self.classes.all() if model is not self and model.is_subclass_of(self)]
+            self._subclasses = self.classes.subclasses_of(self)
         return self._subclasses
+
+    def reached_bases(self):
+        """
+        The classes is_subclass_of finds on the way up from this class, itself included: the
+        compilation's classes among the bases, walked depth first, each qualified name expanded once.
+        """
+        reached = [self]
+        seen = set()
+        stack = [self]
+        while stack:
+            model = stack.pop()
+            if model.qualified in seen:
+                continue
+            seen.add(model.qualified)
+            bases = [base for base in model.bases if isinstance(base, PythonClassModel)]
+            reached.extend(bases)
+            stack.extend(reversed(bases))
+        return reached
 
     def subclass_defines(self, name):
         return any(subclass.find(name) is not None for subclass in self.subclasses)
@@ -1973,16 +1994,19 @@ class PythonClassModel:
 
     def _assigned_outside_constructor(self, name):
         """Whether a method other than __init__ assigns self.<name>: its type is then not the constructor's to say."""
-        for statement in getattr(self.node, "body", ()):
-            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and statement.name != "__init__" and statement.args.args:
-                receiver = statement.args.args[0].arg
-                for child in ast.walk(statement):
-                    if isinstance(child, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
-                        targets = child.targets if isinstance(child, ast.Assign) else [child.target]
-                        for target in targets:
-                            if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == receiver and target.attr == name:
-                                return True
-        return False
+        if self._assigned_outside is None:
+            assigned = set()
+            for statement in getattr(self.node, "body", ()):
+                if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and statement.name != "__init__" and statement.args.args:
+                    receiver = statement.args.args[0].arg
+                    for child in ast.walk(statement):
+                        if isinstance(child, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+                            targets = child.targets if isinstance(child, ast.Assign) else [child.target]
+                            for target in targets:
+                                if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == receiver:
+                                    assigned.add(target.attr)
+            self._assigned_outside = frozenset(assigned)
+        return name in self._assigned_outside
 
 
 def _receiver_assignments(function_node, name):
@@ -2033,6 +2057,7 @@ class PythonClasses:
         self.by_def = {}
         self.by_node = {}
         self.models = []
+        self._subclasses = None  # id(model) -> the classes extending it, see subclasses_of
         for module in checker._modules.values():
             for class_def, node in module.classes:
                 model = PythonClassModel(self, class_def, node, module)
@@ -2045,6 +2070,20 @@ class PythonClasses:
 
     def all(self):
         return self.models
+
+    def subclasses_of(self, model):
+        """
+        The classes of the compilation extending the class, in the order of the compilation: the
+        classes every class reaches on the way up (PythonClassModel.reached_bases) inverted once,
+        rather than every class asked whether it extends each class in turn.
+        """
+        if self._subclasses is None:
+            subclasses = {}
+            for candidate in self.models:
+                for reached in {id(base): base for base in candidate.reached_bases() if base is not candidate}.values():
+                    subclasses.setdefault(id(reached), []).append(candidate)
+            self._subclasses = subclasses
+        return list(self._subclasses.get(id(model), ()))
 
     def describe_base(self, module, base):
         """

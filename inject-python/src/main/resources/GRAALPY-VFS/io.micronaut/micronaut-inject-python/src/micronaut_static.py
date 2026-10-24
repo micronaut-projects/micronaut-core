@@ -26,12 +26,13 @@ module-level one for each method of its scope that is ``SKIPPED``, except in mod
 skipping is the expected common case.
 """
 import ast
+import os
 
 import java
 
 from micronaut_typecheck import (Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, ScopeModes,
                                 ScopeResolver, SCOPE_CLASS, SCOPE_FUNCTION, SCOPE_MODE, class_key, function_node, TRANSPARENT_BASES)
-from micronaut_lowering import JAVA_RESERVED_NAMES, Lowering, stub_type_name, _decorated_with
+from micronaut_lowering import JAVA_RESERVED_NAMES, Lowering, stub_type_name, _child_nodes, _decorated_with, _LEAVES
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
 Decision = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision")
@@ -115,6 +116,7 @@ class StaticPlanner:
         self.strict = strict
         self.decisions = []
         self.bodies = []
+        self.body_classes = set()  # the generated classes the bodies belong to, see Lowering._of_compilation
         self.scripts = []         # the ScriptDefs of the modules that generate a class for their compiled functions only
         self.diagnostics = []
         self._ineligibility = {}  # id(class_def) -> why the class generates no stub, or None: asked once per class
@@ -125,6 +127,7 @@ class StaticPlanner:
         self._reported_classes = set()
         self._fixed = {}          # id(class model) -> the names of its attributes fixed at construction
         self._writes = None       # the attribute writes of the compilation, see AttributeWrites
+        self._modules_by_path = None  # the normalized source path -> the module of the compilation, see module_of_path
 
     def plan(self, checker, visitor_context=None):
         """
@@ -141,6 +144,7 @@ class StaticPlanner:
         self._reported_classes = set()
         self._fixed = {}
         self._writes = None
+        self._modules_by_path = None
         if getattr(checker, "facts", None) is None and visitor_context is not None:
             checker.facts = TypeFacts(visitor_context)
             checker.python_classes = PythonClasses(checker)
@@ -156,6 +160,14 @@ class StaticPlanner:
                 for function_def in members:
                     self._decide(module, class_def, class_node, function_def, function_node(class_node, function_def.name()))
         return list(self.decisions)
+
+    def module_of_path(self, path):
+        """The module of the compilation whose source has the path, normalized (normcase, normpath, abspath), or None."""
+        if self._modules_by_path is None:
+            self._modules_by_path = {}
+            for source, module in self.checker._modules.items():
+                self._modules_by_path.setdefault(os.path.normcase(os.path.normpath(os.path.abspath(source))), module)
+        return self._modules_by_path.get(path)
 
     def module_function(self, module, name):
         """The (function_def, node) of a top-level function of the module, or None."""
@@ -360,6 +372,7 @@ class StaticPlanner:
             # a module without a generated class gets one for its compiled functions
             self._add_script(module)
         self.bodies.append(body)
+        self.body_classes.add(body.className())
         if node is not None:
             self._bodies[id(node)] = body
         return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats())
@@ -773,7 +786,7 @@ class StaticPlanner:
             if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Slice):
                 reasons.append(("unsupported-expression", "a slice has no static lowering", module.span_of(node)))
                 return
-        for child in ast.iter_child_nodes(node):
+        for child in _child_nodes(node):
             if isinstance(child, (ast.stmt, ast.expr, ast.excepthandler, ast.keyword)):
                 self._walk(module, child, reasons)
 
@@ -819,7 +832,7 @@ def _yields(function_node):
             return True
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
             continue
-        stack.extend(ast.iter_child_nodes(node))
+        stack.extend(_child_nodes(node))
     return False
 
 
@@ -840,49 +853,96 @@ class AttributeWrites:
     ``setattr`` on another object, an assignment of ``__class__``, ``__bases__`` or a member of the
     attribute protocol (``Cls.__getattribute__ = f``, ``setattr(Cls, "__setattr__", f)``), a reference
     to ``__setattr__`` that is not called, or a source whose tree is not known.
+
+    The statements the transformer generates from a snippet (the decorator of each annotation a
+    module imports, ``_mn_snippet``) are most of the nodes of a module, and the same in every module
+    importing the annotation: each is scanned once, its writes reused for its copies.
     """
 
     def __init__(self, trees):
-        self.stores = {}              # attribute name -> ids of the Attribute nodes storing or deleting it on another object than self
+        self.stores = set()           # the attribute names stored or deleted on another object than self
         self.named = set()            # the names calls write by a string
         self.classes_written = set()  # id(class node) of the classes whose methods setattr(self, name, ...)
         self.everything = False
+        snippets = {}                 # (snippet, index) -> the writes of that statement of a generated snippet
         for tree in trees:
             if tree is None:
                 self.everything = True
                 continue
-            self._scan(tree)
+            if not isinstance(tree, ast.Module):
+                self._scan(tree)
+                continue
+            for statement in tree.body:
+                snippet = getattr(statement, "_mn_snippet", None)
+                if snippet is None:
+                    self._scan(statement)
+                    continue
+                writes = snippets.get(snippet)
+                if writes is None:
+                    # a module-level statement belongs to no method, wherever it is
+                    writes = AttributeWrites(())
+                    writes._scan(statement)
+                    if not writes.classes_written:
+                        snippets[snippet] = writes  # the classes are those of this copy: scanned again
+                self.stores |= writes.stores
+                self.named |= writes.named
+                self.classes_written |= writes.classes_written
+                self.everything = self.everything or writes.everything
 
     def _scan(self, tree):
-        receivers = {}  # id(node) -> (class node, receiver) for the nodes of a method's own scope
-        for class_node in ast.walk(tree):
-            if isinstance(class_node, ast.ClassDef):
-                for statement in class_node.body:
-                    if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and statement.args.args:
-                        for child in _scope_nodes(statement):
-                            receivers[id(child)] = (class_node, statement.args.args[0].arg)
-        callees = set()
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call):
-                self._call(node, receivers)
-                callees.add(id(node.func))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Constant) and node.value == "__dict__":
-                # getattr(o, "__dict__"), object.__getattribute__(o, "__dict__"): the dictionary itself
-                self.everything = True
-            if not isinstance(node, ast.Attribute):
+        """
+        One walk of the tree, parents before children, each node carrying the method whose own scope
+        it belongs to: ``(class node, receiver)`` for the body of a method of a class (a function of the
+        class body with a first parameter) and what it holds but the functions, lambdas and classes
+        defined in it (a statement of the body itself counts, whatever it is), None elsewhere. The
+        contexts, the leaves (operators, load and store markers) and the walk being one pass are what
+        make it cheaper than walking the tree once per question: the planner scans every module.
+        """
+        stack = [(tree, None)]
+        callees = set()  # id(node) of the o.__setattr__ / o.__delattr__ attributes called, which keep no reference
+        while stack:
+            node, owner = stack.pop()
+            if isinstance(node, ast.Attribute):
+                if node.attr == "__dict__" or (node.attr in PROTOCOL_CHANGES and isinstance(node.ctx, (ast.Store, ast.Del))):
+                    # the class or the attribute protocol of objects changed: what an attribute reads may change with it
+                    self.everything = True
+                elif node.attr in ("__setattr__", "__delattr__") and id(node) not in callees:
+                    self.everything = True  # a reference kept to write with later
+                if isinstance(node.ctx, (ast.Store, ast.Del)):
+                    if owner is None or not isinstance(node.value, ast.Name) or node.value.id != owner[1]:
+                        self.stores.add(node.attr)
+            elif isinstance(node, ast.Call):
+                self._call(node, owner)
+                function = node.func
+                if isinstance(function, ast.Attribute) and function.attr in ("__setattr__", "__delattr__"):
+                    callees.add(id(function))
+            elif isinstance(node, ast.Constant):
+                if node.value == "__dict__":
+                    # getattr(o, "__dict__"), object.__getattribute__(o, "__dict__"): the dictionary itself
+                    self.everything = True
                 continue
-            if node.attr == "__dict__" or (node.attr in PROTOCOL_CHANGES and isinstance(node.ctx, (ast.Store, ast.Del))):
-                # the class or the attribute protocol of objects changed: what an attribute reads may change with it
-                self.everything = True
-            elif node.attr in ("__setattr__", "__delattr__") and id(node) not in callees:
-                self.everything = True  # a reference kept to write with later
-            if isinstance(node.ctx, (ast.Store, ast.Del)):
-                owner = receivers.get(id(node))
-                if owner is None or not isinstance(node.value, ast.Name) or node.value.id != owner[1]:
-                    self.stores.setdefault(node.attr, []).append(id(node))
+            if isinstance(node, ast.ClassDef):
+                for child in _children(node):
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.args.args:
+                        # a method: its body is a scope of its own, whatever its statements are; its
+                        # signature and decorators belong to no method
+                        method = (node, child.args.args[0].arg)
+                        stack.extend((statement, method) for statement in child.body)
+                        stack.extend((other, None) for other in _children(child, "body"))
+                    else:
+                        stack.append((child, None if isinstance(child, _SCOPES) else owner))
+                continue
+            # the children, as ast.iter_child_nodes gives them but the leaves, inlined: the walk is the cost
+            for field in node._fields:
+                value = getattr(node, field, None)
+                if isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, ast.AST) and not isinstance(item, _LEAVES):
+                            stack.append((item, None if isinstance(item, _SCOPES) else owner))
+                elif isinstance(value, ast.AST) and not isinstance(value, _LEAVES):
+                    stack.append((value, None if isinstance(value, _SCOPES) else owner))
 
-    def _call(self, call, receivers):
+    def _call(self, call, owner):
         function = call.func
         name = function.id if isinstance(function, ast.Name) else function.attr if isinstance(function, ast.Attribute) else None
         if name == "vars" and isinstance(function, ast.Name) and (call.args or call.keywords):
@@ -921,16 +981,32 @@ class AttributeWrites:
         if isinstance(target, ast.Call) and isinstance(target.func, ast.Name) and target.func.id == "super":
             # super().__setattr__(name, value) in a method: object's write of an attribute of self, past
             # the __setattr__ that reports changes
-            owner = receivers.get(id(call))
             if owner is not None:
                 self.classes_written.add(id(owner[0]))
                 return
-        owner = receivers.get(id(call))
         if owner is not None and isinstance(target, ast.Name) and owner[1] == target.id:
             # setattr(self, name, value) in a method: an attribute of an object of that class
             self.classes_written.add(id(owner[0]))
             return
         self.everything = True
+
+
+# the nodes that open a scope of their own: what they hold belongs to no enclosing method's scope
+_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+
+
+def _children(node, skip=None):
+    """The child nodes of a node, as ast.iter_child_nodes gives them, but the leaves and the field to skip."""
+    for field in node._fields:
+        if field == skip:
+            continue
+        value = getattr(node, field, None)
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, ast.AST) and not isinstance(item, _LEAVES):
+                    yield item
+        elif isinstance(value, ast.AST) and not isinstance(value, _LEAVES):
+            yield value
 
 
 def _is_patch(function, name):
@@ -943,17 +1019,6 @@ def _is_patch(function, name):
 def _names(node, name):
     """Whether the expression is the name, or an attribute of that name (mock, unittest.mock)."""
     return (isinstance(node, ast.Name) and node.id == name) or (isinstance(node, ast.Attribute) and node.attr == name)
-
-
-def _scope_nodes(function):
-    """The nodes of a function's own scope: those of the functions, lambdas and classes it defines excluded."""
-    stack = list(function.body)
-    while stack:
-        node = stack.pop()
-        yield node
-        for child in ast.iter_child_nodes(node):
-            if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
-                stack.append(child)
 
 
 def _receiver_store(node, receiver):

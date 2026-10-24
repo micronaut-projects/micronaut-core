@@ -339,26 +339,86 @@ def _parameter_names(arguments):
     return {argument.arg for argument in every}
 
 
-def _function_bindings(function_node):
+def _function_names(function_node):
     """
-    The names a function binds in its body (assignments, loop and with targets, imports, nested
-    definitions, except clauses) and its parameters: each hides a module-level name or a builtin
-    of the same name for the whole body. Nested scopes are included, which only hides more.
+    What the lowering of a function needs to know of the names in its tree, in one walk of it:
+
+    * the identifiers, every name and parameter name anywhere in the function, which a local the
+      lowering introduces must not be;
+    * the bindings, the names the function binds in its body (assignments, loop and with targets,
+      imports, nested definitions, except clauses) and its parameters: each hides a module-level
+      name or a builtin of the same name for the whole body. Nested scopes are included, which only
+      hides more;
+    * the names stored anywhere in the function (``x = ...``), among them the parameters the body
+      reassigns.
     """
-    names = _parameter_names(function_node.args)
-    for statement in function_node.body:
-        for child in ast.walk(statement):
-            if isinstance(child, ast.Name) and isinstance(child.ctx, (ast.Store, ast.Del)):
-                names.add(child.id)
-            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                names.add(child.name)
+    identifiers = set()
+    bindings = _parameter_names(function_node.args)
+    stored = set()
+    stack = [(statement, True) for statement in function_node.body]
+    stack.extend((child, False) for child in _child_nodes(function_node) if not _in_body(function_node, child))
+    while stack:
+        child, in_body = stack.pop()
+        if isinstance(child, ast.Name):
+            identifiers.add(child.id)
+            if isinstance(child.ctx, ast.Store):
+                stored.add(child.id)
+                if in_body:
+                    bindings.add(child.id)
+            elif in_body and isinstance(child.ctx, ast.Del):
+                bindings.add(child.id)
+            continue
+        if isinstance(child, ast.arg):
+            identifiers.add(child.arg)
+            if in_body:
+                bindings.add(child.arg)
+        elif in_body:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                bindings.add(child.name)
             elif isinstance(child, ast.alias):
-                names.add(child.asname or child.name.split(".")[0])
+                bindings.add(child.asname or child.name.split(".")[0])
             elif isinstance(child, ast.ExceptHandler) and child.name:
-                names.add(child.name)
-            elif isinstance(child, ast.arg):
-                names.add(child.arg)
-    return names
+                bindings.add(child.name)
+        for grandchild in _child_nodes(child):
+            stack.append((grandchild, in_body))
+    return identifiers, bindings, stored
+
+
+def _in_body(function_node, child):
+    """Whether a child node of the function is one of the statements of its body."""
+    return any(child is statement for statement in function_node.body)
+
+
+# (snippet, index) -> the names the statement of a generated snippet declares global, see ModuleScope
+_SNIPPET_GLOBALS = {}
+# the leaves of a tree no walk of the planner asks about: the load, store and delete markers and the operators
+_LEAVES = (ast.expr_context, ast.operator, ast.boolop, ast.cmpop, ast.unaryop)
+
+
+def _child_nodes(node):
+    """
+    The child nodes of a node in the order of ast.iter_child_nodes, as a list, without the leaves:
+    the planner walks the body of every function several times, and this is the cheaper step.
+    """
+    children = []
+    for field in node._fields:
+        value = getattr(node, field, None)
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, ast.AST) and not isinstance(item, _LEAVES):
+                    children.append(item)
+        elif isinstance(value, ast.AST) and not isinstance(value, _LEAVES):
+            children.append(value)
+    return children
+
+
+def _statement_nodes(tree):
+    """The statements of a tree, at any depth: an expression holds no statement, so none is entered."""
+    stack = [tree]
+    while stack:
+        node = stack.pop()
+        yield node
+        stack.extend(child for child in ast.iter_child_nodes(node) if not isinstance(child, ast.expr))
 
 
 class ModuleScope:
@@ -378,9 +438,15 @@ class ModuleScope:
         self.known = tree is not None
         if tree is None:
             return
-        for child in ast.walk(tree):
-            if isinstance(child, ast.Global):
-                self.declared_global.update(child.names)
+        for statement in getattr(tree, "body", None) if isinstance(tree, ast.Module) else [tree]:
+            # a statement the transformer generated from a snippet declares the globals every copy does
+            snippet = getattr(statement, "_mn_snippet", None)
+            names = _SNIPPET_GLOBALS.get(snippet) if snippet is not None else None
+            if names is None:
+                names = tuple(name for child in _statement_nodes(statement) if isinstance(child, ast.Global) for name in child.names)
+                if snippet is not None:
+                    _SNIPPET_GLOBALS[snippet] = names
+            self.declared_global.update(names)
         for index, statement in enumerate(tree.body):
             self._scan(statement, index, statement)
 
@@ -666,7 +732,8 @@ class Lowering:
         self.loops = []           # (id, node, following depth, branch depth) of the loops enclosing the statement being lowered
         self.reassigned = set()   # the parameters the body assigns, kept in a local of their own
         self.copied = set()       # the collection parameters the body works on a copy of
-        self.identifiers = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)} | {a.arg for a in ast.walk(node) if isinstance(a, ast.arg)}
+        # the identifiers of the function, the names it binds and the names it stores, see _function_names
+        self.identifiers, self.bound, self._stored = _function_names(node)
         self.loop_exits = {}      # loop id -> {"break", "continue"} used in its body
         self.following = []       # the statements following the one being lowered, innermost block last
         self.next_loop = 0
@@ -680,7 +747,6 @@ class Lowering:
         self.hoist_barrier = 0    # inside an operand evaluated lazily or repeatedly: nothing is hoisted there
         self.evaluated = 0        # the evaluations the statement being lowered has completed that may run code or raise
         self.comprehensions = {}  # id(comprehension) -> the local it is hoisted into, when an operand is lowered twice
-        self.bound = _function_bindings(node)  # the names the function binds: a module-level name or builtin of the same name is hidden
         self.thrown = []          # per enclosing try block, the checked exceptions its Java calls declare
         self.java_code = []       # per enclosing try block, the Java methods and constructors outside the compilation it calls
         self.calls_java = False   # the body calls a Java method or constructor outside the compilation
@@ -737,9 +803,7 @@ class Lowering:
         A parameter the body assigns lives in a local of its own from the start: a Java parameter
         keeps the type the stub declares, the local the type the body uses.
         """
-        for node in ast.walk(self.node):
-            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store) and node.id in self.parameters:
-                self.reassigned.add(node.id)
+        self.reassigned.update(name for name in self._stored if name in self.parameters)
         self.reassigned |= self.copied
         for name in sorted(self.reassigned):
             used, stub = self.parameters[name]
@@ -1385,7 +1449,7 @@ class Lowering:
         classes = getattr(self.checker, "python_classes", None)
         if classes is not None and _erased(owner) in classes.by_qualified:
             return True
-        return self.planner is not None and any(body.className() == _erased(owner) for body in self.planner.bodies)
+        return self.planner is not None and _erased(owner) in self.planner.body_classes
 
     def _python_exceptions_reaching(self, java_type, earlier):
         """
@@ -2425,6 +2489,8 @@ class Lowering:
     def _module_of_source(self, source):
         """The module of the compilation of a source file, or None."""
         wanted = os.path.normcase(os.path.normpath(os.path.abspath(source)))
+        if self.planner is not None:
+            return self.planner.module_of_path(wanted)
         for path, module in self.checker._modules.items():
             if os.path.normcase(os.path.normpath(os.path.abspath(path))) == wanted:
                 return module
