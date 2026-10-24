@@ -164,7 +164,7 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |`[...]`, `(...)`, `{...}`, `{k: v}`, `xs[i]`, `m[k]`, `xs[i] = v`, `m[k] = v`, `x in xs`
 |`ArrayList`, immutable `List`, `LinkedHashSet` and `LinkedHashMap` with the element types of the literal (an empty literal takes them from the hint of the local); a literal mixing strings, numbers and objects holds `Object` elements; `{k: v, **other}` builds the map in source order, later keys winning; helpers for the reads, stores and membership tests. A collection given to a parameter hinted `list`, `set` or `dict` is worked on as a copy, as the bridge hands Python a copy.
 
-|`len`, `int`, `float`, `bool`, `abs`, `min`, `max`, `list(xs)`, `set(xs)`, `tuple(xs)`, `str.strip/split/join/upper/lower/startswith/endswith/replace`, `list.append/clear`, `set.add/clear`, `dict.get/keys/values`
+|`len`, `int`, `float`, `bool`, `abs`, `min`, `max`, `list(xs)`, `set(xs)`, `tuple(xs)`, `str.strip/split/join/upper/lower/startswith/endswith/replace`, `list.append/clear`, `set.add`, `dict.get/keys/values`
 |The builtin table: each entry names a Java equivalent or a helper. `list(xs)`, `set(xs)` and `tuple(xs)` copy a Java collection or a typed Python one, a dict yielding its keys. `dict.get` without a default is refused when the values are numbers or booleans, since it may answer `None`.
 
 |Unhinted returns
@@ -201,7 +201,7 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |The generated class's own Java method when it declares one for the call (a public method with a hinted signature the call fills exactly, that no advice intercepts and no subclass of the compilation overrides), else the method of the Python object, which runs its interceptors, overrides and default arguments as Python would.
 |===
 
-Not compiled: generator expressions outside `any` and `all`, nested comprehensions with several `for` clauses, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, class methods, and `Optional` hints; nor the `else` clause of a `for`, `while` or `try` statement, unpacking in a `for` target (`for k, v in ...`) or in an assignment (`a, b = ...`), a chained assignment (`a = b = 0`) and a bare `except:`.
+Not compiled: generator expressions outside `any` and `all`, nested comprehensions with several `for` clauses, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, class methods, and `Optional` hints; nor the `else` clause of a `for`, `while` or `try` statement, unpacking in a `for` target other than `for k, v in mapping.items()` or in an assignment (`a, b = ...`), a chained assignment (`a = b = 0`) and a bare `except:`.
 
 Refused as well, where the Java code would behave differently: a `for` loop whose body may change the collection it iterates (appending to it, storing or deleting an item, passing it to a call; Python goes on iterating, the Java iterator throws `ConcurrentModificationException`), and a lookup, store or membership test of a dict or set, or a dict or set literal, where Python's numeric equality decides (`1`, `1.0` and `True` are one key in Python and three in Java): a numeric or `bool` key among keys of another or of any type.
 
