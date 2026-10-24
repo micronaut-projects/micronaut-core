@@ -194,6 +194,7 @@ httpServer:
       title: HttpServerFilter
       httpServerFilterExample: HttpServerFilter Example
       httpServerFilterErrorStates: HttpServerFilter Error States
+    filterBodyBuffer: Reading the Body in a Filter
     responseHeaderPopulator: Response Header Populators
   byteBody:
     title: Advanced body access
