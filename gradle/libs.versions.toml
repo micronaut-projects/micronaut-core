@@ -56,6 +56,7 @@ native-gradle-plugin = "0.11.5"
 neo4j-java-driver = "5.17.0"
 selenium = "4.27.0"
 okio = "3.18.2"
+oracle-jdbc = "23.26.3.0.0"
 okhttp-sse = "5.4.0"
 slf4j = "2.0.17"
 smallrye = "6.11.4"
@@ -306,6 +307,7 @@ netty-tcnative = { module = 'io.netty:netty-tcnative' }
 netty-tcnative-boringssl = { module = 'io.netty:netty-tcnative-boringssl-static' }
 
 okio = { module = "com.squareup.okio:okio", version.ref="okio" }
+ojdbc = { module = "com.oracle.database.jdbc:ojdbc17", version.ref = "oracle-jdbc" }
 okhttp-sse = { module = "com.squareup.okhttp3:okhttp-sse", version.ref = "okhttp-sse" }
 
 selenium-remote-driver = { module = "org.seleniumhq.selenium:selenium-remote-driver", version.ref = "selenium" }
@@ -333,6 +335,8 @@ micronaut-validation-processor = { module = "io.micronaut.validation:micronaut-v
 micronaut-kotlin-runtime = { module = "io.micronaut.kotlin:micronaut-kotlin-runtime" }
 
 testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "testcontainers" }
+
+ucp = { module = "com.oracle.database.jdbc:ucp17", version.ref = "oracle-jdbc" }
 
 vertx = { module = "io.vertx:vertx-core", version.ref = "vertx" }
 vertx-webclient = { module = "io.vertx:vertx-web-client", version.ref = "vertx" }
