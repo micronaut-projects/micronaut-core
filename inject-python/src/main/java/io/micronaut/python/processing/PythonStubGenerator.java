@@ -5170,7 +5170,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .initializer(PYTHON_FIXED_ATTRIBUTES.instantiate())
                 .build());
         }
-        String name = FIXED_SLOT_PREFIX + readers.size();
+        String name = fixedReaderName(model.element(), readers.size());
         FieldDef slot = FieldDef.builder(name)
             .ofType(PYTHON_FIXED_SLOT)
             .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
@@ -5209,6 +5209,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         builder.addMethod(reader);
         readers.put(key, reader);
         return reader;
+    }
+
+    /**
+     * The name of a fixed reader and its slot: one no method or field of the class, declared or
+     * inherited, has (a Python class may name a method anything).
+     */
+    private static String fixedReaderName(ClassElement element, int index) {
+        Set<String> taken = new HashSet<>();
+        element.getEnclosedElements(ElementQuery.ALL_METHODS).forEach(method -> taken.add(method.getName()));
+        element.getEnclosedElements(ElementQuery.ALL_FIELDS).forEach(field -> taken.add(field.getName()));
+        String name = FIXED_SLOT_PREFIX + index;
+        while (taken.contains(name)) {
+            name = "_" + name;
+        }
+        return name;
     }
 
     /**

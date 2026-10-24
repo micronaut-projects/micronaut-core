@@ -47,6 +47,9 @@ class Pricing:
     def label(self, n: int) -> str:
         return self.name + ":" + str(min(n, self.limit))
 
+    def graalpyInternalFixed0(self) -> str:
+        return "a method of the class, named as the stub names its fixed readers"
+
 @Singleton
 class Counting:
     def __init__(self, name: Annotated[str, Value("${pricing.name:std}")]):
@@ -92,6 +95,7 @@ class Front:
                 row.label = invoke { pricing.label(4) }
                 row.again = invoke { pricing.label(40) }
                 row.front = invoke { front.label(5) }
+                row.own = invoke { pricing.graalpyInternalFixed0() }
                 python('pricing.name = "vip"')
                 row.renamed = invoke { pricing.label(4) }
                 row.front_renamed = invoke { front.label(5) }
@@ -122,6 +126,7 @@ class Front:
         results[StaticCompilationMode.OFF].limited == 3.0d
         results[StaticCompilationMode.OFF].limited_label == 'vip:2'
         results[StaticCompilationMode.OFF].set == 'gold:1'
+        results[StaticCompilationMode.OFF].own == 'a method of the class, named as the stub names its fixed readers'
 
         and: "the bodies are compiled, and an attribute fixed at construction is no bridge call"
         ['Pricing.total', 'Pricing.label', 'Counting.label'].every { compiled[it].outcome() == StaticCompilationDecision.Outcome.COMPILED }
