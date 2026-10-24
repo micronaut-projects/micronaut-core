@@ -875,6 +875,44 @@ class Service:
         with self.assertRaises(ValueError):
             CompileScope("fast", NAMES)
 
+    def test_type_checking_and_static_compilation_share_one_scope_resolver(self):
+        from micronaut_typecheck import ScopeResolver, TypeCheckScope, MODE_ERROR as CHECK_ERROR, MODE_OFF as CHECK_OFF, MODE_WARN as CHECK_WARN
+        checked = ["io.micronaut.context.python.annotation.TypeChecked"]
+        planner = StaticPlanner(MODE_ALL, NAMES)
+        checker = TypeChecker(CHECK_WARN, checked)
+        self.assertIs(ScopeResolver, type(planner.scope))
+        self.assertIs(ScopeResolver, type(checker.scope))
+        self.assertIs(ScopeResolver, type(CompileScope(MODE_OFF, NAMES)))
+        self.assertIs(ScopeResolver, type(TypeCheckScope(CHECK_OFF, checked)))
+
+        class Decorator:
+            def __init__(self, name, value=None):
+                self._name = name
+                self._value = value
+
+            def annotationName(self):
+                return self._name
+
+            def members(self):
+                return {} if self._value is None else {"value": self._value}
+
+        # the same declarations resolve through the same rules: the nearest switch wins
+        def switched(names, value=None):
+            return [Decorator(name, value) for name in names]
+
+        for mode, expected in ((MODE_ALL, (True, "MODE")), (MODE_ANNOTATED, (False, "MODE")), (MODE_OFF, (False, "MODE"))):
+            self.assertEqual(expected, CompileScope(mode, NAMES).resolve([], None, []))
+        self.assertEqual((False, "MODULE"), CompileScope(MODE_ALL, NAMES).resolve(switched(NAMES[:1], "false"), None, []))
+        self.assertEqual((True, "CLASS"), CompileScope(MODE_OFF, NAMES).resolve(switched(NAMES[:1], False), switched(NAMES[1:]), []))
+        self.assertEqual((False, "FUNCTION"), CompileScope(MODE_OFF, NAMES).resolve([], switched(NAMES[:1]), switched(NAMES[:1], False)))
+        for mode, expected in ((CHECK_OFF, (None, "MODE")), (CHECK_WARN, (CHECK_WARN, "MODE")), (CHECK_ERROR, (CHECK_ERROR, "MODE"))):
+            self.assertEqual(expected, TypeCheckScope(mode, checked).resolve([], None, []))
+        self.assertEqual((None, "MODULE"), TypeCheckScope(CHECK_WARN, checked).resolve(switched(checked, "False"), None, []))
+        self.assertEqual((CHECK_ERROR, "CLASS"), TypeCheckScope(CHECK_OFF, checked).resolve(switched(checked, False), switched(checked), []))
+        self.assertEqual((None, "FUNCTION"), TypeCheckScope(CHECK_OFF, checked).resolve([], switched(checked), switched(checked, 0)))
+        # a switch of the other feature is no switch
+        self.assertEqual((True, "MODE"), CompileScope(MODE_ALL, NAMES).resolve(switched(checked, False), None, []))
+
 
 class ClassificationTest(unittest.TestCase):
     def test_functions_that_can_never_be_compiled_are_not_candidates(self):
