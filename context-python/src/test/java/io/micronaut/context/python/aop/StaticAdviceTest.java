@@ -27,6 +27,9 @@ class StaticAdviceTest {
         assertEquals(4.0, StaticAdvice.result(4, "java.lang.Double"));
         assertEquals(true, StaticAdvice.result(true, "boolean"));
         assertEquals("x", StaticAdvice.result("x", "java.lang.String"));
+        assertEquals('x', StaticAdvice.result("x", "char"));
+        assertEquals('x', StaticAdvice.result('x', "char"));
+        assertEquals('x', StaticAdvice.result("x", "java.lang.Character"));
         assertNull(StaticAdvice.result(null, "java.lang.Integer"));
         assertNull(StaticAdvice.result(null, "java.lang.Object"));
     }
@@ -38,6 +41,11 @@ class StaticAdviceTest {
         assertThrows(ClassCastException.class, () -> StaticAdvice.result((1L << 53) + 1, "double"));
         assertThrows(ClassCastException.class, () -> StaticAdvice.result("4", "int"));
         assertThrows(ClassCastException.class, () -> StaticAdvice.result(1L, "boolean"));
+        assertThrows(ClassCastException.class, () -> StaticAdvice.result("xy", "char"));
+        assertThrows(ClassCastException.class, () -> StaticAdvice.result("", "char"));
+        assertThrows(ClassCastException.class, () -> StaticAdvice.result(120L, "char"));
+        assertThrows(ClassCastException.class, () -> StaticAdvice.result("xy", "java.lang.Character"));
+        assertThrows(NullPointerException.class, () -> StaticAdvice.result(null, "char"));
         NullPointerException none = assertThrows(NullPointerException.class, () -> StaticAdvice.result(null, "int"));
         assertTrue(none.getMessage().contains("'int'"), none.getMessage());
     }

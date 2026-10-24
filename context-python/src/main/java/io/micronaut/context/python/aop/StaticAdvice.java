@@ -144,7 +144,7 @@ public final class StaticAdvice<T> {
     /**
      * Converts what an interceptor chain returned to the return type of the generated method, as
      * the bridge converts the value of a Python call: a number to a primitive or its box only when
-     * it fits exactly, {@code None} to no primitive.
+     * it fits exactly, a {@code str} of one character to a {@code char}, {@code None} to no primitive.
      *
      * @param value      What the chain returned
      * @param returnType The name of the return type of the generated method
@@ -174,6 +174,15 @@ public final class StaticAdvice<T> {
             case "short", "java.lang.Short" -> (short) integral(value, Short.MIN_VALUE, Short.MAX_VALUE, returnType);
             case "int", "java.lang.Integer" -> (int) integral(value, Integer.MIN_VALUE, Integer.MAX_VALUE, returnType);
             case "long", "java.lang.Long" -> integral(value, Long.MIN_VALUE, Long.MAX_VALUE, returnType);
+            case "char", "java.lang.Character" -> {
+                if (value instanceof Character) {
+                    yield value;
+                }
+                if (value instanceof String string && string.length() == 1) {
+                    yield string.charAt(0);
+                }
+                throw lossy(value, returnType);
+            }
             case "double", "java.lang.Double" -> floating(value, returnType);
             case "float", "java.lang.Float" -> {
                 double d = floating(value, returnType);
