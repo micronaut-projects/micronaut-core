@@ -41,6 +41,47 @@ class Test {
         context.close()
     }
 
+    void "test a map bound with a property keeps the entries the configuration holds without a value"() {
+        given:
+        Map<String, Object> properties = new LinkedHashMap<>()
+        properties.put('my.nulls.present', 'one')
+        properties.put('my.nulls.absent', null)
+        def context = buildContext('injectnulls.Test', '''
+package injectnulls;
+
+import io.micronaut.context.annotation.Property;
+import io.micronaut.core.convert.format.MapFormat;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+import java.util.Map;
+
+@Singleton
+class Test {
+    @Inject
+    @Property(name = "my.nulls")
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT)
+    public Map<String, Object> objects;
+
+    @Inject
+    @Property(name = "my.nulls")
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT)
+    public Map<String, String> strings;
+}
+''', false, properties)
+        def bean = getBean(context, 'injectnulls.Test')
+
+        expect:
+        context.getProperties('my.nulls').containsKey('absent')
+        bean.objects.containsKey('absent')
+        bean.objects.get('absent') == null
+        bean.objects.get('present') == 'one'
+        // a String converts from nothing: the entry without a value is left out
+        bean.strings == [present: 'one']
+
+        cleanup:
+        context.close()
+    }
+
     void "test inject properties"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
