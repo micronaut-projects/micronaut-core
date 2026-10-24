@@ -267,7 +267,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders, Convers
      */
     default MutableHttpHeaders add(CharSequence header, ZonedDateTime value) {
         if (header != null && value != null) {
-            add(header, value.withZoneSameInstant(GMT).format(DateTimeFormatter.RFC_1123_DATE_TIME));
+            add(header, HttpDates.format(value));
         }
         return this;
     }

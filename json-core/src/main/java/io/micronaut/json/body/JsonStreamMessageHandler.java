@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
@@ -108,6 +109,12 @@ public final class JsonStreamMessageHandler<T> implements MessageBodyHandler<T>,
         }
         @SuppressWarnings("unchecked")
         Argument<T> elementType = (Argument<T>) type.getFirstTypeVariable().orElse(type);
+        // Like the other readers, the input is released on success only, the caller releases it
+        // on failure: the processor takes over, and releases, a reference of its own
+        ReferenceCounted counted = byteBuffer instanceof ReferenceCounted rc ? rc : null;
+        if (counted != null) {
+            counted.retain();
+        }
         // the values of the whole stream, without Reactive Streams
         List<ReadBuffer> values = new ArrayList<>();
         JsonChunkedProcessor processor = new JsonChunkedProcessor();
@@ -117,6 +124,9 @@ public final class JsonStreamMessageHandler<T> implements MessageBodyHandler<T>,
         } catch (IOException e) {
             values.forEach(ReadBuffer::close);
             throw new CodecException("Error decoding JSON stream for type [" + elementType.getName() + "]: " + e.getMessage(), e);
+        } catch (RuntimeException e) {
+            values.forEach(ReadBuffer::close);
+            throw e;
         } finally {
             processor.discard();
         }
@@ -136,6 +146,9 @@ public final class JsonStreamMessageHandler<T> implements MessageBodyHandler<T>,
             } finally {
                 value.close();
             }
+        }
+        if (counted != null) {
+            counted.release();
         }
         //noinspection unchecked
         return (T) elements;
