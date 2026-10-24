@@ -17,6 +17,7 @@ package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
 import java.io.Serializable;
+import java.io.StringWriter;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.RetentionPolicy;
@@ -66,6 +67,7 @@ import io.micronaut.python.processing.model.FunctionDef;
 import io.micronaut.python.processing.staticcompile.Ir;
 import io.micronaut.python.processing.staticcompile.StaticBodyGenerator;
 import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
+import io.micronaut.python.processing.staticcompile.StaticLineMap;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
@@ -375,7 +377,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             if (sourceGenerator != null) {
                 for (StubEntry entry : topLevelStubEntries()) {
                     ClassDef.ClassDefBuilder builder = entry.builder;
-                    sourceGenerator.write(builder.build(), visitorContext, entry.originatingElement);
+                    writeStub(sourceGenerator, builder.build(), visitorContext, entry.originatingElement);
                 }
                 for (StateEntry entry : stateDefs.values()) {
                     sourceGenerator.write(entry.stateDef, visitorContext, entry.originatingElement);
@@ -402,6 +404,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             interfaceDefs.clear();
             annotationDefs.clear();
         }
+    }
+
+    /**
+     * Writes a stub as SourceGen writes a source, with the line markers of its compiled bodies
+     * turned into the comments that give the Python positions of the Java (see {@link StaticLineMap}).
+     */
+    private static void writeStub(SourceGenerator sourceGenerator, ClassDef classDef, VisitorContext visitorContext, Element originatingElement) {
+        visitorContext.visitGeneratedSourceFile(classDef.getPackageName(), classDef.getSimpleName(), originatingElement)
+            .ifPresent(generatedFile -> {
+                try {
+                    StringWriter source = new StringWriter();
+                    sourceGenerator.write(classDef, source);
+                    String text = StaticLineMap.withLineComments(source.toString());
+                    generatedFile.write(writer -> writer.write(text));
+                } catch (Exception e) {
+                    throw new ProcessingException(originatingElement, "Failed to generate '" + classDef.getName() + "': " + e.getMessage(), e);
+                }
+            });
     }
 
     /**
