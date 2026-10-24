@@ -420,3 +420,40 @@ Nearly all of it is the planner (`plan`); rewriting the runtime trees for delega
 * A build compiles in a cold JVM. With the arguments the build's Python compile tasks run with (the host code compiled by C2, GraalPy interpreted without Truffle's compiler, which a single compilation does not pay off) a compilation takes about 40% less time than with the JDK's defaults in either mode, and the planner a quarter or less of its time with the defaults, so mode `all` stays well within the budget.
 * In a JVM that compiles again and again, the other stages run about twice as fast as in a cold JVM, while the planner does not get faster, with or without Truffle's compiler: its share grows to the 15 to 27% above. A processing session, which keeps its context, does not change that over the rounds measured.
 * A JVM-wide GraalPy engine shared by the contexts of the compilations, so that Truffle keeps the code it compiles for the processor's modules, was measured and not adopted: the warm and cold numbers do not change (within 5% for the planner), since the compilations of a corpus run each function of the planner too few times for Truffle to compile it; only a JVM compiling the same application twenty times over halves the planner, by then a few percent of the compilation. The latency mode of the engine (`engine.Mode=latency`, as an incremental compilation uses) changes nothing measurable, and switching Truffle's compiler off per context (`engine.Compilation=false`) makes every stage slower.
+
+== Runtime Performance
+
+A compiled body is Java, so its speed does not depend on the Truffle runtime GraalPy gets. A benchmark of one HTTP service written three ways (a controller and three `@Singleton` services in Java, the same logic in Python with compilation `off`, and that Python compiled in mode `all`, every function but the constructors compiled) gave these indicative numbers on an Apple M2 Max, with `wrk` on the same host at 64 connections:
+
+[cols="3,1,1,1,1"]
+|===
+|Route |GraalVM JDK, mode `off` |GraalVM JDK, mode `all` |OpenJDK, mode `off` |OpenJDK, mode `all`
+
+|A constant
+|0.26×
+|0.97×
+|0.27×
+|0.97×
+
+|A numeric loop
+|0.05×
+|0.61×
+|0.001×
+|0.61×
+
+|String building over lists and dicts
+|0.001×
+|0.57×
+|0.001×
+|0.51×
+
+|Order pricing: validation, a mapped DTO, calls between services, a Java exception raised
+|0.002×
+|0.91×
+|0.002×
+|0.92×
+|===
+
+Each figure is the throughput of the Python service as a fraction of the Java one on the same JDK. On a stock OpenJDK, GraalPy interprets Python without compiling it to machine code, which is where compiling the bodies matters most: the numeric loop served 127 requests a second interpreted and 65,000 compiled. Mode `off` routes are also serialized on the context's lock, so they scale little with concurrent requests; a compiled body takes the lock only where it still calls into Python. Startup time and memory do not change with the mode, since the GraalPy context is created either way.
+
+A compiled `raise` of an exception class of the compilation still constructs the Python exception in Python and takes the context's lock: the same pricing route raising `InvalidLine(Exception)` for 2 of its 12 order lines reached 3% of the Java throughput, and 92% raising a Java exception class instead. On a hot path, raise and catch Java exceptions.
