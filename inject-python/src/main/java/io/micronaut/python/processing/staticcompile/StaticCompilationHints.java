@@ -284,9 +284,6 @@ public final class StaticCompilationHints {
                 if (text.contains("result of a call with None")) {
                     return "Hint the return of the method T | None when it may return None, or drop the test for None of a method that never returns it.";
                 }
-                if (text.contains("a Java method or field returns")) {
-                    return "Pass the message through a str the body builds (an f-string, str(), a literal), or test the Java value for None first.";
-                }
                 break;
             default:
                 break;
