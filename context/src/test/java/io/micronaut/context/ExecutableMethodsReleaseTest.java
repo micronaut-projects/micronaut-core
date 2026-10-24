@@ -26,20 +26,22 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The executable methods of a bean definition are held statically by the definition class, which a development
- * launcher loads in its parent tier, once for every generation: a development context that stops releases what it
- * configured them with, so that neither its environment nor itself stays reachable from them.
+ * The executable methods a generated bean definition holds statically, in {@code $EXEC}, are shared by every context
+ * that loads the definition class, and a development launcher loads it in its parent tier, once for every generation.
+ * Each loaded definition configures a copy of them, so neither a development context nor its environment is reachable
+ * from the shared methods, while the context runs or once it stopped.
  */
 class ExecutableMethodsReleaseTest {
 
     @Test
-    void aStoppedDevelopmentContextIsNotReachableFromTheSharedExecutableMethods() throws Exception {
+    void aDevelopmentContextIsNotReachableFromTheSharedExecutableMethods() throws Exception {
         ApplicationContext context = run("/first");
         Environment environment = context.getEnvironment();
         BeanDefinition<ReleasedBean> definition = context.getBeanDefinition(ReleasedBean.class);
         assertEquals("/first", path(definition));
         Object shared = sharedMethods(definition);
-        assertTrue(reachable(shared, environment), "configured with the context's environment");
+        assertFalse(reachable(shared, environment), "the environment of the running context is reachable");
+        assertFalse(reachable(shared, context), "the running context is reachable");
 
         context.stop();
 
@@ -48,13 +50,12 @@ class ExecutableMethodsReleaseTest {
     }
 
     @Test
-    void aDefinitionLoadedThenDisabledByItsOwnConditionsIsReleasedToo() throws Exception {
+    void aDefinitionLoadedThenDisabledByItsOwnConditionsKeepsNoContext() throws Exception {
         ApplicationContext context = run("/disabled");
         Environment environment = context.getEnvironment();
-        // loading the definition configures the methods its class holds, before its conditions disable it
         assertFalse(context.findBeanDefinition(DisabledReleasedBean.class).isPresent());
         Object shared = sharedMethods(Class.forName(ExecutableMethodsReleaseTest.class.getPackageName() + ".$ExecutableMethodsReleaseTest$DisabledReleasedBean$Definition"));
-        assertTrue(reachable(shared, environment), "configured with the context's environment");
+        assertFalse(reachable(shared, environment), "the environment of the running context is reachable");
 
         context.stop();
 
@@ -62,21 +63,22 @@ class ExecutableMethodsReleaseTest {
     }
 
     @Test
-    void aContextThatConfiguredTheMethodsSinceKeepsThem() throws Exception {
+    void contextsRunningSideBySideEachKeepTheirOwnConfiguration() throws Exception {
         ApplicationContext first = run("/first");
         ApplicationContext second = run("/second");
         try {
             BeanDefinition<ReleasedBean> firstDefinition = first.getBeanDefinition(ReleasedBean.class);
             BeanDefinition<ReleasedBean> secondDefinition = second.getBeanDefinition(ReleasedBean.class);
-            Object shared = sharedMethods(secondDefinition);
+            assertEquals(firstDefinition.getClass(), secondDefinition.getClass());
+            assertEquals("/first", path(firstDefinition));
             assertEquals("/second", path(secondDefinition));
+            Object shared = sharedMethods(secondDefinition);
 
             first.stop();
 
-            assertTrue(reachable(shared, second.getEnvironment()), "the second context configured the methods last");
             assertEquals("/second", path(secondDefinition));
             assertFalse(reachable(shared, first.getEnvironment()));
-            assertEquals(firstDefinition.getClass(), secondDefinition.getClass());
+            assertFalse(reachable(shared, second.getEnvironment()));
         } finally {
             first.close();
             second.close();
