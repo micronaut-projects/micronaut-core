@@ -97,3 +97,5 @@ The page keeps the results as the XML reports do, so it never holds only the las
 A product built on Micronaut puts its own logo in the header with a `META-INF/micronaut-dev/test-report/brand.properties` on the launch classpath, naming the product, `name`, and the resource of its logo, `logo`, an SVG or a PNG.
 
 With `micronaut-dev-livereload` on the classpath as well, the LiveReload server serves the page at `http://localhost:35729/tests/`, or the path `micronaut.dev.test.html-report-path` names, such as `/reports/tests/`. The launcher logs the address. The page follows each run test by test over the event channel's `tests` topic, without reloading. Opened from the file system, the page shows the state it was written with.
+
+Beside the page, `state.json` holds the state it renders. A tool can read it to tell whether continuous testing runs: its `pid` is the launcher's process, `pidStartedAt` the instant that process started (left out where the platform does not tell), so that a reused process number is told apart, and `url` the address of the served page, `null` when no LiveReload server serves it.
