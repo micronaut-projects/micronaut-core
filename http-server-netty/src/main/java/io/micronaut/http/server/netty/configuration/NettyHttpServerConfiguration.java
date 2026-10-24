@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -245,6 +246,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private long formMaxBytes = Long.MAX_VALUE;
     private boolean requestDecompressionEnabled = true;
     private Set<DecoderQuirk> formDecoderQuirks = Collections.emptySet();
+    private boolean formLenientPercentDecoding = false;
+    private Set<DecoderQuirk> effectiveFormDecoderQuirks = effectiveFormDecoderQuirks(formDecoderQuirks, formLenientPercentDecoding);
 
     /**
      * Default empty constructor.
@@ -1009,6 +1012,55 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @Experimental
     public void setFormDecoderQuirks(Set<DecoderQuirk> formDecoderQuirks) {
         this.formDecoderQuirks = formDecoderQuirks;
+        this.effectiveFormDecoderQuirks = effectiveFormDecoderQuirks(formDecoderQuirks, formLenientPercentDecoding);
+    }
+
+    /**
+     * Whether URL-encoded forms accept malformed percent escapes, e.g. {@code %2} or {@code %GG},
+     * and decode them leniently, as before 5.3. By default a malformed escape is refused and the
+     * request is answered with a 400. Default {@code false}.
+     *
+     * @return Whether malformed percent escapes are decoded leniently
+     * @since 5.3.0
+     */
+    public boolean isFormLenientPercentDecoding() {
+        return formLenientPercentDecoding;
+    }
+
+    /**
+     * Whether URL-encoded forms accept malformed percent escapes, e.g. {@code %2} or {@code %GG},
+     * and decode them leniently, as before 5.3. By default a malformed escape is refused and the
+     * request is answered with a 400. Default {@code false}.
+     *
+     * @param formLenientPercentDecoding Whether malformed percent escapes are decoded leniently
+     * @since 5.3.0
+     */
+    public void setFormLenientPercentDecoding(boolean formLenientPercentDecoding) {
+        this.formLenientPercentDecoding = formLenientPercentDecoding;
+        this.effectiveFormDecoderQuirks = effectiveFormDecoderQuirks(formDecoderQuirks, formLenientPercentDecoding);
+    }
+
+    /**
+     * The quirks the form decoder runs with: the {@link #getFormDecoderQuirks() configured ones},
+     * plus the quirks that refuse malformed percent escapes unless
+     * {@link #isFormLenientPercentDecoding() lenient percent decoding} is enabled.
+     *
+     * @return The effective decoder quirks
+     * @since 5.3.0
+     */
+    @Internal
+    public Set<DecoderQuirk> getEffectiveFormDecoderQuirks() {
+        return effectiveFormDecoderQuirks;
+    }
+
+    private static Set<DecoderQuirk> effectiveFormDecoderQuirks(Set<DecoderQuirk> configured, boolean lenientPercentDecoding) {
+        if (lenientPercentDecoding) {
+            return configured;
+        }
+        Set<DecoderQuirk> quirks = new HashSet<>(configured);
+        quirks.add(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE);
+        quirks.add(DecoderQuirk.REFUSE_SHORT_PERCENT_DECODE);
+        return Collections.unmodifiableSet(quirks);
     }
 
     /**

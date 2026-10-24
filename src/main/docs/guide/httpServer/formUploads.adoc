@@ -94,7 +94,7 @@ A form is decoded as it arrives, so `micronaut.server.max-request-buffer-size` d
 * The files of a api:http.form.FormData[] are stored as the `micronaut.server.multipart` configuration says, and each is limited by `micronaut.server.multipart.max-file-size`.
 * The parts of api:http.form.FormParts[] and a api:http.form.FormPart[] are limited one by one, by the operation that reads them: `text()` reads up to `micronaut.server.max-request-buffer-size` bytes, `text(maximumBytes)` and `bytes(maximumBytes)` up to the given limit, and `transferTo` is not limited by the buffer size. A part larger than the limit of its read fails with `413 Request Entity Too Large`.
 
-The request as a whole is limited by `micronaut.server.max-request-size`, and the Netty server limits the number of fields and the bytes the decoder buffers with its `micronaut.server.netty.form-max-fields` and `micronaut.server.netty.form-max-buffered-bytes` settings.
+The request as a whole is limited by `micronaut.server.max-request-size`, and the Netty server limits the number of fields and the bytes the decoder buffers with its `micronaut.server.netty.form-max-fields` and `micronaut.server.netty.form-max-buffered-bytes` settings. A URL-encoded body with a malformed percent escape, such as `%2` or `%GG`, is rejected with `400 Bad Request`; `micronaut.server.netty.form-lenient-percent-decoding: true` decodes such escapes leniently instead.
 
 == Combining Arguments
 
