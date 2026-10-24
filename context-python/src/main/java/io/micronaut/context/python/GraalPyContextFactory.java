@@ -90,11 +90,20 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             spec.loader.exec_module(module)
         """, "micronaut-load-vfs-module.py").cached(true).buildLiteral();
     /**
+     * Registers the interop types of the Java imports manifests in a context whose bootstrap made no Java import
+     * (see {@code micronaut_java_imports}).
+     */
+    private static final Source REGISTER_INTEROP_TYPES_SOURCE = Source.newBuilder(PYTHON,
+        "__import__('micronaut_java_imports').__micronaut_register_interop_types()", "micronaut-register-interop-types.py")
+        .cached(true).buildLiteral();
+    /**
      * Python code that completes the members of every Java object with what GraalPy host interop does not
      * resolve: the trailing-underscore aliases of members named after a Python keyword
      * ({@code builder.from_(...)} for {@code Builder.from(...)}, {@code spec.and_(other)} for
-     * {@code Specification.and(other)}), and the public methods a class inherits from a non-public
-     * superclass (see {@link PythonHostMembers}).
+     * {@code Specification.and(other)}), the public methods a class inherits from a non-public
+     * superclass (see {@link PythonHostMembers}), and the snake_case methods and read-only getter
+     * properties the compiler computed for the Java types the sources reference
+     * ({@code request.basic_auth(...)}, {@code server.port}).
      * <p>
      * The compiler rewrites keyword aliases only on names it can resolve statically (imported Java
      * classes and {@code java.type(...)} aliases). Objects that Java returns at runtime are plain GraalPy
@@ -102,7 +111,11 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * {@code polyglot.register_interop_type} for {@code java.lang.Object} enters the type of every host
      * object instance and its {@code __getattr__} runs only after the regular foreign member lookup has
      * failed, retrying with the underscore stripped (the rule the compiler applies, {@code keyword.iskeyword},
-     * so the same spelling works everywhere) and then asking the runtime for an inherited member.
+     * so the same spelling works everywhere), then asking the runtime for an inherited member, then for
+     * the snake_case method or getter property the compiler recorded for the object's class or one of its
+     * supertypes ({@link PythonJavaInstanceMembers}). The names are read once per class loader and shared
+     * by all contexts, no Java member is inspected at run time, and a real member of the object always
+     * comes first.
      * <p>
      * It makes every {@link Exception} an instance of the Python {@code Exception} class, so that
      * {@code except Exception} catches the exceptions of Java calls ({@link Error}s remain only a
@@ -112,7 +125,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * awaitable, whichever Java call returned it (see {@link PythonAsyncioRuntime#awaitJava}).
      */
     private static final Source JAVA_OBJECT_MEMBERS_SOURCE = Source.newBuilder(PYTHON, """
-        def __micronaut_register_java_object_members():
+        def __micronaut_register_java_object_members(instance_members):
             import keyword
             import java
             from polyglot import register_interop_type
@@ -131,6 +144,12 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                         member = host_members.inheritedMember(self, name)
                         if member is not None:
                             return member
+                        alias = instance_members.methodAlias(self, name)
+                        if alias is not None:
+                            return getattr(self, alias)
+                        getter = instance_members.propertyGetter(self, name)
+                        if getter is not None:
+                            return getattr(self, getter)()
                     raise AttributeError(f"foreign object has no attribute '{name}'")
 
             register_interop_type(java.type('java.lang.Object'), MicronautJavaObject)
@@ -159,8 +178,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 except (KeyError, ImportError, TypeError):
                     pass  # absent, or excluded by graalpy.context.host-class-lookup
 
-        __micronaut_register_java_object_members()
-        del __micronaut_register_java_object_members
+        # the value of the source: the function, no longer bound in __main__
+        globals().pop('__micronaut_register_java_object_members')
         """, "micronaut-java-object-members.py").cached(true).buildLiteral();
     /**
      * Installs the Python view of the generated Java wrappers ({@link ValueCoercible}). A wrapper a
@@ -243,12 +262,14 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     /**
      * Complete the members of the Java objects of a context: keyword-safe aliases, inherited public
-     * methods, {@code await} on stages and publishers, and Java exceptions caught by {@code except Exception}.
+     * methods, snake_case methods and getter properties, {@code await} on stages and publishers, and Java
+     * exceptions caught by {@code except Exception}.
      *
      * @param context The context
+     * @param classLoader The class loader of the application, whose compilations recorded the names
      */
-    static void registerJavaObjectMembers(Context context) {
-        context.eval(JAVA_OBJECT_MEMBERS_SOURCE);
+    static void registerJavaObjectMembers(Context context, ClassLoader classLoader) {
+        context.eval(JAVA_OBJECT_MEMBERS_SOURCE).executeVoid(PythonJavaInstanceMembers.of(classLoader));
     }
 
     /**
@@ -498,7 +519,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             // the public methods GraalPy does not expose because a non-public superclass declares them, and
             // their exceptions to `except Exception`
             now = System.currentTimeMillis();
-            registerJavaObjectMembers(context);
+            registerJavaObjectMembers(context, classLoader);
             LOG.debug("GraalPy Java object members registered in {}ms", System.currentTimeMillis() - now);
             // Before the application modules import: the Java packages, types and annotations they import
             // are served by the finder of the runtime module, from the manifests the compiler wrote
@@ -510,6 +531,9 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             evaluateMain(classLoader, INTERNAL_MAIN, context, fileSystem);
             evaluateMain(classLoader, applicationMain, context, fileSystem);
             LOG.debug("GraalPy main.py evaluated in {}ms", System.currentTimeMillis() - now);
+            // the dataclass wrappers the manifests record are registered by the first Java import, which
+            // sources declaring only dataclasses may not make
+            context.eval(REGISTER_INTEROP_TYPES_SOURCE);
             bootstrapped = true;
             return context;
         } finally {
