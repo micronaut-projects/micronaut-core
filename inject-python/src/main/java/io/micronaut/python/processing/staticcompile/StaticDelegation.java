@@ -34,7 +34,10 @@ import java.util.Set;
  *     (a bool is no int, an int is no float here), checked on every call;</li>
  *     <li>a body without side effects (no write to {@code self}, no Java call) runs the Python body
  *     instead when the Java body fails, so an int that outgrows a long, which Java raises on and
- *     Python promotes, gives Python's result, and any other failure Python's exception;</li>
+ *     Python promotes, gives Python's result, and any other failure Python's exception. Reading
+ *     a property of {@code self} still counts as without side effects although it goes through
+ *     {@code getMember} and so can run a Python {@code @property} getter: when the Java body fails
+ *     and the Python body runs, such a getter runs twice;</li>
  *     <li>a body with side effects cannot be run again: it delegates only when it has no operation
  *     that Java raises on where Python promotes, and the failures Python raises as exceptions of
  *     its own (a division by zero, an assertion, + on None) reach the caller as those exceptions.</li>

@@ -791,6 +791,8 @@ class Lowering:
         if not isinstance(node.target, ast.Name):
             self._refuse("unsupported-statement", "unpacking the loop variable has no static lowering", node.target)
         variable = node.target.id
+        if variable in JAVA_RESERVED_NAMES:
+            self._refuse("java-reserved-name", f"local [{variable}] cannot be declared in Java", node.target)
         if variable in self.parameters or variable in self.locals or variable in self.reassigned:
             self._refuse("unsupported-statement", f"the loop variable [{variable}] is already a local or a parameter", node)
         iterable = node.iter
