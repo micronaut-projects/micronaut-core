@@ -532,6 +532,10 @@ public sealed interface Ir {
      *                       generated method rethrows unchecked as the bridge would
      * @param advised        Whether the method is advised: the generated method runs the
      *                       interceptor chain the proxy binds before the body
+     * @param staticMethod   Whether the body is generated as a static Java method: a static method
+     *                       of a class, or a plain function of a module
+     * @param moduleLevel    Whether the function is a module-level function, generated into the
+     *                       module's class
      */
     record CompiledBody(String className,
                         String methodName,
@@ -542,7 +546,9 @@ public sealed interface Ir {
                         @Nullable SourceSpan span,
                         StaticCompilationDecision.Stats stats,
                         boolean wrapsCheckedExceptions,
-                        boolean advised) {
+                        boolean advised,
+                        boolean staticMethod,
+                        boolean moduleLevel) {
         public CompiledBody {
             Objects.requireNonNull(className, "className");
             Objects.requireNonNull(methodName, "methodName");

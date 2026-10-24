@@ -29,9 +29,13 @@ class StaticDelegationTest {
     private static final String OBJECT = "java.lang.Object";
 
     private static Ir.CompiledBody body(List<String> types, String returnType, Ir.Statement... statements) {
+        return body("app.Outer$Calc", false, false, types, returnType, statements);
+    }
+
+    private static Ir.CompiledBody body(String className, boolean staticMethod, boolean moduleLevel, List<String> types, String returnType, Ir.Statement... statements) {
         List<String> names = IntStream.range(0, types.size()).mapToObj(i -> "p" + i).toList();
-        return new Ir.CompiledBody("app.Outer$Calc", "run", names, types, returnType, new Ir.Body(List.of(statements)),
-            SourceSpan.at("app/calc.py", 3, 5), new StaticCompilationDecision.Stats(statements.length, 0, 0, 0), false, false);
+        return new Ir.CompiledBody(className, "run", names, types, returnType, new Ir.Body(List.of(statements)),
+            SourceSpan.at("app/calc.py", 3, 5), new StaticCompilationDecision.Stats(statements.length, 0, 0, 0), false, false, staticMethod, moduleLevel);
     }
 
     private static Ir.Expression param(String type) {
@@ -76,6 +80,19 @@ class StaticDelegationTest {
         assertNull(StaticDelegation.target(body(List.of("java.util.Map"), OBJECT, returned)));
         assertNull(StaticDelegation.target(body(List.of("java.util.function.Supplier<java.lang.String>"), OBJECT, returned)));
         assertNull(StaticDelegation.target(body(List.of("java.lang.String[]"), OBJECT, returned)));
+    }
+
+    @Test
+    void aStaticMethodOrAModuleFunctionCallsTheGeneratedClassAndDelegatesOnlyWhenItMayBeRunAgain() {
+        Ir.Expression sum = new Ir.Binary("+", param("int"), new Ir.Const(1L, Ir.LONG), Ir.LONG);
+        Ir.Statement returned = new Ir.Return(new Ir.Cast(sum, "int"));
+        assertEquals("Outer$Calc#run#static=app.Outer$Calc#kinds=int#retry",
+            StaticDelegation.target(body("app.Outer$Calc", true, false, List.of("int"), "int", returned)));
+        assertEquals("#run#static=app.Module#kinds=int#retry",
+            StaticDelegation.target(body("app.Module", true, true, List.of("int"), "int", returned)));
+        // no bound object raises a failure as Python's exception: a body with side effects keeps the Python body
+        Ir.Expression call = new Ir.InvokeJava(null, "java.lang.Math", "abs", List.of(Ir.LONG), List.of(param(Ir.LONG)), Ir.LONG);
+        assertNull(StaticDelegation.target(body("app.Module", true, true, List.of(Ir.LONG), Ir.LONG, new Ir.Return(call))));
     }
 
     @Test

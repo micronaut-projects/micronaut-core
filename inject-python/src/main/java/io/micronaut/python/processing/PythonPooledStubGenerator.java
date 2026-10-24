@@ -475,9 +475,13 @@ final class PythonPooledStubGenerator {
         );
         boolean hasAsyncBridgeMethod = methodsToBridge.stream().anyMatch(PythonStubGenerator::isAsyncPythonMethod);
 
+        Set<String> bridged = new HashSet<>();
         for (MethodElement methodElement : methodsToBridge) {
             addBridgeMethodPooledScript(scriptElement, methodElement, builder, pkg, script, allClasses, context, pooledInstanceField);
+            bridged.add(methodElement.getName());
         }
+        // the plain functions the plan compiled: static methods, reaching no instance and no context
+        PythonStubGenerator.addCompiledModuleFunctions(builder, typeName, bridged, context, PythonStubGenerator.pooledStaticAccess());
 
         List<PropertyElement> beanProperties = scriptElement.getBeanProperties();
         for (PropertyElement beanProperty : beanProperties) {

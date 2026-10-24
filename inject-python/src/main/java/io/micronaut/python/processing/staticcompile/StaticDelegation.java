@@ -77,6 +77,10 @@ public final class StaticDelegation {
      * The delegation target of a compiled body, as {@code apply_delegation} reads it:
      * {@code Class#method#owner=<generated class>#kinds=<kind,...>#retry} (or {@code #once} for a
      * body that is not run again), or {@code null} when its Python callers keep the Python body.
+     * A static method, or a module-level function with an empty class part, names the generated
+     * class whose static Java method it calls: {@code Class#method#static=<generated class>#kinds=<kind,...>#retry}.
+     * It has no bound object through which a failure could reach the Python caller as Python's
+     * exception, so only a body that may be run again in Python delegates.
      *
      * @param body The compiled body
      * @return The target, or {@code null}
@@ -96,6 +100,13 @@ public final class StaticDelegation {
             return null;
         }
         String className = body.className();
+        if (body.staticMethod() || body.moduleLevel()) {
+            if (analysis.sideEffects) {
+                return null;
+            }
+            String owner = body.moduleLevel() ? "" : className.substring(className.lastIndexOf('.') + 1);
+            return owner + "#" + body.methodName() + "#static=" + className + "#kinds=" + String.join(",", kinds) + "#retry";
+        }
         return className.substring(className.lastIndexOf('.') + 1) + "#" + body.methodName()
             + "#owner=" + className
             + "#kinds=" + String.join(",", kinds)
