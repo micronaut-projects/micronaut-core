@@ -18,6 +18,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ObjectUtils;
 
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Abstract {@link MessageSource} implementation that provides basic message interpolation.
@@ -79,8 +80,9 @@ public abstract class AbstractMessageSource implements MessageSource {
                         i = next;
                         String var = variable.toString();
                         if (c == R_BRACE) {
-                            final Object val = context.getVariables().get(var);
-                            if (val != null) {
+                            final Map<String, Object> variables = context.getVariables();
+                            final Object val = variables.get(var);
+                            if (val != null || variables.containsKey(var)) {
                                 builder.append(val);
                             } else {
                                 final String resolved = getMessage(var, context).orElse(var);
