@@ -5203,9 +5203,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     private static StatementDef bindStoredValue(ClassStubModel model, VariableDef.This aThis) {
         // a subclass stub keeps the object in its base stub's field: reached through asPolyglotValue()
-        return model.pythonValue() == null
+        @Nullable FieldDef pythonValue = model.pythonValue();
+        return pythonValue == null
             ? bindWrapper(model, aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE))
-            : bindWrapper(model, aThis.field(model.pythonValue()));
+            : bindWrapper(model, aThis.field(pythonValue));
     }
 
     private static Optional<PropertyElement> propertyElement(ClassStubModel model, String property) {
