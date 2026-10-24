@@ -15,6 +15,7 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Retainable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
@@ -46,6 +47,13 @@ public @interface InterceptorBinding {
     String META_BIND_MEMBERS = "bindMembers";
 
     /**
+     * The name of the {@link #matchAllOccurrences()} member.
+     *
+     * @since 5.3.0
+     */
+    String META_MATCH_ALL_OCCURRENCES = "matchAllOccurrences";
+
+    /**
      * When declared on an interceptor, the value of this annotation can be used to indicate the annotation the
      * {@link MethodInterceptor} binds to at runtime.
      *
@@ -71,4 +79,31 @@ public @interface InterceptorBinding {
      * @since 3.3.0
      */
     boolean bindMembers() default false;
+
+    /**
+     * Whether the occurrences of a repeatable binding annotation are matched as one group, the way the single
+     * occurrence of a binding annotation that does not repeat is matched. It only has an effect together with
+     * {@link #bindMembers()}.
+     *
+     * <p>By default, an interceptor applies when any one of the occurrences declared on it matches any one of the
+     * occurrences at the interception point, and the occurrences declared on a method are added to those declared
+     * on its class. When this member is {@code true}:</p>
+     *
+     * <ul>
+     *     <li>every occurrence declared on the interceptor must match an occurrence at the interception point,
+     *     which may declare more occurrences than the interceptor;</li>
+     *     <li>the occurrences declared on a method or a constructor replace those declared on its class, and a
+     *     method or constructor declaring none uses those of its class.</li>
+     * </ul>
+     *
+     * <p>Members annotated with {@link io.micronaut.context.annotation.NonBinding} are left out of the comparison.
+     * The occurrences are compared as they were compiled, without resolving property placeholders or evaluating
+     * expressions in their members. This is the selection that Jakarta Interceptors and CDI specify for repeatable
+     * interceptor bindings.</p>
+     *
+     * @return Whether the occurrences of the binding annotation are matched as one group
+     * @since 5.3.0
+     */
+    @Experimental
+    boolean matchAllOccurrences() default false;
 }

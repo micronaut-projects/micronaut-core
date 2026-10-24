@@ -19,7 +19,6 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DisabledBean;
 import io.micronaut.context.RuntimeBeanDefinition;
-import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
@@ -237,20 +236,6 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * Intended for container lifecycle management and test scenarios.
      */
     void reset();
-
-    /**
-     * Detaches the executable methods of its definitions from what the context configured them with, its environment
-     * and itself, where those methods are shared by every context that loads the definition class. Called by an
-     * application context in development mode as it stops, before {@link #reset()}.
-     *
-     * @param environment The environment of the context that stops
-     * @param beanContext The context that stops
-     * @since 5.3.0
-     */
-    @Internal
-    default void detachExecutableMethods(Environment environment, BeanContext beanContext) {
-        // nothing shared
-    }
 
     /**
      * Initializes the provider for use with the given context.

@@ -28,6 +28,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
@@ -530,7 +531,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated(since = "5.0", forRemoval = true)
     protected final <I> ExecutionFlow<URI> resolveRequestURI(HttpRequest<I> request) {
-        return nettyHttpClient.resolveRequestURI(request).map(NettyHttpClient.ResolvedTarget::releasedUri);
+        return nettyHttpClient.resolveRequestURI(request).map(AbstractHttpClient.ResolvedTarget::releasedUri);
     }
 
     /**
@@ -542,7 +543,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated(since = "5.0", forRemoval = true)
     protected final <I> ExecutionFlow<URI> resolveRequestURI(HttpRequest<I> request, boolean includeContextPath) {
-        return nettyHttpClient.resolveRequestURI(request, includeContextPath).map(NettyHttpClient.ResolvedTarget::releasedUri);
+        return nettyHttpClient.resolveRequestURI(request, includeContextPath).map(AbstractHttpClient.ResolvedTarget::releasedUri);
     }
 
     /**
@@ -554,7 +555,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated(since = "5.0", forRemoval = true)
     protected final <I> ExecutionFlow<URI> resolveRedirectURI(HttpRequest<?> parentRequest, HttpRequest<I> request) {
-        return nettyHttpClient.resolveRedirectURI(parentRequest, request).map(NettyHttpClient.ResolvedTarget::releasedUri);
+        return nettyHttpClient.resolveRedirectURI(parentRequest, request).map(AbstractHttpClient.ResolvedTarget::releasedUri);
     }
 
     /**
