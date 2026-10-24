@@ -373,12 +373,50 @@ On the `shop` fixture (five modules, thirty-odd functions, every one compiled), 
 
 === Compile-time Cost
 
-The design budget is that mode `all` adds at most 15% to a compilation in mode `off`, the type checker running in both. `StaticCompilationBudgetTest` in `test-suite-python-corpus` measures it on the two applications of the corpus and on a larger one made of copies of their packages: it compiles each in both modes, interleaved in one JVM after a warm-up, prints the medians with the time of every stage of the pipeline, and asserts the ratio only when asked to, since a shared CI runner is no measurement bench:
+The design budget is that mode `all` adds at most 15% to a compilation in mode `off`, the type checker running in both. `StaticCompilationBudgetTest` in `test-suite-python-corpus` measures it on the two applications of the corpus and on a larger one made of copies of their packages, compiling each in both modes and comparing the medians, with the time of every stage of the pipeline, in three ways an application is compiled:
+
+* *cold*: a JVM per compilation, as a build compiles (`-Pcorpus.budget.cold=<rounds>`);
+* *warm*: one JVM compiling again and again, each compilation in a GraalPy context of its own, as a build compiling several projects in one compiler process does (`-Pcorpus.budget.rounds=<rounds>`, after `-Pcorpus.budget.warmup` rounds);
+* *session*: one processing session per application and mode, which keeps its context, as development mode compiles (`-Pcorpus.budget.session=<rounds>`).
+
+The modes alternate within each round, so the load of the machine favours neither. `-Pcorpus.budget.jvm-args` gives the arguments of the JVMs compiling, and the ratio is asserted only when asked to, since a shared CI runner is no measurement bench:
 
 [source,bash]
 ----
 ./gradlew :test-suite-python-corpus:test -Ppython-ci --tests '*StaticCompilationBudgetTest' \
-    -Pcorpus.budget.assert -Pcorpus.budget.rounds=5 -Pcorpus.budget.copies=4
+    -Pcorpus.budget.assert -Pcorpus.budget.rounds=5 -Pcorpus.budget.copies=4 -Pcorpus.budget.cold=5 \
+    -Pcorpus.budget.jvm-args="-XX:+UnlockExperimentalVMOptions -XX:-UseJVMCICompiler -Dtruffle.TruffleRuntime=com.oracle.truffle.api.impl.DefaultTruffleRuntime"
 ----
 
-Indicative numbers, from an Apple M2 Max on Oracle GraalVM 25 (five rounds, the spread between rounds under 3%): mode `all` adds 14% to `petclinic` (1.56 s), 25% to `fullstack` (2.29 s) and 26% to four copies of both (10.5 s). Nearly all of it is the planner (`plan`: 9%, 19% and 21% of the compilation in mode `off`); rewriting the runtime trees for delegation adds 2 to 3%, generating the larger stubs and compiling them with `javac` under 1%. The planner runs in a fresh GraalPy context per compilation, mostly interpreted, and its cost grows with the number of functions, so the budget is met for a small application and not yet for larger ones.
+Indicative numbers, from an Apple M2 Max on Oracle GraalVM 25, five rounds on a machine other builds were loading (load average 4 to 12, the spread between cold rounds up to 20%): what mode `all` adds to mode `off`.
+
+[cols="2,1,1,1"]
+|===
+|Compilation |`petclinic` |`fullstack` |four copies of both
+
+|Cold, the JVM arguments of the build's Python compile tasks (above)
+|4% (6.0 s)
+|5% (6.9 s)
+|7% (16.1 s)
+
+|Cold, the JDK's defaults
+|17% (10.0 s)
+|18% (12.4 s)
+|15% (23.0 s)
+
+|Warm
+|13 to 16% (1.5 s)
+|15 to 26% (2.3 s)
+|27% (10.4 s)
+
+|Session
+|16 to 18% (1.2 s)
+|27% (1.9 s)
+|26% (10.0 s)
+|===
+
+Nearly all of it is the planner (`plan`); rewriting the runtime trees for delegation adds 1 to 3%, generating the larger stubs and compiling them with `javac` under 1%. Most of the planner is the lowering of the bodies (three fifths of its samples) and the walks of the trees of the compilation, spread over hundreds of interpreted Python functions. Its cost depends on the JVM rather than on the GraalPy engine:
+
+* A build compiles in a cold JVM. With the arguments the build's Python compile tasks run with (the host code compiled by C2, GraalPy interpreted without Truffle's compiler, which a single compilation does not pay off) a compilation takes about 40% less time than with the JDK's defaults in either mode, and the planner a quarter or less of its time with the defaults, so mode `all` stays well within the budget.
+* In a JVM that compiles again and again, the other stages run about twice as fast as in a cold JVM, while the planner does not get faster, with or without Truffle's compiler: its share grows to the 15 to 27% above. A processing session, which keeps its context, does not change that over the rounds measured.
+* A JVM-wide GraalPy engine shared by the contexts of the compilations, so that Truffle keeps the code it compiles for the processor's modules, was measured and not adopted: the warm and cold numbers do not change (within 5% for the planner), since the compilations of a corpus run each function of the planner too few times for Truffle to compile it; only a JVM compiling the same application twenty times over halves the planner, by then a few percent of the compilation. The latency mode of the engine (`engine.Mode=latency`, as an incremental compilation uses) changes nothing measurable, and switching Truffle's compiler off per context (`engine.Compilation=false`) makes every stage slower.
