@@ -884,11 +884,7 @@ public final class PythonAstParser {
         String sourcePath = sourcePathOf(transformResult.originalSource());
         List<String> targets = new ArrayList<>();
         for (Ir.CompiledBody body : plan.bodies().values()) {
-            // the bodies declared in this source: a class of the same simple name in another source has its own
-            if (body.span() == null || !body.span().path().equals(sourcePath)) {
-                continue;
-            }
-            String target = StaticDelegation.target(body);
+            String target = delegationTarget(body, sourcePath);
             if (target != null) {
                 targets.add(target);
             }
@@ -906,6 +902,29 @@ public final class PythonAstParser {
             transformArtifacts.put(transformResult, new TransformArtifacts(artifacts.tree(), artifacts.runtimeTree(), true));
         }
         return count;
+    }
+
+    /**
+     * The delegation target of a compiled body declared in the source, with the conversion of the
+     * collection it returns for a Python caller, or null when Python callers keep the Python body.
+     */
+    private static @Nullable String delegationTarget(Ir.CompiledBody body, String sourcePath) {
+        // the bodies declared in this source: a class of the same simple name in another source has its own
+        if (body.span() == null || !body.span().path().equals(sourcePath)) {
+            return null;
+        }
+        String target = StaticDelegation.target(body);
+        if (target == null) {
+            return null;
+        }
+        // a collection the Java body returns becomes a Python one for a Python caller
+        String conversion = switch (body.returnType()) {
+            case "java.util.List" -> "#list";
+            case "java.util.Set" -> "#set";
+            case "java.util.Map" -> "#dict";
+            default -> "";
+        };
+        return target + conversion;
     }
 
     PythonBytecodeCompiler.Result compileRuntimeBytecode(TransformResult transformResult,

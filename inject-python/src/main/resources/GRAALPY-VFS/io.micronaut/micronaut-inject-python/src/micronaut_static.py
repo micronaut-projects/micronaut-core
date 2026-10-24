@@ -427,7 +427,9 @@ def apply_delegation(tree, targets):
 
     ``targets`` are ``Class#method#owner=<generated class>#kinds=<kind,...>#retry`` (``#once``
     for a body that is not run again) strings, a nested class as ``Outer$Inner``; a target without
-    its kinds is not delegated. Returns how many functions were rewritten.
+    its kinds is not delegated. ``#list``, ``#set`` or ``#dict`` is appended when the Java body
+    returns a collection, which a Python caller receives as a Python one. Returns how many
+    functions were rewritten.
     """
     wanted = {}
     for target in targets:
@@ -436,7 +438,8 @@ def apply_delegation(tree, targets):
         if "kinds" not in options:
             continue
         kinds = tuple(kind for kind in options["kinds"].split(",") if kind)
-        wanted.setdefault(class_name, {})[method] = (options.get("owner", class_name), kinds, "retry" in options)
+        conversion = next((name for name in ("list", "set", "dict") if name in options), None)
+        wanted.setdefault(class_name, {})[method] = (options.get("owner", class_name), kinds, "retry" in options, conversion)
     count = 0
     for class_node, path in _classes(tree):
         methods = wanted.get("$".join(path))
@@ -445,10 +448,10 @@ def apply_delegation(tree, targets):
         rewritten = 0
         for statement in class_node.body:
             if isinstance(statement, ast.FunctionDef) and statement.name in methods and not _delegates(statement):
-                owner, kinds, retry = methods[statement.name]
+                owner, kinds, retry, conversion = methods[statement.name]
                 if not _receives_self(statement, kinds):
                     continue
-                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, owner, kinds, retry)
+                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, owner, kinds, retry, conversion)
                 ast.fix_missing_locations(statement)
                 rewritten += 1
         if rewritten and not _declares_member(class_node):
@@ -457,6 +460,10 @@ def apply_delegation(tree, targets):
             class_node.body.insert(_docstring_offset(class_node), member)
         count += rewritten
     return count
+
+
+def _result_holder():
+    return ast.Name(id="__mn_m", ctx=ast.Load())
 
 
 def _classes(tree, path=()):
@@ -515,7 +522,7 @@ def _locate(statements, line, column):
                 node.col_offset = node.end_col_offset = column
 
 
-def _delegation(function, owner, kinds, retry):
+def _delegation(function, owner, kinds, retry, conversion=None):
     args = function.args
     positional = list(args.posonlyargs) + list(args.args)
     receiver = positional[0].arg
@@ -544,9 +551,21 @@ def _delegation(function, owner, kinds, retry):
             keywords=[],
         ),
     )
+    result = ast.Subscript(value=load(temporary), slice=ast.Constant(value=0), ctx=ast.Load())
+    if conversion in ("list", "set"):
+        result = ast.Call(func=ast.Name(id=conversion, ctx=ast.Load()), args=[result], keywords=[])
+    elif conversion == "dict":
+        # dict((k, m.get(k)) for k in m.keySet()): a Java map read through its interop members
+        converted = ast.parse("dict((__mn_k, __mn_m.get(__mn_k)) for __mn_k in __mn_m.keySet())").body[0].value
+        converted.args[0].generators[0].iter.func.value = _result_holder()
+        result = ast.Call(
+            func=ast.Lambda(args=ast.arguments(posonlyargs=[], args=[ast.arg(arg="__mn_m")], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]), body=converted),
+            args=[result],
+            keywords=[],
+        )
     returned = ast.If(
         test=ast.Compare(left=load(temporary), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
-        body=[ast.Return(value=ast.Subscript(value=load(temporary), slice=ast.Constant(value=0), ctx=ast.Load()))],
+        body=[ast.Return(value=result)],
         orelse=[],
     )
     guard = ast.If(
