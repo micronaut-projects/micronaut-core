@@ -368,3 +368,15 @@ The cost of type checking and static compilation is measured, not assumed. `Pyth
 The stages (`context`, `transform`, `parse`, `typecheck`, `plan`, `bytecode`, `stubs`, `processor`) are recorded by `PipelineTimings` when the system property `micronaut.python.timings` is set, which the benchmark does; JMH reports each as its sum over the measured iterations. To see where the Python side of a stage spends its time, `-Pjmh.pythonSampler=/path/to/histogram.txt` (the system property `micronaut.python.cpusampler`) turns on the Truffle CPU sampler of the parser's context and writes a histogram of the Python functions when the context closes.
 
 On the `shop` fixture (five modules, thirty-odd functions, every one compiled), type checking and planning add about 150 ms to a cold compilation of one second and about 75 ms to a warm one of six hundred, most of it the inference and the lowering themselves; the caches of the Java lookups, one inference per function shared by the checker and the planner, and two stdlib imports fewer per context were the first savings the profile pointed at.
+
+=== Compile-time Cost
+
+The design budget is that mode `all` adds at most 15% to a compilation in mode `off`, the type checker running in both. `StaticCompilationBudgetTest` in `test-suite-python-corpus` measures it on the two applications of the corpus and on a larger one made of copies of their packages: it compiles each in both modes, interleaved in one JVM after a warm-up, prints the medians with the time of every stage of the pipeline, and asserts the ratio only when asked to, since a shared CI runner is no measurement bench:
+
+[source,bash]
+----
+./gradlew :test-suite-python-corpus:test -Ppython-ci --tests '*StaticCompilationBudgetTest' \
+    -Pcorpus.budget.assert -Pcorpus.budget.rounds=5 -Pcorpus.budget.copies=4
+----
+
+Indicative numbers, from an Apple M2 Max on Oracle GraalVM 25 (five rounds, the spread between rounds under 3%): mode `all` adds 14% to `petclinic` (1.56 s), 25% to `fullstack` (2.29 s) and 26% to four copies of both (10.5 s). Nearly all of it is the planner (`plan`: 9%, 19% and 21% of the compilation in mode `off`); rewriting the runtime trees for delegation adds 2 to 3%, generating the larger stubs and compiling them with `javac` under 1%. The planner runs in a fresh GraalPy context per compilation, mostly interpreted, and its cost grows with the number of functions, so the budget is met for a small application and not yet for larger ones.

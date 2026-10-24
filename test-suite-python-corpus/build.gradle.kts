@@ -106,7 +106,7 @@ tasks.named<Test>("test") {
     // the stage times StaticCompilationBudgetTest prints, one clock read per stage
     systemProperty("micronaut.python.timings", "true")
     // the budget test: -Pcorpus.budget.assert asserts the ratio of the modes, the others set the repeats
-    listOf("corpus.budget.rounds", "corpus.budget.warmup", "corpus.budget.copies").forEach { name ->
+    listOf("corpus.budget.rounds", "corpus.budget.warmup", "corpus.budget.copies", "corpus.budget.limit").forEach { name ->
         providers.gradleProperty(name).orNull?.let { systemProperty(name, it) }
     }
     providers.gradleProperty("corpus.budget.assert").orNull?.let {

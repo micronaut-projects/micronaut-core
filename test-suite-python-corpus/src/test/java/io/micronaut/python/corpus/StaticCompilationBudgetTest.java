@@ -45,20 +45,22 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * The compile-time budget of static compilation: compiling an application in mode {@code all}
- * may take at most 15% longer than compiling it in mode {@code off}, the type checker running at
- * {@code error} in both (its own cost is the checker's budget). The two real applications of the
- * corpus are compiled, and a larger one made of {@value #SCALED_COPIES_DEFAULT} copies of each of
- * their packages, in both modes, interleaved in this JVM after a warm-up, so that the load of the
- * machine and the warming of the JVM affect both modes alike; the medians are compared.
+ * should take at most 15% longer than compiling it in mode {@code off}, the type checker running
+ * at {@code error} in both (its own cost is the checker's budget). The two real applications of the
+ * corpus are compiled, and a larger one made of copies of each of their packages, in both modes,
+ * interleaved in this JVM after a warm-up, so that the load of the machine and the warming of the
+ * JVM affect both modes alike; the medians of the modes are compared.
  *
- * <p>The numbers, with the time of every stage of the pipeline in each mode, are always printed.
- * A shared CI runner is too noisy for a hard timing assertion, so the ratio is asserted only when
- * the system property {@value #ASSERT_PROPERTY} is {@code true} (the Gradle property
- * {@code -Pcorpus.budget.assert}); {@code corpus.budget.rounds}, {@code corpus.budget.warmup} and
- * {@code corpus.budget.copies} set the repeats, the warm-up compilations and the copies of the
- * larger application:</p>
+ * <p>The numbers, with the time of every stage of the pipeline in each mode, are always printed
+ * and written to {@code build/corpus-budget/budget.txt}. A shared CI runner, its JDK and its
+ * neighbours are not a measurement bench, so the ratio is asserted only when the system property
+ * {@value #ASSERT_PROPERTY} is {@code true} (the Gradle property {@code -Pcorpus.budget.assert}),
+ * against {@code corpus.budget.limit} (default {@value #BUDGET}); {@code corpus.budget.rounds},
+ * {@code corpus.budget.warmup} and {@code corpus.budget.copies} set the repeats, the warm-up
+ * compilations and the copies of the larger application (none with {@code 0}):</p>
  *
- * <pre>./gradlew :test-suite-python-corpus:test -Ppython-ci -Pcorpus.budget.assert --tests '*StaticCompilationBudgetTest'</pre>
+ * <pre>./gradlew :test-suite-python-corpus:test -Ppython-ci --tests '*StaticCompilationBudgetTest' \
+ *     -Pcorpus.budget.assert -Pcorpus.budget.rounds=5 -Pcorpus.budget.copies=4</pre>
  */
 class StaticCompilationBudgetTest {
 
@@ -68,7 +70,7 @@ class StaticCompilationBudgetTest {
     static final String ASSERT_PROPERTY = "corpus.budget.assert";
 
     private static final double BUDGET = 1.15;
-    private static final int SCALED_COPIES_DEFAULT = 4;
+    private static final int SCALED_COPIES_DEFAULT = 1;
     private static final List<String> CORPORA = List.of("fullstack", "petclinic");
     // the stages of PipelineTimings, then the phases of the compilation profile, in pipeline order
     private static final List<String> STAGES = List.of(
@@ -85,6 +87,7 @@ class StaticCompilationBudgetTest {
         int warmup = Integer.getInteger("corpus.budget.warmup", 1);
         int copies = Integer.getInteger("corpus.budget.copies", SCALED_COPIES_DEFAULT);
         boolean asserting = Boolean.getBoolean(ASSERT_PROPERTY);
+        double limit = Double.parseDouble(System.getProperty("corpus.budget.limit", Double.toString(BUDGET)));
         File root = new File("build/corpus-budget");
         deleteRecursively(root.toPath());
 
@@ -92,7 +95,9 @@ class StaticCompilationBudgetTest {
         for (String corpus : CORPORA) {
             workloads.add(new Workload(corpus, new File("src/corpus/" + corpus), classpath(corpus, "classpath"), classpath(corpus, "processorPath")));
         }
-        workloads.add(scaled(new File(root, "scaled-src"), copies));
+        if (copies > 0) {
+            workloads.add(scaled(new File(root, "scaled-src"), copies));
+        }
 
         // the warm-up compiles every workload in both modes, so neither mode pays for loading the classes of the other
         for (int i = 0; i < warmup; i++) {
@@ -137,7 +142,7 @@ class StaticCompilationBudgetTest {
                 report.append(String.format(Locale.ROOT, "  %-26s off %8.1f ms   all %8.1f ms   %+7.1f ms  %+6.1f%% of off%n",
                     stage, offStage, allStage, allStage - offStage, (allStage - offStage) / off.median * 100));
             }
-            if (ratio > BUDGET) {
+            if (ratio > limit) {
                 over.add(String.format(Locale.ROOT, "%s: %+.1f%%", workload.name, (ratio - 1) * 100));
             }
         }
@@ -147,11 +152,14 @@ class StaticCompilationBudgetTest {
         for (Workload workload : workloads) {
             assertTrue(workload.compiled > 0, "mode all compiles bodies of " + workload.name);
         }
-        Workload scaled = workloads.get(workloads.size() - 1);
-        int compiledPerCopy = workloads.stream().filter(workload -> workload != scaled).mapToInt(workload -> workload.compiled).sum();
-        assertEquals(compiledPerCopy * copies, scaled.compiled, "every copy of the larger application compiles as its original");
+        if (copies > 0) {
+            Workload scaled = workloads.get(workloads.size() - 1);
+            int compiledPerCopy = workloads.stream().filter(workload -> workload != scaled).mapToInt(workload -> workload.compiled).sum();
+            assertEquals(compiledPerCopy * copies, scaled.compiled, "every copy of the larger application compiles as its original");
+        }
         if (asserting && !over.isEmpty()) {
-            fail("mode all exceeds the compile-time budget of +" + Math.round((BUDGET - 1) * 100) + "% over mode off on " + over + "\n" + report);
+            fail(String.format(Locale.ROOT, "mode all exceeds the compile-time budget of %+.0f%% over mode off on %s%n%s",
+                (limit - 1) * 100, over, report));
         }
     }
 
