@@ -34,7 +34,6 @@ import io.micronaut.http.netty.SslContextAutoLoader;
 import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
-import io.micronaut.http.netty.channel.DefaultEventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
@@ -1107,9 +1106,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     .flatMap(name -> applicationContext.findBean(ExecutorService.class, Qualifiers.byName(name))).orElse(null);
             if (executorService != null) {
                 return nettyEmbeddedServices.createEventLoopGroup(
-                        DefaultEventLoopGroupRegistry.numThreads(config),
-                        executorService,
-                        config.getIoRatio().orElse(null)
+                        config,
+                        executorService
                 );
             } else {
                 return nettyEmbeddedServices.createEventLoopGroup(

@@ -104,10 +104,10 @@ public interface EventLoopGroupFactory {
             EventLoopGroupConfiguration configuration, ThreadFactory threadFactory) {
         ArgumentUtils.requireNonNull("configuration", configuration);
         ArgumentUtils.requireNonNull("threadFactory", threadFactory);
-        return createEventLoopGroup(
-                DefaultEventLoopGroupRegistry.numThreads(configuration),
-                threadFactory,
-                configuration.getIoRatio().orElse(null)
+        return new MultiThreadIoEventLoopGroup(
+            DefaultEventLoopGroupRegistry.numThreads(configuration),
+            threadFactory,
+            createIoHandlerFactory(configuration)
         );
     }
 
