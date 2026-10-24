@@ -306,16 +306,6 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     }
 
     /**
-     * In development mode, the environment of this context when the context created it: a context given its environment
-     * may share it with a running context that configured the shared executable methods last.
-     */
-    @Override
-    @Nullable
-    Environment environmentToReleaseOnStop() {
-        return environmentManaged && environment.isDevelopmentMode() ? environment : null;
-    }
-
-    /**
      * Development mode switched on by configuration, rather than by the system property the configuration
      * default reads, tracks bean dependencies too, unless the builder switched tracking off. The environment
      * has started when this is asked, and no bean has been created yet.

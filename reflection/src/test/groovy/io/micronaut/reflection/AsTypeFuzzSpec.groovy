@@ -18,7 +18,6 @@ package io.micronaut.reflection
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.type.Argument
-import spock.lang.PendingFeature
 
 import java.lang.reflect.GenericArrayType
 import java.lang.reflect.ParameterizedType
@@ -221,9 +220,6 @@ class Fuzz<T extends Number & Comparable<T>, U, V extends List<? extends T>, W e
         seed << (1L..4L)
     }
 
-    @PendingFeature(reason = """the generated metadata drops a wildcard bounded by a primitive array - List<? extends char[]> \
-is generated as List<char[]> - and cuts a self-referential bound reached through another variable to Object - with \
-V extends List<? extends T> and T extends Number & Comparable<T>, the T in the bound of V is bounded by Comparable<Object>""")
     void "a declaration the processor generates renders as the type the JDK reflects, seed #seed"() {
         expect:
         failures(seed, true).isEmpty()
