@@ -27,6 +27,29 @@ With `micronaut.dev.strategy=auto` (the default) or `reload`, an edit that chang
 
 The agent is `micronaut-dev` itself, launched with `-javaagent`, which the build plugins add. Without it, or with `strategy=restart`, every change restarts.
 
+== Python modules
+
+A Python edit that changes only bodies leaves the classes the compiler generates byte for byte the same: only the module and the bytecode written for it change in the class output. Such a change, in which no class changed and no file was added or removed, is offered to the running context's api:context.reload.InPlaceResourceReloader[] beans before anything restarts.
+
+The Python runtime's reloader patches the edited modules into every GraalPy context of the application: the primary one, the pooled ones and those of the asyncio event loops. In each of them:
+
+* the module, class and function objects stay;
+* the functions run the new code;
+* the classes get the new members;
+* the module's other globals are rebound, except the ones the application injects.
+
+The generation keeps running, under every strategy, `restart` included, since nothing is redefined. `micronaut.dev.patch-in-place=false` turns it off.
+
+What the merge cannot follow is refused, and restarts instead:
+
+* a changed base class or metaclass;
+* a function that became a class or a generator;
+* a closure over other variables;
+* a package initialiser (`__init__.py`) or the main script;
+* a module the compiler generated.
+
+Patching is not atomic across contexts: a failure in any of them restarts the application, whose new generation discards what the others applied. Module-level code runs again when a module is patched, so a side effect of it, a registry filled at import, happens again.
+
 == Resources
 
 A changed template, static file or message bundle does not restart anything: it reaches the beans that watch resources of that kind (see the next section).

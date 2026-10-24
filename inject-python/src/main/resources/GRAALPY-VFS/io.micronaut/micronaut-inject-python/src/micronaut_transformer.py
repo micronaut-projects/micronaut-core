@@ -411,6 +411,13 @@ class MicronautTransformer(ast.NodeTransformer):
         """
         self.validation_errors.append(_Diagnostic.error(rule, message, self._span_of(node if node is not None else self._current_statement)))
 
+    def _warning(self, rule, message, node=None):
+        """
+        Record a problem of the module that does not fail the compilation, located at the given node or at the
+        statement being visited.
+        """
+        self.validation_errors.append(_Diagnostic.warning(rule, message, self._span_of(node if node is not None else self._current_statement)))
+
     def visit_ImportFrom(self, node: ast.ImportFrom):
         """
         Transform import statements like:
@@ -707,6 +714,8 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         is_module_level_class = self.class_depth == 0 and self.function_depth == 0
         if is_module_level_class:
             self.all_class_names.append(node.name)
+        if not self.strip_java_interface_bases and self.function_depth > 0:
+            self._warn_function_local_java_bases(node)
         if self.strip_java_interface_bases and node.bases:
             original_base_count = len(node.bases)
             runtime_bases = []
@@ -1201,6 +1210,43 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                 parameters = arguments.posonlyargs + arguments.args + arguments.kwonlyargs
                 return len(parameters) > 1 or arguments.vararg is not None or arguments.kwarg is not None
         return False
+
+    def _warn_function_local_java_bases(self, node: ast.ClassDef) -> None:
+        """
+        Warn about a class defined inside a function that GraalPy has to adapt to a Java type.
+
+        Only a class at module level, or nested in a class, gets a generated Java class. A class
+        defined inside a function keeps a Java class as its base, and a Java interface when it is
+        an interface adapter (see _is_java_interface_adapter), and GraalPy implements it with a
+        host adapter, which it only supports on a JVM: a native executable fails with
+        ``SystemError: Java Class can be extended only in JVM mode`` when the class statement runs.
+        """
+        keeps_java_interface_base = self._is_java_interface_adapter(node)
+        for base in node.bases:
+            java_interface_name = self._java_interface_base_name(base)
+            if java_interface_name is not None:
+                if keeps_java_interface_base:
+                    self._warning("function-local-java-base", self._function_local_java_base_warning(
+                        node, f"implements the Java interface [{java_interface_name}]"
+                    ), node)
+                continue
+            if self._is_java_throwable_base(base):
+                continue
+            java_class_name = self._java_class_name(base)
+            if java_class_name is not None:
+                self._warning("function-local-java-base", self._function_local_java_base_warning(
+                    node, f"extends the Java class [{java_class_name}]"
+                ), node)
+
+    @staticmethod
+    def _function_local_java_base_warning(node: ast.ClassDef, relation: str) -> str:
+        return (
+            f"Python class [{node.name}] (line {node.lineno}) is defined inside a function and {relation}: "
+            "only a class defined at module level or nested in a class gets a generated Java class. "
+            "GraalPy adapts this class to the Java type at run time, which only a JVM supports; a native "
+            "executable fails with \"Java Class can be extended only in JVM mode\". Define the class at "
+            "module level."
+        )
 
     def _is_java_throwable_base(self, base: ast.AST) -> bool:
         """Strip Java Throwable bases from native runtime bytecode.
