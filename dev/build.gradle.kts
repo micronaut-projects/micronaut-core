@@ -10,6 +10,8 @@ dependencies {
     // the gate filter and the compile-error page exist only when an HTTP server is present
     compileOnly(projects.micronautHttp)
     compileOnly(projects.micronautHttpServer)
+    // the listening sockets kept across generations exist only when the Netty server is present
+    compileOnly(projects.micronautHttpServerNetty)
     // the /dev endpoint exists only when the management module is present
     compileOnly(projects.micronautManagement)
     // the embedded Groovy compiler exists when the project's own Groovy is on the launch classpath
@@ -47,6 +49,7 @@ dependencies {
     // a UCP pool of H2 retained across generations, in a JVM of its own, to see what UCP's JVM-wide threads keep
     testImplementation(libs.ucp)
     testImplementation(libs.ojdbc)
+    testImplementation(libs.logback.classic)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
     testImplementation(libs.junit.platform.launcher)
