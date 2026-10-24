@@ -174,7 +174,10 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         this.methodInjection = methodInjection;
         this.fieldInjection = fieldInjection;
         this.annotationInjection = annotationInjection;
-        this.executableMethodsDefinition = executableMethodsDefinition;
+        // The generated definition is shared by the contexts loading this bean definition: the copy gives the
+        // methods, and the values they keep, to the context loading this instance
+        this.executableMethodsDefinition = executableMethodsDefinition instanceof AbstractExecutableMethodsDefinition<T> generated
+            ? generated.copy() : executableMethodsDefinition;
         this.typeArgumentsMap = typeArgumentsMap;
         this.precalculatedInfo = precalculatedInfo;
     }
@@ -791,23 +794,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
         if (executableMethodsDefinition instanceof BeanContextConfigurable ctxConfigurable) {
             ctxConfigurable.configure(beanContext);
-        }
-    }
-
-    /**
-     * Detaches the executable methods of this definition class from what a context configured them with, its
-     * environment and itself, if they still are; the methods themselves stay. They are held statically by the
-     * definition class, which a development launcher loads in its parent tier, for every context and generation: a
-     * context calls this as it stops, so that it is not kept by them. Any instance of the class detaches them, such as
-     * the reference of a definition the context loaded and then discarded.
-     *
-     * @param environment The environment of the context that stops
-     * @param beanContext The context that stops
-     */
-    @Internal
-    public final void detachExecutableMethods(Environment environment, BeanContext beanContext) {
-        if (executableMethodsDefinition instanceof AbstractExecutableMethodsDefinition<T> methods) {
-            methods.detach(environment, beanContext);
         }
     }
 
