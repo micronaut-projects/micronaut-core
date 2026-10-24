@@ -13,6 +13,7 @@ import keyword
 import pkgutil
 import sys
 import uuid
+import weakref
 
 
 def __micronaut_new_uninitialized_instance(cls):
@@ -45,6 +46,97 @@ def __micronaut_initialize_instance(instance, cls, *args):
 def __micronaut_set_instance_property(instance, name, value):
     object.__setattr__(instance, name, value)
     return instance
+
+
+class _MicronautCompiledObjects:
+    """
+    The objects bound to the compiled Java bodies of their classes (PythonStatic.bindCompiled), held
+    weakly and by identity: outside the objects, so a copy, vars() and pickle see the object's own
+    attributes only, and whatever __eq__ or __hash__ the class defines. A class whose methods were
+    rewritten to delegate carries this registry as its __micronaut_compiled__ attribute once one of
+    its objects is bound.
+    """
+
+    def __init__(self):
+        self._bound = {}
+
+    def bind(self, instance, owner, delegate):
+        key = id(instance)
+        entry = self._bound.get(key)
+        if entry is None or entry[0]() is not instance:
+            try:
+                reference = weakref.ref(instance, lambda _, key=key, bound=self._bound: bound.pop(key, None))
+            except TypeError:
+                return False  # not weakly referenceable: the object keeps the Python bodies
+            entry = self._bound[key] = (reference, {})
+        entry[1][owner] = delegate
+        return True
+
+    def call(self, instance, owner, method, arguments, kinds, retry):
+        """
+        The result of the Java body of owner.method for a bound object, as a 1-tuple, or None when
+        the Python body is to run: the object is not bound, an argument is not of the exact Python
+        type and range the Java parameter holds, or the body may be run again in Python (retry) and
+        failed, which a body without side effects allows, so that Python's result or exception is
+        what the caller sees (an int that outgrows a long, a value the Java types reject).
+        """
+        entry = self._bound.get(id(instance))
+        if entry is None or entry[0]() is not instance:
+            return None
+        delegate = entry[1].get(owner)
+        if delegate is None:
+            return None
+        for argument, kind in zip(arguments, kinds):
+            if not _micronaut_fits(argument, kind):
+                return None
+        if not retry:
+            return (getattr(delegate, method)(instance, *arguments),)
+        try:
+            return (getattr(delegate, method)(instance, *arguments),)
+        except Exception:
+            return None
+
+
+# the bounds of the Java integer parameter kinds
+_MICRONAUT_INT_BOUNDS = {"int": 2 ** 31, "long": 2 ** 63, "short": 2 ** 15, "byte": 2 ** 7}
+
+
+def _micronaut_fits(value, kind):
+    """Whether a value reaches a Java parameter of the kind unchanged, as the Python body would see it."""
+    if kind.startswith("?"):
+        if value is None:
+            return True
+        kind = kind[1:]
+    if kind in _MICRONAUT_INT_BOUNDS:
+        bound = _MICRONAUT_INT_BOUNDS[kind]
+        return type(value) is int and -bound <= value < bound
+    if kind == "float":
+        return type(value) is float
+    if kind == "bool":
+        return type(value) is bool
+    if kind == "str":
+        return type(value) is str
+    return False
+
+
+__micronaut_compiled_objects = _MicronautCompiledObjects()
+
+
+def __micronaut_bind_compiled(instance, owner, delegate):
+    """Binds an object to the compiled bodies of one class: each class of its MRO with rewritten methods gets the registry."""
+    for cls in type(instance).__mro__:
+        if "__micronaut_compiled__" in cls.__dict__ and cls.__dict__["__micronaut_compiled__"] is None:
+            setattr(cls, "__micronaut_compiled__", __micronaut_compiled_objects)
+    return __micronaut_compiled_objects.bind(instance, owner, delegate)
+
+
+_MICRONAUT_PYTHON_ERRORS = {"ZeroDivisionError": ZeroDivisionError, "TypeError": TypeError, "AssertionError": AssertionError}
+
+
+def __micronaut_raise(kind, message):
+    """Raises the Python exception a compiled body failed with (PythonStatic.forPython)."""
+    error = _MICRONAUT_PYTHON_ERRORS[kind]
+    raise error() if message is None else error(message)
 
 
 def __micronaut_set_instance_properties(instance, names, values):
