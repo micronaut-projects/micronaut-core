@@ -1,0 +1,144 @@
+package io.micronaut.dev.test;
+
+import io.micronaut.dev.compile.SourceKind;
+import io.micronaut.dev.compile.SourceRoot;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * Tests that an engine discovers from their source files, as pytest's, run with every test and again by their file.
+ */
+class FileDiscoveredTestsTest {
+
+    @TempDir
+    Path directory;
+
+    @Test
+    void everyTestSelectsTheTestDirectoriesAndAFileOfResultsRunsAgainByItself() throws Exception {
+        Path tests = Files.createDirectories(directory.resolve("project/tests"));
+        Files.writeString(tests.resolve("test_a.py"), "ok");
+        Files.writeString(tests.resolve("test_b.py"), "fails");
+        Path classes = Files.createDirectories(directory.resolve("project/test-classes"));
+        // the engine is a service of the run's loader only, so it never joins the JUnit Platform running this test
+        Path services = Files.createDirectories(directory.resolve("services/META-INF/services"));
+        Files.writeString(services.resolve("org.junit.platform.engine.TestEngine"), FileTestEngine.class.getName());
+        JUnitPlatformTestRunner runner = new JUnitPlatformTestRunner();
+        Map<String, String> onlyFiles = Map.of("junit.jupiter.extensions.autodetection.enabled", "false");
+
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {directory.resolve("services").toUri().toURL()}, getClass().getClassLoader())) {
+            List<SourceRoot> sources = List.of(new SourceRoot(SourceKind.JAVA, directory.resolve("project/java")), new SourceRoot(SourceKind.PYTHON, tests));
+
+            RecordingListener all = new RecordingListener();
+            TestRunSummary everything = runner.run(new TestRunRequest("run-1", loader, List.of(classes), sources, TestSelection.all(), onlyFiles), all, new Cancellation());
+            assertEquals(1, everything.passed());
+            assertEquals(1, everything.failed());
+            assertEquals(TestStatus.FAILED, all.status("tests/test_b.py.test_b.py"));
+
+            // the failed file runs again, selected by the name its results are grouped under
+            RecordingListener again = new RecordingListener();
+            TestRunSummary rerun = runner.run(new TestRunRequest("run-2", loader, List.of(classes), sources,
+                TestSelection.ofClasses(Set.of("tests/test_b.py"), "failed"), onlyFiles), again, new Cancellation());
+            assertEquals(1, rerun.total());
+            assertEquals(Set.of("tests/test_b.py.test_b.py"), again.outcomes.keySet());
+
+            // a file that is gone runs nothing, rather than failing as a class that is not there
+            Files.delete(tests.resolve("test_b.py"));
+            RecordingListener gone = new RecordingListener();
+            TestRunSummary none = runner.run(new TestRunRequest("run-3", loader, List.of(classes), sources,
+                TestSelection.ofClasses(Set.of("tests/test_b.py"), "failed"), onlyFiles), gone, new Cancellation());
+            assertEquals(0, none.total());
+            assertTrue(none.complete());
+
+            // an engine that names a test's class by its file's absolute path, as pytest's does, is reported by the file
+            // relative to its test source root, and that name runs the file again
+            Files.writeString(tests.resolve("test_b.py"), "fails");
+            Map<String, String> absolute = Map.of("junit.jupiter.extensions.autodetection.enabled", "false", FileTestEngine.ABSOLUTE, "true");
+            RecordingListener named = new RecordingListener();
+            runner.run(new TestRunRequest("run-4", loader, List.of(classes), sources, TestSelection.all(), absolute), named, new Cancellation());
+            assertEquals(Set.of("test_a.py.test_a.py", "test_b.py.test_b.py"), named.outcomes.keySet());
+            RecordingListener byRelativeName = new RecordingListener();
+            TestRunSummary relativeRerun = runner.run(new TestRunRequest("run-5", loader, List.of(classes), sources,
+                TestSelection.ofClasses(Set.of("test_b.py"), "failed"), absolute), byRelativeName, new Cancellation());
+            assertEquals(1, relativeRerun.total());
+            assertEquals(TestStatus.FAILED, byRelativeName.status("test_b.py.test_b.py"));
+        }
+    }
+    @Test
+    void aFileNamedByItsRealPathIsReportedRelativeToTheRootItsLinkedRootLeadsTo() throws Exception {
+        Path tests = Files.createDirectories(directory.resolve("project/tests"));
+        Files.writeString(tests.resolve("test_a.py"), "ok");
+        // the test source root is a link, as /var is on macOS, and the engine names each file by its real path
+        Path linked = Files.createSymbolicLink(directory.resolve("project/linked"), tests);
+        Path classes = Files.createDirectories(directory.resolve("project/test-classes"));
+        Path services = Files.createDirectories(directory.resolve("services/META-INF/services"));
+        Files.writeString(services.resolve("org.junit.platform.engine.TestEngine"), FileTestEngine.class.getName());
+        Map<String, String> real = Map.of("junit.jupiter.extensions.autodetection.enabled", "false", FileTestEngine.REAL, "true");
+
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {directory.resolve("services").toUri().toURL()}, getClass().getClassLoader())) {
+            RecordingListener named = new RecordingListener();
+            new JUnitPlatformTestRunner().run(new TestRunRequest("run-1", loader, List.of(classes), List.of(new SourceRoot(SourceKind.PYTHON, linked)),
+                TestSelection.all(), real), named, new Cancellation());
+            assertEquals(Set.of("test_a.py.test_a.py"), named.outcomes.keySet());
+        }
+    }
+
+    @Test
+    void aClassNameThatIsNoFileOfATestRootIsReportedAsItIs() throws Exception {
+        Path tests = Files.createDirectories(directory.resolve("project/tests"));
+        Files.writeString(tests.resolve("test_a.py"), "ok");
+        Path classes = Files.createDirectories(directory.resolve("project/test-classes"));
+        Path services = Files.createDirectories(directory.resolve("services/META-INF/services"));
+        Files.writeString(services.resolve("org.junit.platform.engine.TestEngine"), FileTestEngine.class.getName());
+        JUnitPlatformTestRunner runner = new JUnitPlatformTestRunner();
+        List<SourceRoot> sources = List.of(new SourceRoot(SourceKind.PYTHON, tests));
+
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {directory.resolve("services").toUri().toURL()}, getClass().getClassLoader())) {
+            // an absolute path outside every test root, to a file that is not there, and a name no path can have
+            for (String name : List.of(directory.resolve("elsewhere/test_x.py").toString(), "bad\0name")) {
+                Map<String, String> named = Map.of("junit.jupiter.extensions.autodetection.enabled", "false", FileTestEngine.NAMED, name);
+                RecordingListener listener = new RecordingListener();
+                runner.run(new TestRunRequest("named", loader, List.of(classes), sources, TestSelection.all(), named), listener, new Cancellation());
+                assertEquals(Set.of(name + ".test_a.py"), listener.outcomes.keySet(), name);
+            }
+        }
+    }
+
+    @Test
+    void aFileIsSelectedByItsPathRelativeToItsRootOrAbsoluteAndNothingElse() throws Exception {
+        Path tests = Files.createDirectories(directory.resolve("project/tests"));
+        Files.writeString(tests.resolve("test_a.py"), "ok");
+        Path outside = Files.writeString(Files.createDirectories(directory.resolve("elsewhere")).resolve("test_x.py"), "ok");
+        Path classes = Files.createDirectories(directory.resolve("project/test-classes"));
+        Path services = Files.createDirectories(directory.resolve("services/META-INF/services"));
+        Files.writeString(services.resolve("org.junit.platform.engine.TestEngine"), FileTestEngine.class.getName());
+        JUnitPlatformTestRunner runner = new JUnitPlatformTestRunner();
+        Map<String, String> onlyFiles = Map.of("junit.jupiter.extensions.autodetection.enabled", "false");
+
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {directory.resolve("services").toUri().toURL()}, getClass().getClassLoader())) {
+            List<SourceRoot> sources = List.of(new SourceRoot(SourceKind.JAVA, directory.resolve("project/java")), new SourceRoot(SourceKind.PYTHON, tests));
+            for (String name : List.of("test_a.py", tests.resolve("test_a.py").toString())) {
+                RecordingListener listener = new RecordingListener();
+                TestRunSummary summary = runner.run(new TestRunRequest("by-file", loader, List.of(classes), sources,
+                    TestSelection.ofClasses(Set.of(name), "failed"), onlyFiles), listener, new Cancellation());
+                assertEquals(1, summary.passed(), name);
+            }
+            // a file outside the test roots, or a name that is no path, runs nothing
+            for (String name : List.of(outside.toString(), "../elsewhere/test_x.py", "bad\0.py")) {
+                TestRunSummary summary = runner.run(new TestRunRequest("none", loader, List.of(classes), sources,
+                    TestSelection.ofClasses(Set.of(name), "failed"), onlyFiles), new RecordingListener(), new Cancellation());
+                assertEquals(0, summary.total(), name);
+            }
+        }
+    }
+}
