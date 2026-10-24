@@ -982,6 +982,8 @@ class Lowering:
         for handler in node.handlers:
             if handler.type is None:
                 self._refuse("python-exception", "a bare except clause catches Python exceptions", handler)
+            if handler.name is not None and handler.name in JAVA_RESERVED_NAMES:
+                self._refuse("java-reserved-name", f"local [{handler.name}] cannot be declared in Java", handler)
             caught = self._typed(handler.type)
             if caught is None or caught.kind != JAVA_REF or not self.checker.facts.isAssignable(caught.name, "java.lang.Throwable"):
                 self._refuse("python-exception", "an except clause naming anything but a Java exception type has no static lowering", handler)
