@@ -49,6 +49,7 @@ import java.util.zip.GZIPOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -437,7 +438,9 @@ class CompressorTest {
      */
     private static final class OneShotFactory implements NettyZlibCodecFactory {
         final boolean decline;
+        boolean failEncoder;
         int calls;
+        int encoders;
 
         OneShotFactory(boolean decline) {
             this.decline = decline;
@@ -445,6 +448,10 @@ class CompressorTest {
 
         @Override
         public ZlibEncoder newZlibEncoder(ZlibWrapper wrapper, int compressionLevel, int windowBits, int memLevel) {
+            encoders++;
+            if (failEncoder) {
+                throw new IllegalStateException("No encoder");
+            }
             return DefaultNettyZlibCodecFactory.INSTANCE.newZlibEncoder(wrapper, compressionLevel, windowBits, memLevel);
         }
 
@@ -560,6 +567,40 @@ class CompressorTest {
         session.finish();
         session.discard();
         assertNull(session.poll());
+    }
+
+    @Test
+    void discardBeforeAnyEncoderCreatesNone() {
+        var factory = new OneShotFactory(false);
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        session.discard();
+        assertEquals(0, factory.encoders);
+    }
+
+    @Test
+    void failingEncoderCreationReleasesTheHeldAndPushedBodies() {
+        var factory = new OneShotFactory(false);
+        factory.failEncoder = true;
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        ByteBuf first = Unpooled.copiedBuffer("hello ", StandardCharsets.UTF_8);
+        ByteBuf second = Unpooled.copiedBuffer("world", StandardCharsets.UTF_8);
+        session.push(first);
+        assertThrows(IllegalStateException.class, () -> session.push(second));
+        assertEquals(0, second.refCnt());
+        session.discard();
+        assertEquals(0, first.refCnt());
+    }
+
+    @Test
+    void failingEncoderAfterDeclinedOneShotReleasesTheBody() {
+        var factory = new OneShotFactory(true);
+        factory.failEncoder = true;
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        ByteBuf body = Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8);
+        session.push(body);
+        assertThrows(IllegalStateException.class, session::finish);
+        assertEquals(0, body.refCnt());
+        session.discard();
     }
 }
 
