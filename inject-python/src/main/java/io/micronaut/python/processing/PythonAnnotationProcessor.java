@@ -1066,6 +1066,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 for (var srcDir : srcDirs) {
                     Path directory = Paths.get(srcDir);
                     if (Files.isDirectory(directory)) {
+                        // the sources of a directory in the order of their paths, not the order the file system lists them
+                        // in, which differs between file systems: the modules of a compilation are checked, planned and
+                        // generated in this order, so the same sources give the same output everywhere
+                        Map<String, Path> files = new TreeMap<>();
                         try {
                             Files.walkFileTree(directory, new SimpleFileVisitor<>() {
                                 @Override
@@ -1095,11 +1099,14 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                                     "Micronaut generates package __init__.py files for the GraalPy VFS; remove [" + relative + "] from the project source."
                                             );
                                         }
-                                        sources.add(Source.newBuilder(PYTHON_LANGUAGE, file.toFile()).build());
+                                        files.put(relative, file);
                                     }
                                     return FileVisitResult.CONTINUE;
                                 }
                             });
+                            for (Path file : files.values()) {
+                                sources.add(Source.newBuilder(PYTHON_LANGUAGE, file.toFile()).build());
+                            }
                         } catch (IOException e) {
                             throw new ProcessingException(originatingElement, "Error processing python code in directory [" + directory + "]: " + e.getMessage());
                         }
