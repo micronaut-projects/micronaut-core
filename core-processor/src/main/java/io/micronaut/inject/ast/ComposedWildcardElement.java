@@ -41,6 +41,12 @@ record ComposedWildcardElement(List<ClassElement> upperBounds,
     }
 
     @Override
+    public Optional<ClassElement> getResolved() {
+        // Like the wildcards of the compilers: the lower bound when there is one, otherwise the upper bound
+        return Optional.of(lowerBounds.isEmpty() ? upperBound() : lowerBounds.get(0));
+    }
+
+    @Override
     public List<? extends ClassElement> getUpperBounds() {
         return upperBounds;
     }
