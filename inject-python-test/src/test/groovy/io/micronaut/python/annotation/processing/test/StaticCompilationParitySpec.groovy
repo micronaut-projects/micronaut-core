@@ -20,6 +20,7 @@ class StaticCompilationParitySpec extends AbstractPythonTypeElementSpec {
     }
 
     static final String SOURCE = '''
+from dataclasses import dataclass, field
 from jakarta.inject import Singleton
 from java.lang import IllegalArgumentException
 from java.lang import Integer, Math, StringBuilder
@@ -51,6 +52,11 @@ class Calc:
     @property
     def factor(self) -> float:
         return self.rate * 2
+
+    def bagged(self, n: int) -> str:
+        bag = Bag(n)
+        bag.rename("sack" + str(n))
+        return str(bag.doubled() + bag.count + bag._secret()) + "|" + bag.label
 
     def chained(self, n: int) -> str:
         return str(self.helper(n) * 2 + self._hidden(n)) + "|" + str(self.factor * n) + "|" + self.label(n, "z")
@@ -221,8 +227,30 @@ class Calc:
     def unicode(self, text: str) -> str:
         return text[0] + "|" + str(len(text)) + "|" + text[-1] + "|" + text.upper() + "|" + text.lower() + "|" + str("a" in text)
 
+    def picked(self, n: int, fallback: str) -> str:
+        bag = Bag(n)
+        bag.rename("" if n == 0 else "named")
+        return bag.label or fallback
+
+    def formed(self, name: str) -> str:
+        form = Form(name=name)
+        form.count = 4
+        return form.name + str(form.count) + str(len(form.tags)) + str(Form("q", 2).count)
+
+    def maybe_name(self, flag: bool) -> str | None:
+        return "x" if flag else None
+
     def maybe_count(self, n: int) -> int | None:
         return n if n > 0 else None
+
+    def sized(self, n: int) -> int | None:
+        return Bag(n).maybe_size()
+
+    def spelled_size(self, n: int) -> str:
+        return str(Bag(n).maybe_size())
+
+    def spelled_limit(self, n: int) -> str:
+        return str(Bag(n).limit)
 
     def merged(self, extra: dict[str, str]) -> dict[str, str]:
         return {"a": "1", **extra, "z": "9"}
@@ -272,6 +300,7 @@ class Calc:
             if count > 5:
                 break
         return count
+
     def boxed_none(self, name: str) -> bool:
         return Integer.getInteger(name) is None
 
@@ -334,20 +363,52 @@ class Calc:
     def ambiguous(self, a: int, b: int) -> str:
         return StaticOverloads.pick(a, b)
 
+@dataclass
+class Form:
+    name: str = ""
+    count: int = 0
+    tags: list[str] = field(default_factory=list)
+
 @Singleton
 class Pair:
     def __init__(self, calc: Calc):
         self.calc = calc
+        self.builder = StringBuilder("x")
 
     def has_partner(self) -> bool:
         return self.calc is not None
+
+    def built(self) -> str:
+        return self.builder.append("y").toString()
+
+class Bag:
+    label: str = "bag"
+    limit: int | None = None
+
+    def __init__(self, count: int):
+        self.count = count
+
+    def doubled(self) -> int:
+        return self.count * 2
+
+    def _secret(self) -> int:
+        return 7
+
+    def maybe_size(self) -> int | None:
+        return self.count if self.count > 0 else None
+
+    def rename(self, label: str) -> None:
+        self.label = label
 '''
 
     static final List<List> CASES = [
         ["total", 3, 2.5d], ["total", 50, 2.5d],
         ["label", 2, "pen"],
         ["chained", 3], ["chained", 0],
+        ["bagged", 3], ["bagged", -1],
         ["described", "ab"],
+        ["formed", "f"],
+        ["picked", 0, "fb"], ["picked", 1, "fb"],
         ["ratio", 1, 4], ["ratio", 1, 0],
         ["parity", 3], ["parity", 8],
         ["unicode", "\uD83D\uDE00ab"], ["unicode", "i\u00DF"],
@@ -374,7 +435,9 @@ class Pair:
         ["relooped", 3], ["relooped", 0],
         ["safe_host", "http://example.com/x"], ["safe_host", "not a url"],
         ["strict_host", ""], ["strict_host", "http://example.com/x"],
+        ["maybe_name", true], ["maybe_name", false],
         ["maybe_count", 3], ["maybe_count", 0],
+        ["sized", 3], ["sized", 0], ["spelled_size", 3], ["spelled_size", 0], ["spelled_limit", 1],
         ["branch_local", true], ["branch_local", false],
         ["guarded", 3], ["guarded", 0],
         ["boxed_none", "no.such.property"], ["boxed_none", "micronaut.static.parity"],
@@ -412,6 +475,7 @@ class Pair:
                 def pair = getBean(context, 'python.Pair')
                 results[m] = CASES.collectEntries { List row -> [(row.toString()): invoke(calc, row)] }
                 results[m]['pair'] = pair.has_partner()
+                results[m]['built'] = pair.built()
                 results[m]['words'] = calc.words(new ArrayList<>(['a', 'skip', 'b']))
                 results[m]['keyed'] = calc.keyed(new LinkedHashMap<>([bb: 2, a: 1]))
                 results[m]['edge'] = calc.edge(0)
@@ -428,7 +492,7 @@ class Pair:
                 results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name']), decisions.toString()
+                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled']), decisions.toString()
                     REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
@@ -453,12 +517,21 @@ class Pair:
         results[StaticCompilationMode.OFF][["above", 8192, 9007199254740992.0d].toString()] == true
         results[StaticCompilationMode.OFF][["below", 8192, Double.NaN].toString()] == false
         results[StaticCompilationMode.OFF][["exclaim", null].toString()] == "raised"
+        // a method of a Python object hinted int | None that returns None, and an attribute that holds None
+        results[StaticCompilationMode.OFF][["sized", 0].toString()] == null
+        results[StaticCompilationMode.OFF][["sized", 3].toString()] == 3
+        results[StaticCompilationMode.OFF][["spelled_size", 0].toString()] == "None"
+        results[StaticCompilationMode.OFF][["spelled_limit", 1].toString()] == "None"
         results[StaticCompilationMode.OFF][["query", "http://example.com/x"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["mixed_local", true].toString()] == "2"
         results[StaticCompilationMode.OFF][["ratio", 1, 0].toString()] == "raised"
         results[StaticCompilationMode.OFF][["host", "not a url"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["entry", "k", 3].toString()] == "k=3"
         results[StaticCompilationMode.OFF]['pair'] == true
+        results[StaticCompilationMode.OFF]['built'] == 'xy'
+        results[StaticCompilationMode.OFF][["formed", "f"].toString()] == 'f402'
+        results[StaticCompilationMode.OFF][["picked", 0, "fb"].toString()] == 'fb'
+        results[StaticCompilationMode.OFF][["picked", 1, "fb"].toString()] == 'named'
         results[StaticCompilationMode.OFF]['words'] == 'a;b;'
         results[StaticCompilationMode.OFF]['keyed'] == 3
         results[StaticCompilationMode.OFF]['collected'] == ['B', 'A']

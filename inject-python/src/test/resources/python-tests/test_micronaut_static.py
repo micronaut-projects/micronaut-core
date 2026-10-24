@@ -65,6 +65,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from jakarta.inject import Singleton
 
+ROLE = "user"
+LIMIT = 20
+
 
 @dataclass
 class Form:
@@ -82,6 +85,21 @@ class Finder:
 
     def pick(self, fallback: Form) -> Form:
         return self.form or fallback
+
+    def role(self) -> str:
+        return ROLE
+
+    def limit(self, n: int) -> int:
+        return n + LIMIT
+
+    def form_of(self) -> Form:
+        return Form(name="x")
+
+    def form_count(self, form: Form) -> int:
+        return Form(form.name, count=3).count
+
+    def rename(self, form: Form, name: str) -> None:
+        form.name = name
 
     def unhinted(self, flag: bool):
         return "x" if flag else "y"
@@ -139,6 +157,10 @@ class CorpusFindingsTest(unittest.TestCase):
         self.assertEqual("Conditional", returned.getClass().getSimpleName())
         self.assertEqual("java.lang.Integer", returned.type())
 
+    def test_a_union_with_none_returns_its_member(self):
+        self.assertEqual("COMPILED", self.decisions["Finder.named"].outcome().name(), rules(self.decisions["Finder.named"]))
+        self.assertEqual("java.lang.String", self.bodies["named"].returnType())
+
     def test_an_abstract_method_is_not_a_candidate(self):
         for name in ("to_thing", "described"):
             decision = self.decisions[f"Mapper.{name}"]
@@ -152,6 +174,35 @@ class CorpusFindingsTest(unittest.TestCase):
 
     def _returned(self, name):
         return list(self._compiled(name).body().statements())[-1].value()
+
+    def test_a_module_constant_is_inlined(self):
+        returned = self._returned("role")
+        self.assertEqual("Const", returned.getClass().getSimpleName())
+        self.assertEqual("user", returned.value())
+        returned = _uncast(self._returned("limit"))
+        self.assertEqual("Binary", returned.getClass().getSimpleName())
+        self.assertEqual(20, returned.right().value())
+
+    def test_a_construction_by_keyword_fills_the_defaults(self):
+        returned = self._returned("form_of")
+        self.assertEqual("NewJava", returned.getClass().getSimpleName())
+        self.assertEqual(["java.lang.String", "int", "java.util.List<java.lang.String>"], list(returned.parameterTypes()))
+        arguments = list(returned.arguments())
+        self.assertEqual("x", arguments[0].value())
+        self.assertEqual(0, _uncast(arguments[1]).value())
+        self.assertEqual("Helper", arguments[2].getClass().getSimpleName())
+        self.assertEqual("list", arguments[2].name())
+        construction = _uncast(self._returned("form_count")).receiver()
+        self.assertEqual("NewJava", construction.getClass().getSimpleName())
+        self.assertEqual(3, _uncast(list(construction.arguments())[1]).value())
+
+    def test_an_attribute_of_an_object_of_the_compilation_is_assigned_through_its_setter(self):
+        statement = list(self._compiled("rename").body().statements())[0]
+        self.assertEqual("Eval", statement.getClass().getSimpleName())
+        call = statement.expression()
+        self.assertEqual("InvokeJava", call.getClass().getSimpleName())
+        self.assertEqual("setName", call.name())
+        self.assertEqual(["java.lang.String"], list(call.parameterTypes()))
 
     def test_or_on_an_attribute_of_an_object_yields_the_fallback_when_none(self):
         returned = self._returned("pick")
@@ -487,9 +538,28 @@ class Slotted:
 
 
 LOWERED = '''
-from typing import Optional
-from jakarta.inject import Singleton
+from typing import Annotated, Optional
+from jakarta.inject import Inject, Singleton
 from java.lang import Exception, RuntimeException
+from micronaut.context.annotation import Executable
+
+
+class Cart:
+    items: int = 0
+
+    def __init__(self, items: int, owner: str):
+        self.items = items
+        self.owner = owner
+
+    @staticmethod
+    def tag(n: int) -> int:
+        return n
+
+    def total(self, n: int) -> int:
+        return self.items * n
+
+    def _hidden(self) -> int:
+        return 1
 
 
 @Singleton
@@ -498,6 +568,12 @@ class Pricing:
 
     def __init__(self, rate: float):
         self.rate = rate
+
+    def carted(self, cart: Cart, n: int) -> int:
+        return cart.total(n) + cart.items + cart._hidden()
+
+    def built(self, n: int) -> str:
+        return Cart(n, "x").owner
 
     def total(self, quantity: int, unit_price: float) -> float:
         subtotal = quantity * unit_price
@@ -599,6 +675,12 @@ class Pricing:
         total = 0
         for int in range(n):
             total += int
+        return total
+
+    def reserved_items(self, prices: dict[str, int]) -> int:
+        total = 0
+        for name, new in prices.items():
+            total += new
         return total
 
     def reserved_catch(self, n: int) -> int:
@@ -752,8 +834,266 @@ class Pricing:
 
     def literal_compare(self, x: float) -> bool:
         return x > 100
+
+    def tagged(self, cart: Cart, n: int) -> int:
+        return cart.tag(n)
+
+    def tagged_afresh(self, n: int) -> int:
+        return Cart(n, "x").tag(n)
+
+    def paged(self, pages: dict[str, int]) -> int:
+        total = 0
+        for title, count in pages.items():
+            if len(title) > 0:
+                total = total + count
+        return total
+
+
+pricing: Annotated[Pricing, Inject]
+
+
+@Executable
+def route(n: int) -> int:
+    return pricing.truncate(n) + n
+
+
+@Executable
+def peek(cart: Cart) -> str:
+    return cart.owner
+
+
+def helper_only(n: int) -> int:
+    return n
 '''
 
+
+ADVISED = '''
+from jakarta.inject import Singleton
+
+
+def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
+    def decorator(func):
+        return func
+    return decorator
+
+
+@micronaut_annotation("pkg.Logged")
+def Logged():
+    def decorator(target):
+        return target
+    return decorator
+
+
+@Singleton
+class Audit:
+    @Logged
+    def label(self, n: int) -> str:
+        return str(n)
+
+    def plain(self, n: int) -> int:
+        return n
+'''
+
+
+class AroundBinding:
+    """What the planner asks of the description of an around binding."""
+
+    def annotation(self):
+        return True
+
+    def interceptorBinding(self):
+        return True
+
+    def validationConstraint(self):
+        return False
+
+    def executable(self):
+        return True
+
+    def introduction(self):
+        return False
+
+
+class AdvisedFacts(FakeFacts):
+    """Facts describing the decorator Logged as an around binding."""
+
+    def describeAnnotation(self, name):
+        return AroundBinding() if name.rsplit(".", 1)[-1] == "Logged" else None
+
+
+MIXED = '''
+from jakarta.inject import Singleton
+import java
+
+Describable = java.type("io.micronaut.python.annotation.processing.test.defaults.Describable")
+
+
+class Base(Describable):
+    def name(self) -> str:
+        return "base"
+
+
+@Singleton
+class Sub(Base, Describable):
+    def name(self) -> str:
+        return "sub"
+
+
+@Singleton
+class Consumer:
+    def __init__(self, target: Sub):
+        self.target = target
+
+    def describe_target(self) -> str:
+        return self.target.describe()
+
+    def name_target(self) -> str:
+        return self.target.name()
+'''
+
+
+class MixedBasesTest(unittest.TestCase):
+    def test_a_java_base_among_the_bases_of_a_receiver(self):
+        decisions, planner = plan(MIXED, MODE_ALL, facts=FakeFacts())
+        bodies = {body.methodName(): body for body in planner.bodies}
+        self.assertEqual("COMPILED", decisions["Consumer.name_target"].outcome().name(), [(r.rule(), r.message()) for r in decisions["Consumer.name_target"].reasons()])
+        call = _uncast(list(bodies["name_target"].body().statements())[0].value())
+        self.assertEqual("InvokeJava", call.getClass().getSimpleName())
+        # a default method of the Java interface is not modelled: the call is refused, not crashed on
+        self.assertEqual("SKIPPED", decisions["Consumer.describe_target"].outcome().name())
+        self.assertEqual(["unknown-type"], rules(decisions["Consumer.describe_target"]))
+
+
+class AdviceTest(unittest.TestCase):
+    def test_an_advised_method_is_compiled_with_its_chain(self):
+        decisions, planner = plan(ADVISED, MODE_ALL, facts=AdvisedFacts())
+        self.assertEqual("COMPILED", decisions["Audit.label"].outcome().name(), [(r.rule(), r.message()) for r in decisions["Audit.label"].reasons()])
+        bodies = {body.methodName(): body for body in planner.bodies}
+        self.assertTrue(bodies["label"].advised())
+        self.assertFalse(bodies["plain"].advised())
+
+
+
+class Description:
+    """The description of an annotation, with the flags the planner reads."""
+
+    def __init__(self, scope=False, executable=False, interceptor=False, constraint=False):
+        self._scope, self._executable, self._interceptor, self._constraint = scope, executable, interceptor, constraint
+
+    def annotation(self):
+        return True
+
+    def interceptorBinding(self):
+        return self._interceptor
+
+    def validationConstraint(self):
+        return self._constraint
+
+    def executable(self):
+        return self._executable
+
+    def introduction(self):
+        return False
+
+    def scope(self):
+        return self._scope
+
+
+class ScriptFacts(FakeFacts):
+    """Facts describing the annotations of a module of routes as Micronaut declares them."""
+
+    DESCRIPTIONS = {
+        "Singleton": Description(scope=True, executable=True),
+        "ContextPooled": Description(scope=True, executable=True),
+        "Controller": Description(executable=True),
+        "Requires": Description(),
+        "Get": Description(executable=True),
+        "NotBlank": Description(constraint=True),
+        "Logged": Description(executable=True, interceptor=True),
+    }
+
+    def describeAnnotation(self, name):
+        return self.DESCRIPTIONS.get(name.rsplit(".", 1)[-1])
+
+
+SCRIPTED = '''
+from typing import Annotated
+from jakarta.inject import Singleton
+from jakarta.validation.constraints import NotBlank
+from micronaut.context.annotation import Requires
+from micronaut.context.python.scope import ContextPooled
+from micronaut.http.annotation import Controller, Get
+
+
+def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
+    def decorator(func):
+        return func
+    return decorator
+
+
+@micronaut_annotation("pkg.Logged")
+def Logged():
+    def decorator(target):
+        return target
+    return decorator
+
+
+{module}
+
+
+class Cart:
+    def __init__(self, owner: str):
+        self.owner = owner
+
+
+@Get("/peek")
+def peek(cart: Cart) -> str:
+    return cart.owner
+
+
+@Get("/plain/{{n}}")
+def plain(n: int) -> int:
+    return n + 1
+
+
+@Get("/checked/{{name}}")
+def checked(name: Annotated[str, NotBlank]) -> str:
+    return name
+
+
+@Get("/logged/{{n}}")
+@Logged
+def logged(n: int) -> int:
+    return n
+'''
+
+
+class ScriptTest(unittest.TestCase):
+    def test_a_module_level_annotation_that_declares_no_scope_keeps_the_module_pooled(self):
+        # PythonScriptElement pools every bean module that declares no scope: @Controller or @Requires do not
+        for module in ("", 'Controller("/c")', 'Requires(property="x")', 'Controller("/c")\nContextPooled()'):
+            decisions, _ = plan(SCRIPTED.format(module=module), MODE_ALL, facts=ScriptFacts())
+            self.assertEqual("SKIPPED", decisions["peek"].outcome().name(), module)
+            self.assertEqual(["pooled-module"], rules(decisions["peek"]), module)
+            self.assertEqual("COMPILED", decisions["plain"].outcome().name(), module)
+
+    def test_a_module_declaring_a_scope_reaches_python_objects(self):
+        decisions, _ = plan(SCRIPTED.format(module='Controller("/c")\nSingleton()'), MODE_ALL, facts=ScriptFacts())
+        self.assertEqual("COMPILED", decisions["peek"].outcome().name(), [(r.rule(), r.message()) for r in decisions["peek"].reasons()])
+
+    def test_an_advised_module_function_is_not_compiled(self):
+        # the generated class of a module runs no compiled advice: validation and around bindings would be bypassed
+        for module in ("", 'Controller("/c")\nSingleton()'):
+            decisions, _ = plan(SCRIPTED.format(module=module), MODE_ALL, facts=ScriptFacts())
+            for name, advice in (("checked", "NotBlank"), ("logged", "Logged")):
+                self.assertEqual("NOT_CANDIDATE", decisions[name].outcome().name(), name)
+                self.assertEqual(["intercepted-method"], rules(decisions[name]), name)
+                self.assertIn(f"[{advice}]", decisions[name].reasons()[0].message())
+
+    def test_a_module_level_around_binding_advises_every_function(self):
+        decisions, _ = plan(SCRIPTED.format(module='Logged()'), MODE_ALL, facts=ScriptFacts())
+        self.assertEqual("NOT_CANDIDATE", decisions["plain"].outcome().name())
+        self.assertEqual(["intercepted-method"], rules(decisions["plain"]))
 
 class LoweringTest(unittest.TestCase):
     def setUp(self):
@@ -810,6 +1150,62 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("result", list(branch.then().statements())[0].name())
         self.assertEqual("-", list(branch.orElse().statements())[0].value().op())
 
+    def test_a_static_method_is_called_on_a_plain_receiver_only(self):
+        tagged = _uncast(list(self.bodies["tagged"].body().statements())[0].value())
+        self.assertEqual("InvokeJava", tagged.getClass().getSimpleName())
+        self.assertIsNone(tagged.receiver())
+        # Python constructs the Cart before calling the static method; a static Java call would not
+        self.assertEqual("SKIPPED", self.decisions["Pricing.tagged_afresh"].outcome().name())
+        self.assertEqual(["unsupported-expression"], rules(self.decisions["Pricing.tagged_afresh"]))
+
+    def test_dict_entries_unpack_into_the_loop_variables(self):
+        paged = self.bodies["paged"]
+        loop = list(paged.body().statements())[2]  # after the copy of the parameter and total = 0
+        self.assertEqual("ForEach", loop.getClass().getSimpleName())
+        self.assertEqual("java.util.Map.Entry", loop.type())
+        self.assertEqual("entrySet", loop.iterable().name())
+        bindings = list(loop.body().statements())[:2]
+        self.assertEqual(["title", "count"], [binding.name() for binding in bindings])
+        self.assertEqual(["java.lang.String", "long"], [binding.type() for binding in bindings])
+        self.assertEqual(["getKey", "getValue"], [_uncast(binding.value()).name() for binding in bindings])
+        self.assertEqual("COMPILED", self.decisions["Pricing.paged"].outcome().name())
+
+    def test_module_functions_compile_into_the_script_class(self):
+        route = self.decisions["route"]
+        self.assertEqual("COMPILED", route.outcome().name(), [(r.rule(), r.message()) for r in route.reasons()])
+        body = self.bodies["route"]
+        self.assertTrue(body.className().endswith("Module"), body.className())  # the generated class of module.py
+        call = _uncast(_uncast(list(body.body().statements())[0].value()).left())
+        self.assertEqual("truncate", call.name())
+        self.assertEqual("ModuleAttribute", call.receiver().getClass().getSimpleName())
+        self.assertEqual("pricing", call.receiver().name())
+        self.assertEqual(call.receiver().owner(), body.className())
+        # a module without a module-level annotation is served by a context pool: a Python read is out of reach
+        self.assertEqual("SKIPPED", self.decisions["peek"].outcome().name())
+        self.assertEqual(["pooled-module"], rules(self.decisions["peek"]))
+        self.assertEqual("NOT_CANDIDATE", self.decisions["helper_only"].outcome().name())
+        self.assertEqual(["class-not-eligible"], rules(self.decisions["helper_only"]))
+
+    def test_objects_of_the_compilation_are_reached_through_their_generated_classes(self):
+        for name in ("carted", "built"):
+            self.assertEqual("COMPILED", self.decisions[f"Pricing.{name}"].outcome().name(), f"{name}: {[(r.rule(), r.message()) for r in self.decisions[f'Pricing.{name}'].reasons()]}")
+        carted = _uncast(list(self.bodies["carted"].body().statements())[0].value())
+        total = _uncast(carted.left().left())
+        self.assertEqual("InvokeJava", total.getClass().getSimpleName())
+        self.assertEqual("pkg.Cart", total.owner())
+        self.assertEqual("total", total.name())
+        self.assertEqual(["int"], list(total.parameterTypes()))
+        items = _uncast(carted.left().right())
+        self.assertEqual("getItems", items.name())  # a hinted class attribute: the accessor of the generated class
+        hidden = _uncast(carted.right())
+        self.assertEqual("InvokePython", hidden.getClass().getSimpleName())  # not bridged: through the Python object
+        self.assertEqual(2, self.bodies["carted"].stats().javaCalls())
+        self.assertEqual(1, self.bodies["carted"].stats().bridgeCalls())
+        built = _uncast(list(self.bodies["built"].body().statements())[0].value())
+        self.assertEqual("PythonMember", built.getClass().getSimpleName())  # an instance attribute: no accessor
+        self.assertEqual("NewJava", built.receiver().getClass().getSimpleName())
+        self.assertEqual(["int", "java.lang.String"], list(built.receiver().parameterTypes()))
+
     def test_a_literal_of_mixed_elements_holds_objects(self):
         # [1, "x"] hinted list[int]: the literal holds Objects, cast through the raw type; Python checks the hint no more
         self.assertEqual("COMPILED", self.decisions["Pricing.mixed"].outcome().name(), rules(self.decisions["Pricing.mixed"]))
@@ -827,8 +1223,9 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual(1, self.bodies["sibling"].stats().javaCalls())
         hidden = _uncast(list(self.bodies["hidden_call"].body().statements())[0].value())
         self.assertEqual("python", _uncast(hidden.left()).dispatch())  # not bridged: the stub has no Java method for it
-        self.assertEqual("python", _uncast(hidden.right()).dispatch())  # the call relies on a default argument
-        self.assertEqual(2, self.bodies["hidden_call"].stats().bridgeCalls())
+        self.assertEqual("java", _uncast(hidden.right()).dispatch())  # the default the call relies on is filled in
+        self.assertEqual(1, _uncast(list(_uncast(hidden.right()).arguments())[0]).value())
+        self.assertEqual(1, self.bodies["hidden_call"].stats().bridgeCalls())
         via_property = _uncast(list(self.bodies["via_property"].body().statements())[0].value())
         self.assertEqual("doubled", via_property.left().property())
         self.assertEqual("double", via_property.left().type())
@@ -853,6 +1250,7 @@ class LoweringTest(unittest.TestCase):
             "switched": "java-reserved-name",
             "reserved_each": "java-reserved-name",
             "reserved_range": "java-reserved-name",
+            "reserved_items": "java-reserved-name",
             "reserved_catch": "java-reserved-name",
             "leaked": "unsupported-statement",
             "raises_python": "python-exception",
@@ -877,6 +1275,7 @@ class LoweringTest(unittest.TestCase):
         # a loop variable is a Java local too
         self.assertEqual("local [new] cannot be declared in Java", self.decisions["Pricing.reserved_each"].reasons()[0].message())
         self.assertEqual("local [int] cannot be declared in Java", self.decisions["Pricing.reserved_range"].reasons()[0].message())
+        self.assertEqual("local [new] cannot be declared in Java", self.decisions["Pricing.reserved_items"].reasons()[0].message())
         # and so is the variable of an except clause
         self.assertEqual("local [new] cannot be declared in Java", self.decisions["Pricing.reserved_catch"].reasons()[0].message())
 

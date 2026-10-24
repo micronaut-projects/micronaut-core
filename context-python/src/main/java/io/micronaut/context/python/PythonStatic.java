@@ -424,6 +424,25 @@ public final class PythonStatic {
     }
 
     /**
+     * An attribute of a Python object a compiled body reads whose hint is a primitive
+     * ({@code int}, {@code float} or {@code bool}): a property's getter, a hinted class attribute or
+     * an attribute {@code __init__} assigns. The hint is trusted, and checked for None as
+     * {@link #returned(org.graalvm.polyglot.Value, String, String)} checks a result.
+     *
+     * @param value     The value of the attribute
+     * @param attribute The attribute, as {@code Class.attribute}
+     * @param hint      The Python name of the hinted type
+     * @return The value, which is not None
+     * @throws IllegalStateException When the value is None, as a TypeError
+     */
+    public static org.graalvm.polyglot.Value hinted(org.graalvm.polyglot.Value value, String attribute, String hint) {
+        if (value.isNull()) {
+            throw new PythonError(TYPE_ERROR, attribute + " is None but is hinted as " + hint);
+        }
+        return value;
+    }
+
+    /**
      * Binds a Python object to the compiled bodies of one class of its MRO: the rewritten methods
      * of that class run the Java bodies for the object from then on, see {@code apply_delegation}.
      * The binding is kept outside the object, weakly, so a copy of the object is not bound and
