@@ -3516,8 +3516,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             List<PropertyElement> beanProperties = scriptElement.getBeanProperties();
             for (PropertyElement beanProperty : beanProperties) {
                 if (beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
-                    // the injected bean is a member of the module, and a static field of the
-                    // generated class for the compiled bodies of the module's functions
+                    // the injected bean is a member of the module, and a private volatile instance
+                    // field of the generated class for the compiled bodies of the module's functions:
+                    // not static, since two application contexts must not share a bean
                     FieldDef injected = injectedField(builder, beanProperty, propertySourceType(beanProperty));
                     addSetterScript(beanProperty, builder, pythonValue, injected);
                 }
