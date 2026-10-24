@@ -1141,6 +1141,8 @@ class Lowering:
         return self._loop(node, build)[0]
 
     def _loop_variable(self, variable, node):
+        if variable in JAVA_RESERVED_NAMES:
+            self._refuse("java-reserved-name", f"local [{variable}] cannot be declared in Java", node.target)
         if variable in self.parameters or variable in self.locals or variable in self.reassigned:
             self._refuse("unsupported-statement", f"the loop variable [{variable}] is already a local or a parameter", node)
 
