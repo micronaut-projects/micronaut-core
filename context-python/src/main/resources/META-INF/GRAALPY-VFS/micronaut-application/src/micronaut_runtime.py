@@ -153,8 +153,9 @@ def __micronaut_bind_compiled(instance, owner, delegate):
 
 # The epochs of the Java fields holding attributes fixed at construction (PythonFixedAttributes), by
 # the class of the objects they hold attributes of, each by its id: a change of an attribute of such
-# an object moves them on, and the Java side reads the attribute again.
-_MICRONAUT_FIXED_EPOCHS = {}
+# an object moves them on, and the Java side reads the attribute again. Held weakly by the class: a
+# class created at run time goes with its objects.
+_MICRONAUT_FIXED_EPOCHS = weakref.WeakKeyDictionary()
 
 
 def _micronaut_fixed_changed(cls):
@@ -216,7 +217,10 @@ def __micronaut_fixed_member(instance, name, epoch, epoch_id):
         return None
     epochs = _MICRONAUT_FIXED_EPOCHS.get(cls)
     if epochs is None:
-        epochs = _MICRONAUT_FIXED_EPOCHS[cls] = {}
+        try:
+            epochs = _MICRONAUT_FIXED_EPOCHS[cls] = {}
+        except TypeError:
+            return False  # a class that cannot be referenced weakly: read every time
     if epoch_id not in epochs:
         epochs[epoch_id] = epoch
     return (attributes[name],)
