@@ -15,14 +15,12 @@
  */
 package io.micronaut.context.beans;
 
-import io.micronaut.context.AbstractInitializableBeanDefinition;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanContextConfiguration;
 import io.micronaut.context.BeanDefinitionsProvider;
 import io.micronaut.context.BeanResolutionCustomizer;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DisabledBean;
-import io.micronaut.context.env.Environment;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.annotation.Replaces;
@@ -418,17 +416,6 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             return List.of();
         }
         return producers;
-    }
-
-    @Override
-    public void detachExecutableMethods(Environment environment, BeanContext beanContext) {
-        Beans loaded = beans;
-        if (loaded == null) {
-            return;
-        }
-        for (BeanDefinitionProducer producer : loaded.all) {
-            producer.detachExecutableMethods(environment, beanContext);
-        }
     }
 
     @Override
@@ -908,19 +895,6 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                 }
             }
             return false;
-        }
-
-        /**
-         * Detaches the executable methods of the definition class from the stopping context: through the definition
-         * when it was loaded, or else through the reference, as a definition loaded and then discarded, such as one
-         * its own conditions disabled, configured them all the same.
-         */
-        void detachExecutableMethods(Environment environment, BeanContext beanContext) {
-            if (definition instanceof AbstractInitializableBeanDefinition<?> loaded) {
-                loaded.detachExecutableMethods(environment, beanContext);
-            } else if (reference instanceof AbstractInitializableBeanDefinition<?> definitionAndReference) {
-                definitionAndReference.detachExecutableMethods(environment, beanContext);
-            }
         }
 
         void disableIfMatch(BeanDefinitionReference<?> toDisable) {

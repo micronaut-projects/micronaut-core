@@ -74,7 +74,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         // set supported options as system properties to keep compatibility
         // in particular for micronaut-openapi, they are restored once the processing is over
         ProcessorOptionsSystemProperties.apply(environment, environment.options)
-        ProcessorOptionsSystemProperties.acquire(this)
+        ProcessorOptionsSystemProperties.acquire(environment, this)
 
         if (typeElementVisitors == null) {
             typeElementVisitors = findTypeElementVisitors()
