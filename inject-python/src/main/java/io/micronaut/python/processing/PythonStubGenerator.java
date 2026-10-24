@@ -17,6 +17,7 @@ package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
 import java.io.Serializable;
+import java.io.StringWriter;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.RetentionPolicy;
@@ -27,6 +28,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -66,6 +68,7 @@ import io.micronaut.python.processing.model.FunctionDef;
 import io.micronaut.python.processing.staticcompile.Ir;
 import io.micronaut.python.processing.staticcompile.StaticBodyGenerator;
 import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
+import io.micronaut.python.processing.staticcompile.StaticLineMap;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
@@ -202,6 +205,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String STATIC_ADVICE_BIND = "bindStaticAdvice";
     // the parameter of a compiled delegate method carrying the Python object
     private static final String COMPILED_SELF = "__mnSelf";
+    // the Python object a stub extending a Python class stub last bound to the compiled bodies of its classes
+    private static final String COMPILED_BOUND_FIELD = "graalpyInternalCompiledValue";
     public static final ClassTypeDef PYTHON_ASYNCIO_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonAsyncioRuntime");
     public static final ClassTypeDef PYTHON_CONTEXT_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime");
     public static final ClassTypeDef PYTHON_JAVA_BASES = ClassTypeDef.of("io.micronaut.context.python.PythonJavaBases");
@@ -218,6 +223,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String PYTHON_DATE_TIME_ANNOTATION = "io.micronaut.context.python.annotation.PythonDateTime";
     public static final ClassTypeDef PYTHON_MODULE_ANNOTATION = ClassTypeDef.of("io.micronaut.context.python.annotation.PythonModule");
     public static final ClassTypeDef POLYGLOT_VALUE_CONVERTER = ClassTypeDef.of("io.micronaut.context.python.PolyglotValueConverter");
+    private static final ClassTypeDef PYTHON_FIXED_ATTRIBUTES = ClassTypeDef.of("io.micronaut.context.python.PythonFixedAttributes");
+    private static final ClassTypeDef PYTHON_FIXED_SLOT = ClassTypeDef.of("io.micronaut.context.python.PythonFixedAttributes.Slot");
+    private static final String FIXED_ATTRIBUTES_FIELD = "graalpyInternalFixedAttributes";
+    private static final String FIXED_SLOT_PREFIX = "graalpyInternalFixed";
+    private static final String VALUE_OF = "valueOf";
     /**
      * The type of a proxy that intercepts a target bean; a generated stub that is one has no Python object of its own.
      */
@@ -314,6 +324,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private final Map<String, PythonReflectionGate.Copy> copiedRuntimeAnnotations = new HashMap<>();
     private PythonReflectionGate reflectionGate;
     private final Map<String, StubEntry> classBuilders = new LinkedHashMap<>();
+    // per stub builder, the readers of attributes fixed at construction its compiled bodies read, by attribute and type
+    private final Map<ClassDef.ClassDefBuilder, Map<String, MethodDef>> fixedReaders = new IdentityHashMap<>();
     private final Map<String, StateEntry> stateDefs = new LinkedHashMap<>();
     private final Map<String, EnumEntry> enumDefs = new LinkedHashMap<>();
     private final Map<String, InterfaceEntry> interfaceDefs = new LinkedHashMap<>();
@@ -375,7 +387,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             if (sourceGenerator != null) {
                 for (StubEntry entry : topLevelStubEntries()) {
                     ClassDef.ClassDefBuilder builder = entry.builder;
-                    sourceGenerator.write(builder.build(), visitorContext, entry.originatingElement);
+                    writeStub(sourceGenerator, builder.build(), visitorContext, entry.originatingElement);
                 }
                 for (StateEntry entry : stateDefs.values()) {
                     sourceGenerator.write(entry.stateDef, visitorContext, entry.originatingElement);
@@ -397,11 +409,30 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         } finally {
             classBuilders.clear();
+            fixedReaders.clear();
             stateDefs.clear();
             enumDefs.clear();
             interfaceDefs.clear();
             annotationDefs.clear();
         }
+    }
+
+    /**
+     * Writes a stub as SourceGen writes a source, with the line markers of its compiled bodies
+     * turned into the comments that give the Python positions of the Java (see {@link StaticLineMap}).
+     */
+    private static void writeStub(SourceGenerator sourceGenerator, ClassDef classDef, VisitorContext visitorContext, Element originatingElement) {
+        visitorContext.visitGeneratedSourceFile(classDef.getPackageName(), classDef.getSimpleName(), originatingElement)
+            .ifPresent(generatedFile -> {
+                try {
+                    StringWriter source = new StringWriter();
+                    sourceGenerator.write(classDef, source);
+                    String text = StaticLineMap.withLineComments(source.toString());
+                    generatedFile.write(writer -> writer.write(text));
+                } catch (Exception e) {
+                    throw new ProcessingException(originatingElement, "Failed to generate '" + classDef.getName() + "': " + e.getMessage(), e);
+                }
+            });
     }
 
     /**
@@ -1305,10 +1336,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         .addParameter(ParameterDef.of(PYTHON_CLASS_REFERENCE_PARAMETER, PYTHON_CLASS_REFERENCE))
                         .build(((aThis, methodParameters) -> {
                                 if (extendsPythonClass) {
-                                    // the object lives in the base stub's field: reached through asPolyglotValue()
+                                    // the object lives in the base stub's field: reached through asPolyglotValue(),
+                                    // which binds it to the compiled bodies of the classes of the stub
                                     return StatementDef.multi(
                                         invokeOwnedObjectSuperConstructor(aThis, superType, methodParameters.get(0)),
-                                        bindWrapper(model, aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE))
+                                        bindsCompiled(model) ? aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE) : StatementDef.multi()
                                     );
                                 }
                                 return StatementDef.multi(
@@ -1930,6 +1962,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ))
                     );
                 } else if (extendsPythonClass) {
+                    if (bindsCompiled(model)) {
+                        // the base stub keeps the object and creates it again once its application has shut
+                        // down, binding the compiled bodies of its own classes only: an object this stub has not
+                        // bound yet is bound to the bodies of every class of its MRO here
+                        FieldDef bound = FieldDef.builder(COMPILED_BOUND_FIELD)
+                            .ofType(POLYGLOT_VALUE)
+                            .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
+                            .build();
+                        builder.addField(bound);
+                        return aThis.superRef().invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).newLocal(VALUE_PARAMETER, value -> StatementDef.multi(
+                            value.notEqualsReferentially(aThis.field(bound)).doIf(StatementDef.multi(
+                                bindWrapper(model, value),
+                                aThis.field(bound).assign(value)
+                            )),
+                            value.returning()
+                        ));
+                    }
                     return aThis.superRef().invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).returning();
                 } else {
                     return StatementDef.multi(
@@ -5111,7 +5160,125 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 FieldDef field = accessor ? null : model.propertyFields().get(property);
                 return field != null ? aThis.field(field).assign(value) : members.write(property, type, value, accessor);
             }
+
+            @Override
+            public ExpressionDef readFixed(String property, String typeName, TypeDef type) {
+                if (model.isIntrospectedBean() || model.propertyFields().containsKey(property) || !fixedType(model.context(), typeName)) {
+                    // an introspected stub holds its state in fields of its own
+                    return read(property, typeName, type, false);
+                }
+                MethodDef reader = fixedReader(model, property, typeName, type);
+                return aThis.invoke(reader.getName(), type);
+            }
         };
+    }
+
+    /**
+     * Whether the stub generator keeps a value of the type in a Java field for an attribute fixed at
+     * construction, as the planner decided: not a value of an introspected class of the compilation,
+     * whose generated object is a copy of the Python object's state (the planner refuses those too).
+     */
+    private boolean fixedType(VisitorContext context, String typeName) {
+        String erasedName = typeName.indexOf('<') < 0 ? typeName : typeName.substring(0, typeName.indexOf('<'));
+        if (erasedName.indexOf('.') < 0) {
+            return true;
+        }
+        return context.getClassElement(erasedName.replace('$', '.'))
+            .map(type -> !isGeneratedWrapperType(allClasses, type) || !type.hasStereotype(Introspected.class))
+            .orElse(true);
+    }
+
+    /**
+     * The private method of the stub reading an attribute fixed at construction (see
+     * {@code StaticPlanner.fixed_attribute}): the slot of the attribute keeps the converted value
+     * for the Python object until a change of an attribute of an object of the class is reported,
+     * see {@code PythonFixedAttributes}. The stub class gets the epoch of its slots once, each
+     * attribute a transient slot, created on its first read.
+     */
+    private MethodDef fixedReader(ClassStubModel model, String property, String typeName, TypeDef type) {
+        ClassDef.ClassDefBuilder builder = model.builder();
+        Map<String, MethodDef> readers = fixedReaders.computeIfAbsent(builder, b -> new LinkedHashMap<>());
+        String key = property + ' ' + typeName;
+        MethodDef existing = readers.get(key);
+        if (existing != null) {
+            return existing;
+        }
+        if (readers.isEmpty()) {
+            builder.addField(FieldDef.builder(FIXED_ATTRIBUTES_FIELD)
+                .ofType(PYTHON_FIXED_ATTRIBUTES)
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
+                .initializer(PYTHON_FIXED_ATTRIBUTES.instantiate())
+                .build());
+        }
+        String name = fixedReaderName(model.element(), readers.size());
+        FieldDef slot = FieldDef.builder(name)
+            .ofType(PYTHON_FIXED_SLOT)
+            .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
+            .build();
+        builder.addField(slot);
+        // the value converted as a read of the attribute through the Python object converts it, boxed
+        MethodDef convertMethod = MethodDef.builder(CONVERT_METHOD)
+            .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+            .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
+            .returns(TypeDef.OBJECT)
+            .build();
+        Optional<PropertyElement> element = propertyElement(model, property);
+        MethodDef implementation = MethodDef.override(convertMethod)
+            .build((aThis, methodParameters) -> {
+                ExpressionDef converted = convertPythonValue(model.context(), methodParameters.get(0), typeName, type, element);
+                return (type instanceof TypeDef.Primitive primitive
+                    ? primitive.wrapperType().invokeStatic(VALUE_OF, List.of(primitive), primitive.wrapperType(), converted)
+                    : converted).returning();
+            });
+        ExpressionDef converter = new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
+        // a plain object of the compilation is wrapped, not copied: kept whatever its Python value
+        String erasedName = typeName.indexOf('<') < 0 ? typeName : typeName.substring(0, typeName.indexOf('<'));
+        boolean wrapper = erasedName.indexOf('.') >= 0 && model.context().getClassElement(erasedName.replace('$', '.'))
+            .map(attributeType -> isGeneratedWrapperType(allClasses, attributeType)).orElse(false);
+        MethodDef reader = MethodDef.builder(name)
+            .addModifiers(Modifier.PRIVATE)
+            .addJavadoc("The attribute [" + property + "] of the Python object, fixed at construction.")
+            .returns(type)
+            .build((aThis, methodParameters) -> aThis.field(slot).newLocal("slot", current -> StatementDef.multi(
+                current.isNull().doIf(StatementDef.multi(
+                    current.assign(PYTHON_FIXED_SLOT.instantiate()),
+                    aThis.field(slot).assign(current)
+                )),
+                unboxed(current.invoke("read", TypeDef.OBJECT,
+                    aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE),
+                    ExpressionDef.constant(property),
+                    javaClassType(model.element()).getStaticField(FIXED_ATTRIBUTES_FIELD, PYTHON_FIXED_ATTRIBUTES),
+                    converter,
+                    ExpressionDef.constant(wrapper)), type).returning()
+            )));
+        builder.addMethod(reader);
+        readers.put(key, reader);
+        return reader;
+    }
+
+    /**
+     * The name of a fixed reader and its slot: one no method or field of the class, declared or
+     * inherited, has (a Python class may name a method anything).
+     */
+    private static String fixedReaderName(ClassElement element, int index) {
+        Set<String> taken = new HashSet<>();
+        element.getEnclosedElements(ElementQuery.ALL_METHODS).forEach(method -> taken.add(method.getName()));
+        element.getEnclosedElements(ElementQuery.ALL_FIELDS).forEach(field -> taken.add(field.getName()));
+        String name = FIXED_SLOT_PREFIX + index;
+        while (taken.contains(name)) {
+            name = "_" + name;
+        }
+        return name;
+    }
+
+    /**
+     * A value a slot holds as an object, at the type the compiled body reads: a primitive unboxed.
+     */
+    private static ExpressionDef unboxed(ExpressionDef value, TypeDef type) {
+        if (type instanceof TypeDef.Primitive primitive) {
+            return value.cast(primitive.wrapperType()).invoke(primitive.name() + "Value", primitive);
+        }
+        return value.cast(type);
     }
 
     /**
@@ -5331,6 +5498,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * Whether the Python object of the stub is bound to compiled bodies, see {@link #bindWrapper}.
+     */
+    private static boolean bindsCompiled(ClassStubModel model) {
+        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
+        return plan != null && !compiledOwnersOf(plan, model).isEmpty();
+    }
+
+    /**
      * The classes of the MRO of the stub's class with compiled bodies of their own: the class
      * itself and its Python bases, in the order Python resolves a method.
      */
@@ -5411,9 +5586,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     private static StatementDef bindStoredValue(ClassStubModel model, VariableDef.This aThis) {
         // a subclass stub keeps the object in its base stub's field: reached through asPolyglotValue()
-        return model.pythonValue() == null
+        @Nullable FieldDef pythonValue = model.pythonValue();
+        return pythonValue == null
             ? bindWrapper(model, aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE))
-            : bindWrapper(model, aThis.field(model.pythonValue()));
+            : bindWrapper(model, aThis.field(pythonValue));
     }
 
     private static Optional<PropertyElement> propertyElement(ClassStubModel model, String property) {

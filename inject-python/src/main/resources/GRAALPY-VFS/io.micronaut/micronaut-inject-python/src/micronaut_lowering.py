@@ -607,6 +607,27 @@ class Refused(Exception):
     """A construct without a lowering; the reason is recorded before it is raised."""
 
 
+class _Lowered(list):
+    """The lowered statements of a block, with the Python line each one is lowered from in ``lines``."""
+
+    def __init__(self):
+        super().__init__()
+        self.lines = []
+
+    def add(self, statements, line):
+        self.extend(statements)
+        self.lines.extend([line] * len(statements))
+
+
+def _body(statements, prefix=()):
+    """
+    A Body of lowered statements, after the given ones lowered from no statement of their own: the
+    lines of the statements the generated Java maps its lines to (see StaticLineMap).
+    """
+    lines = list(getattr(statements, "lines", [0] * len(statements)))
+    return Body(list(prefix) + list(statements), [0] * len(prefix) + lines)
+
+
 class _ComprehensionBody(ast.stmt):
     """The statement at the heart of the loop a comprehension lowers to: the element appended to the result."""
     _fields = ()
@@ -652,6 +673,7 @@ class Lowering:
         self.parameters = {}      # name -> (type used at, stub type)
         self.java_calls = 0
         self.bridge_calls = 0
+        self.fixed_reads = 0      # the reads of attributes of self fixed at construction, from Java fields of the stub
         self.helper_calls = 0
         self.checked = False      # a call declares a checked exception
         self.prelude = []         # per statement being lowered, the statements a comprehension hoists before it
@@ -677,7 +699,7 @@ class Lowering:
                 self._refuse("unknown-type", "the function does not return a value on every path", self.node)
             self._shadow_reassigned_parameters()
             statements = self._block(self.node.body)
-            body = Body(self.hoisted + statements)
+            body = _body(statements, self.hoisted)
         except Refused:
             return None
         if self.reasons:
@@ -706,7 +728,7 @@ class Lowering:
             return ExceptionCrossing.TRANSLATED
         classes = getattr(self.checker, "python_classes", None)
         exception_classes = classes is not None and any(model.is_throwable() for model in classes.all())
-        if exception_classes and (self.compilation_calls or self.bridge_calls):
+        if exception_classes and (self.compilation_calls or self.bridge_calls or self.fixed_reads):
             return ExceptionCrossing.PYTHON_BODY
         return ExceptionCrossing.UNTRANSLATED
 
@@ -978,10 +1000,10 @@ class Lowering:
 
     def _block(self, statements):
         self.depth += 1
-        lowered = []
+        lowered = _Lowered()
         for index, statement in enumerate(statements):
             self.following.append(statements[index + 1:])
-            lowered.extend(self._statement(statement))
+            lowered.add(self._statement(statement), getattr(statement, "lineno", 0))
             self.following.pop()
         self.depth -= 1
         return lowered
@@ -1037,13 +1059,13 @@ class Lowering:
             test = self._truthy(node.test)
             self.branches.append(node)
             self.branch_depths.append(self.depth)
-            then = Body(self._branch_block(node.body))
-            or_else = Body(self._branch_block(node.orelse)) if node.orelse else None
+            then = _body(self._branch_block(node.body))
+            or_else = _body(self._branch_block(node.orelse)) if node.orelse else None
             self.branch_depths.pop()
             self.branches.pop()
             return [If(test, then, or_else)]
         if isinstance(node, ast.While):
-            return self._loop(node, lambda loop: While(loop, self._unhoisted(lambda: self._truthy(node.test)), Body(self._block(node.body)), *self._exits(loop)))
+            return self._loop(node, lambda loop: While(loop, self._unhoisted(lambda: self._truthy(node.test)), _body(self._block(node.body)), *self._exits(loop)))
         if isinstance(node, ast.For):
             return [self._for(node)]
         if isinstance(node, ast.Break):
@@ -1135,7 +1157,7 @@ class Lowering:
 
             def build(loop):
                 self.locals[variable] = LONG
-                return ForRange(loop, variable, start, stop, step, Body(self._block(node.body)), *self._exits(loop))
+                return ForRange(loop, variable, start, stop, step, _body(self._block(node.body)), *self._exits(loop))
             return self._loop(node, build)[0]
         if ((isinstance(iterable, ast.Name) or (isinstance(iterable, ast.Attribute) and isinstance(iterable.value, ast.Name) and iterable.value.id == "self"))
                 and _may_change_iterated(iterable, node.body)):
@@ -1163,7 +1185,7 @@ class Lowering:
 
         def build(loop):
             self.locals[variable] = used
-            return ForEach(loop, variable, used, declared, collection, Body(self._block(node.body)), *self._exits(loop))
+            return ForEach(loop, variable, used, declared, collection, _body(self._block(node.body)), *self._exits(loop))
         return self._loop(node, build)[0]
 
     def _loop_variable(self, variable, node):
@@ -1207,7 +1229,7 @@ class Lowering:
             for name, getter, java_type in ((key_name, "getKey", used[0]), (value_name, "getValue", used[1])):
                 self.locals[name] = java_type
                 bindings.append(Local(name, java_type, Cast(InvokeJava(LocalRef(entry, MAP_ENTRY), MAP_ENTRY, getter, [], [], OBJECT), java_type)))
-            return ForEach(loop, entry, MAP_ENTRY, MAP_ENTRY, entries, Body(bindings + self._block(node.body)), *self._exits(loop))
+            return ForEach(loop, entry, MAP_ENTRY, MAP_ENTRY, entries, _body(self._block(node.body), bindings), *self._exits(loop))
         return self._loop(node, build)[0]
 
     # ---------------------------------------------------------------- exceptions
@@ -1411,7 +1433,7 @@ class Lowering:
         self.thrown.append(set())
         self.java_code.append([])
         try:
-            body = Body(self._block(node.body))
+            body = _body(self._block(node.body))
         finally:
             thrown = self.thrown.pop()
             java_code = self.java_code.pop()
@@ -1453,7 +1475,7 @@ class Lowering:
             declared_before = set(self.locals)
             self.handling.append(("except", handler.name))
             try:
-                catches.append(Catch(caught[0], handler.name, Body(self._block(handler.body))))
+                catches.append(Catch(caught[0], handler.name, _body(self._block(handler.body))))
             finally:
                 self.handling.pop()
                 if handler.name is not None:
@@ -1465,7 +1487,7 @@ class Lowering:
             declared_before = set(self.locals)
             self.handling.append(("finally", None))
             try:
-                finally_body = Body(self._block(node.finalbody))
+                finally_body = _body(self._block(node.finalbody))
             finally:
                 self.handling.pop()
             self._end_scope(node, declared_before, [], "the finally block")
@@ -1602,7 +1624,7 @@ class Lowering:
             current = self._name(node.target)
         elif isinstance(node.target, ast.Attribute) and isinstance(node.target.value, ast.Name) and node.target.value.id == "self":
             property_type = self._self_property_type(node.target.attr, node.target)
-            current = SelfProperty(node.target.attr, property_type, self._is_accessor(node.target.attr))
+            current = SelfProperty(node.target.attr, property_type, self._is_accessor(node.target.attr), False)
             # an int attribute is a long in the body, as a read of it is
             used = JAVA_PRIMITIVE_NUMBERS.get(property_type, property_type)
             current = Cast(current, used) if used != property_type else current
@@ -2135,9 +2157,15 @@ class Lowering:
 
     def _attribute(self, node):
         if isinstance(node.value, ast.Name) and node.value.id == "self":
-            self.bridge_calls += 1
             property_type = self._self_property_type(node.attr, node)
-            read = SelfProperty(node.attr, property_type, self._is_accessor(node.attr))
+            accessor = self._is_accessor(node.attr)
+            fixed = not accessor and self._fixed(node.attr, property_type)
+            if fixed:
+                # read from a Java field of the stub: the Python object is reached once per object
+                self.fixed_reads += 1
+            else:
+                self.bridge_calls += 1
+            read = SelfProperty(node.attr, property_type, accessor, fixed)
             # an int attribute (an instance attribute hinted through __init__) is a long in the body; one
             # that may be None stays boxed
             used = JAVA_PRIMITIVE_NUMBERS.get(property_type, property_type)
@@ -2167,6 +2195,11 @@ class Lowering:
                 return self._python_attribute(model, value, node)
         self._outside_module(node.value)
         self._refuse("dynamic-call", f"the attribute [{node.attr}] resolves to no Java field or property of self", node)
+
+    def _fixed(self, name, property_type):
+        """Whether self.<name> is fixed at construction, so the stub reads it from a Java field (StaticPlanner.fixed_attribute)."""
+        fixed_attribute = getattr(self.planner, "fixed_attribute", None)
+        return fixed_attribute is not None and not self.static and self.class_model is not None and fixed_attribute(self.class_model, name, property_type)
 
     def _is_accessor(self, name):
         """Whether the attribute of self is a @property: its getter and setter run on the Python object."""

@@ -418,6 +418,18 @@ class ModuleFunctionTest(unittest.TestCase):
         self.assertEqual("append", append.name())
         self.assertEqual("LocalRef", _uncast(statements[-1].value()).getClass().getSimpleName())
 
+    def test_each_statement_carries_the_python_line_it_is_lowered_from(self):
+        # the generated Java maps its lines to them, so stack traces show the Python line
+        line = MODULE.splitlines().index("    return [v * 2 for v in values if v % 2 == 0]") + 1
+        body = self._compiled("evens").body()
+        statements = list(body.statements())
+        self.assertEqual(len(statements), len(list(body.lines())))
+        # the loop the comprehension is hoisted into belongs to the statement it is part of
+        self.assertEqual([line] * 3, list(body.lines())[-3:])
+        self.assertEqual([line], list(statements[-2].body().lines()))
+        twice_of = MODULE.splitlines().index("    return n * RATE") + 1
+        self.assertEqual([twice_of], list(self._compiled("twice_of").body().lines()))
+
     def test_dict_comprehensions_and_any_and_all_lower_alike(self):
         statements = list(self._compiled("lengths").body().statements())
         self.assertEqual("java.util.Map<java.lang.String,long>", statements[-3].type())
@@ -874,6 +886,122 @@ class Service:
     def test_unknown_modes_are_rejected(self):
         with self.assertRaises(ValueError):
             CompileScope("fast", NAMES)
+
+    def test_type_checking_and_static_compilation_share_one_scope_resolver(self):
+        from micronaut_typecheck import ScopeResolver, TypeCheckScope, MODE_ERROR as CHECK_ERROR, MODE_OFF as CHECK_OFF, MODE_WARN as CHECK_WARN
+        checked = ["io.micronaut.context.python.annotation.TypeChecked"]
+        planner = StaticPlanner(MODE_ALL, NAMES)
+        checker = TypeChecker(CHECK_WARN, checked)
+        self.assertIs(ScopeResolver, type(planner.scope))
+        self.assertIs(ScopeResolver, type(checker.scope))
+        self.assertIs(ScopeResolver, type(CompileScope(MODE_OFF, NAMES)))
+        self.assertIs(ScopeResolver, type(TypeCheckScope(CHECK_OFF, checked)))
+
+        class Decorator:
+            def __init__(self, name, value=None):
+                self._name = name
+                self._value = value
+
+            def annotationName(self):
+                return self._name
+
+            def members(self):
+                return {} if self._value is None else {"value": self._value}
+
+        # the same declarations resolve through the same rules: the nearest switch wins
+        def switched(names, value=None):
+            return [Decorator(name, value) for name in names]
+
+        for mode, expected in ((MODE_ALL, (True, "MODE")), (MODE_ANNOTATED, (False, "MODE")), (MODE_OFF, (False, "MODE"))):
+            self.assertEqual(expected, CompileScope(mode, NAMES).resolve([], None, []))
+        self.assertEqual((False, "MODULE"), CompileScope(MODE_ALL, NAMES).resolve(switched(NAMES[:1], "false"), None, []))
+        self.assertEqual((True, "CLASS"), CompileScope(MODE_OFF, NAMES).resolve(switched(NAMES[:1], False), switched(NAMES[1:]), []))
+        self.assertEqual((False, "FUNCTION"), CompileScope(MODE_OFF, NAMES).resolve([], switched(NAMES[:1]), switched(NAMES[:1], False)))
+        for mode, expected in ((CHECK_OFF, (None, "MODE")), (CHECK_WARN, (CHECK_WARN, "MODE")), (CHECK_ERROR, (CHECK_ERROR, "MODE"))):
+            self.assertEqual(expected, TypeCheckScope(mode, checked).resolve([], None, []))
+        self.assertEqual((None, "MODULE"), TypeCheckScope(CHECK_WARN, checked).resolve(switched(checked, "False"), None, []))
+        self.assertEqual((CHECK_ERROR, "CLASS"), TypeCheckScope(CHECK_OFF, checked).resolve(switched(checked, False), switched(checked), []))
+        self.assertEqual((None, "FUNCTION"), TypeCheckScope(CHECK_OFF, checked).resolve([], switched(checked), switched(checked, 0)))
+        # a switch of the other feature is no switch
+        self.assertEqual((True, "MODE"), CompileScope(MODE_ALL, NAMES).resolve(switched(checked, False), None, []))
+
+
+NESTED_CLASSES = '''
+from micronaut.context.python.annotation import CompileStatic
+
+
+@CompileStatic(False)
+class Legacy:
+    def run(self, value: int) -> int:
+        return value
+
+    class Inner:
+        def m(self, value: int) -> int:
+            return value
+
+        @CompileStatic
+        def fast(self, value: int) -> int:
+            return value
+
+        @CompileStatic
+        class Switched:
+            def deep(self, value: int) -> int:
+                return value
+
+
+@CompileStatic
+class Opted:
+    class Inner:
+        def m(self, value: int) -> int:
+            return value
+
+        @CompileStatic(False)
+        class Excluded:
+            def deep(self, value: int) -> int:
+                return value
+
+
+class Plain:
+    class Inner:
+        def m(self, value: int) -> int:
+            return value
+'''
+
+
+class NestedClassCompileScopeTest(unittest.TestCase):
+    """A nested class takes the CompileStatic switch of the class around it, as it takes its TypeChecked switch."""
+
+    def outcomes(self, mode):
+        decisions, _ = plan(NESTED_CLASSES, mode)
+        return {name.replace("$", "."): (decision.outcome().name(), decision.scope().name()) for name, decision in decisions.items()}
+
+    def test_an_outer_switch_off_excludes_the_nested_classes_under_mode_all(self):
+        outcomes = self.outcomes(MODE_ALL)
+        self.assertEqual(("EXCLUDED", "CLASS"), outcomes["Legacy.run"])
+        self.assertEqual(("EXCLUDED", "CLASS"), outcomes["Legacy.Inner.m"])
+        self.assertEqual(("CANDIDATE", "FUNCTION"), outcomes["Legacy.Inner.fast"])
+        self.assertEqual(("CANDIDATE", "MODE"), outcomes["Plain.Inner.m"])
+
+    def test_an_outer_switch_on_compiles_the_nested_classes_under_modes_annotated_and_off(self):
+        for mode in (MODE_ANNOTATED, MODE_OFF):
+            outcomes = self.outcomes(mode)
+            self.assertEqual(("CANDIDATE", "CLASS"), outcomes["Opted.Inner.m"], mode)
+            self.assertEqual(("EXCLUDED", "MODE"), outcomes["Plain.Inner.m"], mode)
+
+    def test_a_nested_class_switch_overrides_the_outer_one(self):
+        for mode in (MODE_ALL, MODE_ANNOTATED, MODE_OFF):
+            outcomes = self.outcomes(mode)
+            self.assertEqual(("CANDIDATE", "CLASS"), outcomes["Legacy.Inner.Switched.deep"], mode)
+            self.assertEqual(("EXCLUDED", "CLASS"), outcomes["Opted.Inner.Excluded.deep"], mode)
+
+    def test_the_planner_and_the_checker_resolve_the_same_classes_alike(self):
+        from micronaut_typecheck import MODE_WARN as CHECK_WARN
+        checker = TypeChecker(CHECK_WARN, NAMES)  # the CompileStatic names, so both read the same switches
+        visitor = MicronautAstVisitor(Callback(), "pkg", "module.py", None, None, source_path="module.py", source_text=NESTED_CLASSES, type_checker=checker)
+        visitor.visit(ast.parse(NESTED_CLASSES))
+        checked = {unit.qualified_name: unit.severity is not None for unit in checker.units() if unit.function_def is not None}
+        compiled = {name: outcome == "CANDIDATE" for name, (outcome, _) in self.outcomes(MODE_ALL).items()}
+        self.assertEqual(checked, compiled)
 
 
 class ClassificationTest(unittest.TestCase):
@@ -2907,6 +3035,245 @@ class PythonSemanticsTest(unittest.TestCase):
     def test_a_tuple_literal_and_a_tuple_copy_build_tuples(self):
         self.assertIsNotNone(self._helper(self._returned("pair"), "tuple"), self._returned("pair"))
         self.assertIsNotNone(self._helper(self._returned("frozen"), "copyOfTuple"), self._returned("frozen"))
+
+
+class FixedFacts(FakeFacts):
+    """The facts of a compilation whose classes are introspected only when named so."""
+
+    def __init__(self, introspected=()):
+        self.introspected = set(introspected)
+
+    def isIntrospected(self, name):
+        return name in self.introspected
+
+
+FIXED = '''
+class Repo:
+    def __init__(self, base: int):
+        self.base = base
+
+    def find(self, n: int) -> int:
+        return n + self.base
+
+
+class Service:
+    def __init__(self, rate: float, name: str, repo: Repo, count: int, items: list[str]):
+        """Every attribute is assigned here and only read afterwards."""
+        self.rate = rate
+        self.name = name
+        self.repo = repo
+        self.count = count
+        self.items = items
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+
+    def label(self) -> str:
+        return self.name + str(self.count)
+
+    def found(self, n: int) -> int:
+        return self.repo.find(n)
+
+    def listed(self) -> int:
+        return len(self.items)
+
+
+class Counter:
+    def __init__(self, start: int):
+        self.start = start
+        self.calls = 0
+
+    def bump(self) -> None:
+        self.calls += 1
+
+    def read(self) -> int:
+        return self.start
+
+
+class Patched:
+    def __init__(self, factor: float, limit: int):
+        self.factor = factor
+        self.limit = limit
+
+    def total(self, n: int) -> float:
+        return n * self.factor
+
+    def capped(self, n: int) -> int:
+        return min(n, self.limit)
+
+
+def reset(patched: Patched) -> None:
+    patched.factor = 2.0
+
+
+class Named:
+    def __init__(self, bound: int, size: int):
+        self.bound = bound
+        self.size = size
+
+    def capped(self, n: int) -> int:
+        return min(n, self.bound) + self.size
+
+
+def tweak(named: Named) -> None:
+    setattr(named, "bound", 3)
+
+
+class Base:
+    def __init__(self, rate: float):
+        self.rate = rate
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+
+
+class Derived(Base):
+    pass
+
+
+class Guarded:
+    def __init__(self, rate: float):
+        self.rate = rate
+
+    def __setattr__(self, name, value):
+        object.__setattr__(self, name, value)
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+
+
+class Later:
+    def __init__(self, rate: float):
+        self.rate = rate
+
+        def change():
+            self.rate = 2.0
+        self.change = change
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+
+
+class Updating:
+    def __init__(self, rate: float):
+        self.rate = rate
+
+    def update(self, name: str, value: float) -> None:
+        super().__setattr__(name, value)
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+
+
+class Declared:
+    rate: float = 1.0
+
+    def __init__(self, rate: float):
+        self.rate = rate
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+'''
+
+
+def _self_reads(body):
+    """The reads of attributes of self in a compiled body, by attribute: whether each is fixed."""
+    reads = {}
+    children = ("body", "statements", "value", "left", "right", "operand", "receiver", "arguments", "test", "then", "orElse", "parts", "expression")
+
+    def visit(node):
+        if node is None or isinstance(node, (str, bool, int, float)):
+            return
+        if hasattr(node, "size") and hasattr(node, "iterator"):
+            for element in node:
+                visit(element)
+            return
+        if not hasattr(node, "getClass"):
+            return
+        if node.getClass().getSimpleName() == "SelfProperty":
+            reads[node.property()] = node.fixed()
+            return
+        for accessor in children:
+            if hasattr(node, accessor):
+                visit(getattr(node, accessor)())
+
+    visit(body.body())
+    return reads
+
+
+class FixedAttributeTest(unittest.TestCase):
+    """Attributes fixed at construction: __init__ assigns them and nothing writes them later, so a stub reads them from Java fields."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.decisions, cls.planner = plan(FIXED, MODE_ALL, facts=FixedFacts())
+        cls.bodies = {(body.className().split(".")[-1], body.methodName()): body for body in cls.planner.bodies}
+
+    def _body(self, owner, name):
+        decision = self.decisions[f"{owner}.{name}"]
+        self.assertEqual("COMPILED", decision.outcome().name(), [(r.rule(), r.message()) for r in decision.reasons()])
+        return self.bodies[(owner, name)]
+
+    def test_attributes_only_init_assigns_are_read_from_java_fields(self):
+        self.assertEqual({"rate": True}, _self_reads(self._body("Service", "total")))
+        self.assertEqual({"name": True, "count": True}, _self_reads(self._body("Service", "label")))
+        self.assertEqual({"repo": True}, _self_reads(self._body("Service", "found")))  # a plain object of the compilation
+        for name in ("total", "label", "found"):
+            self.assertEqual(0, self._body("Service", name).stats().bridgeCalls(), name)
+
+    def test_a_collection_is_read_through_the_python_object(self):
+        # the boundary copies a Python list: a change in place would not reach a kept copy
+        self.assertEqual({"items": False}, _self_reads(self._body("Service", "listed")))
+        self.assertEqual(1, self._body("Service", "listed").stats().bridgeCalls())
+
+    def test_a_class_writing_its_attributes_after_construction_keeps_them_in_python(self):
+        # each write would report a change: the class keeps every attribute in Python
+        self.assertEqual({"start": False}, _self_reads(self._body("Counter", "read")))
+        self.assertEqual(1, self._body("Counter", "read").stats().bridgeCalls())
+
+    def test_an_attribute_written_elsewhere_in_the_compilation_is_not_fixed(self):
+        # by its name: an assignment on another object may assign the attribute of a class, which no change reports
+        self.assertEqual({"factor": False}, _self_reads(self._body("Patched", "total")))
+        self.assertEqual({"limit": True}, _self_reads(self._body("Patched", "capped")))
+
+    def test_an_attribute_a_call_names_is_not_fixed(self):
+        self.assertEqual({"bound": False, "size": True}, _self_reads(self._body("Named", "capped")))
+
+    def test_a_class_with_a_subclass_a_setattr_a_closure_or_a_declaration_is_not_fixed(self):
+        for owner in ("Base", "Guarded", "Later", "Declared", "Updating"):
+            self.assertEqual({"rate": False}, _self_reads(self._body(owner, "total")), owner)
+
+    def test_an_introspected_class_or_value_is_not_fixed(self):
+        decisions, planner = plan(FIXED, MODE_ALL, facts=FixedFacts(introspected={"pkg.Service", "Service"}))
+        bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
+        self.assertEqual({"rate": False}, _self_reads(bodies[("Service", "total")]))
+        decisions, planner = plan(FIXED, MODE_ALL, facts=FixedFacts(introspected={"pkg.Repo", "Repo"}))
+        bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
+        self.assertEqual({"repo": False}, _self_reads(bodies[("Service", "found")]))
+        self.assertEqual({"rate": True}, _self_reads(bodies[("Service", "total")]))
+
+    def test_without_introspection_facts_nothing_is_fixed(self):
+        decisions, planner = plan(FIXED, MODE_ALL, facts=FakeFacts())
+        bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
+        self.assertEqual({"rate": False}, _self_reads(bodies[("Service", "total")]))
+
+    def test_dict_access_anywhere_in_the_compilation_fixes_nothing(self):
+        for escape in ("vars(service)", "service.__dict__", "object.__setattr__(service, attribute, 1)", "setattr(service, attribute, 1)",
+                       "Service.__getattribute__ = None", "del Service.__setattr__", "setattr(Service, \"__delattr__\", None)", "Service.__bases__ = ()", "getattr(service, \"__dict__\")[attribute] = 1",
+                       "object.__setattr__(service, attribute, \"new\")", "setattr(service, attribute, \"new\")",
+                       "mock.patch.object(Service, attribute, \"new\")", "mock.patch(attribute, \"new\")", "__setattr__(service, attribute)"):
+            source = FIXED + f"\n\ndef escape(service: Service, attribute: str) -> None:\n    {escape}\n"
+            decisions, planner = plan(source, MODE_ALL, facts=FixedFacts())
+            bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
+            self.assertEqual({"rate": False}, _self_reads(bodies[("Service", "total")]), escape)
+
+    def test_a_patch_naming_the_attribute_unfixes_it(self):
+        for patch in ('mock.patch.object(Service, "rate", 2.0)', 'mock.patch("pkg.Service.rate", 2.0)', 'monkeypatch.setattr(service, "rate", 2.0)', "mock.patch.multiple(service, rate=2.0)"):
+            source = FIXED + f"\n\ndef patched(service, mock, monkeypatch) -> None:\n    {patch}\n"
+            decisions, planner = plan(source, MODE_ALL, facts=FixedFacts())
+            bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
+            self.assertEqual({"rate": False}, _self_reads(bodies[("Service", "total")]), patch)
+            self.assertEqual({"name": True, "count": True}, _self_reads(bodies[("Service", "label")]), patch)
 
 
 if __name__ == "__main__":

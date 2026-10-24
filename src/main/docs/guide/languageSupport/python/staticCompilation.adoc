@@ -55,7 +55,7 @@ PyronautCompiler.builder()
 
 == Switching Compilation On or Off for a Scope
 
-The `CompileStatic` annotation switches compilation for a class, a function or, applied as a bare statement, a module, with the scope rules of `TypeChecked`: the nearest declaration wins.
+The `CompileStatic` annotation switches compilation for a class, a function or, applied as a bare statement, a module, with the scope rules of `TypeChecked`: the nearest declaration wins: a function over its class, a nested class over the class around it, a class over its module, a module over the compilation's mode.
 
 [source,python]
 .shop/PricingService.py
@@ -211,7 +211,7 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |Inlined as literals, including a constant imported from another module of the compilation, when the defining module binds the name once, in a statement of its own body, and no function declares it `global`; a constant that may be rebound is refused (`unknown-type`).
 
 |`self.x`, `self.x = v`
-|The Java field of an introspected class, else the attribute of the Python object; a `@property` always runs its Python getter or setter. An attribute `__init__` assigns a hinted parameter or a Java call or construction (`self._encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder()`) has that type in every method.
+|The Java field of an introspected class, else the attribute of the Python object, read from a Java field of the stub when it is fixed at construction (see <<staticCompilationFixedAttributes>>); a `@property` always runs its Python getter or setter. An attribute `__init__` assigns a hinted parameter or a Java call or construction (`self._encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder()`) has that type in every method.
 
 |`self.method(...)`
 |The generated class's own Java method when it declares one for the call (a public method with a hinted signature the call fills exactly, that no advice intercepts and no subclass of the compilation overrides), else the method of the Python object, which runs its interceptors, overrides and default arguments as Python would.
@@ -224,7 +224,7 @@ Refused as well, where the Java code would behave differently: a `for` loop whos
 [[staticCompilationOneImplementation]]
 == One Implementation
 
-The Python object of a compiled class still exists: the generated class creates it, and Python code, the interceptor chains and the event loop call the Python class's own functions. So that a Python caller runs the same code as a Java caller, the generated class binds every Python object it creates or wraps to the compiled bodies of each class of its MRO that has some, and the runtime tree of the module is rewritten before its bytecode is compiled: a compiled function runs the Java body of the class it is defined in when its object is bound, so `super().label(...)` from a subclass runs the base's body, not the override; otherwise it runs its original body, which keeps objects created in Python (`Calc().label(...)`) on the Python implementation. The binding is kept outside the object: a copy of a bound object is not bound, and `vars()`, `copy` and `pickle` see the object's own attributes only.
+The Python object of a compiled class still exists: the generated class creates it, and Python code, the interceptor chains and the event loop call the Python class's own functions. So that a Python caller runs the same code as a Java caller, the generated class binds every Python object it creates or wraps to the compiled bodies of each class of its MRO that has some, and the runtime tree of the module is rewritten before its bytecode is compiled: a compiled function runs the Java body of the class it is defined in when its object is bound, so `super().label(...)` from a subclass runs the base's body, not the override; otherwise it runs its original body, which keeps objects created in Python (`Calc().label(...)`) on the Python implementation. The binding is kept outside the object: a copy of a bound object is not bound, and `vars()`, `copy` and `pickle` see the object's own attributes only. An object the generated class creates again because the application it was created in has shut down (an instance held across applications, such as a JVM-wide singleton) is bound again in the application now running, to the compiled bodies of every class of its MRO, so its Python callers keep running the Java bodies.
 
 A Python caller runs the Java body only when it gets what the Python body would give it:
 
@@ -234,18 +234,56 @@ A Python caller runs the Java body only when it gets what the Python body would 
 
 A division by zero, a failed `assert` or `+` on `None` in a Java body reaches a Python caller as the `ZeroDivisionError`, `AssertionError` or `TypeError` Python raises, and a checked exception of a Java call as itself. A body that uses a construct this check does not analyse (a loop, a collection, exception handling, a call of a sibling method) keeps the Python body for its Python callers; its Java callers run the compiled body all the same.
 
-Introspected classes keep their ownership model: their state lives in Java fields, and a compiled body reads and writes those fields, which is what a Java caller of the accessors sees. Other classes keep their state in the Python object, and a compiled body reaches it through the same member access the generated accessors use; each such access crosses into the Python runtime, which the report counts as a bridge call, so a compiled body that touches many attributes of a plain class may not be faster than the bridge it replaces.
+Introspected classes keep their ownership model: their state lives in Java fields, and a compiled body reads and writes those fields, which is what a Java caller of the accessors sees. Other classes keep their state in the Python object, and a compiled body reaches it through the same member access the generated accessors use; each such access crosses into the Python runtime, which the report counts as a bridge call, so a compiled body that touches many attributes of a plain class may not be faster than the bridge it replaces. An attribute fixed at construction is the exception.
+
+[[staticCompilationFixedAttributes]]
+=== Attributes Fixed at Construction
+
+A compiled body of a plain class reads an attribute from a Java field of the stub when the attribute is fixed at construction: `__init__` assigns it, and nothing writes it afterwards. The stub reads the attribute through the Python object the first time a compiled body of the object reads it, keeps the converted value, and reads it again only when an attribute of an object of the class changes. A controller whose `__init__` stores the services it is injected with reaches them without crossing into Python, and a route that only calls their compiled methods runs as Java from end to end:
+
+[source,python]
+----
+@Controller("/items")
+class ItemController:
+    def __init__(self, items: ItemService, users: UserService):
+        self.items = items              # <1>
+        self.users = users
+
+    @Get("/{id}")
+    def show(self, id: UUID) -> ItemPublic:
+        return item_public(self.items.by_id(id))   # <2>
+----
+<1> Assigned by `__init__` only: fixed at construction
+<2> `self.items` is read from a Java field; the report counts no bridge call for it
+
+The compiler fixes an attribute when the whole compilation shows that the Python object would give the same value every time:
+
+* the class has no base but `object` (or `ABC`, `Generic`) and no subclass in the compilation, no metaclass and no decorator other than annotations, is neither introspected nor a dataclass or an exception, defines none of `+__setattr__+`, `+__delattr__+`, `+__getattr__+`, `+__getattribute__+`, `+__new__+` and `+__slots__+`, and no method other than `+__init__+` (nor a function `+__init__+` defines) assigns or deletes an attribute of `self`;
+* the class declares nothing of the name (a class attribute, a `@property`, a method), and the name is no dunder or private attribute;
+* no code of the compilation assigns or deletes the attribute on an object other than the receiver of a method (`item.title = v`, `Cls.title = v`, `del obj.title`), nor names it in a call that writes attributes by name (`setattr(obj, "title", v)`, `delattr`, `patch.object(Cls, "title")`, `patch("app.m.Cls.title")`, `monkeypatch.setattr(obj, "title", v)`, `patch.multiple(obj, title=v)`), and none reaches attributes in a way no name says: `+__dict__+` (as an attribute or the string `"__dict__"`), `vars()`, `setattr` or `object.__setattr__` with a computed name on another object than `self`, an assignment of `+__class__+`, of `+__bases__+` or of a member of the attribute protocol (`Cls.__getattribute__ = f`);
+* the value converts to the same Java value every time: a number, a boolean, a string, a Java object (handed over as itself) or an object of a plain class of the compilation (which its generated class wraps); not a collection, which is copied, nor an object of an introspected class, which copies the Python object's state. A value of a Java type the Python object converts to (a value a target type mapping may build anew) is kept only when the Python value is a Java object, a string, a number, a boolean, a date or a time, and read every time otherwise.
+
+The first read makes the class report changes: the runtime gives the class a `+__setattr__+` and a `+__delattr__+` that do what `object` does and tell the stubs when an attribute an object already has is assigned again or deleted (a first assignment cannot change a value read before), so an assignment the compiler does not see (a test's `monkeypatch.setattr(controller, "items", fake)`, code outside the compilation, a Java caller's `putMember`) makes the stubs read the attribute again. An object whose class serves its attributes itself at run time (a subclass created at run time with a `+__getattribute__+` of its own, a class attribute of the name) is read through the Python object every time. Objects created in Python are unaffected, and the Python bodies read the attributes as they always do.
+
+[[staticCompilationStackTraces]]
+== Stack Traces and Debugging
+
+The generated Java of a compiled method notes where each statement comes from: a `Compiled from` javadoc gives the Python file and the line of the `def`, and a `// Python line N` comment precedes the Java of each Python statement. When `PyronautCompiler` compiles the application (the `pyronaut` CLI and the build tasks that run it, to a directory or in memory), it rewrites the class files of such a generated class to these positions: the class names the Python file as its source, and each line of a compiled method is the line of the Python statement it runs, or the line of the `def` for the code the generated class adds around the statements. A stack trace of an exception raised in a compiled body therefore shows the Python position (`at shop.PricingService.total(pricing.py:12)`), and so does a debugger, which reads the same attributes. The other methods of the class, which call into Python, have no Python statement of their own: their frames show the Python file without a line, followed by the frames of the Python code they run.
+
+A class compiled by `javac` without `PyronautCompiler` (the annotation processor on the processor path of a plain Java compilation) keeps the positions of the generated Java, with the comments as the map to the Python source.
 
 [[staticCompilationAssumptions]]
 == Assumptions and Limitations
 
-Static compilation makes three assumptions about the code it compiles, and does not check them at runtime.
+Static compilation makes four assumptions about the code it compiles, and does not check them at runtime.
 
 *Applications are compiled, not libraries.* The planner sees every subclass of the compilation: a sibling that one of them overrides is called through the Python object, and the subclass's generated class overrides the Java method. A subclass defined outside the compilation (in another module or library, inside a function, or created at runtime with `type(...)`) is not seen, and there is no runtime guard for it: if it overrides a compiled method, Java callers (a route, an injected service, the generated class's own compiled bodies calling the method on `self`) reach the compiled body of the base, not the override. So compile applications, not libraries meant to be subclassed by others, and keep every subclass that overrides a compiled method in the same compilation; a method that must stay overridable from outside is excluded with `@CompileStatic(False)`.
 
 *Return hints are trusted, and checked for `None`.* A compiled body that calls a Python method (a sibling the generated class does not declare, or a method of another object of the compilation, called through the Python object) takes the method's return hint as the type of the result, so a method hinted `-> int` gives a `long`; an attribute of another object it reads through the Python object (a `@property`, a hinted class attribute, an attribute `__init__` assigns) has the type of its hint. The hint is not verified beyond `None`: a method hinted `int`, `float` or `bool` that returns `None` fails the compiled call with a `TypeError` naming the method and its hint (`Calc._maybe() returned None but is hinted to return int`; an `IllegalStateException` for a Java caller), and such an attribute that is `None` fails the read the same way (`Bag.weight is None but is hinted as float`), where the Python body would carry the `None` on until an operation rejects it. Hint a method that may return `None` with `int | None`, which compiles to a boxed `Long`.
 
 *Exceptions of the compilation are raised by the compilation.* A Python exception raised in Python is the Python exception in Python code, and one that crossed Java code (a Java method calling back into Python) is its generated Java class. A compiled body sees both as the Java class. It refuses an except clause for an exception class around its own calls of Java code, and its Python callers keep the Python body when it calls both Java code and code of the compilation. What it cannot see is a Python method of the compilation it calls (compiled or not) letting through the Java class it received from a Java call of its own: a compiled clause catches it there, and a Python caller of the compiled method gets the Python exception, where Python would see the Java class.
+
+*Attributes fixed at construction change through the attribute protocol.* The compiler sees every write of an attribute the compilation makes, and the runtime every assignment and deletion of an attribute of an object (see <<staticCompilationFixedAttributes>>). What neither sees is a change behind the protocol, made where no name says so (by code outside the compilation, or through `getattr` with a computed name that is `"__dict__"`): a write to the object's `+__dict__+` or through `object.__setattr__`, an attribute of the same name added to the class (`patch.object(ItemController, "items", new_callable=PropertyMock)` in a test outside the compilation), an assignment of `+__class__+` or of a member of the protocol. A stub that read the attribute before keeps the value it read. Leave a class that such code changes out of static compilation, or write the attribute through `setattr`.
 
 [[staticCompilationReport]]
 == The Report
@@ -255,7 +293,7 @@ One record per function of the compilation, delivered to the builder callback as
 [source]
 ----
 COMPILED      PricingService.total  src/main/python/shop/PricingService.py:11:5
-              statements 1 · java calls 0 · bridge calls 1 · helpers 0
+              statements 1 · java calls 0 · bridge calls 0 · helpers 0
 SKIPPED       PricingService.discounted  src/main/python/shop/PricingService.py:14:5
               [unsupported-expression] src/main/python/shop/PricingService.py:15:16  a list comprehension has no static lowering
 EXCLUDED      PricingService.describe  src/main/python/shop/PricingService.py:18:5
@@ -272,7 +310,7 @@ special-method                   1
 unsupported-expression           1
 ----
 
-`self.rate` is one bridge call: `PricingService` is not introspected, so its state lives in the Python object. The matching record of `decisions.jsonl`:
+`self.rate` is no bridge call: `PricingService` is not introspected, so its state lives in the Python object, but `__init__` alone assigns `rate`, so the stub keeps it in a Java field (see <<staticCompilationFixedAttributes>>). The matching record of `decisions.jsonl`:
 
 [source,json]
 ----

@@ -1,6 +1,9 @@
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.python.PythonContextRuntime
 import io.micronaut.context.python.PythonStatic
+import io.micronaut.python.compiler.InMemoryBeanDefinitionsProvider
 import io.micronaut.python.compiler.PyronautCompiler
 import io.micronaut.python.processing.staticcompile.StaticCompilationDecision
 import io.micronaut.python.processing.staticcompile.StaticCompilationMode
@@ -540,5 +543,102 @@ class Copier:
 
         cleanup:
         context?.close()
+    }
+
+    void "a context restart keeps delegating: the objects stubs create again are bound (#compileMode)"() {
+        given:
+        mode = compileMode
+        int compiled = compileMode == StaticCompilationMode.ALL ? 1 : 0
+        PythonStatic.resetEntries()
+        def first = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
+
+@Singleton
+class Calc:
+    unit: str = "base"
+
+    def __init__(self):
+        self.unit = "x"
+
+    def label(self, count: int, name: str) -> str:
+        return f"{count} {self.unit} {name}"
+
+class Base:
+    def foo(self, n: int) -> int:
+        return n + 1
+
+@Singleton
+class Sub(Base):
+    def bar(self, n: int) -> int:
+        return n * 2
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def __init__(self, calc: Calc, sub: Sub):
+        self.calc = calc
+        self.sub = sub
+
+    def run(self) -> str:
+        return self.through(self.calc, self.sub)
+
+    def through(self, calc: Calc, sub: Sub) -> str:
+        return f"{calc.label(2, 'pen')} {sub.foo(1)} {sub.bar(2)}"
+''')
+        def calc = getBean(first, 'python.Calc')
+        def sub = getBean(first, 'python.Sub')
+        ApplicationContext second = null
+
+        expect:
+        compileMode == StaticCompilationMode.OFF || decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName().containsAll(['Calc.label', 'Base.foo', 'Sub.bar'])
+
+        when: "Python and Java call the compiled methods of the beans of the first application"
+        def fromPython = getBean(first, 'python.Caller').run()
+        def fromJava = "${calc.label(3, 'jar')} ${sub.foo(4)} ${sub.bar(5)}".toString()
+
+        then:
+        fromPython == '2 x pen 2 4'
+        fromJava == '3 x jar 5 10'
+        PythonStatic.entries('python.Calc#label') == 2 * compiled
+        PythonStatic.entries('python.Base#foo') == 2 * compiled
+        PythonStatic.entries('python.Sub#bar') == 2 * compiled
+
+        when: "the application shuts down and another one starts: the stubs held over create their Python objects again"
+        def classLoader = first.classLoader
+        first.close()
+        first = null
+        second = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .beanDefinitionsProvider(new InMemoryBeanDefinitionsProvider(false))
+            .environments('test')
+            .build().start()
+        def javaAfter = "${calc.label(6, 'cap')} ${sub.foo(7)} ${sub.bar(8)}".toString()
+
+        then: "Java callers of the stubs held over still run the Java bodies"
+        PythonContextRuntime.isInitialized()
+        javaAfter == '6 x cap 8 16'
+        PythonStatic.entries('python.Calc#label') == 3 * compiled
+        PythonStatic.entries('python.Base#foo') == 3 * compiled
+        PythonStatic.entries('python.Sub#bar') == 3 * compiled
+
+        when: "Python code of the new application calls the objects created again, then its own beans"
+        def caller = getBean(second, 'python.Caller')
+        def pythonAfter = caller.through(calc, sub)
+        def ownAfter = caller.run()
+
+        then: "the objects created again are bound: Python callers run the Java bodies too"
+        pythonAfter == '2 x pen 2 4'
+        ownAfter == '2 x pen 2 4'
+        PythonStatic.entries('python.Calc#label') == 5 * compiled
+        PythonStatic.entries('python.Base#foo') == 5 * compiled
+        PythonStatic.entries('python.Sub#bar') == 5 * compiled
+
+        cleanup:
+        second?.close()
+        first?.close()
+
+        where:
+        compileMode << [StaticCompilationMode.OFF, StaticCompilationMode.ALL]
     }
 }
