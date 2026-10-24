@@ -49,7 +49,7 @@ class AsyncRequestBodyConcurrentCopyTest {
     @Test
     void aCopyReadTogetherWithTheBodyLeavesTheBodyIntact() throws Exception {
         try (ApplicationContext ctx = ApplicationContext.run()) {
-            AsyncRequestBodyArgumentBinder binder = ctx.getBean(AsyncRequestBodyArgumentBinder.class);
+            AsyncRequestBodyFactory factory = ctx.getBean(AsyncRequestBodyFactory.class);
             Random random = new Random(42);
             for (int size : new int[] {5000, 300_000, 1_500_000}) {
                 for (int chunk : new int[] {1000, 8192}) {
@@ -58,7 +58,7 @@ class AsyncRequestBodyConcurrentCopyTest {
                         random.nextBytes(data);
                         Chunks chunks = new Chunks(data, chunk);
                         Server server = new Server(FACTORY.adapt(chunks, new BodySizeLimits(Long.MAX_VALUE, 10 * 1024 * 1024), null, null));
-                        DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, binder);
+                        DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, factory);
                         AsyncRequestBody copy = body.copy();
                         CompletableFuture<byte[]> copied = copy.bytes(Integer.MAX_VALUE - 8).toCompletableFuture();
                         CompletableFuture<byte[]> original = body.bytes(Integer.MAX_VALUE - 8).toCompletableFuture();

@@ -45,7 +45,6 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -66,10 +65,6 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
      */
     @Nullable
     private final AsyncFunctionDiscoveryClient asyncDiscoveryClient;
-    /**
-     * The function name of each method, which does not change.
-     */
-    private final Map<ExecutableMethod<?, ?>, String> functionNames = new ConcurrentHashMap<>();
 
     /**
      * Constructor.
@@ -124,9 +119,8 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
             body = parameterValueMap;
         }
 
-        String functionName = functionNames.computeIfAbsent(context.getExecutableMethod(), method ->
-            method.stringValue(AnnotationUtil.NAMED).orElseGet(() -> NameUtils.hyphenate(method.getMethodName(), true))
-        );
+        // The function name of the method doesn't change: the method keeps it
+        String functionName = context.getCachedValue(FunctionName.class, FunctionName::of).name();
 
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
         try {
@@ -238,6 +232,19 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
                 throw error;
             }
             throw Exceptions.propagate(cause);
+        }
+    }
+
+
+    /**
+     * The name of the function a method invokes.
+     *
+     * @param name The function name
+     */
+    private record FunctionName(String name) {
+
+        static FunctionName of(ExecutableMethod<?, ?> method) {
+            return new FunctionName(method.stringValue(AnnotationUtil.NAMED).orElseGet(() -> NameUtils.hyphenate(method.getMethodName(), true)));
         }
     }
 
