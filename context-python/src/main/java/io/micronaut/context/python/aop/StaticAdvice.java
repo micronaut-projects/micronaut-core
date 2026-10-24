@@ -104,7 +104,7 @@ public final class StaticAdvice<T> {
     @SuppressWarnings("unchecked")
     public @Nullable Object proceed(String methodName, String[] parameterTypes, Object[] arguments) {
         T targetBean = target.get();
-        RuntimeProxyDefinition.InterceptedMethod<T> intercepted = select(interceptedByName.get(methodName), parameterTypes);
+        RuntimeProxyDefinition.InterceptedMethod<T> intercepted = select(interceptedByName.get(methodName), methodName, parameterTypes);
         if (intercepted == null) {
             if (introduction) {
                 throw selfCall(methodName, "no introduction interceptor answers it");
@@ -242,36 +242,43 @@ public final class StaticAdvice<T> {
                 candidates.add((ExecutableMethod<T, Object>) executableMethod);
             }
         }
-        ExecutableMethod<T, Object> match = selectBy(candidates, ExecutableMethod::getArguments, parameterTypes);
+        ExecutableMethod<T, Object> match = selectBy(candidates, ExecutableMethod::getArguments, methodName, parameterTypes);
         if (match == null) {
             throw new IllegalStateException("No executable method [" + methodName + "] with parameters " + Arrays.toString(parameterTypes) + " on " + proxyDefinition.proxyBeanDefinition().getBeanType().getName());
         }
         return match;
     }
 
-    private static <T> RuntimeProxyDefinition.@Nullable InterceptedMethod<T> select(@Nullable List<RuntimeProxyDefinition.InterceptedMethod<T>> candidates, String[] parameterTypes) {
-        return candidates == null ? null : selectBy(candidates, method -> method.executableMethod().getArguments(), parameterTypes);
+    private static <T> RuntimeProxyDefinition.@Nullable InterceptedMethod<T> select(@Nullable List<RuntimeProxyDefinition.InterceptedMethod<T>> candidates, String methodName, String[] parameterTypes) {
+        return candidates == null ? null : selectBy(candidates, method -> method.executableMethod().getArguments(), methodName, parameterTypes);
     }
 
     /**
      * The candidate declaring the parameter types of the generated method, the one whose body was
-     * entered; when none spells them the same way, the first of the same arity.
+     * entered; when none spells them the same way, the only one of the same arity.
+     *
+     * @throws IllegalStateException When none spells them the same way and several have the same
+     *                               arity, so that picking one could run the wrong overload
      */
-    private static <M> @Nullable M selectBy(List<M> candidates, Function<M, Argument<?>[]> argumentsOf, String[] parameterTypes) {
-        M first = null;
+    private static <M> @Nullable M selectBy(List<M> candidates, Function<M, Argument<?>[]> argumentsOf, String methodName, String[] parameterTypes) {
+        M sameArity = null;
+        int sameArityCount = 0;
         for (M candidate : candidates) {
             Argument<?>[] parameters = argumentsOf.apply(candidate);
             if (parameters.length != parameterTypes.length) {
                 continue;
             }
-            if (first == null) {
-                first = candidate;
-            }
             if (declares(parameters, parameterTypes)) {
                 return candidate;
             }
+            sameArity = candidate;
+            sameArityCount++;
         }
-        return first;
+        if (sameArityCount > 1) {
+            throw new IllegalStateException("No overload of the method [" + methodName + "] declares the parameter types "
+                + Arrays.toString(parameterTypes) + ", and " + sameArityCount + " take as many parameters: the one the compiled body belongs to is ambiguous");
+        }
+        return sameArity;
     }
 
     private static boolean declares(Argument<?>[] parameters, String[] parameterTypes) {
