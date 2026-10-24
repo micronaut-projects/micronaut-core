@@ -83,13 +83,36 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
 
     @Override
     public Publisher<String> readChunked(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        Charset charset = getCharset(mediaType);
+        Charset charset;
+        try {
+            charset = getCharset(mediaType);
+        } catch (CodecException e) {
+            // signalled through the publisher, which takes over the input and releases it: the
+            // input has no other owner once it is passed here
+            return PieceReaders.publisherOfBuffers(input, new FailingPieceReader(e), PieceReaders::adapt);
+        }
         return PieceReaders.publisherOfBuffers(input, new DecodingPieceReader(charset), PieceReaders::adapt);
     }
 
     @Override
     public PieceReader<String> openPieceReader(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
         return new DecodingPieceReader(getCharset(mediaType));
+    }
+
+    /**
+     * Only the charset of the {@code Content-Type} describes how the body is encoded. The
+     * {@code Accept-Charset} header is a preference for the response and is not consulted.
+     */
+    private Charset getCharset(@Nullable MediaType mediaType) {
+        if (mediaType == null) {
+            return defaultCharset;
+        }
+        try {
+            return mediaType.getCharset().orElse(defaultCharset);
+        } catch (IllegalArgumentException e) {
+            // IllegalCharsetNameException or UnsupportedCharsetException: the client sent a bad charset
+            throw new CodecException("Unsupported charset in content type: " + mediaType, e);
+        }
     }
 
     /**
@@ -159,18 +182,35 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
     }
 
     /**
-     * Only the charset of the {@code Content-Type} describes how the body is encoded. The
-     * {@code Accept-Charset} header is a preference for the response and is not consulted.
+     * Fails the read of a body that cannot be decoded, e.g. because of an unsupported charset,
+     * closing the pieces it is given.
      */
-    private Charset getCharset(@Nullable MediaType mediaType) {
-        if (mediaType == null) {
-            return defaultCharset;
+    private static final class FailingPieceReader implements PieceReader<String> {
+        private final CodecException failure;
+
+        FailingPieceReader(CodecException failure) {
+            this.failure = failure;
         }
-        try {
-            return mediaType.getCharset().orElse(defaultCharset);
-        } catch (IllegalArgumentException e) {
-            // IllegalCharsetNameException or UnsupportedCharsetException: the client sent a bad charset
-            throw new CodecException("Unsupported charset in content type: " + mediaType, e);
+
+        @Override
+        public void read(ReadBuffer piece) {
+            piece.close();
+            throw failure;
+        }
+
+        @Override
+        public void complete() {
+            throw failure;
+        }
+
+        @Override
+        public @Nullable String poll() {
+            return null;
+        }
+
+        @Override
+        public void close() {
+            // nothing is buffered
         }
     }
 }

@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.HttpDates;
 import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -35,7 +36,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
@@ -265,7 +265,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     }
 
     private void setUnsafe(CharSequence header, ZonedDateTime value) {
-        setUnsafe(header, value.withZoneSameInstant(GMT).format(DateTimeFormatter.RFC_1123_DATE_TIME));
+        setUnsafe(header, HttpDates.format(value));
     }
 
     @Override
