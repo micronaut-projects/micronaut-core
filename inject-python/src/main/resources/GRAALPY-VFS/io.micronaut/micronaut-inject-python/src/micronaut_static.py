@@ -898,15 +898,20 @@ class AttributeWrites:
             self.named.update(keyword.arg for keyword in call.keywords if keyword.arg is not None)
             if any(keyword.arg in PROTOCOL_CHANGES for keyword in call.keywords):
                 self.everything = True
-        if strings or name not in COMPUTED_WRITERS:
+        if name not in COMPUTED_WRITERS:
             return
         if isinstance(function, ast.Attribute) and isinstance(function.value, ast.Call) and isinstance(function.value.func, ast.Name) and function.value.func.id == "super":
             return  # super().__setattr__(name, value): the default write of a class that takes it over itself
-        # the object written: setattr(o, ...), object.__setattr__(o, ...), or o.__setattr__(...) bound
-        if isinstance(function, ast.Name) or (isinstance(function, ast.Attribute) and isinstance(function.value, ast.Name) and function.value.id in ("object", "type")):
-            target = call.args[0] if call.args else None
+        # the object written and the name it is written by: setattr(o, name, v), monkeypatch.setattr(o, name, v),
+        # object.__setattr__(o, name, v), or o.__setattr__(name, v) bound; a string anywhere else is a value
+        if name in ("__setattr__", "__delattr__") and not (isinstance(function.value, ast.Name) and function.value.id in ("object", "type")):
+            target, named = function.value, call.args[0] if call.args else None
         else:
-            target = function.value
+            target, named = (call.args[0] if call.args else None), (call.args[1] if len(call.args) > 1 else None)
+            if isinstance(target, ast.Constant) and isinstance(target.value, str) and isinstance(function, ast.Attribute):
+                return  # monkeypatch.setattr("app.m.Cls.attribute", v): the name is the string's last part
+        if isinstance(named, ast.Constant) and isinstance(named.value, str):
+            return
         owner = receivers.get(id(call))
         if owner is not None and isinstance(target, ast.Name) and owner[1] == target.id:
             # setattr(self, name, value) in a method: an attribute of an object of that class
