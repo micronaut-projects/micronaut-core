@@ -84,8 +84,8 @@ import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -168,6 +168,7 @@ public final class DevRuntime implements Closeable {
     private boolean contextClaimed; // guarded by lifecycle: whether the generation adopted its context, the first it created
     private volatile List<Path> watchedRoots = List.of(); // NOSONAR java:S3077 an immutable list, replaced whole
     private @Nullable DirectoryWatcher watcher;
+    private final Map<Path, FileWatcherRegistration> pinnedWatches = new ConcurrentHashMap<>();
     // read by the request threads of the script filter and the /dev endpoint, set by the launcher
     private volatile @Nullable LiveReloadServer liveReload; // NOSONAR java:S3077 thread-safe server, replaced whole
     private @Nullable Instrumentation instrumentation;
@@ -175,7 +176,6 @@ public final class DevRuntime implements Closeable {
     private volatile @Nullable Thread worker; // NOSONAR java:S3077 only the reference is published
     private final AtomicInteger redefinitions = new AtomicInteger();
     private final AtomicInteger inPlacePatches = new AtomicInteger();
-    private final Map<Path, FileWatcherRegistration> pinnedWatches = new ConcurrentHashMap<>();
     private OutputSnapshot snapshot = OutputSnapshot.empty();
     /**
      * The changes of the batch whose compilation failed, merged into the next batch until they compile: the next edit
