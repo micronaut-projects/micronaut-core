@@ -146,6 +146,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String JAVA_LANG_SHORT = "java.lang.Short";
     private static final String JAVA_LANG_DOUBLE = "java.lang.Double";
     private static final String JAVA_LANG_FLOAT = "java.lang.Float";
+    private static final String JAVA_LANG_BOOLEAN = "java.lang.Boolean";
+    private static final String JAVA_LANG_BYTE = "java.lang.Byte";
+    private static final String JAVA_LANG_INTEGER = "java.lang.Integer";
+    private static final String JAVA_LANG_LONG = "java.lang.Long";
     private static final String AS_SHORT = "asShort";
     private static final String AS_INT = "asInt";
     private static final String AS_LONG = "asLong";
@@ -1454,8 +1458,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         if (declaresCompiledDelegate(model)) {
             builder.addInnerType(compiledDelegate(model));
-            declareStaticAdvice(model);
         }
+        declareStaticAdvice(model);
 
         return new BridgedMethods(methodsToBridge, hasAsyncBridgeMethod);
     }
@@ -4732,7 +4736,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     private static Ir.@Nullable CompiledBody compiledBody(BridgeMethodSpec spec, @Nullable ClassStubModel model, VisitorContext context) {
         if (spec.junit5Test() || spec.introduced() || spec.returnTypeOverride() != null
-            || spec.signatureMethod() != spec.method() || spec.method().isStatic() || isAsyncPythonMethod(spec.method())) {
+            || spec.method().isStatic() || spec.method().isAbstract() || isAsyncPythonMethod(spec.method())) {
             return null;
         }
         if (model == null && !spec.script()) {
@@ -4747,32 +4751,96 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * The interceptor chain of a compiled advised method: when the instance is the proxy of the
      * bean, the advice it binds runs the interceptors and calls the method on the target bean,
-     * which runs the body; the target itself binds no advice and runs the body directly.
+     * which runs the body; the target itself binds no advice and runs the body directly. What the
+     * chain returns is converted to the return type as the bridge converts a Python result, since
+     * an interceptor may answer with a value of another type (a Python int is a {@code Long}).
      */
-    private static StatementDef adviceChain(VariableDef.This aThis, Ir.CompiledBody compiledBody, List<VariableDef.MethodParameter> methodParameters, TypeDef returnType) {
+    private static StatementDef adviceChain(VariableDef.This aThis, String methodName, List<String> parameterTypeNames, List<VariableDef.MethodParameter> methodParameters, TypeDef returnType) {
         VariableDef.Field advice = aThis.field(STATIC_ADVICE_FIELD, STATIC_ADVICE);
         List<ExpressionDef> arguments = new ArrayList<>(methodParameters);
         List<ExpressionDef> parameterTypes = new ArrayList<>();
-        for (String parameterType : compiledBody.parameterTypes()) {
-            int generics = parameterType.indexOf('<');
-            parameterTypes.add(ExpressionDef.constant(generics < 0 ? parameterType : parameterType.substring(0, generics)));
+        for (String parameterType : parameterTypeNames) {
+            parameterTypes.add(ExpressionDef.constant(erased(parameterType)));
         }
         ExpressionDef proceed = advice.invoke("proceed", TypeDef.OBJECT,
-            ExpressionDef.constant(compiledBody.methodName()), TypeDef.STRING.array().instantiate(parameterTypes), TypeDef.OBJECT.array().instantiate(arguments));
+            ExpressionDef.constant(methodName), TypeDef.STRING.array().instantiate(parameterTypes), TypeDef.OBJECT.array().instantiate(arguments));
         StatementDef intercepted = TypeDef.VOID.equals(returnType)
             ? StatementDef.multi((StatementDef) proceed, new StatementDef.Return(null))
-            : proceed.cast(returnType).returning();
+            : STATIC_ADVICE.invokeStatic("result", TypeDef.OBJECT, proceed, ExpressionDef.constant(erased(erasedTypeName(returnType, Map.of()))))
+                .cast(returnType).returning();
         return advice.isNonNull().doIf(intercepted);
     }
 
     /**
-     * Declares the advice of a class with compiled advised methods: a field the proxy binds and
-     * the binding method. A class whose Java superclass is a generated class with advised methods
-     * inherits both.
+     * Whether the chain of an introduced method can answer for the bridge: its return type is one
+     * whose conversion from what an interceptor returns is the bridge's (void, a primitive or its box,
+     * a string or an object). An introduced method returning another type keeps its bridge.
+     */
+    private static boolean introducedReturnConverts(TypeDef returnType) {
+        String name = erased(erasedTypeName(returnType, Map.of()));
+        return switch (name) {
+            case "void", BOOLEAN_TYPE, "byte", SHORT_TYPE, "int", "long", FLOAT_TYPE, DOUBLE_TYPE,
+                 JAVA_LANG_BOOLEAN, JAVA_LANG_BYTE, JAVA_LANG_SHORT, JAVA_LANG_INTEGER, JAVA_LANG_LONG,
+                 JAVA_LANG_FLOAT, JAVA_LANG_DOUBLE, JAVA_LANG_STRING, "java.lang.Object" -> true;
+            default -> false;
+        };
+    }
+
+    /**
+     * A Java type name as the IR spells it, without type arguments and with nested types dotted.
+     */
+    private static String erased(String typeName) {
+        int generics = typeName.indexOf('<');
+        return (generics < 0 ? typeName : typeName.substring(0, generics)).replace('$', '.');
+    }
+
+    /**
+     * Whether a compiled body fits the signature the bridge declares: the same erased parameter
+     * types, and a return type the bridge's accepts (the same, or an {@code Object} return, which
+     * takes any value boxed). A bridge with method type variables or a generic-to-array parameter
+     * keeps its bridge.
+     */
+    private static boolean sameLayout(Ir.CompiledBody body, List<ParameterDef> parameterDefs, List<TypeDef.TypeVariable> methodTypeVariables, TypeDef returnType, boolean genericToArray) {
+        if (genericToArray || !methodTypeVariables.isEmpty() || body.parameterTypes().size() != parameterDefs.size()) {
+            return false;
+        }
+        for (int i = 0; i < parameterDefs.size(); i++) {
+            if (!erased(erasedTypeName(parameterDefs.get(i).getType(), Map.of())).equals(erased(body.parameterTypes().get(i)))) {
+                return false;
+            }
+        }
+        String returned = erased(erasedTypeName(returnType, Map.of()));
+        return returned.equals(erased(body.returnType())) || Object.class.getName().equals(returned);
+    }
+
+    /**
+     * Whether the abstract methods of an introduction class run their chain in the generated class:
+     * the class is an abstract introduction bean and static compilation switches one of its abstract
+     * methods on (a {@code CompileStatic} scope, or mode {@code all} without one excluding it).
+     */
+    private static boolean staticIntroduction(ClassElement element, @Nullable StaticCompilationPlan plan) {
+        if (plan == null || !element.isAbstract() || !element.hasStereotype(Introduction.class)
+            || !(element instanceof AbstractPythonClassElement pythonClass)) {
+            return false;
+        }
+        io.micronaut.python.processing.model.ClassDef classDef = pythonClass.getNativeType();
+        String sourcePath = classDef.span() == null ? null : classDef.span().path();
+        for (FunctionDef function : classDef.functions()) {
+            if ((function.isAbstract() || function.hasPlaceholderBody()) && plan.switchedOn(sourcePath, classDef.name() + "." + function.name())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Declares the advice of a class with compiled advised methods, or of an introduction class
+     * whose abstract methods run their chain in Java: a field the proxy binds and the binding
+     * method. A class whose Java superclass is a generated class with advised methods inherits both.
      */
     private static void declareStaticAdvice(ClassStubModel model) {
         StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
-        if (plan == null || !advisesCompiled(plan, model.element().getName()) || inheritsStaticAdvice(model, plan)) {
+        if (plan == null || !(advisesCompiled(plan, model.element().getName()) || staticIntroduction(model.element(), plan)) || inheritsStaticAdvice(model, plan)) {
             return;
         }
         FieldDef field = FieldDef.builder(STATIC_ADVICE_FIELD)
@@ -4804,7 +4872,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         ClassElement current = model.superType();
         while (current instanceof PythonClassElement pythonClass) {
-            if (advisesCompiled(plan, pythonClass.getName())) {
+            if (advisesCompiled(plan, pythonClass.getName()) || staticIntroduction(pythonClass, plan)) {
                 return true;
             }
             current = pythonClass.getSuperType().orElse(null);
@@ -5325,16 +5393,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         boolean spreadsVarargs = spreadsVarargs(methodElement, bridgeOwner);
         Ir.CompiledBody compiledBody = compiledBody(spec, model, visitorContext);
-        if (compiledBody != null && compiledBody.parameterNames().size() == parameterDefs.size()) {
+        if (compiledBody != null && sameLayout(compiledBody, parameterDefs, methodTypeVariables, methodSourceReturnType, genericToArray)) {
             // the body runs as Java: no crossing into Python for callers of the stub
             if (compiledBody.span() != null) {
                 methodBuilder.addJavadoc("Compiled from " + compiledBody.span().location());
             }
             boolean trace = staticCompilationPlan(visitorContext).trace();
             builder.addMethod(methodBuilder.build((aThis, methodParameters) -> StatementDef.multi(
-                compiledBody.advised() && model != null ? adviceChain(aThis, compiledBody, methodParameters, methodSourceReturnType) : StatementDef.multi(),
+                compiledBody.advised() && model != null ? adviceChain(aThis, compiledBody.methodName(), compiledBody.parameterTypes(), methodParameters, methodSourceReturnType) : StatementDef.multi(),
                 StaticBodyGenerator.generate(compiledBody, methodParameters, model != null ? selfAccess(model, aThis) : scriptSelfAccess(visitorContext, aThis), trace))));
             return;
+        }
+        if (methodElement.isAbstract() && introducedReturnConverts(methodSourceReturnType) && staticIntroduction(bridgeOwner, staticCompilationPlan(visitorContext))) {
+            // the abstract method of an introduction: the proxy binds the introduction's chain, which runs in Java
+            List<String> parameterTypes = new ArrayList<>();
+            for (ParameterDef parameterDef : parameterDefs) {
+                parameterTypes.add(erasedTypeName(parameterDef.getType(), Map.of()));
+            }
+            methodBuilder.addStatement((aThis, methodParameters) -> adviceChain(aThis, pythonFunctionName, parameterTypes, methodParameters, methodSourceReturnType));
         }
         builder.addMethod(methodBuilder
             .build(((aThis, methodParameters) -> rethrowingCheckedExceptions(checkedExceptions, javaClassType(bridgeOwner), () -> {

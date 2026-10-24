@@ -359,7 +359,7 @@ public final class TypeFacts {
                 checkedExceptions.add(thrown.getName());
             }
         }
-        return new MethodSignature(parameterTypes, method.isVarArgs(), method.isStatic(), typeName(method.getGenericReturnType()), !checkedExceptions.isEmpty(), typeArguments(method.getGenericReturnType()), checkedExceptions);
+        return new MethodSignature(parameterTypes, method.isVarArgs(), method.isStatic(), typeName(method.getGenericReturnType()), !checkedExceptions.isEmpty(), typeArguments(method.getGenericReturnType()), checkedExceptions, method.isDefault());
     }
 
     /**
@@ -533,8 +533,9 @@ public final class TypeFacts {
      *                       declaration order; empty when the return type is not parameterized or
      *                       an argument is a type variable
      * @param checkedExceptions The qualified names of the checked exceptions the method declares
+     * @param isDefault      Whether the method is a default method of an interface
      */
-    public record MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments, List<String> checkedExceptions) {
+    public record MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments, List<String> checkedExceptions, boolean isDefault) {
 
         public MethodSignature {
             parameterTypes = List.copyOf(parameterTypes);
@@ -553,7 +554,7 @@ public final class TypeFacts {
          * @param returnTypeArguments The type arguments of the return type
          */
         public MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments) {
-            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, returnTypeArguments, List.of());
+            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, returnTypeArguments, List.of(), false);
         }
 
         /**
@@ -566,7 +567,7 @@ public final class TypeFacts {
          * @param throwsChecked  Whether the method declares a checked exception
          */
         public MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked) {
-            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, List.of());
+            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, List.of(), List.of(), false);
         }
 
         /**

@@ -116,7 +116,28 @@ def _micronaut_fits(value, kind):
         return type(value) is bool
     if kind == "str":
         return type(value) is str
+    if kind.startswith("java:"):
+        # a Java object the body takes as itself: never a Python value, which the boundary converts
+        return _micronaut_is_java_instance(value, kind[len("java:"):])
     return False
+
+
+_MICRONAUT_JAVA_TYPES = {}
+
+
+def _micronaut_is_java_instance(value, name):
+    """Whether the value is a Java object of the named class, which reaches the Java parameter unchanged."""
+    import java
+    if value is None or not java.is_object(value):
+        return False
+    java_type = _MICRONAUT_JAVA_TYPES.get(name)
+    if java_type is None:
+        try:
+            java_type = java.type(name)
+        except Exception:
+            return False
+        _MICRONAUT_JAVA_TYPES[name] = java_type
+    return isinstance(value, java_type)
 
 
 __micronaut_compiled_objects = _MicronautCompiledObjects()

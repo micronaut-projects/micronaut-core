@@ -31,7 +31,8 @@ import java.util.Set;
  * <ul>
  *     <li>every argument must reach the Java parameter unchanged: an int in the range of the Java
  *     integer, a float, a bool, a str, or None for a boxed parameter, each of exactly that type
- *     (a bool is no int, an int is no float here), checked on every call;</li>
+ *     (a bool is no int, an int is no float here), or a Java object of the parameter's class,
+ *     which the boundary hands over as itself, checked on every call;</li>
  *     <li>a body without side effects (no write to {@code self}, no Java call) runs the Python body
  *     instead when the Java body fails, so an int that outgrows a long, which Java raises on and
  *     Python promotes, gives Python's result, and any other failure Python's exception. Reading
@@ -67,6 +68,7 @@ public final class StaticDelegation {
     private static final Set<String> PROMOTING_HELPERS = Set.of("power");
     private static final Set<String> PROMOTING_LONG_OPS = Set.of("+", "-", "*", "//", "**");
     private static final Set<String> NARROW_TYPES = Set.of(INT, SHORT, BYTE, "java.lang.Integer", "java.lang.Short", "java.lang.Byte");
+    private static final String JAVA_KIND = "java:";
 
     private StaticDelegation() {
     }
@@ -82,7 +84,7 @@ public final class StaticDelegation {
     public static @Nullable String target(Ir.CompiledBody body) {
         List<String> kinds = new ArrayList<>(body.parameterTypes().size());
         for (String parameterType : body.parameterTypes()) {
-            String kind = KINDS.get(parameterType);
+            String kind = KINDS.getOrDefault(parameterType, javaKind(parameterType));
             if (kind == null) {
                 return null;
             }
@@ -98,6 +100,20 @@ public final class StaticDelegation {
             + "#owner=" + className
             + "#kinds=" + String.join(",", kinds)
             + (analysis.sideEffects ? "#once" : "#retry");
+    }
+
+    /**
+     * The kind of a parameter of a Java class whose objects reach it unchanged: a Java object of the
+     * class, checked on every call; a Python value, which the boundary converts, is not one. A
+     * parameterized or array type is not taken, nor a collection, which a Python caller passes as a
+     * Python one.
+     */
+    private static @Nullable String javaKind(String parameterType) {
+        if (parameterType.indexOf('.') < 0 || parameterType.indexOf('<') >= 0 || parameterType.endsWith("[]")
+            || parameterType.startsWith("java.util.")) {
+            return null;
+        }
+        return JAVA_KIND + parameterType;
     }
 
     /**
