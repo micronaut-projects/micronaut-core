@@ -2,6 +2,7 @@ package io.micronaut.dev;
 
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
+import io.micronaut.dev.test.TestFileNames;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,7 +41,9 @@ class TestSessionFileTestsTest {
         assertFalse(TestSession.isTestFileName(roots, "app.GreeterTest"));
         assertFalse(TestSession.isTestFileName(List.of(new SourceRoot(SourceKind.JAVA, project.resolve("src/test/java"))), "test_a.py"));
 
-        assertEquals(Set.of("test_a.py", "unit/test_a.py"), TestSession.resultNamesOf(roots, tests.resolve("test_a.py")));
+        // and by its absolute path, as pytest's engine may name it
+        Set<String> names = TestSession.resultNamesOf(roots, tests.resolve("test_a.py"));
+        assertTrue(names.containsAll(Set.of("test_a.py", "unit/test_a.py", TestFileNames.slashed(tests.toAbsolutePath().normalize()) + "/test_a.py")), names::toString);
         assertEquals(Set.of(), TestSession.resultNamesOf(roots, project.resolve("src/test/java/app/GreeterTest.java")));
     }
 
@@ -55,7 +58,9 @@ class TestSessionFileTestsTest {
 
         Set<String> gone = TestSession.goneTestFiles(roots, deleted, List.of("tests/test_kept.py", "tests/test_failed.py", "app.FailedTest"));
 
-        assertEquals(Set.of("test_deleted.py", "tests/test_deleted.py", "tests/test_failed.py"), gone);
+        assertTrue(gone.containsAll(Set.of("test_deleted.py", "tests/test_deleted.py", "tests/test_failed.py")), gone::toString);
+        assertFalse(gone.contains("tests/test_kept.py"));
+        assertFalse(gone.contains("app.FailedTest"));
         assertEquals(Set.of(), TestSession.goneTestFiles(roots, Map.of(), List.of("tests/test_kept.py")));
     }
 

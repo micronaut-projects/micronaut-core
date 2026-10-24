@@ -561,7 +561,18 @@ public final class DevRuntime implements Closeable {
             }
             Path resourceRoot = mostSpecificRoot(absolute);
             if (resourceRoot != null) {
-                resources.merge(resourceRootKinds.get(resourceRoot), change, SourceChanges::merge);
+                ResourceKind kind = resourceRootKinds.get(resourceRoot);
+                if (deleted) {
+                    for (Path removed : liveRemoved(absolute)) {
+                        Path removedRoot = mostSpecificRoot(removed);
+                        if (removedRoot != null) {
+                            resources.merge(resourceRootKinds.get(removedRoot), new SourceChanges(Set.of(), Set.of(removed)), SourceChanges::merge);
+                        }
+                    }
+                } else {
+                    classLoader.liveResources().seen(absolute);
+                    resources.merge(kind, change, SourceChanges::merge);
+                }
             } else {
                 LOG.debug("{} is under no source or resource root: ignored", absolute);
             }

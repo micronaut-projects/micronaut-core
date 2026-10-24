@@ -7,7 +7,6 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.dev.compile.SourceKind;
-import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.manifest.DevReloadStrategy;
 import org.junit.jupiter.api.Test;
@@ -15,11 +14,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.instrument.Instrumentation;
-import java.lang.instrument.UnmodifiableClassException;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Proxy;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -35,13 +29,20 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BooleanSupplier;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import io.micronaut.dev.loader.GenerationClassLoader;
+import java.lang.instrument.Instrumentation;
+import java.lang.instrument.UnmodifiableClassException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 class DevRuntimeTest {
 
@@ -244,77 +245,103 @@ class DevRuntimeTest {
     }
 
     @Test
-    void aRedefinitionTheJvmRefusesRestartsWithEveryChangedClassAndLeavesTheRetiredGenerationAsItWas() throws Exception {
+    void aViewDeletedFromItsRootIsGoneRatherThanServedFromTheBuildCopyAndTheWatchIsToldEachFile() throws Exception {
         Path src = Files.createDirectories(project.resolve("src/main/java/app"));
         Files.writeString(src.resolve("Application.java"), """
             package app;
             public class Application {
                 public static void main(String[] args) {
-                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest")).mainClass(Application.class).start();
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
                 }
             }
             """);
-        Path greeter = src.resolve("Greeter.java");
-        Files.writeString(greeter, greeter("one"));
-        Path other = src.resolve("Other.java");
-        Files.writeString(other, other("one"));
+        Path views = Files.createDirectories(project.resolve("src/main/resources/views"));
+        Path index = views.resolve("index.html");
+        Files.writeString(index, "<p>live</p>");
+        Path partials = Files.createDirectories(views.resolve("partials"));
+        Files.writeString(partials.resolve("a.html"), "a");
+        Files.writeString(partials.resolve("b.html"), "b");
+        // the build copied the resource root into its output, and a processor generated a resource no root holds
+        Path output = Files.createDirectories(project.resolve("build/resources/main"));
+        Files.createDirectories(output.resolve("views/partials"));
+        Files.writeString(output.resolve("views/index.html"), "<p>stale</p>");
+        Files.writeString(output.resolve("views/partials/a.html"), "stale a");
+        Files.writeString(output.resolve("views/partials/b.html"), "stale b");
+        Files.writeString(output.resolve("views/generated.html"), "generated");
         Path manifestFile = project.resolve("dev.properties");
         Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
         Files.writeString(manifestFile, """
             micronaut.dev.main-class=app.Application
-            micronaut.dev.strategy=auto
-            micronaut.dev.reloadable=build/classes
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes,build/resources/main
             micronaut.dev.compile-classpath=@cp.argfile
             micronaut.dev.processor-path=@cp.argfile
             micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.resources.views=src/main/resources/views
             micronaut.dev.compile.java.output=build/classes
             """);
 
         DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
         try {
             ApplicationContext first = runtime.context().orElseThrow();
-            assertEquals("one", greet(first));
-            assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
-            refuseRedefinitions(runtime);
-            GenerationClassLoader generation = runtime.classLoader().current();
-            byte[] greeterBefore = InPlaceUpdates.classFile(generation.roots(), "app.Greeter");
-            byte[] otherBefore = InPlaceUpdates.classFile(generation.roots(), "app.Other");
+            ClassLoader loader = first.getClassLoader();
+            assertEquals("<p>live</p>", read(loader, "views/index.html"));
+            List<ResourceChange> changes = new CopyOnWriteArrayList<>();
+            ((DefaultBeanContext) first).resources(ResourceKind.VIEWS).include("**/*.html").watch(changes::add);
+            changes.clear();
 
-            // two body-only edits the JVM refuses to redefine: the restart applies both
-            Files.writeString(greeter, greeter("two"));
-            Files.writeString(other, other("two"));
-            runtime.reload();
+            // the template is deleted: the watch is told, and the build's stale copy is not served in its place
+            Files.delete(index);
+            runtime.changed(List.of(), List.of(index));
+            assertTrue(removedIn(changes).contains(index.toAbsolutePath()), changes.toString());
+            assertNull(loader.getResource("views/index.html"));
+            assertFalse(loader.getResources("views/index.html").hasMoreElements());
+            // a resource only the build output holds is still served
+            assertEquals("generated", read(loader, "views/generated.html"));
+
+            // a directory deleted as a whole: the watch is told of each file it held
+            Files.delete(partials.resolve("a.html"));
+            Files.delete(partials.resolve("b.html"));
+            Files.delete(partials);
+            changes.clear();
+            runtime.changed(List.of(), List.of(partials));
+            List<Path> removed = removedIn(changes);
+            assertTrue(removed.contains(partials.resolve("a.html").toAbsolutePath()), removed.toString());
+            assertTrue(removed.contains(partials.resolve("b.html").toAbsolutePath()), removed.toString());
+            assertNull(loader.getResource("views/partials/a.html"));
+
+            // a template created, read, and deleted after startup is gone too, and a new generation keeps it gone
+            Path late = views.resolve("late.html");
+            Files.writeString(late, "late");
+            Files.writeString(output.resolve("views/late.html"), "stale late");
+            assertEquals("late", read(loader, "views/late.html"));
+            Files.delete(late);
+            assertNull(loader.getResource("views/late.html"));
+            runtime.restart();
             ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
-            assertNotSame(first, second);
-            assertEquals(0, runtime.redefinitions());
-            assertEquals("two", greet(second));
-            Class<?> otherType = second.getClassLoader().loadClass("app.Other");
-            assertEquals("two", otherType.getMethod("value").invoke(null));
-            // the retired generation's snapshot holds the class files it ran with, not the refused ones
-            assertArrayEquals(greeterBefore, InPlaceUpdates.classFile(generation.roots(), "app.Greeter"));
-            assertArrayEquals(otherBefore, InPlaceUpdates.classFile(generation.roots(), "app.Other"));
+            assertNull(second.getClassLoader().getResource("views/index.html"));
+            assertNull(second.getClassLoader().getResource("views/late.html"));
+            assertEquals("generated", read(second.getClassLoader(), "views/generated.html"));
+
+            // written again, it is served live
+            Files.writeString(index, "<p>back</p>");
+            runtime.changed(List.of(index), List.of());
+            assertEquals("<p>back</p>", read(second.getClassLoader(), "views/index.html"));
         } finally {
             runtime.close();
         }
     }
 
-    /**
-     * Gives the runtime an agent that refuses every redefinition, as the JVM does a change it cannot apply.
-     */
-    private static void refuseRedefinitions(DevRuntime runtime) throws ReflectiveOperationException {
-        Field field = DevRuntime.class.getDeclaredField("instrumentation");
-        field.setAccessible(true);
-        Instrumentation agent = (Instrumentation) field.get(runtime);
-        field.set(runtime, Proxy.newProxyInstance(DevRuntimeTest.class.getClassLoader(), new Class<?>[] {Instrumentation.class}, (proxy, method, args) -> {
-            if (method.getName().equals("redefineClasses")) {
-                throw new UnmodifiableClassException("refused by the test");
-            }
-            try {
-                return method.invoke(agent, args);
-            } catch (InvocationTargetException e) {
-                throw e.getCause();
-            }
-        }));
+    private static List<Path> removedIn(List<ResourceChange> changes) {
+        return changes.stream().flatMap(change -> change.removed().stream()).toList();
+    }
+
+    private static String read(ClassLoader loader, String name) throws IOException {
+        try (var in = loader.getResourceAsStream(name)) {
+            assertNotNull(in, name);
+            return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
     }
 
     @Test
@@ -550,4 +577,79 @@ class DevRuntimeTest {
         Object bean = context.getBean(type);
         return (String) type.getMethod("greet").invoke(bean);
     }
+
+    @Test
+    void aRedefinitionTheJvmRefusesRestartsWithEveryChangedClassAndLeavesTheRetiredGenerationAsItWas() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Path greeter = src.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        Path other = src.resolve("Other.java");
+        Files.writeString(other, other("one"));
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=auto
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            assertEquals("one", greet(first));
+            assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            refuseRedefinitions(runtime);
+            GenerationClassLoader generation = runtime.classLoader().current();
+            byte[] greeterBefore = InPlaceUpdates.classFile(generation.roots(), "app.Greeter");
+            byte[] otherBefore = InPlaceUpdates.classFile(generation.roots(), "app.Other");
+
+            // two body-only edits the JVM refuses to redefine: the restart applies both
+            Files.writeString(greeter, greeter("two"));
+            Files.writeString(other, other("two"));
+            runtime.reload();
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+            assertNotSame(first, second);
+            assertEquals(0, runtime.redefinitions());
+            assertEquals("two", greet(second));
+            Class<?> otherType = second.getClassLoader().loadClass("app.Other");
+            assertEquals("two", otherType.getMethod("value").invoke(null));
+            // the retired generation's snapshot holds the class files it ran with, not the refused ones
+            assertArrayEquals(greeterBefore, InPlaceUpdates.classFile(generation.roots(), "app.Greeter"));
+            assertArrayEquals(otherBefore, InPlaceUpdates.classFile(generation.roots(), "app.Other"));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    /**
+     * Gives the runtime an agent that refuses every redefinition, as the JVM does a change it cannot apply.
+     */
+    private static void refuseRedefinitions(DevRuntime runtime) throws ReflectiveOperationException {
+        Field field = DevRuntime.class.getDeclaredField("instrumentation");
+        field.setAccessible(true);
+        Instrumentation agent = (Instrumentation) field.get(runtime);
+        field.set(runtime, Proxy.newProxyInstance(DevRuntimeTest.class.getClassLoader(), new Class<?>[] {Instrumentation.class}, (proxy, method, args) -> {
+            if (method.getName().equals("redefineClasses")) {
+                throw new UnmodifiableClassException("refused by the test");
+            }
+            try {
+                return method.invoke(agent, args);
+            } catch (InvocationTargetException e) {
+                throw e.getCause();
+            }
+        }));
+    }
+
 }
