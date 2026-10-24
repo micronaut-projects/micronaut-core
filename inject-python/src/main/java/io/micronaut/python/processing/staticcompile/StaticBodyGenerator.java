@@ -368,11 +368,15 @@ public final class StaticBodyGenerator {
             case Ir.PutSelf put -> self.write(put.property(), type(put.type()), expression(put.value()), put.accessor());
             case Ir.If branch -> {
                 ExpressionDef.ConditionExpressionDef condition = condition(branch.test());
-                yield branch.orElse() == null
+                Ir.@Nullable Body orElse = branch.orElse();
+                yield orElse == null
                     ? condition.doIf(statements(branch.then()))
-                    : condition.doIfElse(statements(branch.then()), statements(branch.orElse()));
+                    : condition.doIfElse(statements(branch.then()), statements(orElse));
             }
-            case Ir.Return ret -> ret.value() == null ? new StatementDef.Return(null) : expression(ret.value()).returning();
+            case Ir.Return ret -> {
+                Ir.@Nullable Expression value = ret.value();
+                yield value == null ? new StatementDef.Return(null) : expression(value).returning();
+            }
             case Ir.While loop -> {
                 List<StatementDef> out = new ArrayList<>();
                 Loop context = enterLoop(loop.loop(), loop.hasBreak(), loop.hasContinue(), out);
@@ -537,10 +541,11 @@ public final class StaticBodyGenerator {
         List<TypeDef> parameterTypes = types(call.parameterTypes());
         TypeDef returnType = Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type());
         List<ExpressionDef> arguments = expressions(call.arguments());
-        if (call.receiver() == null) {
+        Ir.@Nullable Expression receiver = call.receiver();
+        if (receiver == null) {
             return classType(call.owner()).invokeStatic(call.name(), parameterTypes, returnType, arguments);
         }
-        return expression(call.receiver()).invoke(call.name(), parameterTypes, returnType, arguments);
+        return expression(receiver).invoke(call.name(), parameterTypes, returnType, arguments);
     }
 
     /**
