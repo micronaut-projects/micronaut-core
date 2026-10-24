@@ -30,6 +30,7 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     testImplementation(libs.managed.groovy.json)
+    testImplementation(libs.managed.snakeyaml)
     testImplementation(libs.logback.classic)
 
     testRuntimeOnly(platform(libs.test.boms.micronaut.sql))
