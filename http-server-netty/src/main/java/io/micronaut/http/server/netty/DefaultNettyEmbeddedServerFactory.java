@@ -41,9 +41,7 @@ import io.micronaut.http.netty.channel.converters.DefaultChannelOptionFactory;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.ssl.CertificateProvidedSslBuilder;
 import io.micronaut.http.server.netty.ssl.NettyServerSslFactory;
-import io.micronaut.http.server.netty.ssl.SelfSignedSslBuilder;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.server.netty.websocket.WebSocketUpgradeHandlerFactory;
@@ -196,21 +194,8 @@ public class DefaultNettyEmbeddedServerFactory
     private NettyEmbeddedServices resolveNettyEmbeddedServices(NettyHttpServerConfiguration configuration,
                                                                @Nullable ServerSslConfiguration sslConfiguration) {
         if (sslConfiguration != null && sslConfiguration.isEnabled()) {
-            ServerSslBuilder resolvedSslBuilder;
-            final ResourceResolver resourceResolver = applicationContext.getBean(ResourceResolver.class);
-            if (sslConfiguration.buildSelfSigned()) {
-                resolvedSslBuilder = new SelfSignedSslBuilder(
-                      configuration,
-                      sslConfiguration,
-                      resourceResolver
-                );
-            } else {
-                resolvedSslBuilder = new CertificateProvidedSslBuilder(
-                    configuration,
-                    sslConfiguration,
-                    resourceResolver
-                );
-            }
+            ServerSslBuilder resolvedSslBuilder = sslFactory.legacyBuilder(
+                configuration, sslConfiguration, applicationContext.getBean(ResourceResolver.class));
             return new DelegateNettyEmbeddedServices() {
                 @Override
                 public NettyEmbeddedServices getDelegate() {
