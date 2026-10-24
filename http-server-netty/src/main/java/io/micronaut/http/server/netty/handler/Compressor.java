@@ -320,16 +320,25 @@ public final class Compressor {
                 pushed = true;
             } else {
                 pushed = true;
-                streamHeld();
-                channel().writeOutbound(data);
+                EmbeddedChannel channel;
+                try {
+                    streamHeld();
+                    channel = channel();
+                } catch (RuntimeException | Error e) {
+                    data.release();
+                    throw e;
+                }
+                channel.writeOutbound(data);
             }
         }
 
         private void streamHeld() {
             ByteBuf data = held;
             if (data != null) {
+                // Creating the encoder may throw; the held body stays owned here until the encoder takes it.
+                EmbeddedChannel channel = channel();
                 held = null;
-                channel().writeOutbound(data);
+                channel.writeOutbound(data);
             }
         }
 
@@ -354,7 +363,15 @@ public final class Compressor {
                     finished = true;
                     return;
                 }
-                channel().writeOutbound(body);
+                EmbeddedChannel channel;
+                try {
+                    channel = channel();
+                } catch (RuntimeException | Error e) {
+                    body.release();
+                    finished = true;
+                    throw e;
+                }
+                channel.writeOutbound(body);
             }
             channel().finish();
             finished = true;
@@ -372,9 +389,13 @@ public final class Compressor {
                 result.release();
             }
             if (!finished) {
-                try {
-                    channel().finishAndReleaseAll();
-                } catch (DecompressionException ignored) {
+                // Without an encoder there is nothing to release; creating one just to discard it would be waste.
+                EmbeddedChannel channel = compressionChannel;
+                if (channel != null) {
+                    try {
+                        channel.finishAndReleaseAll();
+                    } catch (DecompressionException ignored) {
+                    }
                 }
                 finished = true;
             }
