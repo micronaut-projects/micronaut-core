@@ -5191,6 +5191,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     : converted).returning();
             });
         ExpressionDef converter = new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
+        // a plain object of the compilation is wrapped, not copied: kept whatever its Python value
+        String erasedName = typeName.indexOf('<') < 0 ? typeName : typeName.substring(0, typeName.indexOf('<'));
+        boolean wrapper = erasedName.indexOf('.') >= 0 && model.context().getClassElement(erasedName.replace('$', '.'))
+            .map(attributeType -> isGeneratedWrapperType(allClasses, attributeType)).orElse(false);
         MethodDef reader = MethodDef.builder(name)
             .addModifiers(Modifier.PRIVATE)
             .addJavadoc("The attribute [" + property + "] of the Python object, fixed at construction.")
@@ -5204,7 +5208,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE),
                     ExpressionDef.constant(property),
                     javaClassType(model.element()).getStaticField(FIXED_ATTRIBUTES_FIELD, PYTHON_FIXED_ATTRIBUTES),
-                    converter), type).returning()
+                    converter,
+                    ExpressionDef.constant(wrapper)), type).returning()
             )));
         builder.addMethod(reader);
         readers.put(key, reader);

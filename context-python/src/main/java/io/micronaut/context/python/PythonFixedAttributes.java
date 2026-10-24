@@ -94,9 +94,11 @@ public final class PythonFixedAttributes {
          * @param name       The attribute
          * @param attributes The attributes of the stub class
          * @param converter  The conversion of the Python value to the Java type the bodies read
+         * @param wrapper    Whether the type is the generated class of a plain class of the compilation,
+         *                   which wraps a Python object of it without copying its state
          * @return The value
          */
-        public @Nullable Object read(Value self, String name, PythonFixedAttributes attributes, PolyglotValueConverter<?> converter) {
+        public @Nullable Object read(Value self, String name, PythonFixedAttributes attributes, PolyglotValueConverter<?> converter, boolean wrapper) {
             // the epoch is read before the attribute: a change after it moves the epoch past the kept value
             long epoch = attributes.epoch();
             Fixed fixed = current;
@@ -121,9 +123,21 @@ public final class PythonFixedAttributes {
                 current = new Fixed(self, epoch, null, false);
                 return converter.convert(self.getMember(name));
             }
-            Object value = converter.convert(found.getArrayElement(0));
-            current = new Fixed(self, epoch, value, true);
+            Value member = found.getArrayElement(0);
+            Object value = converter.convert(member);
+            // a value converted from a Python object other than an immutable one may be a copy of its
+            // state (a target type mapping), which a change in place does not reach: read every time
+            current = new Fixed(self, epoch, value, wrapper || unchanging(member));
             return value;
+        }
+
+        /**
+         * Whether a Python value converts to an equal Java value as long as it is the same object: a
+         * Java object, handed over as itself, or an immutable Python value.
+         */
+        private static boolean unchanging(Value member) {
+            return member.isHostObject() || member.isNull() || member.isString() || member.isBoolean() || member.isNumber()
+                || member.isDate() || member.isTime() || member.isTimeZone() || member.isDuration();
         }
     }
 
