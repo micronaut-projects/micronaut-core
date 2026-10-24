@@ -78,14 +78,14 @@ public final class PythonStatic {
      * Counts an entry into a compiled body; emitted at the start of every compiled body when the
      * compilation traces, see {@code micronaut.python.compile.static.trace}.
      *
-     * @param key The compiled body, as {@code class#method}
+     * @param key The compiled body, as {@code package.Class#method}: the qualified name of the class and the method
      */
     public static void entered(String key) {
         ENTRIES.computeIfAbsent(key, k -> new LongAdder()).increment();
     }
 
     /**
-     * @param key The compiled body, as {@code class#method}
+     * @param key The compiled body, as {@code package.Class#method}: the qualified name of the class and the method
      * @return How many times the compiled body ran since the last reset
      */
     public static long entries(String key) {
