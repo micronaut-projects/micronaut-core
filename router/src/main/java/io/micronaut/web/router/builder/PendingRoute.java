@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
+import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
@@ -45,6 +46,16 @@ import java.util.function.Supplier;
 @Internal
 final class PendingRoute {
 
+    /**
+     * The settings of a route of resources that it does not inherit from its groups: the handler
+     * decides the media type of each resource.
+     */
+    static final int RESOURCE_SETTINGS = RouteGroupDefaults.CONSUMES_SETTING | RouteGroupDefaults.PRODUCES_SETTING;
+    /**
+     * The name of the blocking executor, {@code TaskExecutors.BLOCKING}.
+     */
+    private static final String BLOCKING_EXECUTOR = "blocking";
+
     private final AbstractHttpRouteBuilder builder;
     /**
      * Adds the routes of a handler: one, or one per HTTP method.
@@ -52,7 +63,8 @@ final class PendingRoute {
     private final Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes;
     private final String description;
     /**
-     * The URI template of a route of {@code GET} only, which may be a WebSocket route, or {@code null}.
+     * The URI template of a route of {@code GET} only, which may be a WebSocket route or a route
+     * of resources, or {@code null}.
      */
     private final @Nullable Supplier<@Nullable String> getTemplate;
     private final List<Consumer<HandlerRoutes>> settings = new ArrayList<>();
@@ -183,7 +195,121 @@ final class PendingRoute {
     void end(Supplier<HandlerMethod<?>> handler, @Nullable Consumer<RouteSettings> init, int own) {
         checkPending();
         ended = true;
-        HandlerRoutes added = builder.addRoutes(this, () -> routes.apply(handler), init, own);
+        addRoutes(() -> routes.apply(handler), init, own);
+    }
+
+    /**
+     * End a route of resources: add the routes of {@code GET} of the URI prefix, the template of
+     * the route without its trailing slashes, and of every path under it, with the path variable
+     * of the handler. The handler decides the media type of each resource: the media types of a
+     * group do not apply.
+     *
+     * @param resources The handler of the resources
+     * @throws IllegalStateException    if the route is not a route of {@code GET} only, is a
+     *                                  located route, its template is not a URI template, or its
+     *                                  prefix has the path variable of the handler
+     * @throws IllegalArgumentException if the path variable of the handler is not a plain name, or
+     *                                  the URI prefix has a query or a fragment
+     */
+    void endResources(ResourceHandler resources) {
+        checkPending();
+        checkNotLocated();
+        Supplier<@Nullable String> source = getTemplate;
+        if (source == null) {
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is not a route of resources: a route of resources is a GET route, e.g. GET(uriPrefix).resources(...)");
+        }
+        String template = source.get();
+        if (template == null) {
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is not a route of resources: a route of resources has a URI template, not a template of another language");
+        }
+        String pathVariable;
+        try {
+            RoutePrefix.checkPath(template, "a route of resources");
+            RoutePrefix.checkSegmentVariables(template, "a route of resources");
+            pathVariable = resourcePathVariable(resources);
+            if (UriMatchTemplate.of(template).getVariableNames().contains(pathVariable)) {
+                throw new IllegalStateException("The prefix of the route " + description + " has the variable " + pathVariable
+                    + " of the path of the resources: give the resources another path variable, e.g. StaticResources.pathVariable(\"file\")");
+            }
+        } catch (RuntimeException e) {
+            drop();
+            throw e;
+        }
+        int end = template.length();
+        while (end > 0 && template.charAt(end - 1) == '/') {
+            end--;
+        }
+        String prefix = template.substring(0, end);
+        if (!prefix.isEmpty() && prefix.charAt(0) != '/') {
+            prefix = '/' + prefix;
+        }
+        String root = prefix.isEmpty() ? "/" : prefix;
+        String paths = prefix + "/{+" + pathVariable + "}";
+        Supplier<HandlerMethod<?>> handler = () -> HandlerMethod.of(resources);
+        ended = true;
+        // the prefix itself, e.g. for the index file, and every path under it
+        addRoutes(() -> {
+            List<RouteSettings> added = new ArrayList<>(2);
+            added.add(builder.getRoute(root, handler.get()));
+            added.add(builder.getRoute(paths, handler.get()));
+            return added;
+        }, resourceSettings(resources), RESOURCE_SETTINGS);
+    }
+
+    /**
+     * The settings a route of resources gives its routes: those whose reading blocks run on the
+     * blocking executor, which the executor of the route, or of its groups, given later, replaces.
+     *
+     * @param resources The handler of the resources
+     * @return The settings, or {@code null}
+     */
+    static @Nullable Consumer<RouteSettings> resourceSettings(ResourceHandler resources) {
+        return resources.blocking() ? route -> route.executeOn(BLOCKING_EXECUTOR) : null;
+    }
+
+    /**
+     * End a route with a handler of resources at its own URI template, e.g.
+     * {@code GET("/files/{+path}", resources)}: it runs like a route of resources.
+     *
+     * @param resources The handler of the resources
+     * @throws IllegalStateException if the route is a located route
+     */
+    void endResourceHandler(ResourceHandler resources) {
+        checkPending();
+        checkNotLocated();
+        end(() -> HandlerMethod.of(resources), resourceSettings(resources), RESOURCE_SETTINGS);
+    }
+
+    private void checkNotLocated() {
+        if (builder.located()) {
+            // the handler of the resources would not see the located target, nor its settings the
+            // media types and the executor of the locator
+            drop();
+            throw new IllegalStateException("The route " + description
+                + " is a located route: a route of resources is a route of an HttpRoutes bean");
+        }
+    }
+
+    private static String resourcePathVariable(ResourceHandler resources) {
+        String pathVariable = Objects.requireNonNull(resources.pathVariable(), "pathVariable");
+        if (pathVariable.isEmpty()) {
+            throw new IllegalArgumentException("The path variable of a resource handler must have a name");
+        }
+        for (int i = 0; i < pathVariable.length(); i++) {
+            char c = pathVariable.charAt(i);
+            if (!Character.isLetterOrDigit(c) && c != '_') {
+                throw new IllegalArgumentException("The path variable of a resource handler must be a plain name: " + pathVariable);
+            }
+        }
+        return pathVariable;
+    }
+
+    private void addRoutes(Supplier<List<RouteSettings>> handlerRoutes, @Nullable Consumer<RouteSettings> init, int own) {
+        HandlerRoutes added = builder.addRoutes(this, handlerRoutes, init, own);
         for (Consumer<HandlerRoutes> setting : settings) {
             setting.accept(added);
         }
@@ -215,8 +341,7 @@ final class PendingRoute {
      */
     NullPointerException missing(String name) {
         checkPending();
-        ended = true;
-        builder.dropPending(this);
+        drop();
         return new NullPointerException(name);
     }
 

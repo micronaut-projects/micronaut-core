@@ -20,7 +20,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.QueryStringDecoder;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.DelegatingExecutableMethod;
@@ -48,7 +50,13 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     private final UriMatchInfo matchInfo;
     private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
+    private final boolean plusAsSpace;
     private final @Nullable MediaType selectedMediaType;
+    /**
+     * The status a route selector rejected the request with, {@code 406} or {@code 415}, see
+     * {@link io.micronaut.web.router.spi.RouteMatchSelector.Selection#rejectionStatus()}.
+     */
+    private final @Nullable HttpStatus rejectionStatus;
     @Nullable
     private Map<String, Object> variables;
     private @Nullable Map<String, Object> rawVariables;
@@ -58,25 +66,41 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @param matchInfo The URI match info
      * @param routeInfo The URI route
      * @param defaultCharset The default charset
+     * @param plusAsSpace Whether a {@code +} in a path variable is decoded as a space, see {@link RouteAssembly#PATH_VARIABLE_PLUS_AS_SPACE}
      * @param conversionService The conversion service
      */
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
                          UriRouteInfo<T, R> routeInfo,
-                         Charset defaultCharset, ConversionService conversionService
+                         Charset defaultCharset,
+                         boolean plusAsSpace,
+                         ConversionService conversionService
     ) {
-        this(matchInfo, routeInfo, defaultCharset, conversionService, null);
+        this(matchInfo, routeInfo, defaultCharset, plusAsSpace, conversionService, null);
     }
 
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
                                  UriRouteInfo<T, R> routeInfo,
                                  Charset defaultCharset,
+                                 boolean plusAsSpace,
                                  ConversionService conversionService,
                                  @Nullable MediaType selectedMediaType) {
+        this(matchInfo, routeInfo, defaultCharset, plusAsSpace, conversionService, selectedMediaType, null);
+    }
+
+    private DefaultUriRouteMatch(UriMatchInfo matchInfo,
+                                 UriRouteInfo<T, R> routeInfo,
+                                 Charset defaultCharset,
+                                 boolean plusAsSpace,
+                                 ConversionService conversionService,
+                                 @Nullable MediaType selectedMediaType,
+                                 @Nullable HttpStatus rejectionStatus) {
         super(routeInfo, conversionService);
         this.matchInfo = matchInfo;
         this.uriRouteInfo = routeInfo;
         this.defaultCharset = defaultCharset;
+        this.plusAsSpace = plusAsSpace;
         this.selectedMediaType = selectedMediaType;
+        this.rejectionStatus = rejectionStatus;
     }
 
     /**
@@ -84,7 +108,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @return A new match of the same route and path with the media type
      */
     DefaultUriRouteMatch<T, R> withSelectedMediaType(MediaType mediaType) {
-        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, mediaType);
+        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, plusAsSpace, conversionService, mediaType);
     }
 
     /**
@@ -92,7 +116,27 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @return A new match with the match info and the negotiated media type of this match
      */
     DefaultUriRouteMatch<T, R> withMatchInfo(UriMatchInfo matchInfo) {
-        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, selectedMediaType);
+        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, plusAsSpace, conversionService, selectedMediaType, rejectionStatus);
+    }
+
+    /**
+     * @param status The status a route selector rejected the request with, {@code 406} or {@code 415}
+     * @return A new match of the same route and path, rejected with the status
+     */
+    DefaultUriRouteMatch<T, R> withRejectionStatus(HttpStatus status) {
+        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, plusAsSpace, conversionService, selectedMediaType, status);
+    }
+
+    /**
+     * The status the route selector of the route rejected the request with: a match the router
+     * finds for the routes of any method, see {@link Router#findAny(io.micronaut.http.HttpRequest)},
+     * which the request is answered with {@code 406} or {@code 415} for, with the types of the route.
+     *
+     * @return The status, or {@code null} if the match is not rejected
+     * @since 5.3.0
+     */
+    public @Nullable HttpStatus rejectionStatus() {
+        return rejectionStatus;
     }
 
     @Override
@@ -163,7 +207,9 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
                 variables = CollectionUtils.newLinkedHashMap(matchVariables.size());
                 matchVariables.forEach((k, v) -> {
                     if (v instanceof CharSequence) {
-                        v = URLDecoder.decode(v.toString(), defaultCharset);
+                        v = plusAsSpace
+                            ? URLDecoder.decode(v.toString(), defaultCharset)
+                            : QueryStringDecoder.decodePathComponent(v.toString(), defaultCharset);
                     }
                     variables.put(k, v);
                 });

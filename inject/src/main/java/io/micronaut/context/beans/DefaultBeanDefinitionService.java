@@ -23,6 +23,7 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DisabledBean;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.RuntimeBeanDefinition;
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.event.BeanDestroyedEventListener;
@@ -120,6 +121,19 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     @Nullable
     @SuppressWarnings("java:S3077")
     private volatile ProducersByDefinitionName producersByDefinitionName;
+
+    /**
+     * The producers of {@link #beans} whose reference declares {@link Replaces}, found on the first lookup that
+     * needs them, with the number of producers they were found among: a {@link io.micronaut.context.RuntimeBeanDefinition}
+     * added since is appended to the producers, which the count detects.
+     */
+    @Nullable
+    @SuppressWarnings("java:S3077")
+    private volatile ReplacingProducers replacingProducers;
+    /**
+     * Guards the publication of {@link #producersByDefinitionName} and {@link #replacingProducers} against {@link #reset()}.
+     */
+    private final Object lookupCachesLock = new Object();
 
     private final BeanResolutionCustomizer beanResolutionCustomizer;
 
@@ -266,7 +280,12 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         indexByDefinitionName(index, current.all);
         // A proxied bean is disabled in the main list and its target is kept apart, see createBeans
         indexByDefinitionName(index, current.proxyTargetBeans);
-        producersByDefinitionName = new ProducersByDefinitionName(current, index);
+        synchronized (lookupCachesLock) {
+            // not after a reset dropped the beans read, see reset
+            if (beans == current) {
+                producersByDefinitionName = new ProducersByDefinitionName(current, index);
+            }
+        }
         return index;
     }
 
@@ -402,6 +421,12 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     @Override
     public void reset() {
         beans = null;
+        // the lookup caches hold the definitions of the beans dropped above, and so the beans they supply;
+        // under the lock, a lookup that read those beans before cannot publish a cache of them after
+        synchronized (lookupCachesLock) {
+            producersByDefinitionName = null;
+            replacingProducers = null;
+        }
         disabledBeans.clear();
         additionalBeanDefinitions.clear();
         additionalBeanConfigurations.clear();
@@ -461,6 +486,42 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     @Override
     public Iterable<BeanDefinition<Object>> getTargetProxyBeans(BeanContext beanContext) {
         return getBeanDefinitions(Objects.requireNonNull(beans).proxyTargetBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+    }
+
+    @Override
+    public Iterable<BeanDefinition<Object>> getReplacingBeans(BeanContext beanContext) {
+        Beans current = beans;
+        if (current == null) {
+            return List.of();
+        }
+        List<BeanDefinitionProducer> producers = replacingProducers(current);
+        if (producers.isEmpty()) {
+            return List.of();
+        }
+        return getBeanDefinitions(producers, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+    }
+
+    private List<BeanDefinitionProducer> replacingProducers(Beans current) {
+        // read before the producers are, so that one added meanwhile has the next lookup find them again
+        int count = current.all.size();
+        ReplacingProducers cached = replacingProducers;
+        if (cached != null && cached.beans == current && cached.count == count) {
+            return cached.producers;
+        }
+        List<BeanDefinitionProducer> producers = new ArrayList<>(2);
+        for (BeanDefinitionProducer producer : current.all) {
+            BeanDefinitionReference<?> reference = producer.reference;
+            if (reference != null && reference.hasAnnotation(Replaces.class)) {
+                producers.add(producer);
+            }
+        }
+        synchronized (lookupCachesLock) {
+            // not after a reset dropped the beans read, see reset
+            if (beans == current) {
+                replacingProducers = new ReplacingProducers(current, count, producers);
+            }
+        }
+        return producers;
     }
 
     @Override
@@ -659,6 +720,9 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     private record ProducersByDefinitionName(Beans beans, Map<String, List<BeanDefinitionProducer>> index) {
+    }
+
+    private record ReplacingProducers(Beans beans, int count, List<BeanDefinitionProducer> producers) {
     }
 
     private record Beans(

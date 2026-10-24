@@ -52,7 +52,7 @@ public final class BodyPieces implements PieceReader<ByteBuffer<?>> {
      */
     @SuppressWarnings("java:S2095") // the elements own the piece reader, and close it
     public static BodyElements<ByteBuffer<?>> elements(CloseableByteBody body) {
-        return new ByteBodyElements<>(body, new BodyPieces(), BodyPieces::wrap);
+        return new ByteBodyElements<>(body, new BodyPieces(), BodyPieces::wrap, true);
     }
 
     /**
@@ -73,7 +73,7 @@ public final class BodyPieces implements PieceReader<ByteBuffer<?>> {
      * @return The lines
      */
     public static BodyElements<ByteBuffer<?>> lines(CloseableByteBody body, long maxLineLength) {
-        return new ByteBodyElements<>(body, lineReader(maxLineLength, ByteArrayBufferFactory.INSTANCE::wrap), BodyPieces::wrap);
+        return new ByteBodyElements<>(body, lineReader(maxLineLength, ByteArrayBufferFactory.INSTANCE::wrap), BodyPieces::wrap, true);
     }
 
     /**

@@ -240,6 +240,17 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
     }
 
     /**
+     * Add a {@code GET} route of a URI template, e.g. a route of resources.
+     *
+     * @param uri     The URI template, under the prefix of the builder
+     * @param handler The handler
+     * @return The settings of the route
+     */
+    final RouteSettings getRoute(String uri, HandlerMethod<?> handler) {
+        return add(HttpMethod.GET.name(), HttpMethod.GET, uriDeclaration(uri), handler);
+    }
+
+    /**
      * @param uri A URI template, under the prefix of the builder
      * @return The declaration: the routes of its methods share one template, built when the first is added
      */
@@ -286,6 +297,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
      * @param uri     The URI template of the route, relative to the prefix of the builder
      * @param get     Whether it is a route of {@code GET} only, which may be a WebSocket route
      * @param routes  Adds the routes of a handler, given the URI template under the prefix
+     * @param getOnly Whether the route is a route of {@code GET} only
      * @return The spec of the pending route
      */
     private HttpRouteSpec pending(String methods, String uri, boolean get, BiFunction<DeclaredTemplate, Supplier<HandlerMethod<?>>, List<RouteSettings>> routes) {
@@ -475,6 +487,12 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         pending.add(declaration);
         LocatorSupport support = assembly.locatorSupport();
         return new DefaultLocatorSpec(this, prefixUri, declaration, support.context(), support.bodyHandlers(), DEFAULT_CONSUMES);
+    }
+
+    @Override
+    public final <T> void locateOn(String executorName, String prefixUri, LocatorHandler<? extends T> locator,
+                                   Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locateAsync(prefixUri, RouteLocator.onExecutor(assembly, executorName, locator), routesOf);
     }
 
     /**
