@@ -27,6 +27,7 @@ import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.RetainedEventLoopGroups;
 import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
 import io.netty.channel.EventLoopGroup;
+import io.netty.util.concurrent.EventExecutor;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
@@ -139,6 +140,26 @@ final class DevEventLoopGroups implements RetainedEventLoopGroups {
         }
         generation++;
         unclaimed.forEach(Retained::shutdown);
+    }
+
+    /**
+     * Whether an event loop belongs to a group retained across the restart: what runs on it outlives the generation.
+     *
+     * @param eventLoop The event loop
+     * @return True if one of the retained groups holds it
+     */
+    synchronized boolean retains(EventExecutor eventLoop) {
+        if (closed) {
+            return false;
+        }
+        for (Retained retained : groups.values()) {
+            for (EventExecutor executor : retained.group) {
+                if (executor == eventLoop) {
+                    return !retained.group.isShuttingDown();
+                }
+            }
+        }
+        return false;
     }
 
     /**
