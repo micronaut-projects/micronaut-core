@@ -1397,6 +1397,8 @@ class Lowering:
         for handler in node.handlers:
             if handler.type is None:
                 self._refuse("python-exception", "a bare except clause catches Python exceptions", handler)
+            if handler.name is not None and handler.name in JAVA_RESERVED_NAMES:
+                self._refuse("java-reserved-name", f"local [{handler.name}] cannot be declared in Java", handler)
             caught = self._caught_type(handler, caught_types, java_code)
             if handler.name is not None and (handler.name in self.locals or handler.name in self.parameters):
                 self._refuse("unsupported-statement", f"the exception variable [{handler.name}] is already a local or a parameter", handler)
