@@ -246,7 +246,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         "It should not be possible to process elements without at least one annotation present and this call breaks that assumption")
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        return ProcessorOptionsSystemProperties.process(this, roundEnv.processingOver(), () -> processRound(annotations, roundEnv));
+        return ProcessorOptionsSystemProperties.process(processingEnv.getElementUtils(), this, roundEnv.processingOver(), () -> processRound(annotations, roundEnv));
     }
 
     private boolean processRound(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
