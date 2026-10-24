@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -218,6 +219,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String PYTHON_DATE_TIME_ANNOTATION = "io.micronaut.context.python.annotation.PythonDateTime";
     public static final ClassTypeDef PYTHON_MODULE_ANNOTATION = ClassTypeDef.of("io.micronaut.context.python.annotation.PythonModule");
     public static final ClassTypeDef POLYGLOT_VALUE_CONVERTER = ClassTypeDef.of("io.micronaut.context.python.PolyglotValueConverter");
+    private static final ClassTypeDef PYTHON_FIXED_ATTRIBUTES = ClassTypeDef.of("io.micronaut.context.python.PythonFixedAttributes");
+    private static final ClassTypeDef PYTHON_FIXED_SLOT = ClassTypeDef.of("io.micronaut.context.python.PythonFixedAttributes.Slot");
+    private static final String FIXED_ATTRIBUTES_FIELD = "graalpyInternalFixedAttributes";
+    private static final String FIXED_SLOT_PREFIX = "graalpyInternalFixed";
+    private static final String VALUE_OF = "valueOf";
     /**
      * The type of a proxy that intercepts a target bean; a generated stub that is one has no Python object of its own.
      */
@@ -314,6 +320,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private final Map<String, PythonReflectionGate.Copy> copiedRuntimeAnnotations = new HashMap<>();
     private PythonReflectionGate reflectionGate;
     private final Map<String, StubEntry> classBuilders = new LinkedHashMap<>();
+    // per stub builder, the readers of attributes fixed at construction its compiled bodies read, by attribute and type
+    private final Map<ClassDef.ClassDefBuilder, Map<String, MethodDef>> fixedReaders = new IdentityHashMap<>();
     private final Map<String, StateEntry> stateDefs = new LinkedHashMap<>();
     private final Map<String, EnumEntry> enumDefs = new LinkedHashMap<>();
     private final Map<String, InterfaceEntry> interfaceDefs = new LinkedHashMap<>();
@@ -397,6 +405,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         } finally {
             classBuilders.clear();
+            fixedReaders.clear();
             stateDefs.clear();
             enumDefs.clear();
             interfaceDefs.clear();
@@ -5111,7 +5120,105 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 FieldDef field = accessor ? null : model.propertyFields().get(property);
                 return field != null ? aThis.field(field).assign(value) : members.write(property, type, value, accessor);
             }
+
+            @Override
+            public ExpressionDef readFixed(String property, String typeName, TypeDef type) {
+                if (model.isIntrospectedBean() || model.propertyFields().containsKey(property) || !fixedType(model.context(), typeName)) {
+                    // an introspected stub holds its state in fields of its own
+                    return read(property, typeName, type, false);
+                }
+                MethodDef reader = fixedReader(model, property, typeName, type);
+                return aThis.invoke(reader.getName(), type);
+            }
         };
+    }
+
+    /**
+     * Whether the stub generator keeps a value of the type in a Java field for an attribute fixed at
+     * construction, as the planner decided: not a value of an introspected class of the compilation,
+     * whose generated object is a copy of the Python object's state (the planner refuses those too).
+     */
+    private boolean fixedType(VisitorContext context, String typeName) {
+        String erasedName = typeName.indexOf('<') < 0 ? typeName : typeName.substring(0, typeName.indexOf('<'));
+        if (erasedName.indexOf('.') < 0) {
+            return true;
+        }
+        return context.getClassElement(erasedName.replace('$', '.'))
+            .map(type -> !isGeneratedWrapperType(allClasses, type) || !type.hasStereotype(Introspected.class))
+            .orElse(true);
+    }
+
+    /**
+     * The private method of the stub reading an attribute fixed at construction (see
+     * {@code StaticPlanner.fixed_attribute}): the slot of the attribute keeps the converted value
+     * for the Python object until a change of an attribute of an object of the class is reported,
+     * see {@code PythonFixedAttributes}. The stub class gets the epoch of its slots once, each
+     * attribute a transient slot, created on its first read.
+     */
+    private MethodDef fixedReader(ClassStubModel model, String property, String typeName, TypeDef type) {
+        ClassDef.ClassDefBuilder builder = model.builder();
+        Map<String, MethodDef> readers = fixedReaders.computeIfAbsent(builder, b -> new LinkedHashMap<>());
+        String key = property + ' ' + typeName;
+        MethodDef existing = readers.get(key);
+        if (existing != null) {
+            return existing;
+        }
+        if (readers.isEmpty()) {
+            builder.addField(FieldDef.builder(FIXED_ATTRIBUTES_FIELD)
+                .ofType(PYTHON_FIXED_ATTRIBUTES)
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
+                .initializer(PYTHON_FIXED_ATTRIBUTES.instantiate())
+                .build());
+        }
+        String name = FIXED_SLOT_PREFIX + readers.size();
+        FieldDef slot = FieldDef.builder(name)
+            .ofType(PYTHON_FIXED_SLOT)
+            .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
+            .build();
+        builder.addField(slot);
+        // the value converted as a read of the attribute through the Python object converts it, boxed
+        MethodDef convertMethod = MethodDef.builder(CONVERT_METHOD)
+            .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+            .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
+            .returns(TypeDef.OBJECT)
+            .build();
+        Optional<PropertyElement> element = propertyElement(model, property);
+        MethodDef implementation = MethodDef.override(convertMethod)
+            .build((aThis, methodParameters) -> {
+                ExpressionDef converted = convertPythonValue(model.context(), methodParameters.get(0), typeName, type, element);
+                return (type instanceof TypeDef.Primitive primitive
+                    ? primitive.wrapperType().invokeStatic(VALUE_OF, List.of(primitive), primitive.wrapperType(), converted)
+                    : converted).returning();
+            });
+        ExpressionDef converter = new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
+        MethodDef reader = MethodDef.builder(name)
+            .addModifiers(Modifier.PRIVATE)
+            .addJavadoc("The attribute [" + property + "] of the Python object, fixed at construction.")
+            .returns(type)
+            .build((aThis, methodParameters) -> aThis.field(slot).newLocal("slot", current -> StatementDef.multi(
+                current.isNull().doIf(StatementDef.multi(
+                    current.assign(PYTHON_FIXED_SLOT.instantiate()),
+                    aThis.field(slot).assign(current)
+                )),
+                unboxed(current.invoke("read", TypeDef.OBJECT,
+                    aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE),
+                    ExpressionDef.constant(property),
+                    javaClassType(model.element()).getStaticField(FIXED_ATTRIBUTES_FIELD, PYTHON_FIXED_ATTRIBUTES),
+                    converter), type).returning()
+            )));
+        builder.addMethod(reader);
+        readers.put(key, reader);
+        return reader;
+    }
+
+    /**
+     * A value a slot holds as an object, at the type the compiled body reads: a primitive unboxed.
+     */
+    private static ExpressionDef unboxed(ExpressionDef value, TypeDef type) {
+        if (type instanceof TypeDef.Primitive primitive) {
+            return value.cast(primitive.wrapperType()).invoke(primitive.name() + "Value", primitive);
+        }
+        return value.cast(type);
     }
 
     /**

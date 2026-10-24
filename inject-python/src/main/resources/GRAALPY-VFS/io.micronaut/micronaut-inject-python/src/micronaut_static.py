@@ -29,7 +29,7 @@ import ast
 
 import java
 
-from micronaut_typecheck import Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, function_node, switch_value
+from micronaut_typecheck import Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, function_node, switch_value, TRANSPARENT_BASES
 from micronaut_lowering import JAVA_RESERVED_NAMES, Lowering, stub_type_name, _decorated_with
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
@@ -60,6 +60,27 @@ SUPPORTED_EXPRESSIONS = (ast.Constant, ast.Name, ast.Attribute, ast.Call, ast.Bi
 # the reasons a class generates no class stub, by the decorator or base that says so
 POOLED_DECORATOR = "ContextPooled"
 PROTOCOL_BASES = {"Protocol", "typing.Protocol"}
+
+# attributes fixed at construction (StaticPlanner.fixed_attribute): the members through which a class
+# takes over the access to the attributes of its objects
+ATTRIBUTE_PROTOCOL = {"__setattr__", "__delattr__", "__getattr__", "__getattribute__", "__new__", "__slots__",
+                      "__dict__", "__class__", "__init_subclass__", "__class_getitem__", "__set_name__"}
+# the Java types whose value a Python value converts to anew every time, equal each time: numbers,
+# booleans, characters and strings
+FIXED_SCALARS = {"long", "int", "short", "byte", "double", "float", "boolean", "char",
+                 "java.lang.Long", "java.lang.Integer", "java.lang.Short", "java.lang.Byte", "java.lang.Double",
+                 "java.lang.Float", "java.lang.Boolean", "java.lang.Character", "java.lang.String"}
+# the types any Python value converts to, a container among them
+LOOSE_TYPES = {"java.lang.Object", "java.lang.Number", "java.io.Serializable", "java.lang.Comparable", "java.lang.CharSequence"}
+# the types of java.util whose values are immutable
+IMMUTABLE_UTIL_TYPES = {"java.util.UUID", "java.util.Locale", "java.util.Currency"}
+# the types a Python container converts to, by a copy of its elements
+CONTAINER_TYPES = ("java.lang.Iterable", "java.util.Map", "java.util.Iterator", "java.util.Optional", "java.util.stream.BaseStream")
+# the calls writing the attribute their string argument names: setattr(o, "x", v), delattr(o, "x"),
+# object.__setattr__(o, "x", v), monkeypatch.setattr(o, "x", v), patch.object(o, "x"), patch("m.C.x"), patch.multiple(o, x=v)
+NAMED_WRITERS = {"setattr", "delattr", "__setattr__", "__delattr__", "object", "multiple", "patch"}
+# the calls among them that write the attribute a computed name says when no string names it
+COMPUTED_WRITERS = {"setattr", "delattr", "__setattr__", "__delattr__"}
 
 
 class CompileScope:
@@ -109,6 +130,8 @@ class StaticPlanner:
         self._bodies = {}         # id(node) -> the compiled body
         # the classes already reported for a class-level switch they can never honour
         self._reported_classes = set()
+        self._fixed = {}          # id(class model) -> the names of its attributes fixed at construction
+        self._writes = None       # the attribute writes of the compilation, see AttributeWrites
 
     def plan(self, checker, visitor_context=None):
         """
@@ -122,6 +145,8 @@ class StaticPlanner:
         self._decided = {}
         self._bodies = {}
         self._reported_classes = set()
+        self._fixed = {}
+        self._writes = None
         if getattr(checker, "facts", None) is None and visitor_context is not None:
             checker.facts = TypeFacts(visitor_context)
             checker.python_classes = PythonClasses(checker)
@@ -157,6 +182,129 @@ class StaticPlanner:
     def body_of(self, node):
         """The compiled body of a decided function, or None."""
         return self._bodies.get(id(node))
+
+    # ---------------------------------------------------------------- attributes fixed at construction
+
+    def fixed_attribute(self, class_model, name, type_name):
+        """
+        Whether a compiled body of the class reads ``self.<name>`` from a Java field of its stub
+        instead of the Python object (``Ir.SelfProperty#fixed``): the attribute is fixed at
+        construction. ``__init__`` assigns it; no method of the class writes an attribute of
+        ``self`` after construction; no code of the compilation assigns the name on another object
+        (which may be the class itself) or names it in a call writing attributes by name, nor reaches
+        attributes behind the attribute protocol (``__dict__``, ``vars()``, a computed
+        ``object.__setattr__``); the class takes over no part of the protocol, so ``self.<name>`` is
+        the entry of the object's ``__dict__``; and the value converts to the same Java value every
+        time (a number, a string, a Java object, a plain object of the compilation, which its
+        generated class wraps). The stub reads the attribute through the Python object once per
+        object; ``micronaut_runtime`` then makes the class's ``__setattr__`` and ``__delattr__``
+        report every later change of an attribute an object has, so a write the compilation does not
+        see (a test's ``monkeypatch.setattr``, code outside the compilation, a method of another
+        class called with the object) makes the stub read it again. See ``PythonFixedAttributes``.
+        """
+        if class_model is None or not self._fixable_type(type_name):
+            return False
+        key = id(class_model)
+        if key not in self._fixed:
+            self._fixed[key] = self._fixed_attributes(class_model)
+        return name in self._fixed[key]
+
+    def _fixed_attributes(self, model):
+        """The names of the attributes of the class fixed at construction, see fixed_attribute."""
+        if not self._fixable_class(model):
+            return frozenset()
+        writes = self._attribute_writes()
+        if writes.everything or id(model.node) in writes.classes_written:
+            return frozenset()
+        names = set()
+        for name in model.instance_attributes:
+            if name.startswith("__") or name in writes.named or name in writes.stores:
+                # a dunder or a name-mangled private attribute; one a call writes by its name, or one
+                # assigned on an object other than the receiver of a method (an object of the class,
+                # or the class itself)
+                continue
+            if model.find(name) != ("instance", None):
+                continue  # the class or a base declares the name: a descriptor may serve it
+            names.add(name)
+        return frozenset(names)
+
+    def _fixable_class(self, model):
+        """
+        Whether the objects of the class keep their attributes in their ``__dict__`` and write them
+        through ``object.__setattr__`` only while ``__init__`` runs: no base but ``object`` (or ``ABC``,
+        ``Generic``), no subclass of the compilation, no metaclass or decorator of its own, no part
+        of the attribute protocol, a constructor of its own, and no method other than ``__init__``
+        (nor a function ``__init__`` defines) writing an attribute of ``self``.
+        """
+        if model.constructor is None or model.constructor[1] is None or not model.constructor[1].args.args:
+            return False
+        if any(base.name() not in TRANSPARENT_BASES for base in model.class_def.bases()) or model.bases:
+            return False
+        if model.is_open() or model.is_lookup_dynamic() or model.subclasses:
+            return False
+        if any(decorator.annotationName().rsplit(".", 1)[-1] == "dataclass" for decorator in model.class_def.decorators()):
+            return False
+        if self._introspected(model.qualified) or model.is_throwable():
+            return False
+        node = model.node
+        for statement in getattr(node, "body", ()):
+            for target in _declared_names(statement):
+                if target in ATTRIBUTE_PROTOCOL:
+                    return False
+        for statement in getattr(node, "body", ()):
+            if not isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) or not statement.args.args:
+                continue
+            receiver = statement.args.args[0].arg
+            if statement.name == "__init__":
+                # a function __init__ defines runs later: its writes of self are no construction
+                nested = [child for child in ast.walk(statement) if child is not statement and isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda))]
+                if any(_receiver_store(grandchild, receiver) for child in nested for grandchild in ast.walk(child)):
+                    return False
+                continue
+            if any(_receiver_store(child, receiver) for child in ast.walk(statement)):
+                return False
+        return True
+
+    def _fixable_type(self, type_name):
+        """
+        Whether a value of the Java type a compiled body reads converts to the same Java value every
+        time the Python value is the same object: a number, a boolean, a string, a Java object (the
+        boundary hands it over as itself), a plain object of the compilation (its generated class
+        wraps the Python object). A collection is copied, and an introspected object of the
+        compilation is a copy of its state, which changes in place.
+        """
+        if type_name in FIXED_SCALARS:
+            return True
+        erased = type_name.split("<", 1)[0]
+        if erased.endswith("[]") or erased in LOOSE_TYPES or "." not in erased:
+            return False
+        if erased.startswith("java.util.") and erased not in IMMUTABLE_UTIL_TYPES:
+            return False
+        facts = getattr(self.checker, "facts", None)
+        if facts is None:
+            return False
+        if any(facts.isAssignable(erased, container) for container in CONTAINER_TYPES):
+            return False
+        classes = getattr(self.checker, "python_classes", None)
+        model = classes.by_qualified.get(erased) if classes is not None else None
+        if model is not None:
+            return not model.is_throwable() and not any(self._introspected(other.qualified) for other in [model] + list(model.subclasses))
+        return True
+
+    def _introspected(self, qualified_name):
+        """Whether the generated class of the class is introspected; unknown facts count as introspected."""
+        facts = getattr(self.checker, "facts", None)
+        introspected = getattr(facts, "isIntrospected", None) if facts is not None else None
+        return True if introspected is None else bool(introspected(qualified_name))
+
+    def _attribute_writes(self):
+        if self._writes is None:
+            trees = []
+            for module in self.checker._modules.values():
+                tree = getattr(getattr(module, "visitor", None), "module_node", None)
+                trees.append(tree)
+            self._writes = AttributeWrites(trees)
+        return self._writes
 
     def script_class_name(self, module):
         """The name of the module's generated class: the script's when it has one, else the class its compiled functions get."""
@@ -672,6 +820,120 @@ def _yields(function_node):
 
 def _describe(node):
     return _NAMES.get(type(node), f"a {type(node).__name__} node")
+
+
+class AttributeWrites:
+    """
+    The writes of attributes of objects in the sources of a compilation, by the name of the attribute
+    (StaticPlanner.fixed_attribute): the nodes assigning or deleting ``<anything>.<name>`` but an
+    attribute of the receiver of the method they are in (``self.<name>``: an object of that class,
+    whose own writes the class answers for, and which the reported changes cover anyway); the names
+    a call writes by a string (``setattr(o, "x", v)``, ``monkeypatch.setattr(o, "x", v)``,
+    ``patch.object(C, "x")``, ``patch("app.m.C.x")``, ``patch.multiple(o, x=v)``); the classes whose
+    methods write attributes of ``self`` by a computed name (``setattr(self, name, value)``); and
+    ``everything`` when a write may reach any attribute: ``__dict__``, ``vars()``, a computed
+    ``setattr`` on another object, an assignment of ``__class__``, a reference to ``__setattr__`` that
+    is not called, or a source whose tree is not known.
+    """
+
+    def __init__(self, trees):
+        self.stores = {}              # attribute name -> ids of the Attribute nodes storing or deleting it on another object than self
+        self.named = set()            # the names calls write by a string
+        self.classes_written = set()  # id(class node) of the classes whose methods setattr(self, name, ...)
+        self.everything = False
+        for tree in trees:
+            if tree is None:
+                self.everything = True
+                continue
+            self._scan(tree)
+
+    def _scan(self, tree):
+        receivers = {}  # id(node) -> (class node, receiver) for the nodes of a method's own scope
+        for class_node in ast.walk(tree):
+            if isinstance(class_node, ast.ClassDef):
+                for statement in class_node.body:
+                    if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and statement.args.args:
+                        for child in _scope_nodes(statement):
+                            receivers[id(child)] = (class_node, statement.args.args[0].arg)
+        callees = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                self._call(node, receivers)
+                callees.add(id(node.func))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Attribute):
+                continue
+            if node.attr == "__dict__" or (node.attr == "__class__" and isinstance(node.ctx, (ast.Store, ast.Del))):
+                self.everything = True
+            elif node.attr in ("__setattr__", "__delattr__") and id(node) not in callees:
+                self.everything = True  # a reference kept to write with later
+            if isinstance(node.ctx, (ast.Store, ast.Del)):
+                owner = receivers.get(id(node))
+                if owner is None or not isinstance(node.value, ast.Name) or node.value.id != owner[1]:
+                    self.stores.setdefault(node.attr, []).append(id(node))
+
+    def _call(self, call, receivers):
+        function = call.func
+        name = function.id if isinstance(function, ast.Name) else function.attr if isinstance(function, ast.Attribute) else None
+        if name == "vars" and isinstance(function, ast.Name) and (call.args or call.keywords):
+            self.everything = True
+            return
+        if name not in NAMED_WRITERS:
+            return
+        strings = [argument.value for argument in list(call.args) + [keyword.value for keyword in call.keywords]
+                   if isinstance(argument, ast.Constant) and isinstance(argument.value, str)]
+        for string in strings:
+            self.named.add(string.rsplit(".", 1)[-1])
+        if name == "multiple":
+            self.named.update(keyword.arg for keyword in call.keywords if keyword.arg is not None)
+        if strings or name not in COMPUTED_WRITERS:
+            return
+        if isinstance(function, ast.Attribute) and isinstance(function.value, ast.Call) and isinstance(function.value.func, ast.Name) and function.value.func.id == "super":
+            return  # super().__setattr__(name, value): the default write of a class that takes it over itself
+        # the object written: setattr(o, ...), object.__setattr__(o, ...), or o.__setattr__(...) bound
+        if isinstance(function, ast.Name) or (isinstance(function, ast.Attribute) and isinstance(function.value, ast.Name) and function.value.id in ("object", "type")):
+            target = call.args[0] if call.args else None
+        else:
+            target = function.value
+        owner = receivers.get(id(call))
+        if owner is not None and isinstance(target, ast.Name) and owner[1] == target.id:
+            # setattr(self, name, value) in a method: an attribute of an object of that class
+            self.classes_written.add(id(owner[0]))
+            return
+        self.everything = True
+
+
+def _scope_nodes(function):
+    """The nodes of a function's own scope: those of the functions, lambdas and classes it defines excluded."""
+    stack = list(function.body)
+    while stack:
+        node = stack.pop()
+        yield node
+        for child in ast.iter_child_nodes(node):
+            if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
+                stack.append(child)
+
+
+def _receiver_store(node, receiver):
+    """Whether the node assigns or deletes an attribute of the receiver, or setattr()s or delattr()s one."""
+    if isinstance(node, ast.Attribute) and isinstance(node.ctx, (ast.Store, ast.Del)):
+        return isinstance(node.value, ast.Name) and node.value.id == receiver
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("setattr", "delattr"):
+        return bool(node.args) and isinstance(node.args[0], ast.Name) and node.args[0].id == receiver
+    return False
+
+
+def _declared_names(statement):
+    """The names a statement of a class body binds: a function, a class, an assignment or an import."""
+    if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return [statement.name]
+    if isinstance(statement, ast.Assign):
+        return [name.id for target in statement.targets for name in ast.walk(target) if isinstance(name, ast.Name)]
+    if isinstance(statement, (ast.AnnAssign, ast.AugAssign)):
+        return [name.id for name in ast.walk(statement.target) if isinstance(name, ast.Name)]
+    if isinstance(statement, (ast.Import, ast.ImportFrom)):
+        return [(alias.asname or alias.name).split(".")[0] for alias in statement.names]
+    return []
 
 
 def _generates_class(script):

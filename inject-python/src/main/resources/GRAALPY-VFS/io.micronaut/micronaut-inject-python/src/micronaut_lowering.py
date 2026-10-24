@@ -652,6 +652,7 @@ class Lowering:
         self.parameters = {}      # name -> (type used at, stub type)
         self.java_calls = 0
         self.bridge_calls = 0
+        self.fixed_reads = 0      # the reads of attributes of self fixed at construction, from Java fields of the stub
         self.helper_calls = 0
         self.checked = False      # a call declares a checked exception
         self.prelude = []         # per statement being lowered, the statements a comprehension hoists before it
@@ -706,7 +707,7 @@ class Lowering:
             return ExceptionCrossing.TRANSLATED
         classes = getattr(self.checker, "python_classes", None)
         exception_classes = classes is not None and any(model.is_throwable() for model in classes.all())
-        if exception_classes and (self.compilation_calls or self.bridge_calls):
+        if exception_classes and (self.compilation_calls or self.bridge_calls or self.fixed_reads):
             return ExceptionCrossing.PYTHON_BODY
         return ExceptionCrossing.UNTRANSLATED
 
@@ -1602,7 +1603,7 @@ class Lowering:
             current = self._name(node.target)
         elif isinstance(node.target, ast.Attribute) and isinstance(node.target.value, ast.Name) and node.target.value.id == "self":
             property_type = self._self_property_type(node.target.attr, node.target)
-            current = SelfProperty(node.target.attr, property_type, self._is_accessor(node.target.attr))
+            current = SelfProperty(node.target.attr, property_type, self._is_accessor(node.target.attr), False)
             # an int attribute is a long in the body, as a read of it is
             used = JAVA_PRIMITIVE_NUMBERS.get(property_type, property_type)
             current = Cast(current, used) if used != property_type else current
@@ -2135,9 +2136,15 @@ class Lowering:
 
     def _attribute(self, node):
         if isinstance(node.value, ast.Name) and node.value.id == "self":
-            self.bridge_calls += 1
             property_type = self._self_property_type(node.attr, node)
-            read = SelfProperty(node.attr, property_type, self._is_accessor(node.attr))
+            accessor = self._is_accessor(node.attr)
+            fixed = not accessor and self._fixed(node.attr, property_type)
+            if fixed:
+                # read from a Java field of the stub: the Python object is reached once per object
+                self.fixed_reads += 1
+            else:
+                self.bridge_calls += 1
+            read = SelfProperty(node.attr, property_type, accessor, fixed)
             # an int attribute (an instance attribute hinted through __init__) is a long in the body; one
             # that may be None stays boxed
             used = JAVA_PRIMITIVE_NUMBERS.get(property_type, property_type)
@@ -2167,6 +2174,11 @@ class Lowering:
                 return self._python_attribute(model, value, node)
         self._outside_module(node.value)
         self._refuse("dynamic-call", f"the attribute [{node.attr}] resolves to no Java field or property of self", node)
+
+    def _fixed(self, name, property_type):
+        """Whether self.<name> is fixed at construction, so the stub reads it from a Java field (StaticPlanner.fixed_attribute)."""
+        fixed_attribute = getattr(self.planner, "fixed_attribute", None)
+        return fixed_attribute is not None and not self.static and self.class_model is not None and fixed_attribute(self.class_model, name, property_type)
 
     def _is_accessor(self, name):
         """Whether the attribute of self is a @property: its getter and setter run on the Python object."""

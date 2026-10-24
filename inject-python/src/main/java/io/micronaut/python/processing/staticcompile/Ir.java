@@ -271,8 +271,11 @@ public sealed interface Ir {
      * @param property The property
      * @param type     The Java type of the property
      * @param accessor Whether the property is a Python {@code @property}, whose getter runs on the Python object
+     * @param fixed    Whether the attribute is fixed at construction: {@code __init__} assigns it and nothing
+     *                 writes it later, so the stub reads it from the Python object once and from a Java field
+     *                 afterwards (see {@code StaticPlanner.fixed_attribute})
      */
-    record SelfProperty(String property, String type, boolean accessor) implements Expression {
+    record SelfProperty(String property, String type, boolean accessor, boolean fixed) implements Expression {
     }
 
     /**
