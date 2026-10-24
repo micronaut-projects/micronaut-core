@@ -109,11 +109,14 @@ public final class PythonStatic {
      * The Java exception a compiled {@code raise} of a Python exception class throws: the one the
      * runtime creates when the Python exception reaches Java code, the generated class of its
      * exception class created through its {@code Value} constructor (a failure of that constructor
-     * reported as an {@link IllegalStateException}, as for a Python raise).
+     * reported as an {@link IllegalStateException}, as for a Python raise). A generated class that
+     * cannot be created at all is an {@link IllegalStateException} naming it too, rather than an
+     * exception the compiled handlers of the exception class would not catch.
      *
      * @param generatedClass The generated class of the exception class
      * @param exception      The Python exception, created by its class
      * @return The Java exception to throw
+     * @throws IllegalStateException When the generated class cannot be created for the Python exception
      */
     @UsedByGeneratedCode
     public static RuntimeException raised(Class<?> generatedClass, Value exception) {

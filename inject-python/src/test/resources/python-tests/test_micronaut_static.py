@@ -1154,6 +1154,24 @@ class Pricing:
         switch = n
         return switch
 
+    def reserved_each(self, xs: list[int]) -> int:
+        total = 0
+        for new in xs:
+            total += new
+        return total
+
+    def reserved_range(self, n: int) -> int:
+        total = 0
+        for int in range(n):
+            total += int
+        return total
+
+    def reserved_items(self, prices: dict[str, int]) -> int:
+        total = 0
+        for name, new in prices.items():
+            total += new
+        return total
+
     def summed(self, n: int) -> int:
         total = 0
         for i in range(1, n + 1, 2):
@@ -2169,6 +2187,9 @@ class LoweringTest(unittest.TestCase):
             "maybe_unbound": "unsupported-statement",
             "maybe": "unsupported-expression",
             "switched": "java-reserved-name",
+            "reserved_each": "java-reserved-name",
+            "reserved_range": "java-reserved-name",
+            "reserved_items": "java-reserved-name",
             "leaked": "unsupported-statement",
             "raises_python": "python-exception",
             "shadowed": "python-exception",  # without Java facts the exception types are unknown; with them the order is refused
@@ -2189,6 +2210,10 @@ class LoweringTest(unittest.TestCase):
             self.assertIsNotNone(decision.reasons()[0].span(), name)
         self.assertEqual("local [value] is a [long] and then a [java.lang.String]", self.decisions["Pricing.retyped"].reasons()[0].message())
         self.assertEqual("the function does not return a value on every path", self.decisions["Pricing.falls_through"].reasons()[0].message())
+        # a loop variable is a Java local too
+        self.assertEqual("local [new] cannot be declared in Java", self.decisions["Pricing.reserved_each"].reasons()[0].message())
+        self.assertEqual("local [int] cannot be declared in Java", self.decisions["Pricing.reserved_range"].reasons()[0].message())
+        self.assertEqual("local [new] cannot be declared in Java", self.decisions["Pricing.reserved_items"].reasons()[0].message())
 
     def test_static_methods_compile_into_their_static_bridge(self):
         decision = self.decisions["Pricing.helper"]
