@@ -687,6 +687,12 @@ class Pricing:
             total += new
         return total
 
+    def reserved_catch(self, n: int) -> int:
+        try:
+            return n
+        except Exception as new:
+            return 0
+
     def summed(self, n: int) -> int:
         total = 0
         for i in range(1, n + 1, 2):
@@ -1262,6 +1268,7 @@ class LoweringTest(unittest.TestCase):
             "reserved_each": "java-reserved-name",
             "reserved_range": "java-reserved-name",
             "reserved_items": "java-reserved-name",
+            "reserved_catch": "java-reserved-name",
             "leaked": "unsupported-statement",
             "raises_python": "python-exception",
             "shadowed": "python-exception",  # without Java facts the exception types are unknown; with them the order is refused
@@ -1286,6 +1293,8 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("local [new] cannot be declared in Java", self.decisions["Pricing.reserved_each"].reasons()[0].message())
         self.assertEqual("local [int] cannot be declared in Java", self.decisions["Pricing.reserved_range"].reasons()[0].message())
         self.assertEqual("local [new] cannot be declared in Java", self.decisions["Pricing.reserved_items"].reasons()[0].message())
+        # and so is the variable of an except clause
+        self.assertEqual("local [new] cannot be declared in Java", self.decisions["Pricing.reserved_catch"].reasons()[0].message())
 
     def test_static_methods_are_not_candidates_yet(self):
         decision = self.decisions["Pricing.helper"]
