@@ -219,7 +219,8 @@ class StaticCompilationBudgetTest {
         System.out.println(report);
         Files.writeString(new File(root, "budget.txt").toPath(), report);
 
-        if (rounds > 0) {
+        // every way of compiling records what mode all compiles: the last compilation measured in that mode tells
+        if (rounds > 0 || sessionRounds > 0 || cold > 0) {
             for (Workload workload : workloads) {
                 assertTrue(workload.compiled > 0, "mode all compiles bodies of " + workload.name);
             }
