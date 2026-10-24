@@ -3,9 +3,18 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.server.netty.DefaultHttpCompressionStrategy;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.compression.ZlibDecoder;
+import io.netty.handler.codec.compression.ZlibEncoder;
+import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -20,7 +29,12 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
+import java.nio.charset.StandardCharsets;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -30,6 +44,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -414,4 +430,136 @@ class CompressorTest {
             List.of(" gzip ; q = 0.5 ")
         ).map(Arguments::of);
     }
+
+    /**
+     * A factory whose one-shot path gzips with the JDK and counts its calls, or declines when
+     * {@code decline} is set.
+     */
+    private static final class OneShotFactory implements NettyZlibCodecFactory {
+        final boolean decline;
+        int calls;
+
+        OneShotFactory(boolean decline) {
+            this.decline = decline;
+        }
+
+        @Override
+        public ZlibEncoder newZlibEncoder(ZlibWrapper wrapper, int compressionLevel, int windowBits, int memLevel) {
+            return DefaultNettyZlibCodecFactory.INSTANCE.newZlibEncoder(wrapper, compressionLevel, windowBits, memLevel);
+        }
+
+        @Override
+        public ZlibDecoder newZlibDecoder(ZlibWrapper wrapper, int maxAllocation) {
+            return DefaultNettyZlibCodecFactory.INSTANCE.newZlibDecoder(wrapper, maxAllocation);
+        }
+
+        @Override
+        public ByteBuf compressZlib(ZlibWrapper wrapper, int compressionLevel, int windowBits, int memLevel, ByteBuf body, ByteBufAllocator allocator) {
+            calls++;
+            assertEquals(ZlibWrapper.GZIP, wrapper);
+            if (decline) {
+                return null;
+            }
+            var bytes = new ByteArrayOutputStream();
+            try (var gzip = new GZIPOutputStream(bytes)) {
+                gzip.write(ByteBufUtil.getBytes(body));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return allocator.buffer().writeBytes(bytes.toByteArray());
+        }
+    }
+
+    private static Compressor.Session gzipSession(OneShotFactory factory, HttpResponse response) {
+        HttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+        request.headers().add(HttpHeaderNames.ACCEPT_ENCODING, "gzip");
+        return Objects.requireNonNull(Compressor.create(STRATEGY, factory)).prepare(context(), request, response, -1);
+    }
+
+    private static byte[] gunzip(ByteBuf compressed) throws IOException {
+        try (var gzip = new GZIPInputStream(new ByteArrayInputStream(ByteBufUtil.getBytes(compressed)))) {
+            return gzip.readAllBytes();
+        } finally {
+            compressed.release();
+        }
+    }
+
+    @Test
+    void wholeBodyIsCompressedInOneCall() throws IOException {
+        var factory = new OneShotFactory(false);
+        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 11);
+        Compressor.Session session = gzipSession(factory, response);
+        ByteBuf body = Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8);
+        session.push(body);
+        session.finish();
+        session.fixContentLength(response);
+        ByteBuf compressed = Objects.requireNonNull(session.poll());
+        assertEquals(1, factory.calls);
+        assertEquals(0, body.refCnt());
+        assertEquals(compressed.readableBytes(), response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
+        assertEquals("hello world", new String(gunzip(compressed), StandardCharsets.UTF_8));
+        assertNull(session.poll());
+    }
+
+    @Test
+    void pollingBeforeTheEndStreamsTheBody() throws IOException {
+        var factory = new OneShotFactory(false);
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        session.push(Unpooled.copiedBuffer("hello ", StandardCharsets.UTF_8));
+        ByteBuf first = Objects.requireNonNull(session.poll());
+        session.push(Unpooled.copiedBuffer("world", StandardCharsets.UTF_8));
+        session.finish();
+        ByteBuf rest = Objects.requireNonNull(session.poll());
+        assertEquals(0, factory.calls);
+        assertEquals("hello world", new String(gunzip(Unpooled.wrappedBuffer(first, rest)), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void secondPushStreamsTheHeldBody() throws IOException {
+        var factory = new OneShotFactory(false);
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        session.push(Unpooled.copiedBuffer("hello ", StandardCharsets.UTF_8));
+        session.push(Unpooled.copiedBuffer("world", StandardCharsets.UTF_8));
+        session.finish();
+        assertEquals(0, factory.calls);
+        assertEquals("hello world", new String(gunzip(Objects.requireNonNull(session.poll())), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void declinedOneShotFallsBackToTheEncoder() throws IOException {
+        var factory = new OneShotFactory(true);
+        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 11);
+        Compressor.Session session = gzipSession(factory, response);
+        session.push(Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8));
+        session.finish();
+        session.fixContentLength(response);
+        ByteBuf compressed = Objects.requireNonNull(session.poll());
+        assertEquals(1, factory.calls);
+        assertEquals(compressed.readableBytes(), response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
+        assertEquals("hello world", new String(gunzip(compressed), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void discardReleasesTheHeldBody() {
+        var factory = new OneShotFactory(false);
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        ByteBuf body = Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8);
+        session.push(body);
+        session.discard();
+        assertEquals(0, body.refCnt());
+        assertEquals(0, factory.calls);
+    }
+
+    @Test
+    void discardReleasesAnUnpolledResult() {
+        var factory = new OneShotFactory(false);
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        session.push(Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8));
+        session.finish();
+        session.discard();
+        assertNull(session.poll());
+    }
 }
+
