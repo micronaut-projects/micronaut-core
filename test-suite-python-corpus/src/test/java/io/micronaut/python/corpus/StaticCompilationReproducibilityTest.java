@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.corpus;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -44,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * second one writes the source files in the reverse order, so a file system listing them in the
  * order they were created lists them differently.
  */
+@Tag("child-jvm") // starts JVMs with the test class path: a constrained run can exclude this tag
 class StaticCompilationReproducibilityTest {
 
     private static final List<String> CORPORA = List.of("fullstack", "petclinic");
