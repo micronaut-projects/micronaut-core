@@ -469,6 +469,76 @@ public final class PythonStatic {
     }
 
     /**
+     * @param value An element of a collection, boxed by the host boundary
+     * @return The value as a Python int
+     * @throws ClassCastException When the element is not an int (a float, say, which the compiled body
+     * cannot keep as Python would), so that the body fails rather than truncates it
+     * @throws ArithmeticException When the element is an int that does not fit a long
+     */
+    public static long toLong(@Nullable Object value) {
+        if (value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte) {
+            return ((Number) value).longValue();
+        }
+        if (value instanceof BigInteger big) {
+            return big.longValueExact();
+        }
+        if (value instanceof Boolean bool) {
+            return bool.booleanValue() ? 1 : 0;
+        }
+        throw new ClassCastException("not an int: " + str(value));
+    }
+
+    /**
+     * @param value An element of a collection, boxed by the host boundary
+     * @return The value as a Python float; a bool is 1.0 or 0.0, as Python's arithmetic takes it
+     * @throws ClassCastException When the element is not a number
+     */
+    public static double toDouble(@Nullable Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (value instanceof Boolean bool) {
+            return bool.booleanValue() ? 1.0 : 0.0;
+        }
+        throw new ClassCastException("not a float: " + str(value));
+    }
+
+    /**
+     * @param step The step of a range
+     * @return The step
+     * @throws IllegalArgumentException When the step is zero, as Python raises ValueError
+     */
+    public static long step(long step) {
+        if (step == 0) {
+            throw new IllegalArgumentException("range() arg 3 must not be zero");
+        }
+        return step;
+    }
+
+    /**
+     * @param value The current value of a range loop
+     * @param stop  The bound
+     * @param step  The step
+     * @return The next value of the range; the bound when the next value would not fit a long,
+     * since the loop ends there as Python's would
+     */
+    public static long advance(long value, long stop, long step) {
+        long next = value + step;
+        boolean overflowed = step > 0 ? next < value : next > value;
+        return overflowed ? stop : next;
+    }
+
+    /**
+     * @param value The current value of a range loop
+     * @param stop  The bound
+     * @param step  The step
+     * @return Whether the value is within the range
+     */
+    public static boolean inRange(long value, long stop, long step) {
+        return step > 0 ? value < stop : value > stop;
+    }
+
+    /**
      * @param value A string, or None
      * @return Its truthiness: non-null and non-empty
      */
