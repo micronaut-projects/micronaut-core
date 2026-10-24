@@ -157,7 +157,7 @@ public sealed class PackageElementVisitorProcessor extends AbstractInjectAnnotat
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        return ProcessorOptionsSystemProperties.process(this, roundEnv.processingOver(), () -> processRound(annotations, roundEnv));
+        return ProcessorOptionsSystemProperties.process(processingEnv.getElementUtils(), this, roundEnv.processingOver(), () -> processRound(annotations, roundEnv));
     }
 
     private boolean processRound(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
