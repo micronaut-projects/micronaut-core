@@ -3026,6 +3026,17 @@ class Later:
         return n * self.rate
 
 
+class Updating:
+    def __init__(self, rate: float):
+        self.rate = rate
+
+    def update(self, name: str, value: float) -> None:
+        super().__setattr__(name, value)
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+
+
 class Declared:
     rate: float = 1.0
 
@@ -3101,7 +3112,7 @@ class FixedAttributeTest(unittest.TestCase):
         self.assertEqual({"bound": False, "size": True}, _self_reads(self._body("Named", "capped")))
 
     def test_a_class_with_a_subclass_a_setattr_a_closure_or_a_declaration_is_not_fixed(self):
-        for owner in ("Base", "Guarded", "Later", "Declared"):
+        for owner in ("Base", "Guarded", "Later", "Declared", "Updating"):
             self.assertEqual({"rate": False}, _self_reads(self._body(owner, "total")), owner)
 
     def test_an_introspected_class_or_value_is_not_fixed(self):

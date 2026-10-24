@@ -900,8 +900,6 @@ class AttributeWrites:
                 self.everything = True
         if name not in COMPUTED_WRITERS:
             return
-        if isinstance(function, ast.Attribute) and isinstance(function.value, ast.Call) and isinstance(function.value.func, ast.Name) and function.value.func.id == "super":
-            return  # super().__setattr__(name, value): the default write of a class that takes it over itself
         # the object written and the name it is written by: setattr(o, name, v), monkeypatch.setattr(o, name, v),
         # object.__setattr__(o, name, v), or o.__setattr__(name, v) bound; a string anywhere else is a value
         if name in ("__setattr__", "__delattr__") and not (isinstance(function.value, ast.Name) and function.value.id in ("object", "type")):
@@ -912,6 +910,13 @@ class AttributeWrites:
                 return  # monkeypatch.setattr("app.m.Cls.attribute", v): the name is the string's last part
         if isinstance(named, ast.Constant) and isinstance(named.value, str):
             return
+        if isinstance(target, ast.Call) and isinstance(target.func, ast.Name) and target.func.id == "super":
+            # super().__setattr__(name, value) in a method: object's write of an attribute of self, past
+            # the __setattr__ that reports changes
+            owner = receivers.get(id(call))
+            if owner is not None:
+                self.classes_written.add(id(owner[0]))
+                return
         owner = receivers.get(id(call))
         if owner is not None and isinstance(target, ast.Name) and owner[1] == target.id:
             # setattr(self, name, value) in a method: an attribute of an object of that class
