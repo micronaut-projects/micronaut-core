@@ -174,7 +174,10 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         this.methodInjection = methodInjection;
         this.fieldInjection = fieldInjection;
         this.annotationInjection = annotationInjection;
-        this.executableMethodsDefinition = executableMethodsDefinition;
+        // The generated definition is shared by the contexts loading this bean definition: the copy gives the
+        // methods, and the values they keep, to the context loading this instance
+        this.executableMethodsDefinition = executableMethodsDefinition instanceof AbstractExecutableMethodsDefinition<T> generated
+            ? generated.copy() : executableMethodsDefinition;
         this.typeArgumentsMap = typeArgumentsMap;
         this.precalculatedInfo = precalculatedInfo;
     }
