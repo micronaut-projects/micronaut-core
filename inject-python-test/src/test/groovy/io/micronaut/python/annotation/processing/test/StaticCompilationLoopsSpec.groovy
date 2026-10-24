@@ -188,6 +188,18 @@ class Loops:
                 if x < y:
                     count += 1
         return count
+
+    def reserved_each(self, xs: list[int]) -> int:
+        total = 0
+        for new in xs:
+            total += new
+        return total
+
+    def reserved_range(self, n: int) -> int:
+        total = 0
+        for int in range(n):
+            total += int
+        return total
 '''
 
     void "compiled loops and handlers agree with the Python bodies, and the constructs that cannot are refused"() {
@@ -225,6 +237,8 @@ class Loops:
                     passes          : invoke { loops.passes(new ArrayList<>([1, 2])) },
                     grows_items     : invoke { loops.grows_items() },
                     pairs           : invoke { loops.pairs(new ArrayList<>([1, 2, 3])) },
+                    reserved_each   : invoke { loops.reserved_each(new ArrayList<>([1, 2])) },
+                    reserved_range  : invoke { loops.reserved_range(4) },
                 ]
                 if (m == StaticCompilationMode.ALL) {
                     decisions.each { compiled[it.qualifiedName()] = it }
@@ -249,6 +263,8 @@ class Loops:
         results[StaticCompilationMode.OFF].run_appends == 4      // Python goes on over the elements the body appends
         results[StaticCompilationMode.OFF].grows_items == 4
         results[StaticCompilationMode.OFF].pairs == 3
+        results[StaticCompilationMode.OFF].reserved_each == 3
+        results[StaticCompilationMode.OFF].reserved_range == 6
 
         and: "a range loop assigning its variable, a handler of a checked exception a Java call declares, and a loop unboxing elements are compiled"
         ['reassigned', 'skipped', 'catches_declared', 'ints', 'floats'].every { outcome(compiled, it) == StaticCompilationDecision.Outcome.COMPILED }
@@ -272,6 +288,10 @@ class Loops:
 
         and: "a loop that only reads it, in a nested loop and a comparison, is compiled"
         outcome(compiled, 'pairs') == StaticCompilationDecision.Outcome.COMPILED
+
+        and: "a loop variable Java cannot declare is refused, and the method runs as Python"
+        rule(compiled, 'reserved_each') == 'java-reserved-name'
+        rule(compiled, 'reserved_range') == 'java-reserved-name'
     }
 
     void "a float element of a list hinted list[int] fails the compiled body rather than being truncated"() {
