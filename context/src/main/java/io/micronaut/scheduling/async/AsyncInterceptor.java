@@ -22,6 +22,7 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.ReturnType;
@@ -80,7 +81,7 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
     @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        String executorServiceName = context.stringValue(Async.class).orElse(TaskExecutors.SCHEDULED);
+        String executorServiceName = context.getCachedValue(Plan.class, Plan::of).executorServiceName();
         ExecutorService executorService;
         if (TaskExecutors.SCHEDULED.equals(executorServiceName) && scheduledExecutorService.isPresent()) {
             executorService = scheduledExecutorService.get().get();
@@ -127,4 +128,17 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
             return interceptedMethod.handleException(e);
         }
     }
+
+    /**
+     * The executor service an {@link Async} method runs on, kept by the method.
+     *
+     * @param executorServiceName The name of the executor service
+     */
+    private record Plan(String executorServiceName) {
+
+        static Plan of(ExecutableMethod<?, ?> method) {
+            return new Plan(method.stringValue(Async.class).orElse(TaskExecutors.SCHEDULED));
+        }
+    }
+
 }
