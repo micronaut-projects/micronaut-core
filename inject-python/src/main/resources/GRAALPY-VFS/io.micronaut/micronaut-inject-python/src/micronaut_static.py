@@ -1151,8 +1151,6 @@ def apply_delegation(tree, targets):
         kinds = tuple(kind for kind in options["kinds"].split(",") if kind)
         conversion = next((name for name in ("list", "set", "dict") if name in options), None)
         static_class = options.get("static")
-        if static_class is not None and "retry" not in options:
-            continue  # a static body that cannot be run again keeps the Python body, see above
         wanted.setdefault(class_name, {})[method] = (options.get("owner", class_name), kinds, "retry" in options, conversion, static_class, "python-exceptions" in options)
     count = 0
     for class_node, path in _classes(tree):
@@ -1166,7 +1164,7 @@ def apply_delegation(tree, targets):
                 if static_class is not None:
                     if not _takes_exactly(statement, kinds):
                         continue
-                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion)
+                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion, retry, translated)
                     ast.fix_missing_locations(statement)
                     count += 1
                     continue
@@ -1184,9 +1182,9 @@ def apply_delegation(tree, targets):
     if functions:
         for statement in tree.body:
             if isinstance(statement, ast.FunctionDef) and statement.name in functions and not _delegates(statement):
-                _, kinds, _, conversion, static_class, _ = functions[statement.name]
+                _, kinds, retry, conversion, static_class, translated = functions[statement.name]
                 if static_class is not None and _takes_exactly(statement, kinds):
-                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion)
+                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion, retry, translated)
                     ast.fix_missing_locations(statement)
                     count += 1
     if count and not any(isinstance(statement, ast.FunctionDef) and statement.name == STATIC_LOOKUP for statement in tree.body):
@@ -1227,7 +1225,7 @@ def _mn_static_class(name):
     return found
 
 
-def _mn_static_call(name, method, arguments, kinds):
+def _mn_static_call(name, method, arguments, kinds, retry=True, translated=False):
     found = _mn_static_class(name)
     if found is None:
         return None
@@ -1238,10 +1236,26 @@ def _mn_static_call(name, method, arguments, kinds):
     for argument, kind in zip(arguments, kinds):
         if not fits(argument, kind):
             return None
+    if retry:
+        try:
+            return (getattr(found, method)(*arguments),)
+        except Exception:
+            return None
+    failure = None
     try:
         return (getattr(found, method)(*arguments),)
-    except Exception:
-        return None
+    except BaseException as error:
+        failure = error
+    # outside the handler, so the exception raised keeps its own context: the Python exception the
+    # failure carries, or Python's exception for it (PythonStatic.forPython), or the failure itself
+    found = _mn_python_exception(failure) if translated else None
+    if found is not None:
+        raise found
+    import java as __mn_java_module
+    if __mn_java_module.is_object(failure):
+        # raises the Python exception of a failure Python raises one for, or the checked exception of a Java call
+        __mn_java_module.type("io.micronaut.context.python.PythonStatic").forPython(failure)
+    raise failure
 
 
 def _mn_python_exception(error):
@@ -1327,8 +1341,12 @@ def _takes_exactly(function, kinds):
     return len(positional) == len(kinds) and args.vararg is None and args.kwarg is None and not args.kwonlyargs
 
 
-def _static_delegation(function, static_class, kinds, conversion=None):
-    """The prologue of a static method or a module-level function: the static Java method of the generated class, when it is loadable and the arguments fit it."""
+def _static_delegation(function, static_class, kinds, conversion=None, retry=True, translated=False):
+    """
+    The prologue of a static method or a module-level function: the static Java method of the
+    generated class, when it is loadable and the arguments fit it. A body with side effects (not
+    retry) is not run again: its failures reach the caller as Python's exceptions.
+    """
     args = function.args
     names = [argument.arg for argument in list(args.posonlyargs) + list(args.args)]
     temporary = _temporary(function)
@@ -1341,7 +1359,7 @@ def _static_delegation(function, static_class, kinds, conversion=None):
                 ast.Constant(value=function.name),
                 ast.Tuple(elts=[ast.Name(id=name, ctx=ast.Load()) for name in names], ctx=ast.Load()),
                 ast.Tuple(elts=[ast.Constant(value=kind) for kind in kinds], ctx=ast.Load()),
-            ],
+            ] + ([] if retry else [ast.Constant(value=False), ast.Constant(value=translated)]),
             keywords=[],
         ),
     )

@@ -87,16 +87,20 @@ class StaticDelegationTest {
     }
 
     @Test
-    void aStaticMethodOrAModuleFunctionCallsTheGeneratedClassAndDelegatesOnlyWhenItMayBeRunAgain() {
+    void aStaticMethodOrAModuleFunctionCallsTheGeneratedClassAndRunsOnceWithSideEffects() {
         Ir.Expression sum = new Ir.Binary("+", param("int"), new Ir.Const(1L, Ir.LONG), Ir.LONG);
         Ir.Statement returned = new Ir.Return(new Ir.Cast(sum, "int"));
         assertEquals("Outer$Calc#run#static=app.Outer$Calc#kinds=int#retry",
             StaticDelegation.target(body("app.Outer$Calc", true, false, List.of("int"), "int", returned)));
         assertEquals("#run#static=app.Module#kinds=int#retry",
             StaticDelegation.target(body("app.Module", true, true, List.of("int"), "int", returned)));
-        // no bound object raises a failure as Python's exception: a body with side effects keeps the Python body
+        // a body with side effects runs once, its failures raised as Python's in the context of the caller
         Ir.Expression call = new Ir.InvokeJava(null, "java.lang.Math", "abs", List.of(Ir.LONG), List.of(param(Ir.LONG)), Ir.LONG);
-        assertNull(StaticDelegation.target(body("app.Module", true, true, List.of(Ir.LONG), Ir.LONG, new Ir.Return(call))));
+        assertEquals("#run#static=app.Module#kinds=long#once", StaticDelegation.target(body("app.Module", true, true, List.of(Ir.LONG), Ir.LONG, new Ir.Return(call))));
+        assertEquals("#run#static=app.Module#kinds=long#once#python-exceptions",
+            StaticDelegation.target(body("app.Module", true, true, Ir.ExceptionCrossing.TRANSLATED, List.of(Ir.LONG), Ir.LONG, new Ir.Return(call))));
+        // and none when it also has an operation that promotes
+        assertNull(StaticDelegation.target(body("app.Module", true, true, List.of(Ir.LONG), Ir.LONG, new Ir.Return(new Ir.Unary("-", call, Ir.LONG)))));
     }
 
     @Test
@@ -161,8 +165,7 @@ class StaticDelegationTest {
         Ir.Expression call = new Ir.InvokeJava(null, "java.lang.Math", "abs", List.of(Ir.LONG), List.of(param(Ir.LONG)), Ir.LONG);
         assertEquals("none(it has side effects (the call of [java.lang.Math.abs]) and the long negation raises where Python promotes)",
             StaticDelegation.status(body(List.of(Ir.LONG), Ir.LONG, new Ir.Return(new Ir.Unary("-", call, Ir.LONG)))));
-        assertEquals("none(a static body with side effects (the call of [java.lang.Math.abs]) has no bound object to raise Python's exception through)",
-            StaticDelegation.status(body("app.Module", true, true, List.of(Ir.LONG), Ir.LONG, new Ir.Return(call))));
+        assertEquals("static-once", StaticDelegation.status(body("app.Module", true, true, List.of(Ir.LONG), Ir.LONG, new Ir.Return(call))));
         assertEquals("none(a Java exception of a Python exception class may come from the compilation or from Java code)",
             StaticDelegation.status(body("app.Outer$Calc", false, false, Ir.ExceptionCrossing.PYTHON_BODY, List.of(Ir.STRING), Ir.VOID, write)));
         Ir.Expression attribute = new Ir.SelfProperty("items", "java.util.List<java.lang.String>", false, false);

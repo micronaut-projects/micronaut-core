@@ -93,9 +93,9 @@ app/services/items.py ItemService.__init__ NOT_CANDIDATE
 app/services/items.py ItemService.by_id COMPILED delegation=none(parameter [item_id] is a [java.util.UUID], which a Python argument does not reach unchanged)
 app/services/items.py ItemService.create COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/services/items.py ItemService.delete COMPILED delegation=once
-app/services/items.py ItemService.is_owned_by COMPILED delegation=none(a static body with side effects (the call of [app.Item.getOwner]) has no bound object to raise Python's exception through)
+app/services/items.py ItemService.is_owned_by COMPILED delegation=static-once
 app/services/items.py ItemService.list_for COMPILED delegation=once
-app/services/items.py ItemService.may_access COMPILED delegation=none(a static body with side effects (the call of [app.User.isIsSuperuser]) has no bound object to raise Python's exception through)
+app/services/items.py ItemService.may_access COMPILED delegation=static-once
 app/services/items.py ItemService.update COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/services/mail.py MailService.__init__ NOT_CANDIDATE
 app/services/mail.py MailService._send COMPILED delegation=none(parameter [props] is a [java.util.Map<java.lang.Object,java.lang.Object>], which a Python argument does not reach unchanged)

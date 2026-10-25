@@ -660,9 +660,33 @@ public final class PythonStatic {
      * @return The exception to throw, when it has no Python counterpart
      */
     public static RuntimeException forPython(org.graalvm.polyglot.Value self, RuntimeException exception) {
+        return forPython(self.getContext(), exception);
+    }
+
+    /**
+     * The exception a static compiled body called from Python throws instead, as
+     * {@link #forPython(org.graalvm.polyglot.Value, RuntimeException)} gives it: the failure is raised
+     * as Python's exception in the context of the Python caller, the one the calling thread has
+     * entered, else the context of the running application.
+     *
+     * @param exception The exception the body threw
+     * @return The exception to throw, when it has no Python counterpart
+     * @since 5.3.0
+     */
+    public static RuntimeException forPython(RuntimeException exception) {
+        org.graalvm.polyglot.Context context;
+        try {
+            context = org.graalvm.polyglot.Context.getCurrent();
+        } catch (IllegalStateException e) {
+            context = PythonContextRuntime.getContext();
+        }
+        return forPython(context, exception);
+    }
+
+    private static RuntimeException forPython(org.graalvm.polyglot.Context context, RuntimeException exception) {
         if (exception instanceof PythonFailure failure) {
             // raises the Python exception, which reaches the Python caller as itself
-            PythonContextRuntime.helper(self.getContext(), RAISE_PYTHON).execute(failure.pythonType(), failure.pythonMessage());
+            PythonContextRuntime.helper(context, RAISE_PYTHON).execute(failure.pythonType(), failure.pythonMessage());
         }
         if (exception instanceof UncheckedFailure unchecked && unchecked.getCause() instanceof Exception cause) {
             throw PythonStatic.<RuntimeException>sneakyThrow(cause);

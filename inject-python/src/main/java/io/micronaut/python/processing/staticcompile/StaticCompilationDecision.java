@@ -37,7 +37,7 @@ import java.util.Properties;
  * @param stats         What the body contains
  * @param delegation    Whether the Python callers of a compiled body run its Java body, see
  *                      {@link io.micronaut.python.processing.staticcompile.StaticDelegation#status(Ir.CompiledBody)}:
- *                      {@code retry}, {@code once}, {@code static} or {@code none(<why>)}; {@code null} when it is not compiled
+ *                      {@code retry}, {@code once}, {@code static}, {@code static-once} or {@code none(<why>)}; {@code null} when it is not compiled
  * @author Graeme Rocher
  * @since 5.3.0
  */

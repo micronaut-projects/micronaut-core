@@ -97,9 +97,9 @@ public final class StaticDelegation {
      * {@code #python-exceptions} is appended when the rewritten function raises the Python exception a
      * Java exception of the body carries (see {@link Ir.ExceptionCrossing#TRANSLATED}).
      * A static method, or a module-level function with an empty class part, names the generated
-     * class whose static Java method it calls: {@code Class#method#static=<generated class>#kinds=<kind,...>#retry}.
-     * It has no bound object through which a failure could reach the Python caller as Python's
-     * exception, so only a body that may be run again in Python delegates.
+     * class whose static Java method it calls: {@code Class#method#static=<generated class>#kinds=<kind,...>#retry},
+     * or {@code #once} for a body with side effects, whose failures reach the Python caller as
+     * Python's exceptions through the context the caller entered.
      *
      * @param body The compiled body
      * @return The target, or {@code null}
@@ -112,7 +112,8 @@ public final class StaticDelegation {
      * Whether, and how, the Python callers of a compiled body run its Java body, as the report says
      * it: {@code retry} (run again in Python when the Java body fails), {@code once} (a body with side
      * effects, run once), {@code static} (a static method or a module-level function, run again in
-     * Python when it fails), or {@code none(<why>)} when they keep the Python body. The collection
+     * Python when it fails), {@code static-once} (one with side effects, run once), or
+     * {@code none(<why>)} when they keep the Python body. The collection
      * the body returns counts, see {@link #returnConversion(Ir.CompiledBody)}.
      *
      * @param body The compiled body
@@ -164,11 +165,13 @@ public final class StaticDelegation {
         }
         String className = body.className();
         if (body.staticMethod() || body.moduleLevel()) {
-            if (analysis.sideEffects) {
-                return Decision.refused("a static body with side effects (" + analysis.sideEffect + ") has no bound object to raise Python's exception through");
-            }
+            // a body with side effects runs once: its failures reach the Python caller as Python's
+            // exceptions, raised in the context the caller entered (PythonStatic.forPython)
             String owner = body.moduleLevel() ? "" : className.substring(className.lastIndexOf('.') + 1);
-            return new Decision(owner + "#" + body.methodName() + "#static=" + className + "#kinds=" + String.join(",", kinds) + "#retry", "static", "");
+            return new Decision(owner + "#" + body.methodName() + "#static=" + className + "#kinds=" + String.join(",", kinds)
+                + (analysis.sideEffects ? "#once" : "#retry")
+                + (analysis.sideEffects && body.exceptions() == Ir.ExceptionCrossing.TRANSLATED ? "#python-exceptions" : ""),
+                analysis.sideEffects ? "static-once" : "static", "");
         }
         return new Decision(className.substring(className.lastIndexOf('.') + 1) + "#" + body.methodName()
             + "#owner=" + className

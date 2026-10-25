@@ -41,7 +41,9 @@ class StaticCompilationDelegationCoverageSpec extends AbstractPythonTypeElementS
                 results[m.optionValue()] = getBean(context, 'python.Caller').probe()
                 if (m == StaticCompilationMode.ALL) {
                     delegated.each { name, status ->
-                        def decision = decisions.find { it.qualifiedName() == name }
+                        // a module function is named by its key, package.Script#function
+                        String qualified = name.contains('#') ? name.substring(name.indexOf('#') + 1) : name
+                        def decision = decisions.find { it.qualifiedName() == qualified }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.COMPILED: "$name: $decision"
                         assert decision.delegation() == status
                         // Class.method counts as python.Class#method; a module function names its key itself
@@ -243,5 +245,59 @@ class Caller:
         results['entries.Words.number'] == 3
         results['entries.Words.keyed'] == 1
         results['entries.Words.copied'] == 1
+    }
+
+    void "a static method or a module function calling java runs once for python callers and fails with python's exceptions"() {
+        when:
+        def results = parity('''
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
+from java.lang import Integer
+from java.net import URI
+
+class Rejected(Exception):
+    pass
+
+def parsed(text: str) -> str:
+    return str(Integer.parseInt(text))
+
+def scheme(text: str) -> str:
+    return URI(text).getScheme()
+
+class Ratios:
+    @staticmethod
+    def ratio(text: str, d: int) -> float:
+        return Integer.parseInt(text) / d
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def attempt(self, call):
+        try:
+            return str(call())
+        except ZeroDivisionError as e:
+            return f"ZeroDivisionError({e}) context={e.__context__ is not None}"
+        except Exception as e:
+            described = type(e).__name__ + " " + str(e)
+            return next((name for name in ("NumberFormatException", "URISyntaxException") if name in described), described)
+
+    def probe(self) -> str:
+        return " ".join([
+            self.attempt(lambda: parsed("12")),
+            self.attempt(lambda: parsed("x")),
+            self.attempt(lambda: Ratios.ratio("3", 2)),
+            self.attempt(lambda: Ratios.ratio("3", 0)),
+            self.attempt(lambda: Ratios.ratio("y", 1)),
+            self.attempt(lambda: scheme("http://a")),
+            self.attempt(lambda: scheme("a b")),
+        ])
+''', ['python.Script#parsed': 'static-once', 'python.Script#scheme': 'static-once', 'Ratios.ratio': 'static-once'])
+
+        then:
+        results.off == '12 NumberFormatException 1.5 ZeroDivisionError(division by zero) context=False NumberFormatException http URISyntaxException'
+        results.all == results.off
+        results['entries.python.Script#parsed'] == 2
+        results['entries.Ratios.ratio'] == 3
+        results['entries.python.Script#scheme'] == 2
     }
 }
