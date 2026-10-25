@@ -2061,6 +2061,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
             property_def = property_def.withGetter(func_def)
         elif property_type == "setter":
             property_def = property_def.withSetter(func_def)
+        elif property_type == "deleter":
+            property_def = property_def.withDeleter(func_def)
 
         self.current_class_properties[property_name] = property_def
 
