@@ -23,6 +23,7 @@ import io.micronaut.core.type.TypeInformation;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.scheduling.executor.DefaultExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import jakarta.inject.Inject;
@@ -37,7 +38,8 @@ import java.util.function.Supplier;
 
 /**
  * Routes generated Python controller methods to the IO executor while leaving
- * Micronaut's default executor selection available for Java code.
+ * Micronaut's default executor selection available for Java code. A Python method
+ * annotated with {@link ExecuteOn} runs on the executor it names, as a Java method does.
  */
 @Singleton
 @Replaces(DefaultExecutorSelector.class)
@@ -63,8 +65,9 @@ final class PythonExecutorSelector extends DefaultExecutorSelector {
 
     @Override
     public Optional<ExecutorService> select(@Nullable MethodReference<?, ?> method, ThreadSelection threadSelection) {
-        if (isPythonMethod(method)) {
-            TypeInformation<?> returnType = Objects.requireNonNull(method).getReturnType();
+        // @ExecuteOn names the executor of a Python method as it does for a Java one
+        if (isPythonMethod(method) && !Objects.requireNonNull(method).hasStereotype(ExecuteOn.class)) {
+            TypeInformation<?> returnType = method.getReturnType();
             if (!returnType.isAsyncOrReactive()) {
                 return Optional.of(ioExecutor.get());
             }
