@@ -490,4 +490,53 @@ class Labels:
         second?.close()
         first?.close()
     }
+
+    void "a body calling compiled code that may overflow keeps the python body: python promotes the int"() {
+        when:
+        def results = parity('''
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
+from java.lang import Integer
+
+def cube(n: int) -> int:
+    return n * n * n
+
+def label(n: int) -> str:
+    return Integer.toHexString(n)
+
+@Singleton
+class Calc:
+    def big(self, n: int) -> int:
+        return cube(n)
+
+    def hex(self, n: int) -> str:
+        return label(n) + Integer.toString(n)
+
+    def loud(self, n: int) -> str:
+        return self.hex(n) + "!"
+
+    def bigger(self, n: int) -> int:
+        return self.big(n)
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def __init__(self, calc: Calc):
+        self.calc = calc
+
+    def probe(self) -> str:
+        return f"{self.calc.big(2 ** 30)} {self.calc.hex(255)} {self.calc.loud(1)} {self.calc.bigger(2 ** 30)}"
+''', ['Calc.big': 'none(it has side effects (the call of [python.Script.cube]) and a call of code of the compilation raises where Python promotes)',
+       'Calc.hex': 'once', 'Calc.loud': 'once',
+       'Calc.bigger': 'none(it has side effects (the call of [self.big]) and a call of code of the compilation raises where Python promotes)'])
+
+        then:
+        results.off == '1237940039285380274899124224 ff255 11! 1237940039285380274899124224'
+        results.all == results.off
+        results['entries.Calc.big'] == 0
+        // the compiled function or sibling it calls cannot overflow: the body runs once
+        results['entries.Calc.loud'] == 1
+        results['entries.Calc.hex'] == 2
+        results['entries.Calc.bigger'] == 0
+    }
 }

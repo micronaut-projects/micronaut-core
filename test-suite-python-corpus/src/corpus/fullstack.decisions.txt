@@ -100,9 +100,9 @@ app/services/items.py ItemService.update COMPILED delegation=none(a Java excepti
 app/services/mail.py MailService.__init__ NOT_CANDIDATE
 app/services/mail.py MailService._send COMPILED delegation=none(parameter [props] is a [java.util.Map<java.lang.Object,java.lang.Object>], which a Python argument does not reach unchanged)
 app/services/mail.py MailService.render_reset_password_html SKIPPED
-app/services/mail.py MailService.send_new_account_email COMPILED delegation=none(it has side effects (a [InvokeSibling]) and a [InvokeSibling] raises where Python promotes)
-app/services/mail.py MailService.send_reset_password_email COMPILED delegation=none(it has side effects (a [InvokeSibling]) and a [InvokeSibling] raises where Python promotes)
-app/services/mail.py MailService.send_test_email COMPILED delegation=none(it has side effects (a [InvokeSibling]) and a [InvokeSibling] raises where Python promotes)
+app/services/mail.py MailService.send_new_account_email COMPILED delegation=once
+app/services/mail.py MailService.send_reset_password_email COMPILED delegation=once
+app/services/mail.py MailService.send_test_email COMPILED delegation=once
 app/services/users.py UserService.__init__ NOT_CANDIDATE
 app/services/users.py UserService.authenticate COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/services/users.py UserService.by_email COMPILED delegation=once
@@ -111,9 +111,9 @@ app/services/users.py UserService.count COMPILED delegation=none(it has side eff
 app/services/users.py UserService.create COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/services/users.py UserService.delete COMPILED delegation=once
 app/services/users.py UserService.page COMPILED delegation=once
-app/services/users.py UserService.register COMPILED delegation=none(it has side effects (a [InvokeSibling]) and a [InvokeSibling] raises where Python promotes)
+app/services/users.py UserService.register COMPILED delegation=none(it has side effects (the call of [self.create]) and a call of code of the compilation raises where Python promotes)
 app/services/users.py UserService.set_password COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/services/users.py UserService.update COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
-app/services/users.py UserService.update_me COMPILED delegation=none(it has side effects (a [InvokeSibling]) and a [InvokeSibling] raises where Python promotes)
+app/services/users.py UserService.update_me COMPILED delegation=none(it has side effects (the call of [self.update]) and a call of code of the compilation raises where Python promotes)
 app/services/users.py UserService.verify_password COMPILED delegation=once
 app/services/users.py _java_uuid SKIPPED

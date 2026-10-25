@@ -23,6 +23,7 @@ import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StaticDelegationTest {
 
@@ -240,7 +241,7 @@ class StaticDelegationTest {
     void aPlainClassOfTheCompilationIsTakenAsThePythonObject() {
         Ir.CompiledBody plain = new Ir.CompiledBody("app.Greeter", "run", List.of("user"), List.of("app.User"), Ir.STRING,
             new Ir.Body(List.of(new Ir.Return(new Ir.Const("a", Ir.STRING)))), SourceSpan.at("app/calc.py", 3, 5),
-            new StaticCompilationDecision.Stats(1, 0, 0, 0), false, false, false, false, Ir.ExceptionCrossing.UNTRANSLATED, List.of("User"));
+            new StaticCompilationDecision.Stats(1, 0, 0, 0), false, false, false, false, Ir.ExceptionCrossing.UNTRANSLATED, List.of("User"), false);
         assertEquals("Greeter#run#owner=app.Greeter#kinds=python:User#retry", StaticDelegation.target(plain));
         // without the Python class, a Java object of the generated class only
         assertEquals("Outer$Calc#run#owner=app.Outer$Calc#kinds=java:app.User#retry",
@@ -261,5 +262,21 @@ class StaticDelegationTest {
         Ir.Expression count = new Ir.InvokeJava(null, "app.Repository", "count", List.of(), List.of(), Ir.LONG);
         assertEquals("none(it has side effects (the call of [app.Repository.count]) and the narrowing to [int] raises where Python promotes)",
             StaticDelegation.status(body(List.of(), "int", new Ir.Return(new Ir.Cast(count, "int")))));
+    }
+
+    @Test
+    void aCallOfCodeOfTheCompilationThatMayOverflowPromotes() {
+        Ir.Statement sent = new Ir.Eval(new Ir.InvokeSibling("send", List.of(Ir.STRING), List.of(param(Ir.STRING)), Ir.VOID, "java"));
+        assertEquals("once", StaticDelegation.status(body(List.of(Ir.STRING), Ir.VOID, sent)));
+        Ir.CompiledBody computing = new Ir.CompiledBody("app.Outer$Calc", "run", List.of("p0"), List.of(Ir.STRING), Ir.VOID,
+            new Ir.Body(List.of(sent)), SourceSpan.at("app/calc.py", 3, 5), new StaticCompilationDecision.Stats(1, 0, 0, 0),
+            false, false, false, false, Ir.ExceptionCrossing.UNTRANSLATED, List.of(), true);
+        assertEquals("none(it has side effects (the call of [self.send]) and a call of code of the compilation raises where Python promotes)",
+            StaticDelegation.status(computing));
+        assertTrue(StaticDelegation.promotes(computing));
+        // a change of a collection is a side effect, and no number it computes overflows
+        Ir.Expression list = new Ir.Helper("list", List.of(), "java.util.List<java.lang.String>");
+        Ir.Statement appended = new Ir.Eval(new Ir.Helper("append", List.of(list, param(Ir.STRING)), Ir.NONE));
+        assertEquals("once", StaticDelegation.status(body(List.of(Ir.STRING), Ir.VOID, appended)));
     }
 }

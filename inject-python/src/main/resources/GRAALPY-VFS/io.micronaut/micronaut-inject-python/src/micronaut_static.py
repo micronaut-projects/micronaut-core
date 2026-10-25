@@ -196,6 +196,15 @@ class StaticPlanner:
             return self._decided[id(node)]
         return self._decide(module, None, None, function_def, node)
 
+    def decide_method(self, model, function_def, node):
+        """
+        The decision of a method of a class of the compilation a compiled body calls, made now when the
+        planner has not reached it yet; None while its own decision is under way (a cycle of calls).
+        """
+        if id(node) in self._decided:
+            return self._decided[id(node)]
+        return self._decide(model.module, model.class_def, model.node, function_def, node)
+
     def body_of(self, node):
         """The compiled body of a decided function, or None."""
         return self._bodies.get(id(node))

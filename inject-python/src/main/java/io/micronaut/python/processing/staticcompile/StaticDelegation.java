@@ -72,8 +72,10 @@ public final class StaticDelegation {
     // collection build a new one; power and int() raise where Python promotes (an int beyond a long)
     private static final Set<String> PURE_HELPERS = Set.of("str", "divide", "floorDiv", "floorMod", "compare", "concat", "box", "truthy",
         "assertion", "group", "max", "min", "list", "tuple", "set", "map", "len", "at", "item", "get", "contains",
-        "copyOfList", "copyOfSet", "copyOfMap", "copyOfTuple", "toFloat", "strip", "split", "join", "repr");
+        "copyOfList", "copyOfSet", "copyOfMap", "copyOfTuple", "copy", "toFloat", "strip", "split", "join", "repr");
     private static final Set<String> PROMOTING_HELPERS = Set.of("power", "toInt");
+    // the helpers that change the collection they are given, which is a side effect, and compute no number
+    private static final Set<String> CHANGING_HELPERS = Set.of("append", "add", "put", "putAll", "setItem", "setAt");
     // the helpers that read a collection they are given without keeping it, by the position of the argument
     private static final Map<String, Integer> READING_HELPERS = Map.ofEntries(
         Map.entry("len", 0), Map.entry("at", 0), Map.entry("item", 0), Map.entry("get", 0), Map.entry("contains", 0),
@@ -136,6 +138,23 @@ public final class StaticDelegation {
     }
 
     /**
+     * Whether a compiled body may raise where Python promotes (an int that outgrows a long), itself or
+     * through the code of the compilation it calls: a caller of it may then too.
+     *
+     * @param body The compiled body
+     * @return Whether it may
+     * @since 5.3.0
+     */
+    public static boolean promotes(Ir.CompiledBody body) {
+        if (body.callsCompiledCode()) {
+            return true;
+        }
+        Analysis analysis = new Analysis();
+        analysis.visit(body.body());
+        return analysis.promotes;
+    }
+
+    /**
      * @param reason Why the Python callers keep the Python body
      * @return The status of a body that is not delegated
      */
@@ -166,6 +185,8 @@ public final class StaticDelegation {
             return Decision.refused("a Java exception of a Python exception class may come from the compilation or from Java code");
         }
         Analysis analysis = new Analysis();
+        // a compiled function or a Python method the body calls may overflow where Python promotes
+        analysis.promotes(body.callsCompiledCode(), "a call of code of the compilation");
         analysis.visit(body.body());
         if (analysis.sideEffects && analysis.promotes) {
             return Decision.refused("it has side effects (" + analysis.sideEffect + ") and " + analysis.promotion + " raises where Python promotes");
@@ -506,6 +527,8 @@ public final class StaticDelegation {
                 case Ir.Helper helper -> {
                     if (PROMOTING_HELPERS.contains(helper.name())) {
                         promotes(true, "the helper [" + helper.name() + "]");
+                    } else if (CHANGING_HELPERS.contains(helper.name())) {
+                        sideEffect("the helper [" + helper.name() + "]");
                     } else if (!PURE_HELPERS.contains(helper.name())) {
                         sideEffect("the helper [" + helper.name() + "]");
                         promotes(true, "the helper [" + helper.name() + "]");
@@ -519,6 +542,11 @@ public final class StaticDelegation {
                 case Ir.InvokeJava call -> {
                     sideEffect("the call of [" + call.owner() + "." + call.name() + "]");
                     visit(call.receiver());
+                    arguments(call.arguments());
+                }
+                case Ir.InvokeSibling call -> {
+                    // a method of self: whether it may overflow is the lowering's to say (callsCompiledCode)
+                    sideEffect("the call of [self." + call.name() + "]");
                     arguments(call.arguments());
                 }
                 case Ir.NewJava construction -> {

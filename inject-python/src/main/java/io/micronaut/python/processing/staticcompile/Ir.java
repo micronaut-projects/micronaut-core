@@ -590,6 +590,9 @@ public sealed interface Ir {
      * @param pythonParameters Per parameter, the Python name ({@code Outer.Inner}) of the plain class of the
      *                       compilation whose generated class the parameter is, which wraps the Python object a
      *                       Python caller passes, or an empty string
+     * @param callsCompiledCode Whether the body calls code of the compilation that computes a result of its
+     *                       own (a compiled function, a method of a Python class through its generated class),
+     *                       which may overflow where Python promotes
      */
     record CompiledBody(String className,
                         String methodName,
@@ -604,7 +607,8 @@ public sealed interface Ir {
                         boolean staticMethod,
                         boolean moduleLevel,
                         ExceptionCrossing exceptions,
-                        List<String> pythonParameters) {
+                        List<String> pythonParameters,
+                        boolean callsCompiledCode) {
         public CompiledBody {
             Objects.requireNonNull(className, "className");
             Objects.requireNonNull(exceptions, "exceptions");
@@ -636,7 +640,7 @@ public sealed interface Ir {
                             boolean wrapsCheckedExceptions, boolean advised, boolean staticMethod, boolean moduleLevel,
                             ExceptionCrossing exceptions) {
             this(className, methodName, parameterNames, parameterTypes, returnType, body, span, stats, wrapsCheckedExceptions,
-                advised, staticMethod, moduleLevel, exceptions, List.of());
+                advised, staticMethod, moduleLevel, exceptions, List.of(), false);
         }
 
         /**
