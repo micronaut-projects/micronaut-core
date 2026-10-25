@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,9 +68,18 @@ public final class StaticDelegation {
         Map.entry("java.lang.Integer", "?int"), Map.entry("java.lang.Long", "?long"), Map.entry("java.lang.Short", "?short"),
         Map.entry("java.lang.Byte", "?byte"), Map.entry("java.lang.Double", "?float"), Map.entry("java.lang.Boolean", "?bool")
     );
-    // the helpers of PythonStatic without side effects; power raises where Python promotes
-    private static final Set<String> PURE_HELPERS = Set.of("str", "divide", "floorDiv", "floorMod", "compare", "concat", "box", "truthy", "assertion", "group", "max", "min");
-    private static final Set<String> PROMOTING_HELPERS = Set.of("power");
+    // the helpers of PythonStatic without side effects: they read their arguments, and those that build a
+    // collection build a new one; power and int() raise where Python promotes (an int beyond a long)
+    private static final Set<String> PURE_HELPERS = Set.of("str", "divide", "floorDiv", "floorMod", "compare", "concat", "box", "truthy",
+        "assertion", "group", "max", "min", "list", "tuple", "set", "map", "len", "at", "item", "get", "contains",
+        "copyOfList", "copyOfSet", "copyOfMap", "copyOfTuple", "toFloat", "strip", "split", "join", "repr");
+    private static final Set<String> PROMOTING_HELPERS = Set.of("power", "toInt");
+    // the helpers that read a collection they are given without keeping it, by the position of the argument
+    private static final Map<String, Integer> READING_HELPERS = Map.ofEntries(
+        Map.entry("len", 0), Map.entry("at", 0), Map.entry("item", 0), Map.entry("get", 0), Map.entry("contains", 0),
+        Map.entry("copyOfList", 0), Map.entry("copyOfSet", 0), Map.entry("copyOfMap", 0), Map.entry("copyOfTuple", 0),
+        Map.entry("truthy", 0), Map.entry("str", 0), Map.entry("repr", 0), Map.entry("join", 1),
+        Map.entry("append", 0), Map.entry("add", 0), Map.entry("setItem", 0), Map.entry("setAt", 0));
     private static final Set<String> PROMOTING_LONG_OPS = Set.of("+", "-", "*", "//", "**");
     // the helpers that build a new collection, which the Python body builds as a new Python one; put and putAll answer the map they are given
     private static final Set<String> BUILDING_HELPERS = Set.of("list", "set", "map", "copyOfList", "copyOfSet", "copyOfMap", "split");
@@ -216,7 +227,9 @@ public final class StaticDelegation {
         }
         List<Ir.Expression> returned = new ArrayList<>();
         returns(body.body(), returned);
-        if (!returned.isEmpty() && returned.stream().allMatch(StaticDelegation::built)) {
+        Map<String, List<Ir.Expression>> assigned = new HashMap<>();
+        assignments(body.body(), assigned);
+        if (!returned.isEmpty() && returned.stream().allMatch(value -> built(value, body.body(), assigned, new HashSet<>()))) {
             return conversion;
         }
         if (!returned.isEmpty() && returned.stream().allMatch(StaticDelegation::javaObject)) {
@@ -239,14 +252,117 @@ public final class StaticDelegation {
         }
     }
 
-    private static boolean built(Ir.Expression value) {
+    private static void assignments(@Nullable Ir node, Map<String, List<Ir.Expression>> assigned) {
+        switch (node) {
+            case Ir.Body body -> body.statements().forEach(statement -> assignments(statement, assigned));
+            case Ir.If branch -> {
+                assignments(branch.then(), assigned);
+                assignments(branch.orElse(), assigned);
+            }
+            case Ir.Local local -> assigned.computeIfAbsent(local.name(), name -> new ArrayList<>()).add(local.value());
+            case Ir.Assign assign -> assigned.computeIfAbsent(assign.name(), name -> new ArrayList<>()).add(assign.value());
+            case null, default -> {
+                // a statement assigning no local: a delegated body has no loops or try blocks
+            }
+        }
+    }
+
+    /**
+     * Whether a returned value is a collection the body builds, which the Python body returns as a new
+     * Python one: a building helper, or a local every assignment of which is one and that nothing but
+     * the return and the helpers reading or filling it sees, so no other object holds it.
+     */
+    private static boolean built(Ir.Expression value, Ir.Body body, Map<String, List<Ir.Expression>> assigned, Set<String> visiting) {
         return switch (value) {
-            case Ir.Cast cast -> built(cast.operand());
-            case Ir.Conditional conditional -> built(conditional.then()) && built(conditional.orElse());
+            case Ir.Cast cast -> built(cast.operand(), body, assigned, visiting);
+            case Ir.Conditional conditional -> built(conditional.then(), body, assigned, visiting) && built(conditional.orElse(), body, assigned, visiting);
             case Ir.Helper helper -> BUILDING_HELPERS.contains(helper.name())
-                || UPDATING_HELPERS.contains(helper.name()) && !helper.arguments().isEmpty() && built(helper.arguments().get(0));
+                || UPDATING_HELPERS.contains(helper.name()) && !helper.arguments().isEmpty() && built(helper.arguments().get(0), body, assigned, visiting);
+            case Ir.LocalRef local -> {
+                List<Ir.Expression> values = assigned.get(local.name());
+                if (values == null || !visiting.add(local.name())) {
+                    yield false;
+                }
+                Escape escape = new Escape(local.name());
+                escape.visit(body, false);
+                yield !escape.escapes && values.stream().allMatch(assignment -> built(assignment, body, assigned, visiting));
+            }
             default -> false;
         };
+    }
+
+    /**
+     * Whether a local may be held by anything but the body: it escapes wherever it is used other than
+     * returned, tested or given to a helper that reads or fills it without keeping it.
+     */
+    private static final class Escape {
+        private final String name;
+        private boolean escapes;
+
+        Escape(String name) {
+            this.name = name;
+        }
+
+        void visit(List<? extends Ir> nodes, boolean safe) {
+            for (Ir node : nodes) {
+                visit(node, safe);
+            }
+        }
+
+        /**
+         * @param node The node
+         * @param safe Whether a value the node evaluates to may be the local: it is not kept
+         */
+        void visit(@Nullable Ir node, boolean safe) {
+            switch (node) {
+                case null -> {
+                    // nothing
+                }
+                case Ir.LocalRef local -> escapes |= !safe && local.name().equals(name);
+                case Ir.Body body -> visit(body.statements(), false);
+                case Ir.Return ret -> visit(ret.value(), true);
+                case Ir.If branch -> {
+                    visit(branch.test(), true);
+                    visit(branch.then(), false);
+                    visit(branch.orElse(), false);
+                }
+                case Ir.Cast cast -> visit(cast.operand(), safe);
+                case Ir.Truthy truthy -> visit(truthy.operand(), true);
+                case Ir.Compare compare -> {
+                    visit(compare.left(), true);
+                    visit(compare.right(), true);
+                }
+                case Ir.And and -> {
+                    visit(and.left(), safe);
+                    visit(and.right(), safe);
+                }
+                case Ir.Or or -> {
+                    visit(or.left(), safe);
+                    visit(or.right(), safe);
+                }
+                case Ir.Conditional conditional -> {
+                    visit(conditional.test(), true);
+                    visit(conditional.then(), safe);
+                    visit(conditional.orElse(), safe);
+                }
+                case Ir.Helper helper -> {
+                    Integer read = READING_HELPERS.get(helper.name());
+                    for (int i = 0; i < helper.arguments().size(); i++) {
+                        visit(helper.arguments().get(i), read != null && read == i);
+                    }
+                }
+                case Ir.Local local -> visit(local.value(), false);
+                case Ir.Assign assign -> visit(assign.value(), false);
+                case Ir.Eval eval -> visit(eval.expression(), true);
+                case Ir.Const _, Ir.Param _, Ir.SelfProperty _, Ir.StaticField _, Ir.ModuleAttribute _ -> {
+                    // no local
+                }
+                default -> {
+                    // any other use may keep the local: every local it holds escapes
+                    escapes |= String.valueOf(node).contains("LocalRef[name=" + name + ",");
+                }
+            }
+        }
     }
 
     private static boolean javaObject(Ir.Expression value) {

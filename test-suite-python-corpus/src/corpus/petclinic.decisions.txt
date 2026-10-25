@@ -54,15 +54,15 @@ petclinic/repositories.py PetTypeRepository.findOneById NOT_CANDIDATE
 petclinic/repositories.py SpecialityRepository.findAllOrderByName NOT_CANDIDATE
 petclinic/repositories.py VetRepository.findAllWithSpecialities NOT_CANDIDATE
 petclinic/repositories.py VisitRepository.findByPetIdOrderByDateDesc NOT_CANDIDATE
-petclinic/services.py ClinicService.find_all_owners COMPILED delegation=none(it has side effects (the helper [copyOfList]) and the helper [copyOfList] raises where Python promotes)
-petclinic/services.py ClinicService.find_all_specialities COMPILED delegation=none(it has side effects (the helper [copyOfList]) and the helper [copyOfList] raises where Python promotes)
-petclinic/services.py ClinicService.find_all_vets COMPILED delegation=none(it has side effects (the helper [copyOfList]) and the helper [copyOfList] raises where Python promotes)
+petclinic/services.py ClinicService.find_all_owners COMPILED delegation=once
+petclinic/services.py ClinicService.find_all_specialities COMPILED delegation=once
+petclinic/services.py ClinicService.find_all_vets COMPILED delegation=once
 petclinic/services.py ClinicService.find_owner_by_id COMPILED delegation=none(it has side effects (the call of [petclinic.OwnerRepository.findOneById]) and the narrowing to [int] raises where Python promotes)
-petclinic/services.py ClinicService.find_owner_by_last_name COMPILED delegation=none(it has side effects (the helper [copyOfList]) and the helper [copyOfList] raises where Python promotes)
+petclinic/services.py ClinicService.find_owner_by_last_name COMPILED delegation=once
 petclinic/services.py ClinicService.find_pet_by_id COMPILED delegation=none(it has side effects (the call of [petclinic.PetRepository.findOneById]) and the narrowing to [int] raises where Python promotes)
 petclinic/services.py ClinicService.find_pet_type_by_id COMPILED delegation=none(it has side effects (the call of [petclinic.PetTypeRepository.findOneById]) and the narrowing to [int] raises where Python promotes)
-petclinic/services.py ClinicService.find_pet_types COMPILED delegation=none(it has side effects (the helper [copyOfList]) and the helper [copyOfList] raises where Python promotes)
-petclinic/services.py ClinicService.find_visits_by_pet_id COMPILED delegation=none(it has side effects (the helper [copyOfList]) and the helper [copyOfList] raises where Python promotes)
+petclinic/services.py ClinicService.find_pet_types COMPILED delegation=once
+petclinic/services.py ClinicService.find_visits_by_pet_id COMPILED delegation=none(it has side effects (the call of [petclinic.VisitRepository.findByPetIdOrderByDateDesc]) and the narrowing to [int] raises where Python promotes)
 petclinic/services.py ClinicService.owner_detail_model SKIPPED
 petclinic/services.py ClinicService.save_owner COMPILED delegation=once
 petclinic/services.py ClinicService.save_pet COMPILED delegation=once

@@ -164,4 +164,84 @@ class Caller:
         results['entries.Labels.label'] == 1
         results['entries.Labels.loud'] == 1
     }
+
+    void "a body building collections with the helpers delegates and returns a new python collection"() {
+        when:
+        def results = parity('''
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
+from java.util import Collections
+
+@Singleton
+class Words:
+    def pair(self, a: str, b: str) -> list[str]:
+        both = [a, b]
+        return both
+
+    def words(self, text: str) -> list[str]:
+        return text.split(",")
+
+    def stripped(self, text: str) -> str:
+        return text.strip()
+
+    def count(self, text: str) -> int:
+        return len(text.split())
+
+    def has(self, text: str, word: str) -> bool:
+        return word in text.split()
+
+    def joined(self, text: str) -> str:
+        return "-".join(text.split()) + str(text.split())
+
+    def number(self, text: str) -> int:
+        return int(text)
+
+    def keyed(self, key: str, value: str) -> dict[str, str]:
+        found = {key: value}
+        return found
+
+    def copied(self, text: str) -> list[str]:
+        return list(Collections.singletonList(text))
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def __init__(self, words: Words):
+        self.words = words
+
+    def probe(self) -> str:
+        pair = self.words.pair("a", "b")
+        pair.append("c")
+        again = self.words.pair("a", "b")
+        copied = self.words.copied("x")
+        copied.append("y")
+        keyed = self.words.keyed("k", "v")
+        keyed["l"] = "w"
+        try:
+            self.words.number("x1")
+            failed = "none"
+        except ValueError as e:
+            failed = type(e).__name__
+        return " ".join([
+            type(pair).__name__, str(pair), str(again),
+            str(self.words.words(" a,b ")), self.words.stripped(" s "), str(self.words.count("a b  c")), str(self.words.has("a b", "b")),
+            self.words.joined("a b"), str(self.words.number("12")), str(self.words.number("99999999999999999999999")), failed,
+            type(copied).__name__, str(copied), type(keyed).__name__, str(keyed),
+        ])
+''', ['Words.pair': 'retry', 'Words.words': 'retry', 'Words.stripped': 'retry', 'Words.count': 'retry', 'Words.has': 'retry', 'Words.joined': 'retry',
+       'Words.number': 'retry', 'Words.keyed': 'retry', 'Words.copied': 'once'])
+
+        then:
+        results.off == "list ['a', 'b', 'c'] ['a', 'b'] [' a', 'b '] s 3 True a-b['a', 'b'] 12 99999999999999999999999 ValueError list ['x', 'y'] dict {'k': 'v', 'l': 'w'}"
+        results.all == results.off
+        results['entries.Words.pair'] == 2
+        results['entries.Words.words'] == 1
+        results['entries.Words.count'] == 1
+        results['entries.Words.has'] == 1
+        results['entries.Words.joined'] == 1
+        // the int beyond a long and the text that is no int fail in Java and run again in Python
+        results['entries.Words.number'] == 3
+        results['entries.Words.keyed'] == 1
+        results['entries.Words.copied'] == 1
+    }
 }

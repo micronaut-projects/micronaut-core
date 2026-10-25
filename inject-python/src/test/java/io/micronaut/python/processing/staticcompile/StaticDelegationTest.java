@@ -191,4 +191,37 @@ class StaticDelegationTest {
         // the call is the side effect, the read of the bean none: nothing promotes, so the body runs once
         assertEquals("once", StaticDelegation.status(body(List.of(), Ir.LONG, new Ir.Return(call))));
     }
+
+    @Test
+    void aLocalTheBodyBuildsAndKeepsToItselfIsReturnedAsANewPythonCollection() {
+        String type = "java.util.List<java.lang.String>";
+        Ir.Statement built = new Ir.Local("xs", type, new Ir.Helper("list", List.of(param(Ir.STRING)), type));
+        Ir.Expression xs = new Ir.LocalRef("xs", type);
+        Ir.Statement appended = new Ir.Eval(new Ir.Helper("append", List.of(xs, param(Ir.STRING)), Ir.NONE));
+        Ir.Statement sized = new Ir.Eval(new Ir.Helper("len", List.of(xs), Ir.LONG));
+        assertEquals("#list", StaticDelegation.returnConversion(body(List.of(Ir.STRING), type, built, appended, sized, new Ir.Return(xs))));
+        // held by the object as well: the Python body returns the list self.items holds
+        Ir.Statement kept = new Ir.PutSelf("items", type, xs, false);
+        assertNull(StaticDelegation.returnConversion(body(List.of(Ir.STRING), type, built, kept, new Ir.Return(xs))));
+        // an alias of it, which the Python body may return elsewhere
+        Ir.Statement alias = new Ir.Local("ys", type, xs);
+        assertNull(StaticDelegation.returnConversion(body(List.of(Ir.STRING), type, built, alias, new Ir.Return(new Ir.LocalRef("ys", type)))));
+        Ir.Statement passed = new Ir.Eval(new Ir.InvokeJava(null, "java.util.Collections", "shuffle", List.of("java.util.List"), List.of(xs), Ir.VOID));
+        assertNull(StaticDelegation.returnConversion(body(List.of(Ir.STRING), type, built, passed, new Ir.Return(xs))));
+        // assigned a collection of Python origin on another path
+        Ir.Statement reassigned = new Ir.If(new Ir.Const(true, Ir.BOOLEAN),
+            new Ir.Body(List.of(new Ir.Assign("xs", new Ir.SelfProperty("items", type, false, false)))), null);
+        assertNull(StaticDelegation.returnConversion(body(List.of(Ir.STRING), type, built, reassigned, new Ir.Return(xs))));
+    }
+
+    @Test
+    void theHelpersThatReadOrBuildHaveNoSideEffectAndIntPromotes() {
+        Ir.Expression split = new Ir.Helper("split", List.of(param(Ir.STRING)), "java.util.List<java.lang.String>");
+        assertEquals("retry", StaticDelegation.status(body(List.of(Ir.STRING), Ir.LONG, new Ir.Return(new Ir.Helper("len", List.of(split), Ir.LONG)))));
+        Ir.Expression parsed = new Ir.Helper("toInt", List.of(param(Ir.STRING)), Ir.LONG);
+        assertEquals("retry", StaticDelegation.status(body(List.of(Ir.STRING), Ir.LONG, new Ir.Return(parsed))));
+        Ir.Statement write = new Ir.PutSelf("count", Ir.LONG, parsed, false);
+        assertEquals("none(it has side effects (the write of self.count) and the helper [toInt] raises where Python promotes)",
+            StaticDelegation.status(body(List.of(Ir.STRING), Ir.VOID, write)));
+    }
 }
