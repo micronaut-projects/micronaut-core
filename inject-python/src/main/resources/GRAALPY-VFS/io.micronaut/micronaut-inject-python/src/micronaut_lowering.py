@@ -1468,8 +1468,12 @@ class Lowering:
 
     def _patched_classes(self):
         """
-        The names that code of the compilation assigns one of the EAGER_EXCEPTION_MEMBERS on, or calls
-        setattr or delattr on with such a member or a computed name: E.__str__ = ..., setattr(E, "args", ...).
+        The classes that code of the compilation may give one of the EAGER_EXCEPTION_MEMBERS after their
+        definition, by name: an assignment or a deletion (E.__str__ = ..., app.errors.E.__init__ = ...),
+        or a setattr or delattr with such a member or a computed name, on a name, on a name bound to it
+        (Alias = E; Alias.__str__ = ...) or on the last attribute of a qualified name; a write on self is
+        one on an instance. A special method written on anything else (cls.__str__ = ...,
+        type(e).__init__ = ..., self.__class__.__str__ = ...) may reach any class: the set then holds "*".
         Collected once per compilation over the ASTs of its modules.
         """
         trees = [getattr(getattr(module, "visitor", None), "module_node", None) for module in self.checker._modules.values()]
@@ -1477,25 +1481,74 @@ class Lowering:
         cached = getattr(self.checker, "_mn_patched_classes", None)
         if cached is not None and len(cached[0]) == len(trees) and all(a is b for a, b in zip(cached[0], trees)):
             return cached[1]
-        names = set()
+        classes = {model.class_def.name() for model in self.checker.python_classes.all()}
+        receivers = set()
+        specials = set()  # the names a special method is written on
+        aliases = {}  # a name -> the names assigned to it
+        unresolved = False
+
+        def written(receiver, member):
+            # member is None for a computed name; a special method or args written on an instance changes
+            # neither how its class creates its exceptions nor the message of one created before
+            nonlocal unresolved
+            special = member is not None and member != "args"
+            if isinstance(receiver, ast.Name):
+                if receiver.id == "self":
+                    return
+                receivers.add(receiver.id)
+                if special:
+                    specials.add(receiver.id)
+            elif isinstance(receiver, ast.Attribute):
+                if receiver.attr == "__class__":
+                    unresolved = unresolved or member != "args"  # self.__class__.__str__ = ...: the class of an object
+                else:
+                    receivers.add(receiver.attr)
+            elif special:
+                unresolved = True  # type(e).__init__ = ...
+
         for tree in trees:
             for node in ast.walk(tree):
                 targets = ()
                 if isinstance(node, ast.Assign):
                     targets = node.targets
+                    if isinstance(node.value, (ast.Name, ast.Attribute)):
+                        source = node.value.id if isinstance(node.value, ast.Name) else node.value.attr
+                        for target in node.targets:
+                            if isinstance(target, ast.Name):
+                                aliases.setdefault(target.id, set()).add(source)
                 elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
                     targets = (node.target,)
                 elif isinstance(node, ast.Delete):
                     targets = node.targets
                 for target in targets:
                     for element in (target.elts if isinstance(target, (ast.Tuple, ast.List)) else (target,)):
-                        if isinstance(element, ast.Attribute) and element.attr in EAGER_EXCEPTION_MEMBERS and isinstance(element.value, ast.Name):
-                            names.add(element.value.id)
+                        if isinstance(element, ast.Attribute) and element.attr in EAGER_EXCEPTION_MEMBERS:
+                            written(element.value, element.attr)
                 if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("setattr", "delattr")
-                        and len(node.args) >= 2 and isinstance(node.args[0], ast.Name)):
+                        and len(node.args) >= 2):
                     member = node.args[1]
-                    if not isinstance(member, ast.Constant) or member.value in EAGER_EXCEPTION_MEMBERS:
-                        names.add(node.args[0].id)
+                    if not isinstance(member, ast.Constant):
+                        written(node.args[0], None)
+                    elif member.value in EAGER_EXCEPTION_MEMBERS:
+                        written(node.args[0], member.value)
+        def reached(start):
+            """The name and the names bound to it, transitively."""
+            found = set()
+            pending = [start]
+            while pending:
+                name = pending.pop()
+                if name not in found:
+                    found.add(name)
+                    pending.extend(aliases.get(name, ()))
+            return found
+
+        names = set()
+        for receiver in receivers:
+            names |= reached(receiver)
+        # a special method written on a name bound to no class of the compilation (cls.__str__ = ..., a
+        # parameter or a local) may be written on any class
+        if unresolved or any(not reached(name) & classes for name in specials):
+            names.add("*")
         self.checker._mn_patched_classes = (trees, names)
         return names
 
@@ -1523,7 +1576,8 @@ class Lowering:
             if (member in model.methods or member in model.properties or member in model.attributes
                     or member in model.instance_attributes or member in model.nested):
                 return False
-        if model.class_def.name() in self._patched_classes():
+        patched = self._patched_classes()
+        if "*" in patched or model.class_def.name() in patched:
             return False  # E.__str__ = ... or setattr(E, ...) somewhere in the compilation
         classes = self.checker.python_classes
         for base in model.class_def.bases():

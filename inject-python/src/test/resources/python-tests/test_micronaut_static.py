@@ -1913,6 +1913,14 @@ class Set(Exception):
 setattr(Set, "args", ())
 
 
+class Aliased(Exception):
+    pass
+
+
+Other = Aliased
+Other.__init__ = lambda self, *arguments: None
+
+
 @Singleton
 class Gate:
     def plain(self, n: int) -> int:
@@ -1962,7 +1970,39 @@ class Gate:
 
     def set(self, n: int) -> int:
         raise Set("x")
+
+    def aliased(self, n: int) -> int:
+        raise Aliased("x")
 '''
+
+
+PATCHING = '''
+from jakarta.inject import Singleton
+
+
+class Plain(Exception):
+    pass
+
+
+def respell(cls):
+    cls.__str__ = lambda self: "respelled"
+
+
+@Singleton
+class Gate:
+    def plain(self, n: int) -> int:
+        raise Plain(n)
+'''
+
+
+class LazyExceptionPatchingTest(unittest.TestCase):
+    """A special method written on a class the compilation cannot name may be any exception class's: every raise is eager."""
+
+    def test_a_special_method_written_on_an_unknown_class_keeps_every_raise_eager(self):
+        decisions, planner = plan(PATCHING, MODE_ALL, facts=FakeFacts())
+        body = {body.methodName(): body for body in planner.bodies}["plain"]
+        self.assertEqual("COMPILED", decisions["Gate.plain"].outcome().name(), rules(decisions["Gate.plain"]))
+        self.assertFalse(list(body.body().statements())[0].exception().lazy())
 
 
 class LazyExceptionTest(unittest.TestCase):
@@ -1987,7 +2027,7 @@ class LazyExceptionTest(unittest.TestCase):
 
     def test_a_class_that_could_tell_the_difference_is_created_when_it_is_raised(self):
         for name in ("initialized", "inherits", "spelled", "represented", "created", "finalized", "argued", "reassigned",
-                     "decorated", "keyed", "spelled_base", "patched", "set"):
+                     "decorated", "keyed", "spelled_base", "patched", "set", "aliased"):
             self.assertFalse(self._construction(name).lazy(), name)
 
 

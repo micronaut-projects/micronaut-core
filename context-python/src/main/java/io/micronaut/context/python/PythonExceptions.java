@@ -186,7 +186,7 @@ public final class PythonExceptions {
      * @since 5.3.0
      */
     @UsedByGeneratedCode
-    public static @Nullable String argumentsMessage(Object[] arguments) {
+    public static @Nullable String argumentsMessage(@Nullable Object[] arguments) {
         if (arguments.length == 0) {
             return null;
         }
