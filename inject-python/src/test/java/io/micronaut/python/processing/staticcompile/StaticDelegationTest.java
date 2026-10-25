@@ -102,4 +102,31 @@ class StaticDelegationTest {
         Ir.Expression negated = new Ir.Unary("-", call, Ir.LONG);
         assertNull(StaticDelegation.target(body(List.of(Ir.LONG), Ir.LONG, new Ir.Return(negated))));
     }
+
+    @Test
+    void aCollectionTheBodyBuildsBecomesAPythonOneForAPythonCaller() {
+        // the lowering spells the return type with its type arguments
+        Ir.Expression built = new Ir.Helper("list", List.of(new Ir.Const("a", Ir.STRING)), "java.util.List<java.lang.String>");
+        assertEquals("#list", StaticDelegation.returnConversion(body(List.of(), "java.util.List<java.lang.String>", new Ir.Return(built))));
+        Ir.Expression map = new Ir.Helper("putAll", List.of(new Ir.Helper("map", List.of(), "java.util.Map<java.lang.String, java.lang.Long>"), param("java.util.Map")),
+            "java.util.Map<java.lang.String, java.lang.Long>");
+        assertEquals("#dict", StaticDelegation.returnConversion(body(List.of(), "java.util.Map<java.lang.String, java.lang.Long>", new Ir.Return(map))));
+        assertEquals("", StaticDelegation.returnConversion(body(List.of(), Ir.STRING, new Ir.Return(new Ir.Const("a", Ir.STRING)))));
+    }
+
+    @Test
+    void aJavaCollectionReachesAPythonCallerAsItIs() {
+        Ir.Expression call = new Ir.InvokeJava(null, "java.util.Collections", "emptySet", List.of(), List.of(), "java.util.Set<java.lang.String>");
+        assertEquals("", StaticDelegation.returnConversion(body(List.of(), "java.util.Set<java.lang.String>", new Ir.Return(call))));
+    }
+
+    @Test
+    void aCollectionOfPythonOriginIsNotDelegated() {
+        // the Python body returns the attribute itself, which a Java body cannot give back
+        Ir.Expression attribute = new Ir.SelfProperty("items", "java.util.List<java.lang.String>", false);
+        assertNull(StaticDelegation.returnConversion(body(List.of(), "java.util.List<java.lang.String>", new Ir.Return(attribute))));
+        Ir.Expression call = new Ir.InvokeJava(null, "java.util.Collections", "emptyList", List.of(), List.of(), "java.util.List<java.lang.String>");
+        Ir.Statement mixed = new Ir.If(new Ir.Const(true, Ir.BOOLEAN), new Ir.Body(List.of(new Ir.Return(call))), null);
+        assertNull(StaticDelegation.returnConversion(body(List.of(), "java.util.List<java.lang.String>", mixed, new Ir.Return(new Ir.Const(null, Ir.NONE)))));
+    }
 }

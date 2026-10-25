@@ -988,17 +988,9 @@ public final class PythonAstParser {
             return null;
         }
         String target = StaticDelegation.target(body);
-        if (target == null) {
-            return null;
-        }
-        // a collection the Java body returns becomes a Python one for a Python caller
-        String conversion = switch (body.returnType()) {
-            case "java.util.List" -> "#list";
-            case "java.util.Set" -> "#set";
-            case "java.util.Map" -> "#dict";
-            default -> "";
-        };
-        return target + conversion;
+        // a collection the Java body builds becomes a Python one for a Python caller
+        String conversion = target == null ? null : StaticDelegation.returnConversion(body);
+        return conversion == null ? null : target + conversion;
     }
 
     PythonBytecodeCompiler.Result compileRuntimeBytecode(TransformResult transformResult,
