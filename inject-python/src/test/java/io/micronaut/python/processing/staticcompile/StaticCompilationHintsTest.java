@@ -46,7 +46,7 @@ class StaticCompilationHintsTest {
         // the rules are the first argument of _refuse(...) in the lowering, the first element of the
         // reason tuples the planner appends, and the rules of the problems the type checker reports in a
         // body, which the planner takes as the reasons of the decision (rules.problems)
-        Pattern refusal = Pattern.compile("(?:_refuse\\(|reasons\\.append\\(\\(|reason = \\()\\s*f?\"([^\"]+)\"");
+        Pattern refusal = Pattern.compile("(?:_refuse\\(|_record\\(|reasons\\.append\\(\\(|reasons = \\[\\(|reason = \\()\\s*f?\"([^\"]+)\"");
         Pattern problem = Pattern.compile("_report\\(\\s*f?\"([^\"]+)\"");
         TreeSet<String> rules = new TreeSet<>();
         collect(refusal, "micronaut_static.py", rules);
@@ -56,7 +56,9 @@ class StaticCompilationHintsTest {
         // a rule given through a variable or an f-string would escape the literal match above
         for (String file : List.of("micronaut_static.py", "micronaut_lowering.py")) {
             String source = source(file);
-            Matcher dynamic = Pattern.compile("self\\._refuse\\(\\s*(?!\")").matcher(source);
+            // the lowering records a reason with _record too, the planner records a decision with its own _record
+            String calls = file.equals("micronaut_lowering.py") ? "self\\._(?:refuse|record)\\(\\s*(?!\"|rule, message)" : "self\\._refuse\\(\\s*(?!\")";
+            Matcher dynamic = Pattern.compile(calls).matcher(source);
             if (dynamic.find()) {
                 fail(file + " gives a rule that is not a literal: " + source.substring(dynamic.start(), Math.min(source.length(), dynamic.start() + 80)));
             }
