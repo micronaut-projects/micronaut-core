@@ -574,14 +574,16 @@ class AddPropertySourceDuringRefreshSpec extends Specification {
         env.stopping.release.countDown()
         assert first.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
 
-        and: "another thread adds one by the same name meanwhile, which waits for the first"
+        and: "another thread adds one by the same name meanwhile, which does not wait for the first"
         PropertySource second = PropertySource.of('watcher', ['watcher.value': 'second'])
         Thread other = daemon('other') { env.addPropertySource(second) }
-        awaitWaiting(other)
+        other.join(WAIT_SECONDS * 1000L)
+        boolean otherWaited = other.alive
         release(first, refresher)
         other.join(WAIT_SECONDS * 1000L)
 
-        then: "the second is registered and its values are the ones looked up"
+        then: "the second is registered and its values are the ones looked up, as it is processed after the first"
+        !otherWaited
         !other.alive
         env.propertySources.find { it.name == 'watcher' }.is(second)
         env.getProperty('watcher.value', String).get() == 'second'
