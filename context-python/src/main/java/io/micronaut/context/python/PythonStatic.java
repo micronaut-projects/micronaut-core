@@ -837,7 +837,10 @@ public final class PythonStatic {
      */
     public static boolean contains(@Nullable Object container, @Nullable Object element) {
         if (container instanceof CharSequence text) {
-            return element != null && text.toString().contains(element.toString());
+            if (element == null) {
+                throw new PythonError(TYPE_ERROR, "'in <string>' requires string as left operand, not NoneType");
+            }
+            return text.toString().contains(element.toString());
         }
         if (container instanceof Collection<?> collection) {
             try {

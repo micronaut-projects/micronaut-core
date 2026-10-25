@@ -76,6 +76,13 @@ class PythonStaticTest {
     }
 
     @Test
+    void noneInAStringRaisesAsPythonDoes() {
+        assertTrue(PythonStatic.contains("abc", "b"));
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> PythonStatic.contains("abc", null));
+        assertTrue(error.getMessage().startsWith("TypeError"), error.getMessage());
+    }
+
+    @Test
     void veryLongLiteralsAreReadWithoutExhaustingTheStack() {
         // a backtracking matcher recursing once per digit group overflowed the stack on such literals
         String grouped = "1_".repeat(100_000) + "1";

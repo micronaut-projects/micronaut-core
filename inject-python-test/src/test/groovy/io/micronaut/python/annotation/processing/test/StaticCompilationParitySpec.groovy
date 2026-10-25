@@ -296,6 +296,9 @@ class Calc:
     def biggest(self, a: float, b: float) -> str:
         return f"{max(a, b)} {min(a, b)}"
 
+    def within(self, part: str, text: str) -> bool:
+        return part in text
+
     # refused: each would differ from Python if compiled
 
     def mixed_local(self, flag: bool) -> str:
@@ -378,6 +381,7 @@ class Pair:
         ["maybe_concat", true],
         ["ambiguous", 1, 2],
         ["biggest", 1.0d, Double.NaN], ["biggest", Double.NaN, 1.0d], ["biggest", -0.0d, 0.0d], ["biggest", 0.0d, -0.0d], ["biggest", 1.0d, 2.5d],
+        ["within", "b", "abc"], ["within", null, "abc"],
         ["mixed_max", 3, 2.5d],
     ]
 
@@ -444,6 +448,7 @@ class Pair:
         results[StaticCompilationMode.OFF][["biggest", Double.NaN, 1.0d].toString()] == "nan nan"
         results[StaticCompilationMode.OFF][["biggest", -0.0d, 0.0d].toString()] == "-0.0 -0.0"
         results[StaticCompilationMode.OFF][["biggest", 0.0d, -0.0d].toString()] == "0.0 0.0"
+        results[StaticCompilationMode.OFF][["within", null, "abc"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["mixed_max", 3, 2.5d].toString()] == "3 2.5"
         results[StaticCompilationMode.OFF][["query", "http://example.com/x"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["mixed_local", true].toString()] == "2"
