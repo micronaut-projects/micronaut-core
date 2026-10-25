@@ -67,9 +67,12 @@ public final class StaticDelegation {
         Map.entry("java.lang.Byte", "?byte"), Map.entry("java.lang.Double", "?float"), Map.entry("java.lang.Boolean", "?bool")
     );
     // the helpers of PythonStatic without side effects; power raises where Python promotes
-    private static final Set<String> PURE_HELPERS = Set.of("str", "divide", "floorDiv", "floorMod", "compare", "concat", "box", "truthy", "assertion", "group");
+    private static final Set<String> PURE_HELPERS = Set.of("str", "divide", "floorDiv", "floorMod", "compare", "concat", "box", "truthy", "assertion", "group", "max", "min");
     private static final Set<String> PROMOTING_HELPERS = Set.of("power");
     private static final Set<String> PROMOTING_LONG_OPS = Set.of("+", "-", "*", "//", "**");
+    // the helpers that build a new collection, which the Python body builds as a new Python one; put and putAll answer the map they are given
+    private static final Set<String> BUILDING_HELPERS = Set.of("list", "set", "map", "copyOfList", "copyOfSet", "copyOfMap", "split");
+    private static final Set<String> UPDATING_HELPERS = Set.of("put", "putAll");
     private static final Set<String> NARROW_TYPES = Set.of(INT, SHORT, BYTE, "java.lang.Integer", "java.lang.Short", "java.lang.Byte");
     private static final String JAVA_KIND = "java:";
 
@@ -134,6 +137,74 @@ public final class StaticDelegation {
             return null;
         }
         return JAVA_KIND + parameterType;
+    }
+
+    /**
+     * The conversion a Python caller of a delegated body applies to the collection the body returns:
+     * {@code #list}, {@code #set} or {@code #dict} when every return builds a new collection, which
+     * the Python body returns as a new Python one; an empty string when the return type is not a
+     * collection or every return is a Java object, which the Python body returns as it is; or
+     * {@code null} when a return may be a collection the Python caller would receive as the same
+     * Python object (an attribute, a parameter, a local), which a Java body cannot give back:
+     * such a body is not delegated.
+     *
+     * @param body The compiled body
+     * @return The conversion, or {@code null}
+     */
+    public static @Nullable String returnConversion(Ir.CompiledBody body) {
+        String returnType = body.returnType();
+        int arguments = returnType.indexOf('<');
+        String conversion = switch (arguments < 0 ? returnType : returnType.substring(0, arguments)) {
+            case "java.util.List" -> "#list";
+            case "java.util.Set" -> "#set";
+            case "java.util.Map" -> "#dict";
+            default -> "";
+        };
+        if (conversion.isEmpty()) {
+            return conversion;
+        }
+        List<Ir.Expression> returned = new ArrayList<>();
+        returns(body.body(), returned);
+        if (!returned.isEmpty() && returned.stream().allMatch(StaticDelegation::built)) {
+            return conversion;
+        }
+        if (!returned.isEmpty() && returned.stream().allMatch(StaticDelegation::javaObject)) {
+            return "";
+        }
+        return null;
+    }
+
+    private static void returns(@Nullable Ir node, List<Ir.Expression> returned) {
+        switch (node) {
+            case Ir.Body body -> body.statements().forEach(statement -> returns(statement, returned));
+            case Ir.If branch -> {
+                returns(branch.then(), returned);
+                returns(branch.orElse(), returned);
+            }
+            case Ir.Return ret -> returned.add(ret.value() == null ? new Ir.Const(null, Ir.NONE) : ret.value());
+            case null, default -> {
+                // a statement without a return of its own: a delegated body has no loops or try blocks
+            }
+        }
+    }
+
+    private static boolean built(Ir.Expression value) {
+        return switch (value) {
+            case Ir.Cast cast -> built(cast.operand());
+            case Ir.Conditional conditional -> built(conditional.then()) && built(conditional.orElse());
+            case Ir.Helper helper -> BUILDING_HELPERS.contains(helper.name())
+                || UPDATING_HELPERS.contains(helper.name()) && !helper.arguments().isEmpty() && built(helper.arguments().get(0));
+            default -> false;
+        };
+    }
+
+    private static boolean javaObject(Ir.Expression value) {
+        return switch (value) {
+            case Ir.Cast cast -> javaObject(cast.operand());
+            case Ir.Conditional conditional -> javaObject(conditional.then()) && javaObject(conditional.orElse());
+            case Ir.InvokeJava _, Ir.NewJava _, Ir.StaticField _, Ir.Field _ -> true;
+            default -> false;
+        };
     }
 
     /**
