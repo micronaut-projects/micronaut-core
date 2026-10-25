@@ -400,4 +400,42 @@ class Caller:
         results['entries.Greeter.welcome'] == 2
         results['entries.Greeter.show'] == 0
     }
+
+    void "an int narrowed for a java call runs once: an int beyond the java parameter fails in python too"() {
+        when:
+        def results = parity('''
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
+from java.lang import Integer
+
+@Singleton
+class Hex:
+    def hex(self, n: int) -> str:
+        return Integer.toHexString(n)
+
+    def widened(self, n: int) -> int:
+        return n + 1
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def __init__(self, hex: Hex):
+        self.hex = hex
+
+    def probe(self) -> str:
+        try:
+            self.hex.hex(2 ** 40)
+            failed = "none"
+        except Exception:
+            failed = "failed"
+        return f"{self.hex.hex(255)} {failed} {self.hex.widened(2 ** 63 - 1)} {self.hex.widened(5)}"
+''', ['Hex.hex': 'once', 'Hex.widened': 'retry'])
+
+        then:
+        results.off == 'ff failed 9223372036854775808 6'
+        results.all == results.off
+        // an int parameter of the stub takes the ints of its range only: the Python body runs for the others
+        results['entries.Hex.hex'] == 1
+        results['entries.Hex.widened'] == 1
+    }
 }

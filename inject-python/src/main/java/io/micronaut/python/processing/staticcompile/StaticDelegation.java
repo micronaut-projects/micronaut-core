@@ -84,7 +84,8 @@ public final class StaticDelegation {
     // the helpers that build a new collection, which the Python body builds as a new Python one; put and putAll answer the map they are given
     private static final Set<String> BUILDING_HELPERS = Set.of("list", "set", "map", "copyOfList", "copyOfSet", "copyOfMap", "split");
     private static final Set<String> UPDATING_HELPERS = Set.of("put", "putAll");
-    private static final Set<String> NARROW_TYPES = Set.of(INT, SHORT, BYTE, "java.lang.Integer", "java.lang.Short", "java.lang.Byte");
+    // the integer types narrower than a long, by their width in bits
+    private static final Map<String, Integer> NARROW_TYPES = Map.of(INT, 32, SHORT, 16, BYTE, 8, "java.lang.Integer", 32, "java.lang.Short", 16, "java.lang.Byte", 8);
     private static final String JAVA_KIND = "java:";
     private static final String PYTHON_KIND = "python:";
     // the final, immutable value classes of java.util, whose objects a Python caller holds as Java objects
@@ -414,6 +415,33 @@ public final class StaticDelegation {
             }
         }
 
+        /**
+         * The arguments of a Java call: an int beyond the range of a narrower Java parameter fails the
+         * call in Python as well (the boundary cannot convert it), so its narrowing promotes nothing.
+         */
+        void arguments(List<Ir.Expression> arguments) {
+            for (Ir.Expression argument : arguments) {
+                visit(argument instanceof Ir.Cast cast && NARROW_TYPES.containsKey(cast.type()) && Ir.LONG.equals(cast.operand().type()) ? cast.operand() : argument);
+            }
+        }
+
+        /**
+         * Whether a cast narrows a long that may not fit: a long that holds a narrower parameter or a
+         * widened narrower value fits a type at least as wide.
+         */
+        private static boolean narrows(Ir.Cast cast) {
+            Integer width = NARROW_TYPES.get(cast.type());
+            if (width == null || !Ir.LONG.equals(cast.operand().type())) {
+                return false;
+            }
+            Integer held = switch (cast.operand()) {
+                case Ir.Param param -> NARROW_TYPES.get(param.parameterType());
+                case Ir.Cast widened -> NARROW_TYPES.get(widened.operand().type());
+                default -> null;
+            };
+            return held == null || held > width;
+        }
+
         void visit(@Nullable Ir node) {
             switch (node) {
                 case null -> {
@@ -472,7 +500,7 @@ public final class StaticDelegation {
                 case Ir.Truthy truthy -> visit(truthy.operand());
                 case Ir.StrJoin join -> visit(join.parts());
                 case Ir.Cast cast -> {
-                    promotes(Ir.LONG.equals(cast.operand().type()) && NARROW_TYPES.contains(cast.type()), "the narrowing to [" + cast.type() + "]");
+                    promotes(narrows(cast), "the narrowing to [" + cast.type() + "]");
                     visit(cast.operand());
                 }
                 case Ir.Helper helper -> {
@@ -491,11 +519,11 @@ public final class StaticDelegation {
                 case Ir.InvokeJava call -> {
                     sideEffect("the call of [" + call.owner() + "." + call.name() + "]");
                     visit(call.receiver());
-                    visit(call.arguments());
+                    arguments(call.arguments());
                 }
                 case Ir.NewJava construction -> {
                     sideEffect("the construction of [" + construction.type() + "]");
-                    visit(construction.arguments());
+                    arguments(construction.arguments());
                 }
                 default -> {
                     // a kind of node this analysis does not know: assumed to do both
