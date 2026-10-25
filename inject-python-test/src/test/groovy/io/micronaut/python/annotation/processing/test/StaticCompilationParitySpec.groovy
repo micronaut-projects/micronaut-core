@@ -32,6 +32,7 @@ from java.util import AbstractMap, Objects
 class Calc:
     rate: float = 1.5
     count: int = 0
+    reads: int = 0
 
     def total(self, quantity: int, unit_price: float) -> float:
         subtotal = quantity * unit_price
@@ -358,6 +359,15 @@ class Calc:
     def mixed_max(self, a: int, b: float) -> str:
         return f"{max(a, b)} {min(b, a)}"
 
+    def gained(self) -> str:
+        value = self.gain or 2.5
+        return str(value) + "|" + str(self.reads)
+
+    @property
+    def gain(self) -> float:
+        self.reads += 1
+        return 1.5
+
     def int_default(self, prices: dict[str, float]) -> str:
         return f"{prices.get('x', 0)}"
 
@@ -424,12 +434,13 @@ class Pair:
         ["within", "b", "abc"], ["within", null, "abc"],
         ["filled"], ["extending"],
         ["mixed_max", 3, 2.5d],
+        ["gained"],
     ]
 
     // the fixture methods the compiler must refuse: compiled, each would differ from its Python body
     static final Map<String, String> REFUSED = [mixed_local: "unknown-type", mixed_conditional: "unsupported-expression", float_power: "unsupported-expression",
                                                 maybe_concat: "unknown-type", ambiguous: "ambiguous-overload", mixed_max: "unsupported-expression",
-                                                int_default: "unsupported-expression"]
+                                                int_default: "unsupported-expression", gained: "unsupported-expression"]
 
     void "compiled bodies agree with the Python bodies on every input"() {
         given:
@@ -495,6 +506,7 @@ class Pair:
         results[StaticCompilationMode.OFF][["extending"].toString()] == "a,bTrue1True"
         results[StaticCompilationMode.OFF][["mixed_max", 3, 2.5d].toString()] == "3 2.5"
         results[StaticCompilationMode.OFF]['int_default'] == "0"
+        results[StaticCompilationMode.OFF][["gained"].toString()] == "1.5|1"
         results[StaticCompilationMode.OFF][["query", "http://example.com/x"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["mixed_local", true].toString()] == "2"
         results[StaticCompilationMode.OFF][["ratio", 1, 0].toString()] == "raised"

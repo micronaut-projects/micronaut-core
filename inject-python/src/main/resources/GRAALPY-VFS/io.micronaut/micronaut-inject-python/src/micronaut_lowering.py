@@ -301,6 +301,13 @@ def _pure_operand(node):
     return isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
 
 
+def _runs_getter(expression):
+    """Whether the lowered expression reads a @property of self, whose Python getter runs on every read."""
+    while expression.getClass().getSimpleName() == "Cast":
+        expression = expression.operand()
+    return expression.getClass().getSimpleName() == "SelfProperty" and expression.accessor()
+
+
 def _always_returns(statements):
     """Whether every path through the statements ends in a return (or a raise, which Java accepts as a terminal too)."""
     for statement in statements:
@@ -1707,16 +1714,18 @@ class Lowering:
             for value in values[1:]:
                 result = And(result, value) if isinstance(node.op, ast.And) else Or(result, value)
             return result
-        if len(values) == 2 and _pure_operand(node.values[0]):
+        if len(values) == 2 and _pure_operand(node.values[0]) and not _runs_getter(values[0]):
             # `x or default` on values of one type, or of two reference types one of which takes the
-            # other: the left operand is pure (a name, a literal or an attribute of a name), so it
-            # may be tested and yielded
+            # other: the left operand is pure (a name, a literal or an attribute of a name that is
+            # no @property, whose getter would run twice), so it may be tested and yielded
             first, second = values
             result_type = self._common_type(first.type(), second.type())
             if result_type is not None:
                 test = self._truthy(node.values[0])
                 first, second = self._coerce(first, result_type, node), self._coerce(second, result_type, node)
                 return Conditional(test, first, second, result_type) if isinstance(node.op, ast.Or) else Conditional(test, second, first, result_type)
+        if len(values) == 2 and _runs_getter(values[0]):
+            self._refuse("unsupported-expression", f"and/or on the @property [{node.values[0].attr}] would run its getter twice: read it into a local first", node)
         self._refuse("unsupported-expression", "and/or on values that are not booleans of one type has no static lowering", node)
 
     def _common_type(self, first, second):

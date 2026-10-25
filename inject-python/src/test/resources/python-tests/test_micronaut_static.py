@@ -593,6 +593,9 @@ class Pricing:
     def via_property(self) -> float:
         return self.doubled + 1
 
+    def doubled_or(self) -> float:
+        return self.doubled or 1.0
+
     def maybe(self, n: int) -> Optional[int]:
         return n
 
@@ -895,12 +898,15 @@ class LoweringTest(unittest.TestCase):
             "maybe_concat": "unknown-type",
             "mixed_max": "unsupported-expression",
             "int_default": "unsupported-expression",
+            "doubled_or": "unsupported-expression",
         }
         for name, rule in expectations.items():
             decision = self.decisions[f"Pricing.{name}"]
             self.assertEqual("SKIPPED", decision.outcome().name(), name)
             self.assertEqual(rule, decision.reasons()[0].rule(), f"{name}: {[(r.rule(), r.message()) for r in decision.reasons()]}")
             self.assertIsNotNone(decision.reasons()[0].span(), name)
+        # the conditional would test and then yield the @property: its getter would run twice
+        self.assertIn("getter twice", self.decisions["Pricing.doubled_or"].reasons()[0].message())
         self.assertEqual("local [value] is a [long] and then a [java.lang.String]", self.decisions["Pricing.retyped"].reasons()[0].message())
         self.assertEqual("the function does not return a value on every path", self.decisions["Pricing.falls_through"].reasons()[0].message())
         # a loop variable is a Java local too
