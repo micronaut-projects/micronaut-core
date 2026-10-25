@@ -258,13 +258,13 @@ class PyronautCompilerStaticCompilationTest {
             .buildClassLoader();
 
         Map<String, StaticCompilationDecision> byName = decisions.stream().collect(Collectors.toMap(StaticCompilationDecision::qualifiedName, Function.identity()));
-        assertEquals(Outcome.CANDIDATE, byName.get("Switches.plain").outcome());
+        assertEquals(Outcome.COMPILED, byName.get("Switches.plain").outcome());
         assertEquals(StaticCompilationDecision.Scope.FUNCTION, byName.get("Switches.plain").scope());
-        assertEquals(Outcome.CANDIDATE, byName.get("Switches.aliased").outcome());
+        assertEquals(Outcome.COMPILED, byName.get("Switches.aliased").outcome());
         assertEquals(StaticCompilationDecision.Scope.FUNCTION, byName.get("Switches.aliased").scope());
         assertEquals(Outcome.EXCLUDED, byName.get("Switches.unswitched").outcome());
         assertEquals(StaticCompilationDecision.Scope.MODE, byName.get("Switches.unswitched").scope());
-        assertEquals(Outcome.CANDIDATE, byName.get("AliasedClass.run").outcome());
+        assertEquals(Outcome.COMPILED, byName.get("AliasedClass.run").outcome());
         assertEquals(StaticCompilationDecision.Scope.CLASS, byName.get("AliasedClass.run").scope());
         assertTrue(diagnostics.isEmpty(), diagnostics.toString());
     }
