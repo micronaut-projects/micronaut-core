@@ -553,6 +553,13 @@ class Pricing:
 
     def literal_compare(self, x: float) -> bool:
         return x > 100
+
+    def several(self, name: str, n: int) -> int:
+        while n > 0:
+            n -= 1
+        size = len(name)
+        power = n ** n
+        return size + power
 '''
 
 
@@ -642,6 +649,16 @@ class LoweringTest(unittest.TestCase):
             self.assertIsNotNone(decision.reasons()[0].span(), name)
         self.assertEqual("local [value] is a [long] and then a [java.lang.String]", self.decisions["Pricing.retyped"].reasons()[0].message())
         self.assertEqual("the function does not return a value on every path", self.decisions["Pricing.falls_through"].reasons()[0].message())
+
+    def test_every_refused_statement_is_a_reason(self):
+        # the lowering goes on after a refused statement; a read of a local whose assignment was
+        # refused is not a reason of its own
+        decision = self.decisions["Pricing.several"]
+        self.assertEqual("SKIPPED", decision.outcome().name())
+        self.assertEqual(["unsupported-statement", "python-builtin-not-lowered", "unbounded-integer-op"], rules(decision),
+                         [(r.rule(), r.message()) for r in decision.reasons()])
+        self.assertEqual([133, 135, 136], [reason.span().line() for reason in decision.reasons()])
+        self.assertNotIn("several", self.bodies)
 
     def test_static_methods_are_not_candidates_yet(self):
         decision = self.decisions["Pricing.helper"]
