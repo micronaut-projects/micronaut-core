@@ -1,9 +1,13 @@
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.context.python.PooledValueCoercible
+import io.micronaut.context.python.PythonPool
 import io.micronaut.context.python.PythonStatic
 import io.micronaut.python.compiler.PyronautCompiler
 import io.micronaut.python.processing.staticcompile.StaticCompilationDecision
 import io.micronaut.python.processing.staticcompile.StaticCompilationMode
+import org.graalvm.polyglot.Context
+import org.graalvm.polyglot.Value
 
 /**
  * A compiled method has one implementation: Python callers of an object bound to its stub run
@@ -516,6 +520,135 @@ class Copier:
         result == "orig! twin? orig# ['label'] ['label']"
         PythonStatic.entries('python.Counter#describe') == 1
         PythonStatic.entries('python.Counter#rename') == 0
+
+        cleanup:
+        context?.close()
+    }
+
+    static final String INTROSPECTED = '''
+from dataclasses import dataclass
+from jakarta.inject import Singleton
+from micronaut.core.annotation import Introspected
+from micronaut.context.python.annotation import CompileStatic
+
+@Introspected
+@dataclass
+class Money:
+    amount: int = 0
+
+    def doubled(self) -> int:
+        return self.amount * 2
+
+@Introspected
+@dataclass(frozen=True)
+class Point:
+    x: int = 0
+
+    def twice(self) -> int:
+        return self.x * 2
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def use(self, money: Money) -> int:
+        return money.doubled()
+
+    def use_point(self, point: Point) -> int:
+        return point.twice()
+
+    def make(self) -> Money:
+        return Money(7)
+
+    def make_point(self) -> Point:
+        return Point(4)
+
+    def fresh(self) -> int:
+        return Money(7).doubled() + Point(4).twice()
+'''
+
+    private static Object newFromJava(ClassLoader classLoader, String className, int value) {
+        return classLoader.loadClass(className).getDeclaredConstructor(int).newInstance(value)
+    }
+
+    void "introspected objects created from java and rebuilt from their fields are bound for python callers"() {
+        given:
+        PythonStatic.resetEntries()
+        def context = buildContext(INTROSPECTED)
+        def caller = getBean(context, 'python.Caller')
+
+        expect:
+        decisions.find { it.qualifiedName() == 'Money.doubled' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
+        decisions.find { it.qualifiedName() == 'Point.twice' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
+
+        when: "a dataclass created from Java is handed to Python code calling the compiled method"
+        def money = newFromJava(context.classLoader, 'python.Money', 5)
+        def fromJava = money.doubled()
+        def fromPython = caller.use(money)
+
+        then: "the Java body ran for both callers"
+        fromJava == 10L
+        fromPython == 10L
+        PythonStatic.entries('python.Money#doubled') == 2
+
+        when: "a frozen dataclass created from Java, rebuilt on every crossing"
+        def point = newFromJava(context.classLoader, 'python.Point', 3)
+        def pointFromJava = point.twice()
+        def pointFromPython = caller.use_point(point)
+        def pointAgain = caller.use_point(point)
+
+        then:
+        pointFromJava == 6L
+        pointFromPython == 6L
+        pointAgain == 6L
+        PythonStatic.entries('python.Point#twice') == 3
+
+        when: "control: objects created and used in Python keep the Python body"
+        long moneyBefore = PythonStatic.entries('python.Money#doubled')
+        long pointBefore = PythonStatic.entries('python.Point#twice')
+        def fresh = caller.fresh()
+
+        then:
+        fresh == 22L
+        PythonStatic.entries('python.Money#doubled') == moneyBefore
+        PythonStatic.entries('python.Point#twice') == pointBefore
+
+        when: "objects created in Python and wrapped by their stubs on the way to Java are bound by the wrapping"
+        def made = caller.make()
+        def madePoint = caller.make_point()
+        def viaPython = caller.use(made)
+        def pointViaPython = caller.use_point(madePoint)
+
+        then:
+        viaPython == 14L
+        pointViaPython == 8L
+        PythonStatic.entries('python.Money#doubled') == moneyBefore + 1
+        PythonStatic.entries('python.Point#twice') == pointBefore + 1
+
+        cleanup:
+        context?.close()
+    }
+
+    void "introspected objects created from java and rebuilt in a pooled context are bound there"() {
+        given:
+        PythonStatic.resetEntries()
+        def context = buildContext(INTROSPECTED, true, [
+            "micronaut.python.pool.enabled": true,
+            "micronaut.python.pool.size"   : 1
+        ])
+        def money = newFromJava(context.classLoader, 'python.Money', 5)
+        def point = newFromJava(context.classLoader, 'python.Point', 3)
+
+        when: "Python code of a pooled context calls the compiled methods of the objects rebuilt there"
+        List<Long> results = context.getBean(PythonPool).withContext { Context targetContext ->
+            Value targetMoney = ((PooledValueCoercible) money).asPolyglotValue(targetContext)
+            Value targetPoint = ((PooledValueCoercible) point).asPolyglotValue(targetContext)
+            [targetMoney.invokeMember('doubled').asLong(), targetPoint.invokeMember('twice').asLong()]
+        }
+
+        then: "the Java bodies ran"
+        results == [10L, 6L]
+        PythonStatic.entries('python.Money#doubled') == 1
+        PythonStatic.entries('python.Point#twice') == 1
 
         cleanup:
         context?.close()
