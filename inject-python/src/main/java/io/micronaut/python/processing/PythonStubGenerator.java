@@ -4160,7 +4160,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     @Nullable
     private static String repeatedAnnotationType(ClassElement annotationType) {
-        return annotationType.getEnclosedElement(ElementQuery.ALL_METHODS.onlyDeclared().named("value"))
+        return annotationType.getEnclosedElement(ElementQuery.ALL_METHODS.onlyDeclared().named(VALUE_PARAMETER))
             .map(MethodElement::getReturnType)
             .filter(ClassElement::isArray)
             .map(ClassElement::fromArray)
