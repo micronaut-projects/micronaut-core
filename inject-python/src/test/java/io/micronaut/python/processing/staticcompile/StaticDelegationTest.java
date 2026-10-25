@@ -141,7 +141,7 @@ class StaticDelegationTest {
     @Test
     void aCollectionOfPythonOriginIsNotDelegated() {
         // the Python body returns the attribute itself, which a Java body cannot give back
-        Ir.Expression attribute = new Ir.SelfProperty("items", "java.util.List<java.lang.String>", false);
+        Ir.Expression attribute = new Ir.SelfProperty("items", "java.util.List<java.lang.String>", false, false);
         assertNull(StaticDelegation.returnConversion(body(List.of(), "java.util.List<java.lang.String>", new Ir.Return(attribute))));
         Ir.Expression call = new Ir.InvokeJava(null, "java.util.Collections", "emptyList", List.of(), List.of(), "java.util.List<java.lang.String>");
         Ir.Statement mixed = new Ir.If(new Ir.Const(true, Ir.BOOLEAN), new Ir.Body(List.of(new Ir.Return(call))), null);
