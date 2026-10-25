@@ -138,6 +138,15 @@ class Calc:
     def query(self, spec: str) -> str:
         return URL(spec).getQuery() + "?"
 
+    def which_none(self) -> str:
+        return StaticOverloads.which(None)
+
+    def which_str(self, value: str) -> str:
+        return StaticOverloads.which(value)
+
+    def sequence_str(self, value: str) -> str:
+        return StaticOverloads.sequence(value)
+
     # refused: each would differ from Python if compiled
 
     def mixed_local(self, flag: bool) -> str:
@@ -236,6 +245,7 @@ class Holder:
         ["above", 8192, 9007199254740992.0d], ["above", 8192, Double.NaN], ["below", 8192, 9007199254740992.0d], ["below", 8192, Double.NaN],
         ["exclaim", "hi"], ["exclaim", null],
         ["query", "http://example.com/x?a=1"], ["query", "http://example.com/x"],
+        ["which_none"], ["which_str", "x"], ["sequence_str", "x"],
         ["mixed_local", true], ["mixed_local", false],
         ["mixed_conditional", true],
         ["float_power", -8.0d, 0.5d], ["float_power", 0.0d, -1.0d],
@@ -301,6 +311,9 @@ class Holder:
         results[StaticCompilationMode.OFF][["host", "not a url"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["entry", "k", 3].toString()] == "k=3"
         results[StaticCompilationMode.OFF]['pair'] == true
+        results[StaticCompilationMode.OFF][["which_none"].toString()] == "String null"
+        results[StaticCompilationMode.OFF][["which_str", "x"].toString()] == "String x"
+        results[StaticCompilationMode.OFF][["sequence_str", "x"].toString()] == "CharSequence x"
         results[StaticCompilationMode.OFF]['holder'] == [true, "python", "Form(name='f', count=3)"]
         results[StaticCompilationMode.OFF][["checked", 0].toString()] == "raised"
         results[StaticCompilationMode.OFF][["signed", 1.0d, 0.1d].toString()] == "10.0 0.09999999999999995"  // GraalPy floors the quotient; CPython would say 9.0

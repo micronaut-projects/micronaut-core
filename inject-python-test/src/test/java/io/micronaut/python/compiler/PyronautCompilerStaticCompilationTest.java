@@ -130,6 +130,41 @@ class PyronautCompilerStaticCompilationTest {
     }
 
     @Test
+    void aCompiledJavaCallNamesTheOverloadItBindsTo(@TempDir Path directory) throws IOException {
+        Path output = Files.createDirectories(directory.resolve("output"));
+        PyronautCompiler.builder()
+            .pythonCode("""
+                from jakarta.inject import Singleton
+                from io.micronaut.python.annotation.processing.test import StaticOverloads
+
+                @Singleton
+                class Overloaded:
+                    def none(self) -> str:
+                        return StaticOverloads.which(None)
+
+                    def text(self, value: str) -> str:
+                        return StaticOverloads.which(value)
+
+                    def sequence(self, value: str) -> str:
+                        return StaticOverloads.sequence(value)
+                """)
+            .staticCompilation(StaticCompilationMode.ALL)
+            .targetDir(output.toFile())
+            .build()
+            .compile();
+
+        String generated;
+        try (var paths = Files.walk(output)) {
+            generated = Files.readString(paths.filter(path -> path.getFileName().toString().equals("Overloaded.java")).findFirst().orElseThrow());
+        }
+        // a None of the parameter's type, an argument at its own type, an argument cast to the overload's parameter
+        assertTrue(generated.contains("String none0 = null;"), generated);
+        assertTrue(generated.contains("StaticOverloads.which(none0)"), generated);
+        assertTrue(generated.contains("StaticOverloads.which(value)"), generated);
+        assertTrue(generated.contains("StaticOverloads.sequence((CharSequence) value)"), generated);
+    }
+
+    @Test
     void strictModeFailsTheBuildForAnExplicitSwitchThatCannotBeHonoured() {
         PyronautCompiler compiler = PyronautCompiler.builder()
             .pythonCode(SOURCE)
