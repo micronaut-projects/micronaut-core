@@ -235,18 +235,18 @@ class PyronautCompilerStaticCompilationTest {
             .filter(candidate -> candidate.contains("\"name\":\"PricingService.names\""))
             .findFirst()
             .orElseThrow();
-        JsonNode record = new ObjectMapper().readTree(line);
-        assertEquals(List.of("record", "name", "source", "line", "column", "outcome", "scope", "reasons", "stats"), propertyNames(record), line);
-        assertEquals("decision", record.get("record").asString());
-        assertEquals("PricingService.names", record.get("name").asString());
-        String source = record.get("source").asString();
+        JsonNode decision = new ObjectMapper().readTree(line);
+        assertEquals(List.of("record", "name", "source", "line", "column", "outcome", "scope", "reasons", "stats"), propertyNames(decision), line);
+        assertEquals("decision", decision.get("record").asString());
+        assertEquals("PricingService.names", decision.get("name").asString());
+        String source = decision.get("source").asString();
         assertFalse(source.isEmpty(), line);
-        assertEquals(13, record.get("line").asInt());
-        assertEquals(5, record.get("column").asInt());
-        assertEquals("SKIPPED", record.get("outcome").asString());
-        assertEquals("MODE", record.get("scope").asString());
+        assertEquals(13, decision.get("line").asInt());
+        assertEquals(5, decision.get("column").asInt());
+        assertEquals("SKIPPED", decision.get("outcome").asString());
+        assertEquals("MODE", decision.get("scope").asString());
 
-        JsonNode reasons = record.get("reasons");
+        JsonNode reasons = decision.get("reasons");
         assertEquals(1, reasons.size(), line);
         JsonNode reason = reasons.get(0);
         assertEquals(List.of("rule", "message", "location"), propertyNames(reason), line);
@@ -255,7 +255,7 @@ class PyronautCompilerStaticCompilationTest {
         assertEquals("the elements of the [java.util.ArrayList] have no static type", reason.get("message").asString());
         assertEquals(source + ":14:50", reason.get("location").asString());
 
-        JsonNode stats = record.get("stats");
+        JsonNode stats = decision.get("stats");
         assertEquals(List.of("statements", "javaCalls", "bridgeCalls", "helperCalls"), propertyNames(stats), line);
         assertEquals(1, stats.get("statements").asInt());
         assertEquals(0, stats.get("javaCalls").asInt());
