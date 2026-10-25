@@ -16,7 +16,8 @@
 package io.micronaut.python.annotation.processing.test;
 
 /**
- * Overloads a call with two ints matches equally well, for the static compilation parity harness.
+ * Overloads for the static compilation parity harness: a pair that a call with two ints matches
+ * equally well, and pairs that a None or a str argument binds to by its declared type.
  */
 @SuppressWarnings("java:S1172") // only the parameter types matter: they make the call ambiguous
 public final class StaticOverloads {
@@ -40,5 +41,37 @@ public final class StaticOverloads {
      */
     public static String pick(double a, long b) {
         return "double, long";
+    }
+
+    /**
+     * @param value A string
+     * @return Which overload ran
+     */
+    public static String which(String value) {
+        return "String " + value;
+    }
+
+    /**
+     * @param value Any value
+     * @return Which overload ran
+     */
+    public static String which(Object value) {
+        return "Object " + value;
+    }
+
+    /**
+     * @param value A character sequence
+     * @return Which overload ran
+     */
+    public static String sequence(CharSequence value) {
+        return "CharSequence " + value;
+    }
+
+    /**
+     * @param value Any value
+     * @return Which overload ran
+     */
+    public static String sequence(Object value) {
+        return "Object " + value;
     }
 }

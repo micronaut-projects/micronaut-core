@@ -16,14 +16,30 @@ class Callback:
         return item
 
 
+class FakeAnnotation:
+    """A Java annotation as the facts describe it, with no members."""
+
+    def annotation(self):
+        return True
+
+    def validationConstraint(self):
+        return False
+
+    def interceptorBinding(self):
+        return False
+
+
 class FakeFacts:
-    """The facts of a compilation without Java types: nothing is described, and a type fits itself."""
+    """
+    The facts of a compilation without Java types: nothing is described but the annotation the
+    processor adds to a dataclass, and a type fits itself.
+    """
 
     def describe(self, name):
         return None
 
     def describeAnnotation(self, name):
-        return None
+        return FakeAnnotation() if name == "io.micronaut.core.annotation.Introspected" else None
 
     def isAssignable(self, source, target):
         return source == target
@@ -378,6 +394,60 @@ class WarningTest(unittest.TestCase):
         self.assertEqual(first_diagnostics, [diagnostic.message() for diagnostic in planner.diagnostics])
         self.assertEqual(2, len(planner.diagnostics))
 
+    def test_a_function_switch_on_a_property_accessor_is_not_a_candidate_and_is_reported(self):
+        source = '''
+from micronaut.context.python.annotation import CompileStatic
+from jakarta.inject import Singleton
+
+
+@Singleton
+class Account:
+    def __init__(self, balance: int):
+        self._balance = balance
+
+    @property
+    @CompileStatic
+    def balance(self) -> int:
+        return self._balance
+
+    @balance.setter
+    @CompileStatic
+    def balance(self, value: int) -> None:
+        self._balance = value
+
+    @balance.deleter
+    @CompileStatic
+    def balance(self) -> None:
+        self._balance = 0
+
+    @property
+    def plain(self) -> int:
+        return self._balance
+
+    @property
+    @CompileStatic(False)
+    def legacy(self) -> int:
+        return self._balance
+'''
+        for mode in (MODE_OFF, MODE_ANNOTATED, MODE_ALL):
+            decisions, planner = plan(source, mode)
+            for name in ("Account.balance", "Account.balance.setter", "Account.balance.deleter"):
+                decision = decisions[name]
+                self.assertEqual("NOT_CANDIDATE", decision.outcome().name(), name)
+                self.assertEqual("FUNCTION", decision.scope().name(), name)
+                self.assertEqual(["property-accessor"], rules(decision), name)
+            # an accessor nothing switches on stays a property of the model, without a decision
+            self.assertNotIn("Account.plain", decisions)
+            self.assertNotIn("Account.legacy", decisions)
+            messages = [diagnostic.message() for diagnostic in planner.diagnostics]
+            self.assertEqual(["[Account.balance] cannot be compiled statically: [property-accessor] a property accessor is called through the Python object's attribute protocol",
+                              "[Account.balance.setter] cannot be compiled statically: [property-accessor] a property accessor is called through the Python object's attribute protocol",
+                              "[Account.balance.deleter] cannot be compiled statically: [property-accessor] a property accessor is called through the Python object's attribute protocol"],
+                             messages, mode)
+            self.assertTrue(all(diagnostic.kind().name() == "WARNING" for diagnostic in planner.diagnostics))
+        _, planner = plan(source, MODE_ANNOTATED, strict=True)
+        self.assertEqual(["ERROR", "ERROR", "ERROR"], [diagnostic.kind().name() for diagnostic in planner.diagnostics])
+
     def test_a_class_switch_on_a_class_that_can_never_be_compiled_is_flagged_once(self):
         source = '''
 from enum import Enum
@@ -549,6 +619,13 @@ class Pricing:
 
     def literal_compare(self, x: float) -> bool:
         return x > 100
+
+    def several(self, name: str, n: int) -> int:
+        while n > 0:
+            n -= 1
+        size = len(name)
+        power = n ** n
+        return size + power
 '''
 
 
@@ -639,6 +716,16 @@ class LoweringTest(unittest.TestCase):
             self.assertIsNotNone(decision.reasons()[0].span(), name)
         self.assertEqual("local [value] is a [long] and then a [java.lang.String]", self.decisions["Pricing.retyped"].reasons()[0].message())
         self.assertEqual("the function does not return a value on every path", self.decisions["Pricing.falls_through"].reasons()[0].message())
+
+    def test_every_refused_statement_is_a_reason(self):
+        # the lowering goes on after a refused statement; a read of a local whose assignment was
+        # refused is not a reason of its own
+        decision = self.decisions["Pricing.several"]
+        self.assertEqual("SKIPPED", decision.outcome().name())
+        self.assertEqual(["unsupported-statement", "python-builtin-not-lowered", "unbounded-integer-op"], rules(decision),
+                         [(r.rule(), r.message()) for r in decision.reasons()])
+        self.assertEqual([133, 135, 136], [reason.span().line() for reason in decision.reasons()])
+        self.assertNotIn("several", self.bodies)
 
     def test_static_methods_are_not_candidates_yet(self):
         decision = self.decisions["Pricing.helper"]
@@ -809,5 +896,129 @@ class Calc:
         self.assertEqual(0, apply_delegation(tree, ["Calc#keyword#owner=app.Calc#kinds=int#retry"]))
 
 
+OBJECTS = '''
+from dataclasses import dataclass
+
+
+class Plain:
+    pass
+
+
+class Sized:
+    def __len__(self) -> int:
+        return 0
+
+
+class Falsy:
+    def __bool__(self) -> bool:
+        return False
+
+
+class Derived(Falsy):
+    pass
+
+
+class Widened:
+    pass
+
+
+class Narrowed(Widened):
+    __len__ = None
+
+
+class Spelled:
+    def __str__(self) -> str:
+        return "spelled"
+
+
+class Represented:
+    def __repr__(self) -> str:
+        return "represented"
+
+
+class Inherited(Represented):
+    pass
+
+
+class Named:
+    def __str__(self) -> str:
+        return "named"
+
+
+class Renamed(Named):
+    def toString(self) -> str:
+        return "renamed"
+
+
+@dataclass
+class Form:
+    name: str = ""
+
+
+class Checks:
+    def plain(self, value: Plain) -> bool:
+        return not value
+
+    def sized(self, value: Sized) -> bool:
+        return not value
+
+    def falsy(self, value: Falsy) -> bool:
+        return not value
+
+    def derived(self, value: Derived) -> bool:
+        return not value
+
+    def widened(self, value: Widened) -> bool:
+        return not value
+
+    def spelled(self, value: Spelled) -> str:
+        return str(value)
+
+    def represented(self, value: Represented) -> str:
+        return f"{value}"
+
+    def inherited(self, value: Inherited) -> str:
+        return str(value)
+
+    def renamed(self, value: Named) -> str:
+        return str(value)
+
+    def form(self, value: Form) -> str:
+        return f"{value}"
+
+    def unspelled(self, value: Plain) -> str:
+        return str(value)
+'''
+
+
+class ObjectsOfTheCompilationTest(unittest.TestCase):
+    """Truthiness and str() of an object of a class of the compilation follow what Python resolves."""
+
+    def setUp(self):
+        self.decisions, _ = plan(OBJECTS, MODE_ALL, facts=FakeFacts())
+
+    def _decided(self, name):
+        decision = self.decisions[f"Checks.{name}"]
+        return decision.outcome().name(), rules(decision)
+
+    def test_an_object_without_bool_or_len_is_true_unless_none(self):
+        self.assertEqual(("COMPILED", []), self._decided("plain"))
+
+    def test_truthiness_from_bool_or_len_is_refused(self):
+        # __len__ and __bool__ of the class, of a base, or of a subclass a value of the class may be
+        for name in ("sized", "falsy", "derived", "widened"):
+            self.assertEqual(("SKIPPED", ["truthiness-of-java-object"]), self._decided(name), name)
+
+    def test_str_is_compiled_where_the_stub_bridges_to_string(self):
+        for name in ("spelled", "represented", "inherited"):
+            self.assertEqual(("COMPILED", []), self._decided(name), name)
+
+    def test_str_of_a_class_without_a_source_str_is_refused(self):
+        # a dataclass's __repr__ is generated, not in its source; a Python toString takes precedence in the stub
+        for name in ("form", "unspelled", "renamed"):
+            self.assertEqual(("SKIPPED", ["unsupported-expression"]), self._decided(name), name)
+
+
 if __name__ == "__main__":
     unittest.main()
+

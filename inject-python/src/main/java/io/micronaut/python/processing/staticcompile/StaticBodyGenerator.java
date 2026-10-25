@@ -25,9 +25,11 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Turns the {@link Ir} of a compiled body into SourceGen statements inside a stub method. The
@@ -46,17 +48,22 @@ public final class StaticBodyGenerator {
     private static final TypeDef DOUBLE = TypeDef.Primitive.DOUBLE;
     private static final TypeDef BOOLEAN = TypeDef.Primitive.BOOLEAN;
     private static final String VALUE_OF = "valueOf";
+    private static final String OBJECT = "java.lang.Object";
 
     private final SelfAccess self;
     private final Map<String, VariableDef.MethodParameter> parameters = new HashMap<>();
     private final Map<String, VariableDef.Local> locals = new LinkedHashMap<>();
+    private final Map<String, VariableDef.Local> typedNulls = new LinkedHashMap<>();
+    private final Set<String> reserved = new HashSet<>();
     private int temporaries;
 
-    private StaticBodyGenerator(SelfAccess self, List<VariableDef.MethodParameter> methodParameters) {
+    private StaticBodyGenerator(SelfAccess self, List<VariableDef.MethodParameter> methodParameters, Ir.Body body) {
         this.self = self;
         for (VariableDef.MethodParameter parameter : methodParameters) {
             parameters.put(parameter.name(), parameter);
+            reserved.add(parameter.name());
         }
+        collectLocals(body, reserved);
     }
 
     /**
@@ -81,7 +88,16 @@ public final class StaticBodyGenerator {
      * @return The statements
      */
     public static StatementDef generate(Ir.CompiledBody body, List<VariableDef.MethodParameter> methodParameters, SelfAccess self, boolean trace) {
-        StatementDef statements = new StaticBodyGenerator(self, methodParameters).statements(body.body());
+        StaticBodyGenerator generator = new StaticBodyGenerator(self, methodParameters, body.body());
+        StatementDef statements = generator.statements(body.body());
+        if (!generator.typedNulls.isEmpty()) {
+            List<StatementDef> declared = new ArrayList<>();
+            for (VariableDef.Local typedNull : generator.typedNulls.values()) {
+                declared.add(new StatementDef.DefineAndAssign(typedNull, ExpressionDef.nullValue()));
+            }
+            declared.add(statements);
+            statements = StatementDef.multi(declared);
+        }
         if (body.wrapsCheckedExceptions()) {
             // a checked exception of a Java call reaches the caller unchecked, as it would through the bridge
             statements = new StatementDef.Try(statements).doCatch(Exception.class, exception ->
@@ -171,7 +187,7 @@ public final class StaticBodyGenerator {
             case Ir.LocalRef ref -> local(ref.name());
             case Ir.SelfProperty property -> self.read(property.property(), property.type(), type(property.type()));
             case Ir.InvokeJava call -> invoke(call);
-            case Ir.NewJava construction -> classType(construction.type()).instantiate(types(construction.parameterTypes()), expressions(construction.arguments()));
+            case Ir.NewJava construction -> classType(construction.type()).instantiate(types(construction.parameterTypes()), arguments(construction.arguments(), construction.parameterTypes()));
             case Ir.StaticField field -> classType(field.owner()).getStaticField(field.name(), type(field.type()));
             case Ir.Field field -> expression(field.receiver()).field(field.name(), type(field.type()));
             case Ir.Binary binary -> binary(binary);
@@ -211,7 +227,7 @@ public final class StaticBodyGenerator {
     private ExpressionDef invoke(Ir.InvokeJava call) {
         List<TypeDef> parameterTypes = types(call.parameterTypes());
         TypeDef returnType = Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type());
-        List<ExpressionDef> arguments = expressions(call.arguments());
+        List<ExpressionDef> arguments = arguments(call.arguments(), call.parameterTypes());
         Ir.@Nullable Expression receiver = call.receiver();
         if (receiver == null) {
             return classType(call.owner()).invokeStatic(call.name(), parameterTypes, returnType, arguments);
@@ -374,6 +390,77 @@ public final class StaticBodyGenerator {
             result.add(expression(expression));
         }
         return result;
+    }
+
+    /**
+     * The arguments of a Java call, each cast to its parameter type where the two differ, so javac
+     * binds the call to the overload the lowering chose rather than to the most specific one for
+     * the argument types.
+     */
+    private List<ExpressionDef> arguments(List<Ir.Expression> arguments, List<String> parameterTypes) {
+        List<ExpressionDef> result = new ArrayList<>(arguments.size());
+        for (int i = 0; i < arguments.size(); i++) {
+            Ir.Expression argument = arguments.get(i);
+            String parameterType = parameterTypes.get(i);
+            String argumentType = argument.type();
+            if (argument instanceof Ir.Const constant && constant.value() == null && !isPrimitive(argumentType)
+                && !Ir.NONE.equals(argumentType) && !OBJECT.equals(argumentType) && argumentType.indexOf('<') < 0) {
+                // SourceGen drops a cast of null, so a None of a type is a local of the type, declared null
+                result.add(typedNulls.computeIfAbsent(argumentType, name -> new VariableDef.Local(freeName("none"), type(name))));
+                continue;
+            }
+            ExpressionDef value = expression(argument);
+            boolean differs = !erased(argumentType).equals(erased(parameterType)) && !Ir.NONE.equals(argumentType);
+            // a primitive parameter takes its exact type from the lowering; a parameterized argument is
+            // cast only to Object, since a cast to the erased parameter type would be an unchecked one
+            if (differs && !isPrimitive(parameterType) && (argumentType.indexOf('<') < 0 || OBJECT.equals(parameterType))) {
+                value = value.cast(type(parameterType));
+            }
+            result.add(value);
+        }
+        return result;
+    }
+
+    /**
+     * A name for a local of the generator that no parameter or local of the body has.
+     */
+    private String freeName(String prefix) {
+        int index = 0;
+        while (reserved.contains(prefix + index)) {
+            index++;
+        }
+        reserved.add(prefix + index);
+        return prefix + index;
+    }
+
+    private static void collectLocals(Ir.Body body, Set<String> names) {
+        for (Ir.Statement statement : body.statements()) {
+            switch (statement) {
+                case Ir.Local local -> names.add(local.name());
+                case Ir.Body nested -> collectLocals(nested, names);
+                case Ir.If branch -> {
+                    collectLocals(branch.then(), names);
+                    Ir.@Nullable Body orElse = branch.orElse();
+                    if (orElse != null) {
+                        collectLocals(orElse, names);
+                    }
+                }
+                default -> {
+                }
+            }
+        }
+    }
+
+    private static String erased(String typeName) {
+        int index = typeName.indexOf('<');
+        return index < 0 ? typeName : typeName.substring(0, index);
+    }
+
+    private static boolean isPrimitive(String typeName) {
+        return switch (typeName) {
+            case "int", "long", "short", "byte", "char", "float", "double", "boolean" -> true;
+            default -> false;
+        };
     }
 
     private static List<TypeDef> types(List<String> names) {
