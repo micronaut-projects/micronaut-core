@@ -34,6 +34,11 @@ on:
       - 'context-python/src/main/java/io/micronaut/context/python/PythonStatic.java'
       - '.github/workflows/python-static-compilation.yml'
   workflow_dispatch:
+    inputs:
+      budget:
+        description: "Also assert the compile-time budget of mode all (StaticCompilationBudgetTest)"
+        type: boolean
+        default: false
 # A new push to a pull request cancels its older run; pushes and manual runs get a group of their own.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
@@ -106,3 +111,58 @@ jobs:
           check_name: "Python Static Compilation CI / Test Report (${{ matrix.shard }}/2)"
           report_paths: '**/build/test-results/test/TEST-*.xml'
           check_retries: 'true'
+  budget:
+    # the compile-time budget of mode all against mode off, asserted on demand only: a shared runner is no
+    # measurement bench, so the job runs when a manual run asks for it
+    name: "compile-time budget"
+    if: github.event_name == 'workflow_dispatch' && inputs.budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: true
+      ORG_GRADLE_PROJECT_cachePush: false
+    steps:
+      # https://github.com/actions/virtual-environments/issues/709
+      - name: Remove system JDKs
+        run: |
+          sudo rm -rf /usr/lib/jvm/*
+          unset JAVA_HOME
+          export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
+      - name: "🗑 Free disk space"
+        run: |
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf "/opt/ghc"
+          sudo rm -rf "/usr/share/dotnet"
+          sudo rm -rf "/usr/local/lib/android"
+          sudo apt-get clean
+          df -h
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: "🔧 Setup GraalVM CE"
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        with:
+          distribution: 'graalvm'
+          java-version: '25'
+          version: '25.4'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: "🔧 Setup Gradle"
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          develocity-access-key: >-
+            ${{ (github.event_name == 'push' && secrets.GRADLE_ENTERPRISE_ACCESS_KEY) ||
+                (github.event_name != 'push' && (secrets.DEVELOCITY_PULL_REQUEST_ACCESS_KEY || secrets.GRADLE_ENTERPRISE_ACCESS_KEY)) ||
+                '' }}
+      - name: "⏱ Assert the compile-time budget of static compilation"
+        run: |
+          ./gradlew :test-suite-python-corpus:test -Ppython-ci --tests '*StaticCompilationBudgetTest' \
+            -Pcorpus.budget.assert --no-daemon
+      - name: "📊 Publish the budget"
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: corpus-budget
+          path: test-suite-python-corpus/build/corpus-budget/budget.txt
+          if-no-files-found: ignore
