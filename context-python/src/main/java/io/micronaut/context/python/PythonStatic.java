@@ -495,6 +495,30 @@ public final class PythonStatic {
     }
 
     /**
+     * Python's {@code max(left, right)} on floats: the first argument unless the second is strictly
+     * greater, so a NaN or a zero of the other sign does not replace it as with {@link Math#max}.
+     *
+     * @param left  The first argument
+     * @param right The second argument
+     * @return {@code max(left, right)}
+     */
+    public static double max(double left, double right) {
+        return right > left ? right : left;
+    }
+
+    /**
+     * Python's {@code min(left, right)} on floats: the first argument unless the second is strictly
+     * smaller, so a NaN or a zero of the other sign does not replace it as with {@link Math#min}.
+     *
+     * @param left  The first argument
+     * @param right The second argument
+     * @return {@code min(left, right)}
+     */
+    public static double min(double left, double right) {
+        return right < left ? right : left;
+    }
+
+    /**
      * @param value A Python int
      * @return The value as a short
      * @throws ArithmeticException When the value does not fit, as the boundary conversion rejects it
@@ -1058,7 +1082,10 @@ public final class PythonStatic {
      */
     public static boolean contains(@Nullable Object container, @Nullable Object element) {
         if (container instanceof CharSequence text) {
-            return element != null && text.toString().contains(element.toString());
+            if (element == null) {
+                throw new PythonError(TYPE_ERROR, "'in <string>' requires string as left operand, not NoneType");
+            }
+            return text.toString().contains(element.toString());
         }
         if (container instanceof Set<?> set) {
             requireHashable(element);
