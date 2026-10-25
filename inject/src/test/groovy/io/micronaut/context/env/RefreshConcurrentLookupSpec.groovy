@@ -808,11 +808,12 @@ class RefreshConcurrentLookupSpec extends Specification {
         adder.daemon = true
         refresher.daemon = true
 
-        when: "the other refresh is waiting for the lock that the adding thread holds"
+        when: "the other refresh is waiting for the adding thread, which holds the lock"
         adder.start()
         refresher.start()
         new PollingConditions(timeout: WAIT_SECONDS).eventually {
-            assert refresher.state == Thread.State.BLOCKED
+            assert refresher.state in [Thread.State.BLOCKED, Thread.State.WAITING, Thread.State.TIMED_WAITING]
+            assert refresher.stackTrace.any { it.className in [DefaultEnvironment.name, AtomicRefresh.name, PropertySourcePropertyResolver.name] }
         }
         proceed.countDown()
         adder.join(WAIT_SECONDS * 1000L)

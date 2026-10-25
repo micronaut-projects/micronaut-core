@@ -65,8 +65,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -101,6 +103,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
     private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList("classpath:/", "file:config/");
+    /** How long a refresh waits at a time for the threads that are processing a property source they added. */
+    private static final long PROCESSING_WAIT_MILLIS = 50;
+    /**
+     * How long a refresh waits for them at most, in all: if a thread could not count itself out,
+     * that only delays refreshes.
+     */
+    private static final long PROCESSING_WAIT_LIMIT_NANOS = TimeUnit.SECONDS.toNanos(5);
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
     protected final MutableConversionService mutableConversionService;
@@ -116,6 +125,22 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
     private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
     private final AtomicBoolean reading = new AtomicBoolean(false);
+    /**
+     * Guards the three fields below, and has a property source registered in one step with deciding
+     * which thread processes it.
+     */
+    private final Object addLock = new Object();
+    /** How many refreshes have been announced and have not ended, see {@link #announced(Supplier)}. */
+    private int refreshes;
+    /** How many threads are processing a property source they added outside a read; a refresh that is announced waits for them. */
+    private int processing;
+    /**
+     * By name, the property sources added outside a read while a refresh is announced, which the
+     * threads adding them have left to it rather than wait for it: the read that opens next reads
+     * them as registered, and what no read takes is processed once no refresh is announced, see
+     * {@link #processLeftToRefresh()}.
+     */
+    private final Map<String, PropertySource> leftToRefresh = new LinkedHashMap<>(4);
     private final Boolean deduceEnvironments;
     private final ApplicationContextConfiguration configuration;
     private final Collection<String> configLocations;
@@ -210,12 +235,179 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
-        propertySources.put(propertySource.getName(), propertySource);
-        if (isRunning() && !reading.get()) {
-            resetCaches();
-            processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
+        String name = propertySource.getName();
+        synchronized (addLock) {
+            propertySources.put(name, propertySource);
+            if (!isRunning() || reading.get()) {
+                return this;
+            }
+            if (refreshes > 0 && !Thread.holdsLock(catalog)) {
+                // left to the refresh, rather than waiting for it: the refresh reads it in its order,
+                // or, if it has read the property sources already, it is processed once it ends. A
+                // thread that holds the lock of the catalogs, as the refreshing one does, waits for
+                // nothing and processes it itself, as it did.
+                leftToRefresh.remove(name);
+                leftToRefresh.put(name, propertySource);
+                return this;
+            }
+            // last, so that nothing that could fail comes between counting this thread and the try
+            processing++;
+        }
+        try {
+            processAdded(name, propertySource);
+        } finally {
+            synchronized (addLock) {
+                // first, and without a call that could fail on a stack that is nearly used up
+                processing--;
+                // a refresh that waits checks again in a while, also if this does not get to notify it
+                addLock.notifyAll();
+            }
         }
         return this;
+    }
+
+    /**
+     * Processes a property source added outside a read, on top of the properties, unless it has
+     * been replaced or removed meanwhile, by a thread that processes or notes that itself.
+     *
+     * @param name           The name it was added by
+     * @param propertySource The property source
+     */
+    private void processAdded(String name, PropertySource propertySource) {
+        synchronized (catalog) {
+            if (propertySources.get(name) == propertySource) {
+                resetCaches();
+                processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
+            }
+        }
+    }
+
+    /**
+     * Processes what the threads that added it left to a refresh and no read has taken, as when
+     * it was added once the refresh had read the property sources, or the refresh failed, once no
+     * refresh is announced and no read is open, as those threads would have. One that fails is
+     * left out with a warning, so that it does not replace the failure of the refresh, and to the
+     * next refresh.
+     */
+    private void processLeftToRefresh() {
+        Map<String, PropertySource> left;
+        synchronized (addLock) {
+            if (refreshes > 0 || reading.get() || leftToRefresh.isEmpty()) {
+                return;
+            }
+            left = new LinkedHashMap<>(leftToRefresh);
+            leftToRefresh.clear();
+            if (!isRunning()) {
+                // registered, as one added to an environment that is not running is
+                return;
+            }
+            // last, as in addPropertySource: a refresh announced from now on waits for this thread
+            processing++;
+        }
+        try {
+            synchronized (catalog) {
+                left.forEach((name, source) -> {
+                    try {
+                        processAdded(name, source);
+                    } catch (Throwable e) {
+                        if (e instanceof VirtualMachineError error && !(e instanceof StackOverflowError)) {
+                            throw error;
+                        }
+                        log.warn("Property source [{}] failed to be processed; the next refresh reads it again", name, e);
+                    }
+                });
+            }
+        } finally {
+            synchronized (addLock) {
+                // first, and without a call that could fail on a stack that is nearly used up
+                processing--;
+                addLock.notifyAll();
+            }
+        }
+    }
+
+    /**
+     * Leaves what a read that failed took of what was left to a refresh, before what has been left
+     * since, to the next refresh, or, if none is announced, processes it as the threads that added
+     * it would have.
+     *
+     * @param taken What the read took, by name
+     */
+    private void leaveToRefresh(Map<String, PropertySource> taken) {
+        if (taken.isEmpty()) {
+            return;
+        }
+        synchronized (addLock) {
+            Map<String, PropertySource> since = new LinkedHashMap<>(leftToRefresh);
+            leftToRefresh.clear();
+            leftToRefresh.putAll(taken);
+            since.forEach((name, source) -> {
+                leftToRefresh.remove(name);
+                leftToRefresh.put(name, source);
+            });
+        }
+        processLeftToRefresh();
+    }
+
+    /**
+     * Runs a refresh, announced before it takes the lock of the catalogs. It waits for the property
+     * sources other threads are processing outside a read, which hold or wait for that lock, and
+     * from then on until it ends a property source added outside a read is left to it, see
+     * {@link #leftToRefresh}, so that no thread that adds one waits for the refresh. A thread that
+     * holds that lock already, as one whose property source refreshes the environment while it is
+     * processed does, does not wait for threads that wait for it.
+     *
+     * @param refresh The refresh
+     * @param <R>     The result type
+     * @return What the refresh returns
+     */
+    private <R> R announced(Supplier<R> refresh) {
+        boolean announced = false;
+        try {
+            boolean interrupted = false;
+            synchronized (addLock) {
+                refreshes++;
+                announced = true;
+                long deadline = System.nanoTime() + PROCESSING_WAIT_LIMIT_NANOS;
+                while (processing > 0 && !Thread.holdsLock(catalog) && deadline - System.nanoTime() > 0) {
+                    try {
+                        // bounded, so that a notification a thread could not send is not waited for
+                        addLock.wait(PROCESSING_WAIT_MILLIS);
+                    } catch (InterruptedException e) {
+                        // waits on: a refresh waited for the lock of the catalogs that they hold, which
+                        // an interrupt does not end either
+                        interrupted = true;
+                    }
+                }
+            }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            return refresh.get();
+        } finally {
+            synchronized (addLock) {
+                // first, and without a call that could fail on a stack that is nearly used up
+                if (announced) {
+                    refreshes--;
+                }
+            }
+            processLeftToRefresh();
+        }
+    }
+
+    /**
+     * Refreshes this environment, see {@link AtomicRefresh#refresh()}.
+     */
+    void refreshProperties() {
+        announced(() -> {
+            // Rebuild into a replacement catalog and publish it in one step, so a concurrent lookup
+            // sees the properties either as they were before the refresh or as they are after it.
+            refresh(() -> {
+                stop();
+                start();
+            });
+            return null;
+        });
     }
 
     @Override
@@ -277,16 +469,39 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         // has published what it read. A start from another thread waits for that here, rather than
         // taking the read over and leaving the refresh to publish a catalog it has not filled.
         synchronized (catalog) {
-            if (running.compareAndSet(false, true)) {
-                log.debug("Starting environment {} for active names {}", this, getActiveNames());
-                if (reading.compareAndSet(false, true)) {
-                    try {
-                        readPropertySources(getPropertySourceRootName());
-                    } finally {
-                        // also when the read fails, or a property source added later is never processed
-                        reading.set(false);
+            boolean started;
+            boolean opened = false;
+            synchronized (addLock) {
+                started = running.compareAndSet(false, true);
+                if (started) {
+                    // last, so that nothing that could fail comes between opening the read and the try
+                    opened = reading.compareAndSet(false, true);
+                }
+            }
+            if (opened) {
+                Map<String, PropertySource> taken = null;
+                boolean read = false;
+                try {
+                    synchronized (addLock) {
+                        // Left to a refresh while no read was open, and so registered: the read reads it
+                        // with the registered property sources. Nothing is left to a refresh from now on.
+                        if (!leftToRefresh.isEmpty()) {
+                            taken = new LinkedHashMap<>(leftToRefresh);
+                            leftToRefresh.clear();
+                        }
+                    }
+                    log.debug("Starting environment {} for active names {}", this, getActiveNames());
+                    readPropertySources(getPropertySourceRootName());
+                    read = true;
+                } finally {
+                    // also when the read fails, or a property source added later is never processed
+                    reading.set(false);
+                    if (!read && taken != null) {
+                        leaveToRefresh(taken);
                     }
                 }
+            } else if (started) {
+                log.debug("Starting environment {} for active names {}", this, getActiveNames());
             }
         }
         return this;
@@ -312,13 +527,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public Map<String, Object> refreshAndDiff() {
         // Under the lock of the catalogs, which the refresh takes itself: the difference is between
-        // what was published before this refresh and what it has published. A property source that
-        // another thread adds to the catalogs, or another refresh, waits until it has been taken.
-        synchronized (catalog) {
-            Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(publishedCatalog());
-            refresh();
-            return diffCatalog(copiedCatalog, publishedCatalog());
-        }
+        // what was published before this refresh and what it has published. Another refresh waits
+        // until it has been taken, and a property source that another thread adds is left to the
+        // refresh, see announced.
+        return announced(() -> {
+            synchronized (catalog) {
+                Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(publishedCatalog());
+                refresh();
+                return diffCatalog(copiedCatalog, publishedCatalog());
+            }
+        });
     }
 
     @Override
