@@ -395,7 +395,7 @@ public final class StaticBodyGenerator {
                 ExpressionDef.ConditionExpressionDef test = loopCondition(context, iterator.invoke("hasNext", BOOLEAN).isTrue());
                 VariableDef.Local variable = new VariableDef.Local(loop.variable(), type(loop.type()));
                 locals.put(loop.variable(), variable);
-                ExpressionDef element = cast(iterator.invoke("next", TypeDef.OBJECT), "java.lang.Object", loop.elementType());
+                ExpressionDef element = cast(iterator.invoke("next", TypeDef.OBJECT), OBJECT, loop.elementType());
                 StatementDef bind = new StatementDef.DefineAndAssign(variable, cast(element, loop.elementType(), loop.type()));
                 StatementDef body = loopBody(context, loop.body(), List.of());
                 out.add(test.whileLoop(StatementDef.multi(bind, body)));
@@ -637,7 +637,7 @@ public final class StaticBodyGenerator {
         if (from.equals(to)) {
             return value;
         }
-        if ("java.lang.Object".equals(from)) {
+        if (OBJECT.equals(from)) {
             // an element of a collection or an iterator: unboxed as the host boundary would convert it
             return switch (to) {
                 case Ir.LONG -> PYTHON_STATIC.invokeStatic("toLong", List.of(TypeDef.OBJECT), LONG, value);
