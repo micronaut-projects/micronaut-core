@@ -412,8 +412,11 @@ public final class StaticBodyGenerator {
             ExpressionDef value = expression(argument);
             boolean differs = !erased(argumentType).equals(erased(parameterType)) && !Ir.NONE.equals(argumentType);
             // a primitive parameter takes its exact type from the lowering; a parameterized argument is
-            // cast only to Object, since a cast to the erased parameter type would be an unchecked one
-            if (differs && !isPrimitive(parameterType) && (argumentType.indexOf('<') < 0 || OBJECT.equals(parameterType))) {
+            // not cast, since a cast to the erased parameter type would be an unchecked one; nor is an
+            // argument to an Object parameter, which is also how the facts spell a type variable: a
+            // cast would make javac infer Object for it (List<String> = singletonList((Object) s)
+            // fails), and no overload the lowering prefers to a more specific one takes an Object
+            if (differs && !isPrimitive(parameterType) && argumentType.indexOf('<') < 0 && !OBJECT.equals(parameterType)) {
                 value = value.cast(type(parameterType));
             }
             result.add(value);
