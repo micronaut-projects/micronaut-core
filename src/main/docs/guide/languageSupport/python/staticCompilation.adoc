@@ -149,7 +149,7 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |Fix it as the message says: the function is compiled once the checker accepts it.
 |===
 
-A `NOT_CANDIDATE` decision carries `class-not-eligible`, `special-method`, `async-function`, `generator-function`, `static-method`, `abstract-method`, `property-accessor`, `overriding-java-method` or `intercepted-method` (the first four rows); a `SKIPPED` one carries the reasons of the other rows.
+A `NOT_CANDIDATE` decision carries `class-not-eligible`, `special-method`, `async-function`, `generator-function`, `static-method`, `abstract-method`, `property-accessor`, `overriding-java-method`, `intercepted-method` or `overridden-method`; a `SKIPPED` one carries `pooled-module` or the reasons of the rows after `overridden-method`.
 
 === The Supported Subset
 
