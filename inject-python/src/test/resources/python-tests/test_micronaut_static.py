@@ -313,6 +313,54 @@ class WarningTest(unittest.TestCase):
         self.assertEqual(first_diagnostics, [diagnostic.message() for diagnostic in planner.diagnostics])
         self.assertEqual(2, len(planner.diagnostics))
 
+    def test_a_function_switch_on_a_property_accessor_is_not_a_candidate_and_is_reported(self):
+        source = '''
+from micronaut.context.python.annotation import CompileStatic
+from jakarta.inject import Singleton
+
+
+@Singleton
+class Account:
+    def __init__(self, balance: int):
+        self._balance = balance
+
+    @property
+    @CompileStatic
+    def balance(self) -> int:
+        return self._balance
+
+    @balance.setter
+    @CompileStatic
+    def balance(self, value: int) -> None:
+        self._balance = value
+
+    @property
+    def plain(self) -> int:
+        return self._balance
+
+    @property
+    @CompileStatic(False)
+    def legacy(self) -> int:
+        return self._balance
+'''
+        for mode in (MODE_OFF, MODE_ANNOTATED, MODE_ALL):
+            decisions, planner = plan(source, mode)
+            for name in ("Account.balance", "Account.balance.setter"):
+                decision = decisions[name]
+                self.assertEqual("NOT_CANDIDATE", decision.outcome().name(), name)
+                self.assertEqual("FUNCTION", decision.scope().name(), name)
+                self.assertEqual(["property-accessor"], rules(decision), name)
+            # an accessor nothing switches on stays a property of the model, without a decision
+            self.assertNotIn("Account.plain", decisions)
+            self.assertNotIn("Account.legacy", decisions)
+            messages = [diagnostic.message() for diagnostic in planner.diagnostics]
+            self.assertEqual(["[Account.balance] cannot be compiled statically: [property-accessor] a property accessor is called through the Python object's attribute protocol",
+                              "[Account.balance.setter] cannot be compiled statically: [property-accessor] a property accessor is called through the Python object's attribute protocol"],
+                             messages, mode)
+            self.assertTrue(all(diagnostic.kind().name() == "WARNING" for diagnostic in planner.diagnostics))
+        _, planner = plan(source, MODE_ANNOTATED, strict=True)
+        self.assertEqual(["ERROR", "ERROR"], [diagnostic.kind().name() for diagnostic in planner.diagnostics])
+
     def test_a_class_switch_on_a_class_that_can_never_be_compiled_is_flagged_once(self):
         source = '''
 from enum import Enum
