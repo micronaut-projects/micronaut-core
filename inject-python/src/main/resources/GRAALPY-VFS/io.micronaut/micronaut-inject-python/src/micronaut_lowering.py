@@ -14,7 +14,7 @@ import ast
 
 import java
 
-from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, Typed
+from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, PythonClassModel, Typed
 
 Ir = java.type("io.micronaut.python.processing.staticcompile.Ir")
 CompiledBody = java.type("io.micronaut.python.processing.staticcompile.Ir$CompiledBody")
@@ -149,6 +149,44 @@ def _operand_nodes(node):
     return ()
 
 
+def _hierarchy(model, seen=None):
+    """The class and its Python bases, each once; None in place of a base the checker cannot see."""
+    seen = seen if seen is not None else set()
+    if model.qualified in seen:
+        return []
+    seen.add(model.qualified)
+    found = [model]
+    for base in model.bases:
+        if base is None or isinstance(base, PythonClassModel):
+            found.extend([None] if base is None else _hierarchy(base, seen))
+    return found
+
+
+def _defines(model, names):
+    """Whether the class or a Python base defines one of the names, as a method or in an assignment of its body."""
+    for candidate in _hierarchy(model):
+        if candidate is None:
+            return True  # an unknown base may define it
+        if any(name in candidate.methods for name in names):
+            return True
+        for statement in getattr(candidate.node, "body", ()):
+            targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target] if isinstance(statement, ast.AnnAssign) else []
+            if any(isinstance(target, ast.Name) and target.id in names for target in targets):
+                return True
+    return False
+
+
+def _plain_truth(model):
+    """
+    Whether an object of the class (or of a subclass of the compilation, which a value of it may
+    be) is true unless None: no __bool__ or __len__ in its hierarchy, no Java base, nothing hidden.
+    """
+    for candidate in [model] + list(model.subclasses):
+        if candidate.is_open() or candidate.java_bases() or _defines(candidate, ("__bool__", "__len__")):
+            return False
+    return True
+
+
 class Refused(Exception):
     """A construct without a lowering; the reason is recorded before it is raised."""
 
@@ -271,6 +309,11 @@ class Lowering:
 
     def _typed(self, node):
         return self.rules.node_types.get(id(node))
+
+    def _python_class(self, type_name):
+        """The model of the class of the compilation a value of the Java type is an object of, or None."""
+        classes = getattr(self.checker, "python_classes", None)
+        return classes.by_qualified.get(_erased(type_name)) if classes is not None else None
 
     @staticmethod
     def _is_number(type_name):
@@ -790,8 +833,11 @@ class Lowering:
         if value_type not in JAVA_NUMBERS and (facts.isAssignable(value_type, "java.util.Collection") or facts.isAssignable(value_type, "java.util.Map")):
             self.helper_calls += 1
             return Truthy(value)
-        if getattr(self.checker, "python_classes", None) is not None and self.checker.python_classes.by_qualified.get(_erased(value_type)) is not None:
-            # an object of a class of the compilation is true unless None: the design leaves __bool__ and __len__ aside
+        model = self._python_class(value_type)
+        if model is not None:
+            if not _plain_truth(model):
+                self._refuse("truthiness-of-java-object", f"the truthiness of a [{model.name}] may come from __bool__, __len__ or a Java base", node)
+            # an object of a class of the compilation that defines neither __bool__ nor __len__ is true unless None
             return Compare("is not None", value, None)
         self._refuse("truthiness-of-java-object", f"the truthiness of a [{value_type}] has no static lowering", node)
 

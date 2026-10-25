@@ -16,14 +16,30 @@ class Callback:
         return item
 
 
+class FakeAnnotation:
+    """A Java annotation as the facts describe it, with no members."""
+
+    def annotation(self):
+        return True
+
+    def validationConstraint(self):
+        return False
+
+    def interceptorBinding(self):
+        return False
+
+
 class FakeFacts:
-    """The facts of a compilation without Java types: nothing is described, and a type fits itself."""
+    """
+    The facts of a compilation without Java types: nothing is described but the annotation the
+    processor adds to a dataclass, and a type fits itself.
+    """
 
     def describe(self, name):
         return None
 
     def describeAnnotation(self, name):
-        return None
+        return FakeAnnotation() if name == "io.micronaut.core.annotation.Introspected" else None
 
     def isAssignable(self, source, target):
         return source == target
@@ -688,5 +704,120 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("Cast", returned.right().getClass().getSimpleName())
 
 
+OBJECTS = '''
+from dataclasses import dataclass
+
+
+class Plain:
+    pass
+
+
+class Sized:
+    def __len__(self) -> int:
+        return 0
+
+
+class Falsy:
+    def __bool__(self) -> bool:
+        return False
+
+
+class Derived(Falsy):
+    pass
+
+
+class Widened:
+    pass
+
+
+class Narrowed(Widened):
+    __len__ = None
+
+
+class Spelled:
+    def __str__(self) -> str:
+        return "spelled"
+
+
+class Represented:
+    def __repr__(self) -> str:
+        return "represented"
+
+
+class Inherited(Represented):
+    pass
+
+
+class Named:
+    def __str__(self) -> str:
+        return "named"
+
+
+class Renamed(Named):
+    def toString(self) -> str:
+        return "renamed"
+
+
+@dataclass
+class Form:
+    name: str = ""
+
+
+class Checks:
+    def plain(self, value: Plain) -> bool:
+        return not value
+
+    def sized(self, value: Sized) -> bool:
+        return not value
+
+    def falsy(self, value: Falsy) -> bool:
+        return not value
+
+    def derived(self, value: Derived) -> bool:
+        return not value
+
+    def widened(self, value: Widened) -> bool:
+        return not value
+
+    def spelled(self, value: Spelled) -> str:
+        return str(value)
+
+    def represented(self, value: Represented) -> str:
+        return f"{value}"
+
+    def inherited(self, value: Inherited) -> str:
+        return str(value)
+
+    def renamed(self, value: Named) -> str:
+        return str(value)
+
+    def form(self, value: Form) -> str:
+        return f"{value}"
+
+    def unspelled(self, value: Plain) -> str:
+        return str(value)
+'''
+
+
+class ObjectsOfTheCompilationTest(unittest.TestCase):
+    """The truthiness of an object of a class of the compilation follows what Python resolves."""
+
+    def setUp(self):
+        self.decisions, _ = plan(OBJECTS, MODE_ALL, facts=FakeFacts())
+
+    def _decided(self, name):
+        decision = self.decisions[f"Checks.{name}"]
+        return decision.outcome().name(), rules(decision)
+
+    def test_an_object_without_bool_or_len_is_true_unless_none(self):
+        self.assertEqual(("COMPILED", []), self._decided("plain"))
+
+    def test_truthiness_from_bool_or_len_is_refused(self):
+        # __len__ and __bool__ of the class, of a base, or of a subclass a value of the class may be
+        for name in ("sized", "falsy", "derived", "widened"):
+            self.assertEqual(("SKIPPED", ["truthiness-of-java-object"]), self._decided(name), name)
+
+
 if __name__ == "__main__":
     unittest.main()
+
