@@ -1,9 +1,13 @@
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.context.python.PooledValueCoercible
+import io.micronaut.context.python.PythonPool
 import io.micronaut.context.python.PythonStatic
 import io.micronaut.python.compiler.PyronautCompiler
 import io.micronaut.python.processing.staticcompile.StaticCompilationDecision
 import io.micronaut.python.processing.staticcompile.StaticCompilationMode
+import org.graalvm.polyglot.Context
+import org.graalvm.polyglot.Value
 
 /**
  * A compiled method has one implementation: Python callers of an object bound to its stub run
@@ -79,6 +83,60 @@ class Caller:
 
     def run(self) -> str:
         return self.calc.label(4, "pen")
+'''
+
+    void "a python caller receives the collection a delegated body returns as the python body returns it"() {
+        given:
+        Map results = [:]
+        [StaticCompilationMode.OFF, StaticCompilationMode.ALL].each { StaticCompilationMode m ->
+            mode = m
+            PythonStatic.resetEntries()
+            def context = buildContext(COLLECTIONS)
+            try {
+                results[m] = getBean(context, 'python.Caller').probe()
+                if (m == StaticCompilationMode.ALL) {
+                    assert decisions.findAll { it.qualifiedName().startsWith('Store.') && it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName() as Set == ['Store.listed', 'Store.java_listed'] as Set
+                    // the Python body returns the attribute itself, which the Java body cannot give back: not delegated
+                    assert PythonStatic.entries('python.Store#listed') == 0
+                    // the Java list the Java body returns is the one the Python body returns
+                    assert PythonStatic.entries('python.Store#java_listed') == 1
+                }
+            } finally {
+                context.close()
+            }
+        }
+
+        expect:
+        results[StaticCompilationMode.OFF] == 'list True SingletonList'
+        results[StaticCompilationMode.ALL] == results[StaticCompilationMode.OFF]
+    }
+
+    static final String COLLECTIONS = '''
+from jakarta.inject import Singleton
+from java.util import Collections
+
+@Singleton
+class Store:
+    items: list[str]
+
+    def __init__(self):
+        self.items = ["a"]
+
+    def listed(self) -> list[str]:
+        return self.items
+
+    def java_listed(self) -> list[str]:
+        return Collections.singletonList("j")
+
+@Singleton
+class Caller:
+    def __init__(self, store: Store):
+        self.store = store
+
+    def probe(self) -> str:
+        listed = self.store.listed()
+        java = self.store.java_listed()
+        return f"{type(listed).__name__} {listed is self.store.items} {java.getClass().getSimpleName()}"
 '''
 
     void "python callers of a bound object run the java body, objects created in python keep the python body"() {
@@ -537,6 +595,135 @@ class Copier:
         result == "orig! twin? orig# ['label'] ['label']"
         PythonStatic.entries('python.Counter#describe') == 1
         PythonStatic.entries('python.Counter#rename') == 0
+
+        cleanup:
+        context?.close()
+    }
+
+    static final String INTROSPECTED = '''
+from dataclasses import dataclass
+from jakarta.inject import Singleton
+from micronaut.core.annotation import Introspected
+from micronaut.context.python.annotation import CompileStatic
+
+@Introspected
+@dataclass
+class Money:
+    amount: int = 0
+
+    def doubled(self) -> int:
+        return self.amount * 2
+
+@Introspected
+@dataclass(frozen=True)
+class Point:
+    x: int = 0
+
+    def twice(self) -> int:
+        return self.x * 2
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def use(self, money: Money) -> int:
+        return money.doubled()
+
+    def use_point(self, point: Point) -> int:
+        return point.twice()
+
+    def make(self) -> Money:
+        return Money(7)
+
+    def make_point(self) -> Point:
+        return Point(4)
+
+    def fresh(self) -> int:
+        return Money(7).doubled() + Point(4).twice()
+'''
+
+    private static Object newFromJava(ClassLoader classLoader, String className, int value) {
+        return classLoader.loadClass(className).getDeclaredConstructor(int).newInstance(value)
+    }
+
+    void "introspected objects created from java and rebuilt from their fields are bound for python callers"() {
+        given:
+        PythonStatic.resetEntries()
+        def context = buildContext(INTROSPECTED)
+        def caller = getBean(context, 'python.Caller')
+
+        expect:
+        decisions.find { it.qualifiedName() == 'Money.doubled' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
+        decisions.find { it.qualifiedName() == 'Point.twice' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
+
+        when: "a dataclass created from Java is handed to Python code calling the compiled method"
+        def money = newFromJava(context.classLoader, 'python.Money', 5)
+        def fromJava = money.doubled()
+        def fromPython = caller.use(money)
+
+        then: "the Java body ran for both callers"
+        fromJava == 10L
+        fromPython == 10L
+        PythonStatic.entries('python.Money#doubled') == 2
+
+        when: "a frozen dataclass created from Java, rebuilt on every crossing"
+        def point = newFromJava(context.classLoader, 'python.Point', 3)
+        def pointFromJava = point.twice()
+        def pointFromPython = caller.use_point(point)
+        def pointAgain = caller.use_point(point)
+
+        then:
+        pointFromJava == 6L
+        pointFromPython == 6L
+        pointAgain == 6L
+        PythonStatic.entries('python.Point#twice') == 3
+
+        when: "control: objects created and used in Python keep the Python body"
+        long moneyBefore = PythonStatic.entries('python.Money#doubled')
+        long pointBefore = PythonStatic.entries('python.Point#twice')
+        def fresh = caller.fresh()
+
+        then:
+        fresh == 22L
+        PythonStatic.entries('python.Money#doubled') == moneyBefore
+        PythonStatic.entries('python.Point#twice') == pointBefore
+
+        when: "objects created in Python and wrapped by their stubs on the way to Java are bound by the wrapping"
+        def made = caller.make()
+        def madePoint = caller.make_point()
+        def viaPython = caller.use(made)
+        def pointViaPython = caller.use_point(madePoint)
+
+        then:
+        viaPython == 14L
+        pointViaPython == 8L
+        PythonStatic.entries('python.Money#doubled') == moneyBefore + 1
+        PythonStatic.entries('python.Point#twice') == pointBefore + 1
+
+        cleanup:
+        context?.close()
+    }
+
+    void "introspected objects created from java and rebuilt in a pooled context are bound there"() {
+        given:
+        PythonStatic.resetEntries()
+        def context = buildContext(INTROSPECTED, true, [
+            "micronaut.python.pool.enabled": true,
+            "micronaut.python.pool.size"   : 1
+        ])
+        def money = newFromJava(context.classLoader, 'python.Money', 5)
+        def point = newFromJava(context.classLoader, 'python.Point', 3)
+
+        when: "Python code of a pooled context calls the compiled methods of the objects rebuilt there"
+        List<Long> results = context.getBean(PythonPool).withContext { Context targetContext ->
+            Value targetMoney = ((PooledValueCoercible) money).asPolyglotValue(targetContext)
+            Value targetPoint = ((PooledValueCoercible) point).asPolyglotValue(targetContext)
+            [targetMoney.invokeMember('doubled').asLong(), targetPoint.invokeMember('twice').asLong()]
+        }
+
+        then: "the Java bodies ran"
+        results == [10L, 6L]
+        PythonStatic.entries('python.Money#doubled') == 1
+        PythonStatic.entries('python.Point#twice') == 1
 
         cleanup:
         context?.close()
