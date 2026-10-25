@@ -228,7 +228,8 @@ class Bag:
 
         and: "a key or element Python's numeric equality decides is refused in lookups, stores, additions, literals and set()"
         def numeric = ['flagged', 'objects', 'stored', 'got', 'added', 'merged', 'literal_keys', 'deduped', 'bool_member', 'comprehended', 'keyed_comprehension']
-        numeric.collectEntries { [(it): compiled["Bag.$it".toString()].reasons()*.rule()] } == numeric.collectEntries { [(it): ['unsupported-expression']] }
+        // every refused statement is a reason: stored has two
+        numeric.collectEntries { [(it): compiled["Bag.$it".toString()].reasons()*.rule()] } == numeric.collectEntries { [(it): ['unsupported-expression'] * (it == 'stored' ? 2 : 1)] }
         numeric.findAll { !compiled["Bag.$it".toString()].reasons()[0].message().contains('Python compares numbers across their types') } == []
         compiled['Bag.str_keyed'].outcome() == StaticCompilationDecision.Outcome.COMPILED
 
