@@ -5264,11 +5264,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Set<String> taken = new HashSet<>();
         element.getEnclosedElements(ElementQuery.ALL_METHODS).forEach(method -> taken.add(method.getName()));
         element.getEnclosedElements(ElementQuery.ALL_FIELDS).forEach(field -> taken.add(field.getName()));
-        String name = FIXED_SLOT_PREFIX + index;
-        while (taken.contains(name)) {
-            name = "_" + name;
+        StringBuilder name = new StringBuilder(FIXED_SLOT_PREFIX).append(index);
+        while (taken.contains(name.toString())) {
+            name.insert(0, '_');
         }
-        return name;
+        return name.toString();
     }
 
     /**
