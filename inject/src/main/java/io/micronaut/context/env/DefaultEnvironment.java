@@ -358,27 +358,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * Processes a property source left to a refresh, on top of the properties, as the thread that
      * added it would have, unless it has been replaced or removed meanwhile, by a thread that
      * processes or notes that itself. One added by the same name while it is processed is handed to
-     * this thread, which processes it after it, so that no thread waits for this one. No lock is
-     * held while the code of an override runs.
+     * this thread, which processes it after it, and so on, one at a time, so that no thread waits
+     * for this one and a long run of them does not use up the stack. No lock is held while the code
+     * of an override runs.
      *
      * @param name   The name it was added by
      * @param source The property source
      */
     private void processLeftOver(String name, PropertySource source) {
         resetCaches();
-        Processed processed = null;
-        synchronized (addLock) {
-            if (propertySources.get(name) == source) {
-                Processed sameName = processedByName.get(name);
-                if (isLeftOverElsewhere(sameName)) {
-                    sameName.changed = source;
-                    sameName.handedOver = source;
-                } else {
-                    processed = startProcessing(name);
-                    processed.leftOverBy = Thread.currentThread();
-                }
-            }
-        }
+        Processed processed = startLeftOver(name, source);
         if (processed != null) {
             PropertySource handedOver = null;
             try {
@@ -391,10 +380,36 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     processed.handedOver = null;
                     endProcessing(name, source, processed);
                 }
-                if (handedOver != null) {
-                    processHandedOver(name, handedOver);
+                while (handedOver != null) {
+                    handedOver = processHandedOver(name, handedOver);
                 }
             }
+        }
+    }
+
+    /**
+     * Starts processing a property source left to a refresh, or one handed over after it, unless it
+     * has been replaced or removed meanwhile, or one by the same name, left to a refresh, is being
+     * processed by another thread, which it is then handed to.
+     *
+     * @param name   The name it was added by
+     * @param source The property source
+     * @return What {@link #startProcessing(String)} returned, or {@code null} if it is not processed
+     */
+    private @Nullable Processed startLeftOver(String name, PropertySource source) {
+        synchronized (addLock) {
+            if (propertySources.get(name) == source) {
+                Processed sameName = processedByName.get(name);
+                if (isLeftOverElsewhere(sameName)) {
+                    sameName.changed = source;
+                    sameName.handedOver = source;
+                } else {
+                    Processed processed = startProcessing(name);
+                    processed.leftOverBy = Thread.currentThread();
+                    return processed;
+                }
+            }
+            return null;
         }
     }
 
@@ -406,16 +421,33 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      *
      * @param name   The name it was added by
      * @param source The property source
+     * @return The property source handed over while it was processed, to process next, or {@code null}
      */
-    private void processHandedOver(String name, PropertySource source) {
+    private @Nullable PropertySource processHandedOver(String name, PropertySource source) {
+        Processed processed = null;
+        PropertySource handedOver = null;
         try {
-            processLeftOver(name, source);
+            resetCaches();
+            processed = startLeftOver(name, source);
+            if (processed != null) {
+                processPropertySource(source, PropertySource.PropertyConvention.JAVA_PROPERTIES);
+            }
         } catch (Throwable e) {
             if (e instanceof VirtualMachineError error && !(e instanceof StackOverflowError)) {
                 throw error;
             }
             log.warn("Property source [{}] failed to be processed; the next refresh reads it again", name, e);
+        } finally {
+            if (processed != null) {
+                synchronized (addLock) {
+                    processed.leftOverBy = null;
+                    handedOver = processed.handedOver;
+                    processed.handedOver = null;
+                    endProcessing(name, source, processed);
+                }
+            }
         }
+        return handedOver;
     }
 
     /**

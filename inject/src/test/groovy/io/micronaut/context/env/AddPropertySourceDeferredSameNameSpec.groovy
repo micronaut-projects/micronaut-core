@@ -1,10 +1,12 @@
 package io.micronaut.context.env
 
+import groovy.transform.CompileStatic
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextConfiguration
 import spock.lang.Specification
 import spock.lang.Timeout
 
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -21,7 +23,7 @@ class AddPropertySourceDeferredSameNameSpec extends Specification {
         given:
         ReviewEnvironment env = new ReviewEnvironment()
         ReplaySource first = new ReplaySource(true)
-        FailingSource failing = new FailingSource(env, first)
+        FailingSource failing = new FailingSource(env, first.armed)
         env.addPropertySource(failing)
         env.start()
         List<Throwable> errors = Collections.synchronizedList([])
@@ -102,7 +104,7 @@ class AddPropertySourceDeferredSameNameSpec extends Specification {
         given:
         ReviewEnvironment env = new ReviewEnvironment()
         ReplaySource first = new ReplaySource(false)
-        FailingSource failing = new FailingSource(env, first)
+        FailingSource failing = new FailingSource(env, first.armed)
         env.addPropertySource(failing)
         env.start()
         List<Throwable> errors = Collections.synchronizedList([])
@@ -172,6 +174,74 @@ class AddPropertySourceDeferredSameNameSpec extends Specification {
         env.readFailed.countDown()
         first.replay.release.countDown()
         if (![refresher, adder, replacement].findAll().any { it.alive }) {
+            env.stop()
+        }
+    }
+
+    void "a long run of sources added by the name of deferred work, each while the one before is processed, is processed in order without deepening the stack"() {
+        given:
+        int count = 300
+        ReviewEnvironment env = new ReviewEnvironment()
+        AtomicBoolean replay = new AtomicBoolean()
+        Map<Integer, Integer> depths = new ConcurrentHashMap<>()
+        Map<Integer, String> threads = new ConcurrentHashMap<>()
+        List<ChainSource> chain = (0..count).collect { new ChainSource(it, replay, depths, threads) }
+        FailingSource failing = new FailingSource(env, replay)
+        env.addPropertySource(failing)
+        env.start()
+        List<Throwable> errors = Collections.synchronizedList([])
+        AtomicReference<Throwable> refreshFailure = new AtomicReference<>()
+        List<Thread> adders = Collections.synchronizedList([])
+        Thread refresher = null
+
+        when: 'a failed refresh leaves the first source to be processed after it'
+        env.parkStop.set(true)
+        failing.armed.set(true)
+        refresher = worker('review-refresh', errors) {
+            try {
+                env.refresh()
+            } catch (Throwable t) {
+                refreshFailure.set(t)
+            }
+        }
+        assert env.stopped.entered.await(10, TimeUnit.SECONDS)
+        Thread adder = worker('review-add', errors) { env.addPropertySource(chain[0]) }
+        adders.add(adder)
+        awaitCondition { env.propertySources.any { it.is(chain[0]) } }
+        awaitCondition { !adder.alive || adder.state in [Thread.State.BLOCKED, Thread.State.TIMED_WAITING] }
+        env.stopped.release.countDown()
+        assert chain[0].processing.entered.await(10, TimeUnit.SECONDS)
+
+        and: 'each next source by that name is added while the one before is processed'
+        for (int i = 1; i <= count; i++) {
+            ChainSource next = chain[i]
+            Thread add = worker("review-add-$i", errors) { env.addPropertySource(next) }
+            adders.add(add)
+            // handed over, or, up to 4.10.34, waiting to process it itself
+            awaitCondition {
+                !add.alive || add.state == Thread.State.BLOCKED && add.stackTrace.any { it.methodName == 'processPropertySource' }
+            }
+            chain[i - 1].processing.release.countDown()
+            assert next.processing.entered.await(10, TimeUnit.SECONDS) : "errors=${errors}"
+        }
+        chain[count].processing.release.countDown()
+        adders.each { it.join(10_000) }
+        refresher.join(10_000)
+
+        then: 'the last one ends on top, processed about as deep in the stack as the first one handed over'
+        !refresher.alive
+        adders.every { !it.alive }
+        errors.empty
+        refreshFailure.get() instanceof IllegalArgumentException
+        depths.size() == count + 1
+        assert depths[count] <= depths[1] + 10 : "depths=${depths[1]}..${depths[count]}; threads=${threads[1]}..${threads[count]}"
+        env.getProperty('chain.value', Integer).orElse(-1) == count
+
+        cleanup:
+        env.stopped.release.countDown()
+        env.readFailed.countDown()
+        chain.each { it.processing.release.countDown() }
+        if (!(adders + refresher).findAll().any { it.alive }) {
             env.stop()
         }
     }
@@ -256,13 +326,41 @@ class AddPropertySourceDeferredSameNameSpec extends Specification {
         }
     }
 
+    @CompileStatic
+    static class ChainSource implements PropertySource {
+        final int sequence
+        final AtomicBoolean replay
+        final Map<Integer, Integer> depths
+        final Map<Integer, String> threads
+        final Gate processing = new Gate()
+        ChainSource(int sequence, AtomicBoolean replay, Map<Integer, Integer> depths, Map<Integer, String> threads) {
+            this.sequence = sequence
+            this.replay = replay
+            this.depths = depths
+            this.threads = threads
+        }
+        @Override
+        String getName() { 'chain' }
+        @Override
+        Object get(String key) { sequence }
+        @Override
+        Iterator<String> iterator() {
+            if (replay.get()) {
+                depths.put(sequence, new Throwable().stackTrace.length)
+                threads.put(sequence, Thread.currentThread().name)
+                processing.pause()
+            }
+            return ['chain.value'].iterator()
+        }
+    }
+
     static class FailingSource implements PropertySource {
         final AtomicBoolean armed = new AtomicBoolean()
         private final ReviewEnvironment env
-        private final ReplaySource source
-        FailingSource(ReviewEnvironment env, ReplaySource source) {
+        private final AtomicBoolean toArm
+        FailingSource(ReviewEnvironment env, AtomicBoolean toArm) {
             this.env = env
-            this.source = source
+            this.toArm = toArm
         }
         @Override
         String getName() { 'failing' }
@@ -273,7 +371,7 @@ class AddPropertySourceDeferredSameNameSpec extends Specification {
         @Override
         Iterator<String> iterator() {
             if (armed.compareAndSet(true, false)) {
-                source.armed.set(true)
+                toArm.set(true)
                 env.readFailed.countDown()
                 throw new IllegalArgumentException('read failed')
             }
