@@ -538,6 +538,17 @@ class Pricing:
     def sibling(self, n: int) -> int:
         return self.truncate(n)
 
+    def filled(self, tag: str) -> int:
+        xs: list[str] = []
+        self.fill(xs, tag)
+        return len(xs) + self.label_of((tag, tag))
+
+    def fill(self, xs: list[str], tag: str) -> None:
+        xs.append(tag)
+
+    def label_of(self, pair: tuple[str, str]) -> int:
+        return len(pair)
+
     def hidden_call(self, n: int) -> int:
         return self._secret(n) + self.defaulted()
 
@@ -838,6 +849,13 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("python", _uncast(hidden.left()).dispatch())  # not bridged: the stub has no Java method for it
         self.assertEqual("python", _uncast(hidden.right()).dispatch())  # the call relies on a default argument
         self.assertEqual(2, self.bodies["hidden_call"].stats().bridgeCalls())
+        # fill appends to the caller's list, which the stub's Java method would copy: called through the Python object
+        self.assertEqual("COMPILED", self.decisions["Pricing.filled"].outcome().name(), rules(self.decisions["Pricing.filled"]))
+        statements = list(self.bodies["filled"].body().statements())
+        fill = _uncast(statements[1].expression())
+        self.assertEqual(("fill", "python"), (fill.name(), fill.dispatch()))
+        label_of = _uncast(_uncast(statements[2].value()).right())
+        self.assertEqual(("label_of", "java"), (label_of.name(), label_of.dispatch()))  # a tuple is not updated in place
         via_property = _uncast(list(self.bodies["via_property"].body().statements())[0].value())
         self.assertEqual("doubled", via_property.left().property())
         self.assertEqual("double", via_property.left().type())

@@ -1488,7 +1488,8 @@ class Lowering:
         """
         A call of a method of the class on self. The stub's Java method is called when the stub
         declares one for the call (a public method with a hinted signature the call fills, that no
-        advice intercepts and no subclass of the compilation overrides); otherwise the method of the
+        advice intercepts, no subclass of the compilation overrides and that takes no list, set or
+        dict, see _shares_collection); otherwise the method of the
         Python object is invoked, which runs the interceptors, the override or the defaults as Python would.
         """
         if self.class_model is None:
@@ -1525,7 +1526,8 @@ class Lowering:
         declares = (not name.startswith("_") and not self.advised(function_def) and not self.class_model.subclass_overrides(name)
                     and len(parameters) == len(lowered_arguments)
                     and all(argument.typeAnnotation() is not None and not argument.variadic() for argument in parameters)
-                    and function_node.args.vararg is None and not function_node.args.kwonlyargs and function_node.args.kwarg is None)
+                    and function_node.args.vararg is None and not function_node.args.kwonlyargs and function_node.args.kwarg is None
+                    and not any(self._shares_collection(argument.typeAnnotation()) for argument in parameters))
         if declares:
             parameter_types = [self._stub_type(self.bindings.of_hint(argument.typeAnnotation()), argument.typeAnnotation(), node) for argument in parameters]
             arguments = [self._coerce(argument, parameter_type, argument_node)
@@ -1541,6 +1543,17 @@ class Lowering:
         # a boxed result may be null, which Python sees as None: it stays boxed, a primitive is widened
         used = JAVA_PRIMITIVE_NUMBERS.get(return_type, return_type)
         return Cast(call, used) if used != return_type else call
+
+    def _shares_collection(self, hint):
+        """
+        Whether a parameter hinted so receives the caller's own list, set or dict when Python calls
+        the method, which the stub's Java method cannot give it: the bridge hands the Python body a
+        copy, and a compiled body works on a copy (see _parameters), so the callee would update a
+        copy the caller never sees. Such a call goes through the Python object, which passes the
+        caller's collection itself.
+        """
+        typed = self.bindings.of_hint(hint)
+        return typed is not None and typed.kind == BUILTIN and typed.name in COLLECTION_TYPES and typed.name != "tuple"
 
     def _inferred_return(self, model, function_def, function_node, node):
         """
