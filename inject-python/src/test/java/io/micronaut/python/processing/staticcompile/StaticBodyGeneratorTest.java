@@ -69,6 +69,16 @@ class StaticBodyGeneratorTest {
         }
 
         @Override
+        public ExpressionDef invokeOn(ExpressionDef value, String owner, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+            throw new UnsupportedOperationException(owner + "." + name + "()");
+        }
+
+        @Override
+        public ExpressionDef readOf(ExpressionDef value, String owner, String property, String typeName, TypeDef type) {
+            throw new UnsupportedOperationException(owner + "." + property);
+        }
+
+        @Override
         public StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor) {
             throw new UnsupportedOperationException("self." + property);
         }
@@ -172,7 +182,7 @@ class StaticBodyGeneratorTest {
     }
 
     private static Generated generate(Ir.Body body, String returnType, List<String> parameterNames, List<String> parameterTypes) throws Exception {
-        Ir.CompiledBody compiled = new Ir.CompiledBody("generated.Body", "run", parameterNames, parameterTypes, returnType, body, null, Stats.NONE, false);
+        Ir.CompiledBody compiled = new Ir.CompiledBody("generated.Body", "run", parameterNames, parameterTypes, returnType, body, null, Stats.NONE, false, false);
         MethodDef.MethodDefBuilder method = MethodDef.builder("run").addModifiers(Modifier.PUBLIC).returns(StaticBodyGenerator.type(returnType));
         for (int i = 0; i < parameterNames.size(); i++) {
             method.addParameter(ParameterDef.of(parameterNames.get(i), StaticBodyGenerator.type(parameterTypes.get(i))));
