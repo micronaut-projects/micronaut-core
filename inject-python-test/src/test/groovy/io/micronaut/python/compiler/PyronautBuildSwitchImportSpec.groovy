@@ -1,6 +1,7 @@
 package io.micronaut.python.compiler
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.python.ValueCoercible
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 
 /**
@@ -33,6 +34,11 @@ class Aliases:
     def checked(self, n: int) -> int:
         return n + 3
 
+    @CompileStatic
+    @property
+    def outer(self) -> int:
+        return 6
+
 
 @CS
 @Singleton
@@ -50,6 +56,8 @@ class AliasedClass:
         aliases.aliased(1) == 3
         aliases.checked(1) == 4
         aliasedClass.run(1) == 5
+        // a bare switch above @property decorates the property object, which it returns as it is
+        ((ValueCoercible) aliases).asPolyglotValue().getMember("outer").asInt() == 6
 
         cleanup:
         context?.close()

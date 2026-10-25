@@ -298,12 +298,13 @@ JAVA_IMPORT_NAMESPACES = frozenset({"micronaut", "io", "java", "javax", "jakarta
 # ``pyronaut.build`` holds the names the pyronaut build tools read (Dependency, MavenRepository, ...), which the
 # application never sees, and the compiler switches, which stay decorators: the processor resolves them by the
 # name they are imported from, and at run time, where the module does not exist, they return what they decorate
-# (the switches are source-only annotations).
+# (the switches are source-only annotations). A single argument that is no switch value is the decorated target,
+# which may be a descriptor (a property) rather than a callable.
 PYRONAUT_BUILD_MODULE = 'pyronaut.build'
 PYRONAUT_BUILD_SWITCHES = frozenset({"CompileStatic", "TypeChecked"})
 PYRONAUT_BUILD_SWITCH_RUNTIME_CODE = '''
 def {name}(*arguments, **members):
-    if len(arguments) == 1 and not members and callable(arguments[0]):
+    if len(arguments) == 1 and not members and not isinstance(arguments[0], (bool, int, str)):
         return arguments[0]
     return lambda target: target
 '''
