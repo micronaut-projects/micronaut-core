@@ -136,7 +136,7 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |A body the checker's inference flags carries the checker's rule (an unknown method, an argument of the wrong type, ...) as its reason.
 |===
 
-A `NOT_CANDIDATE` decision carries `class-not-eligible`, `special-method`, `async-function`, `generator-function`, `static-method`, `abstract-method`, `property-accessor`, `overriding-java-method` or `intercepted-method` (the first four rows); a `SKIPPED` one carries the reasons of the other rows.
+A `NOT_CANDIDATE` decision carries `class-not-eligible`, `special-method`, `async-function`, `generator-function`, `static-method`, `abstract-method`, `property-accessor`, `overriding-java-method` or `intercepted-method`; a `SKIPPED` one carries `pooled-module` or the reasons of the rows after `intercepted-method`.
 
 === The Supported Subset
 
