@@ -1,6 +1,8 @@
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.PythonStatic
+import io.micronaut.python.compiler.InMemoryBeanDefinitionsProvider
 import io.micronaut.python.compiler.PyronautCompiler
 import io.micronaut.python.processing.staticcompile.StaticCompilationDecision
 import io.micronaut.python.processing.staticcompile.StaticCompilationMode
@@ -437,5 +439,55 @@ class Caller:
         // an int parameter of the stub takes the ints of its range only: the Python body runs for the others
         results['entries.Hex.hex'] == 1
         results['entries.Hex.widened'] == 1
+    }
+
+    void "a stub creating its python object again after a restart forgets the values its slots kept"() {
+        given:
+        def first = buildContext('''
+from jakarta.inject import Singleton
+from java.lang import StringBuilder
+
+@Singleton
+class Labels:
+    def __init__(self):
+        self.prefix = StringBuilder("p")
+
+    def label(self, n: int) -> str:
+        return self.prefix.toString() + str(n)
+''')
+        def labels = getBean(first, 'python.Labels')
+        def slot = labels.getClass().getDeclaredField('graalpyInternalFixed0')
+        slot.accessible = true
+        ApplicationContext second = null
+
+        expect:
+        decisions.find { it.qualifiedName() == 'Labels.label' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
+
+        when: "a Java caller runs the compiled body, which reads the attribute through its slot"
+        def before = labels.label(1)
+
+        then:
+        before == 'p1'
+        slot.get(labels) != null
+
+        when: "the application shuts down, another one starts and the stub held over creates its Python object again"
+        def classLoader = first.classLoader
+        first.close()
+        first = null
+        second = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .beanDefinitionsProvider(new InMemoryBeanDefinitionsProvider(false))
+            .environments('test')
+            .build().start()
+        labels.asPolyglotValue()
+
+        then: "the slot no longer holds the object of the closed context"
+        slot.get(labels) == null
+        labels.label(2) == 'p2'
+        slot.get(labels) != null
+
+        cleanup:
+        second?.close()
+        first?.close()
     }
 }

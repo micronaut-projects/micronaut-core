@@ -1511,6 +1511,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (declaresCompiledDelegate(model)) {
             builder.addInnerType(compiledDelegate(model));
         }
+        if (readsFixedAttributes(model)) {
+            builder.addMethod(fixedReset(model));
+        }
         declareStaticAdvice(model);
 
         return new BridgedMethods(methodsToBridge, hasAsyncBridgeMethod);
@@ -1976,7 +1979,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         .doIf(StatementDef.multi(
                                             value.assign(newInstance),
                                             aThis.field(pythonValueFinal).assign(value),
-                                            bindWrapper(model, value)
+                                            bindWrapper(model, value),
+                                            resetFixedAttributes(model, aThis)
                                         ))
                                 ))),
                             value.returning()
@@ -1995,7 +1999,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         return aThis.superRef().invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).newLocal(VALUE_PARAMETER, value -> StatementDef.multi(
                             value.notEqualsReferentially(aThis.field(bound)).doIf(StatementDef.multi(
                                 bindWrapper(model, value),
-                                aThis.field(bound).assign(value)
+                                aThis.field(bound).assign(value),
+                                resetFixedAttributes(model, aThis)
                             )),
                             value.returning()
                         ));
@@ -5596,10 +5601,65 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * has compiled bodies.
      */
     private static StatementDef assignPythonValue(ClassStubModel model, VariableDef.This aThis, ExpressionDef value) {
-        return StatementDef.multi(
+        StatementDef assigned = StatementDef.multi(
             aThis.field(pythonValueField(model)).assign(value),
             bindWrapper(model, aThis.field(pythonValueField(model)))
         );
+        return StatementDef.multi(assigned, resetFixedAttributes(model, aThis));
+    }
+
+    /**
+     * Forgets what the slots of the stub keep, when the stub takes a new Python object: the values
+     * belong to the previous object, and to its context once that is closed.
+     */
+    private static StatementDef resetFixedAttributes(ClassStubModel model, VariableDef.This aThis) {
+        return readsFixedAttributes(model) ? aThis.invoke(fixedResetName(model.element()), TypeDef.VOID) : StatementDef.multi();
+    }
+
+    /**
+     * Whether the compiled bodies of the stub's class may read attributes fixed at construction from
+     * slots of the stub (see {@link #fixedReader}), which a new Python object of the stub resets.
+     */
+    private static boolean readsFixedAttributes(ClassStubModel model) {
+        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
+        if (plan == null || model.isIntrospectedBean()) {
+            return false;
+        }
+        for (Ir.CompiledBody body : plan.bodiesOf(model.element().getName())) {
+            if (String.valueOf(body.body()).contains("fixed=true")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The private method of the stub that forgets what its slots keep, called when the stub takes a
+     * new Python object: a slot holds the previous object and its converted value until its next
+     * read otherwise, which keeps a closed context alive after a restart.
+     */
+    private MethodDef fixedReset(ClassStubModel model) {
+        Map<String, MethodDef> readers = fixedReaders.computeIfAbsent(model.builder(), b -> new LinkedHashMap<>());
+        return MethodDef.builder(fixedResetName(model.element()))
+            .addModifiers(Modifier.PRIVATE)
+            .returns(TypeDef.VOID)
+            .build((aThis, methodParameters) -> {
+                List<StatementDef> resets = new ArrayList<>();
+                for (MethodDef reader : readers.values()) {
+                    resets.add(aThis.field(reader.getName(), PYTHON_FIXED_SLOT).assign(ExpressionDef.nullValue()));
+                }
+                return StatementDef.multi(resets);
+            });
+    }
+
+    private static String fixedResetName(ClassElement element) {
+        Set<String> taken = new HashSet<>();
+        element.getEnclosedElements(ElementQuery.ALL_METHODS).forEach(method -> taken.add(method.getName()));
+        StringBuilder name = new StringBuilder(FIXED_SLOT_PREFIX).append("Reset");
+        while (taken.contains(name.toString())) {
+            name.insert(0, '_');
+        }
+        return name.toString();
     }
 
     /**
