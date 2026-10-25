@@ -10,8 +10,9 @@ function of the compilation as Java ``StaticCompilationDecision`` values:
   its module off (or the mode is ``off`` and nothing switches it on);
 * ``NOT_CANDIDATE`` when the function can never be compiled: a module-level function, a function of
   a class that generates no class stub (an enum, an interface, a pooled class, a class with
-  ``__slots__`` or ``__getattr__``), an ``async`` or generator function or a special method
-  (property accessors are properties of the model, not functions, and get no decision);
+  ``__slots__`` or ``__getattr__``), an ``async`` or generator function or a special method;
+  property accessors are properties of the model, not functions, and get a decision only when a
+  function-level ``CompileStatic`` switches one on, which is never honoured (``property-accessor``);
 * ``SKIPPED`` with every reason the author can address: a signature without a fixed Java layout
   (``*args``, ``**kwargs``, keyword-only parameters, an unhinted or unresolvable parameter, a return
   hint that resolves to no type), a statement or expression kind that has no lowering. A missing
@@ -121,12 +122,16 @@ class StaticPlanner:
             for function_def, node in module.functions:
                 self._decide(module, None, None, function_def, node)
             for class_def, class_node in module.classes:
-                members = list(class_def.functions())
+                members = [(function_def, None) for function_def in class_def.functions()]
                 if class_def.constructor() is not None:
-                    members.append(class_def.constructor())
-                members.sort(key=lambda function_def: function_def.span().line() if function_def.span() is not None else 0)
-                for function_def in members:
-                    self._decide(module, class_def, class_node, function_def, function_node(class_node, function_def.name()))
+                    members.append((class_def.constructor(), None))
+                members.extend(self._switched_accessors(class_def))
+                members.sort(key=lambda member: member[0].span().line() if member[0].span() is not None else 0)
+                for function_def, accessor in members:
+                    if accessor is None:
+                        self._decide(module, class_def, class_node, function_def, function_node(class_node, function_def.name()))
+                    else:
+                        self._decide_accessor(class_def, function_def, accessor)
         return list(self.decisions)
 
     def module_function(self, module, name):
@@ -249,6 +254,22 @@ class StaticPlanner:
                             java_layout=java_layout, planner=self, static=static)
         body = lowering.lower()
         return body, lowering.reasons
+
+    def _switched_accessors(self, class_def):
+        """The property accessors a function-level switch turns on, as (accessor, kind) members."""
+        accessors = []
+        for prop in class_def.properties():
+            for kind, accessor in (("getter", prop.getter()), ("setter", prop.setter()), ("deleter", prop.deleter())):
+                if accessor is not None and self.scope.switch(accessor.decorators()):
+                    accessors.append((accessor, kind))
+        return accessors
+
+    def _decide_accessor(self, class_def, function_def, kind):
+        """A property accessor switched on explicitly: never compiled, and the switch is reported."""
+        qualified = f"{class_def.name()}.{function_def.name()}" + ("" if kind == "getter" else f".{kind}")
+        span = function_def.span()
+        reasons = [("property-accessor", "a property accessor is called through the Python object's attribute protocol", span)]
+        return self._record(qualified, span, "NOT_CANDIDATE", "FUNCTION", reasons, 0, explicit=True)
 
     def _first_report(self, class_def):
         """Whether the class is reported for the first time in this plan."""

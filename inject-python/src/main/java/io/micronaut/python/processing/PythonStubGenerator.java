@@ -1682,7 +1682,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         if (pythonValueFinal != null) {
             if (isFrozenDataclass && !isAbstractIntro) {
-                return reconstructedValue.returning();
+                // a frozen object is created again on every crossing: each one is bound
+                return returnBound(model, reconstructedValue);
             }
             FieldDef pythonValueField = pythonValueField(model);
             ExpressionDef storedValue = aThis.field(pythonValueField);
@@ -1746,6 +1747,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             List<StatementDef> reconstruct = new ArrayList<>();
             reconstruct.add(aThis.field(pythonValueField).assign(reconstructedValue));
+            reconstruct.add(bindWrapper(model, aThis.field(pythonValueField)));
             if (javaOwnedField != null) {
                 // no Python object existed: the object was created from Java (or loaded
                 // from storage), so its Java fields own the state from here on
@@ -1757,7 +1759,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 StatementDef.multi(reconstruct)
             );
         }
-        return reconstructedValue.returning();
+        return returnBound(model, reconstructedValue);
+    }
+
+    /**
+     * Returns a Python object created for this stub, bound to the compiled bodies of its class
+     * first when there are any.
+     */
+    private static StatementDef returnBound(ClassStubModel model, ExpressionDef value) {
+        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
+        if (plan == null || compiledOwnersOf(plan, model).isEmpty()) {
+            return value.returning();
+        }
+        return value.newLocal(TARGET_VALUE, created -> StatementDef.multi(
+            bindWrapper(model, created),
+            created.returning()
+        ));
     }
 
     /**
@@ -1787,6 +1804,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 PYTHON_COERCION.invokeStatic(
                     REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
                 ),
+                bindWrapper(model, targetValue),
                 targetValue.returning()
             ));
         } else if (beanProperties.isEmpty()) {
@@ -1796,6 +1814,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 PYTHON_COERCION.invokeStatic(
                     REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
                 ),
+                bindWrapper(model, targetValue),
                 targetValue.returning()
             ));
         } else {
@@ -1806,6 +1825,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 statements.add(PYTHON_COERCION.invokeStatic(
                     REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
                 ));
+                // the object of the target context: bound through that context
+                statements.add(bindWrapper(model, targetValue));
                 List<ExpressionDef> memberNames = new ArrayList<>();
                 List<ExpressionDef> memberValues = new ArrayList<>();
                 for (PropertyElement beanProperty : beanProperties) {
