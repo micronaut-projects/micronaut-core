@@ -253,7 +253,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             noteChangeWhileRefreshing(name, propertySource);
             readsBefore = publishedReads;
             // a refresh about to read reads it as registered, without this thread waiting for it
-            process = isRunning() && !reading.get() && (holdsCatalogLock || !deferToRefresh(name, propertySource));
+            process = isRunning() && !reading.get() && (holdsCatalogLock || !deferToRefresh(new Added(name, propertySource, readsBefore)));
         }
         if (process) {
             processAdded(name, propertySource, holdsCatalogLock, readsBefore);
@@ -308,15 +308,14 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * refresh that is about to read, if there is one. Called with the monitor of
      * {@link #propertySources} held.
      *
-     * @param name           The name of the property source
-     * @param propertySource The property source
+     * @param added The property source, with how many reads had published when it was registered
      * @return Whether it is left to a refresh
      */
-    private boolean deferToRefresh(String name, PropertySource propertySource) {
+    private boolean deferToRefresh(Added added) {
         if (refreshesBeforeRead == 0) {
             return false;
         }
-        addLast(deferredToRefresh, new Added(name, propertySource, publishedReads));
+        addLast(deferredToRefresh, added);
         return true;
     }
 
@@ -338,13 +337,14 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * a refresh that is about to read. Either processes it on top if it does not publish what it
      * read. One that is no longer registered as that instance is not left to any read: it must not
      * take the place of what replaced it, which is processed, or left to a read, by the thread that
-     * added it. Called with the monitor of {@link #propertySources} held.
+     * added it. Nor is one that a read has read since, see {@link #publishedReads}. Called with the
+     * monitor of {@link #propertySources} held.
      *
      * @param added The property source
-     * @return Whether it is left to a read, or is no longer registered
+     * @return Whether it is left to a read, no longer registered, or read since
      */
     private boolean handOver(Added added) {
-        if (propertySources.get(added.name()) != added.source()) {
+        if (propertySources.get(added.name()) != added.source() || publishedReads != added.readsBefore()) {
             return true;
         }
         List<Added> read = leftToRead;
@@ -352,7 +352,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             addLast(read, added);
             return true;
         }
-        return deferToRefresh(added.name(), added.source());
+        return deferToRefresh(added);
     }
 
     @Override
@@ -467,8 +467,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             synchronized (propertySources) {
                 // first, and without a call that could fail on a stack that is nearly used up
                 leftToRead = null;
-                if (completed && refresh == null) {
-                    // a start publishes what it reads as it reads it
+                if (completed) {
+                    // in one step with the read ending: a property source added from now on is not
+                    // taken for read. A start publishes what it reads as it reads it, and a refresh
+                    // whose read has completed publishes it, holding the lock of the catalogs until then
                     publishedReads++;
                 }
                 reading.set(false);
@@ -506,10 +508,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             } finally {
                 synchronized (propertySources) {
                     changedWhileRefreshing = null;
-                    if (completed && refresh.leftToRead != null) {
-                        // counted with the lock of the catalogs held, which the refresh keeps until it has published
-                        publishedReads++;
-                    }
                     if (!completed) {
                         // The resolver keeps the catalog it published when the rebuild fails. Put back the
                         // property sources that catalog was built from, so the next refresh drops and reads

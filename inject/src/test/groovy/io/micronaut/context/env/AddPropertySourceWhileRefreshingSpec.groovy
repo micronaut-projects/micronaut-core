@@ -485,6 +485,83 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
         env.stop()
     }
 
+    void "a property source left to a refresh that fails, read by a later refresh, is not left to a third refresh that fails"() {
+        given: "a property source of a higher order than the one added"
+        ScriptedLocator locator = new ScriptedLocator()
+        DefaultEnvironment env = new DefaultEnvironment(withLocator(locator))
+        env.addPropertySource(PropertySource.of('higher', ['watcher.value': 'higher'], 100))
+        env.start()
+        ParksAfterFailedRefresh lower = new ParksAfterFailedRefresh()
+        ParksWhileProcessed processed = new ParksWhileProcessed(Collections.synchronizedList([]))
+        Throwable[] failures = new Throwable[2]
+
+        when: "it is left to a refresh that fails, which is about to process it on top"
+        Thread adder = daemon('adder') { env.addPropertySource(lower) }
+        assert lower.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        locator.park.set(true)
+        Thread refresher = daemon('refresher') {
+            try {
+                env.refresh()
+            } catch (Throwable t) {
+                failures[0] = t
+            } finally {
+                // 5.2.x does not process it on the refresher's thread: this lets the test go on there
+                lower.replayEntered.countDown()
+            }
+        }
+        assert locator.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        lower.release.countDown()
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(WAIT_SECONDS)
+        while (adder.alive && adder.state != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+            Thread.sleep(5)
+        }
+        locator.fail.set(true)
+        locator.release.countDown()
+        adder.join(WAIT_SECONDS * 1000L)
+        assert lower.replayEntered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+
+        and: "another refresh reads it in its order"
+        locator.fail.set(false)
+        env.refresh()
+        String afterRefresh = env.getProperty('watcher.value', String).orElse(null)
+
+        and: "a third refresh, which then fails, waits for a thread processing a property source while the first goes on"
+        processed.arm()
+        Thread processor = daemon('processor') { env.addPropertySource(processed) }
+        assert processed.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        Thread third = daemon('third') {
+            try {
+                env.refresh()
+            } catch (Throwable t) {
+                failures[1] = t
+            }
+        }
+        awaitWaiting(third)
+        lower.replayRelease.countDown()
+        refresher.join(WAIT_SECONDS * 1000L)
+        locator.fail.set(true)
+        processed.release.countDown()
+        processor.join(WAIT_SECONDS * 1000L)
+        third.join(WAIT_SECONDS * 1000L)
+
+        then: "it is not processed on top of what the later refresh read"
+        !adder.alive
+        !refresher.alive
+        !processor.alive
+        !third.alive
+        failures[0] instanceof IllegalStateException
+        failures[1] instanceof IllegalStateException
+        afterRefresh == 'higher'
+        env.getProperty('watcher.value', String).get() == 'higher'
+
+        cleanup:
+        lower.release.countDown()
+        lower.replayRelease.countDown()
+        locator.release.countDown()
+        processed.release.countDown()
+        env.stop()
+    }
+
     void "a property source added by the name of one whose thread is about to process it, as a refresh waits to start, is processed after that refresh fails"() {
         given: "a locator that fails once armed"
         FailsWhenArmed locator = new FailsWhenArmed()
@@ -873,6 +950,29 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
         PropertySource.PropertyConvention getConvention() {
             pass()
             return PropertySource.PropertyConvention.JAVA_PROPERTIES
+        }
+    }
+
+    /**
+     * A property sources locator that parks the read once {@link #park} is set, and fails it while
+     * {@link #fail} is set.
+     */
+    static class ScriptedLocator implements PropertySourcesLocator {
+        final AtomicBoolean park = new AtomicBoolean()
+        final AtomicBoolean fail = new AtomicBoolean()
+        final CountDownLatch reached = new CountDownLatch(1)
+        final CountDownLatch release = new CountDownLatch(1)
+
+        @Override
+        Collection<PropertySource> load(Environment environment) {
+            if (park.compareAndSet(true, false)) {
+                reached.countDown()
+                release.await(AddPropertySourceWhileRefreshingSpec.PARK_SECONDS, TimeUnit.SECONDS)
+            }
+            if (fail.get()) {
+                throw new IllegalStateException('the locator failed')
+            }
+            return []
         }
     }
 
