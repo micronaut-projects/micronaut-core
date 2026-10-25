@@ -250,9 +250,10 @@ class PyronautCompilerStaticCompilationTest {
         assertEquals(1, reasons.size(), line);
         JsonNode reason = reasons.get(0);
         assertEquals(List.of("rule", "message", "location"), propertyNames(reason), line);
-        assertEquals("unsupported-expression", reason.get("rule").asString());
-        assertEquals("a list comprehension has no static lowering", reason.get("message").asString());
-        assertEquals(source + ":14:25", reason.get("location").asString());
+        // the comprehension is lowered; the elements of the raw ArrayList it iterates have no type
+        assertEquals("unknown-type", reason.get("rule").asString());
+        assertEquals("the elements of the [java.util.ArrayList] have no static type", reason.get("message").asString());
+        assertEquals(source + ":14:50", reason.get("location").asString());
 
         JsonNode stats = record.get("stats");
         assertEquals(List.of("statements", "javaCalls", "bridgeCalls", "helperCalls"), propertyNames(stats), line);
