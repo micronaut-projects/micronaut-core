@@ -17,6 +17,9 @@ on:
     paths:
       - 'inject-python/src/main/java/io/micronaut/python/processing/staticcompile/**'
       - 'inject-python/src/main/java/io/micronaut/python/processing/PythonStubGenerator.java'
+      - 'inject-python/src/main/java/io/micronaut/python/processing/PythonAstParser.java'
+      - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_processor.py'
+      - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_transformer.py'
       - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_static.py'
       - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_lowering.py'
       - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_typecheck.py'
@@ -29,6 +32,10 @@ on:
       - '[0-9]+.[0-9]+.x'
     paths:
       - 'inject-python/src/main/java/io/micronaut/python/processing/staticcompile/**'
+      - 'inject-python/src/main/java/io/micronaut/python/processing/PythonStubGenerator.java'
+      - 'inject-python/src/main/java/io/micronaut/python/processing/PythonAstParser.java'
+      - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_processor.py'
+      - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_transformer.py'
       - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_static.py'
       - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_lowering.py'
       - 'context-python/src/main/java/io/micronaut/context/python/PythonStatic.java'
