@@ -1899,6 +1899,20 @@ class Spelled2(Spelled):
     pass
 
 
+class Patched(Exception):
+    pass
+
+
+Patched.__str__ = lambda self: "patched"
+
+
+class Set(Exception):
+    pass
+
+
+setattr(Set, "args", ())
+
+
 @Singleton
 class Gate:
     def plain(self, n: int) -> int:
@@ -1942,6 +1956,12 @@ class Gate:
 
     def spelled_base(self, n: int) -> int:
         raise Spelled2("x")
+
+    def patched(self, n: int) -> int:
+        raise Patched("x")
+
+    def set(self, n: int) -> int:
+        raise Set("x")
 '''
 
 
@@ -1967,7 +1987,7 @@ class LazyExceptionTest(unittest.TestCase):
 
     def test_a_class_that_could_tell_the_difference_is_created_when_it_is_raised(self):
         for name in ("initialized", "inherits", "spelled", "represented", "created", "finalized", "argued", "reassigned",
-                     "decorated", "keyed", "spelled_base"):
+                     "decorated", "keyed", "spelled_base", "patched", "set"):
             self.assertFalse(self._construction(name).lazy(), name)
 
 

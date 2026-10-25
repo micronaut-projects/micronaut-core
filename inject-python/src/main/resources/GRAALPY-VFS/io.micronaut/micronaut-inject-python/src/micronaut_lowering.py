@@ -1466,6 +1466,39 @@ class Lowering:
         self.compilation_calls += 1
         return NewPythonException(generated, lowered, self._creates_lazily(model))
 
+    def _patched_classes(self):
+        """
+        The names that code of the compilation assigns one of the EAGER_EXCEPTION_MEMBERS on, or calls
+        setattr or delattr on with such a member or a computed name: E.__str__ = ..., setattr(E, "args", ...).
+        Collected once per compilation over the ASTs of its modules.
+        """
+        trees = [getattr(getattr(module, "visitor", None), "module_node", None) for module in self.checker._modules.values()]
+        trees = [tree for tree in trees if tree is not None]
+        cached = getattr(self.checker, "_mn_patched_classes", None)
+        if cached is not None and len(cached[0]) == len(trees) and all(a is b for a, b in zip(cached[0], trees)):
+            return cached[1]
+        names = set()
+        for tree in trees:
+            for node in ast.walk(tree):
+                targets = ()
+                if isinstance(node, ast.Assign):
+                    targets = node.targets
+                elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
+                    targets = (node.target,)
+                elif isinstance(node, ast.Delete):
+                    targets = node.targets
+                for target in targets:
+                    for element in (target.elts if isinstance(target, (ast.Tuple, ast.List)) else (target,)):
+                        if isinstance(element, ast.Attribute) and element.attr in EAGER_EXCEPTION_MEMBERS and isinstance(element.value, ast.Name):
+                            names.add(element.value.id)
+                if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("setattr", "delattr")
+                        and len(node.args) >= 2 and isinstance(node.args[0], ast.Name)):
+                    member = node.args[1]
+                    if not isinstance(member, ast.Constant) or member.value in EAGER_EXCEPTION_MEMBERS:
+                        names.add(node.args[0].id)
+        self.checker._mn_patched_classes = (trees, names)
+        return names
+
     def _creates_lazily(self, model, seen=None):
         """
         Whether a raise of the exception class creates the Java exception alone, its generated class
@@ -1473,8 +1506,9 @@ class Lowering:
         exception handler converts it). Only when nothing tells the two apart: the Java message is what
         BaseException.__str__ gives the arguments, the Python exception holds them as its args, and
         creating it runs no code of the compilation. So neither the class nor a Python base defines
-        __new__, __init__, __str__, __repr__, args or __del__, nor is decorated, nor has a metaclass or
-        a dynamic lookup, and every builtin base takes its arguments as BaseException does.
+        __new__, __init__, __str__, __repr__, args or __del__ (in its body, or by an assignment or a
+        setattr on its name anywhere in the compilation), nor is decorated, nor has a metaclass or a
+        dynamic lookup, and every builtin base takes its arguments as BaseException does.
         """
         seen = seen if seen is not None else set()
         if model.qualified in seen:
@@ -1489,6 +1523,8 @@ class Lowering:
             if (member in model.methods or member in model.properties or member in model.attributes
                     or member in model.instance_attributes or member in model.nested):
                 return False
+        if model.class_def.name() in self._patched_classes():
+            return False  # E.__str__ = ... or setattr(E, ...) somewhere in the compilation
         classes = self.checker.python_classes
         for base in model.class_def.bases():
             name = base.name()
