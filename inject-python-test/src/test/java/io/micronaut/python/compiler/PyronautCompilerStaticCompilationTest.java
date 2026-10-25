@@ -22,6 +22,8 @@ import io.micronaut.python.processing.staticcompile.StaticCompilationMode;
 import io.micronaut.python.processing.staticcompile.StaticCompilationReport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -186,6 +188,86 @@ class PyronautCompilerStaticCompilationTest {
     }
 
     @Test
+    void aCompiledJavaCallNamesTheOverloadItBindsTo(@TempDir Path directory) throws IOException {
+        Path output = Files.createDirectories(directory.resolve("output"));
+        PyronautCompiler.builder()
+            .pythonCode("""
+                from jakarta.inject import Singleton
+                from io.micronaut.python.annotation.processing.test import StaticOverloads
+
+                @Singleton
+                class Overloaded:
+                    def none(self) -> str:
+                        return StaticOverloads.which(None)
+
+                    def text(self, value: str) -> str:
+                        return StaticOverloads.which(value)
+
+                    def sequence(self, value: str) -> str:
+                        return StaticOverloads.sequence(value)
+                """)
+            .staticCompilation(StaticCompilationMode.ALL)
+            .targetDir(output.toFile())
+            .build()
+            .compile();
+
+        String generated;
+        try (var paths = Files.walk(output)) {
+            generated = Files.readString(paths.filter(path -> path.getFileName().toString().equals("Overloaded.java")).findFirst().orElseThrow());
+        }
+        // a None of the parameter's type, an argument at its own type, an argument cast to the overload's parameter
+        assertTrue(generated.contains("String none0 = null;"), generated);
+        assertTrue(generated.contains("StaticOverloads.which(none0)"), generated);
+        assertTrue(generated.contains("StaticOverloads.which(value)"), generated);
+        assertTrue(generated.contains("StaticOverloads.sequence((CharSequence) value)"), generated);
+    }
+
+    @Test
+    void aSkippedDecisionRecordCarriesEveryField(@TempDir Path directory) throws IOException {
+        PyronautCompiler.builder()
+            .pythonCode(SOURCE)
+            .staticCompilation(StaticCompilationMode.ALL)
+            .staticCompilationReport(directory.toFile())
+            .build()
+            .buildClassLoader();
+
+        String line = Files.readAllLines(directory.resolve(StaticCompilationReport.DECISIONS_FILE)).stream()
+            .filter(candidate -> candidate.contains("\"name\":\"PricingService.names\""))
+            .findFirst()
+            .orElseThrow();
+        JsonNode record = new ObjectMapper().readTree(line);
+        assertEquals(List.of("record", "name", "source", "line", "column", "outcome", "scope", "reasons", "stats"), propertyNames(record), line);
+        assertEquals("decision", record.get("record").asString());
+        assertEquals("PricingService.names", record.get("name").asString());
+        String source = record.get("source").asString();
+        assertFalse(source.isEmpty(), line);
+        assertEquals(13, record.get("line").asInt());
+        assertEquals(5, record.get("column").asInt());
+        assertEquals("SKIPPED", record.get("outcome").asString());
+        assertEquals("MODE", record.get("scope").asString());
+
+        JsonNode reasons = record.get("reasons");
+        assertEquals(1, reasons.size(), line);
+        JsonNode reason = reasons.get(0);
+        assertEquals(List.of("rule", "message", "location"), propertyNames(reason), line);
+        // the comprehension is lowered; the elements of the raw ArrayList it iterates have no type
+        assertEquals("unknown-type", reason.get("rule").asString());
+        assertEquals("the elements of the [java.util.ArrayList] have no static type", reason.get("message").asString());
+        assertEquals(source + ":14:50", reason.get("location").asString());
+
+        JsonNode stats = record.get("stats");
+        assertEquals(List.of("statements", "javaCalls", "bridgeCalls", "helperCalls"), propertyNames(stats), line);
+        assertEquals(1, stats.get("statements").asInt());
+        assertEquals(0, stats.get("javaCalls").asInt());
+        assertEquals(0, stats.get("bridgeCalls").asInt());
+        assertEquals(0, stats.get("helperCalls").asInt());
+    }
+
+    private static List<String> propertyNames(JsonNode node) {
+        return node.properties().stream().map(Map.Entry::getKey).toList();
+    }
+
+    @Test
     void strictModeFailsTheBuildForAnExplicitSwitchThatCannotBeHonoured() {
         PyronautCompiler compiler = PyronautCompiler.builder()
             .pythonCode(SOURCE)
@@ -195,6 +277,53 @@ class PyronautCompilerStaticCompilationTest {
         RuntimeException exception = assertThrows(RuntimeException.class, compiler::buildClassLoader);
 
         assertTrue(exception.getMessage().contains("[python:compile-static] [PricingService.describe] cannot be compiled statically"), exception.getMessage());
+    }
+
+    @Test
+    void theSwitchImportedFromPyronautBuildPlainOrAliasedIsHonoured() {
+        List<StaticCompilationDecision> decisions = new ArrayList<>();
+        List<PythonDiagnostic> diagnostics = new ArrayList<>();
+        PyronautCompiler.builder()
+            .pythonCode("""
+                from jakarta.inject import Singleton
+                from pyronaut.build import CompileStatic
+                from pyronaut.build import CompileStatic as CS
+
+                @Singleton
+                class Switches:
+                    @CompileStatic
+                    def plain(self, n: int) -> int:
+                        return n
+
+                    @CS
+                    def aliased(self, n: int) -> int:
+                        return n
+
+                    def unswitched(self, n: int) -> int:
+                        return n
+
+                @CS
+                @Singleton
+                class AliasedClass:
+                    def run(self, n: int) -> int:
+                        return n
+                """)
+            .staticCompilation(StaticCompilationMode.ANNOTATED)
+            .staticCompilationDecisionCallback(decisions::add)
+            .pythonDiagnosticCallback(diagnostics::add)
+            .build()
+            .buildClassLoader();
+
+        Map<String, StaticCompilationDecision> byName = decisions.stream().collect(Collectors.toMap(StaticCompilationDecision::qualifiedName, Function.identity()));
+        assertEquals(Outcome.COMPILED, byName.get("Switches.plain").outcome());
+        assertEquals(StaticCompilationDecision.Scope.FUNCTION, byName.get("Switches.plain").scope());
+        assertEquals(Outcome.COMPILED, byName.get("Switches.aliased").outcome());
+        assertEquals(StaticCompilationDecision.Scope.FUNCTION, byName.get("Switches.aliased").scope());
+        assertEquals(Outcome.EXCLUDED, byName.get("Switches.unswitched").outcome());
+        assertEquals(StaticCompilationDecision.Scope.MODE, byName.get("Switches.unswitched").scope());
+        assertEquals(Outcome.COMPILED, byName.get("AliasedClass.run").outcome());
+        assertEquals(StaticCompilationDecision.Scope.CLASS, byName.get("AliasedClass.run").scope());
+        assertTrue(diagnostics.isEmpty(), diagnostics.toString());
     }
 
     @Test
