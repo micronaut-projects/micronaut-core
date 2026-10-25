@@ -2829,7 +2829,7 @@ class Lowering:
             else:
                 self.bridge_calls += 1
                 self._crossing(model, False)
-                read = PythonMember(receiver, node.attr, stub_type)
+                read = PythonMember(receiver, node.attr, stub_type, False)
         elif kind == "property":
             getter = found[1].getter()
             return_def = getter.returnType() if getter is not None else None
@@ -2839,7 +2839,7 @@ class Lowering:
             stub_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
             self.bridge_calls += 1
             self.python_code += 1
-            read = PythonMember(receiver, node.attr, stub_type)
+            read = PythonMember(receiver, node.attr, stub_type, True)
         elif kind == "instance":
             typed = model.instance_attribute_type(node.attr, self.bindings)
             if typed is None:
@@ -2847,7 +2847,7 @@ class Lowering:
             stub_type = self._stub_type(typed, None, node)
             self.bridge_calls += 1
             self._crossing(model, False)
-            read = PythonMember(receiver, node.attr, stub_type)
+            read = PythonMember(receiver, node.attr, stub_type, False)
         else:
             self._refuse("unsupported-expression", f"reading [{node.attr}] of [{model.name}], which is not an attribute, has no static lowering", node)
         # an attribute that may be None stays boxed, a primitive is widened

@@ -177,4 +177,18 @@ class StaticDelegationTest {
         assertEquals("none(the module-level function is a method of the module's bean, which a Python caller does not reach)",
             StaticDelegation.status(body("app.Module", false, true, List.of(), Ir.STRING, returned)));
     }
+
+    @Test
+    void readingAnAttributeOfAnotherObjectOrAnInjectedBeanHasNoSideEffect() {
+        Ir.Expression other = new Ir.SelfProperty("tag", "app.Tag", false, true);
+        Ir.Expression name = new Ir.PythonMember(other, "name", Ir.STRING, false);
+        assertEquals("retry", StaticDelegation.status(body(List.of(), Ir.STRING, new Ir.Return(name))));
+        // a @property of the other object runs its getter
+        Ir.Expression property = new Ir.PythonMember(other, "label", Ir.STRING, true);
+        assertEquals("once", StaticDelegation.status(body(List.of(), Ir.STRING, new Ir.Return(property))));
+        Ir.Expression bean = new Ir.ModuleAttribute("app.Module", "repository", "app.Repository");
+        Ir.Expression call = new Ir.InvokeJava(bean, "app.Repository", "count", List.of(), List.of(), Ir.LONG);
+        // the call is the side effect, the read of the bean none: nothing promotes, so the body runs once
+        assertEquals("once", StaticDelegation.status(body(List.of(), Ir.LONG, new Ir.Return(call))));
+    }
 }

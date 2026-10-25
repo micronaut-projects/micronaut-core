@@ -377,8 +377,9 @@ public sealed interface Ir {
      * @param receiver The receiver, a value of a generated class
      * @param name     The attribute
      * @param type     The Java type of the value
+     * @param accessor Whether the attribute is a Python {@code @property}, whose getter runs on the Python object
      */
-    record PythonMember(Expression receiver, String name, String type) implements Expression {
+    record PythonMember(Expression receiver, String name, String type, boolean accessor) implements Expression {
     }
 
     /**

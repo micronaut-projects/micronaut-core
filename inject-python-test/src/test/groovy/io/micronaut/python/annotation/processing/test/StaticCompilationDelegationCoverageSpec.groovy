@@ -118,4 +118,50 @@ class Caller:
         results['entries.Codes.parse'] == 3
         results['entries.Guarded.parse'] == 0
     }
+
+    void "a body reading an attribute of another python object of the compilation runs again in python when it fails"() {
+        when:
+        def results = parity('''
+from typing import Annotated
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Value
+from micronaut.context.python.annotation import CompileStatic
+
+@Singleton
+class Tag:
+    def __init__(self, name: Annotated[str, Value("${tag.name:red}")]):
+        self.name = name
+
+    @property
+    def shout(self) -> str:
+        return self.name.upper()
+
+@Singleton
+class Labels:
+    def __init__(self, tag: Tag):
+        self.tag = tag
+
+    def label(self, n: int) -> str:
+        return self.tag.name + ":" + str(n)
+
+    def loud(self, n: int) -> str:
+        return self.tag.shout + ":" + str(n)
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def __init__(self, labels: Labels):
+        self.labels = labels
+
+    def probe(self) -> str:
+        return f"{self.labels.label(2)} {self.labels.label(2 ** 70)} {self.labels.loud(3)}"
+''', ['Labels.label': 'retry', 'Labels.loud': 'once'])
+
+        then:
+        results.off == 'red:2 red:1180591620717411303424 RED:3'
+        results.all == results.off
+        // the int beyond a long is not taken: the Python body runs for it
+        results['entries.Labels.label'] == 1
+        results['entries.Labels.loud'] == 1
+    }
 }

@@ -9,29 +9,29 @@
 ? VetWithSpecialities.__init__ NOT_CANDIDATE
 ? Visit.__init__ NOT_CANDIDATE
 ? VisitForm.__init__ NOT_CANDIDATE
-petclinic/controllers.py init_find_form COMPILED delegation=none(it has side effects (the helper [map]) and the helper [map] raises where Python promotes)
-petclinic/controllers.py init_owner_creation_form COMPILED delegation=none(it has side effects (the helper [map]) and the helper [map] raises where Python promotes)
-petclinic/controllers.py init_owner_update_form COMPILED delegation=none(it has side effects (the call of [petclinic.ClinicService.find_owner_by_id]) and a [ModuleAttribute] raises where Python promotes)
+petclinic/controllers.py init_find_form COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py init_owner_creation_form COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py init_owner_update_form COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
 petclinic/controllers.py init_pet_creation_form SKIPPED
-petclinic/controllers.py init_pet_update_form COMPILED delegation=none(it has side effects (the call of [petclinic.ClinicService.find_pet_by_id]) and a [ModuleAttribute] raises where Python promotes)
-petclinic/controllers.py init_visit_creation_form COMPILED delegation=none(it has side effects (the call of [petclinic.ClinicService.find_pet_by_id]) and a [ModuleAttribute] raises where Python promotes)
+petclinic/controllers.py init_pet_update_form COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py init_visit_creation_form COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
 petclinic/controllers.py locale COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
 petclinic/controllers.py parse_form_date COMPILED delegation=none(a static body with side effects (the call of [java.time.LocalDate.parse]) has no bound object to raise Python's exception through)
 petclinic/controllers.py pet_type_for SKIPPED
-petclinic/controllers.py process_find_form COMPILED delegation=none(it has side effects (the call of [petclinic.ClinicService.find_all_owners]) and a [ModuleAttribute] raises where Python promotes)
+petclinic/controllers.py process_find_form COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
 petclinic/controllers.py process_owner_creation_form SKIPPED
 petclinic/controllers.py process_owner_update_form SKIPPED
 petclinic/controllers.py process_pet_creation_form SKIPPED
 petclinic/controllers.py process_pet_update_form SKIPPED
 petclinic/controllers.py process_visit_creation_form SKIPPED
 petclinic/controllers.py redirect_to COMPILED delegation=none(a static body with side effects (the call of [io.micronaut.http.HttpResponse.redirect]) has no bound object to raise Python's exception through)
-petclinic/controllers.py show_owner COMPILED delegation=none(it has side effects (the call of [petclinic.ClinicService.find_owner_by_id]) and a [ModuleAttribute] raises where Python promotes)
-petclinic/controllers.py show_owner_list COMPILED delegation=none(it has side effects (the call of [petclinic.ClinicService.find_all_owners]) and a [ModuleAttribute] raises where Python promotes)
-petclinic/controllers.py show_vet_list COMPILED delegation=none(it has side effects (the helper [map]) and the helper [map] raises where Python promotes)
+petclinic/controllers.py show_owner COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py show_owner_list COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py show_vet_list COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
 petclinic/controllers.py show_vet_list_html SKIPPED
-petclinic/controllers.py show_vet_list_json COMPILED delegation=none(it has side effects (the call of [petclinic.ClinicService.vet_models]) and a [ModuleAttribute] raises where Python promotes)
+petclinic/controllers.py show_vet_list_json COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
 petclinic/controllers.py validation_errors SKIPPED
-petclinic/controllers.py welcome COMPILED delegation=none(it has side effects (the helper [map]) and the helper [map] raises where Python promotes)
+petclinic/controllers.py welcome COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
 petclinic/entities.py Owner.is_new COMPILED delegation=retry
 petclinic/entities.py Pet.get_owner_id COMPILED delegation=once
 petclinic/entities.py Pet.get_type_id COMPILED delegation=once

@@ -128,6 +128,11 @@ public final class StaticDelegation {
     }
 
     private static Decision decide(Ir.CompiledBody body) {
+        if (body.moduleLevel() && !body.staticMethod()) {
+            // a bridged module-level function (a route) is a method of the module's bean, which the
+            // static lookup of the rewritten function does not reach
+            return Decision.refused("the module-level function is a method of the module's bean, which a Python caller does not reach");
+        }
         List<String> kinds = new ArrayList<>(body.parameterTypes().size());
         for (int i = 0; i < body.parameterTypes().size(); i++) {
             String parameterType = body.parameterTypes().get(i);
@@ -147,11 +152,6 @@ public final class StaticDelegation {
             return Decision.refused("it has side effects (" + analysis.sideEffect + ") and " + analysis.promotion + " raises where Python promotes");
         }
         String className = body.className();
-        if (body.moduleLevel() && !body.staticMethod()) {
-            // a bridged module-level function (a route) is a method of the module's bean, which the
-            // static lookup of the rewritten function does not reach
-            return Decision.refused("the module-level function is a method of the module's bean, which a Python caller does not reach");
-        }
         if (body.staticMethod() || body.moduleLevel()) {
             if (analysis.sideEffects) {
                 return Decision.refused("a static body with side effects (" + analysis.sideEffect + ") has no bound object to raise Python's exception through");
@@ -308,6 +308,16 @@ public final class StaticDelegation {
                     // reading a value has no side effect and cannot overflow
                 }
                 case Ir.Field field -> visit(field.receiver());
+                case Ir.ModuleAttribute _ -> {
+                    // an injected bean of the module, read from a field of the module's generated class
+                }
+                case Ir.PythonMember member -> {
+                    if (member.accessor()) {
+                        // a @property of another object runs its getter, which may do anything
+                        sideEffect("the property [" + member.name() + "]");
+                    }
+                    visit(member.receiver());
+                }
                 case Ir.Binary binary -> {
                     promotes(Ir.LONG.equals(binary.type()) && PROMOTING_LONG_OPS.contains(binary.op()), "the long [" + binary.op() + "]");
                     visit(binary.left());
