@@ -59,12 +59,17 @@ class StaticBodyGeneratorTest {
     private static final String OVERLOADS = GeneratorOverloads.class.getName();
     private static final StaticBodyGenerator.SelfAccess NO_SELF = new StaticBodyGenerator.SelfAccess() {
         @Override
-        public ExpressionDef read(String property, String typeName, TypeDef type) {
+        public ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor) {
             throw new UnsupportedOperationException("self." + property);
         }
 
         @Override
-        public StatementDef write(String property, TypeDef type, ExpressionDef value) {
+        public ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct) {
+            throw new UnsupportedOperationException("self." + name + "()");
+        }
+
+        @Override
+        public StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor) {
             throw new UnsupportedOperationException("self." + property);
         }
     };
