@@ -85,15 +85,15 @@ class PricingService:
 
 A `CompileStatic` that switches a function on without the function being compiled gets a warning naming the first reason (an error when `micronaut.python.compile.static.strict` is `true`):
 
-* on a function, the switch warns whenever the function is not compiled, in every mode, including a function that can never be compiled (a static, async or special method);
-* on a class or a module, the switch warns once for each method of its scope that is skipped, except in mode `all`, where skipping is the expected common case and only function-level switches warn. Methods of the scope that are never candidates (a constructor, a dunder, a static method, a method of an ineligible class) are recorded as `NOT_CANDIDATE` in the report without a warning, so a class opt-in covering only such methods is silent: the report is the place to look;
+* on a function, the switch warns whenever the function is not compiled, in every mode, including a function that can never be compiled (a static, async or special method, or a `@property` getter, setter or deleter);
+* on a class or a module, the switch warns once for each method of its scope that is skipped, except in mode `all`, where skipping is the expected common case and only function-level switches warn. Methods of the scope that are never candidates (a constructor, a dunder, a static method) are recorded as `NOT_CANDIDATE` in the report without a warning, so a class opt-in covering only such methods is silent: the report is the place to look. A class switch on a class that can never be compiled (an enum, a protocol, a pooled class, ...) warns once for the class, except in mode `all`; a module switch does not;
 * the mode alone never warns.
 
-The annotation is kept in the source only.
+The switch may also be imported from `pyronaut.build`, as `from pyronaut.build import CompileStatic` (aliased or not) or as a member of the module (`import pyronaut.build as pb`, then `@pb.CompileStatic`); `TypeChecked` likewise. The annotation is kept in the source only.
 
 == What Is Compiled
 
-A method is compiled when it is a candidate, its signature has a Java layout, and every statement and expression of its body has a lowering with Python's semantics. Each failing condition is a reason with a stable identifier in the report. The signature and the statement kinds are checked completely, so all of their reasons are listed; the lowering of the body stops at its first refusal, so a body can carry one lowering reason at a time.
+A method is compiled when it is a candidate, its signature has a Java layout, and every statement and expression of its body has a lowering with Python's semantics. Each failing condition is a reason with a stable identifier in the report. The signature and the statement kinds are checked completely, so all of their reasons are listed; the lowering of the body reports a reason for every refused statement.
 
 [cols="1,3"]
 |===
@@ -107,6 +107,9 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 
 |`special-method`, `async-function`, `generator-function`, `static-method`, `abstract-method`
 |The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, a static or class method, or an abstract method or one whose body is a placeholder (`...`): a call of it runs the implementation of the object.
+
+|`property-accessor`
+|A `@property` getter, setter or deleter: Python calls it through the attribute protocol of the object, so there is no method to compile. Only a function-level `CompileStatic` on the accessor gets this decision, and warns; an accessor nothing switches on has no decision.
 
 |`overriding-java-method`, `intercepted-method`
 |The method implements a method of a Java base or interface, whose bridge keeps the Java signature; or it is an advised method of an introduction, whose chain runs on the Python object; or it is an advised module-level function (an around binding on the function or its module, a validation constraint on a parameter or the return), since the generated class of a module does not run compiled advice yet. Other advised methods of a class (an around binding or a validation constraint on a method, its class or a parameter) are compiled: the Java method runs the interceptor chain the bean's proxy binds before the body, as a proxy compiled for a Java bean does, so validation and around advice cost no crossing into Python.
@@ -124,13 +127,13 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |A builtin, a method of a Python value, a statement kind or an expression kind outside the supported subset below, or a form of a supported statement that is not (see the list after the table).
 
 |`unbounded-integer-op`, `equality-on-object`, `truthiness-of-java-object`, `python-exception`
-|An operation whose Python semantics the lowering does not reproduce: `**` on integers or an integer literal outside `long`, `==` between Java objects, `if x:` on a Java object that is not a collection or a string, raising or catching a Python exception, a bare `except:`.
+|An operation whose Python semantics the lowering does not reproduce: `**` on integers with an exponent that is not a non-negative integer literal, an integer literal outside `long`, `==` between Java objects, `if x:` on a Java object that is not a collection or a string, or on an object of a class of the compilation whose truthiness Python may take from elsewhere (the class, a Python base or a subclass of the compilation defines `__bool__` or `__len__`, has a Java base, or has a base the checker cannot see), raising or catching a Python exception, a bare `except:`.
 
 |The rules of the <<typeChecking, type checker>>
 |A body the checker's inference flags carries the checker's rule (an unknown method, an argument of the wrong type, ...) as its reason.
 |===
 
-A `NOT_CANDIDATE` decision carries the reasons of the first three rows, a `SKIPPED` one the others.
+A `NOT_CANDIDATE` decision carries `class-not-eligible`, `special-method`, `async-function`, `generator-function`, `static-method`, `abstract-method`, `property-accessor`, `overriding-java-method` or `intercepted-method` (the first four rows); a `SKIPPED` one carries the reasons of the other rows.
 
 === The Supported Subset
 
@@ -149,26 +152,26 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |`raise JavaException(...)`, `try`/`except JavaType as e`/`finally`
 |`throw` and `try` with typed catches. A checked exception a Java call declares reaches the caller wrapped in `IllegalStateException`, as it does through the bridge.
 
-|`+`, `-`, `*` on integers
+|`+`, `-`, `*` on integers, `**` with a non-negative integer literal exponent
 |`Math.addExact` and friends: an overflow raises `ArithmeticException` where Python would promote to a big integer. This is the one accepted difference.
 
 |`==`, `!=`, `<` and the rest, `is None`, `not`, `and`, `or`, `x if c else y`
-|Numeric comparisons, `equals` on strings, null checks, boolean operators; `and`/`or` yield a value when both sides share a type, or when they are two objects one of whose types takes the other (`pet.owner or self.find_owner(id)`), the left operand being a name, a literal or an attribute of a name, since it is evaluated twice.
+|Numeric comparisons, `equals` on strings, null checks, boolean operators; `and`/`or` yield a value when both sides share a type, or when they are two objects one of whose types takes the other (`pet.owner or self.find_owner(id)`), the left operand being a name, a literal or an attribute of a name, since it is evaluated twice; a `@property` of `self` as the left operand is refused, since its getter would run twice (read it into a local first).
 
 |f-strings, `str(x)`, `"a" + b`
-|Concatenation through `PythonStatic.str`. A `UUID`, `LocalDate` or `LocalTime` is spelled as Java spells it, which is Python's spelling too; another standard Java value (an `Instant`, a `BigDecimal`) is refused, since Python spells it differently. Format specifications are not compiled.
+|Concatenation through `PythonStatic.str`. A `UUID`, `LocalDate` or `LocalTime` is spelled as Java spells it, which is Python's spelling too; another standard Java value (an `Instant`, a `BigDecimal`) is refused, since Python spells it differently. An object of a class of the compilation is spelled by its generated class's `toString()`, which is Python's `str()` only when the class or a Python base defines `__str__` or `__repr__` in its source: `str()` of any other (a dataclass, whose `__repr__` is generated, or a class defining a Python `toString`) is refused. Format specifications are not compiled.
 
 |`[...]`, `(...)`, `{...}`, `{k: v}`, `xs[i]`, `m[k]`, `xs[i] = v`, `m[k] = v`, `x in xs`
-|`ArrayList`, immutable `List`, `LinkedHashSet` and `LinkedHashMap` with the element types of the literal (an empty literal takes them from the hint of the local); a literal mixing strings, numbers and objects holds `Object` elements; `{k: v, **other}` builds the map in source order, later keys winning; helpers for the reads, stores and membership tests. A collection given to a parameter hinted `list`, `set` or `dict` is worked on as a copy, as the bridge hands Python a copy.
+|`ArrayList`, immutable `List`, `LinkedHashSet` and `LinkedHashMap` with the element types of the literal (an empty literal takes them from the hint of the local); a literal mixing strings, numbers and objects holds `Object` elements; `{k: v, **other}` builds the map in source order, later keys winning; helpers for the reads, stores and membership tests. A collection given to a parameter hinted `list`, `set` or `dict` is worked on as a copy, as the bridge hands Python a copy; a call of a sibling taking one therefore goes through the Python object, which passes the caller's own collection, as Python does.
 
 |`len`, `int`, `float`, `bool`, `abs`, `min`, `max`, `list(xs)`, `set(xs)`, `tuple(xs)`, `str.strip/split/join/upper/lower/startswith/endswith/replace`, `list.append/clear`, `set.add`, `dict.get/keys/values`
-|The builtin table: each entry names a Java equivalent or a helper. `list(xs)`, `set(xs)` and `tuple(xs)` copy a Java collection or a typed Python one, a dict yielding its keys. `dict.get` without a default is refused when the values are numbers or booleans, since it may answer `None`.
+|The builtin table: each entry names a Java equivalent or a helper. `list(xs)`, `set(xs)` and `tuple(xs)` copy a Java collection or a typed Python one, a dict yielding its keys. `dict.get` without a default is refused when the values are numbers or booleans, since it may answer `None`, and so is a default of another numeric kind than the values (`d.get(k, 0)` of a `dict[str, float]`), since Python answers the default itself. `min` and `max` of an int and a float are refused, since Python answers the winning argument with its own type; of floats they keep the earlier argument unless a later one is strictly greater (smaller), as Python does with `NaN` and `-0.0`.
 
 |Unhinted returns
 |`Object`, as the stub declares, every returned value boxed. A call of such a sibling has the one static type its body returns when the checker infers one, cast from the `Object` the Java method returns; a number or a boolean stays an `Object`.
 
 |Java calls, constructors, static fields, enum constants, nested types
-|Direct Java calls with the parameter types of the chosen overload, so the generated code never depends on javac's overload pick; an integer argument to an `int` parameter narrows exactly. A returned `List<String>` or `Map<String, Integer>` keeps its element types, so its elements are iterated, joined and compared with their static types.
+|Direct Java calls with the parameter types of the chosen overload: an argument whose type differs from its parameter's is cast to the parameter type, and a `None` argument is passed through a local of the parameter's type, so the generated code never depends on javac's overload pick; an integer argument to an `int` parameter narrows exactly. A returned `List<String>` or `Map<String, Integer>` keeps its element types, so its elements are iterated, joined and compared with their static types.
 
 |Injected attributes of a module
 |A module-level function of the module's generated class reads an attribute the module injects (`repository: Annotated[BookRepository, Inject]`) from a field of that class, set when the bean is injected, and calls the bean as a Java object.
@@ -183,10 +186,10 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |The Java field of an introspected class, else the attribute of the Python object; a `@property` always runs its Python getter or setter. An attribute `__init__` assigns a hinted parameter or a Java call or construction (`self._encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder()`) has that type in every method.
 
 |`self.method(...)`
-|The generated class's own Java method when it declares one for the call (a public method with a hinted signature the call fills exactly, that no advice intercepts and no subclass of the compilation overrides), else the method of the Python object, which runs its interceptors, overrides and default arguments as Python would.
+|The generated class's own Java method when it declares one for the call (a public method with a hinted signature the call fills exactly, that takes no `list`, `set` or `dict`, that no advice intercepts and no subclass of the compilation overrides), else the method of the Python object, which runs its interceptors, overrides and default arguments as Python would.
 |===
 
-Not compiled: comprehensions, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, calls of module-level functions, and `Optional` hints; nor the `else` clause of a `for`, `while` or `try` statement, unpacking in a `for` target other than `for k, v in mapping.items()` or in an assignment (`a, b = ...`), a chained assignment (`a = b = 0`) and a bare `except:`.
+Not compiled: comprehensions, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, calls of module-level functions, `isinstance`, `**` on floats, and `Optional` hints; nor the `else` clause of a `for`, `while` or `try` statement, unpacking in a `for` target other than `for k, v in mapping.items()` or in an assignment (`a, b = ...`), a chained assignment (`a = b = 0`) and a bare `except:`.
 
 Refused as well, where the Java code would behave differently: a `for` loop whose body may change the collection it iterates (appending to it, storing or deleting an item, passing it to a call; Python goes on iterating, the Java iterator throws `ConcurrentModificationException`), and a lookup, store or membership test of a dict or set, or a dict or set literal, where Python's numeric equality decides (`1`, `1.0` and `True` are one key in Python and three in Java): a numeric or `bool` key among keys of another or of any type.
 
