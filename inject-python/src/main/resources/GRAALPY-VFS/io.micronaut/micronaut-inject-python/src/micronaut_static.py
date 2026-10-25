@@ -41,6 +41,7 @@ Outcome = java.type("io.micronaut.python.processing.staticcompile.StaticCompilat
 Scope = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Scope")
 Reason = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Reason")
 Stats = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Stats")
+Delegation = java.type("io.micronaut.python.processing.staticcompile.StaticDelegation")
 ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
 MICRONAUT_TEST = "io.micronaut.test.extensions.junit5.annotation.MicronautTest"
 
@@ -385,7 +386,7 @@ class StaticPlanner:
         self.body_classes.add(body.className())
         if node is not None:
             self._bodies[id(node)] = body
-        return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats())
+        return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats(), delegation=_delegation_status(body, node))
 
     def _class_scope(self, module, class_def, class_node):
         """The resolution of a class of the module, the classes around it included: resolved once per module and plan."""
@@ -448,9 +449,9 @@ class StaticPlanner:
         self._reported_classes.add(name)
         return True
 
-    def _record(self, qualified, span, outcome, scope, reasons, statements, explicit=False, stats=None):
+    def _record(self, qualified, span, outcome, scope, reasons, statements, explicit=False, stats=None, delegation=None):
         java_reasons = [Reason(rule, message, reason_span) for rule, message, reason_span in reasons]
-        decision = Decision(qualified, span, Outcome.valueOf(outcome), Scope.valueOf(scope), java_reasons, stats or Stats(statements, 0, 0, 0))
+        decision = Decision(qualified, span, Outcome.valueOf(outcome), Scope.valueOf(scope), java_reasons, stats or Stats(statements, 0, 0, 0), delegation)
         self.decisions.append(decision)
         if explicit and reasons and (self.scope.mode != MODE_ALL or scope == SCOPE_FUNCTION):
             rule, message, reason_span = reasons[0]
@@ -1299,6 +1300,24 @@ def _delegates(function):
         return True
     return (isinstance(value, ast.Attribute) and value.attr == JAVA_INSTANCE_MEMBER
             and isinstance(value.value, ast.Name) and value.value.id == "__class__")
+
+
+def _delegation_status(body, node):
+    """
+    Whether the Python callers of a compiled body run its Java body, as the report says it
+    (StaticDelegation.status): apply_delegation rewrites only a function that takes exactly the
+    parameters of the Java body, positionally, and only a body that has a location to tie it to its source.
+    """
+    if body.span() is None:
+        return Delegation.none("the body has no location in a source")
+    status = Delegation.status(body)
+    if status.startswith("none(") or node is None:
+        return status
+    kinds = [None] * len(list(body.parameterTypes()))
+    takes = _takes_exactly(node, kinds) if body.staticMethod() or body.moduleLevel() else _receives_self(node, kinds)
+    if not takes:
+        return Delegation.none("the function takes keyword-only, variadic or more parameters than the Java body")
+    return status
 
 
 def _takes_exactly(function, kinds):

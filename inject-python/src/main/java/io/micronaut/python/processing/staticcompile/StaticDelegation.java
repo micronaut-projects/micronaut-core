@@ -94,35 +94,86 @@ public final class StaticDelegation {
      * @return The target, or {@code null}
      */
     public static @Nullable String target(Ir.CompiledBody body) {
+        return decide(body).target();
+    }
+
+    /**
+     * Whether, and how, the Python callers of a compiled body run its Java body, as the report says
+     * it: {@code retry} (run again in Python when the Java body fails), {@code once} (a body with side
+     * effects, run once), {@code static} (a static method or a module-level function, run again in
+     * Python when it fails), or {@code none(<why>)} when they keep the Python body. The collection
+     * the body returns counts, see {@link #returnConversion(Ir.CompiledBody)}.
+     *
+     * @param body The compiled body
+     * @return The delegation status
+     * @since 5.3.0
+     */
+    public static String status(Ir.CompiledBody body) {
+        Decision decision = decide(body);
+        if (decision.target() == null) {
+            return none(decision.reason());
+        }
+        if (returnConversion(body) == null) {
+            return none("a returned collection may be one the Python body returns as the same Python object");
+        }
+        return decision.status();
+    }
+
+    /**
+     * @param reason Why the Python callers keep the Python body
+     * @return The status of a body that is not delegated
+     */
+    public static String none(String reason) {
+        return "none(" + reason + ")";
+    }
+
+    private static Decision decide(Ir.CompiledBody body) {
         List<String> kinds = new ArrayList<>(body.parameterTypes().size());
-        for (String parameterType : body.parameterTypes()) {
+        for (int i = 0; i < body.parameterTypes().size(); i++) {
+            String parameterType = body.parameterTypes().get(i);
             String kind = KINDS.getOrDefault(parameterType, javaKind(parameterType));
             if (kind == null) {
-                return null;
+                String name = i < body.parameterNames().size() ? body.parameterNames().get(i) : Integer.toString(i);
+                return Decision.refused("parameter [" + name + "] is a [" + parameterType + "], which a Python argument does not reach unchanged");
             }
             kinds.add(kind);
         }
         if (body.exceptions() == Ir.ExceptionCrossing.PYTHON_BODY) {
-            return null;
+            return Decision.refused("a Java exception of a Python exception class may come from the compilation or from Java code");
         }
         Analysis analysis = new Analysis();
         analysis.visit(body.body());
         if (analysis.sideEffects && analysis.promotes) {
-            return null;
+            return Decision.refused("it has side effects (" + analysis.sideEffect + ") and " + analysis.promotion + " raises where Python promotes");
         }
         String className = body.className();
+        if (body.moduleLevel() && !body.staticMethod()) {
+            // a bridged module-level function (a route) is a method of the module's bean, which the
+            // static lookup of the rewritten function does not reach
+            return Decision.refused("the module-level function is a method of the module's bean, which a Python caller does not reach");
+        }
         if (body.staticMethod() || body.moduleLevel()) {
             if (analysis.sideEffects) {
-                return null;
+                return Decision.refused("a static body with side effects (" + analysis.sideEffect + ") has no bound object to raise Python's exception through");
             }
             String owner = body.moduleLevel() ? "" : className.substring(className.lastIndexOf('.') + 1);
-            return owner + "#" + body.methodName() + "#static=" + className + "#kinds=" + String.join(",", kinds) + "#retry";
+            return new Decision(owner + "#" + body.methodName() + "#static=" + className + "#kinds=" + String.join(",", kinds) + "#retry", "static", "");
         }
-        return className.substring(className.lastIndexOf('.') + 1) + "#" + body.methodName()
+        return new Decision(className.substring(className.lastIndexOf('.') + 1) + "#" + body.methodName()
             + "#owner=" + className
             + "#kinds=" + String.join(",", kinds)
             + (analysis.sideEffects ? "#once" : "#retry")
-            + (body.exceptions() == Ir.ExceptionCrossing.TRANSLATED ? "#python-exceptions" : "");
+            + (body.exceptions() == Ir.ExceptionCrossing.TRANSLATED ? "#python-exceptions" : ""),
+            analysis.sideEffects ? "once" : "retry", "");
+    }
+
+    /**
+     * The delegation of a body: its target and status, or the reason it has none.
+     */
+    private record Decision(@Nullable String target, String status, String reason) {
+        static Decision refused(String reason) {
+            return new Decision(null, "none", reason);
+        }
     }
 
     /**
@@ -214,6 +265,23 @@ public final class StaticDelegation {
     private static final class Analysis {
         private boolean sideEffects;
         private boolean promotes;
+        // the first of each, for the report
+        private String sideEffect = "";
+        private String promotion = "";
+
+        private void sideEffect(String what) {
+            if (!sideEffects) {
+                sideEffects = true;
+                sideEffect = what;
+            }
+        }
+
+        private void promotes(boolean promoting, String what) {
+            if (promoting && !promotes) {
+                promotes = true;
+                promotion = what;
+            }
+        }
 
         void visit(List<? extends Ir> nodes) {
             for (Ir node : nodes) {
@@ -241,12 +309,12 @@ public final class StaticDelegation {
                 }
                 case Ir.Field field -> visit(field.receiver());
                 case Ir.Binary binary -> {
-                    promotes |= Ir.LONG.equals(binary.type()) && PROMOTING_LONG_OPS.contains(binary.op());
+                    promotes(Ir.LONG.equals(binary.type()) && PROMOTING_LONG_OPS.contains(binary.op()), "the long [" + binary.op() + "]");
                     visit(binary.left());
                     visit(binary.right());
                 }
                 case Ir.Unary unary -> {
-                    promotes |= Ir.LONG.equals(unary.type()) && "-".equals(unary.op());
+                    promotes(Ir.LONG.equals(unary.type()) && "-".equals(unary.op()), "the long negation");
                     visit(unary.operand());
                 }
                 case Ir.Compare compare -> {
@@ -269,35 +337,38 @@ public final class StaticDelegation {
                 case Ir.Truthy truthy -> visit(truthy.operand());
                 case Ir.StrJoin join -> visit(join.parts());
                 case Ir.Cast cast -> {
-                    promotes |= Ir.LONG.equals(cast.operand().type()) && NARROW_TYPES.contains(cast.type());
+                    promotes(Ir.LONG.equals(cast.operand().type()) && NARROW_TYPES.contains(cast.type()), "the narrowing to [" + cast.type() + "]");
                     visit(cast.operand());
                 }
                 case Ir.Helper helper -> {
                     if (PROMOTING_HELPERS.contains(helper.name())) {
-                        promotes = true;
+                        promotes(true, "the helper [" + helper.name() + "]");
                     } else if (!PURE_HELPERS.contains(helper.name())) {
-                        sideEffects = true;
-                        promotes = true;
+                        sideEffect("the helper [" + helper.name() + "]");
+                        promotes(true, "the helper [" + helper.name() + "]");
                     }
                     visit(helper.arguments());
                 }
                 case Ir.PutSelf put -> {
-                    sideEffects = true;
+                    sideEffect("the write of self." + put.property());
                     visit(put.value());
                 }
                 case Ir.InvokeJava call -> {
-                    sideEffects = true;
+                    sideEffect("the call of [" + call.owner() + "." + call.name() + "]");
                     visit(call.receiver());
                     visit(call.arguments());
                 }
                 case Ir.NewJava construction -> {
-                    sideEffects = true;
+                    sideEffect("the construction of [" + construction.type() + "]");
                     visit(construction.arguments());
                 }
                 default -> {
                     // a kind of node this analysis does not know: assumed to do both
-                    sideEffects = true;
-                    promotes = true;
+                    // the record's name, which its text starts with
+                    String text = String.valueOf(node);
+                    String kind = "a [" + (text.indexOf('[') < 0 ? text : text.substring(0, text.indexOf('['))) + "]";
+                    sideEffect(kind);
+                    promotes(true, kind);
                 }
             }
         }

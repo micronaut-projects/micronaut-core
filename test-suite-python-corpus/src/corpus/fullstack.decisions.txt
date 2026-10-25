@@ -21,36 +21,36 @@ app/config.py AppConfigGuard.check SKIPPED
 app/controllers/errors.py ValidationExceptionHandler.handle SKIPPED
 app/controllers/errors.py _field_of SKIPPED
 app/controllers/items.py ItemController.__init__ NOT_CANDIDATE
-app/controllers/items.py ItemController._current COMPILED
+app/controllers/items.py ItemController._current COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/controllers/items.py ItemController.create_item SKIPPED
-app/controllers/items.py ItemController.delete_item COMPILED
+app/controllers/items.py ItemController.delete_item COMPILED delegation=none(parameter [itemId] is a [java.util.UUID], which a Python argument does not reach unchanged)
 app/controllers/items.py ItemController.list_items SKIPPED
 app/controllers/items.py ItemController.read_item SKIPPED
 app/controllers/items.py ItemController.update_item SKIPPED
 app/controllers/login.py LoginController.__init__ NOT_CANDIDATE
-app/controllers/login.py LoginController.recover_password COMPILED
-app/controllers/login.py LoginController.reset_password COMPILED
+app/controllers/login.py LoginController.recover_password COMPILED delegation=once
+app/controllers/login.py LoginController.reset_password COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/controllers/login.py LoginController.test_token SKIPPED
 app/controllers/private.py PrivateController.__init__ NOT_CANDIDATE
 app/controllers/private.py PrivateController.create_user_directly SKIPPED
 app/controllers/users.py UserController.__init__ NOT_CANDIDATE
-app/controllers/users.py UserController._current COMPILED
+app/controllers/users.py UserController._current COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/controllers/users.py UserController.create_user SKIPPED
-app/controllers/users.py UserController.delete_me COMPILED
-app/controllers/users.py UserController.delete_user COMPILED
+app/controllers/users.py UserController.delete_me COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/controllers/users.py UserController.delete_user COMPILED delegation=none(parameter [userId] is a [java.util.UUID], which a Python argument does not reach unchanged)
 app/controllers/users.py UserController.list_users SKIPPED
 app/controllers/users.py UserController.read_me SKIPPED
 app/controllers/users.py UserController.read_user SKIPPED
 app/controllers/users.py UserController.signup SKIPPED
 app/controllers/users.py UserController.update_me SKIPPED
-app/controllers/users.py UserController.update_my_password COMPILED
+app/controllers/users.py UserController.update_my_password COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/controllers/users.py UserController.update_user SKIPPED
-app/controllers/users.py _email_conflict COMPILED
+app/controllers/users.py _email_conflict COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/controllers/utils.py UtilsController.__init__ NOT_CANDIDATE
-app/controllers/utils.py UtilsController.health_check COMPILED
-app/controllers/utils.py UtilsController.test_email COMPILED
+app/controllers/utils.py UtilsController.health_check COMPILED delegation=retry
+app/controllers/utils.py UtilsController.test_email COMPILED delegation=once
 app/controllers/views.py ViewController.__init__ NOT_CANDIDATE
-app/controllers/views.py ViewController._current COMPILED
+app/controllers/views.py ViewController._current COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/controllers/views.py ViewController.admin_page SKIPPED
 app/controllers/views.py ViewController.dashboard_page SKIPPED
 app/controllers/views.py ViewController.items_page SKIPPED
@@ -60,10 +60,10 @@ app/controllers/views.py ViewController.reset_password_page SKIPPED
 app/controllers/views.py ViewController.settings_page SKIPPED
 app/controllers/views.py ViewController.signup_page SKIPPED
 app/controllers/views.py _model SKIPPED
-app/entities.py Item.is_new COMPILED
-app/entities.py User.is_new COMPILED
+app/entities.py Item.is_new COMPILED delegation=retry
+app/entities.py User.is_new COMPILED delegation=retry
 app/mail_session.py ConfiguredSessionProvider.__init__ NOT_CANDIDATE
-app/mail_session.py ConfiguredSessionProvider.session COMPILED
+app/mail_session.py ConfiguredSessionProvider.session COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/mappers.py _text SKIPPED
 app/mappers.py item_public SKIPPED
 app/mappers.py items_public SKIPPED
@@ -71,9 +71,9 @@ app/mappers.py user_public SKIPPED
 app/mappers.py users_public SKIPPED
 app/paging.py page_request SKIPPED
 app/passwords.py PasswordHasher.__init__ NOT_CANDIDATE
-app/passwords.py PasswordHasher.hash COMPILED
-app/passwords.py PasswordHasher.needs_rehash COMPILED
-app/passwords.py PasswordHasher.verify COMPILED
+app/passwords.py PasswordHasher.hash COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/passwords.py PasswordHasher.needs_rehash COMPILED delegation=once
+app/passwords.py PasswordHasher.verify COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/repositories.py ItemRepository.countByOwnerId NOT_CANDIDATE
 app/repositories.py ItemRepository.findAll NOT_CANDIDATE
 app/repositories.py ItemRepository.findById NOT_CANDIDATE
@@ -82,7 +82,7 @@ app/repositories.py UserRepository.existsByEmail NOT_CANDIDATE
 app/repositories.py UserRepository.findAllOrdered NOT_CANDIDATE
 app/repositories.py UserRepository.findByEmail NOT_CANDIDATE
 app/security/provider.py EmailPasswordAuthenticationProvider.__init__ NOT_CANDIDATE
-app/security/provider.py EmailPasswordAuthenticationProvider.authenticate COMPILED
+app/security/provider.py EmailPasswordAuthenticationProvider.authenticate COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/security/tokens.py PasswordResetTokens.__init__ NOT_CANDIDATE
 app/security/tokens.py PasswordResetTokens._sign SKIPPED
 app/security/tokens.py PasswordResetTokens.issue SKIPPED
@@ -90,30 +90,30 @@ app/security/tokens.py PasswordResetTokens.verify SKIPPED
 app/security/tokens.py _b64decode SKIPPED
 app/security/tokens.py _b64encode SKIPPED
 app/services/items.py ItemService.__init__ NOT_CANDIDATE
-app/services/items.py ItemService.by_id COMPILED
-app/services/items.py ItemService.create COMPILED
-app/services/items.py ItemService.delete COMPILED
-app/services/items.py ItemService.is_owned_by COMPILED
-app/services/items.py ItemService.list_for COMPILED
-app/services/items.py ItemService.may_access COMPILED
-app/services/items.py ItemService.update COMPILED
+app/services/items.py ItemService.by_id COMPILED delegation=none(parameter [item_id] is a [java.util.UUID], which a Python argument does not reach unchanged)
+app/services/items.py ItemService.create COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/services/items.py ItemService.delete COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/services/items.py ItemService.is_owned_by COMPILED delegation=none(a static body with side effects (the call of [app.Item.getOwner]) has no bound object to raise Python's exception through)
+app/services/items.py ItemService.list_for COMPILED delegation=once
+app/services/items.py ItemService.may_access COMPILED delegation=none(a static body with side effects (the call of [app.User.isIsSuperuser]) has no bound object to raise Python's exception through)
+app/services/items.py ItemService.update COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/services/mail.py MailService.__init__ NOT_CANDIDATE
-app/services/mail.py MailService._send COMPILED
+app/services/mail.py MailService._send COMPILED delegation=none(parameter [props] is a [java.util.Map<java.lang.Object,java.lang.Object>], which a Python argument does not reach unchanged)
 app/services/mail.py MailService.render_reset_password_html SKIPPED
-app/services/mail.py MailService.send_new_account_email COMPILED
-app/services/mail.py MailService.send_reset_password_email COMPILED
-app/services/mail.py MailService.send_test_email COMPILED
+app/services/mail.py MailService.send_new_account_email COMPILED delegation=none(it has side effects (a [InvokeSibling]) and a [InvokeSibling] raises where Python promotes)
+app/services/mail.py MailService.send_reset_password_email COMPILED delegation=none(it has side effects (a [InvokeSibling]) and a [InvokeSibling] raises where Python promotes)
+app/services/mail.py MailService.send_test_email COMPILED delegation=none(it has side effects (a [InvokeSibling]) and a [InvokeSibling] raises where Python promotes)
 app/services/users.py UserService.__init__ NOT_CANDIDATE
-app/services/users.py UserService.authenticate COMPILED
-app/services/users.py UserService.by_email COMPILED
+app/services/users.py UserService.authenticate COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/services/users.py UserService.by_email COMPILED delegation=once
 app/services/users.py UserService.by_id SKIPPED
-app/services/users.py UserService.count COMPILED
-app/services/users.py UserService.create COMPILED
-app/services/users.py UserService.delete COMPILED
-app/services/users.py UserService.page COMPILED
-app/services/users.py UserService.register COMPILED
-app/services/users.py UserService.set_password COMPILED
-app/services/users.py UserService.update COMPILED
-app/services/users.py UserService.update_me COMPILED
-app/services/users.py UserService.verify_password COMPILED
+app/services/users.py UserService.count COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/services/users.py UserService.create COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/services/users.py UserService.delete COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/services/users.py UserService.page COMPILED delegation=once
+app/services/users.py UserService.register COMPILED delegation=none(it has side effects (a [InvokeSibling]) and a [InvokeSibling] raises where Python promotes)
+app/services/users.py UserService.set_password COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/services/users.py UserService.update COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/services/users.py UserService.update_me COMPILED delegation=none(it has side effects (a [InvokeSibling]) and a [InvokeSibling] raises where Python promotes)
+app/services/users.py UserService.verify_password COMPILED delegation=once
 app/services/users.py _java_uuid SKIPPED

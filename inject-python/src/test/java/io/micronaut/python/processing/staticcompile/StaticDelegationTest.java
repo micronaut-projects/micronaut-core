@@ -147,4 +147,34 @@ class StaticDelegationTest {
         Ir.Statement mixed = new Ir.If(new Ir.Const(true, Ir.BOOLEAN), new Ir.Body(List.of(new Ir.Return(call))), null);
         assertNull(StaticDelegation.returnConversion(body(List.of(), "java.util.List<java.lang.String>", mixed, new Ir.Return(new Ir.Const(null, Ir.NONE)))));
     }
+
+    @Test
+    void theStatusSaysHowThePythonCallersRunTheBodyOrWhyTheyDoNot() {
+        Ir.Expression sum = new Ir.Binary("+", param("int"), new Ir.Const(1L, Ir.LONG), Ir.LONG);
+        Ir.Statement returned = new Ir.Return(new Ir.Cast(sum, "int"));
+        assertEquals("retry", StaticDelegation.status(body(List.of("int"), "int", returned)));
+        assertEquals("static", StaticDelegation.status(body("app.Module", true, true, List.of("int"), "int", returned)));
+        Ir.Statement write = new Ir.PutSelf("label", Ir.STRING, param(Ir.STRING), false);
+        assertEquals("once", StaticDelegation.status(body(List.of(Ir.STRING), Ir.VOID, write)));
+        assertEquals("none(parameter [p0] is a [java.util.Map], which a Python argument does not reach unchanged)",
+            StaticDelegation.status(body(List.of("java.util.Map"), OBJECT, new Ir.Return(new Ir.Const(null, Ir.NONE)))));
+        Ir.Expression call = new Ir.InvokeJava(null, "java.lang.Math", "abs", List.of(Ir.LONG), List.of(param(Ir.LONG)), Ir.LONG);
+        assertEquals("none(it has side effects (the call of [java.lang.Math.abs]) and the long negation raises where Python promotes)",
+            StaticDelegation.status(body(List.of(Ir.LONG), Ir.LONG, new Ir.Return(new Ir.Unary("-", call, Ir.LONG)))));
+        assertEquals("none(a static body with side effects (the call of [java.lang.Math.abs]) has no bound object to raise Python's exception through)",
+            StaticDelegation.status(body("app.Module", true, true, List.of(Ir.LONG), Ir.LONG, new Ir.Return(call))));
+        assertEquals("none(a Java exception of a Python exception class may come from the compilation or from Java code)",
+            StaticDelegation.status(body("app.Outer$Calc", false, false, Ir.ExceptionCrossing.PYTHON_BODY, List.of(Ir.STRING), Ir.VOID, write)));
+        Ir.Expression attribute = new Ir.SelfProperty("items", "java.util.List<java.lang.String>", false, false);
+        assertEquals("none(a returned collection may be one the Python body returns as the same Python object)",
+            StaticDelegation.status(body(List.of(), "java.util.List<java.lang.String>", new Ir.Return(attribute))));
+    }
+
+    @Test
+    void aBridgedModuleFunctionIsAMethodOfTheModulesBeanAndNotDelegated() {
+        Ir.Statement returned = new Ir.Return(new Ir.Const("a", Ir.STRING));
+        assertNull(StaticDelegation.target(body("app.Module", false, true, List.of(), Ir.STRING, returned)));
+        assertEquals("none(the module-level function is a method of the module's bean, which a Python caller does not reach)",
+            StaticDelegation.status(body("app.Module", false, true, List.of(), Ir.STRING, returned)));
+    }
 }

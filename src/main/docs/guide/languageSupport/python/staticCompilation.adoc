@@ -298,6 +298,7 @@ One record per function of the compilation, delivered to the builder callback as
 ----
 COMPILED      PricingService.total  src/main/python/shop/PricingService.py:11:5
               statements 1 · java calls 0 · bridge calls 0 · helpers 0
+              python callers: retry
 SKIPPED       PricingService.discounted  src/main/python/shop/PricingService.py:14:5
               [unsupported-expression] src/main/python/shop/PricingService.py:15:16  a list comprehension has no static lowering
 EXCLUDED      PricingService.describe  src/main/python/shop/PricingService.py:18:5
@@ -309,6 +310,8 @@ CANDIDATE     0
 SKIPPED       1
 EXCLUDED      1
 NOT_CANDIDATE 1
+
+delegation retry        1
 
 special-method                   1
 unsupported-expression           1
@@ -345,7 +348,26 @@ unsupported-expression           1
 
 The totals per reason at the end of `summary.txt` put the most common blocker one glance away.
 
-`decisions.jsonl` is the input of a build tool's own rendering of the report: its first record is the plan (`mode`, `coverage`), with no timestamp, so the report is the same for the same decisions and a build cache can reuse it; every other one a decision with its `name`, `source`, `line`, `column`, `outcome`, `scope`, `reasons` (`rule`, `message`, `location`, `hint`) and `stats`. Pyronaut renders it as a page in the design of its test report.
+A compiled body also says whether its Python callers run it (see <<staticCompilationOneImplementation>>), on its `python callers:` line and as the `delegation` field of its record, with totals per status at the end of `summary.txt`:
+
+[cols="1,3"]
+|===
+|Delegation |Meaning
+
+|`retry`
+|Python callers of a bound object run the Java body; when it fails, the Python body runs instead, so the caller sees Python's result or exception.
+
+|`once`
+|Python callers of a bound object run the Java body, which has side effects and is not run twice: its failures reach the caller as the exceptions Python raises.
+
+|`static`
+|A static method or a plain module-level function: Python callers call the static Java method of the generated class, and the Python body runs when it fails.
+
+|`none(<why>)`
+|Python callers keep the Python body, for the reason given; Java callers run the compiled body all the same.
+|===
+
+`decisions.jsonl` is the input of a build tool's own rendering of the report: its first record is the plan (`mode`, `coverage`), with no timestamp, so the report is the same for the same decisions and a build cache can reuse it; every other one a decision with its `name`, `source`, `line`, `column`, `outcome`, `scope`, `reasons` (`rule`, `message`, `location`, `hint`), `stats` and, for a compiled body, `delegation`. Pyronaut renders it as a page in the design of its test report.
 
 The output of a compilation depends on its sources only: the same sources give the same bytes, the generated classes and Java sources and the report alike, whatever JVM compiles them and whatever order the file system lists the sources in, which are read in the order of their paths. `StaticCompilationReproducibilityTest` in `test-suite-python-corpus` compiles the corpus twice, in JVMs of their own, and compares every file.
 
