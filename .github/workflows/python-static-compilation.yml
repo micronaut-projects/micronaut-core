@@ -1,0 +1,108 @@
+name: Python Static Compilation CI
+# Runs the Python test corpus of inject-python-test with every eligible function body compiled to Java
+# (static compilation mode `all`), so whatever the compiler compiles there is checked against tests written
+# for the interpreted bodies; plus the corpus of test-suite-python-corpus. The regular Python CI runs them
+# in the default mode only. Runs when the static compiler or the runtime it calls changes, and on demand.
+# Unlike python.yml, this file is not synced from micronaut-project-template.
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+      - '[0-9]+.[0-9]+.x'
+      - 'python/**'
+      - 'python-*'
+      - 'stack/**'
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'inject-python/src/main/java/io/micronaut/python/processing/staticcompile/**'
+      - 'inject-python/src/main/java/io/micronaut/python/processing/PythonStubGenerator.java'
+      - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_static.py'
+      - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_lowering.py'
+      - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_typecheck.py'
+      - 'context-python/src/main/java/io/micronaut/context/python/PythonStatic.java'
+      - 'context-python/src/main/java/io/micronaut/context/python/aop/StaticAdvice*.java'
+      - 'test-suite-python-corpus/**'
+      - '.github/workflows/python-static-compilation.yml'
+  push:
+    branches:
+      - '[0-9]+.[0-9]+.x'
+    paths:
+      - 'inject-python/src/main/java/io/micronaut/python/processing/staticcompile/**'
+      - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_static.py'
+      - 'inject-python/src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_lowering.py'
+      - 'context-python/src/main/java/io/micronaut/context/python/PythonStatic.java'
+      - '.github/workflows/python-static-compilation.yml'
+  workflow_dispatch:
+# A new push to a pull request cancels its older run; pushes and manual runs get a group of their own.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+jobs:
+  build:
+    name: "mode all (${{ matrix.shard }}/2)"
+    if: github.repository == 'micronaut-projects/micronaut-core' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        # the shards of python.yml (python-ci-shards in gradle.properties)
+        shard: [1, 2]
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: true
+      # like the pull request builds of gradle.yml, only read the remote build cache
+      ORG_GRADLE_PROJECT_cachePush: false
+    steps:
+      # https://github.com/actions/virtual-environments/issues/709
+      - name: Remove system JDKs
+        run: |
+          sudo rm -rf /usr/lib/jvm/*
+          unset JAVA_HOME
+          export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
+      - name: "🗑 Free disk space"
+        run: |
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf "/opt/ghc"
+          sudo rm -rf "/usr/share/dotnet"
+          sudo rm -rf "/usr/local/lib/android"
+          sudo apt-get clean
+          df -h
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: "🔧 Setup GraalVM CE"
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        with:
+          distribution: 'graalvm'
+          java-version: '25'
+          version: '25.4'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: "🔧 Setup Gradle"
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          develocity-access-key: >-
+            ${{ (github.event_name == 'push' && secrets.GRADLE_ENTERPRISE_ACCESS_KEY) ||
+                (github.event_name != 'push' && (secrets.DEVELOCITY_PULL_REQUEST_ACCESS_KEY || secrets.GRADLE_ENTERPRISE_ACCESS_KEY)) ||
+                '' }}
+      - name: "🐍 Run the Python tests with static compilation mode all"
+        env:
+          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
+        # inject-python-test forwards the system property to its test JVMs (see its build script)
+        run: |
+          ./gradlew :micronaut-inject-python-test:test \
+            -Ppython-ci -Ppython-ci-shard=${{ matrix.shard }}/2 -Dmicronaut.python.compile.static=all \
+            --no-daemon --continue
+      - name: "🐍 Check the decisions of the corpus applications"
+        if: matrix.shard == 1
+        run: ./gradlew :test-suite-python-corpus:test -Ppython-ci --no-daemon
+      - name: "📊 Publish Test Report"
+        if: always()
+        uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6
+        with:
+          check_name: "Python Static Compilation CI / Test Report (${{ matrix.shard }}/2)"
+          report_paths: '**/build/test-results/test/TEST-*.xml'
+          check_retries: 'true'
