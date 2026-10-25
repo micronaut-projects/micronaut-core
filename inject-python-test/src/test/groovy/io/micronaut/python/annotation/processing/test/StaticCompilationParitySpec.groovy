@@ -20,6 +20,7 @@ class StaticCompilationParitySpec extends AbstractPythonTypeElementSpec {
     }
 
     static final String SOURCE = '''
+from dataclasses import dataclass
 from jakarta.inject import Singleton
 from java.lang import IllegalArgumentException
 from java.lang import Integer, Math, StringBuilder
@@ -307,6 +308,15 @@ class Calc:
         self.fill(xs)
         return len(xs)
 
+    def which_none(self) -> str:
+        return StaticOverloads.which(None)
+
+    def which_str(self, value: str) -> str:
+        return StaticOverloads.which(value)
+
+    def sequence_str(self, value: str) -> str:
+        return StaticOverloads.sequence(value)
+
     # refused: each would differ from Python if compiled
 
     def mixed_local(self, flag: bool) -> str:
@@ -341,6 +351,43 @@ class Pair:
 
     def has_partner(self) -> bool:
         return self.calc is not None
+
+@Singleton
+class Sized:
+    def __len__(self) -> int:
+        return 0
+
+@Singleton
+class Labelled:
+    def __str__(self) -> str:
+        return "python"
+
+    def toString(self) -> str:
+        return "java"
+
+@Singleton
+@dataclass
+class Form:
+    name: str = "f"
+    count: int = 3
+
+@Singleton
+class Holder:
+    def __init__(self, sized: Sized, labelled: Labelled, form: Form):
+        self.sized = sized
+        self.labelled = labelled
+        self.form = form
+
+    # refused: each would differ from Python if compiled
+
+    def empty(self) -> bool:
+        return not self.sized
+
+    def label(self) -> str:
+        return f"{self.labelled}"
+
+    def form_text(self) -> str:
+        return str(self.form)
 '''
 
     static final List<List> CASES = [
@@ -386,6 +433,7 @@ class Pair:
         ["above", 8192, 9007199254740992.0d], ["above", 8192, Double.NaN], ["below", 8192, 9007199254740992.0d], ["below", 8192, Double.NaN],
         ["exclaim", "hi"], ["exclaim", null],
         ["query", "http://example.com/x?a=1"], ["query", "http://example.com/x"],
+        ["which_none"], ["which_str", "x"], ["sequence_str", "x"],
         ["mixed_local", true], ["mixed_local", false],
         ["mixed_conditional", true],
         ["float_power", -8.0d, 0.5d], ["float_power", 0.0d, -1.0d],
@@ -401,6 +449,8 @@ class Pair:
     static final Map<String, String> REFUSED = [mixed_local: "unknown-type", mixed_conditional: "unsupported-expression", float_power: "unsupported-expression",
                                                 maybe_concat: "unknown-type", ambiguous: "ambiguous-overload", mixed_max: "unsupported-expression",
                                                 int_default: "unsupported-expression"]
+    // truthiness from __len__, a toString the stub bridges instead of __str__, a dataclass's generated __repr__
+    static final Map<String, String> HOLDER_REFUSED = [empty: "truthiness-of-java-object", label: "unsupported-expression", form_text: "unsupported-expression"]
 
     void "compiled bodies agree with the Python bodies on every input"() {
         given:
@@ -430,12 +480,18 @@ class Pair:
                 results[m]['viewed'] = calc.viewed('v').collectEntries { k, v -> [(k.toString()): v.toString()] }
                 results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
                 results[m]['int_default'] = calc.int_default(new LinkedHashMap<>([tea: 1.5d]))
+                def holder = getBean(context, 'python.Holder')
+                results[m]['holder'] = [holder.empty(), holder.label(), holder.form_text()]
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
                     // guarded, filled and rows call sibling methods, which have no static lowering yet: they run in Python in both modes
                     assert compiled.containsAll((CASES*.get(0).unique() - ['guarded', 'filled'] - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.fill']), decisions.toString()
                     REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
+                        assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
+                    }
+                    HOLDER_REFUSED.each { name, rule ->
+                        def decision = decisions.find { it.qualifiedName() == "Holder.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
                     }
                 }
@@ -494,6 +550,10 @@ class Pair:
         results[StaticCompilationMode.OFF][["collatz", 27].toString()] == 111
         results[StaticCompilationMode.OFF][["safe_host", "not a url"].toString()].startsWith('bad: ')
         results[StaticCompilationMode.OFF][["strict_host", ""].toString()] == 'raised'
+        results[StaticCompilationMode.OFF][["which_none"].toString()] == "String null"
+        results[StaticCompilationMode.OFF][["which_str", "x"].toString()] == "String x"
+        results[StaticCompilationMode.OFF][["sequence_str", "x"].toString()] == "CharSequence x"
+        results[StaticCompilationMode.OFF]['holder'] == [true, "python", "Form(name='f', count=3)"]
         results[StaticCompilationMode.OFF][["checked", 0].toString()] == "raised"
         results[StaticCompilationMode.OFF][["signed", 1.0d, 0.1d].toString()] == "10.0 0.09999999999999995"  // GraalPy floors the quotient; CPython would say 9.0
         results[StaticCompilationMode.OFF][["signed", -4.0d, 2.0d].toString()] == "-2.0 0.0"

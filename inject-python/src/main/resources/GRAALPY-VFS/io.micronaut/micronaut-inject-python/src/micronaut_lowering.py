@@ -14,7 +14,7 @@ import ast
 
 import java
 
-from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, Typed
+from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, PythonClassModel, Typed
 
 # names Java cannot declare: its keywords and literals, and the methods of Object
 JAVA_RESERVED_NAMES = frozenset((
@@ -335,6 +335,65 @@ def _operand_nodes(node):
     return ()
 
 
+def _hierarchy(model, seen=None):
+    """The class and its Python bases, each once; None in place of a base the checker cannot see."""
+    seen = seen if seen is not None else set()
+    if model.qualified in seen:
+        return []
+    seen.add(model.qualified)
+    found = [model]
+    for base in model.bases:
+        if base is None or isinstance(base, PythonClassModel):
+            found.extend([None] if base is None else _hierarchy(base, seen))
+    return found
+
+
+def _defines(model, names):
+    """Whether the class or a Python base defines one of the names, as a method or in an assignment of its body."""
+    for candidate in _hierarchy(model):
+        if candidate is None:
+            return True  # an unknown base may define it
+        if any(name in candidate.methods for name in names):
+            return True
+        for statement in getattr(candidate.node, "body", ()):
+            targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target] if isinstance(statement, ast.AnnAssign) else []
+            if any(isinstance(target, ast.Name) and target.id in names for target in targets):
+                return True
+    return False
+
+
+def _plain_truth(model):
+    """
+    Whether an object of the class (or of a subclass of the compilation, which a value of it may
+    be) is true unless None: no __bool__ or __len__ in its hierarchy, no Java base, nothing hidden.
+    """
+    for candidate in [model] + list(model.subclasses):
+        if candidate.is_open() or candidate.java_bases() or _defines(candidate, ("__bool__", "__len__")):
+            return False
+    return True
+
+
+def _bridged_str(model):
+    """
+    Whether the toString() of the generated class is Python's str() of the object, as the stub
+    bridges it: the class or a Python base defines __str__ or __repr__ (an instance method without
+    parameters) in its source, nothing of the hierarchy is hidden from the checker, and neither
+    the class nor a subclass of the compilation defines a Python toString, which the stub would
+    bridge instead.
+    """
+    hierarchy = _hierarchy(model)
+    if None in hierarchy or any(candidate.is_open() for candidate in hierarchy):
+        return False
+    if any(_defines(candidate, ("toString",)) for candidate in [model] + list(model.subclasses)):
+        return False
+    for candidate in hierarchy:
+        for name in ("__str__", "__repr__"):
+            found = candidate.methods.get(name)
+            if found is not None and not found[0].isStatic() and len(found[0].arguments().arguments()) == 0:
+                return True
+    return False
+
+
 class Refused(Exception):
     """A construct without a lowering; the reason is recorded before it is raised."""
 
@@ -352,6 +411,8 @@ class Lowering:
         self.bindings = rules.bindings
         self.class_model = class_model
         self.reasons = []
+        self.refused = set()      # (rule, span) of the reasons, which are recorded once each
+        self.unbound = set()      # the locals a refused statement assigns, whose reads are not reasons again
         self.locals = {}          # name -> Java type
         self.hoisted = []         # Local statements declared at the top of the body
         self.depth = 0            # nesting of the statement being lowered
@@ -374,19 +435,26 @@ class Lowering:
     # ---------------------------------------------------------------- entry
 
     def lower(self):
-        """The CompiledBody, or None when the body was refused (the reasons say why)."""
+        """
+        The CompiledBody, or None when the body was refused. A refused statement is a reason and
+        the lowering goes on with the next one, so the reasons are every one the body has, not the
+        first; a refused signature ends it, since the body has nothing to be lowered against.
+        """
         try:
             parameter_names, parameter_types = self._parameters()
             return_type = self._return_type()
-            if return_type != VOID and not _always_returns(self.node.body):
-                self._refuse("unknown-type", "the function does not return a value on every path", self.node)
+        except Refused:
+            return None
+        if return_type != VOID and not _always_returns(self.node.body):
+            self._record("unknown-type", "the function does not return a value on every path", self.node)
+        try:
             self._shadow_reassigned_parameters()
             statements = self._block(self.node.body)
-            body = Body(self.hoisted + statements)
         except Refused:
             return None
         if self.reasons:
             return None
+        body = Body(self.hoisted + statements)
         stats = Stats(len(self.node.body), self.java_calls, self.bridge_calls, self.helper_calls)
         return CompiledBody(self.class_def.qualifiedName(), self.function_def.name(), parameter_names, parameter_types,
                             return_type, body, self.function_def.span(), stats, self.checked)
@@ -417,8 +485,15 @@ class Lowering:
         return shadow
 
     def _refuse(self, rule, message, node):
-        self.reasons.append((rule, message, self.module.span_of(node) if node is not None else self.function_def.span()))
+        self._record(rule, message, node)
         raise Refused()
+
+    def _record(self, rule, message, node):
+        span = self.module.span_of(node) if node is not None else self.function_def.span()
+        key = (rule, str(span))
+        if key not in self.refused:
+            self.refused.add(key)
+            self.reasons.append((rule, message, span))
 
     # ---------------------------------------------------------------- signature
 
@@ -573,6 +648,11 @@ class Lowering:
                 return _erased(self.parameters[node.id][0])
         return None
 
+    def _python_class(self, type_name):
+        """The model of the class of the compilation a value of the Java type is an object of, or None."""
+        classes = getattr(self.checker, "python_classes", None)
+        return classes.by_qualified.get(_erased(type_name)) if classes is not None else None
+
     @staticmethod
     def _is_number(type_name):
         return type_name in NUMBERS
@@ -639,8 +719,14 @@ class Lowering:
         lowered = []
         for index, statement in enumerate(statements):
             self.following.append(statements[index + 1:])
-            lowered.extend(self._statement(statement))
-            self.following.pop()
+            try:
+                lowered.extend(self._statement(statement))
+            except Refused:
+                # the reason is recorded; the locals the statement assigns are unknown from here on
+                self.unbound.update(target.id for target in ast.walk(statement)
+                                    if isinstance(target, ast.Name) and isinstance(target.ctx, ast.Store) and target.id not in self.locals)
+            finally:
+                self.following.pop()
         self.depth -= 1
         return lowered
 
@@ -994,6 +1080,8 @@ class Lowering:
         if op is None:
             self._refuse("unsupported-expression", "the operator has no static lowering", node)
         if isinstance(node.target, ast.Name):
+            if node.target.id in self.unbound and node.target.id not in self.locals:
+                raise Refused()  # its assignment was refused, which is the reason
             if node.target.id not in self.locals:
                 self._refuse("unknown-type", f"local [{node.target.id}] is updated before it is assigned", node)
             current = self._name(node.target)
@@ -1333,6 +1421,8 @@ class Lowering:
             return Param(name, used, stub)
         if name in self.locals:
             return LocalRef(name, self.locals[name])
+        if name in self.unbound:
+            raise Refused()  # its assignment was refused, which is the reason
         if name == "self":
             self._refuse("unsupported-expression", "self as a value has no static lowering", node)
         typed = self._typed(node)
@@ -1624,6 +1714,10 @@ class Lowering:
         kind = _erased(expression.type())
         if kind in STANDARD_TYPES and kind not in STANDARD_STR_TYPES:
             self._refuse("unsupported-expression", f"str() of a [{kind}] spells the value as Python does not", node)
+        model = self._python_class(kind)
+        if model is not None and not _bridged_str(model):
+            # the generated class's toString() is Python's str() only where the stub bridges it to __str__
+            self._refuse("unsupported-expression", f"str() of a [{model.name}] without __str__ or __repr__ in its source spells the generated Java class instead", node)
         return expression
 
     def _conditional(self, node):
@@ -1662,8 +1756,11 @@ class Lowering:
         if _erased(value_type) in (LIST, SET, MAP) or (value_type not in JAVA_NUMBERS and (facts.isAssignable(_erased(value_type), "java.util.Collection") or facts.isAssignable(_erased(value_type), "java.util.Map"))):
             self.helper_calls += 1
             return Truthy(value)
-        if getattr(self.checker, "python_classes", None) is not None and self.checker.python_classes.by_qualified.get(_erased(value_type)) is not None:
-            # an object of a class of the compilation is true unless None: the design leaves __bool__ and __len__ aside
+        model = self._python_class(value_type)
+        if model is not None:
+            if not _plain_truth(model):
+                self._refuse("truthiness-of-java-object", f"the truthiness of a [{model.name}] may come from __bool__, __len__ or a Java base", node)
+            # an object of a class of the compilation that defines neither __bool__ nor __len__ is true unless None
             return Compare("is not None", value, None)
         self._refuse("truthiness-of-java-object", f"the truthiness of a [{value_type}] has no static lowering", node)
 
