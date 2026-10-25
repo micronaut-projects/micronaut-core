@@ -724,6 +724,9 @@ class Pricing:
 
     def float_max(self, x: float, y: float) -> float:
         return max(x, y) + min(x, y)
+
+    def int_default(self, prices: dict[str, float]) -> float:
+        return prices.get("x", 0)
 '''
 
 
@@ -823,6 +826,7 @@ class LoweringTest(unittest.TestCase):
             "float_power": "unsupported-expression",
             "maybe_concat": "unknown-type",
             "mixed_max": "unsupported-expression",
+            "int_default": "unsupported-expression",
         }
         for name, rule in expectations.items():
             decision = self.decisions[f"Pricing.{name}"]

@@ -1290,8 +1290,12 @@ class Lowering:
             if name == "get" and 1 <= len(arguments) <= 2:
                 if len(arguments) == 1 and JAVA_NUMBERS.get(value_type, value_type) in (LONG, DOUBLE, BOOLEAN):
                     self._refuse("python-builtin-not-lowered", f"dict.get without a default may answer None, which a [{value_type}] cannot hold", node)
+                if len(arguments) == 2 and self._is_number(arguments[1].type()) and self._is_number(JAVA_NUMBERS.get(value_type, value_type)) \
+                        and arguments[1].type() != JAVA_NUMBERS.get(value_type, value_type):
+                    # Python answers the default itself: d.get(k, 0) of a dict of floats is the int 0, not 0.0
+                    self._refuse("unsupported-expression", f"dict.get with a [{arguments[1].type()}] default of a dict of [{value_type}] values has no static lowering: Python answers the default with its own type", node)
                 self._exact_key(arguments[0].type(), key_type, node, "looking up a key")
-                key = self._boxed(self._coerce(arguments[0], self._boxed_as(key_type, node, "a key"), node), node)
+                key =self._boxed(self._coerce(arguments[0], self._boxed_as(key_type, node, "a key"), node), node)
                 default = self._boxed(self._coerce(arguments[1], self._boxed_as(value_type, node, "a default"), node), node) if len(arguments) == 2 else Const(None, OBJECT)
                 self.helper_calls += 1
                 return Cast(Helper("get", [receiver, key, default], OBJECT), JAVA_NUMBERS.get(value_type, value_type))
