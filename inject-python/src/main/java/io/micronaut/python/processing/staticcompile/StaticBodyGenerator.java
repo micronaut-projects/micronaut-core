@@ -714,11 +714,6 @@ public final class StaticBodyGenerator {
         return prefix + index;
     }
 
-    private static String erased(String typeName) {
-        int index = typeName.indexOf('<');
-        return index < 0 ? typeName : typeName.substring(0, index);
-    }
-
     private static boolean isPrimitive(String typeName) {
         return switch (typeName) {
             case "int", "long", "short", "byte", "char", "float", "double", "boolean" -> true;
