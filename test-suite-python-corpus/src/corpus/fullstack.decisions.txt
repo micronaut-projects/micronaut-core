@@ -71,9 +71,9 @@ app/mappers.py user_public SKIPPED
 app/mappers.py users_public SKIPPED
 app/paging.py page_request SKIPPED
 app/passwords.py PasswordHasher.__init__ NOT_CANDIDATE
-app/passwords.py PasswordHasher.hash COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/passwords.py PasswordHasher.hash COMPILED delegation=once
 app/passwords.py PasswordHasher.needs_rehash COMPILED delegation=once
-app/passwords.py PasswordHasher.verify COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/passwords.py PasswordHasher.verify COMPILED delegation=once
 app/repositories.py ItemRepository.countByOwnerId NOT_CANDIDATE
 app/repositories.py ItemRepository.findAll NOT_CANDIDATE
 app/repositories.py ItemRepository.findById NOT_CANDIDATE
@@ -92,7 +92,7 @@ app/security/tokens.py _b64encode SKIPPED
 app/services/items.py ItemService.__init__ NOT_CANDIDATE
 app/services/items.py ItemService.by_id COMPILED delegation=none(parameter [item_id] is a [java.util.UUID], which a Python argument does not reach unchanged)
 app/services/items.py ItemService.create COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
-app/services/items.py ItemService.delete COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/services/items.py ItemService.delete COMPILED delegation=once
 app/services/items.py ItemService.is_owned_by COMPILED delegation=none(a static body with side effects (the call of [app.Item.getOwner]) has no bound object to raise Python's exception through)
 app/services/items.py ItemService.list_for COMPILED delegation=once
 app/services/items.py ItemService.may_access COMPILED delegation=none(a static body with side effects (the call of [app.User.isIsSuperuser]) has no bound object to raise Python's exception through)
@@ -107,9 +107,9 @@ app/services/users.py UserService.__init__ NOT_CANDIDATE
 app/services/users.py UserService.authenticate COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/services/users.py UserService.by_email COMPILED delegation=once
 app/services/users.py UserService.by_id SKIPPED
-app/services/users.py UserService.count COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/services/users.py UserService.count COMPILED delegation=none(it has side effects (the call of [io.micronaut.data.repository.CrudRepository.count]) and the narrowing to [int] raises where Python promotes)
 app/services/users.py UserService.create COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
-app/services/users.py UserService.delete COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
+app/services/users.py UserService.delete COMPILED delegation=once
 app/services/users.py UserService.page COMPILED delegation=once
 app/services/users.py UserService.register COMPILED delegation=none(it has side effects (a [InvokeSibling]) and a [InvokeSibling] raises where Python promotes)
 app/services/users.py UserService.set_password COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
