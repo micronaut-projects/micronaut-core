@@ -952,12 +952,11 @@ class Pricing:
     def int_default(self, prices: dict[str, float]) -> float:
         return prices.get("x", 0)
 
-    def several(self, name: str, n: int) -> int:
-        while n > 0:
-            n -= 1
-        size = len(name)
+    def several(self, n: int, x: float) -> int:
         power = n ** n
-        return size + power
+        scaled = x ** 2
+        mixed = 1 if n else 2.5
+        return power
 
 
 pricing: Annotated[Pricing, Inject]
@@ -1414,9 +1413,10 @@ class LoweringTest(unittest.TestCase):
         # refused is not a reason of its own
         decision = self.decisions["Pricing.several"]
         self.assertEqual("SKIPPED", decision.outcome().name())
-        self.assertEqual(["unsupported-statement", "python-builtin-not-lowered", "unbounded-integer-op"], rules(decision),
+        self.assertEqual(["unbounded-integer-op", "unsupported-expression", "unsupported-expression"], rules(decision),
                          [(r.rule(), r.message()) for r in decision.reasons()])
-        self.assertEqual([133, 135, 136], [reason.span().line() for reason in decision.reasons()])
+        start = decision.span().line()  # the three statements below the def
+        self.assertEqual([start + 1, start + 2, start + 3], [reason.span().line() for reason in decision.reasons()])
         self.assertNotIn("several", self.bodies)
 
     def test_static_methods_are_not_candidates_yet(self):

@@ -59,12 +59,27 @@ class StaticBodyGeneratorTest {
     private static final String OVERLOADS = GeneratorOverloads.class.getName();
     private static final StaticBodyGenerator.SelfAccess NO_SELF = new StaticBodyGenerator.SelfAccess() {
         @Override
-        public ExpressionDef read(String property, String typeName, TypeDef type) {
+        public ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor) {
             throw new UnsupportedOperationException("self." + property);
         }
 
         @Override
-        public StatementDef write(String property, TypeDef type, ExpressionDef value) {
+        public ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct) {
+            throw new UnsupportedOperationException("self." + name + "()");
+        }
+
+        @Override
+        public ExpressionDef invokeOn(ExpressionDef value, String owner, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+            throw new UnsupportedOperationException(owner + "." + name + "()");
+        }
+
+        @Override
+        public ExpressionDef readOf(ExpressionDef value, String owner, String property, String typeName, TypeDef type) {
+            throw new UnsupportedOperationException(owner + "." + property);
+        }
+
+        @Override
+        public StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor) {
             throw new UnsupportedOperationException("self." + property);
         }
     };
@@ -126,18 +141,27 @@ class StaticBodyGeneratorTest {
 
     @Test
     void anArgumentIsCastToTheParameterTypeOfTheOverloadTheLoweringChose() throws Exception {
-        // which(value) bound to which(CharSequence) and to which(Object): javac alone would pick which(String)
+        // which(value) bound to which(CharSequence): javac alone would pick which(String)
         Ir.Param value = new Ir.Param("value", Ir.STRING, Ir.STRING);
         Ir.Expression sequence = new Ir.InvokeJava(null, OVERLOADS, "which", List.of("java.lang.CharSequence"), List.of(value), Ir.STRING);
-        Ir.Expression object = new Ir.InvokeJava(null, OVERLOADS, "which", List.of("java.lang.Object"), List.of(value), Ir.STRING);
         Ir.Expression string = new Ir.InvokeJava(null, OVERLOADS, "which", List.of(Ir.STRING), List.of(value), Ir.STRING);
-        Ir.Body body = new Ir.Body(List.of(new Ir.Return(new Ir.StrJoin(List.of(sequence, new Ir.Const(", ", Ir.STRING), object, new Ir.Const(", ", Ir.STRING), string)))));
+        Ir.Body body = new Ir.Body(List.of(new Ir.Return(new Ir.StrJoin(List.of(sequence, new Ir.Const(", ", Ir.STRING), string)))));
         Generated generated = generate(body, Ir.STRING, List.of("value"), List.of(Ir.STRING));
 
         assertTrue(generated.source.contains("GeneratorOverloads.which((CharSequence) value)"), generated.source);
-        assertTrue(generated.source.contains("GeneratorOverloads.which((Object) value)"), generated.source);
         assertTrue(generated.source.contains("GeneratorOverloads.which(value)"), generated.source);
-        assertEquals("CharSequence x, Object x, String x", generated.invoke("x"));
+        assertEquals("CharSequence x, String x", generated.invoke("x"));
+    }
+
+    @Test
+    void anArgumentToATypeVariableIsNotCastSoJavacInfersItsType() throws Exception {
+        // requireNonNull(T) as the facts spell it, requireNonNull(Object): (Object) value would make T an Object, no String
+        Ir.Param value = new Ir.Param("value", Ir.STRING, Ir.STRING);
+        Ir.Expression call = new Ir.InvokeJava(null, "java.util.Objects", "requireNonNull", List.of("java.lang.Object"), List.of(value), Ir.STRING);
+        Generated generated = generate(new Ir.Body(List.of(new Ir.Return(call))), Ir.STRING, List.of("value"), List.of(Ir.STRING));
+
+        assertTrue(generated.source.contains("Objects.requireNonNull(value)"), generated.source);
+        assertEquals("x", generated.invoke("x"));
     }
 
     @Test
@@ -158,7 +182,7 @@ class StaticBodyGeneratorTest {
     }
 
     private static Generated generate(Ir.Body body, String returnType, List<String> parameterNames, List<String> parameterTypes) throws Exception {
-        Ir.CompiledBody compiled = new Ir.CompiledBody("generated.Body", "run", parameterNames, parameterTypes, returnType, body, null, Stats.NONE, false);
+        Ir.CompiledBody compiled = new Ir.CompiledBody("generated.Body", "run", parameterNames, parameterTypes, returnType, body, null, Stats.NONE, false, false);
         MethodDef.MethodDefBuilder method = MethodDef.builder("run").addModifiers(Modifier.PUBLIC).returns(StaticBodyGenerator.type(returnType));
         for (int i = 0; i < parameterNames.size(); i++) {
             method.addParameter(ParameterDef.of(parameterNames.get(i), StaticBodyGenerator.type(parameterTypes.get(i))));
