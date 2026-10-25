@@ -65,6 +65,24 @@ class PythonStaticTest {
     }
 
     @Test
+    void maxAndMinOfFloatsKeepTheEarlierArgumentAsPythonDoes() {
+        assertEquals(1.0, PythonStatic.max(1.0, Double.NaN));
+        assertTrue(Double.isNaN(PythonStatic.max(Double.NaN, 1.0)));
+        assertEquals(1.0, PythonStatic.min(1.0, Double.NaN));
+        assertEquals(Double.doubleToRawLongBits(-0.0), Double.doubleToRawLongBits(PythonStatic.max(-0.0, 0.0)));
+        assertEquals(Double.doubleToRawLongBits(0.0), Double.doubleToRawLongBits(PythonStatic.min(0.0, -0.0)));
+        assertEquals(2.5, PythonStatic.max(1.0, 2.5));
+        assertEquals(1.0, PythonStatic.min(1.0, 2.5));
+    }
+
+    @Test
+    void noneInAStringRaisesAsPythonDoes() {
+        assertTrue(PythonStatic.contains("abc", "b"));
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> PythonStatic.contains("abc", null));
+        assertTrue(error.getMessage().startsWith("TypeError"), error.getMessage());
+    }
+
+    @Test
     void veryLongLiteralsAreReadWithoutExhaustingTheStack() {
         // a backtracking matcher recursing once per digit group overflowed the stack on such literals
         String grouped = "1_".repeat(100_000) + "1";

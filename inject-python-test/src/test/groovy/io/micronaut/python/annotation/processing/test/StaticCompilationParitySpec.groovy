@@ -33,6 +33,7 @@ from java.util import AbstractMap, Objects
 class Calc:
     rate: float = 1.5
     count: int = 0
+    reads: int = 0
 
     def total(self, quantity: int, unit_price: float) -> float:
         subtotal = quantity * unit_price
@@ -342,6 +343,36 @@ class Calc:
     def query(self, spec: str) -> str:
         return URL(spec).getQuery() + "?"
 
+    def biggest(self, a: float, b: float) -> str:
+        return f"{max(a, b)} {min(a, b)}"
+
+    def within(self, part: str, text: str) -> bool:
+        return part in text
+
+    def fill(self, xs: list[str]) -> None:
+        xs.append("a")
+
+    def filled(self) -> int:
+        xs: list[str] = []
+        self.fill(xs)
+        return len(xs)
+
+    def extended(self, xs: list[str]) -> str:
+        return ",".join(xs + ["b"]) + str(xs == ["a"]) + str(len(xs[0:1])) + str("a" in xs)
+
+    def extending(self) -> str:
+        xs: list[str] = ["a"]
+        return self.extended(xs)
+
+    def which_none(self) -> str:
+        return StaticOverloads.which(None)
+
+    def which_str(self, value: str) -> str:
+        return StaticOverloads.which(value)
+
+    def sequence_str(self, value: str) -> str:
+        return StaticOverloads.sequence(value)
+
     # refused: each would differ from Python if compiled
 
     def mixed_local(self, flag: bool) -> str:
@@ -362,6 +393,21 @@ class Calc:
 
     def ambiguous(self, a: int, b: int) -> str:
         return StaticOverloads.pick(a, b)
+
+    def mixed_max(self, a: int, b: float) -> str:
+        return f"{max(a, b)} {min(b, a)}"
+
+    def gained(self) -> str:
+        value = self.gain or 2.5
+        return str(value) + "|" + str(self.reads)
+
+    @property
+    def gain(self) -> float:
+        self.reads += 1
+        return 1.5
+
+    def int_default(self, prices: dict[str, float]) -> str:
+        return f"{prices.get('x', 0)}"
 
 @dataclass
 class Form:
@@ -399,6 +445,43 @@ class Bag:
 
     def rename(self, label: str) -> None:
         self.label = label
+
+@Singleton
+class Sized:
+    def __len__(self) -> int:
+        return 0
+
+@Singleton
+class Labelled:
+    def __str__(self) -> str:
+        return "python"
+
+    def toString(self) -> str:
+        return "java"
+
+@Singleton
+@dataclass
+class Ticket:
+    name: str = "f"
+    count: int = 3
+
+@Singleton
+class Holder:
+    def __init__(self, sized: Sized, labelled: Labelled, form: Ticket):
+        self.sized = sized
+        self.labelled = labelled
+        self.form = form
+
+    # refused: each would differ from Python if compiled
+
+    def empty(self) -> bool:
+        return not self.sized
+
+    def label(self) -> str:
+        return f"{self.labelled}"
+
+    def form_text(self) -> str:
+        return str(self.form)
 '''
 
     static final List<List> CASES = [
@@ -451,16 +534,25 @@ class Bag:
         ["above", 8192, 9007199254740992.0d], ["above", 8192, Double.NaN], ["below", 8192, 9007199254740992.0d], ["below", 8192, Double.NaN],
         ["exclaim", "hi"], ["exclaim", null],
         ["query", "http://example.com/x?a=1"], ["query", "http://example.com/x"],
+        ["which_none"], ["which_str", "x"], ["sequence_str", "x"],
         ["mixed_local", true], ["mixed_local", false],
         ["mixed_conditional", true],
         ["float_power", -8.0d, 0.5d], ["float_power", 0.0d, -1.0d],
         ["maybe_concat", true],
         ["ambiguous", 1, 2],
+        ["biggest", 1.0d, Double.NaN], ["biggest", Double.NaN, 1.0d], ["biggest", -0.0d, 0.0d], ["biggest", 0.0d, -0.0d], ["biggest", 1.0d, 2.5d],
+        ["within", "b", "abc"], ["within", null, "abc"],
+        ["filled"], ["extending"],
+        ["mixed_max", 3, 2.5d],
+        ["gained"],
     ]
 
     // the fixture methods the compiler must refuse: compiled, each would differ from its Python body
     static final Map<String, String> REFUSED = [mixed_local: "unknown-type", mixed_conditional: "unsupported-expression", float_power: "unsupported-expression",
-                                                maybe_concat: "unknown-type", ambiguous: "ambiguous-overload"]
+                                                maybe_concat: "unknown-type", ambiguous: "ambiguous-overload", mixed_max: "unsupported-expression",
+                                                int_default: "unsupported-expression", gained: "unsupported-expression"]
+    // truthiness from __len__, a toString the stub bridges instead of __str__, a dataclass's generated __repr__
+    static final Map<String, String> HOLDER_REFUSED = [empty: "truthiness-of-java-object", label: "unsupported-expression", form_text: "unsupported-expression"]
 
     void "compiled bodies agree with the Python bodies on every input"() {
         given:
@@ -490,11 +582,18 @@ class Bag:
                 results[m]['merged'] = calc.merged(new LinkedHashMap<>([b: '2', a: '3'])).collectEntries { k, v -> [(k.toString()): v.toString()] }
                 results[m]['viewed'] = calc.viewed('v').collectEntries { k, v -> [(k.toString()): v.toString()] }
                 results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
+                results[m]['int_default'] = calc.int_default(new LinkedHashMap<>([tea: 1.5d]))
+                def holder = getBean(context, 'python.Holder')
+                results[m]['holder'] = [holder.empty(), holder.label(), holder.form_text()]
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled']), decisions.toString()
+                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.fill']), decisions.toString()
                     REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
+                        assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
+                    }
+                    HOLDER_REFUSED.each { name, rule ->
+                        def decision = decisions.find { it.qualifiedName() == "Holder.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
                     }
                 }
@@ -522,6 +621,16 @@ class Bag:
         results[StaticCompilationMode.OFF][["sized", 3].toString()] == 3
         results[StaticCompilationMode.OFF][["spelled_size", 0].toString()] == "None"
         results[StaticCompilationMode.OFF][["spelled_limit", 1].toString()] == "None"
+        results[StaticCompilationMode.OFF][["biggest", 1.0d, Double.NaN].toString()] == "1.0 1.0"
+        results[StaticCompilationMode.OFF][["biggest", Double.NaN, 1.0d].toString()] == "nan nan"
+        results[StaticCompilationMode.OFF][["biggest", -0.0d, 0.0d].toString()] == "-0.0 -0.0"
+        results[StaticCompilationMode.OFF][["biggest", 0.0d, -0.0d].toString()] == "0.0 0.0"
+        results[StaticCompilationMode.OFF][["within", null, "abc"].toString()] == "raised"
+        results[StaticCompilationMode.OFF][["filled"].toString()] == 1
+        results[StaticCompilationMode.OFF][["extending"].toString()] == "a,bTrue1True"
+        results[StaticCompilationMode.OFF][["mixed_max", 3, 2.5d].toString()] == "3 2.5"
+        results[StaticCompilationMode.OFF]['int_default'] == "0"
+        results[StaticCompilationMode.OFF][["gained"].toString()] == "1.5|1"
         results[StaticCompilationMode.OFF][["query", "http://example.com/x"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["mixed_local", true].toString()] == "2"
         results[StaticCompilationMode.OFF][["ratio", 1, 0].toString()] == "raised"
@@ -555,6 +664,10 @@ class Bag:
         results[StaticCompilationMode.OFF][["collatz", 27].toString()] == 111
         results[StaticCompilationMode.OFF][["safe_host", "not a url"].toString()].startsWith('bad: ')
         results[StaticCompilationMode.OFF][["strict_host", ""].toString()] == 'raised'
+        results[StaticCompilationMode.OFF][["which_none"].toString()] == "String null"
+        results[StaticCompilationMode.OFF][["which_str", "x"].toString()] == "String x"
+        results[StaticCompilationMode.OFF][["sequence_str", "x"].toString()] == "CharSequence x"
+        results[StaticCompilationMode.OFF]['holder'] == [true, "python", "Ticket(name='f', count=3)"]
         results[StaticCompilationMode.OFF][["checked", 0].toString()] == "raised"
         results[StaticCompilationMode.OFF][["signed", 1.0d, 0.1d].toString()] == "10.0 0.09999999999999995"  // GraalPy floors the quotient; CPython would say 9.0
         results[StaticCompilationMode.OFF][["signed", -4.0d, 2.0d].toString()] == "-2.0 0.0"
