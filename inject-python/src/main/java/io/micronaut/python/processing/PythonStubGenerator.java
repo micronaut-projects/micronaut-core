@@ -331,6 +331,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private final Map<String, InterfaceEntry> interfaceDefs = new LinkedHashMap<>();
     private final Map<String, AnnotationEntry> annotationDefs = new LinkedHashMap<>();
     private final Map<String, Boolean> junitExtensionAnnotations = new HashMap<>();
+    /**
+     * The constructors generated so far that only assign Java fields, as {@code <class>#<number of parameters>}:
+     * calling one does not enter Python (see {@code EventLoopSafety#safeBodies}).
+     */
+    private final Set<String> pythonFreeConstructors = new HashSet<>();
     private Map<String, ClassElement> allClasses = Map.of();
 
     public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
@@ -2083,6 +2088,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * Part of {@link #visitClass} extracted verbatim; locals come from the model.
      */
+    /**
+     * Whether a generated constructor only assigns Java fields, so that calling it does not enter Python.
+     * Known for the classes this generator has visited; any other is taken to enter Python.
+     *
+     * @param constructor The constructor, as {@code <class>#<number of parameters>}
+     * @return Whether it only assigns Java fields
+     */
+    public boolean constructsWithoutPython(String constructor) {
+        return pythonFreeConstructors.contains(constructor);
+    }
+
     private void addFactoryMethods(ClassStubModel model) {
         ClassDef.ClassDefBuilder builder = model.builder();
         boolean isAopProxy = model.isAopProxy();
@@ -2154,6 +2170,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             // them. Any other Python base only wraps the Python object, which then has to exist up front.
             final int[] superConstructorParameterIndexes = extendsPythonClass ? pythonSuperConstructorParameterIndexes(superType, parameters) : null;
             final boolean requiresPythonInstance = extendsPythonClass && superConstructorParameterIndexes == null;
+            if (!constructsJavaBaseFirst(model, isAbstractIntroCtor) && !(extendsJavaBase && !isJunit5Test)
+                && isIntrospectedBean && constructorParametersBackedByFields
+                && !hasConfigurationBuilderProperty && !hasDynamicBeanProperties && !extendsPythonClass) {
+                // the constructor below only assigns the Java fields: the Python object is created when first needed
+                pythonFreeConstructors.add(element.getName() + "#" + parameters.length);
+            }
                 builder.addMethod(
                 constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                     if (constructsJavaBaseFirst(model, isAbstractIntroCtor)) {
@@ -2287,6 +2309,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             final boolean appliesPythonDefaults = isIntrospectedBean
                 && beanProperties.stream().anyMatch(PythonStubGenerator::hasPythonDefaultValue)
                 && isPythonConstructibleWithoutArguments(element);
+            if (!isJunit5Test && !constructsJavaBaseFirst(model, isAbstractIntroNoArg) && !extendsJavaBase
+                && isIntrospectedBean && !hasConfigurationBuilderProperty && !appliesPythonDefaults) {
+                // the constructor below keeps the bean lazy: the Python object is created when first needed
+                pythonFreeConstructors.add(element.getName() + "#0");
+            }
             builder.addMethod(constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                 if (isJunit5Test) {
                     return StatementDef.multi();

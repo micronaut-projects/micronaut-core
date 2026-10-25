@@ -3526,5 +3526,165 @@ class ObjectsOfTheCompilationTest(unittest.TestCase):
             self.assertEqual(("SKIPPED", ["unsupported-expression"]), self._decided(name), name)
 
 
+
+EVENT_LOOP = '''
+class Rejected(Exception):
+    pass
+
+
+class Item:
+    def __init__(self, n: int):
+        self.n = n
+
+
+class Point:
+    def __init__(self, x: int, y: int):
+        self.x = x
+        self.y = y
+
+
+class Origin:
+    def __init__(self, x: int, y: int):
+        self.x = x
+        self.y = y
+
+
+class Leaf:
+    def __init__(self, n: int, item: Item):
+        self.n = n
+        self.item = item
+
+    def plain(self, a: int) -> int:
+        return a + 1
+
+    def fixed(self) -> int:
+        return self.n
+
+    def calls_plain(self, a: int) -> int:
+        return self.plain(a) + self.fixed()
+
+    def calls_private(self, a: int) -> int:
+        return self._private(a)
+
+    def _private(self, a: int) -> int:
+        return a
+
+    def raising(self, a: int) -> int:
+        if a < 0:
+            raise Rejected("negative")
+        return a
+
+    def calls_raising(self, a: int) -> int:
+        return self.raising(a)
+
+    def ping(self, a: int) -> int:
+        if a <= 0:
+            return 0
+        return self.pong(a - 1)
+
+    def pong(self, a: int) -> int:
+        return self.ping(a)
+
+    def builds(self, a: int) -> Item:
+        return Item(a)
+
+    def builds_point(self, a: int) -> Point:
+        return Point(a, a)
+
+    def builds_origin(self) -> Origin:
+        return Origin(0, 0)
+
+    def reads_item(self) -> int:
+        return self.item.n
+
+    def counts_items(self, items: set[Item]) -> int:
+        return len(items)
+
+    def counts_names(self, names: set[str]) -> int:
+        return len(names)
+
+
+class Caller:
+    def __init__(self, leaf: Leaf):
+        self.leaf = leaf
+
+    def through_leaf(self, a: int) -> int:
+        return self.leaf.calls_plain(a)
+
+    def through_private(self, a: int) -> int:
+        return self.leaf.calls_private(a)
+
+
+def twice(n: int) -> int:
+    return n * 2
+
+
+def twice_twice(n: int) -> int:
+    return twice(twice(n))
+'''
+
+
+class EventLoopSafetyTest(unittest.TestCase):
+    """Which compiled bodies never enter Python: the planner's Ir.PythonEntries, decided over the plan by EventLoopSafety."""
+
+    def setUp(self):
+        import java
+        self.decisions, self.planner = plan(EVENT_LOOP, MODE_ALL, facts=FixedFacts(introspected=["pkg.Point"]))
+        self.bodies = {(body.methodName() if body.moduleLevel() else body.className().rsplit(".", 1)[-1] + "." + body.methodName()): body
+                       for body in self.planner.bodies}
+        safety = java.type("io.micronaut.python.processing.staticcompile.EventLoopSafety")
+        # the stub generator tells which generated constructors only assign Java fields: here Point's
+        self.safe = set(safety.safeBodies(list(self.planner.bodies), lambda constructor: constructor == "pkg.Point#2"))
+
+    def _safe(self, name):
+        decision = self.decisions[name]
+        self.assertEqual("COMPILED", decision.outcome().name(), rules(decision))
+        return self.bodies[name].key() in self.safe
+
+    def test_a_body_calling_java_and_compiled_safe_siblings_is_safe(self):
+        self.assertTrue(self._safe("Leaf.plain"))
+        # the first read of an attribute fixed at construction reaches the Python object once per object
+        self.assertTrue(self._safe("Leaf.fixed"))
+        self.assertTrue(self._safe("Leaf.calls_plain"))
+        # through a compiled method of another object of the compilation
+        self.assertTrue(self._safe("Caller.through_leaf"))
+
+    def test_module_functions_calling_compiled_functions_are_safe(self):
+        self.assertTrue(self._safe("twice"))
+        self.assertTrue(self._safe("twice_twice"))
+
+    def test_a_call_through_the_python_object_is_unsafe_and_so_are_its_callers(self):
+        self.assertFalse(self._safe("Leaf.calls_private"))
+        self.assertFalse(self._safe("Caller.through_private"))
+
+    def test_a_raise_of_a_python_exception_class_is_unsafe_and_so_are_its_callers(self):
+        self.assertFalse(self._safe("Leaf.raising"))
+        self.assertFalse(self._safe("Leaf.calls_raising"))
+
+    def test_a_cycle_of_calls_is_unsafe(self):
+        self.assertFalse(self._safe("Leaf.ping"))
+        self.assertFalse(self._safe("Leaf.pong"))
+
+    def test_constructing_a_python_class_or_reading_an_object_through_its_accessor_is_unsafe(self):
+        self.assertFalse(self._safe("Leaf.builds"))
+        self.assertFalse(self._safe("Leaf.reads_item"))
+
+    def test_constructing_an_introspected_class_is_safe_where_its_constructor_only_assigns_java_fields(self):
+        self.assertEqual(["pkg.Point#2"], list(self.bodies["Leaf.builds_point"].pythonEntries().constructions()))
+        self.assertTrue(self._safe("Leaf.builds_point"))
+        # Origin is no introspected class: its generated constructor creates the Python object
+        self.assertFalse(self._safe("Leaf.builds_origin"))
+
+    def test_copying_a_set_of_python_objects_hashes_them(self):
+        # the body works on a copy of a set parameter: a hashed collection of Python objects runs their __hash__
+        self.assertFalse(self._safe("Leaf.counts_items"))
+        self.assertTrue(self._safe("Leaf.counts_names"))
+
+    def test_the_planner_records_what_enters_python(self):
+        entries = self.bodies["Leaf.calls_private"].pythonEntries()
+        self.assertEqual("calls [_private] through the Python object", entries.entry())
+        self.assertEqual(["pkg.Leaf#plain", "pkg.Leaf#fixed"], list(self.bodies["Leaf.calls_plain"].pythonEntries().callees()))
+
+
 if __name__ == "__main__":
     unittest.main()

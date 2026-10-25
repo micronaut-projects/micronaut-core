@@ -586,6 +586,9 @@ public sealed interface Ir {
      *                       module's class
      * @param exceptions     How the Java exception of a Python exception class the body throws reaches a
      *                       Python caller of the rewritten function
+     * @param pythonEntries  What may make the body enter Python, which decides whether a route whose body
+     *                       it is runs on the event loop (see {@link EventLoopSafety}); {@code null} when the
+     *                       planner did not find it out
      */
     record CompiledBody(String className,
                         String methodName,
@@ -599,13 +602,48 @@ public sealed interface Ir {
                         boolean advised,
                         boolean staticMethod,
                         boolean moduleLevel,
-                        ExceptionCrossing exceptions) {
+                        ExceptionCrossing exceptions,
+                        @Nullable PythonEntries pythonEntries) {
         public CompiledBody {
             Objects.requireNonNull(className, "className");
             Objects.requireNonNull(exceptions, "exceptions");
             Objects.requireNonNull(methodName, "methodName");
             parameterNames = List.copyOf(parameterNames);
             parameterTypes = List.copyOf(parameterTypes);
+        }
+
+        /**
+         * A body whose entries into Python the planner has not found out yet.
+         *
+         * @param className      The generated class the method belongs to
+         * @param methodName     The method
+         * @param parameterNames The parameter names, the receiver excluded
+         * @param parameterTypes The Java types of the parameters as the stub declares them
+         * @param returnType     The Java return type as the stub declares it
+         * @param body           The body
+         * @param span           Where the Python function is declared
+         * @param stats          What the body contains
+         * @param wrapsCheckedExceptions Whether a call of the body declares a checked exception
+         * @param advised        Whether the method is advised
+         * @param staticMethod   Whether the body is generated as a static Java method
+         * @param moduleLevel    Whether the function is a module-level function
+         * @param exceptions     How the Java exception of a Python exception class the body throws reaches a Python caller
+         */
+        public CompiledBody(String className, String methodName, List<String> parameterNames, List<String> parameterTypes,
+                            String returnType, Body body, @Nullable SourceSpan span, StaticCompilationDecision.Stats stats,
+                            boolean wrapsCheckedExceptions, boolean advised, boolean staticMethod, boolean moduleLevel,
+                            ExceptionCrossing exceptions) {
+            this(className, methodName, parameterNames, parameterTypes, returnType, body, span, stats, wrapsCheckedExceptions,
+                advised, staticMethod, moduleLevel, exceptions, null);
+        }
+
+        /**
+         * @param entries What may make the body enter Python
+         * @return The body with them
+         */
+        public CompiledBody withPythonEntries(PythonEntries entries) {
+            return new CompiledBody(className, methodName, parameterNames, parameterTypes, returnType,
+                body, span, stats, wrapsCheckedExceptions, advised, staticMethod, moduleLevel, exceptions, entries);
         }
 
         /**
@@ -622,6 +660,25 @@ public sealed interface Ir {
          */
         public static String key(String className, String methodName) {
             return className + "#" + methodName;
+        }
+    }
+
+    /**
+     * What may make a compiled body enter Python, as the planner finds it: what in the body does by
+     * itself, the compiled functions of the compilation it calls through Java, and the generated
+     * classes it constructs, which enter Python unless their generated constructor only assigns Java
+     * fields. {@link EventLoopSafety#safeBodies} decides from them, over the whole plan, which bodies
+     * never enter Python.
+     *
+     * @param entry         What in the body enters Python by itself, or {@code null} for nothing
+     * @param callees       The keys ({@link CompiledBody#key()}) of the compiled bodies the body calls
+     * @param constructions The constructors of generated classes the body calls, as
+     *                      {@code <class>#<number of parameters>}
+     */
+    record PythonEntries(@Nullable String entry, List<String> callees, List<String> constructions) {
+        public PythonEntries {
+            callees = List.copyOf(callees);
+            constructions = List.copyOf(constructions);
         }
     }
 

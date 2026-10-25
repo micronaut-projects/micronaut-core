@@ -59,6 +59,9 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.PythonStubGenerator;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.python.processing.element.PythonMethodElement;
+import io.micronaut.python.processing.staticcompile.EventLoopSafety;
+import io.micronaut.python.processing.staticcompile.Ir;
+import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
 import io.micronaut.sourcegen.model.ObjectDef;
 
 import java.io.IOException;
@@ -83,6 +86,7 @@ import java.util.stream.Collectors;
 public final class PythonTypeElementVisitorProcessor {
     private static final String ANN_VALIDATED = "io.micronaut.validation.Validated";
     private static final String ANN_CONFIGURATION_READER = "io.micronaut.context.annotation.ConfigurationReader";
+    private static final String ANN_EVENT_LOOP_SAFE = "io.micronaut.context.python.annotation.EventLoopSafe";
 
     private final ClassLoader classLoader;
     private final TypeElementVisitor.VisitorKind visitorKind;
@@ -216,6 +220,8 @@ public final class PythonTypeElementVisitorProcessor {
         }
         if (stubGeneratorVisitor != null) {
             finishVisitor(stubGeneratorVisitor, pythonVisitorContext);
+            // the stubs tell which generated constructors enter Python; the bean definitions are written afterwards
+            markEventLoopSafeMethods(environment, allClasses, (PythonStubGenerator) stubGeneratorVisitor.getVisitor());
         }
         if (writeAssociatedBeans) {
             associatedBeanBuilders.addAll(takeAssociatedBeanBuilders(pythonVisitorContext));
@@ -370,6 +376,38 @@ public final class PythonTypeElementVisitorProcessor {
             }
         }
         return true;
+    }
+
+    /**
+     * Annotates the methods whose compiled body never enters Python ({@link EventLoopSafety}) with
+     * {@code EventLoopSafe}, which the executor selection of the runtime reads from the metadata of the
+     * method: such a route runs where a Java route runs, on the event loop unless it names an executor.
+     *
+     * @param environment   The processing environment, holding the static compilation plan
+     * @param classes       The classes being processed
+     * @param stubGenerator The stub generator, which knows the generated constructors that enter Python
+     */
+    private static void markEventLoopSafeMethods(PythonProcessingEnvironment environment, List<ClassElement> classes, PythonStubGenerator stubGenerator) {
+        StaticCompilationPlan plan = environment.staticCompilationPlan().get();
+        if (plan == null || plan.bodies().isEmpty()) {
+            return;
+        }
+        Set<String> safe = EventLoopSafety.safeBodies(List.copyOf(plan.bodies().values()), stubGenerator::constructsWithoutPython);
+        for (ClassElement element : classes) {
+            for (Ir.CompiledBody body : plan.bodiesOf(element.getName())) {
+                if (!safe.contains(body.key())) {
+                    continue;
+                }
+                List<MethodElement> methods = element.getEnclosedElements(
+                    ElementQuery.ALL_METHODS.onlyDeclared().named(body.methodName())
+                );
+                for (MethodElement method : methods) {
+                    if (!method.hasDeclaredAnnotation(ANN_EVENT_LOOP_SAFE)) {
+                        method.annotate(ANN_EVENT_LOOP_SAFE);
+                    }
+                }
+            }
+        }
     }
 
     private void annotatePythonAopProxy(ClassElement element) {
