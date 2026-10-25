@@ -721,6 +721,7 @@ class Lowering:
         self.prelude = []         # per statement being lowered, the statements a comprehension hoists before it
         self.hoist_barrier = 0    # inside an operand evaluated lazily or repeatedly: nothing is hoisted there
         self.evaluated = 0        # the evaluations the statement being lowered has completed that may run code or raise
+        self.synthetic = 0        # inside the loop a comprehension lowers to, whose refused statement refuses the comprehension
         self.comprehensions = {}  # id(comprehension) -> the local it is hoisted into, when an operand is lowered twice
         self.bound = _function_bindings(node)  # the names the function binds: a module-level name or builtin of the same name is hidden
         self.thrown = []          # per enclosing try block, the checked exceptions its Java calls declare
@@ -1045,6 +1046,8 @@ class Lowering:
             try:
                 lowered.extend(self._statement(statement))
             except Refused:
+                if self.synthetic:
+                    raise  # a statement of a comprehension's loop: the comprehension has no lowering
                 # the reason is recorded; the locals the statement assigns are unknown from here on
                 self.unbound.update(target.id for target in ast.walk(statement)
                                     if isinstance(target, ast.Name) and isinstance(target.ctx, ast.Store) and target.id not in self.locals)
@@ -1104,10 +1107,12 @@ class Lowering:
             test = self._truthy(node.test)
             self.branches.append(node)
             self.branch_depths.append(self.depth)
-            then = Body(self._branch_block(node.body))
-            or_else = Body(self._branch_block(node.orelse)) if node.orelse else None
-            self.branch_depths.pop()
-            self.branches.pop()
+            try:
+                then = Body(self._branch_block(node.body))
+                or_else = Body(self._branch_block(node.orelse)) if node.orelse else None
+            finally:
+                self.branch_depths.pop()
+                self.branches.pop()
             return [If(test, then, or_else)]
         if isinstance(node, ast.While):
             return self._loop(node, lambda loop: While(loop, self._unhoisted(lambda: self._truthy(node.test)), Body(self._block(node.body)), *self._exits(loop)))
@@ -1606,7 +1611,11 @@ class Lowering:
             declared = Local(result, BOOLEAN, Const(kind == "all", BOOLEAN))
         else:
             declared = None
-        lowered = self._for(loop)
+        self.synthetic += 1
+        try:
+            lowered = self._for(loop)
+        finally:
+            self.synthetic -= 1
         self.evaluated = 0  # the iterable is evaluated in the hoisted loop, before the rest of the statement as in Python
         if declared is None:
             container_type = marker.container_type
