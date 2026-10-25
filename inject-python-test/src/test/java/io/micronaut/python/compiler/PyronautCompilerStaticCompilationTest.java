@@ -300,11 +300,12 @@ class PyronautCompilerStaticCompilationTest {
         JsonNode reasons = record.get("reasons");
         assertEquals(1, reasons.size(), line);
         JsonNode reason = reasons.get(0);
-        assertEquals(List.of("rule", "message", "location"), propertyNames(reason), line);
+        assertEquals(List.of("rule", "message", "location", "hint"), propertyNames(reason), line);
         // the comprehension is lowered; the elements of the raw ArrayList it iterates have no type
         assertEquals("unknown-type", reason.get("rule").asString());
         assertEquals("the elements of the [java.util.ArrayList] have no static type", reason.get("message").asString());
         assertEquals(source + ":14:50", reason.get("location").asString());
+        assertTrue(reason.get("hint").asString().startsWith("Give the value a static type"), line);
 
         JsonNode stats = record.get("stats");
         assertEquals(List.of("statements", "javaCalls", "bridgeCalls", "helperCalls"), propertyNames(stats), line);
