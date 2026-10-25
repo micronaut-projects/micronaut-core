@@ -430,6 +430,60 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
         env.stop()
     }
 
+    void "a property source added by the name of one whose thread is about to process it, as a refresh waits to start, is processed after that refresh fails"() {
+        given: "a locator that fails once armed"
+        FailsWhenArmed locator = new FailsWhenArmed()
+        locator.release.countDown()
+        DefaultEnvironment env = new DefaultEnvironment(withLocator(locator))
+        env.start()
+        ParksWhenAskedForConvention earlier = new ParksWhenAskedForConvention('watcher')
+        ParksWhileProcessed processed = new ParksWhileProcessed(Collections.synchronizedList([]))
+        PropertySource newer = PropertySource.of('watcher', ['watcher.value': 'newer'])
+        Throwable refreshFailure = null
+
+        when: "the earlier one is registered and its thread parked before it processes it"
+        earlier.arm()
+        Thread earlierAdder = daemon('earlier-adder') { env.addPropertySource(earlier) }
+        assert earlier.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+
+        and: "a refresh that fails waits for another thread processing a property source"
+        processed.arm()
+        Thread adder = daemon('adder') { env.addPropertySource(processed) }
+        assert processed.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        locator.armed.set(true)
+        Thread refresher = daemon('refresher') {
+            try {
+                env.refresh()
+            } catch (Throwable t) {
+                refreshFailure = t
+            }
+        }
+        awaitWaiting(refresher)
+
+        and: "the newer one is added and left to the refresh, and then the thread of the earlier one goes on"
+        changeWhileParked {
+            env.addPropertySource(newer)
+        }
+        earlier.release.countDown()
+        earlierAdder.join(WAIT_SECONDS * 1000L)
+        processed.release.countDown()
+        adder.join(WAIT_SECONDS * 1000L)
+        refresher.join(WAIT_SECONDS * 1000L)
+
+        then: "the newer one is processed once the refresh has failed, as the thread adding it would have"
+        !earlierAdder.alive
+        !adder.alive
+        !refresher.alive
+        refreshFailure instanceof IllegalStateException
+        env.propertySources.find { it.name == 'watcher' }.is(newer)
+        env.getProperty('watcher.value', String).get() == 'newer'
+
+        cleanup:
+        earlier.release.countDown()
+        processed.release.countDown()
+        env.stop()
+    }
+
     void "a property source added while a refresh reads the property sources is registered, and read by the next refresh, as before"() {
         given:
         Gate gate = new Gate()
@@ -736,6 +790,33 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
                 replayEntered.countDown()
                 replayRelease.await(AddPropertySourceWhileRefreshingSpec.PARK_SECONDS, TimeUnit.SECONDS)
             }
+            return PropertySource.PropertyConvention.JAVA_PROPERTIES
+        }
+    }
+
+    /**
+     * A property source without properties that, once armed, parks the thread that asks for its
+     * convention: the thread adding it does, once it is registered and before it is processed.
+     */
+    static class ParksWhenAskedForConvention extends Parking implements PropertySource {
+        private final String name
+
+        ParksWhenAskedForConvention(String name) {
+            this.name = name
+        }
+
+        @Override
+        String getName() { name }
+
+        @Override
+        Object get(String key) { null }
+
+        @Override
+        Iterator<String> iterator() { Collections.emptyIterator() }
+
+        @Override
+        PropertySource.PropertyConvention getConvention() {
+            pass()
             return PropertySource.PropertyConvention.JAVA_PROPERTIES
         }
     }

@@ -268,11 +268,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         // lock of the catalogs was taken
         PropertySource.PropertyConvention convention = propertySource.getConvention();
         synchronized (propertySources) {
-            if (!holdsCatalogLock && handOver(new Added(name, propertySource))) {
+            if (propertySources.get(name) != propertySource) {
+                // replaced or removed meanwhile, by a thread that processes, or leaves to a read, what replaced it
                 return;
             }
-            if (propertySources.get(name) != propertySource) {
-                // replaced or removed meanwhile, outside a read, by a thread that processes that itself
+            if (!holdsCatalogLock && handOver(new Added(name, propertySource))) {
                 return;
             }
             processing++;
@@ -323,12 +323,17 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * Leaves a property source added outside a read, which this thread would process, to the read
      * in progress, which has started since it was registered and reads it as registered, or else to
      * a refresh that is about to read. Either processes it on top if it does not publish what it
-     * read. Called with the monitor of {@link #propertySources} held.
+     * read. One that is no longer registered as that instance is not left to any read: it must not
+     * take the place of what replaced it, which is processed, or left to a read, by the thread that
+     * added it. Called with the monitor of {@link #propertySources} held.
      *
      * @param added The property source
-     * @return Whether it is left to a read
+     * @return Whether it is left to a read, or is no longer registered
      */
     private boolean handOver(Added added) {
+        if (propertySources.get(added.name()) != added.source()) {
+            return true;
+        }
         List<Added> read = leftToRead;
         if (read != null) {
             addLast(read, added);
