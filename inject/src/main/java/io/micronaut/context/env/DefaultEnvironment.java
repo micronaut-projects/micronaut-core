@@ -237,15 +237,18 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
         String name = propertySource.getName();
+        // a thread that holds the lock of the catalogs, as one whose property source adds another
+        // while it is processed does, processes it at once, as it did: it waits for no refresh
+        boolean holdsCatalogLock = propertyPlaceholderResolver.holdsCatalogLock();
         boolean process;
         synchronized (propertySources) {
             propertySources.put(name, propertySource);
             noteChangeWhileRefreshing(name, propertySource);
             // a refresh about to read reads it as registered, without this thread waiting for it
-            process = isRunning() && !reading.get() && !deferToRefresh(name, propertySource);
+            process = isRunning() && !reading.get() && (holdsCatalogLock || !deferToRefresh(name, propertySource));
         }
         if (process) {
-            processAdded(name, propertySource);
+            processAdded(name, propertySource, holdsCatalogLock);
         }
         return this;
     }
@@ -256,15 +259,16 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * read, this thread leaves it to that read, which reads it as registered, rather than waiting for
      * the refresh and processing it once more after it.
      *
-     * @param name           The name of the property source
-     * @param propertySource The property source
+     * @param name             The name of the property source
+     * @param propertySource   The property source
+     * @param holdsCatalogLock Whether this thread holds the lock of the catalogs, and processes it at once
      */
-    private void processAdded(String name, PropertySource propertySource) {
+    private void processAdded(String name, PropertySource propertySource, boolean holdsCatalogLock) {
         // asked for before this thread counts itself as processing, as it was asked for before the
         // lock of the catalogs was taken
         PropertySource.PropertyConvention convention = propertySource.getConvention();
         synchronized (propertySources) {
-            if (handOver(new Added(name, propertySource))) {
+            if (!holdsCatalogLock && handOver(new Added(name, propertySource))) {
                 return;
             }
             if (propertySources.get(name) != propertySource) {
@@ -685,16 +689,26 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     /**
-     * Processes a property source on top of the properties, as the thread that added it would have.
+     * Processes a property source on top of the properties, as the thread that added it would have,
+     * if it is still registered when this thread holds the lock of the catalogs. One replaced since
+     * is not: what replaced it is processed by the thread that added it, or by the next refresh,
+     * and its values must not be overwritten with older ones.
      *
      * @param added      The property source
      * @param convention Its convention
      */
     private void processOnTop(Added added, PropertySource.PropertyConvention convention) {
         try {
-            propertyPlaceholderResolver.resetCachesAndRememberedValues();
-            LOG.debug("Processing property source: {} convention: {}", added.name(), convention);
-            propertyPlaceholderResolver.processPropertySource(added.source(), convention);
+            propertyPlaceholderResolver.withCatalogLock(() -> {
+                synchronized (propertySources) {
+                    if (propertySources.get(added.name()) != added.source()) {
+                        return;
+                    }
+                }
+                propertyPlaceholderResolver.resetCachesAndRememberedValues();
+                LOG.debug("Processing property source: {} convention: {}", added.name(), convention);
+                propertyPlaceholderResolver.processPropertySource(added.source(), convention);
+            });
         } catch (Throwable e) {
             leftOut(added, e);
         }

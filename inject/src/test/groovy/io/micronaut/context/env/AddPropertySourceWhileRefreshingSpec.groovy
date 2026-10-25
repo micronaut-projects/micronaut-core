@@ -22,6 +22,12 @@ import java.util.concurrent.locks.ReentrantLock
 class AddPropertySourceWhileRefreshingSpec extends Specification {
 
     private static final int WAIT_SECONDS = 10
+    /**
+     * How long a parked thread waits to be released: longer than a test waits for another thread,
+     * so that a thread that waits for a parked one is seen to wait, rather than being let go by the
+     * park giving up.
+     */
+    private static final int PARK_SECONDS = WAIT_SECONDS * 2
 
     void "a property source added just before a #how starts does not make the thread that adds it wait for it, and is processed once, in its order"() {
         given: "a locator that, once armed, parks the refresh, and a property source of a lower order that parks the thread adding it once it is registered"
@@ -329,6 +335,101 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
         env.stop()
     }
 
+    void "a property source that adds another while it is processed, as a refresh waits to start, reads the one it added"() {
+        given:
+        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
+        env.start()
+        AddsWhenProcessed source = new AddsWhenProcessed(env)
+        Throwable failure = null
+
+        when: "a refresh waits for the thread processing it, which then adds another and looks it up"
+        Thread adder = daemon('adder') {
+            try {
+                env.addPropertySource(source)
+            } catch (Throwable t) {
+                failure = t
+            }
+        }
+        assert source.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        Thread refresher = daemon('refresher') {
+            try {
+                env.refresh()
+            } catch (Throwable t) {
+                failure = t
+            }
+        }
+        awaitWaiting(refresher)
+        source.release.countDown()
+        adder.join(WAIT_SECONDS * 1000L)
+        refresher.join(WAIT_SECONDS * 1000L)
+
+        then: "it is processed at once, as the thread adding it holds the lock of the catalogs"
+        !adder.alive
+        !refresher.alive
+        failure == null
+        source.observed == 'nested'
+
+        cleanup:
+        source.release.countDown()
+        env.stop()
+    }
+
+    void "a property source left to a refresh that fails does not overwrite a newer one by its name, added and processed after it"() {
+        given:
+        FailsWhenArmed locator = new FailsWhenArmed()
+        DefaultEnvironment env = new DefaultEnvironment(withLocator(locator))
+        env.start()
+        ParksAfterFailedRefresh first = new ParksAfterFailedRefresh()
+        PropertySource second = PropertySource.of('watcher', ['watcher.value': 'second'])
+        Throwable refreshFailure = null
+
+        when: "the first is registered and its thread parked before processing it, and a refresh starts and is parked in the locator"
+        Thread adder = daemon('adder') { env.addPropertySource(first) }
+        assert first.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        locator.armed.set(true)
+        Thread refresher = daemon('refresher') {
+            try {
+                env.refresh()
+            } catch (Throwable t) {
+                refreshFailure = t
+            } finally {
+                // 5.2.x does not process it on the refresher's thread: this lets the test go on there
+                first.replayEntered.countDown()
+            }
+        }
+        assert locator.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+
+        and: "the first's thread goes on, and the refresh fails"
+        first.release.countDown()
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(WAIT_SECONDS)
+        while (adder.alive && adder.state != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+            Thread.sleep(5)
+        }
+        locator.release.countDown()
+        adder.join(WAIT_SECONDS * 1000L)
+        assert first.replayEntered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+
+        and: "a newer one is added and processed while the refresh is about to process the first on top"
+        env.addPropertySource(second)
+        String afterSecond = env.getProperty('watcher.value', String).orElse(null)
+        first.replayRelease.countDown()
+        refresher.join(WAIT_SECONDS * 1000L)
+
+        then: "the newer one keeps its values"
+        !adder.alive
+        !refresher.alive
+        refreshFailure instanceof IllegalStateException
+        afterSecond == 'second'
+        env.propertySources.find { it.name == 'watcher' }.is(second)
+        env.getProperty('watcher.value', String).get() == 'second'
+
+        cleanup:
+        first.release.countDown()
+        first.replayRelease.countDown()
+        locator.release.countDown()
+        env.stop()
+    }
+
     void "a property source added while a refresh reads the property sources is registered, and read by the next refresh, as before"() {
         given:
         Gate gate = new Gate()
@@ -447,7 +548,7 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
             if (armed.compareAndSet(true, false)) {
                 reached.countDown()
                 // qualified: unqualified, Groovy resolves the name through get(String) of a property source
-                if (!release.await(AddPropertySourceWhileRefreshingSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                if (!release.await(AddPropertySourceWhileRefreshingSpec.PARK_SECONDS, TimeUnit.SECONDS)) {
                     throw new IllegalStateException('the parked thread was never released')
                 }
                 return true
@@ -560,7 +661,7 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
 
         @Override
         Iterator<String> iterator() {
-            if (!lock.tryLock(AddPropertySourceWhileRefreshingSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+            if (!lock.tryLock(AddPropertySourceWhileRefreshingSpec.PARK_SECONDS, TimeUnit.SECONDS)) {
                 timedOut.set(true)
                 throw new IllegalStateException('the lock the property source needs was not released')
             }
@@ -569,6 +670,92 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
             } finally {
                 lock.unlock()
             }
+        }
+    }
+
+    /**
+     * A property source that, the first time it is iterated, waits to be released, then adds another
+     * property source and looks up its property.
+     */
+    static class AddsWhenProcessed implements PropertySource {
+        final CountDownLatch entered = new CountDownLatch(1)
+        final CountDownLatch release = new CountDownLatch(1)
+        volatile String observed
+        private final Environment env
+        private final AtomicBoolean once = new AtomicBoolean(true)
+
+        AddsWhenProcessed(Environment env) {
+            this.env = env
+        }
+
+        @Override
+        String getName() { 'nested-parent' }
+
+        @Override
+        Object get(String key) { null }
+
+        @Override
+        Iterator<String> iterator() {
+            if (once.compareAndSet(true, false)) {
+                entered.countDown()
+                release.await(AddPropertySourceWhileRefreshingSpec.PARK_SECONDS, TimeUnit.SECONDS)
+                env.addPropertySource(PropertySource.of('nested', ['nested.value': 'nested']))
+                observed = env.getProperty('nested.value', String).orElse('missing')
+            }
+            return Collections.emptyIterator()
+        }
+    }
+
+    /**
+     * A property source that parks the thread adding it where it asks for its convention, and, once
+     * a refresh it was left to has failed, the refresher where it asks for it again.
+     */
+    static class ParksAfterFailedRefresh implements PropertySource {
+        final CountDownLatch entered = new CountDownLatch(1)
+        final CountDownLatch release = new CountDownLatch(1)
+        final CountDownLatch replayEntered = new CountDownLatch(1)
+        final CountDownLatch replayRelease = new CountDownLatch(1)
+        private final AtomicBoolean once = new AtomicBoolean(true)
+
+        @Override
+        String getName() { 'watcher' }
+
+        @Override
+        Object get(String key) { 'first' }
+
+        @Override
+        Iterator<String> iterator() { ['watcher.value'].iterator() }
+
+        @Override
+        PropertySource.PropertyConvention getConvention() {
+            if (once.compareAndSet(true, false)) {
+                entered.countDown()
+                release.await(AddPropertySourceWhileRefreshingSpec.PARK_SECONDS, TimeUnit.SECONDS)
+            }
+            if (Thread.currentThread().name == 'refresher') {
+                replayEntered.countDown()
+                replayRelease.await(AddPropertySourceWhileRefreshingSpec.PARK_SECONDS, TimeUnit.SECONDS)
+            }
+            return PropertySource.PropertyConvention.JAVA_PROPERTIES
+        }
+    }
+
+    /**
+     * A property sources locator that, once armed, parks the read and then fails.
+     */
+    static class FailsWhenArmed implements PropertySourcesLocator {
+        final AtomicBoolean armed = new AtomicBoolean()
+        final CountDownLatch entered = new CountDownLatch(1)
+        final CountDownLatch release = new CountDownLatch(1)
+
+        @Override
+        Collection<PropertySource> load(Environment environment) {
+            if (armed.compareAndSet(true, false)) {
+                entered.countDown()
+                release.await(AddPropertySourceWhileRefreshingSpec.PARK_SECONDS, TimeUnit.SECONDS)
+                throw new IllegalStateException('the locator failed')
+            }
+            return []
         }
     }
 

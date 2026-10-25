@@ -177,6 +177,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return Thread.holdsLock(catalogLock);
     }
 
+    /**
+     * Runs the given action under the lock that every change of the catalogs takes.
+     *
+     * @param action The action
+     */
+    void withCatalogLock(Runnable action) {
+        synchronized (catalogLock) {
+            action.run();
+        }
+    }
+
     void reset() {
         synchronized (catalogLock) {
             ResolverState empty = new ResolverState();
