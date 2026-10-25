@@ -800,7 +800,7 @@ class Checks:
 
 
 class ObjectsOfTheCompilationTest(unittest.TestCase):
-    """The truthiness of an object of a class of the compilation follows what Python resolves."""
+    """Truthiness and str() of an object of a class of the compilation follow what Python resolves."""
 
     def setUp(self):
         self.decisions, _ = plan(OBJECTS, MODE_ALL, facts=FakeFacts())
@@ -816,6 +816,15 @@ class ObjectsOfTheCompilationTest(unittest.TestCase):
         # __len__ and __bool__ of the class, of a base, or of a subclass a value of the class may be
         for name in ("sized", "falsy", "derived", "widened"):
             self.assertEqual(("SKIPPED", ["truthiness-of-java-object"]), self._decided(name), name)
+
+    def test_str_is_compiled_where_the_stub_bridges_to_string(self):
+        for name in ("spelled", "represented", "inherited"):
+            self.assertEqual(("COMPILED", []), self._decided(name), name)
+
+    def test_str_of_a_class_without_a_source_str_is_refused(self):
+        # a dataclass's __repr__ is generated, not in its source; a Python toString takes precedence in the stub
+        for name in ("form", "unspelled", "renamed"):
+            self.assertEqual(("SKIPPED", ["unsupported-expression"]), self._decided(name), name)
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ class StaticCompilationParitySpec extends AbstractPythonTypeElementSpec {
     }
 
     static final String SOURCE = '''
+from dataclasses import dataclass
 from jakarta.inject import Singleton
 from java.lang import Integer, Math, StringBuilder
 from io.micronaut.python.annotation.processing.test import StaticOverloads
@@ -172,14 +173,36 @@ class Sized:
         return 0
 
 @Singleton
+class Labelled:
+    def __str__(self) -> str:
+        return "python"
+
+    def toString(self) -> str:
+        return "java"
+
+@Singleton
+@dataclass
+class Form:
+    name: str = "f"
+    count: int = 3
+
+@Singleton
 class Holder:
-    def __init__(self, sized: Sized):
+    def __init__(self, sized: Sized, labelled: Labelled, form: Form):
         self.sized = sized
+        self.labelled = labelled
+        self.form = form
 
     # refused: each would differ from Python if compiled
 
     def empty(self) -> bool:
         return not self.sized
+
+    def label(self) -> str:
+        return f"{self.labelled}"
+
+    def form_text(self) -> str:
+        return str(self.form)
 '''
 
     static final List<List> CASES = [
@@ -223,8 +246,8 @@ class Holder:
     // the fixture methods the compiler must refuse: compiled, each would differ from its Python body
     static final Map<String, String> REFUSED = [mixed_local: "unknown-type", mixed_conditional: "unsupported-expression", float_power: "unsupported-expression",
                                                 maybe_concat: "unknown-type", ambiguous: "ambiguous-overload"]
-    // truthiness from __len__
-    static final Map<String, String> HOLDER_REFUSED = [empty: "truthiness-of-java-object"]
+    // truthiness from __len__, a toString the stub bridges instead of __str__, a dataclass's generated __repr__
+    static final Map<String, String> HOLDER_REFUSED = [empty: "truthiness-of-java-object", label: "unsupported-expression", form_text: "unsupported-expression"]
 
     void "compiled bodies agree with the Python bodies on every input"() {
         given:
@@ -240,7 +263,7 @@ class Holder:
                 results[m] = CASES.collectEntries { List row -> [(row.toString()): invoke(calc, row)] }
                 results[m]['pair'] = pair.has_partner()
                 def holder = getBean(context, 'python.Holder')
-                results[m]['holder'] = [holder.empty()]
+                results[m]['holder'] = [holder.empty(), holder.label(), holder.form_text()]
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
                     assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner']), decisions.toString()
@@ -278,7 +301,7 @@ class Holder:
         results[StaticCompilationMode.OFF][["host", "not a url"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["entry", "k", 3].toString()] == "k=3"
         results[StaticCompilationMode.OFF]['pair'] == true
-        results[StaticCompilationMode.OFF]['holder'] == [true]
+        results[StaticCompilationMode.OFF]['holder'] == [true, "python", "Form(name='f', count=3)"]
         results[StaticCompilationMode.OFF][["checked", 0].toString()] == "raised"
         results[StaticCompilationMode.OFF][["signed", 1.0d, 0.1d].toString()] == "10.0 0.09999999999999995"  // GraalPy floors the quotient; CPython would say 9.0
         results[StaticCompilationMode.OFF][["signed", -4.0d, 2.0d].toString()] == "-2.0 0.0"

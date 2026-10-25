@@ -187,6 +187,27 @@ def _plain_truth(model):
     return True
 
 
+def _bridged_str(model):
+    """
+    Whether the toString() of the generated class is Python's str() of the object, as the stub
+    bridges it: the class or a Python base defines __str__ or __repr__ (an instance method without
+    parameters) in its source, nothing of the hierarchy is hidden from the checker, and neither
+    the class nor a subclass of the compilation defines a Python toString, which the stub would
+    bridge instead.
+    """
+    hierarchy = _hierarchy(model)
+    if None in hierarchy or any(candidate.is_open() for candidate in hierarchy):
+        return False
+    if any(_defines(candidate, ("toString",)) for candidate in [model] + list(model.subclasses)):
+        return False
+    for candidate in hierarchy:
+        for name in ("__str__", "__repr__"):
+            found = candidate.methods.get(name)
+            if found is not None and not found[0].isStatic() and len(found[0].arguments().arguments()) == 0:
+                return True
+    return False
+
+
 class Refused(Exception):
     """A construct without a lowering; the reason is recorded before it is raised."""
 
@@ -795,6 +816,10 @@ class Lowering:
         kind = _erased(expression.type())
         if kind in STANDARD_TYPES and kind not in STANDARD_STR_TYPES:
             self._refuse("unsupported-expression", f"str() of a [{kind}] spells the value as Python does not", node)
+        model = self._python_class(kind)
+        if model is not None and not _bridged_str(model):
+            # the generated class's toString() is Python's str() only where the stub bridges it to __str__
+            self._refuse("unsupported-expression", f"str() of a [{model.name}] without __str__ or __repr__ in its source spells the generated Java class instead", node)
         return expression
 
     def _conditional(self, node):
