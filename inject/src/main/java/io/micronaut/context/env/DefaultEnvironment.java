@@ -150,6 +150,12 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private @Nullable List<Added> leftToRead;
     /** How many threads are processing a property source they added outside a read; a refresh about to start waits for them. */
     private int processing;
+    /**
+     * How many reads of the property sources have completed and published what they read. A read
+     * that completes after a property source was registered, or left to a read, has read it in its
+     * order, so it is not processed on top once more.
+     */
+    private long publishedReads;
 
     // For configuration maps, sets with low access - it's enough to use Collections.synchronized
 
@@ -241,14 +247,16 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         // while it is processed does, processes it at once, as it did: it waits for no refresh
         boolean holdsCatalogLock = propertyPlaceholderResolver.holdsCatalogLock();
         boolean process;
+        long readsBefore;
         synchronized (propertySources) {
             propertySources.put(name, propertySource);
             noteChangeWhileRefreshing(name, propertySource);
+            readsBefore = publishedReads;
             // a refresh about to read reads it as registered, without this thread waiting for it
             process = isRunning() && !reading.get() && (holdsCatalogLock || !deferToRefresh(name, propertySource));
         }
         if (process) {
-            processAdded(name, propertySource, holdsCatalogLock);
+            processAdded(name, propertySource, holdsCatalogLock, readsBefore);
         }
         return this;
     }
@@ -262,8 +270,9 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * @param name             The name of the property source
      * @param propertySource   The property source
      * @param holdsCatalogLock Whether this thread holds the lock of the catalogs, and processes it at once
+     * @param readsBefore      How many reads had published when it was registered
      */
-    private void processAdded(String name, PropertySource propertySource, boolean holdsCatalogLock) {
+    private void processAdded(String name, PropertySource propertySource, boolean holdsCatalogLock, long readsBefore) {
         // asked for before this thread counts itself as processing, as it was asked for before the
         // lock of the catalogs was taken
         PropertySource.PropertyConvention convention = propertySource.getConvention();
@@ -272,7 +281,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 // replaced or removed meanwhile, by a thread that processes, or leaves to a read, what replaced it
                 return;
             }
-            if (!holdsCatalogLock && handOver(new Added(name, propertySource))) {
+            if (publishedReads != readsBefore) {
+                // a read has started and published since it was registered, and has read it in its order
+                return;
+            }
+            if (!holdsCatalogLock && handOver(new Added(name, propertySource, readsBefore))) {
                 return;
             }
             processing++;
@@ -303,7 +316,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         if (refreshesBeforeRead == 0) {
             return false;
         }
-        addLast(deferredToRefresh, new Added(name, propertySource));
+        addLast(deferredToRefresh, new Added(name, propertySource, publishedReads));
         return true;
     }
 
@@ -454,6 +467,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             synchronized (propertySources) {
                 // first, and without a call that could fail on a stack that is nearly used up
                 leftToRead = null;
+                if (completed && refresh == null) {
+                    // a start publishes what it reads as it reads it
+                    publishedReads++;
+                }
                 reading.set(false);
             }
             if (!completed && refresh == null) {
@@ -489,6 +506,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             } finally {
                 synchronized (propertySources) {
                     changedWhileRefreshing = null;
+                    if (completed && refresh.leftToRead != null) {
+                        // counted with the lock of the catalogs held, which the refresh keeps until it has published
+                        publishedReads++;
+                    }
                     if (!completed) {
                         // The resolver keeps the catalog it published when the rebuild fails. Put back the
                         // property sources that catalog was built from, so the next refresh drops and reads
@@ -697,7 +718,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * Processes a property source on top of the properties, as the thread that added it would have,
      * if it is still registered when this thread holds the lock of the catalogs. One replaced since
      * is not: what replaced it is processed by the thread that added it, or by the next refresh,
-     * and its values must not be overwritten with older ones.
+     * and its values must not be overwritten with older ones. Nor is one that a read published
+     * since it was left to a read has read: it has read it in its order.
      *
      * @param added      The property source
      * @param convention Its convention
@@ -706,7 +728,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         try {
             propertyPlaceholderResolver.withCatalogLock(() -> {
                 synchronized (propertySources) {
-                    if (propertySources.get(added.name()) != added.source()) {
+                    if (propertySources.get(added.name()) != added.source() || publishedReads != added.readsBefore()) {
                         return;
                     }
                 }
@@ -1445,10 +1467,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     /**
      * A property source added outside a read, by the name it was added by.
      *
-     * @param name   The name
-     * @param source The property source
+     * @param name        The name
+     * @param source      The property source
+     * @param readsBefore How many reads had published when it was left to a read, see {@link #publishedReads}
      */
-    private record Added(String name, PropertySource source) {
+    private record Added(String name, PropertySource source, long readsBefore) {
     }
 
     /**

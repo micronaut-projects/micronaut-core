@@ -430,6 +430,61 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
         env.stop()
     }
 
+    void "a property source left to a refresh that fails is not processed on top once a later refresh has read it in its order"() {
+        given: "a property source of a higher order than the one added"
+        FailsWhenArmed locator = new FailsWhenArmed()
+        DefaultEnvironment env = new DefaultEnvironment(withLocator(locator))
+        env.addPropertySource(PropertySource.of('higher', ['watcher.value': 'higher'], 100))
+        env.start()
+        ParksAfterFailedRefresh lower = new ParksAfterFailedRefresh()
+        Throwable refreshFailure = null
+
+        when: "it is registered and its thread parked before processing it, and a refresh starts and is parked in the locator"
+        Thread adder = daemon('adder') { env.addPropertySource(lower) }
+        assert lower.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        locator.armed.set(true)
+        Thread refresher = daemon('refresher') {
+            try {
+                env.refresh()
+            } catch (Throwable t) {
+                refreshFailure = t
+            } finally {
+                // 5.2.x does not process it on the refresher's thread: this lets the test go on there
+                lower.replayEntered.countDown()
+            }
+        }
+        assert locator.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+
+        and: "its thread goes on, and the refresh fails and is about to process it on top"
+        lower.release.countDown()
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(WAIT_SECONDS)
+        while (adder.alive && adder.state != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+            Thread.sleep(5)
+        }
+        locator.release.countDown()
+        adder.join(WAIT_SECONDS * 1000L)
+        assert lower.replayEntered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+
+        and: "another refresh reads it in its order meanwhile"
+        env.refresh()
+        String afterRefresh = env.getProperty('watcher.value', String).orElse(null)
+        lower.replayRelease.countDown()
+        refresher.join(WAIT_SECONDS * 1000L)
+
+        then: "it is not processed on top of what that refresh read"
+        !adder.alive
+        !refresher.alive
+        refreshFailure instanceof IllegalStateException
+        afterRefresh == 'higher'
+        env.getProperty('watcher.value', String).get() == 'higher'
+
+        cleanup:
+        lower.release.countDown()
+        lower.replayRelease.countDown()
+        locator.release.countDown()
+        env.stop()
+    }
+
     void "a property source added by the name of one whose thread is about to process it, as a refresh waits to start, is processed after that refresh fails"() {
         given: "a locator that fails once armed"
         FailsWhenArmed locator = new FailsWhenArmed()
