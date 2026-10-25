@@ -334,6 +334,11 @@ class Account:
     def balance(self, value: int) -> None:
         self._balance = value
 
+    @balance.deleter
+    @CompileStatic
+    def balance(self) -> None:
+        self._balance = 0
+
     @property
     def plain(self) -> int:
         return self._balance
@@ -345,7 +350,7 @@ class Account:
 '''
         for mode in (MODE_OFF, MODE_ANNOTATED, MODE_ALL):
             decisions, planner = plan(source, mode)
-            for name in ("Account.balance", "Account.balance.setter"):
+            for name in ("Account.balance", "Account.balance.setter", "Account.balance.deleter"):
                 decision = decisions[name]
                 self.assertEqual("NOT_CANDIDATE", decision.outcome().name(), name)
                 self.assertEqual("FUNCTION", decision.scope().name(), name)
@@ -355,11 +360,12 @@ class Account:
             self.assertNotIn("Account.legacy", decisions)
             messages = [diagnostic.message() for diagnostic in planner.diagnostics]
             self.assertEqual(["[Account.balance] cannot be compiled statically: [property-accessor] a property accessor is called through the Python object's attribute protocol",
-                              "[Account.balance.setter] cannot be compiled statically: [property-accessor] a property accessor is called through the Python object's attribute protocol"],
+                              "[Account.balance.setter] cannot be compiled statically: [property-accessor] a property accessor is called through the Python object's attribute protocol",
+                              "[Account.balance.deleter] cannot be compiled statically: [property-accessor] a property accessor is called through the Python object's attribute protocol"],
                              messages, mode)
             self.assertTrue(all(diagnostic.kind().name() == "WARNING" for diagnostic in planner.diagnostics))
         _, planner = plan(source, MODE_ANNOTATED, strict=True)
-        self.assertEqual(["ERROR", "ERROR"], [diagnostic.kind().name() for diagnostic in planner.diagnostics])
+        self.assertEqual(["ERROR", "ERROR", "ERROR"], [diagnostic.kind().name() for diagnostic in planner.diagnostics])
 
     def test_a_class_switch_on_a_class_that_can_never_be_compiled_is_flagged_once(self):
         source = '''
