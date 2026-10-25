@@ -81,6 +81,60 @@ class Caller:
         return self.calc.label(4, "pen")
 '''
 
+    void "a python caller receives the collection a delegated body returns as the python body returns it"() {
+        given:
+        Map results = [:]
+        [StaticCompilationMode.OFF, StaticCompilationMode.ALL].each { StaticCompilationMode m ->
+            mode = m
+            PythonStatic.resetEntries()
+            def context = buildContext(COLLECTIONS)
+            try {
+                results[m] = getBean(context, 'python.Caller').probe()
+                if (m == StaticCompilationMode.ALL) {
+                    assert decisions.findAll { it.qualifiedName().startsWith('Store.') && it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName() as Set == ['Store.listed', 'Store.java_listed'] as Set
+                    // the Python body returns the attribute itself, which the Java body cannot give back: not delegated
+                    assert PythonStatic.entries('python.Store#listed') == 0
+                    // the Java list the Java body returns is the one the Python body returns
+                    assert PythonStatic.entries('python.Store#java_listed') == 1
+                }
+            } finally {
+                context.close()
+            }
+        }
+
+        expect:
+        results[StaticCompilationMode.OFF] == 'list True SingletonList'
+        results[StaticCompilationMode.ALL] == results[StaticCompilationMode.OFF]
+    }
+
+    static final String COLLECTIONS = '''
+from jakarta.inject import Singleton
+from java.util import Collections
+
+@Singleton
+class Store:
+    items: list[str]
+
+    def __init__(self):
+        self.items = ["a"]
+
+    def listed(self) -> list[str]:
+        return self.items
+
+    def java_listed(self) -> list[str]:
+        return Collections.singletonList("j")
+
+@Singleton
+class Caller:
+    def __init__(self, store: Store):
+        self.store = store
+
+    def probe(self) -> str:
+        listed = self.store.listed()
+        java = self.store.java_listed()
+        return f"{type(listed).__name__} {listed is self.store.items} {java.getClass().getSimpleName()}"
+'''
+
     void "python callers of a bound object run the java body, objects created in python keep the python body"() {
         given:
         PythonStatic.resetEntries()

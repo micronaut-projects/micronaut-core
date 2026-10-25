@@ -313,6 +313,20 @@ class Calc:
     def query(self, spec: str) -> str:
         return URL(spec).getQuery() + "?"
 
+    def biggest(self, a: float, b: float) -> str:
+        return f"{max(a, b)} {min(a, b)}"
+
+    def within(self, part: str, text: str) -> bool:
+        return part in text
+
+    def fill(self, xs: list[str]) -> None:
+        xs.append("a")
+
+    def filled(self) -> int:
+        xs: list[str] = []
+        self.fill(xs)
+        return len(xs)
+
     # refused: each would differ from Python if compiled
 
     def mixed_local(self, flag: bool) -> str:
@@ -333,6 +347,12 @@ class Calc:
 
     def ambiguous(self, a: int, b: int) -> str:
         return StaticOverloads.pick(a, b)
+
+    def mixed_max(self, a: int, b: float) -> str:
+        return f"{max(a, b)} {min(b, a)}"
+
+    def int_default(self, prices: dict[str, float]) -> str:
+        return f"{prices.get('x', 0)}"
 
 @Singleton
 class Pair:
@@ -393,11 +413,16 @@ class Pair:
         ["float_power", -8.0d, 0.5d], ["float_power", 0.0d, -1.0d],
         ["maybe_concat", true],
         ["ambiguous", 1, 2],
+        ["biggest", 1.0d, Double.NaN], ["biggest", Double.NaN, 1.0d], ["biggest", -0.0d, 0.0d], ["biggest", 0.0d, -0.0d], ["biggest", 1.0d, 2.5d],
+        ["within", "b", "abc"], ["within", null, "abc"],
+        ["filled"],
+        ["mixed_max", 3, 2.5d],
     ]
 
     // the fixture methods the compiler must refuse: compiled, each would differ from its Python body
     static final Map<String, String> REFUSED = [mixed_local: "unknown-type", mixed_conditional: "unsupported-expression", float_power: "unsupported-expression",
-                                                maybe_concat: "unknown-type", ambiguous: "ambiguous-overload"]
+                                                maybe_concat: "unknown-type", ambiguous: "ambiguous-overload", mixed_max: "unsupported-expression",
+                                                int_default: "unsupported-expression"]
 
     void "compiled bodies agree with the Python bodies on every input"() {
         given:
@@ -426,9 +451,10 @@ class Pair:
                 results[m]['merged'] = calc.merged(new LinkedHashMap<>([b: '2', a: '3'])).collectEntries { k, v -> [(k.toString()): v.toString()] }
                 results[m]['viewed'] = calc.viewed('v').collectEntries { k, v -> [(k.toString()): v.toString()] }
                 results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
+                results[m]['int_default'] = calc.int_default(new LinkedHashMap<>([tea: 1.5d]))
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name']), decisions.toString()
+                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Calc.fill']), decisions.toString()
                     REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
@@ -453,6 +479,14 @@ class Pair:
         results[StaticCompilationMode.OFF][["above", 8192, 9007199254740992.0d].toString()] == true
         results[StaticCompilationMode.OFF][["below", 8192, Double.NaN].toString()] == false
         results[StaticCompilationMode.OFF][["exclaim", null].toString()] == "raised"
+        results[StaticCompilationMode.OFF][["biggest", 1.0d, Double.NaN].toString()] == "1.0 1.0"
+        results[StaticCompilationMode.OFF][["biggest", Double.NaN, 1.0d].toString()] == "nan nan"
+        results[StaticCompilationMode.OFF][["biggest", -0.0d, 0.0d].toString()] == "-0.0 -0.0"
+        results[StaticCompilationMode.OFF][["biggest", 0.0d, -0.0d].toString()] == "0.0 0.0"
+        results[StaticCompilationMode.OFF][["within", null, "abc"].toString()] == "raised"
+        results[StaticCompilationMode.OFF][["filled"].toString()] == 1
+        results[StaticCompilationMode.OFF][["mixed_max", 3, 2.5d].toString()] == "3 2.5"
+        results[StaticCompilationMode.OFF]['int_default'] == "0"
         results[StaticCompilationMode.OFF][["query", "http://example.com/x"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["mixed_local", true].toString()] == "2"
         results[StaticCompilationMode.OFF][["ratio", 1, 0].toString()] == "raised"

@@ -752,6 +752,15 @@ class Pricing:
 
     def literal_compare(self, x: float) -> bool:
         return x > 100
+
+    def mixed_max(self, n: int, x: float) -> float:
+        return max(n, x)
+
+    def float_max(self, x: float, y: float) -> float:
+        return max(x, y) + min(x, y)
+
+    def int_default(self, prices: dict[str, float]) -> float:
+        return prices.get("x", 0)
 '''
 
 
@@ -866,6 +875,8 @@ class LoweringTest(unittest.TestCase):
             "mixed_conditional": "unsupported-expression",
             "float_power": "unsupported-expression",
             "maybe_concat": "unknown-type",
+            "mixed_max": "unsupported-expression",
+            "int_default": "unsupported-expression",
         }
         for name, rule in expectations.items():
             decision = self.decisions[f"Pricing.{name}"]
@@ -928,6 +939,11 @@ class LoweringTest(unittest.TestCase):
         parsed = list(self.bodies["parsed"].body().statements())
         self.assertEqual("java.util.List<java.lang.String>", parsed[0].value().type())
         self.assertEqual("max", parsed[-1].value().operand().name())
+        self.assertEqual("InvokeJava", parsed[-1].value().operand().getClass().getSimpleName())  # Math.max of longs
+        # floats keep the earlier argument unless a later one is strictly greater (smaller), as Python does with NaN and -0.0
+        float_max = list(self.bodies["float_max"].body().statements())[0].value()
+        self.assertEqual(["Helper", "max"], [float_max.left().getClass().getSimpleName(), float_max.left().name()])
+        self.assertEqual(["Helper", "min"], [float_max.right().getClass().getSimpleName(), float_max.right().name()])
         counted = list(self.bodies["counted"].body().statements())  # [0] and [1] copy the parameters
         self.assertEqual("setItem", counted[2].expression().name())
         appended = list(self.bodies["appended"].body().statements())[1].value()  # after the copy of the parameter

@@ -1251,12 +1251,19 @@ class Lowering:
         if name in ("min", "max") and len(arguments) >= 2:
             if not all(self._is_number(argument.type()) for argument in arguments):
                 self._refuse("unsupported-expression", f"{name}() of values that are not numbers has no static lowering", node)
-            result_type = DOUBLE if any(argument.type() == DOUBLE for argument in arguments) else LONG
-            widened = [self._coerce(argument, result_type, node) for argument in arguments]
-            result = widened[0]
-            for argument in widened[1:]:
-                self.java_calls += 1
-                result = InvokeJava(None, "java.lang.Math", name, [result_type, result_type], [result, argument], result_type)
+            if len({argument.type() for argument in arguments}) > 1:
+                # Python answers the winning argument itself: max(3, 2.5) is the int 3, not 3.0
+                self._refuse("unsupported-expression", f"{name}() of an int and a float has no static lowering: Python answers the winning argument with its own type", node)
+            result_type = arguments[0].type()
+            result = arguments[0]
+            for argument in arguments[1:]:
+                if result_type == DOUBLE:
+                    # Python keeps the earlier argument unless a later one is strictly greater (smaller): NaN and -0.0 differ from Math
+                    self.helper_calls += 1
+                    result = Helper(name, [result, argument], DOUBLE)
+                else:
+                    self.java_calls += 1
+                    result = InvokeJava(None, "java.lang.Math", name, [result_type, result_type], [result, argument], result_type)
             return result
         return None
 
@@ -1309,8 +1316,12 @@ class Lowering:
             if name == "get" and 1 <= len(arguments) <= 2:
                 if len(arguments) == 1 and JAVA_NUMBERS.get(value_type, value_type) in (LONG, DOUBLE, BOOLEAN):
                     self._refuse("python-builtin-not-lowered", f"dict.get without a default may answer None, which a [{value_type}] cannot hold", node)
+                if len(arguments) == 2 and self._is_number(arguments[1].type()) and self._is_number(JAVA_NUMBERS.get(value_type, value_type)) \
+                        and arguments[1].type() != JAVA_NUMBERS.get(value_type, value_type):
+                    # Python answers the default itself: d.get(k, 0) of a dict of floats is the int 0, not 0.0
+                    self._refuse("unsupported-expression", f"dict.get with a [{arguments[1].type()}] default of a dict of [{value_type}] values has no static lowering: Python answers the default with its own type", node)
                 self._exact_key(arguments[0].type(), key_type, node, "looking up a key")
-                key = self._boxed(self._coerce(arguments[0], self._boxed_as(key_type, node, "a key"), node), node)
+                key =self._boxed(self._coerce(arguments[0], self._boxed_as(key_type, node, "a key"), node), node)
                 default = self._boxed(self._coerce(arguments[1], self._boxed_as(value_type, node, "a default"), node), node) if len(arguments) == 2 else Const(None, OBJECT)
                 self.helper_calls += 1
                 return Cast(Helper("get", [receiver, key, default], OBJECT), JAVA_NUMBERS.get(value_type, value_type))
