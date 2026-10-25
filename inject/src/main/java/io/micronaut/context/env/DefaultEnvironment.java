@@ -244,19 +244,24 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
         String name = propertySource.getName();
+        // asked before the lock below is taken, so that an override runs no code under it
+        boolean running = isRunning();
         synchronized (addLock) {
             propertySources.put(name, propertySource);
-            if (changedWhileProcessed.containsKey(name)) {
+            boolean sameNameProcessed = changedWhileProcessed.containsKey(name);
+            if (sameNameProcessed) {
                 changedWhileProcessed.put(name, propertySource);
             }
-            if (!isRunning() || reading.get()) {
+            if (!running || reading.get()) {
                 return this;
             }
-            if (refreshes > 0 && !Thread.holdsLock(catalog)) {
+            if (refreshes > 0 && !Thread.holdsLock(catalog) && !sameNameProcessed) {
                 // left to the refresh, rather than waiting for it: the refresh reads it in its order,
                 // or, if it has read the property sources already, it is processed once it ends. A
                 // thread that holds the lock of the catalogs, as the refreshing one does, waits for
-                // nothing and processes it itself, as it did.
+                // nothing and processes it itself, as it did. So does one that adds a property source
+                // by the name of one another thread processes, after it, as it did, rather than
+                // leave it to a refresh that the code of that property source may run meanwhile.
                 leftToRefresh.remove(name);
                 leftToRefresh.put(name, propertySource);
                 return this;
@@ -285,6 +290,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param propertySource The property source
      */
     private void processAdded(String name, PropertySource propertySource) {
+        // before the lock of the catalogs is taken, as it was
+        resetCaches();
         synchronized (catalog) {
             synchronized (addLock) {
                 if (propertySources.get(name) != propertySource) {
@@ -293,17 +300,19 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 changedWhileProcessed.put(name, null);
             }
             try {
-                resetCaches();
                 processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
             } finally {
                 synchronized (addLock) {
                     // processPropertySource registers it again: what another thread has registered or
-                    // removed by that name meanwhile, which processes or notes that itself, stays
+                    // removed by that name meanwhile, which processes or notes that itself, stays.
+                    // Compared by identity, so that no code of a property source runs under this lock.
                     Object changed = changedWhileProcessed.remove(name);
-                    if (changed == REMOVED) {
-                        propertySources.remove(name, propertySource);
-                    } else if (changed != null) {
-                        propertySources.replace(name, propertySource, (PropertySource) changed);
+                    if (changed != null && propertySources.get(name) == propertySource) {
+                        if (changed == REMOVED) {
+                            propertySources.remove(name);
+                        } else {
+                            propertySources.put(name, (PropertySource) changed);
+                        }
                     }
                 }
             }
@@ -319,13 +328,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     private void processLeftToRefresh() {
         Map<String, PropertySource> left;
+        // asked before the lock below is taken, so that an override runs no code under it
+        boolean running = isRunning();
         synchronized (addLock) {
             if (refreshes > 0 || reading.get() || leftToRefresh.isEmpty()) {
                 return;
             }
             left = new LinkedHashMap<>(leftToRefresh);
             leftToRefresh.clear();
-            if (!isRunning()) {
+            if (!running) {
                 // registered, as one added to an environment that is not running is
                 return;
             }
@@ -333,18 +344,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             processing++;
         }
         try {
-            synchronized (catalog) {
-                left.forEach((name, source) -> {
-                    try {
-                        processAdded(name, source);
-                    } catch (Throwable e) {
-                        if (e instanceof VirtualMachineError error && !(e instanceof StackOverflowError)) {
-                            throw error;
-                        }
-                        log.warn("Property source [{}] failed to be processed; the next refresh reads it again", name, e);
+            left.forEach((name, source) -> {
+                try {
+                    processAdded(name, source);
+                } catch (Throwable e) {
+                    if (e instanceof VirtualMachineError error && !(e instanceof StackOverflowError)) {
+                        throw error;
                     }
-                });
-            }
+                    log.warn("Property source [{}] failed to be processed; the next refresh reads it again", name, e);
+                }
+            });
         } finally {
             synchronized (addLock) {
                 // first, and without a call that could fail on a stack that is nearly used up

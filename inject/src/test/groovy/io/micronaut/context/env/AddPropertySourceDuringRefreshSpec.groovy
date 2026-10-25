@@ -367,6 +367,110 @@ class AddPropertySourceDuringRefreshSpec extends Specification {
         env.stop()
     }
 
+    void "a property source added by the code of one being processed, while a refresh waits for it, is in the properties right away"() {
+        given:
+        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
+        env.start()
+        AddsWhenProcessed adding = new AddsWhenProcessed(env)
+
+        when: "a refresh waits for the thread processing the property source, whose code then adds another one and looks it up"
+        adding.arm()
+        Thread adder = daemon('adder') { env.addPropertySource(adding) }
+        assert adding.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        Thread refresher = daemon('refresher') { env.refresh() }
+        awaitWaiting(refresher)
+        adding.release.countDown()
+        adder.join(WAIT_SECONDS * 1000L)
+        refresher.join(WAIT_SECONDS * 1000L)
+
+        then:
+        !adder.alive
+        !refresher.alive
+        adding.seen == 'nested'
+        env.getProperty('nested.value', String).get() == 'nested'
+
+        cleanup:
+        adding.release.countDown()
+        env.stop()
+    }
+
+    void "a property source added by the name of one being processed, whose code refreshes the environment, is processed after it"() {
+        given:
+        ParkingEnvironment env = new ParkingEnvironment()
+        env.start()
+        RefreshesOnce first = new RefreshesOnce(env, 'first')
+
+        when: "the first is processed, and its code refreshes the environment, which is parked, while another thread adds one by the same name"
+        Thread adder = parkIn(env.stopping) { env.addPropertySource(first) }
+        PropertySource second = PropertySource.of('watcher', ['watcher.value': 'second'])
+        Thread other = daemon('other') { env.addPropertySource(second) }
+        awaitDoneOrBlocked(other)
+        release(env.stopping, adder)
+        other.join(WAIT_SECONDS * 1000L)
+
+        then: "the second is registered and its values are the ones looked up"
+        !other.alive
+        env.propertySources.find { it.name == 'watcher' }.is(second)
+        env.getProperty('watcher.value', String).get() == 'second'
+
+        cleanup:
+        env.stopping.release.countDown()
+        env.stop()
+    }
+
+    void "a property source added by code that resetCaches() runs and waits for, while another one is added, does not deadlock"() {
+        given:
+        AddsWhenResetting env = new AddsWhenResetting()
+        env.start()
+
+        when:
+        env.armed.set(true)
+        Thread adder = daemon('adder') { env.addPropertySource(PropertySource.of('outer', ['outer.key': 'outer'])) }
+        adder.join(WAIT_SECONDS * 1000L)
+
+        then:
+        !adder.alive
+        env.helperFinished
+        env.getProperty('outer.key', String).orElse(null) == 'outer'
+        env.getProperty('helper.key', String).orElse(null) == 'helper'
+
+        cleanup:
+        if (!adder.alive) {
+            env.stop()
+        }
+    }
+
+    void "a property source added by code that isRunning() runs, while another thread processes one, does not deadlock"() {
+        given:
+        AddsWhenAskedIfRunning env = new AddsWhenAskedIfRunning()
+        env.start()
+        ParksWhileProcessed processed = new ParksWhileProcessed(Collections.synchronizedList([]))
+
+        when: "another thread processes a property source, and a thread whose isRunning() adds one adds another"
+        processed.arm()
+        Thread first = daemon('first') { env.addPropertySource(processed) }
+        assert processed.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        env.armed.set(true)
+        Thread second = daemon('second') { env.addPropertySource(PropertySource.of('second', ['second.key': 'second'])) }
+        awaitDoneOrBlocked(second)
+        processed.release.countDown()
+        first.join(WAIT_SECONDS * 1000L)
+        second.join(WAIT_SECONDS * 1000L)
+
+        then:
+        !first.alive
+        !second.alive
+        env.getProperty('nested.key', String).orElse(null) == 'nested'
+        env.getProperty('second.key', String).orElse(null) == 'second'
+
+        cleanup:
+        processed.release.countDown()
+        if (!first.alive && !second.alive) {
+            // stopping needs the lock that deadlocked threads would still hold
+            env.stop()
+        }
+    }
+
     /**
      * The configuration of an environment that holds the property sources a test gives it and
      * nothing of the machine it runs on.
@@ -555,6 +659,108 @@ class AddPropertySourceDuringRefreshSpec extends Specification {
                 events << 'processed'
             }
             return ['order.value', 'lower.key'].iterator()
+        }
+    }
+
+    /**
+     * An environment without default property sources whose resetCaches(), once armed, has another
+     * thread add a property source and waits for it, bounded.
+     */
+    static class AddsWhenResetting extends DefaultEnvironment {
+        final AtomicBoolean armed = new AtomicBoolean()
+        volatile boolean helperFinished
+
+        AddsWhenResetting() {
+            super(AddPropertySourceDuringRefreshSpec.withoutDefaultPropertySources())
+        }
+
+        @Override
+        protected void resetCaches() {
+            if (armed?.compareAndSet(true, false)) {
+                Thread helper = new Thread({ addPropertySource(PropertySource.of('helper', ['helper.key': 'helper'])) }, 'helper')
+                helper.daemon = true
+                helper.start()
+                helper.join(AddPropertySourceDuringRefreshSpec.WAIT_SECONDS * 1000L)
+                helperFinished = !helper.alive
+            }
+            super.resetCaches()
+        }
+    }
+
+    /**
+     * An environment without default property sources whose isRunning(), once armed, adds a
+     * property source.
+     */
+    static class AddsWhenAskedIfRunning extends DefaultEnvironment {
+        final AtomicBoolean armed = new AtomicBoolean()
+
+        AddsWhenAskedIfRunning() {
+            super(AddPropertySourceDuringRefreshSpec.withoutDefaultPropertySources())
+        }
+
+        @Override
+        boolean isRunning() {
+            if (armed?.compareAndSet(true, false)) {
+                addPropertySource(PropertySource.of('nested', ['nested.key': 'nested']))
+            }
+            return super.isRunning()
+        }
+    }
+
+    /**
+     * A property source named {@code watcher} whose code, the first time it is processed, refreshes
+     * the environment.
+     */
+    static class RefreshesOnce implements PropertySource {
+        private final Environment env
+        private final String value
+        private final AtomicBoolean refreshed = new AtomicBoolean()
+
+        RefreshesOnce(Environment env, String value) {
+            this.env = env
+            this.value = value
+        }
+
+        @Override
+        String getName() { 'watcher' }
+
+        @Override
+        Object get(String key) { key == 'watcher.value' ? value : null }
+
+        @Override
+        Iterator<String> iterator() {
+            if (refreshed.compareAndSet(false, true)) {
+                env.refresh()
+            }
+            return ['watcher.value'].iterator()
+        }
+    }
+
+    /**
+     * A property source that, once armed, parks the thread that processes it, and then adds another
+     * property source and notes the value it looks up right after.
+     */
+    static class AddsWhenProcessed extends Parking implements PropertySource {
+        volatile String seen
+        private final Environment env
+
+        AddsWhenProcessed(Environment env) {
+            this.env = env
+        }
+
+        @Override
+        String getName() { 'adding' }
+
+        @Override
+        Object get(String key) { key == 'adding.key' ? 'adding' : null }
+
+        @Override
+        Iterator<String> iterator() {
+            if (pass()) {
+                env.addPropertySource(PropertySource.of('nested', ['nested.value': 'nested']))
+                seen = env.getProperty('nested.value', String).orElse(null)
+            }
+            return ['adding.key'].iterator()
         }
     }
 
