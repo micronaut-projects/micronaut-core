@@ -70,6 +70,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -94,6 +95,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         new ConstantPropertySourceLoader()
     );
     private static final String FILE_PREFIX = "file:";
+    /** How long a refresh waits at a time for the threads that are processing a property source they added. */
+    private static final long ANNOUNCED_WAIT_MILLIS = 50;
+    /** How long a refresh waits for them at most, before it goes on as it did, without waiting. */
+    private static final long ANNOUNCED_WAIT_LIMIT_MILLIS = 5_000;
 
     private final ClassPathResourceLoader resourceLoader;
     private final MutableConversionService mutableConversionService;
@@ -127,6 +132,24 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * the monitor of {@link #propertySources}.
      */
     private @Nullable RefreshChanges changedWhileRefreshing;
+    /**
+     * How many refreshes are about to take the lock of the catalogs and have not started to read the
+     * property sources, see {@link #announceRefresh(RefreshAnnouncement)}. Guarded by the monitor of
+     * {@link #propertySources}, as are the three fields below.
+     */
+    private int refreshesBeforeRead;
+    /**
+     * The property sources added outside a read that the threads adding them have left to a refresh
+     * about to read, in the order they were added, rather than waiting for that refresh.
+     */
+    private List<Added> deferredToRefresh = new ArrayList<>(4);
+    /**
+     * While a read of the property sources is in progress, those it reads as registered that the
+     * threads adding them would have processed: processed on top if the read fails.
+     */
+    private @Nullable List<Added> leftToRead;
+    /** How many threads are processing a property source they added outside a read; a refresh about to start waits for them. */
+    private int processing;
 
     // For configuration maps, sets with low access - it's enough to use Collections.synchronized
 
@@ -213,15 +236,101 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
+        String name = propertySource.getName();
+        boolean process;
         synchronized (propertySources) {
-            internalAddPropertySource(propertySource);
-            noteChangeWhileRefreshing(propertySource.getName(), propertySource);
+            propertySources.put(name, propertySource);
+            noteChangeWhileRefreshing(name, propertySource);
+            // a refresh about to read reads it as registered, without this thread waiting for it
+            process = isRunning() && !reading.get() && !deferToRefresh(name, propertySource);
         }
-        if (isRunning() && !reading.get()) {
-            propertyPlaceholderResolver.resetCachesAndRememberedValues();
-            internalProcessPropertySource(propertySource);
+        if (process) {
+            processAdded(name, propertySource);
         }
         return this;
+    }
+
+    /**
+     * Processes a property source added outside a read on top of the properties, as it was, if it
+     * is still registered. If a read has started since it was registered, or a refresh is about to
+     * read, this thread leaves it to that read, which reads it as registered, rather than waiting for
+     * the refresh and processing it once more after it.
+     *
+     * @param name           The name of the property source
+     * @param propertySource The property source
+     */
+    private void processAdded(String name, PropertySource propertySource) {
+        // asked for before this thread counts itself as processing, as it was asked for before the
+        // lock of the catalogs was taken
+        PropertySource.PropertyConvention convention = propertySource.getConvention();
+        synchronized (propertySources) {
+            if (handOver(new Added(name, propertySource))) {
+                return;
+            }
+            if (propertySources.get(name) != propertySource) {
+                // replaced or removed meanwhile, outside a read, by a thread that processes that itself
+                return;
+            }
+            processing++;
+        }
+        try {
+            propertyPlaceholderResolver.resetCachesAndRememberedValues();
+            LOG.debug("Processing property source: {} convention: {}", name, convention);
+            propertyPlaceholderResolver.processPropertySource(propertySource, convention);
+        } finally {
+            synchronized (propertySources) {
+                processing--;
+                // a refresh that waits checks again in a while, also if this does not get to notify it
+                propertySources.notifyAll();
+            }
+        }
+    }
+
+    /**
+     * Leaves a property source added outside a read, which the thread adding it would process, to a
+     * refresh that is about to read, if there is one. Called with the monitor of
+     * {@link #propertySources} held.
+     *
+     * @param name           The name of the property source
+     * @param propertySource The property source
+     * @return Whether it is left to a refresh
+     */
+    private boolean deferToRefresh(String name, PropertySource propertySource) {
+        if (refreshesBeforeRead == 0) {
+            return false;
+        }
+        addLast(deferredToRefresh, new Added(name, propertySource));
+        return true;
+    }
+
+    /**
+     * Adds a property source left to a read last, in the place of one left by the same name: the
+     * thread that added that one would have processed it before this one, which replaces it.
+     *
+     * @param left  The property sources left to a read
+     * @param added The property source
+     */
+    private static void addLast(List<Added> left, Added added) {
+        left.removeIf(earlier -> earlier.name().equals(added.name()));
+        left.add(added);
+    }
+
+    /**
+     * Leaves a property source added outside a read, which this thread would process, to the read
+     * in progress, which has started since it was registered and reads it as registered, or else to
+     * a refresh that is about to read. Either processes it on top if it does not publish what it
+     * read. Called with the monitor of {@link #propertySources} held.
+     *
+     * @param added The property source
+     * @return Whether it is left to a read
+     */
+    private boolean handOver(Added added) {
+        List<Added> read = leftToRead;
+        if (read != null) {
+            addLast(read, added);
+            return true;
+        }
+        return deferToRefresh(added.name(), added.source());
     }
 
     @Override
@@ -297,17 +406,49 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     public Environment start() {
         if (running.compareAndSet(false, true)) {
             LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
-            readProperties();
+            readProperties(null);
         }
         return this;
     }
 
-    private void readProperties() {
-        if (reading.compareAndSet(false, true)) {
-            try {
-                loadProperties();
-            } finally {
+    /**
+     * Reads the property sources, unless a read is in progress, as it did. In one step with starting
+     * to read, a refresh stops counting as about to read, and what was left to it is read as
+     * registered. Property sources left to a start that fails are processed on top, as the threads
+     * adding them would have; a refresh that fails does so once it has failed.
+     *
+     * @param refresh The refresh that reads, {@code null} for a start
+     */
+    private void readProperties(@Nullable RefreshAnnouncement refresh) {
+        List<Added> left;
+        List<Added> none = new ArrayList<>(4);
+        synchronized (propertySources) {
+            if (refresh != null) {
+                opened(refresh);
+            }
+            left = deferredToRefresh;
+            // the last call before the try: nothing that could fail comes between the two
+            if (!reading.compareAndSet(false, true)) {
+                return;
+            }
+            deferredToRefresh = none;
+            leftToRead = left;
+            if (refresh != null) {
+                refresh.leftToRead = left;
+            }
+        }
+        boolean completed = false;
+        try {
+            loadProperties();
+            completed = true;
+        } finally {
+            synchronized (propertySources) {
+                // first, and without a call that could fail on a stack that is nearly used up
+                leftToRead = null;
                 reading.set(false);
+            }
+            if (!completed && refresh == null) {
+                processLeftOver(left, false);
             }
         }
     }
@@ -319,7 +460,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         propertyPlaceholderResolver.reset();
     }
 
-    private void refreshProperties() {
+    private void refreshProperties(RefreshAnnouncement refresh) {
         // Rebuild into a replacement catalog and publish it in one step, so a concurrent lookup
         // sees the properties either as they were before the refresh or as they are after it.
         propertyPlaceholderResolver.refresh(() -> {
@@ -334,7 +475,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             boolean completed = false;
             try {
                 dropProperties();
-                readProperties();
+                readProperties(refresh);
                 completed = true;
             } finally {
                 synchronized (propertySources) {
@@ -355,6 +496,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 }
             }
         });
+        refresh.published = true;
     }
 
     @Override
@@ -375,13 +517,205 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public Map<String, Object> refreshAndDiff() {
-        return propertyPlaceholderResolver.diff(this::refresh);
+        RefreshAnnouncement refresh = new RefreshAnnouncement();
+        try {
+            announceRefresh(refresh);
+            return propertyPlaceholderResolver.diff(() -> refreshProperties(refresh));
+        } finally {
+            synchronized (propertySources) {
+                // first, and without a call that could fail on a stack that is nearly used up
+                if (refresh.announced && !refresh.opened) {
+                    refresh.opened = true;
+                    refreshesBeforeRead--;
+                }
+            }
+            endRefresh(refresh);
+        }
     }
 
     @Override
     public Environment refresh() {
-        refreshProperties();
+        RefreshAnnouncement refresh = new RefreshAnnouncement();
+        try {
+            announceRefresh(refresh);
+            refreshProperties(refresh);
+        } finally {
+            synchronized (propertySources) {
+                // first, and without a call that could fail on a stack that is nearly used up
+                if (refresh.announced && !refresh.opened) {
+                    refresh.opened = true;
+                    refreshesBeforeRead--;
+                }
+            }
+            endRefresh(refresh);
+        }
         return this;
+    }
+
+    /**
+     * Announces a refresh before it takes the lock of the catalogs: from now on, a property source
+     * added outside a read is left to it, so no thread that adds one waits for the refresh. It first
+     * waits for the threads that are processing one they added outside a read, which hold or are
+     * about to take that lock, unless this thread holds it already, as one whose property source
+     * refreshes the environment while it is processed does.
+     *
+     * @param refresh The refresh
+     */
+    private void announceRefresh(RefreshAnnouncement refresh) {
+        synchronized (propertySources) {
+            refreshesBeforeRead++;
+            refresh.announced = true;
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(ANNOUNCED_WAIT_LIMIT_MILLIS);
+            while (processing > 0 && !propertyPlaceholderResolver.holdsCatalogLock()) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) {
+                    // goes on as it did: a thread still processing then waits for this refresh
+                    break;
+                }
+                try {
+                    // bounded, so that a notification a thread could not send is not waited for
+                    propertySources.wait(Math.max(1, Math.min(ANNOUNCED_WAIT_MILLIS, TimeUnit.NANOSECONDS.toMillis(remaining))));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Stops counting a refresh as about to read, once it has started to read or has ended without
+     * reading. Called with the monitor of {@link #propertySources} held.
+     *
+     * @param refresh The refresh
+     */
+    private void opened(RefreshAnnouncement refresh) {
+        if (refresh.announced && !refresh.opened) {
+            refresh.opened = true;
+            refreshesBeforeRead--;
+        }
+    }
+
+    /**
+     * Ends a refresh, once it holds no lock and no longer counts as about to read. What was left to
+     * it is processed on top, as the threads that added it would have, if it did not publish what it
+     * read, and so is what was left to refreshes that ended without reading, once none is about to.
+     *
+     * @param refresh The refresh
+     */
+    private void endRefresh(RefreshAnnouncement refresh) {
+        List<Added> left = refresh.published ? null : refresh.leftToRead;
+        processLeftOver(left != null ? left : List.of(), true);
+    }
+
+    /**
+     * Processes on top of the properties, in the order they were added, property sources added
+     * outside a read that the threads adding them left to a read which has not published them, as
+     * those threads would have, and, if asked to and no refresh is about to read, those left to
+     * refreshes that ended without reading. If a refresh is about to read, or a read is in progress,
+     * they are left to that read instead, which reads them as registered. This throws nothing that
+     * would replace the failure of the read: one that fails is left out with a warning, and to the
+     * next refresh.
+     *
+     * @param left         The property sources left to a read that has not published them
+     * @param withDeferred Whether to take those left to refreshes that ended without reading
+     */
+    private void processLeftOver(List<Added> left, boolean withDeferred) {
+        List<Added> sources = new ArrayList<>(left);
+        if (withDeferred) {
+            List<Added> none = new ArrayList<>(4);
+            synchronized (propertySources) {
+                if (refreshesBeforeRead == 0 && !deferredToRefresh.isEmpty()) {
+                    // swapped in one step, so that a failure from here on loses nothing that is left
+                    List<Added> deferred = deferredToRefresh;
+                    deferredToRefresh = none;
+                    sources.addAll(deferred);
+                }
+            }
+        }
+        if (sources.isEmpty()) {
+            return;
+        }
+        // asked for before this thread counts itself as processing, as the threads adding them did
+        List<PropertySource.@Nullable PropertyConvention> conventions = new ArrayList<>(sources.size());
+        for (Added added : sources) {
+            conventions.add(conventionOf(added));
+        }
+        boolean[] counted = new boolean[1];
+        try {
+            synchronized (propertySources) {
+                if (leftToRead != null || refreshesBeforeRead > 0) {
+                    for (Added added : sources) {
+                        handOver(added);
+                    }
+                    return;
+                }
+                processing++;
+                counted[0] = true;
+            }
+            for (int i = 0; i < sources.size(); i++) {
+                PropertySource.PropertyConvention convention = conventions.get(i);
+                if (convention != null) {
+                    processOnTop(sources.get(i), convention);
+                }
+            }
+        } finally {
+            synchronized (propertySources) {
+                // first, and without a call that could fail on a stack that is nearly used up
+                if (counted[0]) {
+                    counted[0] = false;
+                    processing--;
+                }
+                propertySources.notifyAll();
+            }
+        }
+    }
+
+    /**
+     * @param added A property source added outside a read
+     * @return Its convention, {@code null} if asking for it failed, which is logged
+     */
+    private PropertySource.@Nullable PropertyConvention conventionOf(Added added) {
+        try {
+            return added.source().getConvention();
+        } catch (Throwable e) {
+            leftOut(added, e);
+            return null;
+        }
+    }
+
+    /**
+     * Processes a property source on top of the properties, as the thread that added it would have.
+     *
+     * @param added      The property source
+     * @param convention Its convention
+     */
+    private void processOnTop(Added added, PropertySource.PropertyConvention convention) {
+        try {
+            propertyPlaceholderResolver.resetCachesAndRememberedValues();
+            LOG.debug("Processing property source: {} convention: {}", added.name(), convention);
+            propertyPlaceholderResolver.processPropertySource(added.source(), convention);
+        } catch (Throwable e) {
+            leftOut(added, e);
+        }
+    }
+
+    /**
+     * Logs that a property source left to a read failed to be processed after it, without letting
+     * the logging fail in its place: the message of the failure is the code of the property source.
+     *
+     * @param added The property source
+     * @param e     The failure
+     */
+    private static void leftOut(Added added, Throwable e) {
+        if (e instanceof VirtualMachineError error && !(e instanceof StackOverflowError)) {
+            throw error;
+        }
+        try {
+            LOG.warn("Property source [{}] failed to be processed; the next refresh reads it again", added.name(), e);
+        } catch (Throwable ignored) {
+            // the failure of the property source is not described, rather than fail in its place
+        }
     }
 
     @Override
@@ -1087,6 +1421,30 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     @Override
     public MutableConversionService getConversionService() {
         return mutableConversionService;
+    }
+
+    /**
+     * A property source added outside a read, by the name it was added by.
+     *
+     * @param name   The name
+     * @param source The property source
+     */
+    private record Added(String name, PropertySource source) {
+    }
+
+    /**
+     * A refresh, from {@link #announceRefresh(RefreshAnnouncement)} until it ends. Guarded by the
+     * monitor of the registered property sources.
+     */
+    private static final class RefreshAnnouncement {
+        /** Whether it is counted in {@link #refreshesBeforeRead}. */
+        private boolean announced;
+        /** Whether it has started to read, or ended without reading, and is no longer counted. */
+        private boolean opened;
+        /** What was left to it that its read reads as registered, {@code null} if it has not read. */
+        private @Nullable List<Added> leftToRead;
+        /** Whether it has published what it read. */
+        private boolean published;
     }
 
     /**
