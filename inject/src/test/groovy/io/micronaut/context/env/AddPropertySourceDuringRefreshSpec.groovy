@@ -324,6 +324,49 @@ class AddPropertySourceDuringRefreshSpec extends Specification {
         env.stop()
     }
 
+    void "a property source added by the name of one left to a refresh, while that one is processed after the refresh, is the one that stays"() {
+        given:
+        FailsWhenAsked flaky = new FailsWhenAsked()
+        ResettingEnvironment env = new ResettingEnvironment()
+        env.addPropertySource(flaky)
+        env.start()
+
+        when: "a property source is left to a refresh that fails, and is processed after it"
+        flaky.fail.set(true)
+        Thread refresher = parkIn(env.stopping) {
+            try {
+                env.refresh()
+            } catch (IllegalArgumentException ignored) {
+                // expected
+            }
+        }
+        Thread first = daemon('first') {
+            env.addPropertySource(PropertySource.of('replaced', ['replaced.key': 'first']))
+        }
+        first.join(WAIT_SECONDS * 1000L)
+        assert !first.alive
+        env.resetting.arm()
+        env.stopping.release.countDown()
+        assert env.resetting.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+
+        and: "once the first has been added, another thread adds one by the same name while the first is processed"
+        PropertySource second = PropertySource.of('replaced', ['replaced.key': 'second'])
+        Thread adder = daemon('second') { env.addPropertySource(second) }
+        awaitDoneOrBlocked(adder)
+        release(env.resetting, refresher)
+        adder.join(WAIT_SECONDS * 1000L)
+
+        then: "the second is registered and its values are the ones looked up"
+        !adder.alive
+        env.propertySources.find { it.name == 'replaced' }.is(second)
+        env.getProperty('replaced.key', String).get() == 'second'
+
+        cleanup:
+        env.stopping.release.countDown()
+        env.resetting.release.countDown()
+        env.stop()
+    }
+
     /**
      * The configuration of an environment that holds the property sources a test gives it and
      * nothing of the machine it runs on.
@@ -424,6 +467,22 @@ class AddPropertySourceDuringRefreshSpec extends Specification {
         Environment stop() {
             stopping.pass()
             return super.stop()
+        }
+    }
+
+    /**
+     * The same, that also parks, once armed, a thread that resets the caches of the running
+     * environment, as one does right before it processes a property source added to it.
+     */
+    static class ResettingEnvironment extends ParkingEnvironment {
+        final Parking resetting = new Parking()
+
+        @Override
+        protected void resetCaches() {
+            if (isRunning()) {
+                resetting.pass()
+            }
+            super.resetCaches()
         }
     }
 

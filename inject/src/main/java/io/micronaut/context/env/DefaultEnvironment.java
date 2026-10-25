@@ -110,6 +110,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * that only delays refreshes.
      */
     private static final long PROCESSING_WAIT_LIMIT_NANOS = TimeUnit.SECONDS.toNanos(5);
+    /** Notes in {@link #changedWhileProcessed} that the property source has been removed. */
+    private static final Object REMOVED = new Object();
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
     protected final MutableConversionService mutableConversionService;
@@ -126,7 +128,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
     private final AtomicBoolean reading = new AtomicBoolean(false);
     /**
-     * Guards the three fields below, and has a property source registered in one step with deciding
+     * Guards the four fields below, and has a property source registered in one step with deciding
      * which thread processes it.
      */
     private final Object addLock = new Object();
@@ -141,6 +143,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * {@link #processLeftToRefresh()}.
      */
     private final Map<String, PropertySource> leftToRefresh = new LinkedHashMap<>(4);
+    /**
+     * By the name of each property source added outside a read that a thread is processing, see
+     * {@link #processAdded(String, PropertySource)}, what another thread has registered by that
+     * name since, {@link #REMOVED} if it has removed it, or {@code null}.
+     */
+    private final Map<String, Object> changedWhileProcessed = new HashMap<>(4);
     private final Boolean deduceEnvironments;
     private final ApplicationContextConfiguration configuration;
     private final Collection<String> configLocations;
@@ -238,6 +246,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         String name = propertySource.getName();
         synchronized (addLock) {
             propertySources.put(name, propertySource);
+            if (changedWhileProcessed.containsKey(name)) {
+                changedWhileProcessed.put(name, propertySource);
+            }
             if (!isRunning() || reading.get()) {
                 return this;
             }
@@ -275,9 +286,26 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     private void processAdded(String name, PropertySource propertySource) {
         synchronized (catalog) {
-            if (propertySources.get(name) == propertySource) {
+            synchronized (addLock) {
+                if (propertySources.get(name) != propertySource) {
+                    return;
+                }
+                changedWhileProcessed.put(name, null);
+            }
+            try {
                 resetCaches();
                 processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
+            } finally {
+                synchronized (addLock) {
+                    // processPropertySource registers it again: what another thread has registered or
+                    // removed by that name meanwhile, which processes or notes that itself, stays
+                    Object changed = changedWhileProcessed.remove(name);
+                    if (changed == REMOVED) {
+                        propertySources.remove(name, propertySource);
+                    } else if (changed != null) {
+                        propertySources.replace(name, propertySource, (PropertySource) changed);
+                    }
+                }
             }
         }
     }
@@ -412,7 +440,13 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment removePropertySource(PropertySource propertySource) {
-        propertySources.remove(propertySource.getName());
+        String name = propertySource.getName();
+        synchronized (addLock) {
+            propertySources.remove(name);
+            if (changedWhileProcessed.containsKey(name)) {
+                changedWhileProcessed.put(name, REMOVED);
+            }
+        }
         if (isRunning() && !reading.get()) {
             resetCaches();
         }
