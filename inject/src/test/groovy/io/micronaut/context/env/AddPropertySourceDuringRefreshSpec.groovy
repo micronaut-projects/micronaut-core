@@ -471,6 +471,28 @@ class AddPropertySourceDuringRefreshSpec extends Specification {
         }
     }
 
+    void "a property source added while a refresh restarts the environment, by a thread that pauses once it finds it stopped, is read by the refresh"() {
+        given:
+        StopsThenParks env = new StopsThenParks()
+        env.start()
+
+        when: "the refresh is parked once it has stopped the environment, and the thread adding finds it stopped and pauses until the refresh is done"
+        Thread refresher = parkIn(env.stopped) { env.refresh() }
+        env.asking.arm()
+        Thread adder = daemon('adder') { env.addPropertySource(PropertySource.of('added', ['added.key': 'added'])) }
+        assert env.asking.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        release(env.stopped, refresher)
+        release(env.asking, adder)
+
+        then:
+        env.getProperty('added.key', String).orElse(null) == 'added'
+
+        cleanup:
+        env.stopped.release.countDown()
+        env.asking.release.countDown()
+        env.stop()
+    }
+
     /**
      * The configuration of an environment that holds the property sources a test gives it and
      * nothing of the machine it runs on.
@@ -659,6 +681,35 @@ class AddPropertySourceDuringRefreshSpec extends Specification {
                 events << 'processed'
             }
             return ['order.value', 'lower.key'].iterator()
+        }
+    }
+
+    /**
+     * An environment without default property sources that, once armed, parks a refresh once it
+     * has stopped the environment, and the thread named {@code adder} once it has found it stopped.
+     */
+    static class StopsThenParks extends DefaultEnvironment {
+        final Parking stopped = new Parking()
+        final Parking asking = new Parking()
+
+        StopsThenParks() {
+            super(AddPropertySourceDuringRefreshSpec.withoutDefaultPropertySources())
+        }
+
+        @Override
+        Environment stop() {
+            Environment environment = super.stop()
+            stopped?.pass()
+            return environment
+        }
+
+        @Override
+        boolean isRunning() {
+            boolean running = super.isRunning()
+            if (!running && Thread.currentThread().name == 'adder') {
+                asking?.pass()
+            }
+            return running
         }
     }
 

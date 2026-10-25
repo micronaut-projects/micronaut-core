@@ -244,15 +244,22 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
         String name = propertySource.getName();
-        // asked before the lock below is taken, so that an override runs no code under it
-        boolean running = isRunning();
         synchronized (addLock) {
             propertySources.put(name, propertySource);
-            boolean sameNameProcessed = changedWhileProcessed.containsKey(name);
-            if (sameNameProcessed) {
+            if (changedWhileProcessed.containsKey(name)) {
                 changedWhileProcessed.put(name, propertySource);
             }
+        }
+        // asked once it is registered, as it was, so that a read that starts meanwhile reads it, and
+        // with no lock held, so that an override runs no code under one
+        boolean running = isRunning();
+        synchronized (addLock) {
+            boolean sameNameProcessed = changedWhileProcessed.containsKey(name);
             if (!running || reading.get()) {
+                return this;
+            }
+            if (propertySources.get(name) != propertySource && changedWhileProcessed.get(name) != propertySource) {
+                // replaced or removed meanwhile, by a thread that processes or notes that itself
                 return this;
             }
             if (refreshes > 0 && !Thread.holdsLock(catalog) && !sameNameProcessed) {
