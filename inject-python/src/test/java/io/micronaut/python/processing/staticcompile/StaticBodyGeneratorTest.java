@@ -182,7 +182,7 @@ class StaticBodyGeneratorTest {
     }
 
     private static Generated generate(Ir.Body body, String returnType, List<String> parameterNames, List<String> parameterTypes) throws Exception {
-        Ir.CompiledBody compiled = new Ir.CompiledBody("generated.Body", "run", parameterNames, parameterTypes, returnType, body, null, Stats.NONE, false, false, false, false, Ir.ExceptionCrossing.UNTRANSLATED);
+        Ir.CompiledBody compiled = new Ir.CompiledBody("generated.Body", "run", parameterNames, parameterTypes, returnType, body, null, Stats.NONE, false, false, false, false, Ir.ExceptionCrossing.UNTRANSLATED, List.of(), false);
         MethodDef.MethodDefBuilder method = MethodDef.builder("run").addModifiers(Modifier.PUBLIC).returns(StaticBodyGenerator.type(returnType));
         for (int i = 0; i < parameterNames.size(); i++) {
             method.addParameter(ParameterDef.of(parameterNames.get(i), StaticBodyGenerator.type(parameterTypes.get(i))));

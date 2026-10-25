@@ -210,15 +210,6 @@ public final class StaticDelegation {
     }
 
     /**
-     * The delegation of a body: its target and status, or the reason it has none.
-     */
-    private record Decision(@Nullable String target, String status, String reason) {
-        static Decision refused(String reason) {
-            return new Decision(null, "none", reason);
-        }
-    }
-
-    /**
      * The kind of a parameter of a Java class whose objects reach it unchanged: a Java object of the
      * class, checked on every call; a Python value, which the boundary converts, is not one. A
      * parameterized or array type is not taken, nor a collection, which a Python caller passes as a
@@ -320,80 +311,6 @@ public final class StaticDelegation {
             }
             default -> false;
         };
-    }
-
-    /**
-     * Whether a local may be held by anything but the body: it escapes wherever it is used other than
-     * returned, tested or given to a helper that reads or fills it without keeping it.
-     */
-    private static final class Escape {
-        private final String name;
-        private boolean escapes;
-
-        Escape(String name) {
-            this.name = name;
-        }
-
-        void visit(List<? extends Ir> nodes, boolean safe) {
-            for (Ir node : nodes) {
-                visit(node, safe);
-            }
-        }
-
-        /**
-         * @param node The node
-         * @param safe Whether a value the node evaluates to may be the local: it is not kept
-         */
-        void visit(@Nullable Ir node, boolean safe) {
-            switch (node) {
-                case null -> {
-                    // nothing
-                }
-                case Ir.LocalRef local -> escapes |= !safe && local.name().equals(name);
-                case Ir.Body body -> visit(body.statements(), false);
-                case Ir.Return ret -> visit(ret.value(), true);
-                case Ir.If branch -> {
-                    visit(branch.test(), true);
-                    visit(branch.then(), false);
-                    visit(branch.orElse(), false);
-                }
-                case Ir.Cast cast -> visit(cast.operand(), safe);
-                case Ir.Truthy truthy -> visit(truthy.operand(), true);
-                case Ir.Compare compare -> {
-                    visit(compare.left(), true);
-                    visit(compare.right(), true);
-                }
-                case Ir.And and -> {
-                    visit(and.left(), safe);
-                    visit(and.right(), safe);
-                }
-                case Ir.Or or -> {
-                    visit(or.left(), safe);
-                    visit(or.right(), safe);
-                }
-                case Ir.Conditional conditional -> {
-                    visit(conditional.test(), true);
-                    visit(conditional.then(), safe);
-                    visit(conditional.orElse(), safe);
-                }
-                case Ir.Helper helper -> {
-                    Integer read = READING_HELPERS.get(helper.name());
-                    for (int i = 0; i < helper.arguments().size(); i++) {
-                        visit(helper.arguments().get(i), read != null && read == i);
-                    }
-                }
-                case Ir.Local local -> visit(local.value(), false);
-                case Ir.Assign assign -> visit(assign.value(), false);
-                case Ir.Eval eval -> visit(eval.expression(), true);
-                case Ir.Const _, Ir.Param _, Ir.SelfProperty _, Ir.StaticField _, Ir.ModuleAttribute _ -> {
-                    // no local
-                }
-                default -> {
-                    // any other use may keep the local: every local it holds escapes
-                    escapes |= String.valueOf(node).contains("LocalRef[name=" + name + ",");
-                }
-            }
-        }
     }
 
     private static boolean javaObject(Ir.Expression value) {
@@ -562,6 +479,93 @@ public final class StaticDelegation {
                     promotes(true, kind);
                 }
             }
+        }
+    }
+
+    /**
+     * Whether a local may be held by anything but the body: it escapes wherever it is used other than
+     * returned, tested or given to a helper that reads or fills it without keeping it.
+     */
+    private static final class Escape {
+        private final String name;
+        private boolean escapes;
+
+        Escape(String name) {
+            this.name = name;
+        }
+
+        void visit(List<? extends Ir> nodes, boolean safe) {
+            for (Ir node : nodes) {
+                visit(node, safe);
+            }
+        }
+
+        /**
+         * @param node The node
+         * @param safe Whether a value the node evaluates to may be the local: it is not kept
+         */
+        void visit(@Nullable Ir node, boolean safe) {
+            switch (node) {
+                case null -> {
+                    // nothing
+                }
+                case Ir.LocalRef local -> escapes |= !safe && local.name().equals(name);
+                case Ir.Body body -> visit(body.statements(), false);
+                case Ir.Return ret -> visit(ret.value(), true);
+                case Ir.If branch -> {
+                    visit(branch.test(), true);
+                    visit(branch.then(), false);
+                    visit(branch.orElse(), false);
+                }
+                case Ir.Cast cast -> visit(cast.operand(), safe);
+                case Ir.Truthy truthy -> visit(truthy.operand(), true);
+                case Ir.Compare compare -> {
+                    visit(compare.left(), true);
+                    visit(compare.right(), true);
+                }
+                case Ir.And and -> {
+                    visit(and.left(), safe);
+                    visit(and.right(), safe);
+                }
+                case Ir.Or or -> {
+                    visit(or.left(), safe);
+                    visit(or.right(), safe);
+                }
+                case Ir.Conditional conditional -> {
+                    visit(conditional.test(), true);
+                    visit(conditional.then(), safe);
+                    visit(conditional.orElse(), safe);
+                }
+                case Ir.Helper helper -> {
+                    Integer read = READING_HELPERS.get(helper.name());
+                    for (int i = 0; i < helper.arguments().size(); i++) {
+                        visit(helper.arguments().get(i), read != null && read == i);
+                    }
+                }
+                case Ir.Local local -> visit(local.value(), false);
+                case Ir.Assign assign -> visit(assign.value(), false);
+                case Ir.Eval eval -> visit(eval.expression(), true);
+                case Ir.Const _, Ir.Param _, Ir.SelfProperty _, Ir.StaticField _, Ir.ModuleAttribute _ -> {
+                    // no local
+                }
+                default -> {
+                    // any other use may keep the local: every local it holds escapes
+                    escapes |= String.valueOf(node).contains("LocalRef[name=" + name + ",");
+                }
+            }
+        }
+    }
+
+    /**
+     * The delegation of a body: its target and status, or the reason it has none.
+     *
+     * @param target The target, or {@code null} when the body is not delegated
+     * @param status The status, see {@link #status(Ir.CompiledBody)}
+     * @param reason Why the body is not delegated, empty when it is
+     */
+    private record Decision(@Nullable String target, String status, String reason) {
+        static Decision refused(String reason) {
+            return new Decision(null, "none", reason);
         }
     }
 }

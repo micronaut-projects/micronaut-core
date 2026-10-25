@@ -40,7 +40,7 @@ class StaticDelegationTest {
     private static Ir.CompiledBody body(String className, boolean staticMethod, boolean moduleLevel, Ir.ExceptionCrossing exceptions, List<String> types, String returnType, Ir.Statement... statements) {
         List<String> names = IntStream.range(0, types.size()).mapToObj(i -> "p" + i).toList();
         return new Ir.CompiledBody(className, "run", names, types, returnType, new Ir.Body(List.of(statements)),
-            SourceSpan.at("app/calc.py", 3, 5), new StaticCompilationDecision.Stats(statements.length, 0, 0, 0), false, false, staticMethod, moduleLevel, exceptions);
+            SourceSpan.at("app/calc.py", 3, 5), new StaticCompilationDecision.Stats(statements.length, 0, 0, 0), false, false, staticMethod, moduleLevel, exceptions, List.of(), false);
     }
 
     private static Ir.Expression param(String type) {

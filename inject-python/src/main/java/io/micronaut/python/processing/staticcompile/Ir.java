@@ -619,31 +619,6 @@ public sealed interface Ir {
         }
 
         /**
-         * A body none of whose parameters is a plain class of the compilation.
-         *
-         * @param className      The generated class the method belongs to
-         * @param methodName     The method
-         * @param parameterNames The parameter names, the receiver excluded
-         * @param parameterTypes The Java types of the parameters as the stub declares them
-         * @param returnType     The Java return type as the stub declares it
-         * @param body           The body
-         * @param span           Where the Python function is declared
-         * @param stats          What the body contains
-         * @param wrapsCheckedExceptions Whether a call of the body declares a checked exception
-         * @param advised        Whether the method is advised
-         * @param staticMethod   Whether the body is generated as a static Java method
-         * @param moduleLevel    Whether the function is a module-level function
-         * @param exceptions     How the Java exception of a Python exception class reaches a Python caller
-         */
-        public CompiledBody(String className, String methodName, List<String> parameterNames, List<String> parameterTypes,
-                            String returnType, Body body, @Nullable SourceSpan span, StaticCompilationDecision.Stats stats,
-                            boolean wrapsCheckedExceptions, boolean advised, boolean staticMethod, boolean moduleLevel,
-                            ExceptionCrossing exceptions) {
-            this(className, methodName, parameterNames, parameterTypes, returnType, body, span, stats, wrapsCheckedExceptions,
-                advised, staticMethod, moduleLevel, exceptions, List.of(), false);
-        }
-
-        /**
          * @param index The position of a parameter
          * @return The Python name of the plain class of the compilation the parameter takes, or an empty string
          */
