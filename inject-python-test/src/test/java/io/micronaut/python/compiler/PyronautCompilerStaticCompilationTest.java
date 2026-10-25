@@ -22,6 +22,8 @@ import io.micronaut.python.processing.staticcompile.StaticCompilationMode;
 import io.micronaut.python.processing.staticcompile.StaticCompilationReport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -105,6 +107,50 @@ class PyronautCompilerStaticCompilationTest {
         assertTrue(summary.contains("CANDIDATE     PricingService.total"), summary);
         assertTrue(summary.contains("[unsupported-expression]"), summary);
         assertTrue(summary.contains("EXCLUDED      1"), summary);
+    }
+
+    @Test
+    void aSkippedDecisionRecordCarriesEveryField(@TempDir Path directory) throws IOException {
+        PyronautCompiler.builder()
+            .pythonCode(SOURCE)
+            .staticCompilation(StaticCompilationMode.ALL)
+            .staticCompilationReport(directory.toFile())
+            .build()
+            .buildClassLoader();
+
+        String line = Files.readAllLines(directory.resolve(StaticCompilationReport.DECISIONS_FILE)).stream()
+            .filter(candidate -> candidate.contains("\"name\":\"PricingService.names\""))
+            .findFirst()
+            .orElseThrow();
+        JsonNode record = new ObjectMapper().readTree(line);
+        assertEquals(List.of("record", "name", "source", "line", "column", "outcome", "scope", "reasons", "stats"), propertyNames(record), line);
+        assertEquals("decision", record.get("record").asString());
+        assertEquals("PricingService.names", record.get("name").asString());
+        String source = record.get("source").asString();
+        assertFalse(source.isEmpty(), line);
+        assertEquals(13, record.get("line").asInt());
+        assertEquals(5, record.get("column").asInt());
+        assertEquals("SKIPPED", record.get("outcome").asString());
+        assertEquals("MODE", record.get("scope").asString());
+
+        JsonNode reasons = record.get("reasons");
+        assertEquals(1, reasons.size(), line);
+        JsonNode reason = reasons.get(0);
+        assertEquals(List.of("rule", "message", "location"), propertyNames(reason), line);
+        assertEquals("unsupported-expression", reason.get("rule").asString());
+        assertEquals("a list comprehension has no static lowering", reason.get("message").asString());
+        assertEquals(source + ":14:25", reason.get("location").asString());
+
+        JsonNode stats = record.get("stats");
+        assertEquals(List.of("statements", "javaCalls", "bridgeCalls", "helperCalls"), propertyNames(stats), line);
+        assertEquals(1, stats.get("statements").asInt());
+        assertEquals(0, stats.get("javaCalls").asInt());
+        assertEquals(0, stats.get("bridgeCalls").asInt());
+        assertEquals(0, stats.get("helperCalls").asInt());
+    }
+
+    private static List<String> propertyNames(JsonNode node) {
+        return node.properties().stream().map(Map.Entry::getKey).toList();
     }
 
     @Test
