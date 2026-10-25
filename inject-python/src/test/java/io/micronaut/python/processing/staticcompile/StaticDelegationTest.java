@@ -227,4 +227,12 @@ class StaticDelegationTest {
         assertEquals("none(it has side effects (the write of self.count) and the helper [toInt] raises where Python promotes)",
             StaticDelegation.status(body(List.of(Ir.STRING), Ir.VOID, write)));
     }
+
+    @Test
+    void theImmutableValueClassesOfJavaUtilAreTakenAsJavaObjects() {
+        Ir.Statement returned = new Ir.Return(new Ir.Const("a", Ir.STRING));
+        assertEquals("Outer$Calc#run#owner=app.Outer$Calc#kinds=java:java.util.UUID,java:java.util.Locale,java:java.util.Currency#retry",
+            StaticDelegation.target(body(List.of("java.util.UUID", "java.util.Locale", "java.util.Currency"), Ir.STRING, returned)));
+        assertNull(StaticDelegation.target(body(List.of("java.util.Date"), Ir.STRING, returned)));
+    }
 }

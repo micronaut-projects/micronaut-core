@@ -300,4 +300,47 @@ class Caller:
         results['entries.Ratios.ratio'] == 3
         results['entries.python.Script#scheme'] == 2
     }
+
+    void "a body taking a UUID, a Locale or a Currency delegates for a python caller passing the java object"() {
+        when:
+        def results = parity('''
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
+from java.util import UUID, Locale, Currency
+
+@Singleton
+class Ids:
+    def text(self, id: UUID) -> str:
+        return id.toString()
+
+    def tag(self, locale: Locale) -> str:
+        return locale.toLanguageTag()
+
+    def code(self, currency: Currency) -> str:
+        return currency.getCurrencyCode()
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def __init__(self, ids: Ids):
+        self.ids = ids
+
+    def probe(self) -> str:
+        id = UUID.fromString("123e4567-e89b-12d3-a456-426614174000")
+        try:
+            self.ids.text(None)
+            failed = "none"
+        except Exception as e:
+            failed = "failed"
+        return " ".join([self.ids.text(id), self.ids.tag(Locale.forLanguageTag("en-GB")), self.ids.code(Currency.getInstance("EUR")), failed])
+''', ['Ids.text': 'once', 'Ids.tag': 'once', 'Ids.code': 'once'])
+
+        then:
+        results.off == '123e4567-e89b-12d3-a456-426614174000 en-GB EUR failed'
+        results.all == results.off
+        // None is no UUID: the Python body runs for it
+        results['entries.Ids.text'] == 1
+        results['entries.Ids.tag'] == 1
+        results['entries.Ids.code'] == 1
+    }
 }

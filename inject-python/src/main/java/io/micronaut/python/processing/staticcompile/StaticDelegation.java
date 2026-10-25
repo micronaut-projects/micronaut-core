@@ -86,6 +86,8 @@ public final class StaticDelegation {
     private static final Set<String> UPDATING_HELPERS = Set.of("put", "putAll");
     private static final Set<String> NARROW_TYPES = Set.of(INT, SHORT, BYTE, "java.lang.Integer", "java.lang.Short", "java.lang.Byte");
     private static final String JAVA_KIND = "java:";
+    // the final, immutable value classes of java.util, whose objects a Python caller holds as Java objects
+    private static final Set<String> IMMUTABLE_UTIL_TYPES = Set.of("java.util.UUID", "java.util.Locale", "java.util.Currency");
 
     private StaticDelegation() {
     }
@@ -194,11 +196,11 @@ public final class StaticDelegation {
      * The kind of a parameter of a Java class whose objects reach it unchanged: a Java object of the
      * class, checked on every call; a Python value, which the boundary converts, is not one. A
      * parameterized or array type is not taken, nor a collection, which a Python caller passes as a
-     * Python one.
+     * Python one: of {@code java.util}, only the immutable value classes are.
      */
     private static @Nullable String javaKind(String parameterType) {
         if (parameterType.indexOf('.') < 0 || parameterType.indexOf('<') >= 0 || parameterType.endsWith("[]")
-            || parameterType.startsWith("java.util.")) {
+            || parameterType.startsWith("java.util.") && !IMMUTABLE_UTIL_TYPES.contains(parameterType)) {
             return null;
         }
         return JAVA_KIND + parameterType;

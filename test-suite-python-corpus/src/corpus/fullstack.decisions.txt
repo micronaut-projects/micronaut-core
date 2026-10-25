@@ -23,7 +23,7 @@ app/controllers/errors.py _field_of SKIPPED
 app/controllers/items.py ItemController.__init__ NOT_CANDIDATE
 app/controllers/items.py ItemController._current COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/controllers/items.py ItemController.create_item SKIPPED
-app/controllers/items.py ItemController.delete_item COMPILED delegation=none(parameter [itemId] is a [java.util.UUID], which a Python argument does not reach unchanged)
+app/controllers/items.py ItemController.delete_item COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/controllers/items.py ItemController.list_items SKIPPED
 app/controllers/items.py ItemController.read_item SKIPPED
 app/controllers/items.py ItemController.update_item SKIPPED
@@ -37,7 +37,7 @@ app/controllers/users.py UserController.__init__ NOT_CANDIDATE
 app/controllers/users.py UserController._current COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/controllers/users.py UserController.create_user SKIPPED
 app/controllers/users.py UserController.delete_me COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
-app/controllers/users.py UserController.delete_user COMPILED delegation=none(parameter [userId] is a [java.util.UUID], which a Python argument does not reach unchanged)
+app/controllers/users.py UserController.delete_user COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/controllers/users.py UserController.list_users SKIPPED
 app/controllers/users.py UserController.read_me SKIPPED
 app/controllers/users.py UserController.read_user SKIPPED
@@ -90,7 +90,7 @@ app/security/tokens.py PasswordResetTokens.verify SKIPPED
 app/security/tokens.py _b64decode SKIPPED
 app/security/tokens.py _b64encode SKIPPED
 app/services/items.py ItemService.__init__ NOT_CANDIDATE
-app/services/items.py ItemService.by_id COMPILED delegation=none(parameter [item_id] is a [java.util.UUID], which a Python argument does not reach unchanged)
+app/services/items.py ItemService.by_id COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/services/items.py ItemService.create COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/services/items.py ItemService.delete COMPILED delegation=once
 app/services/items.py ItemService.is_owned_by COMPILED delegation=static-once
