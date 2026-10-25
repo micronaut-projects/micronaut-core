@@ -2846,7 +2846,8 @@ class Lowering:
             else:
                 self.bridge_calls += 1
                 self._crossing(model, False)
-                read = PythonMember(receiver, node.attr, stub_type, False)
+                # an attribute of a class serving its attributes itself runs code: a side effect
+                read = PythonMember(receiver, node.attr, stub_type, not _plain_attributes(model))
         elif kind == "property":
             getter = found[1].getter()
             return_def = getter.returnType() if getter is not None else None
@@ -2864,7 +2865,7 @@ class Lowering:
             stub_type = self._stub_type(typed, None, node)
             self.bridge_calls += 1
             self._crossing(model, False)
-            read = PythonMember(receiver, node.attr, stub_type, False)
+            read = PythonMember(receiver, node.attr, stub_type, not _plain_attributes(model))
         else:
             self._refuse("unsupported-expression", f"reading [{node.attr}] of [{model.name}], which is not an attribute, has no static lowering", node)
         # an attribute that may be None stays boxed, a primitive is widened

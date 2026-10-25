@@ -279,4 +279,21 @@ class StaticDelegationTest {
         Ir.Statement appended = new Ir.Eval(new Ir.Helper("append", List.of(list, param(Ir.STRING)), Ir.NONE));
         assertEquals("once", StaticDelegation.status(body(List.of(Ir.STRING), Ir.VOID, appended)));
     }
+
+    @Test
+    void aHelperFailingWithAJavaExceptionKeepsABodyWithSideEffectsInPython() {
+        String type = "java.util.List<java.lang.String>";
+        Ir.Expression first = new Ir.Helper("at", List.of(new Ir.SelfProperty("items", type, false, false), new Ir.Const(0L, Ir.LONG)), OBJECT);
+        // run again in Python when it fails, so the caller sees the IndexError
+        assertEquals("retry", StaticDelegation.status(body(List.of(), OBJECT, new Ir.Return(first))));
+        Ir.Statement write = new Ir.PutSelf("last", OBJECT, first, false);
+        assertEquals("none(it has side effects (the write of self.last) and the helper [at] fails with a Java exception where Python raises its own)",
+            StaticDelegation.status(body(List.of(), Ir.VOID, write)));
+        // a dict of str keys cannot fail on a key
+        Ir.Expression keyed = new Ir.Helper("map", List.of(new Ir.Const("k", Ir.STRING), param(Ir.STRING)), "java.util.Map<java.lang.String,java.lang.String>");
+        assertEquals("once", StaticDelegation.status(body(List.of(Ir.STRING), Ir.VOID, new Ir.PutSelf("last", OBJECT, keyed, false))));
+        // an attribute of a class serving its attributes itself runs code
+        Ir.Expression dynamic = new Ir.PythonMember(new Ir.SelfProperty("tag", "app.Tag", false, true), "name", Ir.STRING, true);
+        assertEquals("once", StaticDelegation.status(body(List.of(), Ir.STRING, new Ir.Return(dynamic))));
+    }
 }

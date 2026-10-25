@@ -76,6 +76,11 @@ public final class StaticDelegation {
     private static final Set<String> PROMOTING_HELPERS = Set.of("power", "toInt");
     // the helpers that change the collection they are given, which is a side effect, and compute no number
     private static final Set<String> CHANGING_HELPERS = Set.of("append", "add", "put", "putAll", "setItem", "setAt");
+    // the helpers that may fail with a Java exception where Python raises an exception of its own (an
+    // IndexError, a KeyError, a TypeError of an unhashable key, a ValueError): a body run once cannot
+    // give the Python caller Python's exception, a body run again in Python can
+    private static final Set<String> FAILING_HELPERS = Set.of("at", "item", "setAt", "setItem", "get", "contains", "set", "map",
+        "copyOfSet", "put", "toFloat", "split", "join");
     // the helpers that read a collection they are given without keeping it, by the position of the argument
     private static final Map<String, Integer> READING_HELPERS = Map.ofEntries(
         Map.entry("len", 0), Map.entry("at", 0), Map.entry("item", 0), Map.entry("get", 0), Map.entry("contains", 0),
@@ -89,6 +94,9 @@ public final class StaticDelegation {
     // the integer types narrower than a long, by their width in bits
     private static final Map<String, Integer> NARROW_TYPES = Map.of(INT, 32, SHORT, 16, BYTE, 8, "java.lang.Integer", 32, "java.lang.Short", 16, "java.lang.Byte", 8);
     private static final String JAVA_KIND = "java:";
+    // the Java types of the values that are hashable in Python whatever they hold
+    private static final Set<String> SCALAR_TYPES = Set.of(Ir.LONG, Ir.DOUBLE, Ir.BOOLEAN, Ir.STRING, INT, SHORT, BYTE,
+        "java.lang.Long", "java.lang.Integer", "java.lang.Short", "java.lang.Byte", "java.lang.Double", "java.lang.Boolean");
     private static final String PYTHON_KIND = "python:";
     // the final, immutable value classes of java.util, whose objects a Python caller holds as Java objects
     private static final Set<String> IMMUTABLE_UTIL_TYPES = Set.of("java.util.UUID", "java.util.Locale", "java.util.Currency");
@@ -149,7 +157,7 @@ public final class StaticDelegation {
         if (body.callsCompiledCode()) {
             return true;
         }
-        Analysis analysis = new Analysis();
+        Analysis analysis = new Analysis(true);
         analysis.visit(body.body());
         return analysis.promotes;
     }
@@ -186,10 +194,10 @@ public final class StaticDelegation {
         }
         Analysis analysis = new Analysis();
         // a compiled function or a Python method the body calls may overflow where Python promotes
-        analysis.promotes(body.callsCompiledCode(), "a call of code of the compilation");
+        analysis.promotes(body.callsCompiledCode(), "a call of code of the compilation raises where Python promotes");
         analysis.visit(body.body());
         if (analysis.sideEffects && analysis.promotes) {
-            return Decision.refused("it has side effects (" + analysis.sideEffect + ") and " + analysis.promotion + " raises where Python promotes");
+            return Decision.refused("it has side effects (" + analysis.sideEffect + ") and " + analysis.promotion);
         }
         String className = body.className();
         if (body.staticMethod() || body.moduleLevel()) {
@@ -327,11 +335,22 @@ public final class StaticDelegation {
      * Python promotes. A node of a kind this class does not know counts as both.
      */
     private static final class Analysis {
+        // whether every kind of statement is walked, for the promotions of a callee: a delegated body
+        // itself has none of the statements walked only then
+        private final boolean complete;
         private boolean sideEffects;
         private boolean promotes;
         // the first of each, for the report
         private String sideEffect = "";
         private String promotion = "";
+
+        Analysis() {
+            this(false);
+        }
+
+        Analysis(boolean complete) {
+            this.complete = complete;
+        }
 
         private void sideEffect(String what) {
             if (!sideEffects) {
@@ -361,6 +380,30 @@ public final class StaticDelegation {
             for (Ir.Expression argument : arguments) {
                 visit(argument instanceof Ir.Cast cast && NARROW_TYPES.containsKey(cast.type()) && Ir.LONG.equals(cast.operand().type()) ? cast.operand() : argument);
             }
+        }
+
+        /**
+         * Whether a helper that may fail with a Java exception can for these arguments: a key of a dict
+         * or an element of a set that is a number, a bool or a str is hashable.
+         */
+        private static boolean mayFail(Ir.Helper helper) {
+            List<Ir.Expression> arguments = helper.arguments();
+            return switch (helper.name()) {
+                case "map" -> {
+                    boolean unhashable = false;
+                    for (int i = 0; i < arguments.size(); i += 2) {
+                        unhashable |= !hashable(arguments.get(i));
+                    }
+                    yield unhashable;
+                }
+                case "set" -> !arguments.stream().allMatch(Analysis::hashable);
+                case "put", "get", "contains", "setItem" -> arguments.size() < 2 || !hashable(arguments.get(1));
+                default -> true;
+            };
+        }
+
+        private static boolean hashable(Ir.Expression value) {
+            return SCALAR_TYPES.contains(value.type());
         }
 
         /**
@@ -410,12 +453,12 @@ public final class StaticDelegation {
                     visit(member.receiver());
                 }
                 case Ir.Binary binary -> {
-                    promotes(Ir.LONG.equals(binary.type()) && PROMOTING_LONG_OPS.contains(binary.op()), "the long [" + binary.op() + "]");
+                    promotes(Ir.LONG.equals(binary.type()) && PROMOTING_LONG_OPS.contains(binary.op()), "the long [" + binary.op() + "] raises where Python promotes");
                     visit(binary.left());
                     visit(binary.right());
                 }
                 case Ir.Unary unary -> {
-                    promotes(Ir.LONG.equals(unary.type()) && "-".equals(unary.op()), "the long negation");
+                    promotes(Ir.LONG.equals(unary.type()) && "-".equals(unary.op()), "the long negation raises where Python promotes");
                     visit(unary.operand());
                 }
                 case Ir.Compare compare -> {
@@ -438,17 +481,21 @@ public final class StaticDelegation {
                 case Ir.Truthy truthy -> visit(truthy.operand());
                 case Ir.StrJoin join -> visit(join.parts());
                 case Ir.Cast cast -> {
-                    promotes(narrows(cast), "the narrowing to [" + cast.type() + "]");
+                    promotes(narrows(cast), "the narrowing to [" + cast.type() + "] raises where Python promotes");
                     visit(cast.operand());
                 }
                 case Ir.Helper helper -> {
                     if (PROMOTING_HELPERS.contains(helper.name())) {
-                        promotes(true, "the helper [" + helper.name() + "]");
+                        promotes(true, "the helper [" + helper.name() + "] raises where Python promotes");
                     } else if (CHANGING_HELPERS.contains(helper.name())) {
                         sideEffect("the helper [" + helper.name() + "]");
                     } else if (!PURE_HELPERS.contains(helper.name())) {
                         sideEffect("the helper [" + helper.name() + "]");
-                        promotes(true, "the helper [" + helper.name() + "]");
+                        promotes(true, "the helper [" + helper.name() + "] raises where Python promotes");
+                    }
+                    if (FAILING_HELPERS.contains(helper.name()) && mayFail(helper)) {
+                        // not run again: its Java failure would reach the Python caller
+                        promotes(true, "the helper [" + helper.name() + "] fails with a Java exception where Python raises its own");
                     }
                     visit(helper.arguments());
                 }
@@ -470,13 +517,39 @@ public final class StaticDelegation {
                     sideEffect("the construction of [" + construction.type() + "]");
                     arguments(construction.arguments());
                 }
+                case Ir.While loop when complete -> {
+                    visit(loop.test());
+                    visit(loop.body());
+                }
+                case Ir.ForRange loop when complete -> {
+                    visit(loop.start());
+                    visit(loop.stop());
+                    visit(loop.step());
+                    visit(loop.body());
+                }
+                case Ir.ForEach loop when complete -> {
+                    visit(loop.iterable());
+                    visit(loop.body());
+                }
+                case Ir.Try attempt when complete -> {
+                    visit(attempt.body());
+                    for (Ir.Catch handler : attempt.catches()) {
+                        visit(handler.body());
+                    }
+                    visit(attempt.finallyBody());
+                }
+                case Ir.Throw thrown when complete -> visit(thrown.exception());
+                case Ir.NewPythonException construction when complete -> visit(construction.arguments());
+                case Ir.Break _, Ir.Continue _ when complete -> {
+                    // a jump computes nothing
+                }
                 default -> {
                     // a kind of node this analysis does not know: assumed to do both
                     // the record's name, which its text starts with
                     String text = String.valueOf(node);
                     String kind = "a [" + (text.indexOf('[') < 0 ? text : text.substring(0, text.indexOf('['))) + "]";
                     sideEffect(kind);
-                    promotes(true, kind);
+                    promotes(true, kind + " raises where Python promotes");
                 }
             }
         }

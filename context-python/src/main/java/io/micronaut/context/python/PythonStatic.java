@@ -669,18 +669,22 @@ public final class PythonStatic {
      * as Python's exception in the context of the Python caller, the one the calling thread has
      * entered, else the context of the running application.
      *
-     * @param exception The exception the body threw
+     * @param exception The exception the body threw, any Throwable a Python caller caught
      * @return The exception to throw, when it has no Python counterpart
      * @since 5.3.0
      */
-    public static RuntimeException forPython(RuntimeException exception) {
+    public static Throwable forPython(Throwable exception) {
+        if (!(exception instanceof RuntimeException runtime)) {
+            // an Error or a checked exception: the caller raises it as it is
+            return exception;
+        }
         org.graalvm.polyglot.Context context;
         try {
             context = org.graalvm.polyglot.Context.getCurrent();
         } catch (IllegalStateException e) {
             context = PythonContextRuntime.getContext();
         }
-        return forPython(context, exception);
+        return forPython(context, runtime);
     }
 
     private static RuntimeException forPython(org.graalvm.polyglot.Context context, RuntimeException exception) {

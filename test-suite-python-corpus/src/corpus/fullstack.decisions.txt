@@ -111,9 +111,9 @@ app/services/users.py UserService.count COMPILED delegation=none(it has side eff
 app/services/users.py UserService.create COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/services/users.py UserService.delete COMPILED delegation=once
 app/services/users.py UserService.page COMPILED delegation=once
-app/services/users.py UserService.register COMPILED delegation=none(it has side effects (the call of [self.create]) and a call of code of the compilation raises where Python promotes)
+app/services/users.py UserService.register COMPILED delegation=once
 app/services/users.py UserService.set_password COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
 app/services/users.py UserService.update COMPILED delegation=none(a Java exception of a Python exception class may come from the compilation or from Java code)
-app/services/users.py UserService.update_me COMPILED delegation=none(it has side effects (the call of [self.update]) and a call of code of the compilation raises where Python promotes)
+app/services/users.py UserService.update_me COMPILED delegation=once
 app/services/users.py UserService.verify_password COMPILED delegation=once
 app/services/users.py _java_uuid SKIPPED
