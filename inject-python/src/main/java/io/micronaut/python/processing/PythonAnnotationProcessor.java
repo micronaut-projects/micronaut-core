@@ -97,14 +97,15 @@ import java.util.stream.Collectors;
  * each registered processor. The options below are declared by this processor's
  * {@link io.micronaut.inject.visitor.TypeElementVisitor}s, which a tool enumerating processors
  * never sees; {@code TypeElementVisitorProcessor} aggregates its visitors' options for the same
- * reason, and this processor loads its visitors too late in a round to do that dynamically.
+ * reason, and this processor loads its visitors too late in a round to do that dynamically. The
+ * options the processor reads itself (the source root, the bytecode cache, type checking and
+ * static compilation) are added by {@link #getSupportedOptions()}, which advertises both.
  *
  * @author Micronaut
  * @since 5.2.0
  */
 @SupportedAnnotationTypes(PythonAnnotationProcessor.PYTHON_APPLICATION_ANNOTATION)
 @SupportedOptions({
-    PythonAnnotationProcessor.SOURCE_ROOT_OPTION,
     PythonClassExclusions.OPTION,
     PythonReflectionGate.OPTION,
     PythonReflectionGate.WARNINGS_OPTION,
