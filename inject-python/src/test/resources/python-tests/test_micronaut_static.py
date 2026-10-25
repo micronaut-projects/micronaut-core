@@ -2625,7 +2625,7 @@ class Calc:
         self.assertIn("__mn_java_p = _mn_python_exception(__mn_java_e)", source)
         self.assertNotRegex(source, r"raise .* from ")  # the Python exception keeps its own cause and context
         self.assertIn("def _mn_python_exception(error):", source)
-        self.assertEqual("_mn_python_exception", tree.body[3].name)  # the helpers precede the class
+        self.assertEqual(["_mn_python_class", "_mn_python_exception"], [tree.body[3].name, tree.body[4].name])  # the helpers precede the class
         calc = next(node for node in tree.body if isinstance(node, ast.ClassDef))
         self.assertIsInstance(calc.body[0], ast.Expr)  # the class docstring stays first
         self.assertEqual("__micronaut_compiled__", calc.body[1].targets[0].id)
@@ -2726,6 +2726,27 @@ class Calc:
                 del sys.modules["micronaut_runtime"]
             else:
                 sys.modules["micronaut_runtime"] = previous
+
+    def test_a_plain_class_of_the_compilation_is_checked_by_the_class_the_hint_names(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class User:
+    pass
+
+
+class Greeter:
+    def greet(self, user: "User", label: str) -> str:
+        return label
+''')
+        self.assertEqual(1, apply_delegation(tree, ["Greeter#greet#owner=pkg.Greeter#kinds=python:User,str#retry"]))
+        source = ast.unparse(tree)
+        self.assertIn("(_mn_python_class('User', 'User'), 'str')", source)
+        namespace = {}
+        exec(compile(tree, "plain.py", "exec"), namespace)
+        # the class itself, by the name the hint gives it in the module; another class of that name is not it
+        self.assertEqual(("python", namespace["User"]), namespace["_mn_python_class"]("User", "User"))
+        self.assertIsNone(namespace["_mn_python_class"]("User", "Other"))
+        self.assertIsNone(namespace["_mn_python_class"]("Missing.User", "User"))
 
     def test_a_static_body_with_side_effects_runs_once_and_raises_its_failure(self):
         import sys

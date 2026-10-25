@@ -587,6 +587,9 @@ public sealed interface Ir {
      *                       module's class
      * @param exceptions     How the Java exception of a Python exception class the body throws reaches a
      *                       Python caller of the rewritten function
+     * @param pythonParameters Per parameter, the Python name ({@code Outer.Inner}) of the plain class of the
+     *                       compilation whose generated class the parameter is, which wraps the Python object a
+     *                       Python caller passes, or an empty string
      */
     record CompiledBody(String className,
                         String methodName,
@@ -600,13 +603,48 @@ public sealed interface Ir {
                         boolean advised,
                         boolean staticMethod,
                         boolean moduleLevel,
-                        ExceptionCrossing exceptions) {
+                        ExceptionCrossing exceptions,
+                        List<String> pythonParameters) {
         public CompiledBody {
             Objects.requireNonNull(className, "className");
             Objects.requireNonNull(exceptions, "exceptions");
             Objects.requireNonNull(methodName, "methodName");
             parameterNames = List.copyOf(parameterNames);
             parameterTypes = List.copyOf(parameterTypes);
+            pythonParameters = pythonParameters == null ? List.of() : List.copyOf(pythonParameters);
+        }
+
+        /**
+         * A body none of whose parameters is a plain class of the compilation.
+         *
+         * @param className      The generated class the method belongs to
+         * @param methodName     The method
+         * @param parameterNames The parameter names, the receiver excluded
+         * @param parameterTypes The Java types of the parameters as the stub declares them
+         * @param returnType     The Java return type as the stub declares it
+         * @param body           The body
+         * @param span           Where the Python function is declared
+         * @param stats          What the body contains
+         * @param wrapsCheckedExceptions Whether a call of the body declares a checked exception
+         * @param advised        Whether the method is advised
+         * @param staticMethod   Whether the body is generated as a static Java method
+         * @param moduleLevel    Whether the function is a module-level function
+         * @param exceptions     How the Java exception of a Python exception class reaches a Python caller
+         */
+        public CompiledBody(String className, String methodName, List<String> parameterNames, List<String> parameterTypes,
+                            String returnType, Body body, @Nullable SourceSpan span, StaticCompilationDecision.Stats stats,
+                            boolean wrapsCheckedExceptions, boolean advised, boolean staticMethod, boolean moduleLevel,
+                            ExceptionCrossing exceptions) {
+            this(className, methodName, parameterNames, parameterTypes, returnType, body, span, stats, wrapsCheckedExceptions,
+                advised, staticMethod, moduleLevel, exceptions, List.of());
+        }
+
+        /**
+         * @param index The position of a parameter
+         * @return The Python name of the plain class of the compilation the parameter takes, or an empty string
+         */
+        public String pythonParameter(int index) {
+            return index < pythonParameters.size() ? pythonParameters.get(index) : "";
         }
 
         /**

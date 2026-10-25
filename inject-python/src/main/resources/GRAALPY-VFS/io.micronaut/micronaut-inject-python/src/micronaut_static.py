@@ -308,6 +308,19 @@ class StaticPlanner:
             return not model.is_throwable() and not any(self._introspected(other.qualified) for other in [model] + list(model.subclasses))
         return True
 
+    def plain_class(self, type_name):
+        """
+        The model of the plain class of the compilation a Java type is the generated class of: one whose
+        generated class wraps the Python object (no introspected class among it and its subclasses, no
+        exception class), so a Python caller's object of exactly that class reaches the Java body as
+        itself; else None.
+        """
+        classes = getattr(self.checker, "python_classes", None)
+        model = classes.by_qualified.get(type_name) if classes is not None else None
+        if model is None or model.is_throwable() or any(self._introspected(other.qualified) for other in [model] + list(model.subclasses)):
+            return None
+        return model
+
     def _introspected(self, qualified_name):
         """Whether the generated class of the class is introspected; unknown facts count as introspected."""
         facts = getattr(self.checker, "facts", None)
@@ -1209,6 +1222,7 @@ def apply_delegation(tree, targets):
 STATIC_LOOKUP = "_mn_static_class"
 STATIC_CALL = "_mn_static_call"
 PYTHON_EXCEPTION = "_mn_python_exception"
+PYTHON_CLASS = "_mn_python_class"
 HELPERS_SOURCE = """
 _mn_static_classes = {}
 
@@ -1256,6 +1270,15 @@ def _mn_static_call(name, method, arguments, kinds, retry=True, translated=False
         # raises the Python exception of a failure Python raises one for, or the checked exception of a Java call
         __mn_java_module.type("io.micronaut.context.python.PythonStatic").forPython(failure)
     raise failure
+
+
+def _mn_python_class(path, qualname):
+    found = globals().get(path.split(".")[0])
+    for part in path.split(".")[1:]:
+        found = getattr(found, part, None)
+    if not isinstance(found, type) or found.__qualname__ != qualname:
+        return None
+    return ("python", found)
 
 
 def _mn_python_exception(error):
@@ -1331,7 +1354,48 @@ def _delegation_status(body, node):
     takes = _takes_exactly(node, kinds) if body.staticMethod() or body.moduleLevel() else _receives_self(node, kinds)
     if not takes:
         return Delegation.none("the function takes keyword-only, variadic or more parameters than the Java body")
+    positional = list(node.args.posonlyargs) + list(node.args.args)
+    parameters = positional if body.staticMethod() or body.moduleLevel() else positional[1:]
+    for index, argument in enumerate(parameters):
+        if body.pythonParameter(index) and _annotation_path(argument) is None:
+            return Delegation.none(f"the hint of [{argument.arg}] names its class by no name of the module, which the check of the argument looks up")
     return status
+
+
+def _annotation_path(argument):
+    """The dotted name (Cls, mod.Cls) the hint of a parameter names its class by, a quoted hint included, or None."""
+    annotation = argument.annotation
+    if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
+        try:
+            annotation = ast.parse(annotation.value, mode="eval").body
+        except SyntaxError:
+            return None
+    parts = []
+    while isinstance(annotation, ast.Attribute):
+        parts.append(annotation.attr)
+        annotation = annotation.value
+    if not isinstance(annotation, ast.Name):
+        return None
+    parts.append(annotation.id)
+    return ".".join(reversed(parts))
+
+
+def _kind_nodes(function, kinds, receives_self):
+    """
+    The kinds of the parameters as the prologue passes them: a string, or for a plain class of the
+    compilation ("python:<name>") the class the hint names, looked up in the module on each call
+    (None when the module does not hold it, so the argument does not fit).
+    """
+    positional = list(function.args.posonlyargs) + list(function.args.args)
+    parameters = positional[1:] if receives_self else positional
+    nodes = []
+    for index, kind in enumerate(kinds):
+        if kind.startswith("python:") and index < len(parameters) and _annotation_path(parameters[index]) is not None:
+            nodes.append(ast.Call(func=ast.Name(id=PYTHON_CLASS, ctx=ast.Load()),
+                                  args=[ast.Constant(value=_annotation_path(parameters[index])), ast.Constant(value=kind[len("python:"):])], keywords=[]))
+        else:
+            nodes.append(ast.Constant(value=kind))
+    return nodes
 
 
 def _takes_exactly(function, kinds):
@@ -1358,7 +1422,7 @@ def _static_delegation(function, static_class, kinds, conversion=None, retry=Tru
                 ast.Constant(value=static_class),
                 ast.Constant(value=function.name),
                 ast.Tuple(elts=[ast.Name(id=name, ctx=ast.Load()) for name in names], ctx=ast.Load()),
-                ast.Tuple(elts=[ast.Constant(value=kind) for kind in kinds], ctx=ast.Load()),
+                ast.Tuple(elts=_kind_nodes(function, kinds, False), ctx=ast.Load()),
             ] + ([] if retry else [ast.Constant(value=False), ast.Constant(value=translated)]),
             keywords=[],
         ),
@@ -1479,7 +1543,7 @@ def _delegation(function, owner, kinds, retry, conversion=None, translated=False
                 ast.Constant(value=owner),
                 ast.Constant(value=function.name),
                 ast.Tuple(elts=[load(name) for name in names], ctx=ast.Load()),
-                ast.Tuple(elts=[ast.Constant(value=kind) for kind in kinds], ctx=ast.Load()),
+                ast.Tuple(elts=_kind_nodes(function, kinds, True), ctx=ast.Load()),
                 ast.Constant(value=retry),
             ],
             keywords=[],

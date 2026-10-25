@@ -343,4 +343,61 @@ class Caller:
         results['entries.Ids.tag'] == 1
         results['entries.Ids.code'] == 1
     }
+
+    void "a python object of a plain class of the compilation is taken as itself, an introspected one keeps the python body"() {
+        when:
+        def results = parity('''
+from dataclasses import dataclass
+from jakarta.inject import Singleton
+from micronaut.core.annotation import Introspected
+from micronaut.context.python.annotation import CompileStatic
+
+class User:
+    def __init__(self, name: str):
+        self.name = name
+        self.visits = ""
+
+    def visit(self, label: str) -> None:
+        self.visits = self.visits + label
+
+class Admin(User):
+    pass
+
+@Introspected
+@dataclass
+class Card:
+    title: str
+
+@Singleton
+class Greeter:
+    def greet(self, user: User) -> str:
+        return "hi " + user.name
+
+    def welcome(self, user: User) -> None:
+        user.visit("w")
+
+    def show(self, card: Card) -> str:
+        return card.title
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def __init__(self, greeter: Greeter):
+        self.greeter = greeter
+
+    def probe(self) -> str:
+        bob = User("bob")
+        self.greeter.welcome(bob)
+        self.greeter.welcome(bob)
+        return " ".join([self.greeter.greet(bob), bob.visits, self.greeter.greet(Admin("ann")), self.greeter.show(Card("t"))])
+''', ['Greeter.greet': 'retry', 'Greeter.welcome': 'once', 'Greeter.show': 'once'])
+
+        then:
+        results.off == 'hi bob ww hi ann t'
+        results.all == results.off
+        // an Admin is no User exactly, and an introspected Card is converted, not taken as itself: the Python body runs
+        results['entries.Greeter.greet'] == 1
+        results['entries.Greeter.welcome'] == 2
+        results['entries.Greeter.show'] == 0
+    }
 }

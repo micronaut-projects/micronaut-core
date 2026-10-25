@@ -235,4 +235,15 @@ class StaticDelegationTest {
             StaticDelegation.target(body(List.of("java.util.UUID", "java.util.Locale", "java.util.Currency"), Ir.STRING, returned)));
         assertNull(StaticDelegation.target(body(List.of("java.util.Date"), Ir.STRING, returned)));
     }
+
+    @Test
+    void aPlainClassOfTheCompilationIsTakenAsThePythonObject() {
+        Ir.CompiledBody plain = new Ir.CompiledBody("app.Greeter", "run", List.of("user"), List.of("app.User"), Ir.STRING,
+            new Ir.Body(List.of(new Ir.Return(new Ir.Const("a", Ir.STRING)))), SourceSpan.at("app/calc.py", 3, 5),
+            new StaticCompilationDecision.Stats(1, 0, 0, 0), false, false, false, false, Ir.ExceptionCrossing.UNTRANSLATED, List.of("User"));
+        assertEquals("Greeter#run#owner=app.Greeter#kinds=python:User#retry", StaticDelegation.target(plain));
+        // without the Python class, a Java object of the generated class only
+        assertEquals("Outer$Calc#run#owner=app.Outer$Calc#kinds=java:app.User#retry",
+            StaticDelegation.target(body(List.of("app.User"), Ir.STRING, new Ir.Return(new Ir.Const("a", Ir.STRING)))));
+    }
 }

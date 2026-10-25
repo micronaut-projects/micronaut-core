@@ -829,6 +829,7 @@ class Lowering:
         self.following = []       # the statements following the one being lowered, innermost block last
         self.next_loop = 0
         self.parameters = {}      # name -> (type used at, stub type)
+        self.python_parameters = []  # per parameter, the Python name of the plain class of the compilation it takes, or ""
         self.java_calls = 0
         self.bridge_calls = 0
         self.fixed_reads = 0      # the reads of attributes of self fixed at construction, from Java fields of the stub
@@ -879,7 +880,7 @@ class Lowering:
             owner = self.module.script.qualifiedName()
         return CompiledBody(owner, self.function_def.name(), parameter_names, parameter_types,
                             return_type, body, self.function_def.span(), stats, self.checked, self.advised_method,
-                            self.static, self.class_def is None, self._exception_crossing())
+                            self.static, self.class_def is None, self._exception_crossing(), self.python_parameters)
 
     def _exception_crossing(self):
         """
@@ -963,6 +964,9 @@ class Lowering:
                 self.copied.add(name)
             names.append(name)
             types.append(stub_type)
+            plain = typed is not None and typed.kind == PY and self.java_layout is None and self.planner is not None \
+                and getattr(self.planner, "plain_class", None) is not None and self.planner.plain_class(stub_type)
+            self.python_parameters.append(plain.name if plain else "")
         return names, types
 
     def _return_type(self):

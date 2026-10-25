@@ -86,6 +86,7 @@ public final class StaticDelegation {
     private static final Set<String> UPDATING_HELPERS = Set.of("put", "putAll");
     private static final Set<String> NARROW_TYPES = Set.of(INT, SHORT, BYTE, "java.lang.Integer", "java.lang.Short", "java.lang.Byte");
     private static final String JAVA_KIND = "java:";
+    private static final String PYTHON_KIND = "python:";
     // the final, immutable value classes of java.util, whose objects a Python caller holds as Java objects
     private static final Set<String> IMMUTABLE_UTIL_TYPES = Set.of("java.util.UUID", "java.util.Locale", "java.util.Currency");
 
@@ -150,7 +151,10 @@ public final class StaticDelegation {
         List<String> kinds = new ArrayList<>(body.parameterTypes().size());
         for (int i = 0; i < body.parameterTypes().size(); i++) {
             String parameterType = body.parameterTypes().get(i);
-            String kind = KINDS.getOrDefault(parameterType, javaKind(parameterType));
+            // a plain class of the compilation: its generated class wraps the Python object the caller passes
+            String kind = body.pythonParameter(i).isEmpty()
+                ? KINDS.getOrDefault(parameterType, javaKind(parameterType))
+                : PYTHON_KIND + body.pythonParameter(i);
             if (kind == null) {
                 String name = i < body.parameterNames().size() ? body.parameterNames().get(i) : Integer.toString(i);
                 return Decision.refused("parameter [" + name + "] is a [" + parameterType + "], which a Python argument does not reach unchanged");
