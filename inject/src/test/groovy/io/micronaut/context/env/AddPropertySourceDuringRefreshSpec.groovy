@@ -493,6 +493,105 @@ class AddPropertySourceDuringRefreshSpec extends Specification {
         env.stop()
     }
 
+    void "a property source added by code that a processPropertySource() override runs and waits for, while another one is added, does not deadlock"() {
+        given:
+        AddsWhenProcessing env = new AddsWhenProcessing()
+        env.start()
+
+        when:
+        env.armed.set(true)
+        Thread adder = daemon('adder') { env.addPropertySource(PropertySource.of('outer', ['outer.key': 'outer'])) }
+        adder.join(WAIT_SECONDS * 1000L)
+
+        then:
+        !adder.alive
+        env.helperFinished
+        env.getProperty('outer.key', String).orElse(null) == 'outer'
+        env.getProperty('helper.key', String).orElse(null) == 'helper'
+
+        cleanup:
+        if (!adder.alive) {
+            env.stop()
+        }
+    }
+
+    void "a property source left to a failed refresh, whose processPropertySource() override waits for another thread to add one, does not deadlock"() {
+        given:
+        AddsWhenProcessingLeftOver env = new AddsWhenProcessingLeftOver()
+        ArmsFlagWhenFailing flaky = new ArmsFlagWhenFailing(env.armed)
+        env.addPropertySource(flaky)
+        env.start()
+
+        when: "a property source is left to a refresh that fails, and its processing after the refresh waits for another thread's add"
+        flaky.fail.set(true)
+        Thread refresher = parkIn(env.stopping) {
+            try {
+                env.refresh()
+            } catch (IllegalArgumentException ignored) {
+                // expected
+            }
+        }
+        Thread adder = daemon('adder') { env.addPropertySource(PropertySource.of('outer', ['outer.key': 'outer'])) }
+        adder.join(WAIT_SECONDS * 1000L)
+        boolean adderWaited = adder.alive
+        release(env.stopping, refresher)
+
+        then:
+        verifyAll {
+            !adderWaited
+            env.helperFinished
+            env.getProperty('outer.key', String).orElse(null) == 'outer'
+            env.getProperty('helper.key', String).orElse(null) == 'helper'
+        }
+
+        cleanup:
+        env.stopping.release.countDown()
+        if (!refresher.alive) {
+            env.stop()
+        }
+    }
+
+    void "a property source added by the name of one left to a failed refresh, while that one is processed after it, is processed after it and stays registered"() {
+        given: "a property source of a higher order that fails to be read once asked to, and then has the one left to the refresh park when its name is asked for"
+        NameParks first = new NameParks('first')
+        ArmsWhenFailing flaky = new ArmsWhenFailing(first)
+        ParkingEnvironment env = new ParkingEnvironment()
+        env.addPropertySource(flaky)
+        env.start()
+
+        when: "the first is left to a refresh that fails, and parks while it is processed after it"
+        flaky.fail.set(true)
+        Thread refresher = parkIn(env.stopping) {
+            try {
+                env.refresh()
+            } catch (IllegalArgumentException ignored) {
+                // expected
+            }
+        }
+        Thread adder = daemon('adder') { env.addPropertySource(first) }
+        adder.join(WAIT_SECONDS * 1000L)
+        assert !adder.alive
+        env.stopping.release.countDown()
+        assert first.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+
+        and: "another thread adds one by the same name meanwhile, which waits for the first"
+        PropertySource second = PropertySource.of('watcher', ['watcher.value': 'second'])
+        Thread other = daemon('other') { env.addPropertySource(second) }
+        awaitWaiting(other)
+        release(first, refresher)
+        other.join(WAIT_SECONDS * 1000L)
+
+        then: "the second is registered and its values are the ones looked up"
+        !other.alive
+        env.propertySources.find { it.name == 'watcher' }.is(second)
+        env.getProperty('watcher.value', String).get() == 'second'
+
+        cleanup:
+        env.stopping.release.countDown()
+        first.release.countDown()
+        env.stop()
+    }
+
     /**
      * The configuration of an environment that holds the property sources a test gives it and
      * nothing of the machine it runs on.
@@ -735,6 +834,140 @@ class AddPropertySourceDuringRefreshSpec extends Specification {
                 helperFinished = !helper.alive
             }
             super.resetCaches()
+        }
+    }
+
+    /**
+     * An environment without default property sources whose processPropertySource(), once armed,
+     * has another thread add a property source and waits for it, bounded, before it processes the
+     * property source named {@code outer}.
+     */
+    static class AddsWhenProcessing extends DefaultEnvironment {
+        final AtomicBoolean armed = new AtomicBoolean()
+        volatile boolean helperFinished
+
+        AddsWhenProcessing() {
+            super(AddPropertySourceDuringRefreshSpec.withoutDefaultPropertySources())
+        }
+
+        @Override
+        protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
+            if (properties.name == 'outer' && armed?.compareAndSet(true, false)) {
+                Thread helper = new Thread({ addPropertySource(PropertySource.of('helper', ['helper.key': 'helper'])) }, 'helper')
+                helper.daemon = true
+                helper.start()
+                helper.join(AddPropertySourceDuringRefreshSpec.WAIT_SECONDS * 1000L)
+                helperFinished = !helper.alive
+            }
+            super.processPropertySource(properties, convention)
+        }
+    }
+
+    /**
+     * The same as {@link ParkingEnvironment}, whose processPropertySource(), once armed, has another
+     * thread add a property source and waits for it, bounded, before it processes the property
+     * source named {@code outer}.
+     */
+    static class AddsWhenProcessingLeftOver extends ParkingEnvironment {
+        final AtomicBoolean armed = new AtomicBoolean()
+        volatile boolean helperFinished
+
+        @Override
+        protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
+            if (properties.name == 'outer' && armed?.compareAndSet(true, false)) {
+                Thread helper = new Thread({ addPropertySource(PropertySource.of('helper', ['helper.key': 'helper'])) }, 'helper')
+                helper.daemon = true
+                helper.start()
+                helper.join(AddPropertySourceDuringRefreshSpec.WAIT_SECONDS * 1000L)
+                helperFinished = !helper.alive
+            }
+            super.processPropertySource(properties, convention)
+        }
+    }
+
+    /**
+     * A property source of a high order that, once asked to, fails to be read, and sets the given
+     * flag as it does.
+     */
+    static class ArmsFlagWhenFailing implements PropertySource {
+        final AtomicBoolean fail = new AtomicBoolean()
+        private final AtomicBoolean flag
+
+        ArmsFlagWhenFailing(AtomicBoolean flag) {
+            this.flag = flag
+        }
+
+        @Override
+        String getName() { 'arms-flag-when-failing' }
+
+        @Override
+        int getOrder() { 200 }
+
+        @Override
+        Object get(String key) { null }
+
+        @Override
+        Iterator<String> iterator() {
+            if (fail.get()) {
+                flag.set(true)
+                throw new IllegalArgumentException('failed to read the property source')
+            }
+            return Collections.emptyIterator()
+        }
+    }
+
+    /**
+     * A property source named {@code watcher} that, once armed, parks the thread that asks for its
+     * name, as processing it does before anything else.
+     */
+    static class NameParks extends Parking implements PropertySource {
+        private final String value
+
+        NameParks(String value) {
+            this.value = value
+        }
+
+        @Override
+        String getName() {
+            pass()
+            return 'watcher'
+        }
+
+        @Override
+        Object get(String key) { key == 'watcher.value' ? value : null }
+
+        @Override
+        Iterator<String> iterator() { ['watcher.value'].iterator() }
+    }
+
+    /**
+     * A property source of a high order that, once asked to, fails to be read, and arms the given
+     * parking as it does.
+     */
+    static class ArmsWhenFailing implements PropertySource {
+        final AtomicBoolean fail = new AtomicBoolean()
+        private final Parking parking
+
+        ArmsWhenFailing(Parking parking) {
+            this.parking = parking
+        }
+
+        @Override
+        String getName() { 'arms-when-failing' }
+
+        @Override
+        int getOrder() { 200 }
+
+        @Override
+        Object get(String key) { null }
+
+        @Override
+        Iterator<String> iterator() {
+            if (fail.get()) {
+                parking.arm()
+                throw new IllegalArgumentException('failed to read the property source')
+            }
+            return Collections.emptyIterator()
         }
     }
 

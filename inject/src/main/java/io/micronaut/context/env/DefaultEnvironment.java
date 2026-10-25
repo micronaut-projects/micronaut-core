@@ -110,7 +110,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * that only delays refreshes.
      */
     private static final long PROCESSING_WAIT_LIMIT_NANOS = TimeUnit.SECONDS.toNanos(5);
-    /** Notes in {@link #changedWhileProcessed} that the property source has been removed. */
+    /** Notes in {@link Processed#changed} that the property source has been removed. */
     private static final Object REMOVED = new Object();
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
@@ -144,11 +144,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     private final Map<String, PropertySource> leftToRefresh = new LinkedHashMap<>(4);
     /**
-     * By the name of each property source added outside a read that a thread is processing, see
-     * {@link #processAdded(String, PropertySource)}, what another thread has registered by that
-     * name since, {@link #REMOVED} if it has removed it, or {@code null}.
+     * By name, the property sources added outside a read that threads are processing, see
+     * {@link Processed}.
      */
-    private final Map<String, Object> changedWhileProcessed = new HashMap<>(4);
+    private final Map<String, Processed> processedByName = new HashMap<>(4);
     private final Boolean deduceEnvironments;
     private final ApplicationContextConfiguration configuration;
     private final Collection<String> configLocations;
@@ -246,83 +245,163 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         String name = propertySource.getName();
         synchronized (addLock) {
             propertySources.put(name, propertySource);
-            if (changedWhileProcessed.containsKey(name)) {
-                changedWhileProcessed.put(name, propertySource);
+            Processed sameName = processedByName.get(name);
+            if (sameName != null) {
+                sameName.changed = propertySource;
             }
         }
         // asked once it is registered, as it was, so that a read that starts meanwhile reads it, and
         // with no lock held, so that an override runs no code under one
         boolean running = isRunning();
+        Processed processed = null;
+        boolean interrupted;
         synchronized (addLock) {
-            boolean sameNameProcessed = changedWhileProcessed.containsKey(name);
-            if (!running || reading.get()) {
-                return this;
+            interrupted = awaitLeftOver(name);
+            Processed sameName = processedByName.get(name);
+            // Only registered while the environment is not running or a read is open, as it was: the
+            // read that runs, or the next one, reads it. Left alone if replaced or removed meanwhile,
+            // by a thread that processes or notes that itself.
+            if (running && !reading.get()
+                && (propertySources.get(name) == propertySource || sameName != null && sameName.changed == propertySource)) {
+                if (refreshes > 0 && !Thread.holdsLock(catalog) && sameName == null) {
+                    // left to the refresh, rather than waiting for it: the refresh reads it in its order,
+                    // or, if it has read the property sources already, it is processed once it ends. A
+                    // thread that holds the lock of the catalogs, as the refreshing one does, waits for
+                    // nothing and processes it itself, as it did. So does one that adds a property source
+                    // by the name of one another thread processes, after it, as it did, rather than
+                    // leave it to a refresh that the code of that property source may run meanwhile.
+                    leftToRefresh.remove(name);
+                    leftToRefresh.put(name, propertySource);
+                } else {
+                    processed = startProcessing(name);
+                    // last, so that nothing that could fail comes between counting this thread and the try
+                    processing++;
+                }
             }
-            if (propertySources.get(name) != propertySource && changedWhileProcessed.get(name) != propertySource) {
-                // replaced or removed meanwhile, by a thread that processes or notes that itself
-                return this;
-            }
-            if (refreshes > 0 && !Thread.holdsLock(catalog) && !sameNameProcessed) {
-                // left to the refresh, rather than waiting for it: the refresh reads it in its order,
-                // or, if it has read the property sources already, it is processed once it ends. A
-                // thread that holds the lock of the catalogs, as the refreshing one does, waits for
-                // nothing and processes it itself, as it did. So does one that adds a property source
-                // by the name of one another thread processes, after it, as it did, rather than
-                // leave it to a refresh that the code of that property source may run meanwhile.
-                leftToRefresh.remove(name);
-                leftToRefresh.put(name, propertySource);
-                return this;
-            }
-            // last, so that nothing that could fail comes between counting this thread and the try
-            processing++;
         }
-        try {
-            processAdded(name, propertySource);
-        } finally {
-            synchronized (addLock) {
-                // first, and without a call that could fail on a stack that is nearly used up
-                processing--;
-                // a refresh that waits checks again in a while, also if this does not get to notify it
-                addLock.notifyAll();
+        if (processed != null) {
+            try {
+                // as it was, with no lock held while the code of an override runs: processPropertySource
+                // takes the lock of the catalogs itself
+                resetCaches();
+                processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
+            } finally {
+                synchronized (addLock) {
+                    // first, and without a call that could fail on a stack that is nearly used up
+                    processing--;
+                    endProcessing(name, propertySource, processed);
+                    // a refresh that waits checks again in a while, also if this does not get to notify it
+                    addLock.notifyAll();
+                }
             }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
         }
         return this;
     }
 
     /**
-     * Processes a property source added outside a read, on top of the properties, unless it has
-     * been replaced or removed meanwhile, by a thread that processes or notes that itself.
+     * Waits while another thread processes a property source by the given name that was left to a
+     * refresh, so that one added since is processed after it, as it was when it waited for the
+     * lock of the catalogs that thread held. Called with the lock that guards registration held,
+     * which the wait releases.
+     *
+     * @param name The name
+     * @return Whether the thread was interrupted while it waited
+     */
+    private boolean awaitLeftOver(String name) {
+        boolean interrupted = false;
+        Processed processed;
+        while ((processed = processedByName.get(name)) != null
+            && processed.leftOverBy != null && processed.leftOverBy != Thread.currentThread()) {
+            try {
+                // bounded, so that a notification a thread could not send is not waited for
+                addLock.wait(PROCESSING_WAIT_MILLIS);
+            } catch (InterruptedException e) {
+                // waits on, as it waited for the lock of the catalogs, which an interrupt does not end
+                interrupted = true;
+            }
+        }
+        return interrupted;
+    }
+
+    /**
+     * Counts the current thread in as processing a property source by the given name. Called with
+     * the lock that guards registration held.
+     *
+     * @param name The name
+     * @return What is noted for that name while it is processed
+     */
+    private Processed startProcessing(String name) {
+        Processed processed = processedByName.get(name);
+        if (processed == null) {
+            processed = new Processed();
+            processedByName.put(name, processed);
+        }
+        processed.threads++;
+        return processed;
+    }
+
+    /**
+     * Counts the current thread out of processing the given property source. processPropertySource
+     * registers it again: what another thread has registered or removed by that name meanwhile, and
+     * processes or notes itself, stays. Compared by identity, so that no code of a property source
+     * runs under the lock that guards registration, which is held.
      *
      * @param name           The name it was added by
      * @param propertySource The property source
+     * @param processed      What {@link #startProcessing(String)} returned
      */
-    private void processAdded(String name, PropertySource propertySource) {
-        // before the lock of the catalogs is taken, as it was
-        resetCaches();
-        synchronized (catalog) {
-            synchronized (addLock) {
-                if (propertySources.get(name) != propertySource) {
-                    return;
-                }
-                changedWhileProcessed.put(name, null);
+    private void endProcessing(String name, PropertySource propertySource, Processed processed) {
+        if (--processed.threads == 0) {
+            processedByName.remove(name);
+        }
+        Object changed = processed.changed;
+        if (changed != null && changed != propertySource && propertySources.get(name) == propertySource) {
+            if (changed == REMOVED) {
+                propertySources.remove(name);
+            } else {
+                propertySources.put(name, (PropertySource) changed);
             }
+        }
+    }
+
+    /**
+     * Processes a property source left to a refresh, on top of the properties, as the thread that
+     * added it would have, unless it has been replaced or removed meanwhile, by a thread that
+     * processes or notes that itself. One added by the same name while it is processed, once the
+     * call that added this one has returned, waits for it, see {@link #awaitLeftOver(String)}, and
+     * is processed after it. No lock is held while the code of an override runs.
+     *
+     * @param name   The name it was added by
+     * @param source The property source
+     */
+    private void processLeftOver(String name, PropertySource source) {
+        resetCaches();
+        Processed processed = null;
+        boolean interrupted;
+        synchronized (addLock) {
+            interrupted = awaitLeftOver(name);
+            if (propertySources.get(name) == source) {
+                processed = startProcessing(name);
+                processed.leftOverBy = Thread.currentThread();
+            }
+        }
+        if (processed != null) {
             try {
-                processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
+                processPropertySource(source, PropertySource.PropertyConvention.JAVA_PROPERTIES);
             } finally {
                 synchronized (addLock) {
-                    // processPropertySource registers it again: what another thread has registered or
-                    // removed by that name meanwhile, which processes or notes that itself, stays.
-                    // Compared by identity, so that no code of a property source runs under this lock.
-                    Object changed = changedWhileProcessed.remove(name);
-                    if (changed != null && propertySources.get(name) == propertySource) {
-                        if (changed == REMOVED) {
-                            propertySources.remove(name);
-                        } else {
-                            propertySources.put(name, (PropertySource) changed);
-                        }
-                    }
+                    // first, and without a call that could fail on a stack that is nearly used up
+                    processed.leftOverBy = null;
+                    endProcessing(name, source, processed);
+                    addLock.notifyAll();
                 }
             }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -335,32 +414,30 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     private void processLeftToRefresh() {
         Map<String, PropertySource> left;
-        // asked before the lock below is taken, so that an override runs no code under it
-        boolean running = isRunning();
         synchronized (addLock) {
             if (refreshes > 0 || reading.get() || leftToRefresh.isEmpty()) {
                 return;
             }
             left = new LinkedHashMap<>(leftToRefresh);
             leftToRefresh.clear();
-            if (!running) {
-                // registered, as one added to an environment that is not running is
-                return;
-            }
             // last, as in addPropertySource: a refresh announced from now on waits for this thread
             processing++;
         }
         try {
-            left.forEach((name, source) -> {
-                try {
-                    processAdded(name, source);
-                } catch (Throwable e) {
-                    if (e instanceof VirtualMachineError error && !(e instanceof StackOverflowError)) {
-                        throw error;
+            // asked once they are taken, and with no lock held, so that an override runs no code
+            // under one; to an environment that is not running, they stay registered, as one added is
+            if (isRunning()) {
+                left.forEach((name, source) -> {
+                    try {
+                        processLeftOver(name, source);
+                    } catch (Throwable e) {
+                        if (e instanceof VirtualMachineError error && !(e instanceof StackOverflowError)) {
+                            throw error;
+                        }
+                        log.warn("Property source [{}] failed to be processed; the next refresh reads it again", name, e);
                     }
-                    log.warn("Property source [{}] failed to be processed; the next refresh reads it again", name, e);
-                }
-            });
+                });
+            }
         } finally {
             synchronized (addLock) {
                 // first, and without a call that could fail on a stack that is nearly used up
@@ -459,8 +536,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         String name = propertySource.getName();
         synchronized (addLock) {
             propertySources.remove(name);
-            if (changedWhileProcessed.containsKey(name)) {
-                changedWhileProcessed.put(name, REMOVED);
+            Processed sameName = processedByName.get(name);
+            if (sameName != null) {
+                sameName.changed = REMOVED;
             }
         }
         if (isRunning() && !reading.get()) {
@@ -1379,5 +1457,19 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static class EnvironmentsAndPackage {
         String aPackage;
         Set<String> enviroments = new LinkedHashSet<>(1);
+    }
+
+    /**
+     * The threads processing property sources added outside a read by one name, and what another
+     * thread has registered by that name since one of them started. Guarded by the lock that
+     * guards registration.
+     */
+    private static final class Processed {
+        /** How many threads are processing a property source by that name. */
+        private int threads;
+        /** What another thread has registered by that name since, {@link DefaultEnvironment#REMOVED} if removed, or {@code null}. */
+        private @Nullable Object changed;
+        /** The thread processing a property source by that name that was left to a refresh, or {@code null}. */
+        private @Nullable Thread leftOverBy;
     }
 }
