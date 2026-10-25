@@ -57,6 +57,8 @@ public final class StaticCompilationHints {
         HINTS.put("generator-function", "A generator keeps its frame alive between calls. Build a list in a loop and return it instead of yielding.");
         HINTS.put("special-method", "Special methods run in Python: __init__ so that the instance keeps its Python semantics, the others because the runtime calls them. "
             + "Put the logic in a regular method the special method calls.");
+        HINTS.put("property-accessor", "A @property getter, setter or deleter runs through the attribute protocol of the Python object and is never compiled. "
+            + "Remove the CompileStatic from the accessor and move the logic into a regular method it calls: that method compiles.");
         HINTS.put("abstract-method", "Nothing to change: an abstract method has no body. Its implementations are compiled on their own, and a call of it runs the implementation of the object.");
         HINTS.put("overriding-java-method", "Spell the Java signature in the hints: hint each parameter with the Java parameter type, or a subtype of it the body reads the parameter as, "
             + "and leave the return unhinted, hint it object, or hint a type the Java method returns.");
