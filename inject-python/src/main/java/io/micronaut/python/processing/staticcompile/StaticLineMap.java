@@ -147,28 +147,25 @@ public final class StaticLineMap {
                     pendingPath = null;
                     regions.clear();
                 }
-                continue;
-            }
-            Matcher comment = LINE_COMMENT.matcher(text);
-            if (comment.matches()) {
-                int indent = comment.group(1).length();
-                while (!regions.isEmpty() && regions.peek()[0] >= indent) {
-                    regions.pop();
+            } else {
+                Matcher comment = LINE_COMMENT.matcher(text);
+                if (comment.matches()) {
+                    int indent = comment.group(1).length();
+                    while (!regions.isEmpty() && regions.peek()[0] >= indent) {
+                        regions.pop();
+                    }
+                    regions.push(new int[] {indent, Integer.parseInt(comment.group(2))});
+                } else if (!text.isBlank()) {
+                    int indent = indent(text);
+                    while (!regions.isEmpty() && regions.peek()[0] > indent) {
+                        regions.pop();
+                    }
+                    pythonLines[i + 1] = regions.isEmpty() ? defLine : regions.peek()[1];
+                    if (indent == methodIndent && "}".equals(text.trim())) {
+                        methodIndent = -1;
+                        regions.clear();
+                    }
                 }
-                regions.push(new int[] {indent, Integer.parseInt(comment.group(2))});
-                continue;
-            }
-            if (text.isBlank()) {
-                continue;
-            }
-            int indent = indent(text);
-            while (!regions.isEmpty() && regions.peek()[0] > indent) {
-                regions.pop();
-            }
-            pythonLines[i + 1] = regions.isEmpty() ? defLine : regions.peek()[1];
-            if (indent == methodIndent && "}".equals(text.trim())) {
-                methodIndent = -1;
-                regions.clear();
             }
         }
         return file == null ? null : new StaticLineMap(file, pythonLines);
