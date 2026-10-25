@@ -57,6 +57,10 @@ class Invalid(ValueError):
     """A class extending another builtin exception: generated as a RuntimeException too."""
 
 
+class NarrowRejected(Rejected):
+    """A subclass without __init__: raised lazily too, its Python exception of its own class."""
+
+
 class Coded(Exception):
     def __init__(self, code: int):
         super().__init__(f"code {code}")
@@ -235,6 +239,21 @@ class Calc:
         if key == "":
             raise Invalid(key, None, 1.5, True)
         return len(key)
+
+    def rejecting_many(self, key: str) -> int:
+        if key != "":
+            raise Rejected(key, 'say "hi"', -0.0, 1e16, None, 7, False)
+        return 0
+
+    def rejecting_none(self, n: int) -> int:
+        if n < 0:
+            raise Rejected(None)
+        return n
+
+    def narrow_rejecting(self, n: int) -> int:
+        if n < 0:
+            raise NarrowRejected(f"narrow {n}")
+        return n
 
     def caught_invalid(self, key: str) -> int:
         try:
@@ -878,6 +897,9 @@ class Holder:
                 results[m]['invalid-thrown'] = raisedBy { calc.invalid('') }
                 results[m]['reraised-thrown'] = raisedBy { calc.reraised(-1) }
                 results[m]['java-message-thrown'] = raisedBy { calc.java_message(-1) }
+                results[m]['many-thrown'] = raisedBy { calc.rejecting_many("it's") }
+                results[m]['none-thrown'] = raisedBy { calc.rejecting_none(-1) }
+                results[m]['narrow-thrown'] = raisedBy { calc.narrow_rejecting(-1) }
                 PythonStatic.resetEntries()
                 results[m]['once'] = calc.python_catching_once('')
                 results[m]['mixed'] = calc.python_catching_mixed('')
@@ -1004,6 +1026,10 @@ class Holder:
         results[StaticCompilationMode.OFF]['invalid-thrown'] == "python.Invalid: ('', None, 1.5, True)"
         results[StaticCompilationMode.OFF]['reraised-thrown'] == 'python.Rejected: negative -1'
         results[StaticCompilationMode.OFF]['java-message-thrown'] == 'python.Rejected: java'
+        // the message of a lazily created exception is BaseException.__str__ of its arguments
+        results[StaticCompilationMode.OFF]['many-thrown'] == '''python.Rejected: ("it's", 'say "hi"', -0.0, 1e+16, None, 7, False)'''
+        results[StaticCompilationMode.OFF]['none-thrown'] == 'python.Rejected: None'
+        results[StaticCompilationMode.OFF]['narrow-thrown'] == 'python.NarrowRejected: narrow -1'
         results[StaticCompilationMode.OFF]['once'] == 'rejected: module empty'
         results[StaticCompilationMode.OFF]['mixed'] == 'rejected: module empty'
         results[StaticCompilationMode.OFF][["java_in_try", -1].toString()] == -1

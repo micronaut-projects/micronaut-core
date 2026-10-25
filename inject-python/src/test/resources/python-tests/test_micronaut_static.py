@@ -1765,6 +1765,11 @@ class ExceptionClassTest(unittest.TestCase):
         self.assertEqual(4, len(numbered.arguments()))  # an int, a float, a bool and None reach Python as themselves
         # the Python class creates the exception as a generated constructor creates its Python object
         self.assertEqual((1, 0), (self.bodies["raises_own"].stats().javaCalls(), self.bodies["raises_own"].stats().bridgeCalls()))
+        # a class without __init__ (nor a base with one) creates it lazily, the Java exception carrying the arguments
+        self.assertTrue(construction.lazy())
+        self.assertTrue(self._thrown("raises_narrow").exception().lazy())
+        self.assertTrue(numbered.lazy())
+        self.assertFalse(coded.lazy())  # Coded.__init__ decides what its Python exception holds
 
     def test_catching_the_class_catches_the_generated_exception(self):
         for name in ("catches_own", "catches_both", "reraises", "narrowed"):
@@ -1812,6 +1817,158 @@ class ExceptionClassTest(unittest.TestCase):
             self.assertEqual("SKIPPED", decision.outcome().name(), name)
             self.assertEqual("python-exception", decision.reasons()[0].rule(), f"{name}: {rules(decision)}")
             self.assertIn(message, decision.reasons()[0].message(), name)
+
+
+LAZY = '''
+from jakarta.inject import Singleton
+
+
+def registered(cls):
+    return cls
+
+
+class Plain(Exception):
+    """Created lazily."""
+    code = 3
+
+    def describe(self) -> str:
+        return "plain"
+
+
+class Valued(ValueError):
+    pass
+
+
+class Mixin:
+    def hint(self) -> str:
+        return "mixin"
+
+
+class Mixed(Plain, Mixin):
+    pass
+
+
+class Initialized(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
+class Inherits(Initialized):
+    pass
+
+
+class Spelled(Exception):
+    def __str__(self):
+        return "spelled"
+
+
+class Represented(Exception):
+    def __repr__(self):
+        return "represented"
+
+
+class Created(Exception):
+    def __new__(cls, *args):
+        return super().__new__(cls, *args)
+
+
+class Finalized(Exception):
+    def __del__(self):
+        pass
+
+
+class Argued(Exception):
+    args = ("fixed",)
+
+
+class Reassigned(Exception):
+    def reset(self) -> None:
+        self.args = ()
+
+
+@registered
+class Decorated(Exception):
+    pass
+
+
+class Keyed(KeyError):
+    pass
+
+
+class Spelled2(Spelled):
+    pass
+
+
+@Singleton
+class Gate:
+    def plain(self, n: int) -> int:
+        raise Plain(n)
+
+    def valued(self, n: int) -> int:
+        raise Valued("bad", n)
+
+    def mixed(self, n: int) -> int:
+        raise Mixed()
+
+    def initialized(self, n: int) -> int:
+        raise Initialized("init")
+
+    def inherits(self, n: int) -> int:
+        raise Inherits("init")
+
+    def spelled(self, n: int) -> int:
+        raise Spelled("x")
+
+    def represented(self, n: int) -> int:
+        raise Represented("x")
+
+    def created(self, n: int) -> int:
+        raise Created("x")
+
+    def finalized(self, n: int) -> int:
+        raise Finalized("x")
+
+    def argued(self, n: int) -> int:
+        raise Argued("x")
+
+    def reassigned(self, n: int) -> int:
+        raise Reassigned("x")
+
+    def decorated(self, n: int) -> int:
+        raise Decorated("x")
+
+    def keyed(self, n: int) -> int:
+        raise Keyed("x")
+
+    def spelled_base(self, n: int) -> int:
+        raise Spelled2("x")
+'''
+
+
+class LazyExceptionTest(unittest.TestCase):
+    """A raise creates the Java exception alone when nothing of its class can tell the Python exception it is created from apart."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.decisions, cls.planner = plan(LAZY, MODE_ALL, facts=FakeFacts())
+        cls.bodies = {body.methodName(): body for body in cls.planner.bodies}
+
+    def _construction(self, name):
+        self.assertEqual("COMPILED", self.decisions[f"Gate.{name}"].outcome().name(), f"{name}: {rules(self.decisions[f'Gate.{name}'])}")
+        construction = list(self.bodies[name].body().statements())[0].exception()
+        self.assertEqual("NewPythonException", construction.getClass().getSimpleName())
+        return construction
+
+    def test_a_class_taking_its_arguments_as_base_exception_does_is_created_lazily(self):
+        for name in ("plain", "valued", "mixed"):
+            self.assertTrue(self._construction(name).lazy(), name)
+        # the same Java and compilation calls as an eager raise: the planner's view of the body is unchanged
+        self.assertEqual((1, 0), (self.bodies["plain"].stats().javaCalls(), self.bodies["plain"].stats().bridgeCalls()))
+
+    def test_a_class_that_could_tell_the_difference_is_created_when_it_is_raised(self):
+        for name in ("initialized", "inherits", "spelled", "represented", "created", "finalized", "argued", "reassigned",
+                     "decorated", "keyed", "spelled_base"):
+            self.assertFalse(self._construction(name).lazy(), name)
 
 
 HIERARCHY = '''

@@ -16,7 +16,7 @@ import os
 
 import java
 
-from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, UNKNOWN, PythonClassModel, Typed
+from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, UNKNOWN, PythonClassModel, Typed, _native_exception
 
 # names Java cannot declare: its keywords and literals, and the methods of Object
 JAVA_RESERVED_NAMES = frozenset((
@@ -96,6 +96,14 @@ DEFAULTS = {LONG: 0, DOUBLE: 0.0, BOOLEAN: False}
 # the Java types of the arguments a compiled raise hands the Python exception class as Python would: the
 # boundary converts them to the str, int, float, bool or None the Python code passes
 EXCEPTION_ARGUMENT_TYPES = {LONG, DOUBLE, BOOLEAN, STRING, NONE, "java.lang.Long", "java.lang.Integer", "java.lang.Double", "java.lang.Boolean"}
+# the builtin exceptions that take their arguments as BaseException does: args holds them, and str() is
+# the str() of a single argument or the repr of the tuple of several (KeyError, OSError, UnicodeError,
+# ImportError... differ). A raise of a class extending only these creates its Python exception lazily
+LAZY_EXCEPTION_BASES = {"Exception", "ValueError", "TypeError", "RuntimeError", "LookupError", "IndexError", "ArithmeticError",
+                        "OverflowError", "ZeroDivisionError", "AssertionError", "NotImplementedError"}
+# the members that make the Python exception of a class differ from the arguments it is created with, or
+# make its creation (or its collection) observable: a raise of a class defining one creates it eagerly
+EAGER_EXCEPTION_MEMBERS = ("__new__", "__init__", "__str__", "__repr__", "args", "__del__")
 SYNTHESIZED_EXCEPTIONS = ("java.lang.ArithmeticException", "java.lang.ClassCastException", "java.lang.IllegalArgumentException",
                           "java.lang.IllegalStateException", "java.lang.IndexOutOfBoundsException", "java.lang.NullPointerException",
                           "java.lang.UnsupportedOperationException", "java.util.NoSuchElementException",
@@ -1452,10 +1460,49 @@ class Lowering:
             if _erased(value.type()) not in EXCEPTION_ARGUMENT_TYPES:
                 self._refuse("python-exception", f"constructing [{model.name}] with a [{_erased(value.type())}] has no static lowering: only a str, an int, a float, a bool or None reaches the Python class as the value Python passes", argument)
             lowered.append(self._boxed(value, argument))
-        # the Python class creates the exception as a generated constructor creates its Python object
+        # the Python class creates the exception as a generated constructor creates its Python object: when
+        # the raise runs, or, lazily, when the generated class first needs it
         self.java_calls += 1
         self.compilation_calls += 1
-        return NewPythonException(generated, lowered)
+        return NewPythonException(generated, lowered, self._creates_lazily(model))
+
+    def _creates_lazily(self, model, seen=None):
+        """
+        Whether a raise of the exception class creates the Java exception alone, its generated class
+        creating the Python exception from the arguments when it is first needed (it reaches Python, or an
+        exception handler converts it). Only when nothing tells the two apart: the Java message is what
+        BaseException.__str__ gives the arguments, the Python exception holds them as its args, and
+        creating it runs no code of the compilation. So neither the class nor a Python base defines
+        __new__, __init__, __str__, __repr__, args or __del__, nor is decorated, nor has a metaclass or
+        a dynamic lookup, and every builtin base takes its arguments as BaseException does.
+        """
+        seen = seen if seen is not None else set()
+        if model.qualified in seen:
+            return True
+        seen.add(model.qualified)
+        node = model.node
+        if getattr(node, "decorator_list", None) or getattr(node, "keywords", None):
+            return False
+        if model.dynamic or model.lookup_dynamic or model.metaclass or model.constructor is not None:
+            return False
+        for member in EAGER_EXCEPTION_MEMBERS:
+            if (member in model.methods or member in model.properties or member in model.attributes
+                    or member in model.instance_attributes or member in model.nested):
+                return False
+        classes = self.checker.python_classes
+        for base in model.class_def.bases():
+            name = base.name()
+            python = classes.by_qualified.get(name)
+            if python is not None:
+                if not self._creates_lazily(python, seen):
+                    return False
+                continue
+            if name in ("object", "builtins.object"):
+                continue
+            builtin = name[len("builtins."):] if name.startswith("builtins.") else name
+            if "." in builtin or builtin not in LAZY_EXCEPTION_BASES or not _native_exception(base):
+                return False
+        return True
 
     def _names_class(self, function, model):
         """Whether the callee of a call is the class reference of the model."""
