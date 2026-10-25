@@ -120,6 +120,53 @@ class PyronautCompilerStaticCompilationTest {
     }
 
     @Test
+    void theSwitchImportedFromPyronautBuildPlainOrAliasedIsHonoured() {
+        List<StaticCompilationDecision> decisions = new ArrayList<>();
+        List<PythonDiagnostic> diagnostics = new ArrayList<>();
+        PyronautCompiler.builder()
+            .pythonCode("""
+                from jakarta.inject import Singleton
+                from pyronaut.build import CompileStatic
+                from pyronaut.build import CompileStatic as CS
+
+                @Singleton
+                class Switches:
+                    @CompileStatic
+                    def plain(self, n: int) -> int:
+                        return n
+
+                    @CS
+                    def aliased(self, n: int) -> int:
+                        return n
+
+                    def unswitched(self, n: int) -> int:
+                        return n
+
+                @CS
+                @Singleton
+                class AliasedClass:
+                    def run(self, n: int) -> int:
+                        return n
+                """)
+            .staticCompilation(StaticCompilationMode.ANNOTATED)
+            .staticCompilationDecisionCallback(decisions::add)
+            .pythonDiagnosticCallback(diagnostics::add)
+            .build()
+            .buildClassLoader();
+
+        Map<String, StaticCompilationDecision> byName = decisions.stream().collect(Collectors.toMap(StaticCompilationDecision::qualifiedName, Function.identity()));
+        assertEquals(Outcome.CANDIDATE, byName.get("Switches.plain").outcome());
+        assertEquals(StaticCompilationDecision.Scope.FUNCTION, byName.get("Switches.plain").scope());
+        assertEquals(Outcome.CANDIDATE, byName.get("Switches.aliased").outcome());
+        assertEquals(StaticCompilationDecision.Scope.FUNCTION, byName.get("Switches.aliased").scope());
+        assertEquals(Outcome.EXCLUDED, byName.get("Switches.unswitched").outcome());
+        assertEquals(StaticCompilationDecision.Scope.MODE, byName.get("Switches.unswitched").scope());
+        assertEquals(Outcome.CANDIDATE, byName.get("AliasedClass.run").outcome());
+        assertEquals(StaticCompilationDecision.Scope.CLASS, byName.get("AliasedClass.run").scope());
+        assertTrue(diagnostics.isEmpty(), diagnostics.toString());
+    }
+
+    @Test
     void nothingIsPlannedWhenTheModeIsOffAndNoSwitchIsMentioned() {
         List<StaticCompilationDecision> decisions = new ArrayList<>();
         PyronautCompiler.builder()
