@@ -324,6 +324,28 @@ def {JAVA_INTERFACE_DEFAULTS_DECORATOR}(*interface_names):
 # names no class on the compile classpath cannot be satisfied by any Python module at run time.
 JAVA_IMPORT_NAMESPACES = frozenset({"micronaut", "io", "java", "javax", "jakarta"})
 
+# ``pyronaut.build`` holds the names the pyronaut build tools read (Dependency, MavenRepository, ...), which the
+# application never sees, and the compiler switches, which stay decorators: the processor resolves them by the
+# name they are imported from, and at run time, where the module does not exist, they return what they decorate
+# (the switches are source-only annotations). A single argument that is no switch value is the decorated target,
+# which may be a descriptor (a property) rather than a callable.
+PYRONAUT_BUILD_MODULE = 'pyronaut.build'
+PYRONAUT_BUILD_SWITCHES = frozenset({"CompileStatic", "TypeChecked"})
+PYRONAUT_BUILD_SWITCH_RUNTIME_CODE = '''
+def {name}(*arguments, **members):
+    if len(arguments) == 1 and not members and not isinstance(arguments[0], (bool, int, str)):
+        return arguments[0]
+    return lambda target: target
+'''
+
+
+def pyronaut_build_switches(node: ast.ImportFrom) -> list:
+    """The compiler switches a ``from pyronaut.build import ...`` binds, as the aliases of the import."""
+    if node.level != 0:
+        return []
+    return [alias for alias in node.names if alias.name in PYRONAUT_BUILD_SWITCHES]
+
+
 class MicronautTransformer(ast.NodeTransformer):
     """
     AST transformer that converts Java imports into appropriate Python constructs.
@@ -429,8 +451,10 @@ class MicronautTransformer(ast.NodeTransformer):
             return node
         self._current_statement = node
 
-        if node.module == 'pyronaut.build':
-            return None
+        if node.module == PYRONAUT_BUILD_MODULE:
+            # the processor resolves the switches through the import; the build names are dropped
+            switches = pyronaut_build_switches(node)
+            return ast.copy_location(ast.ImportFrom(module=node.module, names=switches, level=0), node) if switches else None
 
         java_module = self._to_java_import_module(node.module)
 
@@ -1942,8 +1966,14 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     def visit_ImportFrom(self, node: ast.ImportFrom):
         if not node.module:
             return node
-        if node.module == 'pyronaut.build':
-            return None
+        if node.module == PYRONAUT_BUILD_MODULE:
+            # the switches are bound to decorators returning their target; the build names are dropped
+            definitions = [
+                ast.copy_location(statement, node)
+                for alias in pyronaut_build_switches(node)
+                for statement in ast.parse(PYRONAUT_BUILD_SWITCH_RUNTIME_CODE.format(name=alias.asname or alias.name)).body
+            ]
+            return definitions or None
         if self._track_facade_import_from(node):
             # served by the Java import finder at run time, as the facade it is
             return node
