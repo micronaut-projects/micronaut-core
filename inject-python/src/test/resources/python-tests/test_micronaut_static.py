@@ -711,7 +711,8 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("SKIPPED", decision.outcome().name())
         self.assertEqual(["unsupported-statement", "python-builtin-not-lowered", "unbounded-integer-op"], rules(decision),
                          [(r.rule(), r.message()) for r in decision.reasons()])
-        self.assertEqual([133, 135, 136], [reason.span().line() for reason in decision.reasons()])
+        start = decision.span().line()  # the while, the len() and the ** below the def
+        self.assertEqual([start + 1, start + 3, start + 4], [reason.span().line() for reason in decision.reasons()])
         self.assertNotIn("several", self.bodies)
 
     def test_static_methods_are_not_candidates_yet(self):
