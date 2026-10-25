@@ -39,7 +39,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 /**
  * A file manager implementation that stores all output in memory.
@@ -124,24 +123,14 @@ final class InMemoryJavaFileManager extends ForwardingJavaFileManager<JavaFileMa
     public FileObject getFileForOutput(Location location, String packageName,
                                        String relativeName, FileObject sibling) throws IOException {
         URI uri = uriForFileObject(location, packageName, relativeName);
-        return inMemoryFileObjects.computeIfAbsent(uri, new Function<URI, JavaFileObject>() {
-            @Override
-            public JavaFileObject apply(URI uri) {
-                return new InMemoryJavaFileManager.InMemoryJavaFileObject(uri);
-            }
-        });
+        return inMemoryFileObjects.computeIfAbsent(uri, InMemoryJavaFileManager.InMemoryJavaFileObject::new);
     }
 
     @Override
     public JavaFileObject getJavaFileForOutput(Location location, String className, final Kind kind,
                                                FileObject sibling) throws IOException {
         URI uri = uriForJavaFileObject(location, className, kind);
-        JavaFileObject output = inMemoryFileObjects.computeIfAbsent(uri, new Function<URI, JavaFileObject>() {
-            @Override
-            public JavaFileObject apply(URI uri) {
-                return new InMemoryJavaFileManager.InMemoryJavaFileObject(uri);
-            }
-        });
+        JavaFileObject output = inMemoryFileObjects.computeIfAbsent(uri, InMemoryJavaFileManager.InMemoryJavaFileObject::new);
         return lineMapping.output(output, kind, sibling);
     }
 
