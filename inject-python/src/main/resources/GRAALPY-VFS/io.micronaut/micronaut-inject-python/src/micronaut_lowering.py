@@ -1225,12 +1225,19 @@ class Lowering:
         if name in ("min", "max") and len(arguments) >= 2:
             if not all(self._is_number(argument.type()) for argument in arguments):
                 self._refuse("unsupported-expression", f"{name}() of values that are not numbers has no static lowering", node)
-            result_type = DOUBLE if any(argument.type() == DOUBLE for argument in arguments) else LONG
-            widened = [self._coerce(argument, result_type, node) for argument in arguments]
-            result = widened[0]
-            for argument in widened[1:]:
-                self.java_calls += 1
-                result = InvokeJava(None, "java.lang.Math", name, [result_type, result_type], [result, argument], result_type)
+            if len({argument.type() for argument in arguments}) > 1:
+                # Python answers the winning argument itself: max(3, 2.5) is the int 3, not 3.0
+                self._refuse("unsupported-expression", f"{name}() of an int and a float has no static lowering: Python answers the winning argument with its own type", node)
+            result_type = arguments[0].type()
+            result = arguments[0]
+            for argument in arguments[1:]:
+                if result_type == DOUBLE:
+                    # Python keeps the earlier argument unless a later one is strictly greater (smaller): NaN and -0.0 differ from Math
+                    self.helper_calls += 1
+                    result = Helper(name, [result, argument], DOUBLE)
+                else:
+                    self.java_calls += 1
+                    result = InvokeJava(None, "java.lang.Math", name, [result_type, result_type], [result, argument], result_type)
             return result
         return None
 

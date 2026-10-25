@@ -63,7 +63,7 @@ public final class StaticDelegation {
         Map.entry("java.lang.Byte", "?byte"), Map.entry("java.lang.Double", "?float"), Map.entry("java.lang.Boolean", "?bool")
     );
     // the helpers of PythonStatic without side effects; power raises where Python promotes
-    private static final Set<String> PURE_HELPERS = Set.of("str", "divide", "floorDiv", "floorMod", "compare", "concat", "box", "truthy", "assertion", "group");
+    private static final Set<String> PURE_HELPERS = Set.of("str", "divide", "floorDiv", "floorMod", "compare", "concat", "box", "truthy", "assertion", "group", "max", "min");
     private static final Set<String> PROMOTING_HELPERS = Set.of("power");
     private static final Set<String> PROMOTING_LONG_OPS = Set.of("+", "-", "*", "//", "**");
     private static final Set<String> NARROW_TYPES = Set.of(INT, SHORT, BYTE, "java.lang.Integer", "java.lang.Short", "java.lang.Byte");

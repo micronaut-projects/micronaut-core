@@ -293,6 +293,9 @@ class Calc:
     def query(self, spec: str) -> str:
         return URL(spec).getQuery() + "?"
 
+    def biggest(self, a: float, b: float) -> str:
+        return f"{max(a, b)} {min(a, b)}"
+
     # refused: each would differ from Python if compiled
 
     def mixed_local(self, flag: bool) -> str:
@@ -313,6 +316,9 @@ class Calc:
 
     def ambiguous(self, a: int, b: int) -> str:
         return StaticOverloads.pick(a, b)
+
+    def mixed_max(self, a: int, b: float) -> str:
+        return f"{max(a, b)} {min(b, a)}"
 
 @Singleton
 class Pair:
@@ -371,11 +377,13 @@ class Pair:
         ["float_power", -8.0d, 0.5d], ["float_power", 0.0d, -1.0d],
         ["maybe_concat", true],
         ["ambiguous", 1, 2],
+        ["biggest", 1.0d, Double.NaN], ["biggest", Double.NaN, 1.0d], ["biggest", -0.0d, 0.0d], ["biggest", 0.0d, -0.0d], ["biggest", 1.0d, 2.5d],
+        ["mixed_max", 3, 2.5d],
     ]
 
     // the fixture methods the compiler must refuse: compiled, each would differ from its Python body
     static final Map<String, String> REFUSED = [mixed_local: "unknown-type", mixed_conditional: "unsupported-expression", float_power: "unsupported-expression",
-                                                maybe_concat: "unknown-type", ambiguous: "ambiguous-overload"]
+                                                maybe_concat: "unknown-type", ambiguous: "ambiguous-overload", mixed_max: "unsupported-expression"]
 
     void "compiled bodies agree with the Python bodies on every input"() {
         given:
@@ -432,6 +440,11 @@ class Pair:
         results[StaticCompilationMode.OFF][["above", 8192, 9007199254740992.0d].toString()] == true
         results[StaticCompilationMode.OFF][["below", 8192, Double.NaN].toString()] == false
         results[StaticCompilationMode.OFF][["exclaim", null].toString()] == "raised"
+        results[StaticCompilationMode.OFF][["biggest", 1.0d, Double.NaN].toString()] == "1.0 1.0"
+        results[StaticCompilationMode.OFF][["biggest", Double.NaN, 1.0d].toString()] == "nan nan"
+        results[StaticCompilationMode.OFF][["biggest", -0.0d, 0.0d].toString()] == "-0.0 -0.0"
+        results[StaticCompilationMode.OFF][["biggest", 0.0d, -0.0d].toString()] == "0.0 0.0"
+        results[StaticCompilationMode.OFF][["mixed_max", 3, 2.5d].toString()] == "3 2.5"
         results[StaticCompilationMode.OFF][["query", "http://example.com/x"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["mixed_local", true].toString()] == "2"
         results[StaticCompilationMode.OFF][["ratio", 1, 0].toString()] == "raised"
