@@ -52,29 +52,18 @@ public sealed interface InterceptorChainFactory permits DefaultInterceptorChainF
     InterceptorCandidateResolver candidateResolver();
 
     /**
-     * The executable methods kept for the proxies of the given type, created by this context. A generated proxy
-     * keeps the methods it intercepts in the definition returned here, so that every instance of a non-singleton
-     * proxy invokes the same methods, which keep the values derived from them for the definition and not for one
-     * instance. The factory is a bean of one context: the methods, and the values they keep, are dropped with it.
+     * The executable methods shared by the proxies of the given type created by this context: those of the first
+     * proxy of the type. Every instance of a non-singleton proxy then invokes the same methods, which keep the values
+     * derived from them for the definition instead of one instance. The factory is a bean of one context: the
+     * methods, and the values they keep, are dropped with it.
      *
      * @param proxyType The generated proxy type
-     * @return The kept methods, or {@code null} if no proxy of the type kept them yet
+     * @param methods   The methods created by the calling proxy
+     * @return The methods shared by the proxies of the type
      * @since 5.3.0
      */
     @UsedByGeneratedCode
-    @Nullable ExecutableMethodsDefinition<?> findProxyMethods(Class<?> proxyType);
-
-    /**
-     * Keeps the executable methods for the proxies of the given type, unless another proxy of the type kept them
-     * first.
-     *
-     * @param proxyType The generated proxy type
-     * @param methods   The methods created by the proxy
-     * @return The kept methods: the given ones, or those another proxy of the type kept first
-     * @since 5.3.0
-     */
-    @UsedByGeneratedCode
-    ExecutableMethodsDefinition<?> keepProxyMethods(Class<?> proxyType, ExecutableMethodsDefinition<?> methods);
+    ExecutableMethodsDefinition<?> shareProxyMethods(Class<?> proxyType, ExecutableMethodsDefinition<?> methods);
 
     /**
      * Builds a method invocation from interceptors already selected for its target. Generated proxies retain the

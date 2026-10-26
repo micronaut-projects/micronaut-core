@@ -68,17 +68,12 @@ public final class DefaultInterceptorChainFactory implements InterceptorChainFac
     }
 
     @Override
-    public @Nullable ExecutableMethodsDefinition<?> findProxyMethods(Class<?> proxyType) {
-        return proxyMethods.get(proxyType);
-    }
-
-    @Override
-    public ExecutableMethodsDefinition<?> keepProxyMethods(Class<?> proxyType, ExecutableMethodsDefinition<?> methods) {
-        // The methods are created before the definition is published, so that the proxies sharing it, created
-        // concurrently, read the same method objects instead of creating their own
-        methods.getExecutableMethods();
-        ExecutableMethodsDefinition<?> kept = proxyMethods.putIfAbsent(proxyType, methods);
-        return kept != null ? kept : methods;
+    public ExecutableMethodsDefinition<?> shareProxyMethods(Class<?> proxyType, ExecutableMethodsDefinition<?> methods) {
+        ExecutableMethodsDefinition<?> shared = proxyMethods.get(proxyType);
+        if (shared == null) {
+            shared = proxyMethods.putIfAbsent(proxyType, methods);
+        }
+        return shared != null ? shared : methods;
     }
 
     @Override

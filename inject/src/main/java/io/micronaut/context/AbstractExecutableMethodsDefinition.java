@@ -234,6 +234,15 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     @Override
     public <R> ExecutableMethod<T, R> getExecutableMethodByIndex(int index) {
         DispatchedExecutableMethod<T, R> executableMethod = (DispatchedExecutableMethod<T, R>) executableMethods[index];
+        return executableMethod != null ? executableMethod : createExecutableMethod(index);
+    }
+
+    /**
+     * Creates the method at the index once: the callers sharing this definition, such as the proxies of a
+     * non-singleton bean created concurrently, get the same method and the values it keeps.
+     */
+    private synchronized <R> ExecutableMethod<T, R> createExecutableMethod(int index) {
+        DispatchedExecutableMethod<T, R> executableMethod = (DispatchedExecutableMethod<T, R>) executableMethods[index];
         if (executableMethod == null) {
             MethodReference methodsReference = methodsReferences[index];
             executableMethod = new DispatchedExecutableMethod<>(dispatcher, index, methodsReference, methodsReference.annotationMetadata);
