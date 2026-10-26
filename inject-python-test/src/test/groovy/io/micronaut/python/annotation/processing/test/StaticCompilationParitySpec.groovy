@@ -26,12 +26,14 @@ from java.lang import IllegalArgumentException
 from java.lang import Integer, Math, StringBuilder
 from io.micronaut.python.annotation.processing.test import StaticOverloads
 from java.net import URL, MalformedURLException
+from java.time import DateTimeException
 from java.util import AbstractMap, Objects
 
 @Singleton
 class Calc:
     rate: float = 1.5
     count: int = 0
+    reads: int = 0
 
     def total(self, quantity: int, unit_price: float) -> float:
         subtotal = quantity * unit_price
@@ -41,6 +43,19 @@ class Calc:
 
     def label(self, count: int, name: str) -> str:
         return f"{count} x {name}: {count * 2.5}"
+
+    def helper(self, n: int) -> int:
+        return n + 1
+
+    def _hidden(self, n: int) -> int:
+        return n - 1
+
+    @property
+    def factor(self) -> float:
+        return self.rate * 2
+
+    def chained(self, n: int) -> str:
+        return str(self.helper(n) * 2 + self._hidden(n)) + "|" + str(self.factor * n) + "|" + self.label(n, "z")
 
     def ratio(self, a: int, b: int) -> float:
         return a / b
@@ -222,6 +237,12 @@ class Calc:
         result.append("z")
         return result
 
+    def unhinted_name(self, name: str):
+        return "<" + name + ">"
+
+    def described(self, name: str) -> str:
+        return self.unhinted_name(name) + "!"
+
     def rows(self) -> list:
         return self.mapped()
 
@@ -237,13 +258,13 @@ class Calc:
     def guarded(self, n: int) -> int:
         try:
             value = self.risky(n)
-        except IllegalArgumentException:
+        except DateTimeException:  # an IllegalArgumentException handler would catch what compiled helpers throw: refused
             return -1
         return value + 1
 
     def risky(self, n: int) -> int:
         if n == 0:
-            raise IllegalArgumentException("zero")
+            raise DateTimeException("zero")
         return n * 2
 
     def edge(self, broken0: int) -> int:
@@ -308,6 +329,25 @@ class Calc:
         self.fill(xs)
         return len(xs)
 
+    def extended(self, xs: list[str]) -> str:
+        return ",".join(xs + ["b"]) + str(xs == ["a"]) + str(len(xs[0:1])) + str("a" in xs)
+
+    def extending(self) -> str:
+        xs: list[str] = ["a"]
+        return self.extended(xs)
+
+    def appended(self) -> str:
+        xs: list[str] = ["a"]
+        sizes: dict[str, int] = {}
+        n = self.append_to(xs, sizes, "b")
+        n = self.append_to(xs, sizes, "c") + n
+        return f"{n} {len(xs)} {len(sizes)} {sizes['c']}"
+
+    def append_to(self, xs: list[str], sizes: dict[str, int], tag: str) -> int:
+        xs.append(tag)
+        sizes[tag] = len(xs)
+        return len(xs)
+
     def which_none(self) -> str:
         return StaticOverloads.which(None)
 
@@ -340,6 +380,15 @@ class Calc:
 
     def mixed_max(self, a: int, b: float) -> str:
         return f"{max(a, b)} {min(b, a)}"
+
+    def gained(self) -> str:
+        value = self.gain or 2.5
+        return str(value) + "|" + str(self.reads)
+
+    @property
+    def gain(self) -> float:
+        self.reads += 1
+        return 1.5
 
     def int_default(self, prices: dict[str, float]) -> str:
         return f"{prices.get('x', 0)}"
@@ -393,6 +442,8 @@ class Holder:
     static final List<List> CASES = [
         ["total", 3, 2.5d], ["total", 50, 2.5d],
         ["label", 2, "pen"],
+        ["chained", 3], ["chained", 0],
+        ["described", "ab"],
         ["ratio", 1, 4], ["ratio", 1, 0],
         ["parity", 3], ["parity", 8],
         ["unicode", "\uD83D\uDE00ab"], ["unicode", "i\u00DF"],
@@ -441,14 +492,15 @@ class Holder:
         ["ambiguous", 1, 2],
         ["biggest", 1.0d, Double.NaN], ["biggest", Double.NaN, 1.0d], ["biggest", -0.0d, 0.0d], ["biggest", 0.0d, -0.0d], ["biggest", 1.0d, 2.5d],
         ["within", "b", "abc"], ["within", null, "abc"],
-        ["filled"],
+        ["filled"], ["extending"], ["appended"],
         ["mixed_max", 3, 2.5d],
+        ["gained"],
     ]
 
     // the fixture methods the compiler must refuse: compiled, each would differ from its Python body
     static final Map<String, String> REFUSED = [mixed_local: "unknown-type", mixed_conditional: "unsupported-expression", float_power: "unsupported-expression",
                                                 maybe_concat: "unknown-type", ambiguous: "ambiguous-overload", mixed_max: "unsupported-expression",
-                                                int_default: "unsupported-expression"]
+                                                int_default: "unsupported-expression", gained: "unsupported-expression"]
     // truthiness from __len__, a toString the stub bridges instead of __str__, a dataclass's generated __repr__
     static final Map<String, String> HOLDER_REFUSED = [empty: "truthiness-of-java-object", label: "unsupported-expression", form_text: "unsupported-expression"]
 
@@ -480,16 +532,22 @@ class Holder:
                 results[m]['viewed'] = calc.viewed('v').collectEntries { k, v -> [(k.toString()): v.toString()] }
                 results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
                 results[m]['int_default'] = calc.int_default(new LinkedHashMap<>([tea: 1.5d]))
+                // a Java caller's collections are copied, as the bridge hands Python copies
+                List<String> given = new ArrayList<>(['x'])
+                Map<String, Integer> sizes = new LinkedHashMap<>()
+                results[m]['append_to'] = [calc.append_to(given, sizes, 'y'), given, sizes]
                 def holder = getBean(context, 'python.Holder')
                 results[m]['holder'] = [holder.empty(), holder.label(), holder.form_text()]
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    // guarded, filled and rows call sibling methods, which have no static lowering yet: they run in Python in both modes
-                    assert compiled.containsAll((CASES*.get(0).unique() - ['guarded', 'filled'] - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.fill']), decisions.toString()
+                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Calc.fill', 'Calc.append_to']), decisions.toString()
                     REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
                     }
+                    // the compiled callee works on the compiled caller's collections as Java code: no bridge call
+                    def appended = decisions.find { it.qualifiedName() == 'Calc.appended' }
+                    assert appended.stats().bridgeCalls() == 0 && appended.stats().javaCalls() == 2, appended.toString()
                     HOLDER_REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Holder.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
@@ -520,8 +578,12 @@ class Holder:
         results[StaticCompilationMode.OFF][["biggest", 0.0d, -0.0d].toString()] == "0.0 0.0"
         results[StaticCompilationMode.OFF][["within", null, "abc"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["filled"].toString()] == 1
+        results[StaticCompilationMode.OFF][["extending"].toString()] == "a,bTrue1True"
+        results[StaticCompilationMode.OFF][["appended"].toString()] == "5 3 2 3"
+        results[StaticCompilationMode.OFF]['append_to'] == [2, ['x'], [:]]
         results[StaticCompilationMode.OFF][["mixed_max", 3, 2.5d].toString()] == "3 2.5"
         results[StaticCompilationMode.OFF]['int_default'] == "0"
+        results[StaticCompilationMode.OFF][["gained"].toString()] == "1.5|1"
         results[StaticCompilationMode.OFF][["query", "http://example.com/x"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["mixed_local", true].toString()] == "2"
         results[StaticCompilationMode.OFF][["ratio", 1, 0].toString()] == "raised"
@@ -541,6 +603,7 @@ class Holder:
         results[StaticCompilationMode.OFF]['copied'] == ['a', 'z']
         results[StaticCompilationMode.OFF][["parsed", "1, 2,3"].toString()] == '6 6 6 3.0'
         results[StaticCompilationMode.OFF][["parsed", "x"].toString()] == 'raised'
+        results[StaticCompilationMode.OFF][["described", "ab"].toString()] == '<ab>!'
         results[StaticCompilationMode.OFF]['edge'] == 1
         results[StaticCompilationMode.OFF][["guarded", 0].toString()] == -1
         results[StaticCompilationMode.OFF][["branch_local", true].toString()] == 'tTrue'

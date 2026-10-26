@@ -414,6 +414,40 @@ public final class PythonStatic {
     }
 
     /**
+     * Invokes a method of the Python object of a compiled body and converts its result: the call a
+     * compiled body makes to a method of its class that the stub does not declare, or that runs
+     * its interceptors on the Python object.
+     *
+     * @param self      The Python object
+     * @param name      The method
+     * @param arguments The arguments
+     * @param converter The conversion of the result to the Java type the body uses
+     * @return The converted result
+     */
+    public static @Nullable Object invoke(org.graalvm.polyglot.Value self, String name, Object[] arguments, PolyglotValueConverter<?> converter) {
+        return converter.convert(PythonInvocation.invokePythonMethod(self, name, arguments));
+    }
+
+    /**
+     * The result of a Python method a compiled body calls whose return hint is a primitive
+     * ({@code int}, {@code float} or {@code bool}). Return hints are trusted, and checked for
+     * None: a None the primitive cannot hold fails as a TypeError naming the method and its hint,
+     * not as the NullPointerException of the conversion.
+     *
+     * @param result The result of the call
+     * @param method The method, as {@code Class.method}
+     * @param hint   The Python name of the hinted type
+     * @return The result, which is not None
+     * @throws IllegalStateException When the result is None, as a TypeError
+     */
+    public static org.graalvm.polyglot.Value returned(org.graalvm.polyglot.Value result, String method, String hint) {
+        if (result.isNull()) {
+            throw new PythonError(TYPE_ERROR, method + "() returned None but is hinted to return " + hint);
+        }
+        return result;
+    }
+
+    /**
      * Binds a Python object to the compiled bodies of one class of its MRO: the rewritten methods
      * of that class run the Java bodies for the object from then on, see {@code apply_delegation}.
      * The binding is kept outside the object, weakly, so a copy of the object is not bound and

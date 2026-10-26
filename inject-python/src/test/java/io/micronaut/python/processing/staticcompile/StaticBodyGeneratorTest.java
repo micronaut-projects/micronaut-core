@@ -18,6 +18,7 @@ package io.micronaut.python.processing.staticcompile;
 import io.micronaut.python.processing.staticcompile.StaticCompilationDecision.Stats;
 import io.micronaut.sourcegen.JavaPoetSourceGenerator;
 import io.micronaut.sourcegen.model.ClassDef;
+import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.ParameterDef;
@@ -40,9 +41,11 @@ import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -58,12 +61,17 @@ class StaticBodyGeneratorTest {
     private static final String OVERLOADS = GeneratorOverloads.class.getName();
     private static final StaticBodyGenerator.SelfAccess NO_SELF = new StaticBodyGenerator.SelfAccess() {
         @Override
-        public ExpressionDef read(String property, String typeName, TypeDef type) {
+        public ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor) {
             throw new UnsupportedOperationException("self." + property);
         }
 
         @Override
-        public StatementDef write(String property, TypeDef type, ExpressionDef value) {
+        public ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct) {
+            throw new UnsupportedOperationException("self." + name + "()");
+        }
+
+        @Override
+        public StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor) {
             throw new UnsupportedOperationException("self." + property);
         }
     };
@@ -163,6 +171,44 @@ class StaticBodyGeneratorTest {
         assertTrue(generated.source.contains("String none2 = null;"), generated.source);
         assertTrue(generated.source.contains("GeneratorOverloads.which(none1)"), generated.source);
         assertEquals("CharSequence null, String null, String null", generated.invoke());
+    }
+
+    @Test
+    void theSharedEntryWorksOnTheCallersCollectionAndTheJavaMethodOnACopy() throws Exception {
+        // xs_ = copy(xs); xs_.add(tag); return xs_.size(), as the lowering gives a list parameter a copy of its own
+        String list = "java.util.List<java.lang.String>";
+        Ir.Param xs = new Ir.Param("xs", list, list);
+        Ir.LocalRef copy = new Ir.LocalRef("xs_", list);
+        Ir.Body body = new Ir.Body(List.of(
+            new Ir.Local("xs_", list, new Ir.Helper("copy", List.of(xs), list)),
+            new Ir.Eval(new Ir.InvokeJava(copy, "java.util.List", "add", List.of("java.lang.Object"), List.of(new Ir.Param("tag", Ir.STRING, Ir.STRING)), Ir.BOOLEAN)),
+            new Ir.Return(new Ir.InvokeJava(copy, "java.util.List", "size", List.of(), List.of(), "int"))));
+        Ir.CompiledBody compiled = new Ir.CompiledBody("generated.Shared", "fill", List.of("xs", "tag"), List.of(list, Ir.STRING), "int", body, null, Stats.NONE, false);
+        assertEquals(Set.of("xs"), StaticBodyGenerator.copiedParameters(compiled));
+        ClassDef.ClassDefBuilder classDef = ClassDef.builder("generated.Shared").addModifiers(Modifier.PUBLIC);
+        for (String name : List.of("fill", "shared")) {
+            MethodDef.MethodDefBuilder method = MethodDef.builder(name).addModifiers(Modifier.PUBLIC).returns(TypeDef.Primitive.INT)
+                .addParameter(ParameterDef.of("xs", StaticBodyGenerator.type(list)))
+                .addParameter(ParameterDef.of("tag", TypeDef.STRING));
+            classDef.addMethod(method.buildStatic(methodParameters -> "fill".equals(name)
+                ? StaticBodyGenerator.generateEntry(compiled, methodParameters, arguments ->
+                    ClassTypeDef.of("generated.Shared").invokeStatic("shared", List.of(StaticBodyGenerator.type(list), TypeDef.STRING), TypeDef.Primitive.INT, arguments))
+                : StaticBodyGenerator.generateShared(compiled, methodParameters, NO_SELF, false)));
+        }
+        StringWriter writer = new StringWriter();
+        new JavaPoetSourceGenerator().write(classDef.build(), writer);
+        String source = writer.toString();
+        Class<?> type = compile("generated.Shared", source);
+
+        assertTrue(source.contains("return Shared.shared(PythonStatic.copy(xs), tag);"), source);
+        assertTrue(source.contains("List xs_ = xs;"), source);
+        List<String> callers = new ArrayList<>(List.of("a"));
+        // a Java caller's list is copied, as the bridge hands Python a copy
+        assertEquals(2, type.getMethod("fill", List.class, String.class).invoke(null, callers, "b"));
+        assertEquals(List.of("a"), callers);
+        // a compiled sibling's list is updated, as Python's callee updates the caller's
+        assertEquals(2, type.getMethod("shared", List.class, String.class).invoke(null, callers, "c"));
+        assertEquals(List.of("a", "c"), callers);
     }
 
     private static Generated generate(Ir.Body body, String returnType, List<String> parameterNames, List<String> parameterTypes) throws Exception {
