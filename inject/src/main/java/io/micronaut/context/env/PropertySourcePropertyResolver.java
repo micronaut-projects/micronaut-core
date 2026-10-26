@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -270,16 +271,33 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * Processes a property source once more into the state the read of the current thread writes
-     * into, on top of what it holds: one that another thread added, and processed into the
-     * published state, since the read took the property sources it reads. It is processed as its
-     * thread did, but without registering it again and without the hooks for subclasses. Called
-     * with the catalog lock held.
+     * Writes the given property sources into the state the read of the current thread writes
+     * into, in their order among the property sources the read has processed. They are ones that
+     * other threads added, and processed into the published state, since the read took the
+     * property sources it reads. The properties are those recorded as each was processed, so no
+     * code of a property source runs: the property sources the read has processed of a higher
+     * order are written again after them, as recorded too. Called with the catalog lock held.
      *
-     * @param propertySource The property source
+     * @param build          What the read writes into
+     * @param addedMeanwhile The property sources added meanwhile, as processed
      */
-    void processAgain(PropertySource propertySource) {
-        processProperties(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
+    void writeInOrder(Build build, List<Processed> addedMeanwhile) {
+        int lowest = Integer.MAX_VALUE;
+        for (Processed added : addedMeanwhile) {
+            lowest = Math.min(lowest, added.order);
+        }
+        List<Processed> written = new ArrayList<>();
+        for (Processed read : build.recorded) {
+            if (read.order > lowest) {
+                written.add(read);
+            }
+        }
+        written.addAll(addedMeanwhile);
+        // a stable sort: one added meanwhile comes after one the read processed of the same order
+        written.sort(Comparator.comparingInt(processed -> processed.order));
+        for (Processed processed : written) {
+            writeProperties(processed.origin, processed.values, processed.convention);
+        }
     }
 
     /**
@@ -298,13 +316,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * Called before a property source that a thread other than one reading the property sources
-     * has registered is processed into the published state, with the catalog lock held, see
+     * The read in progress that a property source a thread other than one reading the property
+     * sources has registered, and processed into the published state, is handed to: that read then
+     * writes it in its order among what it publishes. Called with the catalog lock held, see
      * {@link #processPropertySource(PropertySource, PropertySource.PropertyConvention)}.
      *
      * @param propertySource The property source
+     * @return The read, or {@code null} if there is none to hand it to
      */
-    void beforeProcessing(PropertySource propertySource) {
+    @Nullable
+    Build handOverTo(PropertySource propertySource) {
+        return null;
     }
 
     /**
@@ -856,38 +878,34 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
         Build build = currentRead();
+        int order = properties.getOrder();
         if (build != null && build.state != null) {
             // The thread that reads the property sources: it registers what it has processed once
-            // it publishes it.
+            // it publishes it, and records it to write it again, see writeInOrder.
             build.processed.put(properties.getName(), properties);
+            PropertySource.Origin origin = properties.getOrigin();
+            List<PropertyValue> values = readProperties(properties);
             if (build.state == state) {
-                // A start, which writes where lookups read. The code of the property source runs
-                // before the lock is taken.
-                PropertySource.Origin origin = properties.getOrigin();
-                List<PropertyValue> values = readProperties(properties);
+                // a start, which writes where lookups read: the code of the property source has run
                 synchronized (catalogLock) {
                     writeProperties(origin, values, convention);
                 }
             } else {
-                processProperties(properties, convention);
+                writeProperties(origin, values, convention);
             }
+            build.recorded.add(new Processed(order, origin, values, convention));
             return;
         }
         this.propertySources.put(properties.getName(), properties);
         synchronized (catalogLock) {
-            beforeProcessing(properties);
-            processProperties(properties, convention);
+            PropertySource.Origin origin = properties.getOrigin();
+            List<PropertyValue> values = readProperties(properties);
+            writeProperties(origin, values, convention);
+            Build read = handOverTo(properties);
+            if (read != null) {
+                read.addedMeanwhile.add(new Processed(properties, order, origin, values, convention));
+            }
         }
-    }
-
-    /**
-     * Processes the property source into the state that writes of the current thread go to.
-     *
-     * @param properties The property source
-     * @param convention The property convention
-     */
-    private void processProperties(PropertySource properties, PropertySource.PropertyConvention convention) {
-        writeProperties(properties.getOrigin(), readProperties(properties), convention);
     }
 
     /**
@@ -1507,6 +1525,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          */
         final Map<String, PropertySource> processed = new LinkedHashMap<>();
         /**
+         * What the read has processed, in its order.
+         */
+        final List<Processed> recorded = new ArrayList<>();
+        /**
+         * The property sources that other threads have added, and processed into the published
+         * state, since the read took the registered ones, as processed. Guarded by the catalog
+         * lock.
+         */
+        final List<Processed> addedMeanwhile = new ArrayList<>();
+        /**
          * The state the read writes into and its thread looks up, or {@code null} until it writes.
          */
         private ResolverState state;
@@ -1516,6 +1544,34 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          */
         final boolean isWriting() {
             return state != null;
+        }
+    }
+
+    /**
+     * A property source as it was processed: its properties, read with its code once.
+     */
+    static final class Processed {
+        /**
+         * The property source, {@code null} for one that a read has processed itself.
+         */
+        @Nullable
+        final PropertySource source;
+        private final int order;
+        private final PropertySource.Origin origin;
+        private final List<PropertyValue> values;
+        private final PropertySource.PropertyConvention convention;
+
+        private Processed(int order, PropertySource.Origin origin, List<PropertyValue> values, PropertySource.PropertyConvention convention) {
+            this(null, order, origin, values, convention);
+        }
+
+        private Processed(@Nullable PropertySource source, int order, PropertySource.Origin origin, List<PropertyValue> values,
+                          PropertySource.PropertyConvention convention) {
+            this.source = source;
+            this.order = order;
+            this.origin = origin;
+            this.values = values;
+            this.convention = convention;
         }
     }
 

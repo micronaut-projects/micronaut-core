@@ -568,10 +568,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     /**
      * Publishes what the read has processed, unless the environment was stopped meanwhile. The
-     * property sources other threads have added since it took the registered ones are processed
-     * again on top. The property sources the read has processed are registered, and those of the
-     * reads before it it has read anew are dropped, except where another thread has added or
-     * removed one by the same name meanwhile.
+     * property sources other threads have added since it took the registered ones are written in
+     * their order among those it has read. The property sources the read has processed are
+     * registered, and those of the reads before it it has read anew are dropped, except where
+     * another thread has added or removed one by the same name meanwhile.
      *
      * @param read The read
      * @return Whether it was published
@@ -587,14 +587,19 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             if (reads != generation) {
                 return false;
             }
-            for (PropertySource added : read.addedMeanwhile) {
+            List<Processed> addedMeanwhile = new ArrayList<>(read.addedMeanwhile.size());
+            for (Processed added : read.addedMeanwhile) {
                 // the latest by its name, unless removed since
-                if (this.propertySources.get(added.getName()) == added) {
-                    processAgain(added);
+                if (this.propertySources.get(added.source.getName()) == added.source) {
+                    addedMeanwhile.add(added);
                 }
             }
+            if (!addedMeanwhile.isEmpty()) {
+                writeInOrder(read, addedMeanwhile);
+            }
             if (reads != generation) {
-                // stopped by the code of a property source processed again
+                // stopped meanwhile, by the code that publishing runs: the names of the property
+                // sources, and a hook of a subclass
                 return false;
             }
             Map<String, DefaultPropertyEntry>[] before = publishState(read);
@@ -625,8 +630,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * Takes the registered property sources that the read of the current thread reads, where a
      * read has always taken them: once it has loaded its files and read the bootstrap
      * configuration. From now on a property source that another thread adds is processed when it
-     * is added, and processed again on top of what the read publishes. The refreshable property
-     * sources of the reads before it are left out: it reads them anew.
+     * is added, and the read publishes it in its order. The refreshable property sources of the
+     * reads before it are left out: it reads them anew.
      *
      * @return The registered property sources to read
      */
@@ -637,7 +642,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
         synchronized (catalog) {
             // First: a property source that is added once the registered ones have been taken
-            // must not be only registered, see beforeProcessing.
+            // must not be only registered, see handOverTo.
             read.reading = false;
             List<PropertySource> registered = new ArrayList<>(this.propertySources.size());
             for (PropertySource propertySource : this.propertySources.values()) {
@@ -651,12 +656,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
-    void beforeProcessing(PropertySource propertySource) {
-        // One registered before the read took the ones it reads is read in its order anyway.
+    Build handOverTo(PropertySource propertySource) {
+        // Not one the read reads itself, in its order anyway: one registered before it took the
+        // registered ones, or one of the reads before it, which it reads anew.
         Read read = generation.read;
-        if (read != null && read.input != null && !read.input.contains(propertySource)) {
-            read.addedMeanwhile.add(propertySource);
+        if (read != null && read.input != null && !read.input.contains(propertySource) && !read.earlier.contains(propertySource)) {
+            return read;
         }
+        return null;
     }
 
     /**
@@ -1550,11 +1557,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
          * reads.
          */
         final Set<String> changedNames = ConcurrentHashMap.newKeySet();
-        /**
-         * The property sources that other threads have added, and processed into the published
-         * state, since it took the registered ones. Guarded by the catalog lock.
-         */
-        final List<PropertySource> addedMeanwhile = new ArrayList<>();
         /**
          * The registered property sources it reads, by identity, once it has taken them. Guarded
          * by the catalog lock.

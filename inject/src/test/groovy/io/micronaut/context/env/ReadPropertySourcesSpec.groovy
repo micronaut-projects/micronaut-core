@@ -321,7 +321,7 @@ class ReadPropertySourcesSpec extends Specification {
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13982")
-    void "a property source added once a #how has taken the registered ones is visible at once, and wins over a later one at the end"() {
+    void "a property source added once a #how has taken the registered ones is visible at once, and published in its order"() {
         given: "a property source read after the first that parks the read once armed"
         Gate gate = new Gate(20)
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
@@ -345,11 +345,11 @@ class ReadPropertySourcesSpec extends Specification {
         gate.release.countDown()
         reader.join(WAIT_SECONDS * 1000L)
 
-        then:
+        then: "a later property source wins over it once the read publishes, as it does once the next refresh has read it"
         !adderWaited
         whileRead == 'added'
         !reader.alive
-        env.getProperty('shared.key', String).get() == 'added'
+        env.getProperty('shared.key', String).get() == 'late'
         env.getProperty('added.key', String).get() == 'added'
 
         when: "the next refresh reads it in its order"
@@ -604,45 +604,96 @@ class ReadPropertySourcesSpec extends Specification {
         env.stop()
     }
 
-    void "stop() from the code of a property source that a refresh processes again as it publishes leaves the environment stopped"() {
-        given: "a property source read last that parks the refresh once armed, and one that stops the environment the second time it is read"
+    void "a property source registered by the name of a configuration file, of a higher order, stays registered and wins through refreshes"() {
+        given:
+        FileReadingEnvironment env = new FileReadingEnvironment()
+        PropertySource registered = PropertySource.of('application', ['app.value': 'registered', 'registered.key': 'registered'], 10)
+        env.addPropertySource(registered)
+
+        when:
+        env.start()
+        env.refresh()
+        env.refresh()
+
+        then:
+        env.files.get() == 3
+        env.propertySources.find { it.name == 'application' }.is(registered)
+        env.getProperty('app.value', String).get() == 'registered'
+        env.getProperty('registered.key', String).get() == 'registered'
+
+        cleanup:
+        env.stop()
+    }
+
+    void "a refresh publishes a property source added meanwhile as it was processed, without running its code again"() {
+        given: "a property source read last that parks the refresh once armed, and one that counts the times it is read"
         Gate gate = new Gate(Ordered.LOWEST_PRECEDENCE)
-        Map<String, Object> data = ['app.value': 'old']
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
-        env.addPropertySource(new MapPropertySource('data', data))
+        env.addPropertySource(PropertySource.of('data', ['app.value': 'value']))
         env.addPropertySource(gate)
         env.start()
         AtomicInteger reads = new AtomicInteger()
-        PropertySource stopping = new PropertySource() {
+        PropertySource counted = new PropertySource() {
             @Override
-            String getName() { 'stopping' }
+            String getName() { 'counted' }
 
             @Override
-            Object get(String key) { key == 'stopping.key' ? 'value' : null }
+            Object get(String key) { key == 'counted.key' ? 'value' : null }
 
             @Override
             Iterator<String> iterator() {
-                if (reads.incrementAndGet() == 2) {
-                    env.stop()
-                }
-                return ['stopping.key'].iterator()
+                reads.incrementAndGet()
+                return ['counted.key'].iterator()
             }
         }
 
-        when: "it is added once the refresh has taken the registered property sources, and processed again as the refresh publishes"
-        data.put('app.value', 'new')
+        when: "it is added once the refresh has taken the registered property sources"
         gate.arm()
         Thread refresher = daemon('refresher') { env.refresh() }
         assert gate.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        env.addPropertySource(stopping)
+        env.addPropertySource(counted)
         gate.release.countDown()
         refresher.join(WAIT_SECONDS * 1000L)
 
-        then: "nothing the refresh read is published: the stopped environment answers what it held when stopped"
+        then: "it was read once, when it was added, and is published"
         !refresher.alive
-        reads.get() == 2
-        !env.running
-        env.getProperty('app.value', String).get() == 'old'
+        reads.get() == 1
+        env.running
+        env.getProperty('counted.key', String).get() == 'value'
+        env.getProperty('app.value', String).get() == 'value'
+
+        cleanup:
+        gate.release.countDown()
+        env.stop()
+    }
+
+    void "a Consul watch that replaces its property source and adds every registered one again, during a refresh, keeps their precedence"() {
+        given: "a configuration file of the environment, a Consul property source and a higher one that overrides a key of it, as system properties do"
+        Gate gate = new Gate(Ordered.LOWEST_PRECEDENCE)
+        FileReadingEnvironment env = new FileReadingEnvironment()
+        env.addPropertySource(PropertySource.of('consul-app', ['shared.key': 'consul-old', 'consul.key': 'consul-old'], -50))
+        env.addPropertySource(PropertySource.of('higher', ['shared.key': 'higher'], 100))
+        env.addPropertySource(gate)
+        env.start()
+
+        when: "the watch replaces the Consul property source and adds every registered one again, sorted by order, once a refresh has taken the registered ones"
+        gate.arm()
+        Thread refresher = daemon('refresher') { env.refresh() }
+        assert gate.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        List<PropertySource> updated = env.propertySources.collect {
+            it.name == 'consul-app' ? PropertySource.of('consul-app', ['shared.key': 'consul-new', 'consul.key': 'consul-new'], it.order) : it
+        }
+        updated.sort { it.order }.each { env.addPropertySource(it) }
+        String whileRead = env.getProperty('consul.key', String).orElse(null)
+        gate.release.countDown()
+        refresher.join(WAIT_SECONDS * 1000L)
+
+        then: "the new Consul values are visible at once, and the read publishes them in their order, with the file it has read anew"
+        !refresher.alive
+        whileRead == 'consul-new'
+        env.getProperty('consul.key', String).get() == 'consul-new'
+        env.getProperty('shared.key', String).get() == 'higher'
+        env.getProperty('app.value', String).get() == 'v2'
 
         cleanup:
         gate.release.countDown()
