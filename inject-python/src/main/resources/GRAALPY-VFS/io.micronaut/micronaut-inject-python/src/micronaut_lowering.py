@@ -159,6 +159,21 @@ def _erased(type_name):
     return type_name if index < 0 else type_name[:index]
 
 
+def _descriptor_parameter_types(signature):
+    """
+    The parameter types a call of the Java method names in its descriptor: a parameter declared with a type
+    variable is its erasure (Object for the T of an Optional[Foo]), the others as the signature spells them.
+    """
+    resolved = list(signature.parameterTypes())
+    erased = list(signature.erasedParameterTypes())
+    return [declared if declared != _erased(type_name) else type_name for type_name, declared in zip(resolved, erased)]
+
+
+def _descriptor_return_type(signature):
+    """The erasure of the declared return type of the Java method, which a call names in its descriptor."""
+    return signature.erasedReturnType()
+
+
 def _arguments(type_name):
     """The type arguments carried in a Java type name, as a list of names."""
     index = type_name.find("<")
@@ -615,6 +630,9 @@ class Lowering:
             # from the hint itself: the checker's pass forgets a parameter the body reassigns
             hint = argument.typeAnnotation()
             typed = self.bindings.of_hint(hint) if hint is not None else None
+            if typed is not None and typed.kind == PY and self._derives_from_python_exception(typed.name):
+                # whatever the Java signature says, a Python exception object cannot become a value of it
+                self._refuse("python-exception", f"parameter [{name}] is a [{typed.name.name()}], a Python exception class; a value of it has no Java layout", self.node)
             stub_type = self.java_layout[0][len(names)] if self.java_layout is not None else self._stub_type(typed, hint, self.node)
             used = self._value_type(typed, self.node)
             if self.java_layout is not None and _erased(used) != _erased(stub_type) and used not in (LONG, DOUBLE, BOOLEAN, STRING):
@@ -632,11 +650,14 @@ class Lowering:
         return names, types
 
     def _return_type(self):
-        if self.java_layout is not None:
-            # the Java method fixes the return type: a value is returned at it, boxed when it is an Object
-            return VOID if self.java_layout[1] == "void" else self.java_layout[1]
         return_def = self.function_def.returnType()
         hint = return_def.typeAnnotation() if return_def is not None else None
+        if self.java_layout is not None:
+            typed = self.bindings.of_hint(hint) if hint is not None and hint.name() != "None" else None
+            if typed is not None and typed.kind == PY and self._derives_from_python_exception(typed.name):
+                self._refuse("python-exception", f"returning a [{typed.name.name()}], a Python exception class, has no Java layout", self.node)
+            # the Java method fixes the return type: a value is returned at it, boxed when it is an Object
+            return VOID if self.java_layout[1] == "void" else self.java_layout[1]
         if hint is None:
             # the stub declares an Object return for an unhinted function that returns a value
             return OBJECT if self.function_def.hasReturnValue() else VOID
@@ -667,6 +688,10 @@ class Lowering:
         if typed.kind == JAVA:
             return typed.name
         if typed.kind == PY:
+            if self._derives_from_python_exception(typed.name):
+                # a Python exception object stays a Python object: the generated class of its class is
+                # no value a Java parameter or return can hold, so the body stays in Python
+                self._refuse("python-exception", f"[{typed.name.name()}] is a Python exception class; a value of it has no Java layout", node)
             return typed.name.qualifiedName()
         self._refuse("unknown-type", f"the hint [{hint.name()}] denotes no value type", node)
 
@@ -1323,7 +1348,7 @@ class Lowering:
         return self._coerce(expression, OBJECT, node)
 
     def _join(self, types, node, what):
-        """The one type of the elements of a literal: numbers widen to a double, anything else must agree."""
+        """The one type of the elements of a literal, or Object when they disagree: each element keeps its own kind, boxed."""
         distinct = []
         for type_name in types:
             if type_name != NONE and type_name not in distinct:
@@ -1332,9 +1357,8 @@ class Lowering:
             return None
         if len(distinct) == 1:
             return distinct[0]
-        if all(self._is_number(type_name) for type_name in distinct):
-            return DOUBLE
-        # a view model mixes strings, numbers and objects: the literal holds Objects, boxed
+        # a literal mixing ints and floats, or strings, numbers and objects, holds Objects: Python keeps
+        # each element's type, so [1, 2.5] renders as [1, 2.5], not [1.0, 2.5]
         return OBJECT
 
     def _sequence(self, node):
@@ -1467,6 +1491,10 @@ class Lowering:
             if value.type() == target:
                 return value
             if self._is_number(value.type()):
+                if name == "int":
+                    # the helper raises on a NaN, an infinity or a value no long holds, where a cast would answer a number
+                    self.helper_calls += 1
+                    return Helper("toInt", [value], LONG)
                 return Cast(value, target)
             if value.type() in (STRING, BOOLEAN):
                 self.helper_calls += 1
@@ -1494,7 +1522,7 @@ class Lowering:
             if name == "set" and _equality_kind(element_type) in _LOOSE_KINDS:
                 self._refuse("unsupported-expression", f"set() of [{_equality_kind(element_type)}] values has no static lowering: Python compares numbers across their types", node)
             self.helper_calls += 1
-            return Helper("copyOf" + ("Set" if name == "set" else "List"), [value], f"{SET if name == 'set' else LIST}<{element_type}>")
+            return Helper("copyOf" + {"set": "Set", "tuple": "Tuple", "list": "List"}[name], [value], f"{SET if name == 'set' else LIST}<{element_type}>")
         if name in ("min", "max") and len(arguments) >= 2:
             if not all(self._is_number(argument.type()) for argument in arguments):
                 self._refuse("unsupported-expression", f"{name}() of values that are not numbers has no static lowering", node)
@@ -1777,7 +1805,7 @@ class Lowering:
                      for argument, parameter_type, argument_node in zip(lowered_arguments, parameter_types, node.args)]
         self.java_calls += 1
         if kind == "constructor":
-            return NewJava(owner, parameter_types, arguments)
+            return NewJava(owner, _descriptor_parameter_types(signature), arguments)
         receiver = None if static else self._expression(function.value)
         if receiver is not None and (receiver.type() in (LONG, DOUBLE, BOOLEAN) or receiver.type() in JAVA_BOXED):
             self._refuse("unsupported-expression", "a call on a Python value has no static lowering", node)
@@ -1786,7 +1814,24 @@ class Lowering:
         if type_arguments:
             # the elements of a returned collection keep their static type: for title in repository.titles()
             return_type = f"{return_type}<{','.join(type_arguments)}>"
-        call = InvokeJava(receiver, owner, name, parameter_types, arguments, return_type)
+        erased_return = _descriptor_return_type(signature)
+        if erased_return != VOID and erased_return != _erased(return_type):
+            # the declared return type is a type variable (T bean() of a BeanRegistration[Foo]): the
+            # signature carries the type the receiver binds it to, while the method returns the variable's
+            # erasure, which the body casts to that type
+            call = InvokeJava(receiver, owner, name, _descriptor_parameter_types(signature), arguments, erased_return)
+            used = JAVA_PRIMITIVE_NUMBERS.get(return_type, return_type)
+            if erased_return == OBJECT:
+                # from an Object, the cast checks the type the receiver binds the variable to: a boxed number stays boxed, as it may be None
+                return Cast(call, used)
+            resolved = Cast(call, return_type)
+            return Cast(resolved, used) if used != return_type else resolved
+        call = InvokeJava(receiver, owner, name, _descriptor_parameter_types(signature), arguments, return_type)
+        if _erased(return_type) == OBJECT:
+            # a type variable of a raw receiver returns as Object; the checker may still know the type
+            inferred = stub_type_name(self._typed(node))
+            if inferred is not None and inferred != OBJECT:
+                return Cast(call, inferred)
         # a boxed return may be null, which Python sees as None: it stays boxed, a primitive is widened
         used = JAVA_PRIMITIVE_NUMBERS.get(return_type, return_type)
         return Cast(call, used) if used != return_type else call
@@ -1888,6 +1933,26 @@ class Lowering:
         return OBJECT if value_type in (LONG, DOUBLE, BOOLEAN) else value_type
 
     # ---------------------------------------------------------------- objects of the classes of the compilation
+
+    def _derives_from_python_exception(self, class_def, seen=None):
+        """Whether the class, or a Python base of it, extends a builtin Python exception."""
+        import builtins
+        seen = seen if seen is not None else set()
+        if class_def.qualifiedName() in seen:
+            return False
+        seen.add(class_def.qualifiedName())
+        classes = getattr(self.checker, "python_classes", None)
+        for base in class_def.bases():
+            name = base.name()
+            model = classes.by_qualified.get(name) if classes is not None else None
+            if model is not None:
+                if self._derives_from_python_exception(model.class_def, seen):
+                    return True
+                continue
+            builtin = getattr(builtins, name.rsplit(".", 1)[-1], None) if "." not in name or name.startswith("builtins.") else None
+            if isinstance(builtin, type) and issubclass(builtin, BaseException):
+                return True
+        return False
 
     def _python_model_of(self, node):
         """The class model of a value of a Python class of the compilation, from the checker's type or the lowering's, else None."""
@@ -2026,6 +2091,8 @@ class Lowering:
         """A construction of an object of the compilation: the generated class's constructor, which mirrors the hinted __init__."""
         model = self.checker.python_classes.of(class_def)
         owner = self._generated_class(model, node)
+        if self._derives_from_python_exception(class_def):
+            self._refuse("python-exception", f"[{model.name}] is a Python exception class; constructing it has no static lowering", node)
         if _abstract_class(class_def):
             self._refuse("unsupported-expression", f"[{model.name}] is a protocol or an abstract class; the generated type cannot be constructed", node)
         constructor = model.constructor_of()

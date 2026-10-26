@@ -114,6 +114,9 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |`overriding-java-method`, `intercepted-method`
 |The method implements a method of a Java base or interface whose signature the hints do not spell (a method implementing a Java method is compiled when each parameter is hinted with the Java parameter type, or a subtype of it the body reads the parameter as (`exception: ConstraintViolationException` where `ExceptionHandler.handle` takes a `Throwable`), and the return is unhinted, hinted `object`, or hinted with a type the Java method returns: `def intercept(self, context: MethodInvocationContext) -> object` compiles into `Object intercept(MethodInvocationContext)`); or it is a concrete advised method of an introduction class, whose chain runs on the Python object; or it is an advised module-level function (an around binding on the function or its module, a validation constraint on a parameter or the return), since the generated class of a module does not run compiled advice yet. Other advised methods of a class (an around binding or a validation constraint on a method, its class or a parameter) are compiled: the Java method runs the interceptor chain the bean's proxy binds before the body, as a proxy compiled for a Java bean does, so validation and around advice cost no crossing into Python.
 
+|`overridden-method`
+|A subclass of the compilation overrides the method with a signature its generated class cannot declare as a Java override of the method (another return hint, or another parameter list). A Java body in the class would also serve the subclass's objects, where the bridge, which dispatches to the Python object, runs the override; the method stays in Python.
+
 |`varargs-signature`, `unhinted-parameter`, `unhinted-return`, `java-reserved-name`
 |The signature has no fixed Java layout: `*args`, `**kwargs` or keyword-only parameters, a parameter without a hint, a parameter or return hint resolving to no Java type or class of the compilation, a method, parameter or local named with a Java keyword or a method of `Object`. A missing return hint is not a reason: the method returns `Object`, as its stub declares.
 
@@ -133,11 +136,11 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |A body the checker's inference flags carries the checker's rule (an unknown method, an argument of the wrong type, ...) as its reason.
 |===
 
-A `NOT_CANDIDATE` decision carries `class-not-eligible`, `special-method`, `async-function`, `generator-function`, `static-method`, `abstract-method`, `property-accessor`, `overriding-java-method` or `intercepted-method`; a `SKIPPED` one carries `pooled-module` or the reasons of the rows after `intercepted-method`.
+A `NOT_CANDIDATE` decision carries `class-not-eligible`, `special-method`, `async-function`, `generator-function`, `static-method`, `abstract-method`, `property-accessor`, `overriding-java-method`, `intercepted-method` or `overridden-method`; a `SKIPPED` one carries `pooled-module` or the reasons of the rows after `overridden-method`.
 
 === The Supported Subset
 
-Python integers are compiled as `long`, floats as `double`, strings as `String`, booleans as `boolean` and `None` as `null`. Where Python and Java differ, the generated code calls a helper of `io.micronaut.context.python.PythonStatic` instead of approximating: `//` and `%` floor, `/` always divides as floats, `str()` spells floats, booleans and `None` as Python does, a string is indexed by code point, `len()`, `in`, negative indexes and a missing key behave as in Python.
+Python integers are compiled as `long`, floats as `double`, strings as `String`, booleans as `boolean` and `None` as `null`. Where Python and Java differ, the generated code calls a helper of `io.micronaut.context.python.PythonStatic` instead of approximating: `//` and `%` floor, `/` always divides as floats, `str()` spells floats, booleans and `None` as Python does, a string is indexed by code point, `len()`, `in`, negative indexes and a missing key behave as in Python, `int()` of a NaN or an infinity raises, `strip()` and `split()` use Python's whitespace, a tuple renders in parentheses and a literal mixing ints and floats keeps each element's type.
 
 [cols="1,2"]
 |===
