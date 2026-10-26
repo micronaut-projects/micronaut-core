@@ -35,7 +35,6 @@ import javax.tools.SimpleJavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
