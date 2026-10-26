@@ -233,6 +233,17 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
+        Read read = currentEnvironmentRead();
+        if (read != null) {
+            // The thread of a read: the read registers it once it publishes, see registerHere. It
+            // reads it with the registered ones until it has taken them, and processes it after.
+            registerHere(read, propertySource.getName(), propertySource);
+            if (read.isWriting() && !read.reading) {
+                resetCaches();
+                processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
+            }
+            return this;
+        }
         noteChange(propertySource.getName(), propertySource);
         propertySources.put(propertySource.getName(), propertySource);
         if (isRunning() && !isReading()) {
@@ -244,12 +255,37 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment removePropertySource(PropertySource propertySource) {
+        Read read = currentEnvironmentRead();
+        if (read != null) {
+            registerHere(read, propertySource.getName(), null);
+            read.processed.remove(propertySource.getName());
+            if (read.isWriting() && !read.reading) {
+                resetCaches();
+            }
+            return this;
+        }
         noteChange(propertySource.getName(), null);
         propertySources.remove(propertySource.getName());
         if (isRunning() && !isReading()) {
             resetCaches();
         }
         return this;
+    }
+
+    /**
+     * Notes that the thread of a read adds or removes a property source by the given name. The
+     * read applies that to the registered property sources once it publishes, so that a read
+     * that is not published registers nothing, and it is the latest change by that name, unless
+     * another thread changes it after.
+     *
+     * @param read  The read of the current thread
+     * @param name  The name
+     * @param added The property source added, {@code null} if one is removed
+     */
+    private static void registerHere(Read read, String name, @Nullable PropertySource added) {
+        read.changedHere.add(name);
+        read.changedNames.remove(name);
+        read.registeredHere.put(name, added);
     }
 
     /**
@@ -265,14 +301,20 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     /**
      * Notes that another thread adds or removes a property source by the given name while a start
      * or a refresh reads: the read then does not register its own by that name, which would undo
-     * the change.
+     * the change. Adding one of the reads before it again changes nothing, as the read reads those
+     * anew. Nor does adding the one registered by the name again, unless the thread of the read
+     * has changed the name meanwhile.
      *
      * @param name  The name
      * @param added The property source added, {@code null} if one is removed
      */
     private void noteChange(String name, @Nullable PropertySource added) {
         Read read = generation.read;
-        if (read != null && read != currentRead() && (added == null || propertySources.get(name) != added)) {
+        if (read == null) {
+            return;
+        }
+        if (added == null
+            || !read.earlier.contains(added) && (propertySources.get(name) != added || read.changedHere.contains(name))) {
             read.changedNames.add(name);
         }
     }
@@ -541,12 +583,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     if (reads.read == read) {
                         reads.read = null;
                     }
-                    if (reads == generation) {
-                        // What a failed read registered of its own, the next read reads anew.
-                        Set<PropertySource> own = identitySet(ownPropertySources);
-                        own.addAll(read.own);
-                        ownPropertySources = new ArrayList<>(own);
-                    }
                 }
             }
         }
@@ -589,8 +625,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
             List<Processed> addedMeanwhile = new ArrayList<>(read.addedMeanwhile.size());
             for (Processed added : read.addedMeanwhile) {
-                // the latest by its name, unless removed since
-                if (this.propertySources.get(added.source.getName()) == added.source) {
+                // the latest by its name, unless removed since, or changed by the thread of the read
+                String name = added.source.getName();
+                boolean changedHereLast = read.registeredHere.containsKey(name) && !read.changedNames.contains(name);
+                if (this.propertySources.get(name) == added.source && !changedHereLast) {
                     addedMeanwhile.add(added);
                 }
             }
@@ -605,6 +643,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             Map<String, DefaultPropertyEntry>[] before = publishState(read);
             for (PropertySource earlier : read.earlier) {
                 this.propertySources.remove(earlier.getName(), earlier);
+            }
+            for (Map.Entry<String, PropertySource> here : read.registeredHere.entrySet()) {
+                // one its thread has removed; one it has added is among those it has processed
+                if (here.getValue() == null && !read.changedNames.contains(here.getKey())) {
+                    this.propertySources.remove(here.getKey());
+                }
             }
             for (Map.Entry<String, PropertySource> processed : read.processed.entrySet()) {
                 // in one step with the check, against an add or a remove that notes the name
@@ -644,23 +688,17 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             // First: a property source that is added once the registered ones have been taken
             // must not be only registered, see handOverTo.
             read.reading = false;
-            List<PropertySource> registered = new ArrayList<>(this.propertySources.size());
-            for (PropertySource propertySource : this.propertySources.values()) {
-                if (!read.earlier.contains(propertySource)) {
-                    registered.add(propertySource);
-                }
-            }
-            read.input = identitySet(registered);
-            return registered;
+            read.taken = true;
+            return new ArrayList<>(registeredFor(read).values());
         }
     }
 
     @Override
     Build handOverTo(PropertySource propertySource) {
-        // Not one the read reads itself, in its order anyway: one registered before it took the
-        // registered ones, or one of the reads before it, which it reads anew.
+        // Not one of the reads before it, which it reads anew: a property source that adds every
+        // registered one again would put what was read before over what it reads.
         Read read = generation.read;
-        if (read != null && read.input != null && !read.input.contains(propertySource) && !read.earlier.contains(propertySource)) {
+        if (read != null && read.taken && !read.earlier.contains(propertySource)) {
             return read;
         }
         return null;
@@ -676,7 +714,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     /**
      * The registered property sources as the thread of a read sees them: without the refreshable
-     * ones of the reads before it, which it reads anew, and with those it has read so far.
+     * ones of the reads before it, which it reads anew, with the changes its thread has made, and
+     * with those it has read so far.
      *
      * @param read The read
      * @return The property sources, by name
@@ -686,6 +725,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         for (PropertySource propertySource : this.propertySources.values()) {
             if (!read.earlier.contains(propertySource)) {
                 registered.put(propertySource.getName(), propertySource);
+            }
+        }
+        for (Map.Entry<String, PropertySource> here : read.registeredHere.entrySet()) {
+            if (!read.changedNames.contains(here.getKey())) {
+                if (here.getValue() == null) {
+                    registered.remove(here.getKey());
+                } else {
+                    registered.put(here.getKey(), here.getValue());
+                }
             }
         }
         registered.putAll(read.processed);
@@ -1554,14 +1602,22 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         final List<PropertySource> own;
         /**
          * The names by which other threads have added or removed a property source while it
-         * reads.
+         * reads, since its thread last did.
          */
         final Set<String> changedNames = ConcurrentHashMap.newKeySet();
         /**
-         * The registered property sources it reads, by identity, once it has taken them. Guarded
-         * by the catalog lock.
+         * The property sources its thread has added by name while it reads, and {@code null} for
+         * those it has removed, which it registers once it is published.
          */
-        Set<PropertySource> input;
+        final Map<String, PropertySource> registeredHere = new LinkedHashMap<>();
+        /**
+         * The names of those, for other threads to check.
+         */
+        final Set<String> changedHere = ConcurrentHashMap.newKeySet();
+        /**
+         * Whether it has taken the registered property sources. Guarded by the catalog lock.
+         */
+        boolean taken;
         /**
          * Whether it reads but has not taken the registered property sources yet: one that another
          * thread adds meanwhile is only registered, and read with the others. Written with the

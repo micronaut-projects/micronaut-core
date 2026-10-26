@@ -697,6 +697,144 @@ class ReadPropertySourcesSpec extends Specification {
         env.stop()
     }
 
+    void "a property source that another thread changes and adds again, once a refresh has processed it, is published as it was added"() {
+        given:
+        Map<String, Object> values = ['app.value': 'old']
+        PropertySource source = new MapPropertySource('data', values)
+        ParkingEnvironment env = new ParkingEnvironment()
+        env.addPropertySource(source)
+        env.start()
+
+        when: "the refresh is parked once it has read the property sources"
+        Thread refresher = parkIn(env.publishing) { env.refresh() }
+        values.put('app.value', 'new')
+        env.addPropertySource(source)
+        String whileRead = env.getProperty('app.value', String).orElse(null)
+        release(env.publishing, refresher)
+
+        then:
+        whileRead == 'new'
+        env.getProperty('app.value', String).get() == 'new'
+
+        cleanup:
+        env.publishing.release.countDown()
+        env.stop()
+    }
+
+    void "a property source that the thread of a refresh removes once it has read the property sources stays removed"() {
+        given:
+        RemovesWhenStarted env = new RemovesWhenStarted()
+        PropertySource removed = PropertySource.of('removed', ['removed.key': 'value'])
+        env.addPropertySource(PropertySource.of('data', ['app.value': 'value']))
+        env.addPropertySource(removed)
+        env.start()
+
+        when:
+        env.removing = removed
+        env.refresh()
+        boolean registeredOnce = env.propertySources.any { it.name == 'removed' }
+        env.refresh()
+
+        then:
+        !registeredOnce
+        !env.propertySources.any { it.name == 'removed' }
+        !env.getProperty('removed.key', String).isPresent()
+        env.getProperty('app.value', String).get() == 'value'
+
+        cleanup:
+        env.stop()
+    }
+
+    void "a property source that another thread adds again, once the thread of a refresh has removed it, stays registered"() {
+        given:
+        RemovesWhenStarted env = new RemovesWhenStarted()
+        PropertySource source = PropertySource.of('again', ['again.key': 'value'])
+        env.addPropertySource(source)
+        env.start()
+
+        when:
+        env.removing = source
+        Thread refresher = parkIn(env.publishing) { env.refresh() }
+        env.addPropertySource(source)
+        release(env.publishing, refresher)
+        env.refresh()
+
+        then:
+        env.propertySources.any { it.is(source) }
+        env.getProperty('again.key', String).get() == 'value'
+
+        cleanup:
+        env.publishing.release.countDown()
+        env.stop()
+    }
+
+    void "a property source that the thread of a refresh adds, after another thread has added one by its name, is the one registered and read"() {
+        given:
+        ReplacesWhenStarted env = new ReplacesWhenStarted()
+        env.addPropertySource(PropertySource.of('extra', ['extra.key': 'first']))
+        env.start()
+
+        when: "another thread adds one by the name once the refresh has read, before the thread of the refresh adds its own"
+        PropertySource own = PropertySource.of('extra', ['extra.key': 'refresh'])
+        env.replacement = own
+        Thread refresher = parkIn(env.started) { env.refresh() }
+        env.addPropertySource(PropertySource.of('extra', ['extra.key': 'other']))
+        release(env.started, refresher)
+
+        then:
+        env.getProperty('extra.key', String).get() == 'refresh'
+        env.propertySources.find { it.name == 'extra' }.is(own)
+
+        cleanup:
+        env.started.release.countDown()
+        env.stop()
+    }
+
+    void "a refresh that stop() has dropped registers nothing its thread adds"() {
+        given: "an environment that locates a property source while it reads, as a bootstrap configuration does"
+        LocatingEnvironment env = new LocatingEnvironment()
+        env.locatedValues = ['located.key': 'old']
+        env.start()
+
+        when: "the environment is stopped while a refresh locates, which then adds what it located, and is started again where nothing is located"
+        Thread refresher = parkIn(env.locating) { env.refresh() }
+        env.stop()
+        release(env.locating, refresher)
+        env.locatedValues = null
+        env.start()
+        env.refresh()
+
+        then:
+        !env.propertySources.any { it.name == 'located' }
+        !env.getProperty('located.key', String).isPresent()
+
+        cleanup:
+        env.locating.release.countDown()
+        env.stop()
+    }
+
+    void "a property source that the read before located, added again before a refresh takes the registered ones, does not replace the one the refresh has located"() {
+        given:
+        LocatingEnvironment env = new LocatingEnvironment()
+        env.locatedValues = ['located.key': 'first']
+        env.start()
+        PropertySource first = env.propertySources.find { it.name == 'located' }
+
+        when: "a refresh locates a new one by the name, and another thread adds the one located before again"
+        env.locatedValues = ['located.key': 'second']
+        Thread refresher = parkIn(env.located) { env.refresh() }
+        env.addPropertySource(first)
+        release(env.located, refresher)
+
+        then:
+        env.getProperty('located.key', String).get() == 'second'
+        env.propertySources.find { it.name == 'located' }.get('located.key') == 'second'
+
+        cleanup:
+        env.located.release.countDown()
+        env.stop()
+    }
+
     @RestoreSystemProperties
     void "stop() from another thread while a refresh of a bootstrap enabled context reads the bootstrap configuration does not wait for it"() {
         given:
@@ -939,6 +1077,93 @@ class ReadPropertySourcesSpec extends Specification {
         @Override
         protected void addDefaultPropertySources(List<PropertySource> propertySources) {
             // only the file
+        }
+    }
+
+    /**
+     * An environment without default property sources whose start() removes the given property
+     * source once it has read the property sources, and then parks the thread once armed.
+     */
+    static class RemovesWhenStarted extends DefaultEnvironment {
+        final Parking publishing = new Parking()
+        volatile PropertySource removing
+
+        RemovesWhenStarted() {
+            super(ReadPropertySourcesSpec.withoutDefaultPropertySources())
+        }
+
+        @Override
+        Environment start() {
+            Environment environment = super.start()
+            PropertySource source = removing
+            if (source != null) {
+                removing = null
+                removePropertySource(source)
+            }
+            publishing.pass()
+            return environment
+        }
+    }
+
+    /**
+     * An environment without default property sources whose start(), once it has read the
+     * property sources, parks the thread once armed, adds the given property source, and then
+     * parks the thread once armed.
+     */
+    static class ReplacesWhenStarted extends DefaultEnvironment {
+        final Parking started = new Parking()
+        final Parking publishing = new Parking()
+        volatile PropertySource replacement
+
+        ReplacesWhenStarted() {
+            super(ReadPropertySourcesSpec.withoutDefaultPropertySources())
+        }
+
+        @Override
+        Environment start() {
+            Environment environment = super.start()
+            started.pass()
+            PropertySource source = replacement
+            if (source != null) {
+                replacement = null
+                addPropertySource(source)
+            }
+            publishing.pass()
+            return environment
+        }
+    }
+
+    /**
+     * An environment that, while it reads its configuration files, adds a new property source
+     * named {@code located} with the given values as one of its own, as the bootstrap
+     * configuration does. Once armed, it parks the thread before it locates, or after. It reads no
+     * files, system properties or environment variables.
+     */
+    static class LocatingEnvironment extends DefaultEnvironment {
+        final Parking locating = new Parking()
+        final Parking located = new Parking()
+        volatile Map<String, Object> locatedValues
+
+        LocatingEnvironment() {
+            super({ ['test'] } as ApplicationContextConfiguration)
+        }
+
+        @Override
+        protected List<PropertySource> readPropertySourceList(String name) {
+            locating.pass()
+            Map<String, Object> values = locatedValues
+            if (values != null) {
+                PropertySource found = PropertySource.of('located', values)
+                addPropertySource(found)
+                refreshablePropertySources.add(found)
+            }
+            located.pass()
+            return []
+        }
+
+        @Override
+        protected void addDefaultPropertySources(List<PropertySource> propertySources) {
+            // only what it locates
         }
     }
 
