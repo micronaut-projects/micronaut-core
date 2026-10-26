@@ -2066,6 +2066,8 @@ class Gate:
                            'getattr(builtins, "setattr")(Plain, "__init__", None)',
                            # a cause the class defines is one the Java exception would not carry
                            'Plain.__cause__ = None',
+                           # a base given after the definition may define __init__ or __str__
+                           'Plain.__bases__ = (ValueError,)',
                            # a parameter spelled as a class of the compilation may be any class
                            'class cls:\n    pass\n\n\ndef patch(cls):\n    cls.__str__ = lambda self: "patched"',
                            # code run from a string
