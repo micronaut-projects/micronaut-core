@@ -193,7 +193,7 @@ class StaticBodyGeneratorTest {
             new Ir.Local("xs_", list, new Ir.Helper("copy", List.of(xs), list)),
             new Ir.Eval(new Ir.InvokeJava(copy, "java.util.List", "add", List.of("java.lang.Object"), List.of(new Ir.Param("tag", Ir.STRING, Ir.STRING)), Ir.BOOLEAN)),
             new Ir.Return(new Ir.InvokeJava(copy, "java.util.List", "size", List.of(), List.of(), "int"))));
-        Ir.CompiledBody compiled = new Ir.CompiledBody("generated.Shared", "fill", List.of("xs", "tag"), List.of(list, Ir.STRING), "int", body, null, Stats.NONE, false);
+        Ir.CompiledBody compiled = new Ir.CompiledBody("generated.Shared", "fill", List.of("xs", "tag"), List.of(list, Ir.STRING), "int", body, null, Stats.NONE, false, false);
         assertEquals(Set.of("xs"), StaticBodyGenerator.copiedParameters(compiled));
         ClassDef.ClassDefBuilder classDef = ClassDef.builder("generated.Shared").addModifiers(Modifier.PUBLIC);
         for (String name : List.of("fill", "shared")) {
