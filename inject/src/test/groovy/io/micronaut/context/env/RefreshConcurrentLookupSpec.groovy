@@ -743,8 +743,13 @@ class RefreshConcurrentLookupSpec extends Specification {
         env.start()
         Map<String, Object> first = null
         Map<String, Object> second = null
+        long secondMillis = -1
         Thread firstRefresh = new Thread({ first = env.refreshAndDiff() }, 'first-refresh')
-        Thread secondRefresh = new Thread({ second = env.refreshAndDiff() }, 'second-refresh')
+        Thread secondRefresh = new Thread({
+            long start = System.nanoTime()
+            second = env.refreshAndDiff()
+            secondMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
+        }, 'second-refresh')
         firstRefresh.daemon = true
         secondRefresh.daemon = true
 
@@ -767,9 +772,12 @@ class RefreshConcurrentLookupSpec extends Specification {
         !firstRefresh.alive
         !secondRefresh.alive
         first != null
-        first.keySet() == ['flag.value'] as Set
         second != null
-        second.keySet() == ['flag.value'] as Set
+        // Unless the first took longer than the second waits for it, two seconds: the second then
+        // leaves its read to the first, whose difference then spans both reads, that is no change.
+        second.isEmpty() ?
+                secondMillis >= 1500 && first.isEmpty() :
+                first.keySet() == ['flag.value'] as Set && second.keySet() == ['flag.value'] as Set
         env.getProperty('flag.value', String).get() == 'a'
 
         cleanup:

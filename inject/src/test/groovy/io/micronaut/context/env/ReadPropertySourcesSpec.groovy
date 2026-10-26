@@ -59,10 +59,10 @@ class ReadPropertySourcesSpec extends Specification {
         boolean stopperWaited = stopper.alive
         release(env.stopping, refresher)
 
-        then: "the stop returns at once, the refresh gets the lock, and the environment ends stopped"
+        then: "the stop returns at once, the refresh reads no property source once stopped, and the environment ends stopped"
         !stopperWaited
         stopMillis >= 0 && stopMillis < 1000
-        !needsLock.timedOut
+        needsLock.reached.count == 1
         diff == [:]
         !env.running
         !env.getProperty('my-app.foo-bar', String).isPresent()
@@ -144,24 +144,25 @@ class ReadPropertySourcesSpec extends Specification {
     }
 
     void "a refresh that finds another refresh reading, which needs a lock it holds, returns within about two seconds, and the other reads once more for it"() {
-        given:
+        given: "a property source read after the data that needs a lock of the application"
         ReentrantLock appLock = new ReentrantLock()
         Map<String, Object> data = ['app.value': 'old']
-        ParkingEnvironment env = new ParkingEnvironment()
+        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         NeedsLock needsLock = new NeedsLock(appLock)
         env.addPropertySource(needsLock)
         env.addPropertySource(new MapPropertySource('data', data))
         env.start()
         Map<String, Object> diff = null
-
-        when: "a refresh is parked before it reads, and another thread holding the lock refreshes after a change"
-        Thread first = parkIn(env.stopping) { env.refresh() }
-        data.put('app.value', 'new')
-        needsLock.armed.set(true)
+        CountDownLatch locked = new CountDownLatch(1)
+        CountDownLatch refreshNow = new CountDownLatch(1)
         long secondMillis = -1
+
+        when: "a refresh has read the data and waits for the lock, which another thread holds as it refreshes after a change"
         Thread second = daemon('second') {
             appLock.lock()
             try {
+                locked.countDown()
+                refreshNow.await(WAIT_SECONDS, TimeUnit.SECONDS)
                 long start = System.nanoTime()
                 diff = env.refreshAndDiff()
                 secondMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
@@ -169,19 +170,28 @@ class ReadPropertySourcesSpec extends Specification {
                 appLock.unlock()
             }
         }
+        assert locked.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        needsLock.armed.set(true)
+        Thread first = daemon('first') { env.refresh() }
+        assert needsLock.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        data.put('app.value', 'new')
+        refreshNow.countDown()
         second.join(WAIT_SECONDS * 1000L)
         boolean secondWaited = second.alive
-        release(env.stopping, first)
+        first.join(WAIT_SECONDS * 1000L)
 
-        then: "the second leaves its read to the first, which gets the lock, completes, and applies the change"
+        then: "the second leaves its read to the first, which gets the lock once the second has returned, and reads once more for it"
         !secondWaited
         secondMillis >= 1500 && secondMillis < 5000
         diff == [:]
         !needsLock.timedOut
+        !first.alive
+
+        and: "the change is applied, which only the read made once more has read"
         env.getProperty('app.value', String).get() == 'new'
 
         cleanup:
-        env.stopping.release.countDown()
+        refreshNow.countDown()
         env.stop()
     }
 
@@ -229,15 +239,15 @@ class ReadPropertySourcesSpec extends Specification {
 
     void "a refresh made while a start reads the property sources leaves every key in place once seen, and is read once the start is done"() {
         given: "a property source read after the first that parks the start once armed"
-        Map<String, Object> late = ['late.key': 'old']
+        Map<String, Object> early = ['early.key': 'early']
         Gate gate = new Gate(20)
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
-        env.addPropertySource(PropertySource.of('early', ['early.key': 'early'], 10))
-        env.addPropertySource(gate)
-        env.addPropertySource(new MapPropertySource('late', late) {
+        env.addPropertySource(new MapPropertySource('early', early) {
             @Override
-            int getOrder() { 30 }
+            int getOrder() { 10 }
         })
+        env.addPropertySource(gate)
+        env.addPropertySource(PropertySource.of('late', ['late.key': 'late'], 30))
         AtomicBoolean polling = new AtomicBoolean(true)
         AtomicBoolean lost = new AtomicBoolean()
         Thread poller = daemon('poller') {
@@ -252,11 +262,11 @@ class ReadPropertySourcesSpec extends Specification {
             }
         }
 
-        when: "the start is parked after the first property source, and another thread refreshes after a change"
+        when: "the start is parked after the first property source, and another thread refreshes after a change of that one"
         gate.arm()
         Thread starter = daemon('starter') { env.start() }
         assert gate.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        late.put('late.key', 'new')
+        early.put('early.key', 'changed')
         Thread refresher = daemon('refresher') { env.refresh() }
         refresher.join(WAIT_SECONDS * 1000L)
         boolean refresherWaited = refresher.alive
@@ -265,12 +275,12 @@ class ReadPropertySourcesSpec extends Specification {
         polling.set(false)
         poller.join(WAIT_SECONDS * 1000L)
 
-        then:
+        then: "the change, which the start had read before, is applied by the read made once more"
         !refresherWaited
         !starter.alive
         !lost.get()
-        env.getProperty('early.key', String).get() == 'early'
-        env.getProperty('late.key', String).get() == 'new'
+        env.getProperty('early.key', String).get() == 'changed'
+        env.getProperty('late.key', String).get() == 'late'
 
         cleanup:
         polling.set(false)
@@ -907,6 +917,7 @@ class ReadPropertySourcesSpec extends Specification {
      */
     static class NeedsLock implements PropertySource {
         final AtomicBoolean armed = new AtomicBoolean()
+        final CountDownLatch reached = new CountDownLatch(1)
         volatile boolean timedOut
         private final ReentrantLock lock
 
@@ -918,11 +929,15 @@ class ReadPropertySourcesSpec extends Specification {
         String getName() { 'needs-lock' }
 
         @Override
+        int getOrder() { 10 }
+
+        @Override
         Object get(String key) { null }
 
         @Override
         Iterator<String> iterator() {
             if (armed.compareAndSet(true, false)) {
+                reached.countDown()
                 // shorter than the waits for the threads, which a deadlock is reported by
                 if (lock.tryLock(ReadPropertySourcesSpec.WAIT_SECONDS.intdiv(2), TimeUnit.SECONDS)) {
                     lock.unlock()
