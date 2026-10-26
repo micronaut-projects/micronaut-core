@@ -17,6 +17,7 @@ package io.micronaut.aop.cachedvalues;
 
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.inject.annotation.builders.Sample;
 
 /**
  * A non-singleton bean with an intercepted method.
@@ -28,5 +29,11 @@ public class RecordedPrototype {
     @Recorded
     public String work() {
         return "work";
+    }
+
+    @Recorded
+    @Sample(name = "${cached.sample.name}")
+    public String placeholder() {
+        return "placeholder";
     }
 }

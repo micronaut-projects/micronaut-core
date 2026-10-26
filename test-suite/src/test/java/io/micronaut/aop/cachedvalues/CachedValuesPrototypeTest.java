@@ -68,6 +68,22 @@ class CachedValuesPrototypeTest {
     }
 
     @Test
+    void creatingAProxyKeepsTheValuesOfMethodsWithPlaceholders() {
+        try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "CachedValuesTest", "cached.sample.name", "a"))) {
+            RecordedPrototype first = context.getBean(RecordedPrototype.class);
+            first.placeholder();
+            context.getBean(RecordedPrototype.class).placeholder();
+            first.placeholder();
+            RecordingInterceptor recorded = context.getBean(RecordingInterceptor.class);
+
+            assertEquals(3, recorded.methods.size());
+            assertSame(recorded.methods.get(0), recorded.methods.get(1));
+            assertSame(recorded.values.get(0), recorded.values.get(1));
+            assertSame(recorded.values.get(0), recorded.values.get(2));
+        }
+    }
+
+    @Test
     void proxiesCreatedConcurrentlyShareTheMethods() throws Exception {
         int threads = 16;
         for (int round = 0; round < 20; round++) {
