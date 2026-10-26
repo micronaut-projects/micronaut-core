@@ -555,8 +555,64 @@ class AnnotationValueSpec extends Specification {
         !compiled.matches(south)
         !south.matches(compiled)
 
-        and: "an empty map of defaults is information, and is not filled in"
-        !new AnnotationValue("test.Zone", [:] as Map<CharSequence, Object>, [:] as Map<CharSequence, Object>).matches(compiled)
+        and: "an empty map of defaults is filled in as well"
+        new AnnotationValue("test.Zone", [:] as Map<CharSequence, Object>, [:] as Map<CharSequence, Object>).matches(compiled)
+        compiled.matches(new AnnotationValue("test.Zone", [:] as Map<CharSequence, Object>, [:] as Map<CharSequence, Object>))
+    }
+
+    void "test matches() compares a nested annotation through matches()"() {
+        given: "a compiled nested occurrence listing its non-binding member and carrying its defaults"
+        def compiledScope = new AnnotationValue("test.Scope", [
+                value                                 : "x",
+                note                                  : "compiled",
+                (AnnotationUtil.NON_BINDING_ATTRIBUTE): ["note", AnnotationUtil.NON_BINDING_ATTRIBUTE] as String[]
+        ] as Map<CharSequence, Object>, [note: "", level: "INFO"] as Map<CharSequence, Object>)
+        def compiled = new AnnotationValue("test.Scoped", [scope: compiledScope] as Map<CharSequence, Object>)
+
+        and: "nested occurrences built at runtime, without the list or the defaults"
+        def built = scoped([value: "x", note: "built"])
+        def explicit = scoped([value: "x", level: "INFO"])
+
+        expect: "the nested non-binding member takes no part, and the nested defaults apply, both ways"
+        compiled.matches(built)
+        built.matches(compiled)
+        compiled.matches(explicit)
+        explicit.matches(compiled)
+
+        and: "a nested binding member still decides"
+        !compiled.matches(scoped([value: "y"]))
+        !scoped([value: "y"]).matches(compiled)
+        !compiled.matches(scoped([value: "x", level: "DEBUG"]))
+    }
+
+    void "test matches() compares the nested annotations of an array in order, whichever shape holds them"() {
+        given:
+        def compiledX = new AnnotationValue("test.Scope", [
+                value                                 : "x",
+                note                                  : "compiled",
+                (AnnotationUtil.NON_BINDING_ATTRIBUTE): ["note"] as String[]
+        ] as Map<CharSequence, Object>)
+        def compiledY = new AnnotationValue("test.Scope", [value: "y"] as Map<CharSequence, Object>)
+        def compiled = new AnnotationValue("test.Scoped", [value: [compiledX, compiledY] as AnnotationValue[]] as Map<CharSequence, Object>)
+        def x = new AnnotationValue("test.Scope", [value: "x", note: "built"] as Map<CharSequence, Object>)
+        def y = new AnnotationValue("test.Scope", [value: "y"] as Map<CharSequence, Object>)
+
+        expect: "an array, an Object[] and a collection of the same occurrences match"
+        compiled.matches(new AnnotationValue("test.Scoped", [value: [x, y] as AnnotationValue[]] as Map<CharSequence, Object>))
+        compiled.matches(new AnnotationValue("test.Scoped", [value: [x, y] as Object[]] as Map<CharSequence, Object>))
+        compiled.matches(new AnnotationValue("test.Scoped", [value: [x, y]] as Map<CharSequence, Object>))
+        new AnnotationValue("test.Scoped", [value: [x, y]] as Map<CharSequence, Object>).matches(compiled)
+
+        and: "the order and the number of the occurrences decide, as they do for an annotation instance"
+        !compiled.matches(new AnnotationValue("test.Scoped", [value: [y, x] as AnnotationValue[]] as Map<CharSequence, Object>))
+        !compiled.matches(new AnnotationValue("test.Scoped", [value: [x] as AnnotationValue[]] as Map<CharSequence, Object>))
+        !compiled.matches(new AnnotationValue("test.Scoped", [value: [x, y, y] as AnnotationValue[]] as Map<CharSequence, Object>))
+    }
+
+    private static AnnotationValue<?> scoped(Map<String, Object> scope) {
+        return new AnnotationValue("test.Scoped", [
+                scope: new AnnotationValue("test.Scope", scope as Map<CharSequence, Object>, (Map<CharSequence, Object>) null)
+        ] as Map<CharSequence, Object>)
     }
 
     void "test matches() compares an empty string with the default it replaces"() {

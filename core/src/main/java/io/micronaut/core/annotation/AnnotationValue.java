@@ -1520,8 +1520,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      *
      * <p>This is a comparison of every member, where {@link #equals(Object)} passes over a member the other value
      * does not have. A member can only be left out when it has a default, so filling the defaults in is what makes
-     * every member comparable. A value which carries no defaults at all, such as one built at runtime without
-     * them, takes those of the other value, as both name the same annotation.</p>
+     * every member comparable. A value which carries no defaults, such as one built at runtime without them,
+     * takes those of the other value, as both name the same annotation.</p>
      *
      * <p>The members listed under {@link AnnotationUtil#NON_BINDING_ATTRIBUTE} by either value take no part, nor
      * does that list itself. A value which does not list them, such as one built at runtime, merely lacks that
@@ -1551,12 +1551,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         // completed maps
         Map<CharSequence, Object> declared = memberValues();
         Map<CharSequence, Object> otherDeclared = other.memberValues();
-        // a value carrying no defaults, such as one built at runtime, lacks them: both name the same annotation,
-        // so the defaults of the other value are its defaults
-        Map<CharSequence, Object> ownDefaults = getDefaultValues();
-        Map<CharSequence, Object> otherOwnDefaults = other.getDefaultValues();
-        Map<CharSequence, Object> defaults = nonNullDefaults(ownDefaults != null ? ownDefaults : otherOwnDefaults);
-        Map<CharSequence, Object> otherDefaults = nonNullDefaults(otherOwnDefaults != null ? otherOwnDefaults : ownDefaults);
+        // a value carrying no defaults, such as one built at runtime or a nested one whose annotation registered
+        // none, lacks them: both name the same annotation, so the defaults of the other value are its defaults
+        Map<CharSequence, Object> ownDefaults = nonNullDefaults(getDefaultValues());
+        Map<CharSequence, Object> otherOwnDefaults = nonNullDefaults(other.getDefaultValues());
+        Map<CharSequence, Object> defaults = ownDefaults.isEmpty() ? otherOwnDefaults : ownDefaults;
+        Map<CharSequence, Object> otherDefaults = otherOwnDefaults.isEmpty() ? ownDefaults : otherOwnDefaults;
         if (declared == otherDeclared && defaults == otherDefaults) {
             // Values read from the same stored members, with the same defaults
             return true;
@@ -1656,7 +1656,59 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (value == null || otherValue == null) {
             return value == null && otherValue == null;
         }
-        return AnnotationUtil.areEqual(value, otherValue);
+        return matchesValue(value, otherValue);
+    }
+
+    /**
+     * Compares two member values, an annotation nested in a member, alone or in an array or a collection, through
+     * {@link #matches(AnnotationValue)} so that its non-binding members and defaults are honoured as well.
+     */
+    private static boolean matchesValue(Object value, Object otherValue) {
+        if (value instanceof AnnotationValue<?> annotation && otherValue instanceof AnnotationValue<?> otherAnnotation) {
+            return annotation.matches(otherAnnotation);
+        }
+        if (!holdsAnnotations(value) && !holdsAnnotations(otherValue)) {
+            return AnnotationUtil.areEqual(value, otherValue);
+        }
+        List<?> values = asList(value);
+        List<?> otherValues = asList(otherValue);
+        if (values.size() != otherValues.size()) {
+            return false;
+        }
+        for (int i = 0; i < values.size(); i++) {
+            Object element = values.get(i);
+            Object otherElement = otherValues.get(i);
+            if (element == null || otherElement == null ? element != otherElement : !matchesValue(element, otherElement)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean holdsAnnotations(Object value) {
+        if (value instanceof AnnotationValue<?>) {
+            return true;
+        }
+        if (value instanceof Object[] array) {
+            return array.length > 0 && array[0] instanceof AnnotationValue<?>;
+        }
+        if (value instanceof Collection<?> collection) {
+            return !collection.isEmpty() && collection.iterator().next() instanceof AnnotationValue<?>;
+        }
+        return false;
+    }
+
+    private static List<?> asList(Object value) {
+        if (value instanceof Object[] array) {
+            return Arrays.asList(array);
+        }
+        if (value instanceof List<?> list) {
+            return list;
+        }
+        if (value instanceof Collection<?> collection) {
+            return new ArrayList<>(collection);
+        }
+        return List.of(value);
     }
 
     /**
