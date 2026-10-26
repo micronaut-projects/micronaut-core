@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Values kept by the methods of the proxies of a non-singleton bean.
@@ -102,7 +103,10 @@ class CachedValuesPrototypeTest {
                 }
                 RecordingInterceptor recorded = context.getBean(RecordingInterceptor.class);
 
-                assertEquals(1, recorded.methods.stream().distinct().count());
+                // the methods are equal by signature: each one must be the same instance
+                Object method = recorded.methods.get(0);
+                assertEquals(threads, recorded.methods.size());
+                assertTrue(recorded.methods.stream().allMatch(m -> m == method));
             }
         }
     }
