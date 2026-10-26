@@ -3952,6 +3952,13 @@ class Leaf:
         self.fill(xs)
         return len(xs)
 
+    def renders(self) -> str:
+        values = [self.item, "label"]
+        return "value " + str(values[0])
+
+    def renders_name(self, name: str) -> str:
+        return "name " + str(name)
+
 
 class Caller:
     def __init__(self, leaf: Leaf):
@@ -4009,6 +4016,12 @@ class EventLoopSafetyTest(unittest.TestCase):
     def test_a_raise_of_a_python_exception_class_is_unsafe_and_so_are_its_callers(self):
         self.assertFalse(self._safe("Leaf.raising"))
         self.assertFalse(self._safe("Leaf.calls_raising"))
+
+    def test_rendering_an_object_value_is_unsafe(self):
+        # an element of a mixed list is an Object, which may be a Python object of the compilation, whose
+        # toString runs its __str__
+        self.assertFalse(self._safe("Leaf.renders"))
+        self.assertTrue(self._safe("Leaf.renders_name"))
 
     def test_a_call_of_the_shared_entry_of_a_compiled_sibling_is_a_java_call(self):
         # fill takes the caller's list: its compiled body is called through its shared entry, in Java
