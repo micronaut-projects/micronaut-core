@@ -2039,6 +2039,33 @@ class LazyExceptionPatchingTest(unittest.TestCase):
             self.assertEqual("COMPILED", decisions["Gate.plain"].outcome().name(), rules(decisions["Gate.plain"]))
             self.assertFalse(list(body.body().statements())[0].exception().lazy())
 
+    def _lazy(self, statements):
+        source = "import builtins\nfrom jakarta.inject import Singleton\n\n\nclass Plain(Exception):\n    pass\n\n\n" + statements + '''
+
+
+@Singleton
+class Gate:
+    def plain(self, n: int) -> int:
+        raise Plain(n)
+'''
+        decisions, planner = plan(source, MODE_ALL, facts=FakeFacts())
+        self.assertEqual("COMPILED", decisions["Gate.plain"].outcome().name(), rules(decisions["Gate.plain"]))
+        body = {body.methodName(): body for body in planner.bodies}["plain"]
+        return list(body.body().statements())[0].exception().lazy()
+
+    def test_every_spelling_of_setattr_on_the_class_keeps_its_raise_eager(self):
+        for statements in ('type.__setattr__(Plain, "__str__", lambda self: "patched")',
+                           'object.__setattr__(Plain, "__init__", None)',
+                           'builtins.setattr(Plain, "__str__", lambda self: "patched")',
+                           'type.__delattr__(Plain, "__str__")',
+                           'Plain.__setattr__(Plain, "__str__", None)',
+                           # a setter not called where it is named may be called on any class
+                           'patch = setattr\npatch(Plain, "__str__", lambda self: "patched")',
+                           'install = type.__setattr__'):
+            self.assertFalse(self._lazy(statements), statements)
+        # an object's own attribute protocol writes no class
+        self.assertTrue(self._lazy("class Tracked:\n    def __setattr__(self, name, value):\n        super().__setattr__(name, value)\n"))
+
 
 class LazyExceptionTest(unittest.TestCase):
     """A raise creates the Java exception alone when nothing of its class can tell the Python exception it is created from apart."""
