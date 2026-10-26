@@ -25,6 +25,8 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.UnsafeExecutionHandle;
 import org.jspecify.annotations.Nullable;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 /**
  * Shared argument metadata. Values and pending results belong to the match, never this plan.
  *
@@ -38,7 +40,7 @@ final class RouteArgumentPlan<T, R> {
     final Argument<?>[] arguments;
     final String[] argumentNames;
     final Class<?>[] wrapperTypes;
-    private volatile @Nullable Binders binders;
+    private final AtomicReference<@Nullable Binders> binders = new AtomicReference<>();
 
     RouteArgumentPlan(MethodBasedRouteInfo<T, R> routeInfo) {
         methodExecutionHandle = routeInfo.getTargetMethod();
@@ -56,17 +58,17 @@ final class RouteArgumentPlan<T, R> {
         if (!(routeInfo instanceof DefaultMethodBasedRouteInfo<?, ?>)) {
             return new Binders(routeInfo.resolveArgumentBinders(registry));
         }
-        Binders resolved = binders;
+        Binders resolved = binders.get();
         if (resolved == null) {
             synchronized (this) {
-                resolved = binders;
+                resolved = binders.get();
                 if (resolved == null) {
                     RequestArgumentBinder<Object>[] all = new RequestArgumentBinder[arguments.length];
                     for (int i = 0; i < arguments.length; i++) {
                         all[i] = (RequestArgumentBinder<Object>) registry.findArgumentBinder(arguments[i]).orElse(null);
                     }
                     resolved = new Binders(all);
-                    binders = resolved;
+                    binders.set(resolved);
                 }
             }
         }

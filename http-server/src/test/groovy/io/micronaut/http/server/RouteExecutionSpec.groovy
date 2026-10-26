@@ -74,25 +74,25 @@ class RouteExecutionSpec extends Specification {
         RouteResult.Prepared facts = (RouteResult.Prepared) RouteResult.prepare(executor, route(ReturnType.of(Mono, Argument.of(HttpResponse, Argument.of(Flux, Argument.STRING)))))
 
         then:
-        !facts.responseBodyAsyncOrReactive
-        facts.nestedResponseBodyAsyncOrReactive
-        !facts.nestedResponseBodyAsync
-        facts.declaredSingle
-        facts.streamOfResponses
-        !facts.hasExecutor
+        !facts.preparedResponseBodyAsyncOrReactive
+        facts.preparedNestedResponseBodyAsyncOrReactive
+        !facts.preparedNestedResponseBodyAsync
+        facts.preparedDeclaredSingle
+        facts.preparedStreamOfResponses
+        !facts.preparedHasExecutor
 
         when:
         facts = (RouteResult.Prepared) RouteResult.prepare(executor, route(ReturnType.of(CompletionStage, Argument.of(HttpResponse, Argument.of(CompletionStage, Argument.STRING)))))
 
         then:
-        facts.nestedResponseBodyAsync
-        facts.nestedResponseBodyAsyncOrReactive
+        facts.preparedNestedResponseBodyAsync
+        facts.preparedNestedResponseBodyAsyncOrReactive
 
         when:
         facts = (RouteResult.Prepared) RouteResult.prepare(executor, route(ReturnType.of(HttpResponse, Argument.of(Flux, Argument.STRING))))
 
         then:
-        facts.responseBodyAsyncOrReactive
+        facts.preparedResponseBodyAsyncOrReactive
     }
 
     void "a route keeps the execution its owner prepared"() {

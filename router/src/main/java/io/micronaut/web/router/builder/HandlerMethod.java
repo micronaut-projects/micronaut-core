@@ -84,6 +84,11 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     private static final String BODY_TYPE = "bodyType";
 
+    /**
+     * The name of the annotated element of a route, for the messages.
+     */
+    private static final String ANNOTATION_METADATA = "annotationMetadata";
+
     private static final Logger LOG = LoggerFactory.getLogger(HandlerMethod.class);
 
     private static final Argument<HttpRequest> REQUEST = Argument.of(HttpRequest.class, "request");
@@ -180,11 +185,9 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     private static @Nullable ExecutableMethod<?, ?> providedMethod(Object handler) {
         if (handler instanceof RouteMethodProvider provider) {
-            ExecutableMethod<?, ?> method = provider.routeMethod();
-            if (method == null) {
-                throw new NullPointerException("The route method provider " + handler + " gave no route method");
-            }
-            Objects.requireNonNull(method.getAnnotationMetadata(), "annotationMetadata");
+            ExecutableMethod<?, ?> method = Objects.requireNonNull(provider.routeMethod(),
+                () -> "The route method provider " + handler + " gave no route method");
+            Objects.requireNonNull(method.getAnnotationMetadata(), ANNOTATION_METADATA);
             return method;
         }
         return null;
@@ -608,8 +611,8 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @Internal
     public void annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
-        Objects.requireNonNull(annotationMetadata, "annotationMetadata");
-        Objects.requireNonNull(annotationMetadata.getAnnotationMetadata(), "annotationMetadata");
+        Objects.requireNonNull(annotationMetadata, ANNOTATION_METADATA);
+        Objects.requireNonNull(annotationMetadata.getAnnotationMetadata(), ANNOTATION_METADATA);
         this.annotationMetadataProvider = annotationMetadata;
         updateAnnotationMetadata();
     }

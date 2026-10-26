@@ -54,6 +54,8 @@ import java.util.Optional;
  */
 abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
+    private static final String WRONG_ARGUMENT_TYPES = "Wrong argument types to method: ";
+
     private static final @Nullable Object[] EMPTY_VALUES = new Object[0];
     /**
      * The value of an argument that is not fulfilled yet.
@@ -208,13 +210,13 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 Object value = variables.get(name);
                 if (value != null) {
                     Optional<?> result = conversionService.convert(value, targetArgument.getType());
-                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException("Wrong argument types to method: " + argumentPlan.executableMethod)));
+                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException(WRONG_ARGUMENT_TYPES + argumentPlan.executableMethod)));
                 } else if (valueIterator.hasNext()) {
                     Optional<?> result = conversionService.convert(valueIterator.next(), targetArgument.getType());
-                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException("Wrong argument types to method: " + argumentPlan.executableMethod)));
+                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException(WRONG_ARGUMENT_TYPES + argumentPlan.executableMethod)));
                 } else if (i < arguments.length) {
                     Optional<?> result = conversionService.convert(arguments[i++], targetArgument.getType());
-                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException("Wrong argument types to method: " + argumentPlan.executableMethod)));
+                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException(WRONG_ARGUMENT_TYPES + argumentPlan.executableMethod)));
                 } else {
                     throw new IllegalArgumentException("Wrong number of arguments to method: " + argumentPlan.executableMethod);
                 }

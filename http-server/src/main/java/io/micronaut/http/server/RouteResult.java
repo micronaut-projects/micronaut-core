@@ -573,13 +573,13 @@ abstract sealed class RouteResult {
          */
         private static final Object NO_EXECUTOR = new Object();
 
-        final boolean responseBodyAsyncOrReactive;
-        final boolean nestedResponseBodyAsyncOrReactive;
-        final boolean nestedResponseBodyAsync;
-        final boolean declaredSingle;
-        final boolean streamOfResponses;
-        final boolean kotlinUnit;
-        final boolean hasExecutor;
+        final boolean preparedResponseBodyAsyncOrReactive;
+        final boolean preparedNestedResponseBodyAsyncOrReactive;
+        final boolean preparedNestedResponseBodyAsync;
+        final boolean preparedDeclaredSingle;
+        final boolean preparedStreamOfResponses;
+        final boolean preparedKotlinUnit;
+        final boolean preparedHasExecutor;
         private final RouteInfo<?> routeInfo;
         /**
          * The executor of a streamed body, {@link #NO_EXECUTOR}, or {@code null} until a body is
@@ -594,49 +594,49 @@ abstract sealed class RouteResult {
             ReturnType<?> returnType = routeInfo.getReturnType();
             Argument<?> first = typeVariable(returnType);
             Argument<?> nested = typeVariable(first);
-            responseBodyAsyncOrReactive = first.isAsyncOrReactive();
-            nestedResponseBodyAsyncOrReactive = nested.isAsyncOrReactive();
-            nestedResponseBodyAsync = nested.isAsync();
-            declaredSingle = routeInfo.isSpecifiedSingle() || routeInfo.isReactive() && routeInfo.isSingleResult();
-            streamOfResponses = HttpResponse.class.isAssignableFrom(first.getType());
-            kotlinUnit = routeInfo.isSuspended() && routeInfo instanceof MethodBasedRouteInfo<?, ?> mbri
+            preparedResponseBodyAsyncOrReactive = first.isAsyncOrReactive();
+            preparedNestedResponseBodyAsyncOrReactive = nested.isAsyncOrReactive();
+            preparedNestedResponseBodyAsync = nested.isAsync();
+            preparedDeclaredSingle = routeInfo.isSpecifiedSingle() || routeInfo.isReactive() && routeInfo.isSingleResult();
+            preparedStreamOfResponses = HttpResponse.class.isAssignableFrom(first.getType());
+            preparedKotlinUnit = routeInfo.isSuspended() && routeInfo instanceof MethodBasedRouteInfo<?, ?> mbri
                 && isKotlinFunctionReturnTypeUnit(mbri.getTargetMethod().getExecutableMethod());
-            hasExecutor = routeInfo.getExecutor(owner.serverConfiguration.getThreadSelection()) != null;
+            preparedHasExecutor = routeInfo.getExecutor(owner.serverConfiguration.getThreadSelection()) != null;
         }
 
         @Override
         final boolean responseBodyAsyncOrReactive(RouteInfo<?> routeInfo) {
-            return responseBodyAsyncOrReactive;
+            return preparedResponseBodyAsyncOrReactive;
         }
 
         @Override
         final boolean nestedResponseBodyAsyncOrReactive(RouteInfo<?> routeInfo) {
-            return nestedResponseBodyAsyncOrReactive;
+            return preparedNestedResponseBodyAsyncOrReactive;
         }
 
         @Override
         final boolean nestedResponseBodyAsync(RouteInfo<?> routeInfo) {
-            return nestedResponseBodyAsync;
+            return preparedNestedResponseBodyAsync;
         }
 
         @Override
         final boolean declaredSingle(RouteInfo<?> routeInfo) {
-            return declaredSingle;
+            return preparedDeclaredSingle;
         }
 
         @Override
         final boolean streamOfResponses(RouteInfo<?> routeInfo) {
-            return streamOfResponses;
+            return preparedStreamOfResponses;
         }
 
         @Override
         final boolean kotlinUnit(RouteInfo<?> routeInfo) {
-            return kotlinUnit;
+            return preparedKotlinUnit;
         }
 
         @Override
         final boolean hasExecutor(RouteInfo<?> routeInfo) {
-            return hasExecutor;
+            return preparedHasExecutor;
         }
 
         @Override

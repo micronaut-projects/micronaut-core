@@ -314,6 +314,7 @@ class PreparedRouteExecutionTest {
 
         @Get("/void")
         void none() {
+            // a void route answers 200 without a body
         }
 
         @Get("/status")

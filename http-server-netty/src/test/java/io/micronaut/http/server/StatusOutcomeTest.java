@@ -172,7 +172,9 @@ class StatusOutcomeTest {
         @Get("/mono-empty")
         Mono<String> monoEmpty() { return Mono.empty(); }
         @Get("/void")
-        void voidValue() { }
+        void voidValue() {
+            // a void route answers without a body
+        }
         @Get("/stage-void")
         CompletionStage<Void> stageVoid() { return CompletableFuture.completedFuture(null); }
         @Get("/mono-void")
