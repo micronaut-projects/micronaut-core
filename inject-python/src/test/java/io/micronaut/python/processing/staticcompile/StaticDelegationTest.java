@@ -292,6 +292,13 @@ class StaticDelegationTest {
         // a dict of str keys cannot fail on a key
         Ir.Expression keyed = new Ir.Helper("map", List.of(new Ir.Const("k", Ir.STRING), param(Ir.STRING)), "java.util.Map<java.lang.String,java.lang.String>");
         assertEquals("once", StaticDelegation.status(body(List.of(Ir.STRING), Ir.VOID, new Ir.PutSelf("last", OBJECT, keyed, false))));
+        // a list added to a set: Python raises TypeError, Java a ClassCastException
+        Ir.Expression set = new Ir.SelfProperty("seen", "java.util.Set<java.lang.Object>", false, false);
+        Ir.Statement added = new Ir.Eval(new Ir.Helper("add", List.of(set, new Ir.Helper("list", List.of(), type)), Ir.NONE));
+        assertEquals("none(it has side effects (the helper [add]) and the helper [add] fails with a Java exception where Python raises its own)",
+            StaticDelegation.status(body(List.of(), Ir.VOID, added)));
+        Ir.Statement addedText = new Ir.Eval(new Ir.Helper("add", List.of(set, param(Ir.STRING)), Ir.NONE));
+        assertEquals("once", StaticDelegation.status(body(List.of(Ir.STRING), Ir.VOID, addedText)));
         // an attribute of a class serving its attributes itself runs code
         Ir.Expression dynamic = new Ir.PythonMember(new Ir.SelfProperty("tag", "app.Tag", false, true), "name", Ir.STRING, true);
         assertEquals("once", StaticDelegation.status(body(List.of(), Ir.STRING, new Ir.Return(dynamic))));

@@ -80,7 +80,7 @@ public final class StaticDelegation {
     // IndexError, a KeyError, a TypeError of an unhashable key, a ValueError): a body run once cannot
     // give the Python caller Python's exception, a body run again in Python can
     private static final Set<String> FAILING_HELPERS = Set.of("at", "item", "setAt", "setItem", "get", "contains", "set", "map",
-        "copyOfSet", "put", "toFloat", "split", "join");
+        "copyOfSet", "put", "add", "toFloat", "split", "join");
     // the helpers that read a collection they are given without keeping it, by the position of the argument
     private static final Map<String, Integer> READING_HELPERS = Map.ofEntries(
         Map.entry("len", 0), Map.entry("at", 0), Map.entry("item", 0), Map.entry("get", 0), Map.entry("contains", 0),
@@ -397,7 +397,7 @@ public final class StaticDelegation {
                     yield unhashable;
                 }
                 case "set" -> !arguments.stream().allMatch(Analysis::hashable);
-                case "put", "get", "contains", "setItem" -> arguments.size() < 2 || !hashable(arguments.get(1));
+                case "put", "get", "contains", "setItem", "add" -> arguments.size() < 2 || !hashable(arguments.get(1));
                 default -> true;
             };
         }
