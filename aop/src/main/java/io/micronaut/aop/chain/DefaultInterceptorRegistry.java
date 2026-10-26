@@ -86,7 +86,6 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
         final Interceptor<T, ?>[] resolvedInterceptors = findInterceptors(
             method.getDeclaringType(),
             interceptors,
-            interceptorKind,
             applicableBindings,
             ExactInterceptorBindingQualifier.of(annotationMetadata, interceptorKind),
             true,
@@ -120,7 +119,6 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
 
     private <T> Interceptor<T, ?>[] findInterceptors(Class<?> declaringType,
                                                      Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
-                                                     InterceptorKind interceptorKind,
                                                      Collection<AnnotationValue<?>> interceptPointBindings,
                                                      ExactInterceptorBindingQualifier<?> interceptPoint,
                                                      boolean selectMethodInterceptor,
@@ -194,7 +192,6 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
         final Interceptor<T, T>[] resolvedInterceptors = findInterceptors(
             constructor.getDeclaringBeanType(),
             (Collection) interceptors,
-            InterceptorKind.AROUND_CONSTRUCT,
             applicableBindings,
             ExactInterceptorBindingQualifier.of(constructor.getAnnotationMetadata(), InterceptorKind.AROUND_CONSTRUCT),
             false,
