@@ -29,6 +29,7 @@ import jakarta.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -50,6 +51,36 @@ public interface BeanContextConfiguration {
      */
     default BeanResolutionTraceConfiguration getTraceConfiguration() {
         return new BeanResolutionTraceConfiguration();
+    }
+
+    /**
+     * The tracers of bean resolution registered for the context, which are active in addition to the tracer of the
+     * {@link #getTraceConfiguration() trace mode} and the discovered tracers.
+     *
+     * @return The tracers
+     * @since 5.3.0
+     * @see BeanResolutionTracer
+     */
+    @Experimental
+    default List<BeanResolutionTracer> getBeanResolutionTracers() {
+        return List.of();
+    }
+
+    /**
+     * Whether the tracers of bean resolution discovered with {@link java.util.ServiceLoader} are enabled. The
+     * {@link BeanResolutionTracerProvider} of a discovered tracer decides with
+     * {@link BeanResolutionTracerProvider#isEnabled(BeanResolutionTracerProvider.Activation)} whether it is active, by
+     * default only if they are.
+     *
+     * <p>Enabled by default when the system property {@code micronaut.inject.trace.tracers} or the environment
+     * variable {@code MICRONAUT_INJECT_TRACE_TRACERS} is {@code true}.</p>
+     *
+     * @return Whether discovered tracers are enabled
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean isBeanResolutionTracerDiscoveryEnabled() {
+        return BeanResolutionTraceMode.isTracerDiscoveryEnabledByDefault();
     }
 
     /**
