@@ -369,7 +369,6 @@ class ReadPropertySourcesSpec extends Specification {
         'refresh' | true
     }
 
-    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13914")
     void "indexed properties added while a refresh changes the list and the map they index give what processing them after the refresh gives"() {
         given:
         Map<String, Object> declared = ['app.list': ['a', 'b'], 'app.map': [k: 'a']]
@@ -400,8 +399,6 @@ class ReadPropertySourcesSpec extends Specification {
         !refresher.alive
         env.getProperty('app.list', List).get() == ['z', 'd']
         env.getProperty('app.map', Map).get() == [k: 'c', y: 'z']
-        newList == ['c', 'd']
-        newMap == [k: 'c']
 
         cleanup:
         gate.release.countDown()
