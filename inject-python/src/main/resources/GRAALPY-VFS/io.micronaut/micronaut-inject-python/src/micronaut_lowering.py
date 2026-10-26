@@ -106,7 +106,7 @@ LAZY_EXCEPTION_BASES = {"Exception", "ValueError", "TypeError", "RuntimeError", 
 # make its creation (or its collection) observable, or give it a state the Java exception does not take
 # (a cause, a context, notes): a raise of a class defining one creates it eagerly
 EAGER_EXCEPTION_MEMBERS = ("__new__", "__init__", "__str__", "__repr__", "args", "__del__", "__cause__", "__context__",
-                           "__suppress_context__", "__traceback__", "__notes__")
+                           "__suppress_context__", "__traceback__", "__notes__", "__bases__")
 SYNTHESIZED_EXCEPTIONS = ("java.lang.ArithmeticException", "java.lang.ClassCastException", "java.lang.IllegalArgumentException",
                           "java.lang.IllegalStateException", "java.lang.IndexOutOfBoundsException", "java.lang.NullPointerException",
                           "java.lang.UnsupportedOperationException", "java.util.NoSuchElementException",
