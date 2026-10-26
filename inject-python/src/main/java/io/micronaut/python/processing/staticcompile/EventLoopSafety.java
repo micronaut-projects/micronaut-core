@@ -73,7 +73,8 @@ public final class EventLoopSafety {
      *
      * @param bodies                The compiled bodies of the plan
      * @param pythonFreeConstructor Whether a constructor of a generated class, as
-     *                              {@code <class>#<number of parameters>}, only assigns Java fields
+     *                              {@code <class>#<number of parameters>}, only assigns Java fields, or the
+     *                              accessors of a property, as {@code <class>.<property>}, only touch its field
      * @return The keys of the bodies that never enter Python
      */
     public static Set<String> safeBodies(List<Ir.CompiledBody> bodies, Predicate<String> pythonFreeConstructor) {

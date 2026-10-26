@@ -337,8 +337,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private final Map<String, AnnotationEntry> annotationDefs = new LinkedHashMap<>();
     private final Map<String, Boolean> junitExtensionAnnotations = new HashMap<>();
     /**
-     * The constructors generated so far that only assign Java fields, as {@code <class>#<number of parameters>}:
-     * calling one does not enter Python (see {@code EventLoopSafety#safeBodies}).
+     * The constructors generated so far that only assign Java fields, as {@code <class>#<number of parameters>},
+     * and the accessors that only read and write a Java field, as {@code <class>.<property>}: calling one
+     * does not enter Python (see {@code EventLoopSafety#safeBodies}).
      */
     private final Set<String> pythonFreeConstructors = new HashSet<>();
     private Map<String, ClassElement> allClasses = Map.of();
@@ -1567,6 +1568,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 } else {
                     addSetterPojo(beanProperty, builder, field, context);
                     addGetterPojo(beanProperty, builder, field, context);
+                    pythonFreeConstructors.add(element.getName() + "." + beanProperty.getName());
                 }
             } else {
                 addSetterDynamic(beanProperty, builder, context, hasAsyncBridgeMethod);
@@ -2101,11 +2103,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * Part of {@link #visitClass} extracted verbatim; locals come from the model.
      */
     /**
-     * Whether a generated constructor only assigns Java fields, so that calling it does not enter Python.
-     * Known for the classes this generator has visited; any other is taken to enter Python.
+     * Whether a generated constructor only assigns Java fields, or a generated accessor only reads and
+     * writes its Java field, so that calling it does not enter Python. Known for the classes this
+     * generator has visited; any other is taken to enter Python.
      *
-     * @param constructor The constructor, as {@code <class>#<number of parameters>}
-     * @return Whether it only assigns Java fields
+     * @param constructor The constructor, as {@code <class>#<number of parameters>}, or the accessors of a
+     *                    property, as {@code <class>.<property>}
+     * @return Whether it only touches Java fields
      */
     public boolean constructsWithoutPython(String constructor) {
         return pythonFreeConstructors.contains(constructor);
@@ -2322,7 +2326,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 && beanProperties.stream().anyMatch(PythonStubGenerator::hasPythonDefaultValue)
                 && isPythonConstructibleWithoutArguments(element);
             if (!isJunit5Test && !constructsJavaBaseFirst(model, isAbstractIntroNoArg) && !extendsJavaBase
-                && isIntrospectedBean && !hasConfigurationBuilderProperty && !appliesPythonDefaults) {
+                && isIntrospectedBean && !hasConfigurationBuilderProperty && !appliesPythonDefaults && !extendsPythonClass) {
                 // the constructor below keeps the bean lazy: the Python object is created when first needed
                 pythonFreeConstructors.add(element.getName() + "#0");
             }

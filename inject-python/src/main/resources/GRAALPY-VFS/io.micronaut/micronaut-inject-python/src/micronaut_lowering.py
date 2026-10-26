@@ -1931,7 +1931,7 @@ class Lowering:
         setter = "set" + target.attr[:1].upper() + target.attr[1:]
         self.java_calls += 1
         self.compilation_calls += 1
-        self._accessor_entry(model, f"assigns [{target.attr}] of [{model.name}]")
+        self._accessor_entry(model, target.attr, f"assigns [{target.attr}] of [{model.name}]")
         return Eval(InvokeJava(self._expression(target.value), owner, setter, [stub_type], [self._coerce(value, stub_type, node)], VOID))
 
     def _subscript_store(self, target, value, node):
@@ -2977,7 +2977,7 @@ class Lowering:
                 getter = ("is" if stub_type == BOOLEAN else "get") + node.attr[:1].upper() + node.attr[1:]
                 self.java_calls += 1
                 self.compilation_calls += 1
-                self._accessor_entry(model, f"reads [{node.attr}] of [{model.name}]")
+                self._accessor_entry(model, node.attr, f"reads [{node.attr}] of [{model.name}]")
                 read = InvokeJava(receiver, owner, getter, [], [], stub_type)
             else:
                 self.bridge_calls += 1
@@ -3004,15 +3004,21 @@ class Lowering:
         used = JAVA_PRIMITIVE_NUMBERS.get(stub_type, stub_type)
         return Cast(read, used) if used != stub_type else read
 
-    def _accessor_entry(self, model, what):
+    def _accessor_entry(self, model, attribute, what):
         """
         Records that a call of an accessor of a generated class enters Python, unless the class and
         every subclass of the compilation is introspected: an introspected stub keeps a hinted attribute
-        in a Java field its accessors read and write, any other stub reaches the Python object.
+        in a Java field its accessors read and write, any other stub reaches the Python object. Even
+        then a bean-style getter or setter the class defines makes the accessor call Python: the stub
+        generator tells which accessors only touch their field (<class>.<property>, see
+        EventLoopSafety.safeBodies), for the class and each subclass, whose override Java dispatch may pick.
         """
         planner = self.planner
-        introspected = planner is not None and all(planner._introspected(candidate.qualified) for candidate in [model] + list(model.subclasses))
-        if not introspected and self.python_entry is None:
+        candidates = [model] + list(model.subclasses)
+        introspected = planner is not None and all(planner._introspected(candidate.qualified) for candidate in candidates)
+        if introspected:
+            self.constructions.extend(f"{candidate.qualified}.{attribute}" for candidate in candidates)
+        elif self.python_entry is None:
             self.python_entry = f"{what} through the Python object"
 
     def _dispatched(self, model, name, function_node, static):

@@ -688,14 +688,15 @@ public sealed interface Ir {
     /**
      * What may make a compiled body enter Python, as the planner finds it: what in the body does by
      * itself, the compiled functions of the compilation it calls through Java, and the generated
-     * classes it constructs, which enter Python unless their generated constructor only assigns Java
-     * fields. {@link EventLoopSafety#safeBodies} decides from them, over the whole plan, which bodies
+     * classes it constructs and the accessors of introspected ones it calls, which enter Python unless
+     * their generated constructor only assigns Java fields and the accessor only touches its field. {@link EventLoopSafety#safeBodies} decides from them, over the whole plan, which bodies
      * never enter Python.
      *
      * @param entry         What in the body enters Python by itself, or {@code null} for nothing
      * @param callees       The keys ({@link CompiledBody#key()}) of the compiled bodies the body calls
      * @param constructions The constructors of generated classes the body calls, as
-     *                      {@code <class>#<number of parameters>}
+     *                      {@code <class>#<number of parameters>}, and the accessors of introspected ones, as
+     *                      {@code <class>.<property>}
      */
     record PythonEntries(@Nullable String entry, List<String> callees, List<String> constructions) {
         public PythonEntries {
