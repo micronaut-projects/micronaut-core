@@ -845,8 +845,6 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                 return;
             }
             configuredEnvironment = environment;
-            // the metadata of the context is wrapped again for the new environment
-            configuredBeanContext = null;
             cachedValues = null;
             if (declaredAnnotationMetadata.hasPropertyExpressions()) {
                 environmentAnnotationMetadata = new MethodAnnotationMetadata(declaredAnnotationMetadata, environment);
@@ -855,6 +853,10 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             properties = environment instanceof PropertyResolverDelegate delegate
                 && delegate.delegate() instanceof PropertySourcePropertyResolver resolver ? resolver : null;
             updateCacheMode();
+            if (configuredBeanContext != null) {
+                // the metadata of the new environment is evaluated with the context the method is configured with
+                applyBeanContext(configuredBeanContext);
+            }
         }
 
         @Override
@@ -864,6 +866,10 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             }
             configuredBeanContext = beanContext;
             cachedValues = null;
+            applyBeanContext(beanContext);
+        }
+
+        private void applyBeanContext(BeanContext beanContext) {
             classLoader = beanContext.getClassLoader();
             if (annotationMetadata instanceof EvaluatedAnnotationMetadata current
                 && current.getAnnotationMetadata() == environmentAnnotationMetadata) {
