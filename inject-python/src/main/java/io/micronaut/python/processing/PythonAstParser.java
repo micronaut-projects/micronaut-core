@@ -951,7 +951,9 @@ public final class PythonAstParser {
                 result = context.eval(TRANSFORM_SOURCE);
             } catch (Exception e) {
                 StringWriter stack = new StringWriter();
-                e.printStackTrace(new PrintWriter(stack));
+                try (PrintWriter writer = new PrintWriter(stack)) {
+                    e.printStackTrace(writer);
+                }
                 throw new ProcessingException(null, "Error processing Python source [" + source.getName() + "]: " + e.getMessage() + System.lineSeparator() + stack, e);
             } finally {
                 PipelineTimings.stop(PipelineTimings.TRANSFORM, started);
