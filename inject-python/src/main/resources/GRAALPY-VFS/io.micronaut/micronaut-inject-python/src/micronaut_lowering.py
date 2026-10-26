@@ -688,13 +688,14 @@ class _ComprehensionBody(ast.stmt):
 class Lowering:
     """Lowers one function body; see the module documentation."""
 
-    def __init__(self, checker, module, class_def, function_def, node, rules, class_model=None, advised=None, advised_method=False, java_layout=None, planner=None, static=False):
+    def __init__(self, checker, module, class_def, function_def, node, rules, class_model=None, advised=None, advised_method=False, java_layout=None, planner=None, static=False, compiled=None):
         self.checker = checker
         self.planner = planner    # the planner, asked for the decisions of the module-level functions the body calls
         self.static = static      # whether the body compiles into a static Java method: a plain module-level function or a static method
         self.java_layout = java_layout  # (parameter types, return type) of the Java method this one implements, which fix the stub's signature
         self.advised = advised or (lambda function_def: False)  # whether a method of the class is advised
         self.advised_method = advised_method  # whether this method is advised: its Java method runs the interceptor chain first
+        self.compiled = compiled or (lambda function_def, function_node: False)  # whether a method of the class is compiled
         self.module = module
         self.class_def = class_def
         self.function_def = function_def
@@ -2488,9 +2489,11 @@ class Lowering:
         """
         A call of a method of the class on self. The stub's Java method is called when the stub
         declares one for the call (a public method with a hinted signature the call fills, that no
-        advice intercepts, no subclass of the compilation overrides and that takes no list, set or
-        dict, see _shares_collection); otherwise the method of the
+        advice intercepts and no subclass of the compilation overrides); otherwise the method of the
         Python object is invoked, which runs the interceptors, the override or the defaults as Python would.
+        A method taking a list, set or dict (see _shares_collection) is called through the shared
+        entry of its compiled body, which works on the caller's collections as Python does, when the
+        class itself defines it and it is compiled; otherwise through the Python object.
         """
         if self.class_model is None:
             self._refuse("sibling-call", f"self.{name}() has no known target", node)
@@ -2532,8 +2535,12 @@ class Lowering:
         declares = (not name.startswith("_") and not self.advised(function_def) and not self.class_model.subclass_overrides(name)
                     and bound is not None
                     and all(argument.typeAnnotation() is not None and not argument.variadic() for argument in parameters)
-                    and function_node.args.vararg is None and not function_node.args.kwonlyargs and function_node.args.kwarg is None
-                    and not any(self._shares_collection(argument.typeAnnotation()) for argument in parameters))
+                    and function_node.args.vararg is None and not function_node.args.kwonlyargs and function_node.args.kwarg is None)
+        shares = declares and any(self._shares_collection(argument.typeAnnotation()) for argument in parameters)
+        if shares and not (name in self.class_model.methods and self.class_model.methods[name][0] is function_def and self.compiled(function_def, function_node)):
+            # the stub's Java method copies the collections: only the compiled body's shared entry
+            # gives the callee the caller's own, and a body inherited from a base has none in this stub
+            declares = False
         if declares:
             parameter_types = [self._stub_type(self.bindings.of_hint(argument.typeAnnotation()), argument.typeAnnotation(), node) for argument in parameters]
             arguments = [self._coerce(argument, parameter_type, argument_node)
@@ -2541,7 +2548,7 @@ class Lowering:
             self.java_calls += 1
             self.compilation_calls += 1
             declared = OBJECT if hint is None and return_type != VOID else return_type
-            call = InvokeSibling(name, parameter_types, arguments, declared, "java")
+            call = InvokeSibling(name, parameter_types, arguments, declared, "shared" if shares else "java")
             call = Cast(call, return_type) if declared != return_type else call
         else:
             if node.keywords:
@@ -2559,8 +2566,8 @@ class Lowering:
         Whether a parameter hinted so receives the caller's own list, set or dict when Python calls
         the method, which the stub's Java method cannot give it: the bridge hands the Python body a
         copy, and a compiled body works on a copy (see _parameters), so the callee would update a
-        copy the caller never sees. Such a call goes through the Python object, which passes the
-        caller's collection itself.
+        copy the caller never sees. Such a call goes to the shared entry of the compiled body, which
+        makes no copy, or through the Python object, which passes the caller's collection itself.
         """
         typed = self.bindings.of_hint(hint)
         return typed is not None and typed.kind == BUILTIN and typed.name in COLLECTION_TYPES and typed.name != "tuple"
