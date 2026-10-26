@@ -1520,7 +1520,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      *
      * <p>This is a comparison of every member, where {@link #equals(Object)} passes over a member the other value
      * does not have. A member can only be left out when it has a default, so filling the defaults in is what makes
-     * every member comparable.</p>
+     * every member comparable. A value which carries no defaults at all, such as one built at runtime without
+     * them, takes those of the other value, as both name the same annotation.</p>
      *
      * <p>The members listed under {@link AnnotationUtil#NON_BINDING_ATTRIBUTE} by either value take no part, nor
      * does that list itself. A value which does not list them, such as one built at runtime, merely lacks that
@@ -1549,9 +1550,13 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         // Compares the members completed with the defaults, declared members winning, without building the
         // completed maps
         Map<CharSequence, Object> declared = memberValues();
-        Map<CharSequence, Object> defaults = nonNullDefaults(getDefaultValues());
         Map<CharSequence, Object> otherDeclared = other.memberValues();
-        Map<CharSequence, Object> otherDefaults = nonNullDefaults(other.getDefaultValues());
+        // a value carrying no defaults, such as one built at runtime, lacks them: both name the same annotation,
+        // so the defaults of the other value are its defaults
+        Map<CharSequence, Object> ownDefaults = getDefaultValues();
+        Map<CharSequence, Object> otherOwnDefaults = other.getDefaultValues();
+        Map<CharSequence, Object> defaults = nonNullDefaults(ownDefaults != null ? ownDefaults : otherOwnDefaults);
+        Map<CharSequence, Object> otherDefaults = nonNullDefaults(otherOwnDefaults != null ? otherOwnDefaults : ownDefaults);
         if (declared == otherDeclared && defaults == otherDefaults) {
             // Values read from the same stored members, with the same defaults
             return true;

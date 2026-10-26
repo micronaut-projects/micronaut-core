@@ -116,7 +116,8 @@ public final class ExactInterceptorBindingQualifier<T> extends FilteringQualifie
      * as the annotations of a programmatic lookup.
      *
      * <p>Each value is an occurrence of a binding annotation itself, repeatable annotations given one value per
-     * occurrence, rather than an annotation composing one.</p>
+     * occurrence, rather than an annotation composing one. A value built without the defaults of its annotation
+     * takes those of the occurrence it is compared with, so it may leave a defaulted member out.</p>
      *
      * @param occurrences The occurrences of the binding annotations of the point
      * @param kind        The kind of the bindings to compare

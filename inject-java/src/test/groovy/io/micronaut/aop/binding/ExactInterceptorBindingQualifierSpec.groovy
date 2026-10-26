@@ -88,6 +88,25 @@ class ExactInterceptorBindingQualifierSpec extends AbstractTypeElementSpec {
         context.close()
     }
 
+    void 'an occurrence built at runtime leaving a defaulted member out matches one compiled from the default: #zone'() {
+        given:
+        def context = buildContext(SOURCE)
+        def builder = AnnotationValue.builder(context.classLoader.loadClass('exactbinding.Zoned'))
+        def point = zone == null ? builder.build() : builder.value(zone).build()
+
+        expect: "the built occurrence carries no defaults, and those of the compiled one apply to it"
+        names(context, ExactInterceptorBindingQualifier.ofOccurrences([point], InterceptorKind.AROUND)) == expected as Set
+
+        cleanup:
+        context.close()
+
+        where:
+        zone    | expected
+        null    | ['NorthZoned']
+        'north' | ['NorthZoned']
+        'south' | ['SouthZoned']
+    }
+
     void 'enum, class and array members are compared: #method'() {
         given:
         def context = buildContext(SOURCE)
@@ -199,7 +218,24 @@ enum Level { HIGH, LOW }
     String[] value();
 }
 
+@Retention(RetentionPolicy.RUNTIME)
+@java.lang.annotation.Target({ElementType.TYPE, ElementType.METHOD})
+@InterceptorBinding(bindMembers = true)
+@interface Zoned {
+    String value() default "north";
+}
+
 interface Handler {
+}
+
+@Singleton
+@Zoned
+class NorthZoned implements Handler {
+}
+
+@Singleton
+@Zoned("south")
+class SouthZoned implements Handler {
 }
 
 @Singleton

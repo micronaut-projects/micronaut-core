@@ -538,6 +538,27 @@ class AnnotationValueSpec extends Specification {
         right.matches(left)
     }
 
+    void "test matches() fills the defaults of a value carrying none from the other side"() {
+        given: "a compiled value carrying the defaults, and values built at runtime without them"
+        def compiled = new AnnotationValue("test.Zone", [:] as Map<CharSequence, Object>, [value: "north"] as Map<CharSequence, Object>)
+        def built = new AnnotationValue("test.Zone", [:] as Map<CharSequence, Object>, (Map<CharSequence, Object>) null)
+        def south = new AnnotationValue("test.Zone", [value: "south"] as Map<CharSequence, Object>, (Map<CharSequence, Object>) null)
+        def north = new AnnotationValue("test.Zone", [value: "north"] as Map<CharSequence, Object>, (Map<CharSequence, Object>) null)
+
+        expect: "the side without defaults lacks the information, so the defaults of the other side apply, both ways"
+        compiled.matches(built)
+        built.matches(compiled)
+        compiled.matches(north)
+        north.matches(compiled)
+
+        and: "a member declared as something else still differs"
+        !compiled.matches(south)
+        !south.matches(compiled)
+
+        and: "an empty map of defaults is information, and is not filled in"
+        !new AnnotationValue("test.Zone", [:] as Map<CharSequence, Object>, [:] as Map<CharSequence, Object>).matches(compiled)
+    }
+
     void "test matches() compares an empty string with the default it replaces"() {
         given: "an annotation whose member defaults to something other than the empty string"
         def defaults = [value: "default"] as Map<CharSequence, Object>
