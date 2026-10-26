@@ -736,7 +736,15 @@ def apply_delegation(tree, targets):
             def total(self, quantity, unit_price):
                 __mn_java = __class__.__micronaut_compiled__
                 if __mn_java is not None:
-                    __mn_java = __mn_java.call(self, 'app.Calc', 'total', (quantity, unit_price), ('int', 'float'), True)
+                    __mn_java_p = None
+                    try:
+                        __mn_java = __mn_java.call(self, 'app.Calc', 'total', (quantity, unit_price), ('int', 'float'), True)
+                    except BaseException as __mn_java_e:
+                        __mn_java_p = _mn_python_exception(__mn_java_e)
+                        if __mn_java_p is None:
+                            raise
+                    if __mn_java_p is not None:
+                        raise __mn_java_p
                     if __mn_java is not None:
                         return __mn_java[0]
                 ...the original body, for objects created in Python...
@@ -749,6 +757,16 @@ def apply_delegation(tree, targets):
     when every argument has the exact Python type and range of its Java parameter, and runs the
     Python body when a body that may be run again fails, see ``StaticDelegation``.
 
+    A Python exception raised by the compilation (a compiled ``raise``, the Python code a compiled
+    body calls) reaches the Java body as the generated Java class of its exception class, which a
+    Python caller of the Python body would catch as the Python class. A target carrying
+    ``#python-exceptions`` (the body calls no Java code outside the compilation, see
+    ``Ir.ExceptionCrossing``) has the prologue above: it raises the Python exception the Java one
+    carries (see ``_mn_python_exception``), and any other exception as it is. The Python exception
+    is raised after the handler, so it keeps its own cause and context: inside the handler Python
+    would chain the Java exception as its context. Without it the call is made as is, and a Java
+    exception reaches the caller as the Java exception, as one that crossed Java code does in Python.
+
     ``targets`` are ``Class#method#owner=<generated class>#kinds=<kind,...>#retry`` (``#once``
     for a body that is not run again) strings, a nested class as ``Outer$Inner``; a target without
     its kinds is not delegated. ``#list``, ``#set`` or ``#dict`` is appended when the Java body
@@ -758,7 +776,8 @@ def apply_delegation(tree, targets):
     module-level function an empty class part: they call the static Java method of the generated
     class, looked up once per module, under the same checks of the arguments. Without a bound
     object a failure cannot reach the caller as Python's exception, so only a body that may be run
-    again (``#retry``) delegates, and the Python body runs when it fails::
+    again (``#retry``) delegates, and the Python body runs when it fails, raising its own
+    exceptions::
 
         def user_public(user):
             __mn_java = _mn_static_call('app.Mappers', 'user_public', (user,), ('java:app.User',))
@@ -779,9 +798,8 @@ def apply_delegation(tree, targets):
         static_class = options.get("static")
         if static_class is not None and "retry" not in options:
             continue  # a static body that cannot be run again keeps the Python body, see above
-        wanted.setdefault(class_name, {})[method] = (options.get("owner", class_name), kinds, "retry" in options, conversion, static_class)
+        wanted.setdefault(class_name, {})[method] = (options.get("owner", class_name), kinds, "retry" in options, conversion, static_class, "python-exceptions" in options)
     count = 0
-    statics = False
     for class_node, path in _classes(tree):
         methods = wanted.get("$".join(path))
         if not methods:
@@ -789,18 +807,17 @@ def apply_delegation(tree, targets):
         rewritten = 0
         for statement in class_node.body:
             if isinstance(statement, ast.FunctionDef) and statement.name in methods and not _delegates(statement):
-                owner, kinds, retry, conversion, static_class = methods[statement.name]
+                owner, kinds, retry, conversion, static_class, translated = methods[statement.name]
                 if static_class is not None:
                     if not _takes_exactly(statement, kinds):
                         continue
                     statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion)
                     ast.fix_missing_locations(statement)
-                    statics = True
                     count += 1
                     continue
                 if not _receives_self(statement, kinds):
                     continue
-                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, owner, kinds, retry, conversion)
+                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, owner, kinds, retry, conversion, translated)
                 ast.fix_missing_locations(statement)
                 rewritten += 1
         if rewritten and not _declares_member(class_node):
@@ -812,17 +829,16 @@ def apply_delegation(tree, targets):
     if functions:
         for statement in tree.body:
             if isinstance(statement, ast.FunctionDef) and statement.name in functions and not _delegates(statement):
-                _, kinds, _, conversion, static_class = functions[statement.name]
+                _, kinds, _, conversion, static_class, _ = functions[statement.name]
                 if static_class is not None and _takes_exactly(statement, kinds):
                     statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion)
                     ast.fix_missing_locations(statement)
-                    statics = True
                     count += 1
-    if statics and not any(isinstance(statement, ast.FunctionDef) and statement.name == STATIC_LOOKUP for statement in tree.body):
+    if count and not any(isinstance(statement, ast.FunctionDef) and statement.name == STATIC_LOOKUP for statement in tree.body):
         offset = _docstring_offset(tree)
         while offset < len(tree.body) and isinstance(tree.body[offset], ast.ImportFrom) and tree.body[offset].module == "__future__":
             offset += 1
-        lookup = ast.parse(STATIC_LOOKUP_SOURCE).body
+        lookup = ast.parse(HELPERS_SOURCE).body
         for statement in lookup:
             for node in ast.walk(statement):
                 if isinstance(node, (ast.stmt, ast.expr, ast.arg)):
@@ -832,12 +848,15 @@ def apply_delegation(tree, targets):
     return count
 
 
-# the module-level lookup of the generated class a static Java method belongs to, cached per module, and
-# the call of the static Java method: only when every argument has the exact Python type and range of its
-# Java parameter (micronaut_runtime), else, or when the Java body fails, None, so the Python body runs
+# the helpers of the rewritten functions, added once to a module with a rewritten function: the lookup of
+# the generated class a static Java method belongs to, cached per module; the call of the static Java
+# method, only when every argument has the exact Python type and range of its Java parameter
+# (micronaut_runtime), else, or when the Java body fails, None, so the Python body runs; and the Python
+# exception a Java exception carries
 STATIC_LOOKUP = "_mn_static_class"
 STATIC_CALL = "_mn_static_call"
-STATIC_LOOKUP_SOURCE = """
+PYTHON_EXCEPTION = "_mn_python_exception"
+HELPERS_SOURCE = """
 _mn_static_classes = {}
 
 
@@ -868,6 +887,18 @@ def _mn_static_call(name, method, arguments, kinds):
         return (getattr(found, method)(*arguments),)
     except Exception:
         return None
+
+
+def _mn_python_exception(error):
+    try:
+        unwrap = error.asPolyglotValue
+    except Exception:
+        return None
+    try:
+        found = unwrap()
+    except Exception:
+        return None
+    return found if isinstance(found, BaseException) else None
 """
 
 
@@ -952,6 +983,52 @@ def _static_delegation(function, static_class, kinds, conversion=None):
     return statements
 
 
+def _translating(temporary, call):
+    """
+    The call of the Java body, raising the Python exception a Java exception of the call carries::
+
+        __mn_java_p = None
+        try:
+            __mn_java = __mn_java.call(...)
+        except BaseException as __mn_java_e:
+            __mn_java_p = _mn_python_exception(__mn_java_e)
+            if __mn_java_p is None:
+                raise
+        if __mn_java_p is not None:
+            raise __mn_java_p
+
+    The Python exception is raised after the handler, so it keeps its own cause and context: inside
+    the handler Python would chain the Java exception as its context, and ``raise ... from`` would
+    suppress the context of the caller's own handler.
+    """
+    caught = temporary + "_e"
+    found = temporary + "_p"
+    handler = ast.ExceptHandler(
+        type=ast.Name(id="BaseException", ctx=ast.Load()),
+        name=caught,
+        body=[
+            ast.Assign(
+                targets=[ast.Name(id=found, ctx=ast.Store())],
+                value=ast.Call(func=ast.Name(id=PYTHON_EXCEPTION, ctx=ast.Load()), args=[ast.Name(id=caught, ctx=ast.Load())], keywords=[]),
+            ),
+            ast.If(
+                test=ast.Compare(left=ast.Name(id=found, ctx=ast.Load()), ops=[ast.Is()], comparators=[ast.Constant(value=None)]),
+                body=[ast.Raise(exc=None, cause=None)],
+                orelse=[],
+            ),
+        ],
+    )
+    return [
+        ast.Assign(targets=[ast.Name(id=found, ctx=ast.Store())], value=ast.Constant(value=None)),
+        ast.Try(body=[call], handlers=[handler], orelse=[], finalbody=[]),
+        ast.If(
+            test=ast.Compare(left=ast.Name(id=found, ctx=ast.Load()), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
+            body=[ast.Raise(exc=ast.Name(id=found, ctx=ast.Load()), cause=None)],
+            orelse=[],
+        ),
+    ]
+
+
 def _converted(result, conversion):
     """The result of a Java method with its collection converted for the Python caller."""
     if conversion in ("list", "set"):
@@ -969,12 +1046,12 @@ def _converted(result, conversion):
 
 
 def _temporary(function):
-    """A name for the delegate that no parameter or name of the function uses."""
+    """A name for the delegate, and with the _e and _p suffixes for the exception it translates, that no parameter or name of the function uses."""
     used = {node.arg for node in ast.walk(function.args) if isinstance(node, ast.arg)}
     used |= {node.id for node in ast.walk(function) if isinstance(node, ast.Name)}
     name = DELEGATE_LOCAL
     suffix = 0
-    while name in used:
+    while name in used or f"{name}_e" in used or f"{name}_p" in used:
         suffix += 1
         name = f"{DELEGATE_LOCAL}_{suffix}"
     return name
@@ -988,7 +1065,7 @@ def _locate(statements, line, column):
                 node.col_offset = node.end_col_offset = column
 
 
-def _delegation(function, owner, kinds, retry, conversion=None):
+def _delegation(function, owner, kinds, retry, conversion=None, translated=False):
     args = function.args
     positional = list(args.posonlyargs) + list(args.args)
     receiver = positional[0].arg
@@ -1025,7 +1102,7 @@ def _delegation(function, owner, kinds, retry, conversion=None):
     )
     guard = ast.If(
         test=ast.Compare(left=load(temporary), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
-        body=[call, returned],
+        body=(_translating(temporary, call) if translated else [call]) + [returned],
         orelse=[],
     )
     statements = [lookup, guard]

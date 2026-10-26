@@ -133,6 +133,48 @@ class Library:
         diagnostics[3].message() == 'class [Shelf] has no member [ad]; did you mean [add]?'
     }
 
+    void "an exception class takes the arguments of Exception, and the exception variable of an except clause is typed"() {
+        when:
+        def diagnostics = check('''
+from jakarta.inject import Singleton
+
+class Rejected(Exception):
+    """Exception(*args): any positional arguments."""
+
+class Coded(Exception):
+    def __init__(self, code: int):
+        super().__init__(f"code {code}")
+        self.code = code
+
+@Singleton
+class Gate:
+    def run(self, n: int) -> int:
+        if n < 0:
+            raise Rejected("negative", n)
+        if n == 0:
+            raise Rejected()
+        if n == 1:
+            raise Rejected(message="one")
+        if n == 2:
+            raise Coded(n, 2)
+        return n
+
+    def guard(self, n: int) -> int:
+        try:
+            return self.run(n)
+        except Coded as coded:
+            return coded.code + coded.cod
+        except Rejected as rejected:
+            return len(rejected.args)
+''')
+
+        then:
+        diagnostics*.rule() == ['python-arity', 'python-arity', 'unknown-python-member']
+        diagnostics[0].message() == '[Rejected] takes positional arguments only, as Exception does; got message='
+        diagnostics[1].message() == '[Coded.__init__] takes 1 positional arguments (code); got 2'
+        diagnostics[2].message() == 'class [Coded] has no member [cod]; did you mean [code]?'
+    }
+
     void "positional-only, keyword-only and class-level calls follow the Python calling rules"() {
         when:
         def diagnostics = check('''

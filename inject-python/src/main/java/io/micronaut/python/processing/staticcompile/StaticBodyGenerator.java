@@ -62,6 +62,8 @@ public final class StaticBodyGenerator {
     private static final ClassTypeDef ITERATOR = ClassTypeDef.of(Iterator.class);
     private static final ClassTypeDef VALUE_COERCIBLE_TYPE = ClassTypeDef.of("io.micronaut.context.python.ValueCoercible");
     private static final ClassTypeDef POLYGLOT_VALUE_TYPE = ClassTypeDef.of("org.graalvm.polyglot.Value");
+    private static final ClassTypeDef PYTHON_CONTEXT_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime");
+    private static final ClassTypeDef PYTHON_CLASS_REFERENCE = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime.PythonClassReference");
 
     private final SelfAccess self;
     private final Map<String, VariableDef.MethodParameter> parameters = new HashMap<>();
@@ -289,6 +291,7 @@ public final class StaticBodyGenerator {
                 // a field of the script: no local names
             }
             case Ir.NewJava construction -> construction.arguments().forEach(a -> collectNames(a, names));
+            case Ir.NewPythonException construction -> construction.arguments().forEach(a -> collectNames(a, names));
             case Ir.Field field -> collectNames(field.receiver(), names);
             case Ir.Binary binary -> {
                 collectNames(binary.left(), names);
@@ -566,6 +569,7 @@ public final class StaticBodyGenerator {
             case Ir.InvokePython call -> self.invokeOn(pythonObject(call.receiver()), pythonClass(call.receiver()), call.name(), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
             case Ir.PythonMember member -> self.readOf(pythonObject(member.receiver()), pythonClass(member.receiver()), member.name(), member.type(), type(member.type()));
             case Ir.ModuleAttribute attribute -> self.injected(injectedField(attribute.name()), type(attribute.type()));
+            case Ir.NewPythonException construction -> newPythonException(construction);
             case Ir.NewJava construction -> classType(construction.type()).instantiate(types(construction.parameterTypes()), arguments(construction.arguments(), construction.parameterTypes()));
             case Ir.StaticField field -> classType(field.owner()).getStaticField(field.name(), type(field.type()));
             case Ir.Field field -> expression(field.receiver()).field(field.name(), type(field.type()));
@@ -580,6 +584,23 @@ public final class StaticBodyGenerator {
             case Ir.Helper helper -> PYTHON_STATIC.invokeStatic(helper.name(), argumentTypes(helper.arguments()), type(helper.type()), expressions(helper.arguments()));
             case Ir.Cast cast -> cast(expression(cast.operand()), cast.operand().type(), cast.type());
         };
+    }
+
+    /**
+     * {@code PythonStatic.raised(E.class, PythonContextRuntime.newInstance(<the class reference of E>, new Object[] {args}))}:
+     * the Python exception created by its Python class, wrapped in its generated class as the runtime
+     * wraps a Python exception that reaches Java code (through the {@code Value} constructor).
+     */
+    private ExpressionDef newPythonException(Ir.NewPythonException construction) {
+        ExpressionDef value = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+            "newInstance",
+            List.of(PYTHON_CLASS_REFERENCE, TypeDef.OBJECT.array()),
+            POLYGLOT_VALUE_TYPE,
+            self.pythonClassReference(construction.type()),
+            TypeDef.OBJECT.array().instantiate(expressions(construction.arguments()))
+        );
+        return PYTHON_STATIC.invokeStatic("raised", List.of(TypeDef.CLASS, POLYGLOT_VALUE_TYPE), ClassTypeDef.of(RuntimeException.class),
+            classType(construction.type()).getStaticField("class", TypeDef.CLASS), value);
     }
 
     private static ExpressionDef constant(Ir.Const constant) {
@@ -985,6 +1006,15 @@ public final class StaticBodyGenerator {
          */
         default ExpressionDef injected(String field, TypeDef type) {
             throw new IllegalStateException("A body of a class reads no injected attribute of a module");
+        }
+
+        /**
+         * @param type The generated class of a Python class of the compilation
+         * @return The {@code PythonClassReference} of the Python class, which creates its objects in the
+         * context of the call
+         */
+        default ExpressionDef pythonClassReference(String type) {
+            throw new IllegalStateException("This body reaches no Python class to create [" + type + "] with");
         }
     }
 }

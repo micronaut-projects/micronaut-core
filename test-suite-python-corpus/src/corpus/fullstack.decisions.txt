@@ -108,12 +108,12 @@ app/services/users.py UserService.authenticate COMPILED
 app/services/users.py UserService.by_email COMPILED
 app/services/users.py UserService.by_id SKIPPED
 app/services/users.py UserService.count COMPILED
-app/services/users.py UserService.create SKIPPED
+app/services/users.py UserService.create COMPILED
 app/services/users.py UserService.delete COMPILED
 app/services/users.py UserService.page COMPILED
 app/services/users.py UserService.register COMPILED
 app/services/users.py UserService.set_password COMPILED
-app/services/users.py UserService.update SKIPPED
+app/services/users.py UserService.update COMPILED
 app/services/users.py UserService.update_me COMPILED
 app/services/users.py UserService.verify_password COMPILED
 app/services/users.py _java_uuid SKIPPED

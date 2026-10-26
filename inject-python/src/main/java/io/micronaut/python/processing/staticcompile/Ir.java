@@ -377,6 +377,21 @@ public sealed interface Ir {
     }
 
     /**
+     * An exception of a Python exception class of the compilation, created as Python creates it:
+     * the Python class called with the arguments, the Python exception wrapped in the generated Java
+     * class through its {@code Value} constructor, as the runtime wraps a Python exception that
+     * reaches Java code. Its Java value is the {@code RuntimeException} a {@code raise} throws.
+     *
+     * @param type      The generated class, a RuntimeException
+     * @param arguments The arguments of the Python class, boxed
+     */
+    record NewPythonException(String type, List<Expression> arguments) implements Expression {
+        public NewPythonException {
+            arguments = List.copyOf(arguments);
+        }
+    }
+
+    /**
      * A read of a static field or an enum constant.
      *
      * @param owner The class
@@ -539,6 +554,8 @@ public sealed interface Ir {
      *                       of a class, or a plain function of a module
      * @param moduleLevel    Whether the function is a module-level function, generated into the
      *                       module's class
+     * @param exceptions     How the Java exception of a Python exception class the body throws reaches a
+     *                       Python caller of the rewritten function
      */
     record CompiledBody(String className,
                         String methodName,
@@ -551,9 +568,11 @@ public sealed interface Ir {
                         boolean wrapsCheckedExceptions,
                         boolean advised,
                         boolean staticMethod,
-                        boolean moduleLevel) {
+                        boolean moduleLevel,
+                        ExceptionCrossing exceptions) {
         public CompiledBody {
             Objects.requireNonNull(className, "className");
+            Objects.requireNonNull(exceptions, "exceptions");
             Objects.requireNonNull(methodName, "methodName");
             parameterNames = List.copyOf(parameterNames);
             parameterTypes = List.copyOf(parameterTypes);
@@ -574,5 +593,31 @@ public sealed interface Ir {
         public static String key(String className, String methodName) {
             return className + "#" + methodName;
         }
+    }
+
+    /**
+     * How a Java exception carrying a Python exception (the generated Java class of a Python
+     * exception class, see {@code ValueCoercible}) that a compiled body throws reaches a Python caller
+     * of the rewritten function. In Python, a Python exception raised by Python code is the Python
+     * exception, and one that crossed Java code (a Java method calling back into Python) is the Java
+     * class: a compiled body cannot tell the two apart once both are the Java class.
+     */
+    enum ExceptionCrossing {
+        /**
+         * The body calls no Java code outside the compilation: any such exception comes from the
+         * compilation (a compiled raise, Python code of the compilation), and the Python caller gets
+         * the Python exception it carries.
+         */
+        TRANSLATED,
+        /**
+         * The body calls Java code outside the compilation and no code of the compilation: any such
+         * exception crossed Java code, and the Python caller gets it as it is.
+         */
+        UNTRANSLATED,
+        /**
+         * The body calls Java code outside the compilation and code of the compilation that may raise
+         * a Python exception class: the Python callers keep the Python body.
+         */
+        PYTHON_BODY
     }
 }

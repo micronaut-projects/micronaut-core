@@ -959,6 +959,8 @@ class JavaReceiverRules:
                 if handler.name:
                     if caught is not None and caught.kind == JAVA_REF:
                         self.bindings.assign(handler.name, Typed(JAVA, caught.name))
+                    elif caught is not None and caught.kind == PY_REF and self._throwable_model(caught) is not None:
+                        self.bindings.assign(handler.name, Typed(PY, caught.name))
                     else:
                         self.bindings.forget(handler.name)
             for child in node.body + node.orelse + node.finalbody:
@@ -1453,6 +1455,24 @@ class JavaReceiverRules:
 
 # Python bases that add no members of their own; any other base the checker cannot see makes a class open
 TRANSPARENT_BASES = {"object", "abc.ABC", "ABC", "typing.Protocol", "Protocol", "typing.Generic", "Generic", "Generic[...]"}
+# the Python exception base whose members are those of BaseException
+PYTHON_EXCEPTION_BASES = {"Exception", "builtins.Exception"}
+# the members every exception inherits from BaseException, of no type the checker knows
+EXCEPTION_ATTRIBUTES = {"args", "__traceback__", "__cause__", "__context__", "__suppress_context__", "__notes__"}
+EXCEPTION_METHODS = {"with_traceback", "add_note"}
+
+
+def _native_exception(base):
+    """
+    Whether a base is a builtin exception class extending Exception (Exception, ValueError, KeyError...),
+    as the processor marks it (TypeRef.nativeException): the generated class of a class extending it
+    first is a RuntimeException, whose Java message is the str() of the Python exception. A local
+    class named like a builtin is none.
+    """
+    native = getattr(base, "nativeException", None)
+    if native is not None:
+        return bool(native())
+    return base.name() in PYTHON_EXCEPTION_BASES
 
 
 def _self_attributes(class_node):
@@ -1588,15 +1608,28 @@ class PythonClassModel:
         self.metaclass = any(kw.arg == "metaclass" for kw in getattr(node, "keywords", ()))
         self._bases = None
         self._subclasses = None
+        self._python_exception = False
 
     @property
     def bases(self):
-        """The resolved bases: PythonClassModel, a Java TypeDescription, or None for an unknown base."""
+        """
+        The resolved bases: PythonClassModel, a Java TypeDescription, or None for an unknown base.
+        A builtin exception base is not among them: the class is an exception class (see is_throwable),
+        with the members of BaseException; a builtin exception other than Exception adds members of its
+        own (the errno of an OSError, the value of a StopIteration), which leave the class open (None).
+        """
         if self._bases is None:
             self._bases = []
             for base in self.class_def.bases():
                 name = base.name()
                 if name in TRANSPARENT_BASES:
+                    continue
+                if _native_exception(base) and name not in self.classes.by_qualified:
+                    # the generated class extends the first base that resolves, as for a Java base
+                    if not any(base is not None for base in self._bases):
+                        self._python_exception = True
+                    if name not in PYTHON_EXCEPTION_BASES:
+                        self._bases.append(None)
                     continue
                 model = self.classes.by_qualified.get(name)
                 if model is not None:
@@ -1605,6 +1638,71 @@ class PythonClassModel:
                 description = self.classes.describe_base(self.module, base) if "." in name else None
                 self._bases.append(description)
         return self._bases
+
+    def superclass(self):
+        """
+        The base the generated class extends, as the stub generator picks it: the first base that
+        resolves (a PythonClassModel or a Java TypeDescription), or None when that is a builtin
+        exception (the generated class extends RuntimeException) or there is none. For
+        ``class E(Exception, Mixin)`` or ``class E(ValueError, Mixin)`` it is None: Mixin is a
+        Python base of E only.
+        """
+        bases = self.bases
+        if self._python_exception:
+            return None
+        return next((base for base in bases if base is not None), None)
+
+    def extends_python_exception(self, seen=None):
+        """Whether the generated class extends RuntimeException for a builtin exception (Exception, ValueError...), directly or through the generated classes of Python bases."""
+        seen = seen or set()
+        if self.qualified in seen:
+            return False
+        seen.add(self.qualified)
+        superclass = self.superclass()
+        if self._python_exception:
+            return True
+        return isinstance(superclass, PythonClassModel) and superclass.extends_python_exception(seen)
+
+    def is_throwable(self, seen=None):
+        """
+        Whether the generated class of the class is a Throwable: the class extends a builtin
+        exception, a Python class that does, or a Java Throwable. For a builtin exception it is a
+        RuntimeException whose Java message is the str() of the Python exception.
+        """
+        seen = seen or set()
+        if self.qualified in seen:
+            return False
+        seen.add(self.qualified)
+        superclass = self.superclass()
+        if self._python_exception:
+            return True
+        if isinstance(superclass, PythonClassModel):
+            return superclass.is_throwable(seen)
+        return superclass is not None and self.classes.checker.facts.isAssignable(superclass.name(), "java.lang.Throwable")
+
+    def throwable_base(self, seen=None):
+        """The Java class the generated class of an exception class extends, beyond the generated classes of its Python bases."""
+        seen = seen or set()
+        if self.qualified in seen:
+            return None
+        seen.add(self.qualified)
+        superclass = self.superclass()
+        if self._python_exception:
+            return "java.lang.RuntimeException"
+        if isinstance(superclass, PythonClassModel):
+            return superclass.throwable_base(seen)
+        return superclass.name() if superclass is not None else None
+
+    def extends(self, other, seen=None):
+        """Whether the generated class of the class is the other's or extends it."""
+        if self.qualified == other.qualified:
+            return True
+        seen = seen or set()
+        if self.qualified in seen:
+            return False
+        seen.add(self.qualified)
+        superclass = self.superclass()
+        return isinstance(superclass, PythonClassModel) and superclass.extends(other, seen)
 
     def java_bases(self, seen=None):
         """The descriptions of the Java bases of the class, its own before those of its Python bases."""
@@ -1678,6 +1776,11 @@ class PythonClassModel:
                     return ("java", base)
                 if base.protectedMethods().contains(name):
                     return ("inherited", None)  # a protected method of the Java base: not judged further
+        if self._python_exception:
+            if name in EXCEPTION_ATTRIBUTES:
+                return ("instance", None)
+            if name in EXCEPTION_METHODS:
+                return ("inherited", None)
         return None
 
     def constructor_of(self, seen=None):
@@ -1929,6 +2032,11 @@ class PythonReceiverMixin:
     def _python_model(self, receiver):
         return self.checker.python_classes.of(receiver.name)
 
+    def _throwable_model(self, receiver):
+        """The model of a class reference naming an exception class of the compilation, else None."""
+        model = self._python_model(receiver)
+        return model if model is not None and model.is_throwable() else None
+
     def _python_member(self, receiver, name, node, calling):
         model = self._python_model(receiver)
         if model is None:
@@ -2018,7 +2126,11 @@ class PythonReceiverMixin:
         constructor = model.constructor_of()
         if constructor is None:
             arguments = len(argument_types) + len(node.keywords)
-            if arguments and not any(kw.arg is None for kw in node.keywords):
+            if model.is_throwable():
+                # Exception(*args): any positional arguments, kept as the args of the exception
+                if node.keywords and not any(kw.arg is None for kw in node.keywords):
+                    self._report("python-arity", f"[{model.name}] takes positional arguments only, as Exception does; got {node.keywords[0].arg}=", node)
+            elif arguments and not any(kw.arg is None for kw in node.keywords):
                 self._report("python-arity", f"[{model.name}] takes no arguments; got {arguments}", node)
         elif constructor is not UNKNOWN:
             function_def, function_node = constructor
