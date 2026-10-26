@@ -1586,8 +1586,15 @@ class Lowering:
         for receiver in receivers:
             names |= reached(receiver)
         # a special method written on a name bound to no class of the compilation (cls.__str__ = ..., a
-        # parameter or a local) may be written on any class
-        if unresolved or any(not reached(name) & classes for name in specials):
+        # local) or on a parameter, whatever class shares its spelling, may be written on any class
+        parameters = set()
+        for tree in trees:
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                    arguments = node.args
+                    parameters.update(argument.arg for argument in arguments.posonlyargs + arguments.args + arguments.kwonlyargs)
+                    parameters.update(argument.arg for argument in (arguments.vararg, arguments.kwarg) if argument is not None)
+        if unresolved or any(name in parameters or not reached(name) & classes for name in specials):
             names.add("*")
         self.checker._mn_patched_classes = (trees, names)
         return names
