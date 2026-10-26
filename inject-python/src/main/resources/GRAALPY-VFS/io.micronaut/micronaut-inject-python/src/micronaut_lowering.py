@@ -103,8 +103,10 @@ EXCEPTION_ARGUMENT_TYPES = {LONG, DOUBLE, BOOLEAN, STRING, NONE, "java.lang.Long
 LAZY_EXCEPTION_BASES = {"Exception", "ValueError", "TypeError", "RuntimeError", "LookupError", "IndexError", "ArithmeticError",
                         "OverflowError", "ZeroDivisionError", "AssertionError", "NotImplementedError"}
 # the members that make the Python exception of a class differ from the arguments it is created with, or
-# make its creation (or its collection) observable: a raise of a class defining one creates it eagerly
-EAGER_EXCEPTION_MEMBERS = ("__new__", "__init__", "__str__", "__repr__", "args", "__del__")
+# make its creation (or its collection) observable, or give it a state the Java exception does not take
+# (a cause, a context, notes): a raise of a class defining one creates it eagerly
+EAGER_EXCEPTION_MEMBERS = ("__new__", "__init__", "__str__", "__repr__", "args", "__del__", "__cause__", "__context__",
+                           "__suppress_context__", "__traceback__", "__notes__")
 SYNTHESIZED_EXCEPTIONS = ("java.lang.ArithmeticException", "java.lang.ClassCastException", "java.lang.IllegalArgumentException",
                           "java.lang.IllegalStateException", "java.lang.IndexOutOfBoundsException", "java.lang.NullPointerException",
                           "java.lang.UnsupportedOperationException", "java.util.NoSuchElementException",
@@ -1576,6 +1578,11 @@ class Lowering:
                 if id(node) not in called and ((isinstance(node, ast.Name) and node.id in setters and isinstance(node.ctx, ast.Load))
                                                or (isinstance(node, ast.Attribute) and node.attr in setters + dunder_setters)):
                     unresolved = True  # a setter referenced, not called: it may be called on any class
+                if isinstance(node, ast.Constant) and node.value in setters + dunder_setters:
+                    unresolved = True  # getattr(builtins, "setattr"): a setter looked up by its name
+                if isinstance(node, ast.ImportFrom) and any(alias.name in setters + dunder_setters and alias.asname not in (None, alias.name)
+                                                            for alias in node.names):
+                    unresolved = True  # from builtins import setattr as patch: called by a name of its own
                 targets = ()
                 if isinstance(node, ast.Assign):
                     targets = node.targets

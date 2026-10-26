@@ -44,6 +44,7 @@ import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.ProcessingException;
@@ -402,12 +403,37 @@ public final class PythonTypeElementVisitorProcessor {
                     ElementQuery.ALL_METHODS.onlyDeclared().named(body.methodName())
                 );
                 for (MethodElement method : methods) {
-                    if (!method.hasDeclaredAnnotation(ANN_EVENT_LOOP_SAFE)) {
+                    // only the bridge of the compiled signature runs the body: another overload of the name calls Python
+                    if (compiledSignature(method, body) && !method.hasDeclaredAnnotation(ANN_EVENT_LOOP_SAFE)) {
                         method.annotate(ANN_EVENT_LOOP_SAFE);
                     }
                 }
             }
         }
+    }
+
+    /**
+     * Whether a method has the signature of a compiled body, whose bridge runs the body (see
+     * {@code PythonStubGenerator.sameLayout}): the same erased parameter types, a return type that is
+     * the body's or {@code Object}, and no type variables of its own.
+     */
+    private static boolean compiledSignature(MethodElement method, Ir.CompiledBody body) {
+        ParameterElement[] parameters = method.getParameters();
+        if (!method.getDeclaredTypeVariables().isEmpty() || parameters.length != body.parameterTypes().size()) {
+            return false;
+        }
+        for (int i = 0; i < parameters.length; i++) {
+            if (!parameters[i].getType().getName().equals(erasedName(body.parameterTypes().get(i)))) {
+                return false;
+            }
+        }
+        String returned = method.getReturnType().getName();
+        return returned.equals(erasedName(body.returnType())) || Object.class.getName().equals(returned);
+    }
+
+    private static String erasedName(String type) {
+        int generic = type.indexOf('<');
+        return generic < 0 ? type : type.substring(0, generic);
     }
 
     private void annotatePythonAopProxy(ClassElement element) {
