@@ -85,7 +85,7 @@ class PyronautCompilerStaticCompilationTest {
         assertNotNull(classLoader);
         Map<String, StaticCompilationDecision> byName = decisions.stream().collect(Collectors.toMap(StaticCompilationDecision::qualifiedName, Function.identity()));
         assertEquals(Outcome.NOT_CANDIDATE, byName.get("PricingService.__init__").outcome());
-        assertEquals(Outcome.CANDIDATE, byName.get("PricingService.total").outcome());
+        assertEquals(Outcome.COMPILED, byName.get("PricingService.total").outcome());
         assertEquals(Outcome.SKIPPED, byName.get("PricingService.names").outcome());
         assertEquals("unsupported-expression", byName.get("PricingService.names").reasons().get(0).rule());
         assertEquals(Outcome.SKIPPED, byName.get("PricingService.describe").outcome());
@@ -104,9 +104,66 @@ class PyronautCompilerStaticCompilationTest {
         assertEquals(decisions.size() + 1, lines.size());
         assertTrue(lines.get(1).startsWith("{\"record\":\"decision\",\"name\":\"PricingService.__init__\""), lines.get(1));
         String summary = Files.readString(directory.resolve(StaticCompilationReport.SUMMARY_FILE));
-        assertTrue(summary.contains("CANDIDATE     PricingService.total"), summary);
+        assertTrue(summary.contains("COMPILED      PricingService.total"), summary);
         assertTrue(summary.contains("[unsupported-expression]"), summary);
         assertTrue(summary.contains("EXCLUDED      1"), summary);
+    }
+
+    @Test
+    void aCompiledBodyIsGeneratedAsJavaInsideTheStub(@TempDir Path directory) throws IOException {
+        Path output = Files.createDirectories(directory.resolve("output"));
+        PyronautCompiler.builder()
+            .pythonCode(SOURCE)
+            .staticCompilation(StaticCompilationMode.ALL)
+            .targetDir(output.toFile())
+            .build()
+            .compile();
+
+        String generated;
+        try (var paths = Files.walk(output)) {
+            generated = Files.readString(paths.filter(path -> path.getFileName().toString().equals("PricingService.java")).findFirst().orElseThrow());
+        }
+        String total = generated.substring(generated.indexOf("Compiled from"), generated.indexOf("public String names("));
+        assertTrue(total.contains("public double total(int quantity, double unit_price)"), total);
+        assertTrue(total.contains("this.asPolyglotValue().getMember(\"rate\").asDouble()"), total);
+        assertTrue(!total.contains("invokePythonMethod"), total);
+        // the method that is not compiled keeps its bridge
+        assertTrue(generated.substring(generated.indexOf("public String names(")).contains("invokePythonMethod"), generated);
+    }
+
+    @Test
+    void aCompiledJavaCallNamesTheOverloadItBindsTo(@TempDir Path directory) throws IOException {
+        Path output = Files.createDirectories(directory.resolve("output"));
+        PyronautCompiler.builder()
+            .pythonCode("""
+                from jakarta.inject import Singleton
+                from io.micronaut.python.annotation.processing.test import StaticOverloads
+
+                @Singleton
+                class Overloaded:
+                    def none(self) -> str:
+                        return StaticOverloads.which(None)
+
+                    def text(self, value: str) -> str:
+                        return StaticOverloads.which(value)
+
+                    def sequence(self, value: str) -> str:
+                        return StaticOverloads.sequence(value)
+                """)
+            .staticCompilation(StaticCompilationMode.ALL)
+            .targetDir(output.toFile())
+            .build()
+            .compile();
+
+        String generated;
+        try (var paths = Files.walk(output)) {
+            generated = Files.readString(paths.filter(path -> path.getFileName().toString().equals("Overloaded.java")).findFirst().orElseThrow());
+        }
+        // a None of the parameter's type, an argument at its own type, an argument cast to the overload's parameter
+        assertTrue(generated.contains("String none0 = null;"), generated);
+        assertTrue(generated.contains("StaticOverloads.which(none0)"), generated);
+        assertTrue(generated.contains("StaticOverloads.which(value)"), generated);
+        assertTrue(generated.contains("StaticOverloads.sequence((CharSequence) value)"), generated);
     }
 
     @Test
@@ -201,13 +258,13 @@ class PyronautCompilerStaticCompilationTest {
             .buildClassLoader();
 
         Map<String, StaticCompilationDecision> byName = decisions.stream().collect(Collectors.toMap(StaticCompilationDecision::qualifiedName, Function.identity()));
-        assertEquals(Outcome.CANDIDATE, byName.get("Switches.plain").outcome());
+        assertEquals(Outcome.COMPILED, byName.get("Switches.plain").outcome());
         assertEquals(StaticCompilationDecision.Scope.FUNCTION, byName.get("Switches.plain").scope());
-        assertEquals(Outcome.CANDIDATE, byName.get("Switches.aliased").outcome());
+        assertEquals(Outcome.COMPILED, byName.get("Switches.aliased").outcome());
         assertEquals(StaticCompilationDecision.Scope.FUNCTION, byName.get("Switches.aliased").scope());
         assertEquals(Outcome.EXCLUDED, byName.get("Switches.unswitched").outcome());
         assertEquals(StaticCompilationDecision.Scope.MODE, byName.get("Switches.unswitched").scope());
-        assertEquals(Outcome.CANDIDATE, byName.get("AliasedClass.run").outcome());
+        assertEquals(Outcome.COMPILED, byName.get("AliasedClass.run").outcome());
         assertEquals(StaticCompilationDecision.Scope.CLASS, byName.get("AliasedClass.run").scope());
         assertTrue(diagnostics.isEmpty(), diagnostics.toString());
     }
