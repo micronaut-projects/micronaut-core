@@ -578,8 +578,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     /**
      * Stops the environment without waiting for a refresh in progress. When it returns, the
-     * properties are empty and the property sources the last refresh loaded itself are
-     * unregistered. A refresh in progress publishes and registers nothing.
+     * properties are empty, and whatever is registered under the names the last refresh loaded
+     * itself is unregistered, as 5.2.x did. A refresh in progress publishes and registers nothing.
      *
      * @return This environment
      */
@@ -589,7 +589,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             running.set(false);
             currentRun = new Run();
             refreshInProgress = null;
-            loadedSources.forEach(this::unregister);
+            // by name: what an add registered in place of a loaded source goes too, so the next start loads that name again
+            loadedSources.keySet().forEach(propertySources::remove);
             loadedSources = Map.of();
             propertyPlaceholderResolver.publishEmpty();
         }

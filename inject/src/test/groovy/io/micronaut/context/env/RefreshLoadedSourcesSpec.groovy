@@ -385,6 +385,26 @@ class RefreshLoadedSourcesSpec extends Specification {
         'once it has taken them'                          | 'no longer returns'                                        | 'v1'   | null  | null
     }
 
+    void "a property source registered by the name of what a bootstrap locator returned is dropped by stop, and the next start registers what the locator returns then"() {
+        given: "a bootstrap locator, as the Consul configuration client is, that returns a new property source each time it loads"
+        ConsulLikeLocator locator = new ConsulLikeLocator({ int load -> [PropertySource.of('consul-app', ['app.value': 'v' + load], 100)] })
+        DefaultEnvironment env = new DefaultEnvironment(withLocator(locator))
+        env.start()
+
+        when: "a configuration watch replaces it between refreshes, with a key the locator no longer returns, and the environment is stopped and started"
+        env.addPropertySource(PropertySource.of('consul-app', ['app.value': 'watched', 'app.stale': 'yes'], 100))
+        env.stop()
+        env.start()
+
+        then: "the start publishes and registers what the locator returns now, as 5.2.x did, and the replaced key is gone"
+        env.getProperty('app.value', String).get() == 'v2'
+        !env.containsProperty('app.stale')
+        env.propertySources.find { it.name == 'consul-app' }.get('app.value') == 'v2'
+
+        cleanup:
+        env.stop()
+    }
+
     void "a configuration file property source whose name waits for another thread to add a property source does not keep that add waiting, and both are published: #refresh"() {
         given: "a loader that gives a property source whose name, when first asked for, waits for another thread to add one"
         AddsWhenNamed named = new AddsWhenNamed()
