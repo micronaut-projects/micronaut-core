@@ -2065,7 +2065,9 @@ class Gate:
                            'from builtins import setattr as patch\npatch(Plain, "__str__", lambda self: "patched")',
                            'getattr(builtins, "setattr")(Plain, "__init__", None)',
                            # a cause the class defines is one the Java exception would not carry
-                           'Plain.__cause__ = None'):
+                           'Plain.__cause__ = None',
+                           # a parameter spelled as a class of the compilation may be any class
+                           'class cls:\n    pass\n\n\ndef patch(cls):\n    cls.__str__ = lambda self: "patched"'):
             self.assertFalse(self._lazy(statements), statements)
         # an object's own attribute protocol writes no class
         self.assertTrue(self._lazy("class Tracked:\n    def __setattr__(self, name, value):\n        super().__setattr__(name, value)\n"))
