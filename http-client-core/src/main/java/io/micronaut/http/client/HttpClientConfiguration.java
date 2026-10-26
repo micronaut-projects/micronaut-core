@@ -1205,6 +1205,35 @@ public abstract class HttpClientConfiguration {
         private PoolVersion version = PoolVersion.V4_9;
 
         /**
+         * Default constructor.
+         */
+        public ConnectionPoolConfiguration() {
+        }
+
+        /**
+         * Copy constructor.
+         *
+         * @param copy The connection pool configuration to copy
+         */
+        protected ConnectionPoolConfiguration(@Nullable ConnectionPoolConfiguration copy) {
+            if (copy != null) {
+                this.maxPendingConnections = copy.maxPendingConnections;
+                this.maxConcurrentRequestsPerHttp2Connection = copy.maxConcurrentRequestsPerHttp2Connection;
+                this.maxConcurrentHttp1Connections = copy.maxConcurrentHttp1Connections;
+                this.maxConcurrentHttp2Connections = copy.maxConcurrentHttp2Connections;
+                this.maxPendingAcquires = copy.maxPendingAcquires;
+                this.acquireTimeout = copy.acquireTimeout;
+                this.enabled = copy.enabled;
+                if (copy.connectionLocality != null) {
+                    this.connectionLocality = copy.connectionLocality;
+                }
+                if (copy.version != null) {
+                    this.version = copy.version;
+                }
+            }
+        }
+
+        /**
          * Whether connection pooling is enabled.
          * [available in the Netty HTTP client]
          * @return True if connection pooling is enabled

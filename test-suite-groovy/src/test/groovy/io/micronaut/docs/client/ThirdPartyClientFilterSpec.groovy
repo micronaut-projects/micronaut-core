@@ -39,7 +39,7 @@ class ThirdPartyClientFilterSpec extends Specification {
     def "a client filter is applied to the request and adds the authorization header"() {
         given:
         def bintrayService = context.getBean(BintrayService)
-        def conditions = new PollingConditions(timeout: 3, delay: 1)
+        PollingConditions conditions = new PollingConditions(timeout: 3, delay: 1)
 
         when:
         String result

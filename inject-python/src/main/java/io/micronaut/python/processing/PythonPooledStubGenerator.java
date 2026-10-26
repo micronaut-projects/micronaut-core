@@ -59,7 +59,7 @@ import static io.micronaut.python.processing.PythonStubGenerator.PYTHON_ASYNCIO_
 import static io.micronaut.python.processing.PythonStubGenerator.addReferencedPythonClassReferenceFields;
 import static io.micronaut.python.processing.PythonStubGenerator.convertedElementPublisher;
 import static io.micronaut.python.processing.PythonStubGenerator.erasedType;
-import static io.micronaut.python.processing.PythonStubGenerator.handleReturnType;
+import static io.micronaut.python.processing.PythonStubGenerator.returnConvertedValue;
 import static io.micronaut.python.processing.PythonStubGenerator.PUBLISHER;
 import static io.micronaut.python.processing.PythonStubGenerator.isAsyncGeneratorPythonMethod;
 import static io.micronaut.python.processing.PythonStubGenerator.isAsyncPythonMethod;
@@ -602,7 +602,7 @@ final class PythonPooledStubGenerator {
                 ).cast(TypeDef.of(CompletionStage.class)).cast(TypeDef.of(methodElement.getGenericReturnType())).returning()
             );
         }
-        return handleReturnType(allClasses, methodElement.getGenericReturnType(), invoked).returning();
+        return returnConvertedValue(allClasses, methodElement.getGenericReturnType(), invoked);
     }
 
     private static void addGetterScriptPooled(PropertyElement beanProperty,
@@ -622,7 +622,7 @@ final class PythonPooledStubGenerator {
             // module attribute goes through the pool's module cache, as it did before holders existed
             var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScript", POLYGLOT_VALUE,
                 List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script), ExpressionDef.constant(beanProperty.getName())));
-            return handleReturnType(allClasses, beanProperty.getGenericType(), invoked).returning();
+            return returnConvertedValue(allClasses, beanProperty.getGenericType(), invoked);
         })));
     }
 

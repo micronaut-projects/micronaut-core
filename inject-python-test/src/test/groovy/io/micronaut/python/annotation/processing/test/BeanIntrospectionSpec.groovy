@@ -22,10 +22,13 @@ import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.python.compiler.Serdeable
 
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import java.util.UUID
 
 /**
@@ -79,6 +82,58 @@ class StandardValues:
         instance.duration_value == duration
         instance.offset_value == offset
         instance.uuid_value == uuid
+
+        cleanup:
+        context?.close()
+    }
+
+    void "Annotated selects the Java type an aware datetime property maps to"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Annotated
+from java.time import Instant, OffsetDateTime, ZonedDateTime
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class FetchLogEntry:
+    run: Annotated[datetime, Instant]
+    offset: Annotated[datetime, OffsetDateTime]
+    zoned: Annotated[datetime | None, ZonedDateTime]
+    naive: datetime
+
+    def utc_run(self) -> bool:
+        return self.run.tzinfo is not None and self.run == datetime(2026, 10, 7, tzinfo=timezone.utc)
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.FetchLogEntry")
+        def run = Instant.parse("2026-10-07T00:00:00Z")
+        def offset = OffsetDateTime.parse("2026-10-07T05:30:00+05:30")
+        def zoned = ZonedDateTime.parse("2026-10-07T00:00:00-03:00")
+        def naive = LocalDateTime.of(2026, 10, 7, 0, 0)
+        def instance = introspection.instantiate(run, offset, zoned, naive)
+
+        then:
+        introspection.getRequiredProperty("run", Instant).type == Instant
+        introspection.getRequiredProperty("offset", OffsetDateTime).type == OffsetDateTime
+        introspection.getRequiredProperty("zoned", ZonedDateTime).type == ZonedDateTime
+        introspection.getRequiredProperty("zoned", ZonedDateTime).isNullable()
+        introspection.getRequiredProperty("naive", LocalDateTime).type == LocalDateTime
+        instance.run == run
+        instance.offset == offset
+        instance.zoned == zoned
+        instance.naive == naive
+        instance.utc_run()
+
+        when:
+        def empty = introspection.instantiate(run, offset, null, naive)
+
+        then:
+        empty.zoned == null
 
         cleanup:
         context?.close()

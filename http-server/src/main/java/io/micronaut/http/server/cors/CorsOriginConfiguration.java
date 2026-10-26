@@ -22,6 +22,9 @@ import org.jspecify.annotations.Nullable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * Stores configuration for CORS.
@@ -48,6 +51,7 @@ public class CorsOriginConfiguration {
     private List<String> allowedOrigins = ANY;
     @Nullable
     private String allowedOriginsRegex;
+    private final AtomicReference<Pattern> allowedOriginsPattern = new AtomicReference<>();
     private List<HttpMethod> allowedMethods = ANY_METHOD;
     private List<String> allowedHeaders = ANY;
     private List<String> exposedHeaders = Collections.emptyList();
@@ -90,6 +94,36 @@ public class CorsOriginConfiguration {
      */
     public void setAllowedOriginsRegex(String allowedOriginsRegex) {
         this.allowedOriginsRegex = allowedOriginsRegex;
+        this.allowedOriginsPattern.set(compileAllowedOriginsRegex(allowedOriginsRegex));
+    }
+
+    /**
+     * The compiled allowed origins regular expression.
+     *
+     * @param regex The allowed origins regular expression, as returned by {@link #getAllowedOriginsRegex()}
+     * @return The compiled regular expression
+     */
+    Pattern getAllowedOriginsPattern(String regex) {
+        Pattern pattern = allowedOriginsPattern.get();
+        // A subclass can override getAllowedOriginsRegex, so check that the precompiled pattern is still the one asked for
+        if (pattern == null || !pattern.pattern().equals(regex)) {
+            pattern = Pattern.compile(regex);
+            allowedOriginsPattern.set(pattern);
+        }
+        return pattern;
+    }
+
+    @Nullable
+    private static Pattern compileAllowedOriginsRegex(@Nullable String regex) {
+        if (regex == null || regex.isEmpty()) {
+            return null;
+        }
+        try {
+            return Pattern.compile(regex);
+        } catch (PatternSyntaxException e) {
+            // An invalid regular expression fails when a request is matched against it, not when it is configured
+            return null;
+        }
     }
 
     /**

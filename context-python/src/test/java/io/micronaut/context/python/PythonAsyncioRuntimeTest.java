@@ -302,8 +302,32 @@ final class PythonAsyncioRuntimeTest {
         }
     }
 
+    // a Python singleton holding mutable state behind a lock, constructed with a Java dependency
+    private static final String STATEFUL_SERVICE = """
+        import asyncio
+        import threading
+        class StatefulService:
+            def __init__(self, resolver):
+                self.resolver = resolver
+                self.lock = threading.Lock()
+                self.calls = 0
+            def describe(self):
+                return self.resolver.toString()
+            async def increment(self):
+                await asyncio.sleep(0)
+                with self.lock:
+                    self.calls += 1
+                    return self.calls
+            async def countdown(self, n):
+                for i in range(n, 0, -1):
+                    await asyncio.sleep(0)
+                    yield i
+        """;
+
     @Test
-    void aNullableAsyncMemberIsCopiedIntoTheEventLoopContext() {
+    // asyncInstance is deprecated but still called by code generated before 5.2.14: it must return the bean itself
+    @SuppressWarnings({"removal", "java:S5738"})
+    void anAsyncMethodOfAPythonBeanRunsOnTheBeansOwnObject() {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "micronaut.python.pool.enabled", true,
@@ -312,27 +336,22 @@ final class PythonAsyncioRuntimeTest {
             PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
             Context primary = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
             PythonPool pool = applicationContext.getBean(PythonPool.class);
-            String holder = "class Holder:\n    pass\n";
-            primary.eval(PYTHON, holder);
-            pool.getEventLoopContext(eventLoop).eval(PYTHON, holder);
+            primary.eval(PYTHON, STATEFUL_SERVICE);
+            pool.getEventLoopContext(eventLoop).eval(PYTHON, STATEFUL_SERVICE);
             PythonContextRuntime.PythonClassReference reference = new PythonContextRuntime.PythonClassReference(
-                PYTHON, "Holder", new String[0], "Holder", "class-instance:Holder");
-            Value fallback = primary.eval(PYTHON, "Holder()");
-            PythonContextRuntime.rememberAsyncMember(fallback, "client", null);
-            PythonContextRuntime.rememberAsyncMember(fallback, "name", "x");
+                PYTHON, "StatefulService", new String[0], "StatefulService", "class-instance:StatefulService");
+            Value service = PythonContextRuntime.newInstance(primary, reference, new StringBuilder("resolver"));
 
-            Value target = PythonContextRuntime.asyncInstance(fallback, reference);
-
-            assertEquals(pool.getEventLoopContext(eventLoop), target.getContext());
-            assertTrue(target.getMember("client").isNull(), "a member remembered as null was not copied as None");
-            assertEquals("x", target.getMember("name").asString());
+            // a copy in the event-loop context would be a second singleton, and it would need the Java dependency again
+            assertSame(service, PythonContextRuntime.asyncInstance(service, reference));
+            assertEquals("resolver", service.invokeMember("describe").asString());
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
         }
     }
 
     @Test
-    void aConstructorInjectedAsyncInstanceIsCreatedWithTheSameArgumentsInTheEventLoopContext() {
+    void aCoroutineInTheEventLoopContextAwaitsAPythonSingletonInItsOwnContext() throws Exception {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "micronaut.python.pool.enabled", true,
@@ -341,45 +360,181 @@ final class PythonAsyncioRuntimeTest {
             PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
             Context primary = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
             PythonPool pool = applicationContext.getBean(PythonPool.class);
-            String service = """
-                import builtins
-                class AsyncService:
-                    def __init__(self, dependency, name, names):
-                        self.dependency = dependency
-                        self.name = name
-                        self.names = names
-                        self.context_marker = builtins.__dict__.get("__service_marker__")
-                    async def call(self):
-                        return self.name
-                """;
-            primary.eval(PYTHON, service);
-            primary.eval(PYTHON, "import builtins\nbuiltins.__service_marker__ = 'startup'");
             Context eventLoopContext = pool.getEventLoopContext(eventLoop);
-            eventLoopContext.eval(PYTHON, service);
-            eventLoopContext.eval(PYTHON, "import builtins\nbuiltins.__service_marker__ = 'event-loop'");
+            primary.eval(PYTHON, STATEFUL_SERVICE);
             PythonContextRuntime.PythonClassReference reference = new PythonContextRuntime.PythonClassReference(
-                PYTHON, "AsyncService", new String[0], "AsyncService", "class-instance:AsyncService");
-            StringBuilder dependency = new StringBuilder("dependency");
-            Value fallback = PythonContextRuntime.newInstance(primary, reference, dependency, "x", List.of("a", "b"));
+                PYTHON, "StatefulService", new String[0], "StatefulService", "class-instance:StatefulService");
+            Value service = PythonContextRuntime.newInstance(primary, reference, new StringBuilder("resolver"));
+            ValueCoercible wrapper = () -> service;
+            eventLoopContext.eval(PYTHON, """
+                async def call_service(service):
+                    first = await service.increment()
+                    second = await service.increment()
+                    counted = [i async for i in service.countdown(2)]
+                    return f"{first},{second},{counted},{service.describe()}"
+                """);
+            Value callService = eventLoopContext.getBindings(PYTHON).getMember("call_service");
 
-            Value target = PythonContextRuntime.asyncInstance(fallback, reference);
+            for (Object injected : List.of(wrapper, PythonCoercion.asyncMemberValue(eventLoopContext, wrapper))) {
+                CompletionStage<?> stage = PythonAsyncioRuntime.toCompletionStage(callService.execute(injected));
+                eventLoop.runUntilComplete(stage);
+                assertEquals(eventLoopContext, callService.getContext());
+                assertTrue(stage.toCompletableFuture().get(1, TimeUnit.SECONDS).toString().endsWith(",[2, 1],resolver"),
+                    () -> "unexpected result " + stage.toCompletableFuture().join());
+            }
 
-            assertEquals(eventLoopContext, target.getContext());
-            assertEquals("x", target.getMember("name").asString());
-            assertEquals("event-loop", target.getMember("context_marker").asString(), "__init__ did not run in the event-loop context");
-            assertEquals(2, target.getMember("names").getArraySize());
-            assertEquals("dependency", target.getMember("dependency").invokeMember("toString").asString());
-            Value again = PythonContextRuntime.asyncInstance(fallback, reference);
-            assertEquals("event-loop", again.getMember("context_marker").asString(),
-                "the startup value replaced a member the event-loop __init__ set");
+            // both calls reached the one object: the state of a singleton is shared by every event loop
+            assertEquals(4, service.getMember("calls").asInt());
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
 
-            Value other = PythonContextRuntime.newInstance(primary, reference, dependency, "y", List.of("c"));
-            Value otherTarget = PythonContextRuntime.asyncInstance(other, reference);
+    @Test
+    void aFailureOfAnAwaitedPythonSingletonCanBeHandledInTheCallersContext() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+            Context primary = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context eventLoopContext = pool.getEventLoopContext(eventLoop);
+            Value service = primary.eval(PYTHON, """
+                class Rejected(Exception):
+                    pass
+                class Failing:
+                    async def fail(self):
+                        try:
+                            raise KeyError("inner")
+                        except KeyError as e:
+                            raise Rejected("no schedule") from e
+                Failing()
+                """);
+            ValueCoercible wrapper = () -> service;
+            // walks the cause chain the way application code unwrapping a wrapped failure does: an exception of the
+            // singleton's context read here failed with an internal GraalPy error no except clause catches
+            eventLoopContext.eval(PYTHON, """
+                async def call_failing(failing):
+                    try:
+                        await failing.fail()
+                    # the replacement is a Java exception, which `except Exception` does not catch (as for a blocking call)
+                    except BaseException as e:
+                        current, seen = e, []
+                        for _ in range(5):
+                            if current is None:
+                                break
+                            seen.append(type(current).__name__)
+                            current = getattr(current, "__cause__", None)
+                        java = getattr(e, "java_exception", None)
+                        return f"{e}|{seen}|{java.getCause() if java is not None else None}"
+                """);
+            Value call = eventLoopContext.getBindings(PYTHON).getMember("call_failing");
 
-            assertEquals("y", otherTarget.getMember("name").asString());
-            assertEquals(1, otherTarget.getMember("names").getArraySize());
-            assertEquals("x", PythonContextRuntime.asyncInstance(fallback, reference).getMember("name").asString(),
-                "two startup instances of a class shared one event-loop instance");
+            CompletionStage<?> stage = PythonAsyncioRuntime.toCompletionStage(call.execute(wrapper));
+            eventLoop.runUntilComplete(stage);
+
+            String result = stage.toCompletableFuture().get(1, TimeUnit.SECONDS).toString();
+            assertTrue(result.contains("Rejected: no schedule|"), result);
+            assertTrue(result.endsWith("|None"), result);
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
+    void theKindOfAMemberIsResolvedPerPythonClassAndObject() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+            Context primary = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context eventLoopContext = pool.getEventLoopContext(eventLoop);
+            primary.eval(PYTHON, """
+                import asyncio
+                class Base:
+                    def __init__(self, callback):
+                        self.callback = callback
+                    def work(self):
+                        return "sync"
+                class Async(Base):
+                    async def work(self):
+                        await asyncio.sleep(0)
+                        return "async"
+                async def async_callback():
+                    return "async-callback"
+                def sync_callback():
+                    return "sync-callback"
+                """);
+            Value bindings = primary.getBindings(PYTHON);
+            // one wrapper class for both objects, as a base-class wrapper serves an instance of a subclass
+            ValueCoercible sync = wrap(bindings.getMember("Base").execute(bindings.getMember("sync_callback")));
+            ValueCoercible async = wrap(bindings.getMember("Async").execute(bindings.getMember("async_callback")));
+            eventLoopContext.eval(PYTHON, """
+                async def call_both(sync, async_):
+                    return [sync.work(), await async_.work(), await async_.callback(), sync.callback(),
+                            sync.work(), await async_.work()]
+                """);
+            Value call = eventLoopContext.getBindings(PYTHON).getMember("call_both");
+
+            CompletionStage<?> stage = PythonAsyncioRuntime.toCompletionStage(call.execute(sync, async));
+            eventLoop.runUntilComplete(stage);
+
+            assertEquals("['sync', 'async', 'async-callback', 'sync-callback', 'sync', 'async']",
+                stage.toCompletableFuture().get(1, TimeUnit.SECONDS).toString());
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    private static ValueCoercible wrap(Value value) {
+        return () -> value;
+    }
+
+    @Test
+    void containersCrossTheContextsOfAnAwaitedPythonSingleton() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+            Context primary = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context eventLoopContext = pool.getEventLoopContext(eventLoop);
+            Value service = primary.eval(PYTHON, """
+                import asyncio
+                class Summary:
+                    def __init__(self, names, total):
+                        self.names = names
+                        self.total = total
+                class Summarizer:
+                    async def summarize(self, request, items):
+                        await asyncio.sleep(0)
+                        names = [item["name"] for item in items]
+                        return {"who": request["who"], "names": names, "total": sum(i["n"] for i in items)}
+                    async def summary(self, items):
+                        return Summary([item["name"] for item in items], len(items))
+                Summarizer()
+                """);
+            ValueCoercible wrapper = () -> service;
+            eventLoopContext.eval(PYTHON, """
+                async def call_summarizer(summarizer):
+                    items = [{"name": "a", "n": 1}, {"name": "b", "n": 2}]
+                    result = await summarizer.summarize({"who": "me"}, items)
+                    summary = await summarizer.summary(items)
+                    return f"{result['who']}:{','.join(result['names'])}:{result['total']}:{list(summary.names)}:{summary.total}"
+                """);
+            Value call = eventLoopContext.getBindings(PYTHON).getMember("call_summarizer");
+
+            CompletionStage<?> stage = PythonAsyncioRuntime.toCompletionStage(call.execute(wrapper));
+            eventLoop.runUntilComplete(stage);
+
+            assertEquals("me:a,b:3:['a', 'b']:2", stage.toCompletableFuture().get(1, TimeUnit.SECONDS).toString());
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
         }
@@ -1398,11 +1553,13 @@ final class PythonAsyncioRuntimeTest {
                 """);
             PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ReactiveClient()));
             Value coroutine = context.eval(PYTHON, """
+                import java
+                RuntimeException = java.type("java.lang.RuntimeException")
                 async def fail(target):
                     try:
                         await target.client.error()
-                    except RuntimeError as exc:
-                        return str(exc)
+                    except RuntimeException as exc:
+                        return exc.getMessage()
                     return "missing-error"
                 fail
                 """).execute(target);
@@ -2090,16 +2247,139 @@ final class PythonAsyncioRuntimeTest {
             CompletionException exception = assertThrows(CompletionException.class, joined::join);
             assertEquals("backend down", assertInstanceOf(IllegalStateException.class, exception.getCause()).getMessage());
 
+            // the await raises the Java exception itself, as the blocking call does
             Value catching = context.eval(PYTHON, """
+                import java
+                IllegalStateException = java.type("java.lang.IllegalStateException")
                 async def call(target):
                     try:
                         return await target.client.message()
-                    except Exception as e:
-                        return type(e).__name__ + ":" + str(e.java_exception.getMessage())
+                    except IllegalStateException as e:
+                        return "IllegalStateException:" + e.getMessage()
                 call
                 """).execute(target);
             CompletionStage caught = PythonAsyncioRuntime.toCompletionStage(catching);
-            assertEquals("MicronautJavaException:backend down", caught.toCompletableFuture().get(1, TimeUnit.SECONDS));
+            assertEquals("IllegalStateException:backend down", caught.toCompletableFuture().get(1, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void awaitedJavaFailureMatchesJavaTypeThroughTasksAndGather() throws Exception {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new FailingAsyncClient()));
+
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                import java
+                RuntimeException = java.type("java.lang.RuntimeException")
+                async def call(target):
+                    outcomes = []
+                    # an uncaught awaited failure fails the task and is raised again where the task is awaited
+                    async def uncaught():
+                        return await target.client.message()
+                    try:
+                        await asyncio.ensure_future(uncaught())
+                    except RuntimeException as e:
+                        outcomes.append("task:" + e.getClass().getSimpleName())
+                    try:
+                        await asyncio.gather(target.client.message(), asyncio.sleep(0))
+                    except RuntimeException as e:
+                        outcomes.append("gather:" + e.getMessage())
+                    # the failure stored on the future keeps the Java exception reachable
+                    results = await asyncio.gather(target.client.message(), return_exceptions=True)
+                    outcomes.append("stored:" + type(results[0]).__name__ + ":" + results[0].java_exception.getMessage())
+                    # as for a blocking Java call, `except Exception` does not catch the Java exception
+                    try:
+                        try:
+                            await target.client.message()
+                        except Exception:
+                            outcomes.append("caught-by-Exception")
+                    except BaseException as e:
+                        outcomes.append("BaseException:" + e.getClass().getSimpleName())
+                    return ",".join(outcomes)
+                call
+                """).execute(target);
+
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+            assertEquals(
+                "task:IllegalStateException,gather:backend down,stored:MicronautJavaException:backend down,BaseException:IllegalStateException",
+                stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void javaExceptionThrownInsideTaskIsRaisedWhereTheTaskIsAwaited() throws Exception {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                import java
+                Integer = java.type("java.lang.Integer")
+                NumberFormatException = java.type("java.lang.NumberFormatException")
+                async def call():
+                    async def parse():
+                        await asyncio.sleep(0)
+                        return Integer.parseInt("not a number")
+                    try:
+                        await asyncio.create_task(parse())
+                    except NumberFormatException as e:
+                        return "caught:" + e.getClass().getSimpleName()
+                call
+                """).execute();
+
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+            assertEquals("caught:NumberFormatException", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void awaitedStageFailingWithAPythonExceptionRaisesThatException() throws Exception {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value failing = context.eval(PYTHON, """
+                class Rejected(Exception):
+                    pass
+                rejected = Rejected("no")
+                async def fail():
+                    raise rejected
+                fail
+                """);
+            // the stage of a coroutine fails with the PolyglotException of its Python exception, which an
+            // interceptor chain wraps in a CompletionException
+            CompletableFuture<Object> wrapped = new CompletableFuture<>();
+            PythonAsyncioRuntime.toCompletionStage(failing.execute()).whenComplete((value, failure) ->
+                wrapped.completeExceptionally(new CompletionException((Throwable) failure)));
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new StageClient(wrapped)));
+            Value catching = context.eval(PYTHON, """
+                async def call(target):
+                    try:
+                        await target.client.stage()
+                    except Rejected as e:
+                        return "same" if e is rejected else "copy"
+                call
+                """).execute(target);
+            CompletionStage caught = PythonAsyncioRuntime.toCompletionStage(catching);
+            assertEquals("same", caught.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        }
+    }
+
+    public static final class StageClient {
+        private final CompletionStage<Object> stage;
+
+        StageClient(CompletionStage<Object> stage) {
+            this.stage = stage;
+        }
+
+        public CompletionStage<Object> stage() {
+            return stage;
         }
     }
 

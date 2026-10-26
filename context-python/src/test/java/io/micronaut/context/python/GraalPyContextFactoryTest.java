@@ -20,6 +20,7 @@ import io.micronaut.logging.LoggingSystem;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
+import org.graalvm.polyglot.Value;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.junit.jupiter.api.Test;
@@ -30,17 +31,41 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class GraalPyContextFactoryTest {
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void loadsMainFromTheConfiguredVfsMountPoint() throws IOException {
+        ClassLoader classLoader = getClass().getClassLoader();
+        System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
+        System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
+        try (VirtualFileSystem vfs = VirtualFileSystem.newBuilder()
+            .resourceDirectory(GraalPyContextFactory.APPLICATION_PATH)
+            .resourceClassLoader(classLoader)
+            .unixMountPoint("/micronaut_test_vfs")
+            .windowsMountPoint("Y:\\micronaut_test_vfs")
+            .build();
+             Context context = GraalPyResources.contextBuilder(vfs).build()) {
+            PolyglotException exception = assertThrows(PolyglotException.class, () ->
+                GraalPyContextFactory.evaluateMain(classLoader, "failing_main.py", context, vfs));
+            assertTrue(exception.getMessage().contains("failing_main.py refuses to load"), exception.getMessage());
+            assertEquals(Path.of(vfs.getMountPoint(), "src", "failing_main.py").toString(),
+                context.eval(PYTHON, "import sys; sys.modules['__main__'].__file__").asString());
+        }
+    }
 
     @Test
     void resolvesActiveVirtualEnvExecutableWithoutPyenvVersion() throws IOException {
@@ -125,6 +150,39 @@ final class GraalPyContextFactoryTest {
     }
 
     @Test
+    void restrictedHostClassLookupAllowsArraysOfVisibleComponentTypes() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "graalpy.context.host-class-lookup", List.of("com.example", "org.slf4j.Logger")
+        ))) {
+            Context context = applicationContext.getBean(Context.class);
+            // primitive arrays are always visible, for example as a body type token for the HTTP client
+            assertEquals(byte[].class, context.eval(PYTHON, "import java\njava.type('byte[]')").asHostObject());
+            assertEquals(int[][].class, context.eval(PYTHON, "java.type('int[][]')").asHostObject());
+            assertEquals(3, context.eval(PYTHON, "java.type('byte[]')(3)").getArraySize());
+            // an array is visible when its component type is
+            assertEquals(String[].class, context.eval(PYTHON, "java.type('java.lang.String[]')").asHostObject());
+            assertEquals(org.slf4j.Logger[][].class, context.eval(PYTHON, "java.type('org.slf4j.Logger[][]')").asHostObject());
+            PolyglotException blocked = assertThrows(PolyglotException.class,
+                () -> context.eval(PYTHON, "java.type('org.slf4j.LoggerFactory[]')"));
+            assertTrue(blocked.getMessage().contains("org.slf4j.LoggerFactory"), blocked.getMessage());
+        }
+    }
+
+    @Test
+    void hostClassFilterMatchesArrayNames() {
+        GraalPyContextConfiguration configuration = new GraalPyContextConfiguration();
+        configuration.setHostClassLookup(List.of("com.example"));
+        Predicate<String> filter = configuration.hostClassFilter();
+        // Truffle checks "byte[]" and then its component "byte"; JVM descriptors match the same way
+        for (String allowed : List.of("byte", "byte[]", "boolean[][]", "[B", "[[I", "com.example.Foo[]", "[Lcom.example.Foo;", "[Ljava.lang.String;", "java.lang.String[]")) {
+            assertTrue(filter.test(allowed), allowed);
+        }
+        for (String denied : List.of("org.other.Foo[]", "[Lorg.other.Foo;", "bytes", "byte[", "[", "[X", "[L;", "[Lcom.example.Foo", "com.examples.Foo[]")) {
+            assertFalse(filter.test(denied), denied);
+        }
+    }
+
+    @Test
     void javaObjectsAnswerToKeywordSafeMemberAliases() {
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "micronaut.python.pool.enabled", true,
@@ -153,6 +211,142 @@ final class GraalPyContextFactoryTest {
                 return pooledContext.eval(PYTHON, "factory.spec('p').or_(factory.spec('q')).is_()").asString();
             });
             assertEquals("p|q", pooled);
+        }
+    }
+
+    @Test
+    void javaStagesAndPublishersReturnedByAnyJavaCallAreAwaitable() throws Exception {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            Context context = applicationContext.getBean(Context.class);
+            Value coroutine = context.eval(PYTHON, """
+                import java
+                CompletableFuture = java.type("java.util.concurrent.CompletableFuture")
+                Mono = java.type("reactor.core.publisher.Mono")
+                IllegalStateException = java.type("java.lang.IllegalStateException")
+                async def call():
+                    values = [
+                        await CompletableFuture.completedFuture("future"),
+                        await Mono.just("mono").toFuture(),
+                        await Mono.just("publisher"),
+                    ]
+                    try:
+                        await Mono.error(IllegalStateException("failed")).toFuture()
+                    except IllegalStateException as e:
+                        values.append(e.getMessage())
+                    return ",".join(values)
+                call
+                """).execute();
+
+            CompletionStage<?> stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+            assertEquals("future,mono,publisher,failed", stage.toCompletableFuture().get(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void javaExceptionsAreCaughtByExceptException() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            Context context = applicationContext.getBean(Context.class);
+            context.getBindings(PYTHON).putMember("thrower", new Thrower());
+            context.eval(PYTHON, """
+                import java
+                Integer = java.type("java.lang.Integer")
+                NumberFormatException = java.type("java.lang.NumberFormatException")
+                IOException = java.type("java.io.IOException")
+
+                def outcome(action):
+                    try:
+                        try:
+                            action()
+                        except Exception:
+                            return "Exception"
+                    except BaseException:
+                        return "BaseException"
+                    return "none"
+
+                def raise_(error):
+                    raise error
+
+                def caught(action):
+                    try:
+                        action()
+                    except BaseException as e:
+                        return e
+                """);
+
+            // an unchecked exception of a Java call, a checked one, and one raised by Python code
+            assertEquals("Exception", context.eval(PYTHON, "outcome(lambda: Integer.parseInt('nope'))").asString());
+            assertEquals("Exception", context.eval(PYTHON, "outcome(lambda: thrower.ioException('unreachable'))").asString());
+            assertEquals("Exception", context.eval(PYTHON, "outcome(lambda: raise_(IOException('raised by Python')))").asString());
+            assertTrue(context.eval(PYTHON, "e = caught(lambda: Integer.parseInt('nope')); isinstance(e, Exception) and isinstance(e, BaseException)").asBoolean());
+            assertTrue(context.eval(PYTHON, "isinstance(e, NumberFormatException) and e.getMessage() == 'For input string: \"nope\"'").asBoolean(),
+                "the exception remains the Java exception");
+            assertTrue(context.eval(PYTHON, "'nope' in str(e)").asBoolean());
+            assertTrue(context.eval(PYTHON, "isinstance(IOException('constructed'), Exception)").asBoolean());
+            assertTrue(context.eval(PYTHON, "not isinstance(e, ValueError)").asBoolean(), "only Exception, not a specific Python error");
+
+            // a Java exception type still selects its except clause
+            assertEquals("IOException", context.eval(PYTHON, """
+                try:
+                    thrower.ioException('selected')
+                except NumberFormatException:
+                    selected = 'NumberFormatException'
+                except IOException:
+                    selected = 'IOException'
+                selected
+                """).asString());
+
+            // a java.lang.Error is a BaseException only, like KeyboardInterrupt, SystemExit and GeneratorExit
+            assertEquals("BaseException", context.eval(PYTHON, "outcome(lambda: thrower.error('fatal'))").asString());
+            assertTrue(context.eval(PYTHON, "e = caught(lambda: thrower.error('fatal')); isinstance(e, BaseException) and not isinstance(e, Exception)").asBoolean());
+            assertEquals("BaseException", context.eval(PYTHON, "outcome(lambda: raise_(KeyboardInterrupt()))").asString());
+            assertEquals("BaseException", context.eval(PYTHON, "outcome(lambda: raise_(SystemExit(1)))").asString());
+            assertEquals("BaseException", context.eval(PYTHON, "outcome(lambda: raise_(GeneratorExit()))").asString());
+
+            // the exception chains, and reaches Java as the host exception it is
+            assertTrue(context.eval(PYTHON, """
+                def wrap():
+                    try:
+                        Integer.parseInt('nope')
+                    except Exception as e:
+                        raise RuntimeError('wrapped') from e
+                w = caught(wrap)
+                isinstance(w, RuntimeError) and isinstance(w.__cause__, NumberFormatException)
+                """).asBoolean());
+            NumberFormatException rethrown = assertThrows(NumberFormatException.class, () -> context.eval(PYTHON, """
+                try:
+                    Integer.parseInt('nope')
+                except Exception:
+                    raise
+                """));
+            assertEquals("For input string: \"nope\"", rethrown.getMessage());
+
+            // pooled contexts are bootstrapped the same way
+            boolean pooled = applicationContext.getBean(PythonContextExecutor.class).withContext(pooledContext -> pooledContext.eval(PYTHON, """
+                import java
+                try:
+                    java.type("java.lang.Integer").parseInt("nope")
+                    result = False
+                except Exception:
+                    result = True
+                result
+                """).asBoolean());
+            assertTrue(pooled);
+        }
+    }
+
+    public static final class Thrower {
+        public void ioException(String message) throws IOException {
+            throw new IOException(message);
+        }
+
+        public void error(String message) {
+            throw new AssertionError(message);
         }
     }
 
@@ -278,7 +472,7 @@ final class GraalPyContextFactoryTest {
         try (Context context = GraalPyResources.contextBuilder(vfs).allowAllAccess(true).build()) {
             String cachePath = context.eval(PYTHON, "import micronaut_asyncio; micronaut_asyncio.__cached__").asString();
 
-            assertTrue(cachePath.contains("/__pycache__/micronaut_asyncio."));
+            assertTrue(cachePath.replace('\\', '/').contains("/__pycache__/micronaut_asyncio."));
             assertTrue(cachePath.endsWith(".pyc"));
         }
     }

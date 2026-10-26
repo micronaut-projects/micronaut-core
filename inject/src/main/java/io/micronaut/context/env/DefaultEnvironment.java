@@ -120,6 +120,13 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean reading = new AtomicBoolean(false);
+    /**
+     * While a refresh runs, what {@link #addPropertySource(PropertySource)} and
+     * {@link #removePropertySource(PropertySource)} have changed since it started. A refresh that
+     * fails puts back the property sources it started with, and then these changes. Guarded by
+     * the monitor of {@link #propertySources}.
+     */
+    private @Nullable RefreshChanges changedWhileRefreshing;
 
     // For configuration maps, sets with low access - it's enough to use Collections.synchronized
 
@@ -206,9 +213,12 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
-        internalAddPropertySource(propertySource);
+        synchronized (propertySources) {
+            internalAddPropertySource(propertySource);
+            noteChangeWhileRefreshing(propertySource.getName(), propertySource);
+        }
         if (isRunning() && !reading.get()) {
-            propertyPlaceholderResolver.resetCaches();
+            propertyPlaceholderResolver.resetCachesAndRememberedValues();
             internalProcessPropertySource(propertySource);
         }
         return this;
@@ -216,11 +226,28 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public Environment removePropertySource(PropertySource propertySource) {
-        propertySources.remove(propertySource.getName());
+        synchronized (propertySources) {
+            propertySources.remove(propertySource.getName());
+            noteChangeWhileRefreshing(propertySource.getName(), null);
+        }
         if (isRunning() && !reading.get()) {
-            propertyPlaceholderResolver.resetCaches();
+            propertyPlaceholderResolver.resetCachesAndRememberedValues();
         }
         return this;
+    }
+
+    /**
+     * Notes, while a refresh runs, what a name is registered with after a change. Called with the
+     * monitor of {@link #propertySources} held.
+     *
+     * @param name   The name of the property source
+     * @param source The property source registered by that name, {@code null} when it was removed
+     */
+    private void noteChangeWhileRefreshing(String name, @Nullable PropertySource source) {
+        RefreshChanges changes = changedWhileRefreshing;
+        if (changes != null) {
+            changes.note(name, source);
+        }
     }
 
     @Override
@@ -259,7 +286,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public Collection<PropertySource> getPropertySources() {
-        return Collections.unmodifiableCollection(propertySources.values());
+        // A copy taken under the monitor of the map: property sources are added and removed while
+        // the environment runs, and iterating a view of the map would then fail
+        synchronized (propertySources) {
+            return List.copyOf(propertySources.values());
+        }
     }
 
     @Override
@@ -273,8 +304,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private void readProperties() {
         if (reading.compareAndSet(false, true)) {
-            loadProperties();
-            reading.set(false);
+            try {
+                loadProperties();
+            } finally {
+                reading.set(false);
+            }
         }
     }
 
@@ -289,8 +323,37 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         // Rebuild into a replacement catalog and publish it in one step, so a concurrent lookup
         // sees the properties either as they were before the refresh or as they are after it.
         propertyPlaceholderResolver.refresh(() -> {
-            dropProperties();
-            readProperties();
+            Map<String, PropertySource> previousSources;
+            RefreshChanges changes;
+            synchronized (propertySources) {
+                previousSources = new LinkedHashMap<>(propertySources);
+                changes = new RefreshChanges(previousSources);
+                changedWhileRefreshing = changes;
+            }
+            List<PropertySource> previousRefreshable = new ArrayList<>(refreshablePropertySources);
+            boolean completed = false;
+            try {
+                dropProperties();
+                readProperties();
+                completed = true;
+            } finally {
+                synchronized (propertySources) {
+                    changedWhileRefreshing = null;
+                    if (!completed) {
+                        // The resolver keeps the catalog it published when the rebuild fails. Put back the
+                        // property sources that catalog was built from, so the next refresh drops and reads
+                        // the same sources again, and then what addPropertySource and removePropertySource
+                        // changed while the failed refresh ran, so that those changes are not undone.
+                        propertySources.clear();
+                        propertySources.putAll(previousSources);
+                        changes.applyTo(propertySources);
+                    }
+                }
+                if (!completed) {
+                    refreshablePropertySources.clear();
+                    refreshablePropertySources.addAll(previousRefreshable);
+                }
+            }
         });
     }
 
@@ -349,7 +412,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private void loadProperties() {
         refreshablePropertySources.clear();
         List<PropertySource> propertySources = new ArrayList<>(configLocations.size());
-        Set<String> preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
+        Set<String> preExistingSourceNames;
+        synchronized (this.propertySources) {
+            // copied under the monitor: another thread can add or remove a property source meanwhile
+            preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
+        }
         if (configuration.isEnableDefaultPropertySources()) {
             propertySources.addAll(readPropertySourceList(applicationName));
             List<PropertySource> defaultPropertySources = new ArrayList<>(4);
@@ -367,7 +434,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         } else {
             propertySources = new ArrayList<>(this.propertySources.size());
         }
-        for (PropertySource propertySource : this.propertySources.values()) {
+        for (PropertySource propertySource : getPropertySources()) {
             if (!propertySources.contains(propertySource)) {
                 propertySources.add(propertySource);
             }
@@ -544,6 +611,20 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             }
         }
         return currentPropertySourceLoaders;
+    }
+
+    /**
+     * Drops the property source loaders, so that the next read of the property sources creates new
+     * instances. The bootstrap context, which refreshes its environment rather than being created
+     * again, calls this before each refresh: a loader then sees a refresh as it did when every read
+     * of the bootstrap configuration had a new environment, and one that returns its property source
+     * only once keeps returning it.
+     */
+    void resetPropertySourceLoaders() {
+        synchronized (this) {
+            propertySourceLoaderList = null;
+            loaderByFormatMap.clear();
+        }
     }
 
     private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
@@ -968,25 +1049,114 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public void close() {
+        // Everything is closed and the environment is stopped even when something fails to close:
+        // the first failure is thrown at the end, with the later ones suppressed by it.
+        RuntimeException failure = null;
         try {
             propertyPlaceholderResolver.close();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to close property placeholder resolver: " + e.getMessage(), e);
+            failure = new RuntimeException("Failed to close property placeholder resolver: " + e.getMessage(), e);
         }
         for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
             if (propertySourcesLocator instanceof Closeable closeable) {
                 try {
                     closeable.close();
                 } catch (Exception e) {
-                    throw new RuntimeException("Failed to close property sources locator " + propertySourcesLocator.getClass() + ": " + e.getMessage(), e);
+                    failure = addFailure(failure, new RuntimeException("Failed to close property sources locator " + propertySourcesLocator.getClass() + ": " + e.getMessage(), e));
                 }
             }
         }
-        stop();
+        try {
+            stop();
+        } catch (RuntimeException e) {
+            failure = addFailure(failure, e);
+        }
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    private static RuntimeException addFailure(@Nullable RuntimeException failure, RuntimeException next) {
+        if (failure == null) {
+            return next;
+        }
+        failure.addSuppressed(next);
+        return failure;
     }
 
     @Override
     public MutableConversionService getConversionService() {
         return mutableConversionService;
+    }
+
+    /**
+     * The property sources added and removed while a refresh runs, which a refresh that fails
+     * applies to the property sources it puts back. They end as if each call had been made on
+     * those property sources, in the order the calls were made: a property source that replaces
+     * one still registered by its name takes its place, and one added under a name that is not
+     * registered goes last. It holds one entry per name.
+     */
+    private static final class RefreshChanges {
+        /**
+         * The property sources registered when the refresh started.
+         */
+        private final Map<String, PropertySource> before;
+        /**
+         * By name, the property source registered after the last change, {@code null} once it was
+         * removed. A name added while it was not registered is moved last, so those names are in
+         * the order in which they go last.
+         */
+        private final Map<String, @Nullable PropertySource> changes = new LinkedHashMap<>();
+        /**
+         * The names added while they were not registered, which go last rather than where they were.
+         */
+        private final Set<String> appended = new HashSet<>();
+
+        RefreshChanges(Map<String, PropertySource> before) {
+            this.before = before;
+        }
+
+        /**
+         * Notes a change.
+         *
+         * @param name   The name of the property source
+         * @param source The property source registered by that name, {@code null} when it was removed
+         */
+        void note(String name, @Nullable PropertySource source) {
+            boolean registered = changes.containsKey(name) ? changes.get(name) != null : before.containsKey(name);
+            if (source == null) {
+                changes.put(name, null);
+                appended.remove(name);
+            } else if (registered) {
+                // takes the place of the property source it replaces
+                changes.put(name, source);
+            } else {
+                // goes last
+                changes.remove(name);
+                changes.put(name, source);
+                appended.add(name);
+            }
+        }
+
+        /**
+         * Applies the changes to the property sources the refresh started with.
+         *
+         * @param propertySources The property sources, as they were when the refresh started
+         */
+        void applyTo(Map<String, PropertySource> propertySources) {
+            changes.forEach((name, source) -> {
+                if (source == null) {
+                    propertySources.remove(name);
+                } else if (!appended.contains(name)) {
+                    propertySources.put(name, source);
+                }
+            });
+            changes.forEach((name, source) -> {
+                if (source != null && appended.contains(name)) {
+                    propertySources.remove(name);
+                    propertySources.put(name, source);
+                }
+            });
+        }
     }
 }

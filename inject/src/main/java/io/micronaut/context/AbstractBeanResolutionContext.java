@@ -219,12 +219,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             if (value.isPresent()) {
                 return value.get();
             } else {
+                Optional<?> defaultValue = argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", argument);
+                if (defaultValue.isPresent()) {
+                    return defaultValue.get();
+                }
                 if (argument.isDeclaredNullable()) {
                     return null;
                 }
-                String finalStringValue = stringValue;
-                return argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", argument)
-                    .orElseThrow(() -> DependencyInjectionException.missingProperty(this, conversionContext, finalStringValue));
+                throw DependencyInjectionException.missingProperty(this, conversionContext, stringValue);
             }
         }
     }

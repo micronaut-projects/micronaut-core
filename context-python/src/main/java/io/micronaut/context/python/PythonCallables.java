@@ -96,7 +96,9 @@ import java.util.function.UnaryOperator;
  * parameters of the interface method wins
  * over one that accepts them through default values, and value-returning interfaces take
  * precedence over void ones so that a zero-argument lambda selects {@code Supplier} over
- * {@code Runnable}, like a Java lambda expression does. The mappings stay out of the decision for
+ * {@code Runnable}, like a Java lambda expression does, also next to further arguments
+ * ({@code Callable} over {@code Runnable} for {@code TaskScheduler.schedule(Duration, ...)}). The
+ * mappings stay out of the decision for
  * a callable whose signature cannot be read (a {@code functools.partial}, a builtin) or that only
  * fits an arity through {@code *args}: the mapping of every overload would apply and the call be
  * ambiguous, where the default conversion of the host interop has an answer ({@code Function} is
@@ -190,10 +192,23 @@ final class PythonCallables {
 
     private static <T> void registerArityMapping(HostAccess.Builder builder, Class<T> type, int arity, boolean returnsValue) {
         // a callable declaring exactly the parameters of the interface method wins; a value-returning
-        // interface wins over a void one (Supplier over Runnable), like a Java lambda expression
-        HostAccess.TargetMappingPrecedence exact = returnsValue
-            ? HostAccess.TargetMappingPrecedence.HIGHEST
-            : HostAccess.TargetMappingPrecedence.HIGH;
+        // interface wins over a void one (Supplier over Runnable), like a Java lambda expression.
+        // The host interop only ranks overloads by mapping precedence when it settles on them at a
+        // loose priority: once every argument converts strictly, mappings of the HIGHEST and HIGH
+        // precedence tie. A call passing another argument (schedule(Duration, Runnable) against
+        // schedule(Duration, Callable)) settles at the strict priority, so a zero-argument void
+        // interface is mapped at LOW precedence, after the value-returning ones. Only the zero-argument
+        // one is: no callable fits an arity of zero exactly and another arity through default values,
+        // where a void interface with parameters would tie with the default-value mappings and with
+        // the loose Map conversion of the host interop
+        HostAccess.TargetMappingPrecedence exact;
+        if (returnsValue) {
+            exact = HostAccess.TargetMappingPrecedence.HIGHEST;
+        } else if (arity == 0) {
+            exact = HostAccess.TargetMappingPrecedence.LOW;
+        } else {
+            exact = HostAccess.TargetMappingPrecedence.HIGH;
+        }
         builder.targetTypeMapping(
             Value.class,
             type,

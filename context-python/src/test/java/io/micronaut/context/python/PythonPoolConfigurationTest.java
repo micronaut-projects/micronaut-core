@@ -18,6 +18,7 @@ package io.micronaut.context.python;
 import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -46,5 +47,24 @@ final class PythonPoolConfigurationTest {
             assertNull(context.getBean(PythonPoolConfiguration.class).ignoreDependencies());
         }
         assertNull(new PythonPoolConfiguration(true, 0, null, 0).ignoreDependencies());
+    }
+
+    @Test
+    void warnWaitDefaultsToTwoSeconds() {
+        // the component is nullable, which must not drop its @Bindable default
+        try (ApplicationContext context = ApplicationContext.run(Map.of(PythonPoolConfiguration.PREFIX + ".size", 3))) {
+            assertEquals(Duration.ofSeconds(2), context.getBean(PythonPoolConfiguration.class).warnWait());
+        }
+        try (ApplicationContext context = ApplicationContext.run()) {
+            assertEquals(Duration.ofSeconds(2), context.getBean(PythonPoolConfiguration.class).warnWait());
+        }
+    }
+
+    @Test
+    void warnWaitCanBeTurnedOff() {
+        // PythonPool never warns for a threshold that is not positive
+        try (ApplicationContext context = ApplicationContext.run(Map.of(PythonPoolConfiguration.PREFIX + ".warn-wait", "0s"))) {
+            assertEquals(Duration.ZERO, context.getBean(PythonPoolConfiguration.class).warnWait());
+        }
     }
 }

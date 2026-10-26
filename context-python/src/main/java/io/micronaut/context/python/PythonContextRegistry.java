@@ -60,6 +60,10 @@ final class PythonContextRegistry {
     private static final AtomicInteger ACTIVE_EXECUTIONS = new AtomicInteger();
     private static final Object LOCK = new Object();
     private static final HashMap<Context, ContextState> CONTEXT_STATES = new HashMap<>();
+    /** The contexts of each engine that are being built and not registered yet; guarded by {@link #LOCK}. */
+    private static final HashMap<Engine, Integer> PENDING_BUILDS = new HashMap<>();
+    /** The {@link #onNoContexts} listeners waiting for the builds of an engine to end; guarded by {@link #LOCK}. */
+    private static final HashMap<Engine, List<Runnable>> AFTER_PENDING_BUILDS = new HashMap<>();
     private static final ScopedValue<ExecutionFrame> CURRENT_EXECUTION = ScopedValue.newInstance();
 
     private PythonContextRegistry() {
@@ -108,6 +112,47 @@ final class PythonContextRegistry {
         ContextState state = state(context);
         state.enterable.set(context);
         state.registered = true;
+    }
+
+    /**
+     * Record that a context of the engine is being built.
+     * <p>
+     * A context exists for the engine before {@link #registerContext} can see it: an engine closed in
+     * between would close under the build. {@link #onNoContexts} therefore waits for the builds of the
+     * engine to end, which callers mark with {@link #endContextBuild} once the context is registered or
+     * the build failed.
+     *
+     * @param engine The engine the context is built on
+     */
+    static void beginContextBuild(Engine engine) {
+        synchronized (LOCK) {
+            PENDING_BUILDS.merge(engine, 1, Integer::sum);
+        }
+    }
+
+    /**
+     * Record that a build marked by {@link #beginContextBuild} ended, registered or failed.
+     *
+     * @param engine The engine the context was built on
+     */
+    static void endContextBuild(Engine engine) {
+        List<Runnable> deferred;
+        synchronized (LOCK) {
+            Integer pending = PENDING_BUILDS.get(engine);
+            if (pending == null) {
+                return;
+            }
+            if (pending > 1) {
+                PENDING_BUILDS.put(engine, pending - 1);
+                return;
+            }
+            PENDING_BUILDS.remove(engine);
+            deferred = AFTER_PENDING_BUILDS.remove(engine);
+        }
+        if (deferred != null) {
+            // gate again, now on the contexts the builds registered
+            deferred.forEach(listener -> onNoContexts(engine, listener));
+        }
     }
 
     /**
@@ -693,6 +738,8 @@ final class PythonContextRegistry {
      * <p>
      * The listener runs immediately when no registered context uses the engine. Registration and gate
      * installation happen under the registry lock so a concurrent unregister cannot miss the listener.
+     * While a context of the engine is being built (see {@link #beginContextBuild}) the gate is installed
+     * once the build ends, so it includes the context the build registers.
      *
      * @param engine The engine to observe
      * @param listener The listener to run when the engine no longer owns contexts
@@ -700,8 +747,14 @@ final class PythonContextRegistry {
     static void onNoContexts(Engine engine, Runnable listener) {
         boolean runNow;
         synchronized (LOCK) {
+            if (PENDING_BUILDS.containsKey(engine)) {
+                AFTER_PENDING_BUILDS.computeIfAbsent(engine, ignored -> new ArrayList<>()).add(listener);
+                return;
+            }
+            // registered contexts only: a state that a late lookup recreated for a context already
+            // closed and unregistered is never unregistered again, and must not hold the engine open
             List<ContextState> states = CONTEXT_STATES.entrySet().stream()
-                .filter(entry -> entry.getKey().getEngine().equals(engine))
+                .filter(entry -> entry.getValue().registered && entry.getKey().getEngine().equals(engine))
                 .map(Map.Entry::getValue)
                 .toList();
             runNow = states.isEmpty();
@@ -775,15 +828,6 @@ final class PythonContextRegistry {
     /**
      * The runtime state of one GraalPy context.
      */
-    /**
-     * The event-loop instance of a startup-context object.
-     *
-     * @param target The event-loop instance
-     * @param constructorMembers The members its own {@code __init__} set
-     */
-    record AsyncInstance(Value target, Set<String> constructorMembers) {
-    }
-
     static final class ContextState {
         final Object lock = new Object();
         /** The enterable creator instance of this context, when known. */
@@ -792,20 +836,13 @@ final class PythonContextRegistry {
         volatile boolean registered;
         /** Whether entering was probed on an instance that cannot be entered. */
         volatile boolean enterUnsupported;
-        /** Host members assigned to startup-context objects, mirrored into event-loop contexts. */
-        final IdentityHashMap<Value, Map<String, Object>> asyncMembers = new IdentityHashMap<>();
-        /**
-         * Host constructor arguments of startup-context objects, replayed into event-loop contexts. Weak: an object
-         * created per request is forgotten with its wrapper, which holds the key.
-         */
-        final WeakHashMap<Value, Object[]> asyncConstructorArguments = new WeakHashMap<>();
-        /**
-         * Event-loop instances of startup-context objects, in an event-loop context. Weak: the startup object's
-         * wrapper holds the key.
-         */
-        final Map<Value, AsyncInstance> asyncInstances = Collections.synchronizedMap(new WeakHashMap<>());
         /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
         final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
+        /**
+         * Whether a member of a Python class is an async function, by class and member name: read for every call
+         * a caller in another context makes through a wrapper.
+         */
+        final Map<Value, Map<String, String>> asyncFunctionKinds = new ConcurrentHashMap<>();
         /**
          * The pooled beans that have an instance in this context, so that closing it can tell them to
          * drop it. The instances themselves live on the bean, which is what makes a collected bean take
@@ -849,10 +886,8 @@ final class PythonContextRegistry {
                 holder.forget(owner);
             }
             pooledHolders.clear();
-            asyncMembers.clear();
-            asyncConstructorArguments.clear();
-            asyncInstances.clear();
             coroutineClasses.clear();
+            asyncFunctionKinds.clear();
             helpers.clear();
             classes.clear();
             scopedProxies.clear();

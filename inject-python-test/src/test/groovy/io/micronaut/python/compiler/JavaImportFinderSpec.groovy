@@ -30,6 +30,7 @@ class JavaImportFinderSpec extends Specification {
 
     private static final String PROBE = '''
 import importlib
+import os
 import sys
 
 from jakarta.inject import Singleton
@@ -37,7 +38,8 @@ from micronaut.context.annotation import Executable
 
 # the modules of micronaut.core loaded when the application modules are imported
 LOADED_AT_STARTUP = sorted(name for name in sys.modules if name == 'micronaut.core' or name.startswith('micronaut.core.'))
-GENERATED_AT_STARTUP = sorted(name for name, module in sys.modules.items() if (getattr(module, '__file__', None) or '').startswith('/graalpy_vfs/src/'))
+SOURCE_DIRECTORY = os.path.dirname(os.path.dirname(__file__))
+GENERATED_AT_STARTUP = sorted(name for name, module in sys.modules.items() if (getattr(module, '__file__', None) or '').startswith(SOURCE_DIRECTORY + os.sep))
 
 
 def _shims():
@@ -229,6 +231,7 @@ class Probe:
 
         then: "starting the application imports no module of micronaut.core, and the only generated modules are the application's"
         report.startup == ""
+        'app' in report.generated.split(',')
         report.generated.split(',').every { !it.startsWith('micronaut.') && !it.startsWith('jakarta') }
 
         and: "a Java package is a module without a file that leaves its subpackages to their first access"

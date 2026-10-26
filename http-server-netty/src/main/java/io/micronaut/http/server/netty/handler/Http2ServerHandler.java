@@ -26,6 +26,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http2.AbstractHttp2ConnectionHandlerBuilder;
@@ -150,7 +151,19 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             str.setProperty(streamKey, existing);
             return;
         }
-        stream.onHeadersRead(HttpConversionUtil.toHttpRequest(streamId, headers, true), endOfStream);
+        HttpRequest request;
+        try {
+            request = HttpConversionUtil.toHttpRequest(streamId, headers, true);
+        } catch (Http2Exception e) {
+            str.removeProperty(streamKey);
+            throw e;
+        } catch (RuntimeException e) {
+            // e.g. a missing :method or :path pseudo-header. RFC 9113 §8.1.1: a malformed
+            // request is a stream error, it must not fail the other streams of the connection.
+            str.removeProperty(streamKey);
+            throw Http2Exception.streamError(streamId, Http2Error.PROTOCOL_ERROR, e, "Malformed request headers");
+        }
+        stream.onHeadersRead(request, endOfStream);
         if (!endOfStream) {
             pendingStreams.add(stream);
         }

@@ -15,11 +15,32 @@
  */
 package io.micronaut.python.processing;
 
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.io.IOAccess;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class PythonAnnotationProcessorTest {
+
+    @Test
+    void generatedLauncherLoadsMembersFromItsOwnDirectory(@TempDir Path directory) throws IOException {
+        Files.writeString(directory.resolve("__micronaut_members_test.py"), "answer = 42\n__all__ = ['answer']\n");
+        try (Context context = Context.newBuilder("python").allowIO(IOAccess.ALL).build()) {
+            context.getBindings("python").putMember("launcher_source", PythonAnnotationProcessor.LAUNCHER_SOURCE);
+            context.getBindings("python").putMember("launcher_path", directory.resolve("__main__.py").toString());
+            assertEquals(42, context.eval("python", """
+                namespace = {'__file__': launcher_path}
+                exec(launcher_source, namespace)
+                namespace['answer']
+                """).asInt());
+        }
+    }
 
     @Test
     void normalizesWindowsResourcePathSeparators() {
