@@ -313,11 +313,38 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 rebuild.run();
                 state = writeState;
                 mirrorPublishedState();
+                propertiesPublished();
             } finally {
                 refreshingThread = null;
                 writeState = state;
             }
         }
+    }
+
+    /**
+     * @return Whether the current thread is rebuilding the catalogs, see {@link #refresh(Runnable)}
+     */
+    boolean isRefreshing() {
+        return refreshingThread == Thread.currentThread();
+    }
+
+    /**
+     * Called once the properties that a start or a refresh processed are published. Called with the
+     * catalog lock held.
+     */
+    void propertiesPublished() {
+        // nothing to note
+    }
+
+    /**
+     * Whether a property source that is about to be processed was processed already, by a start
+     * or a refresh that the processing waited for. Called with the catalog lock held.
+     *
+     * @param propertySource The property source
+     * @return Whether to leave it as processed
+     */
+    boolean alreadyProcessed(PropertySource propertySource) {
+        return false;
     }
 
     /**
@@ -793,6 +820,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
         this.propertySources.put(properties.getName(), properties);
         synchronized (catalogLock) {
+            if (alreadyProcessed(properties)) {
+                return;
+            }
             for (String property : properties) {
 
                 log.trace("Processing property key {}", property);
