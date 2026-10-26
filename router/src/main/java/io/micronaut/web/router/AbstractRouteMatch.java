@@ -29,7 +29,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.PostponedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
-import io.micronaut.http.bind.binders.UnmatchedRequestArgumentBinder;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.builder.DefaultPathVariables;
 import io.micronaut.http.PathVariables;
@@ -396,29 +395,6 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                                   HttpRequest<?> request) {
         ArgumentConversionContext<E> conversionContext = newContext(argument, request);
         ArgumentBinder.BindingResult<E> bindingResult = argumentBinder.bind(conversionContext, request);
-        if (argumentBinder instanceof UnmatchedRequestArgumentBinder && !bindingResult.isPending()) {
-            List<ConversionError> errors = bindingResult.getConversionErrors();
-            if (!errors.isEmpty()) {
-                // A postponed binder may replace these errors with a filter-supplied value.
-                rememberBindingResult(index, new ArgumentBinder.BindingResult<E>() {
-                    @Override
-                    public Optional<E> getValue() {
-                        return Optional.empty();
-                    }
-
-                    @Override
-                    public boolean isSatisfied() {
-                        return false;
-                    }
-
-                    @Override
-                    public List<ConversionError> getConversionErrors() {
-                        return afterBindersApplied ? errors : List.of();
-                    }
-                });
-                return;
-            }
-        }
         fulfillValue(index, argument, bindingResult);
     }
 
@@ -444,6 +420,9 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             rememberBindingResult(index, bindingResult);
             return;
         }
+        // a conversion error fails the request where the value is bound: before the filters for the
+        // binders that run before them, like the unmatched binder
+        failOnConversionErrors(argument, bindingResult);
         setBindingResult(index, argument, bindingResult);
     }
 

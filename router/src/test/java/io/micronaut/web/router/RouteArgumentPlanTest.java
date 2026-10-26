@@ -97,7 +97,7 @@ class RouteArgumentPlanTest {
     }
 
     @Test
-    void filtersCanReplaceUnmatchedConversionErrorsAndUnresolvedErrorsArePreserved() {
+    void anUnmatchedConversionErrorFailsBeforeFilters() {
         try (var context = ApplicationContext.run(Map.of("spec.name", "RouteArgumentPlanTest"))) {
             Router router = context.getBean(Router.class);
             var registry = new DefaultRequestBinderRegistry(ConversionService.SHARED);
@@ -115,25 +115,11 @@ class RouteArgumentPlanTest {
                 };
             });
             for (String path : List.of("error", "nullable-error", "optional-error")) {
-                for (boolean suppliedByFilter : List.of(true, false)) {
-                    var request = request("/binding-plan/" + path + "?count=bad");
-                    var match = router.findClosest(request);
-                    match.fulfillBeforeFilters(registry, request);
-                    assertFalse(match.isSatisfied("count"));
-                    assertFalse(match.isFulfilled());
-                    if (suppliedByFilter) {
-                        request.setAttribute("count", 7);
-                    }
-                    // The executor checks readiness before applying the postponed binders.
-                    assertFalse(match.isFulfilled());
-                    match.fulfillAfterFilters(registry, request);
-                    if (suppliedByFilter) {
-                        assertEquals("count=7", match.execute());
-                    } else {
-                        var failure = assertThrows(ConversionErrorException.class, match::execute);
-                        assertEquals("count", failure.getArgument().getName());
-                    }
-                }
+                var request = request("/binding-plan/" + path + "?count=bad");
+                var match = router.findClosest(request);
+                // like on 5.3.x: the filters do not run for a request whose argument failed to convert
+                var failure = assertThrows(ConversionErrorException.class, () -> match.fulfillBeforeFilters(registry, request));
+                assertEquals("count", failure.getArgument().getName());
             }
         }
     }
@@ -150,7 +136,7 @@ class RouteArgumentPlanTest {
     }
 
     @Test
-    void aDeferredConversionErrorCanBeReplacedWhileAnotherArgumentIsPending() {
+    void aConversionErrorFailsBeforeFiltersWhileAnotherArgumentIsPending() {
         try (var context = ApplicationContext.run(Map.of("spec.name", "RouteArgumentPlanTest"))) {
             Router router = context.getBean(Router.class);
             var pending = new PendingToken();
@@ -165,14 +151,16 @@ class RouteArgumentPlanTest {
             });
             var request = request("/binding-plan/pending-error?count=bad");
             var match = router.findClosest(request);
-            match.fulfillBeforeFilters(registry, request);
-            assertFalse(match.isFulfilled());
-            request.setAttribute("count", 7);
-            match.fulfillAfterFilters(registry, request);
-            assertFalse(match.isFulfilled());
+            assertThrows(ConversionErrorException.class, () -> match.fulfillBeforeFilters(registry, request));
+            // a request without the error waits for the pending argument
+            var valid = request("/binding-plan/pending-error?count=7");
+            var validMatch = router.findClosest(valid);
+            validMatch.fulfillBeforeFilters(registry, valid);
+            validMatch.fulfillAfterFilters(registry, valid);
+            assertFalse(validMatch.isFulfilled());
             pending.ready = true;
-            assertTrue(match.isFulfilled());
-            assertEquals("7:later", match.execute());
+            assertTrue(validMatch.isFulfilled());
+            assertEquals("7:later", validMatch.execute());
         }
     }
 
