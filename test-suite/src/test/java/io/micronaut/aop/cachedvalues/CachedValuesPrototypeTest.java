@@ -18,7 +18,14 @@ package io.micronaut.aop.cachedvalues;
 import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -45,6 +52,42 @@ class CachedValuesPrototypeTest {
             // Each context keeps its own methods, and the values they keep
             assertNotSame(recordedA.methods.get(0), recordedB.methods.get(0));
             assertNotSame(recordedA.values.get(0), recordedB.values.get(0));
+        }
+    }
+
+    @Test
+    void creatingAProxyKeepsTheValuesOfTheMethodsItShares() {
+        try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "CachedValuesTest"))) {
+            context.getBean(RecordedPrototype.class).work();
+            context.getBean(RecordedPrototype.class).work();
+            RecordingInterceptor recorded = context.getBean(RecordingInterceptor.class);
+
+            assertSame(recorded.methods.get(0), recorded.methods.get(1));
+            assertSame(recorded.values.get(0), recorded.values.get(1));
+        }
+    }
+
+    @Test
+    void proxiesCreatedConcurrentlyShareTheMethods() throws Exception {
+        int threads = 16;
+        for (int round = 0; round < 20; round++) {
+            try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "CachedValuesTest"));
+                 ExecutorService executor = Executors.newFixedThreadPool(threads)) {
+                CyclicBarrier barrier = new CyclicBarrier(threads);
+                List<Future<?>> calls = new ArrayList<>();
+                for (int i = 0; i < threads; i++) {
+                    calls.add(executor.submit(() -> {
+                        barrier.await();
+                        return context.getBean(RecordedPrototype.class).work();
+                    }));
+                }
+                for (Future<?> call : calls) {
+                    call.get(10, TimeUnit.SECONDS);
+                }
+                RecordingInterceptor recorded = context.getBean(RecordingInterceptor.class);
+
+                assertEquals(1, recorded.methods.stream().distinct().count());
+            }
         }
     }
 
