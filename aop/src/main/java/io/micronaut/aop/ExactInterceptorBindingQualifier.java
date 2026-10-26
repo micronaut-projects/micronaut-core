@@ -56,6 +56,9 @@ import java.util.stream.Collectors;
  * <p>Members marked {@link io.micronaut.context.annotation.NonBinding} take no part. An occurrence built at runtime
  * does not list them, and the members the other side lists are left out of it as well.</p>
  *
+ * <p>A candidate which does not declare its bindings through {@link InterceptorBinding} can be given by the
+ * occurrences of its binding annotations, see {@link #matches(Collection)}.</p>
+ *
  * <p>The bean-candidate pre-filter {@link io.micronaut.inject.qualifiers.Qualifiers#byInterceptorBinding} instead
  * accepts a candidate any of whose bindings applies.</p>
  *
@@ -126,10 +129,7 @@ public final class ExactInterceptorBindingQualifier<T> extends FilteringQualifie
      */
     public static <T> ExactInterceptorBindingQualifier<T> ofOccurrences(Collection<? extends AnnotationValue<?>> occurrences,
                                                                          InterceptorKind kind) {
-        Map<String, List<AnnotationValue<?>>> grouped = new LinkedHashMap<>();
-        for (AnnotationValue<?> occurrence : occurrences) {
-            grouped.computeIfAbsent(occurrence.getAnnotationName(), k -> new ArrayList<>(2)).add(occurrence);
-        }
+        Map<String, List<AnnotationValue<?>>> grouped = group(occurrences);
         Map<String, List<List<AnnotationValue<?>>>> pointOccurrences = LinkedHashMap.newLinkedHashMap(grouped.size());
         grouped.forEach((name, group) -> pointOccurrences.put(name, List.of(group)));
         return new ExactInterceptorBindingQualifier<>(kind, pointOccurrences, Set.of());
@@ -155,24 +155,59 @@ public final class ExactInterceptorBindingQualifier<T> extends FilteringQualifie
                 continue;
             }
             bound = true;
-            if (!applies(annotationName, binding, candidateMetadata)) {
+            if (!pointOccurrences.containsKey(annotationName)) {
+                return false;
+            }
+            List<AnnotationValue<?>> candidateOccurrences =
+                InterceptorBindingQualifier.resolveDeclaredOccurrences(binding, candidateMetadata, false);
+            if (candidateOccurrences != null
+                && !applies(annotationName, candidateOccurrences, binding.booleanValue(InterceptorBinding.META_MATCH_ALL_OCCURRENCES).orElse(false))) {
                 return false;
             }
         }
         return bound;
     }
 
-    private boolean applies(String annotationName, AnnotationValue<?> binding, AnnotationMetadata candidateMetadata) {
-        List<List<AnnotationValue<?>>> point = pointOccurrences.get(annotationName);
-        if (point == null) {
+    /**
+     * Whether a candidate given by the occurrences of its binding annotations is bound to the interception point,
+     * for a candidate which does not declare its bindings through {@link InterceptorBinding}, such as an
+     * interceptor class of another programming model which records its binding annotations itself.
+     *
+     * <p>The occurrences are grouped by annotation, and each group is compared as a binding with
+     * {@link InterceptorBinding#bindMembers()} and {@link InterceptorBinding#matchAllOccurrences()}: the point must
+     * have the binding annotation, and every occurrence of the group must be the same annotation as one at the
+     * point, which may declare more. A binding the point has without binding members applies by name. Each value
+     * is an occurrence of a binding annotation itself, repeatable annotations given one value per occurrence.</p>
+     *
+     * @param candidateOccurrences The occurrences of the binding annotations of the candidate
+     * @return Whether the candidate has at least one occurrence and every one of them applies at the point
+     */
+    public boolean matches(Collection<? extends AnnotationValue<?>> candidateOccurrences) {
+        if (candidateOccurrences.isEmpty()) {
             return false;
         }
-        List<AnnotationValue<?>> candidateOccurrences =
-            InterceptorBindingQualifier.resolveDeclaredOccurrences(binding, candidateMetadata, false);
-        if (candidateOccurrences == null) {
-            return true;
+        Map<String, List<AnnotationValue<?>>> grouped = group(candidateOccurrences);
+        for (Map.Entry<String, List<AnnotationValue<?>>> group : grouped.entrySet()) {
+            if (!pointOccurrences.containsKey(group.getKey()) || !applies(group.getKey(), group.getValue(), true)) {
+                return false;
+            }
         }
-        boolean matchAllOccurrences = binding.booleanValue(InterceptorBinding.META_MATCH_ALL_OCCURRENCES).orElse(false);
+        return true;
+    }
+
+    private static Map<String, List<AnnotationValue<?>>> group(Collection<? extends AnnotationValue<?>> occurrences) {
+        Map<String, List<AnnotationValue<?>>> grouped = new LinkedHashMap<>();
+        for (AnnotationValue<?> occurrence : occurrences) {
+            grouped.computeIfAbsent(occurrence.getAnnotationName(), k -> new ArrayList<>(2)).add(occurrence);
+        }
+        return grouped;
+    }
+
+    /**
+     * Whether the occurrences of a binding annotation on the candidate apply at the point, which has the annotation.
+     */
+    private boolean applies(String annotationName, List<AnnotationValue<?>> candidateOccurrences, boolean matchAllOccurrences) {
+        List<List<AnnotationValue<?>>> point = pointOccurrences.getOrDefault(annotationName, List.of());
         boolean boundByOccurrences = false;
         boolean boundByNoOccurrences = false;
         for (List<AnnotationValue<?>> occurrences : point) {

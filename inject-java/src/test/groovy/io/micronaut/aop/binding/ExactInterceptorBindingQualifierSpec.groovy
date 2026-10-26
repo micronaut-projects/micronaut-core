@@ -121,12 +121,71 @@ class ExactInterceptorBindingQualifierSpec extends AbstractTypeElementSpec {
 
         where:
         method          | expected
+        'scoped'        | ['ScopedX']
+        'scopedY'       | []
         'high'          | ['High']
         'low'           | []
         'stringTyped'   | ['StringTyped']
         'integerTyped'  | []
         'arrayed'       | ['Arrayed']
         'reordered'     | []
+    }
+
+    void 'the candidate given as occurrences must have every one of them at the point'() {
+        given:
+        def context = buildContext(SOURCE)
+        def qualifier = ExactInterceptorBindingQualifier.ofOccurrences([tag(context, 'a'), tag(context, 'b')], InterceptorKind.AROUND)
+
+        expect: "the candidate carries no Micronaut binding, its occurrences are compared as one group"
+        qualifier.matches([tag(context, 'a')])
+        qualifier.matches([tag(context, 'a'), tag(context, 'b')])
+        !qualifier.matches([tag(context, 'a'), tag(context, 'c')])
+        !qualifier.matches([tag(context, 'c')])
+
+        and: "an annotation the point does not have, or no occurrence at all, does not qualify"
+        !qualifier.matches([tag(context, 'a'), AnnotationValue.builder(context.classLoader.loadClass('exactbinding.Labeled')).build()])
+        !qualifier.matches([])
+
+        cleanup:
+        context.close()
+    }
+
+    void 'the candidate given as occurrences is compared with a point read from metadata'() {
+        given:
+        def context = buildContext(SOURCE)
+        def point = context.getBeanDefinition(context.classLoader.loadClass('exactbinding.Point'))
+        def qualifier = ExactInterceptorBindingQualifier.of(point.getRequiredMethod('inherited').annotationMetadata, InterceptorKind.AROUND)
+        def compiled = context.getBeanDefinition(context.classLoader.loadClass('exactbinding.TagAB'))
+            .getAnnotationValuesByType(context.classLoader.loadClass('exactbinding.Tag'))
+
+        expect: "the compiled occurrences of another bean, and a binding the point has by name only"
+        compiled.size() == 2
+        qualifier.matches(compiled)
+        qualifier.matches([AnnotationValue.builder(context.classLoader.loadClass('exactbinding.Labeled')).value('any').build()])
+        !qualifier.matches(compiled + [tag(context, 'c')])
+
+        cleanup:
+        context.close()
+    }
+
+    void 'a nested non-binding member takes no part when the candidate is given as occurrences'() {
+        given:
+        def context = buildContext(SOURCE)
+        def scopedType = context.classLoader.loadClass('exactbinding.Scoped')
+        def scopeType = context.classLoader.loadClass('exactbinding.Scope')
+        def point = context.getBeanDefinition(context.classLoader.loadClass('exactbinding.Members'))
+            .getRequiredMethod('scoped').annotationMetadata
+        def built = AnnotationValue.builder(scopedType)
+            .values(AnnotationValue.builder(scopeType).value('x').member('note', 'built').build())
+            .build()
+
+        expect:
+        ExactInterceptorBindingQualifier.of(point, InterceptorKind.AROUND).matches([built])
+        !ExactInterceptorBindingQualifier.of(point, InterceptorKind.AROUND).matches([
+            AnnotationValue.builder(scopedType).values(AnnotationValue.builder(scopeType).value('y').build()).build()])
+
+        cleanup:
+        context.close()
     }
 
     void 'the qualifier is equal to one built from the same point'() {
@@ -225,7 +284,25 @@ enum Level { HIGH, LOW }
     String value() default "north";
 }
 
+@Retention(RetentionPolicy.RUNTIME)
+@interface Scope {
+    String value();
+    @NonBinding String note() default "";
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@java.lang.annotation.Target({ElementType.TYPE, ElementType.METHOD})
+@InterceptorBinding(bindMembers = true)
+@interface Scoped {
+    Scope[] value();
+}
+
 interface Handler {
+}
+
+@Singleton
+@Scoped(@Scope(value = "x", note = "handler"))
+class ScopedX implements Handler {
 }
 
 @Singleton
@@ -303,6 +380,13 @@ class Point {
 
 @Singleton
 class Members {
+    @Scoped(@Scope(value = "x", note = "point"))
+    public void scoped() {
+    }
+
+    @Scoped(@Scope("y"))
+    public void scopedY() {
+    }
 
     @Leveled(Level.HIGH)
     public void high() {
