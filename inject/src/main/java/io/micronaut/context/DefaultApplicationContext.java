@@ -948,7 +948,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
 
         private final ApplicationContextConfiguration configuration;
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
-        private BootstrapEnvironment bootstrapEnvironment;
+        /**
+         * Replaced by a stop or a start, which can be on another thread than a read in progress:
+         * a read uses the one it finds when it reads the bootstrap configuration.
+         */
+        private volatile BootstrapEnvironment bootstrapEnvironment;
         private final boolean bootstrapEnabled;
 
         RuntimeConfiguredEnvironment(ApplicationContextConfiguration configuration, boolean bootstrapEnabled) {
@@ -963,38 +967,34 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
 
         @Override
         public Environment stop() {
-            // The lock of the property catalogs, which a refresh holds while it stops and starts this
-            // environment: the bootstrap environment is only ever replaced under that lock.
-            synchronized (catalog) {
-                if (bootstrapEnvironment != null) {
-                    bootstrapEnvironment.stop();
-                    bootstrapEnvironment = null;
-                }
-                return super.stop();
+            BootstrapEnvironment bootstrapEnvironment = this.bootstrapEnvironment;
+            if (bootstrapEnvironment != null) {
+                bootstrapEnvironment.stop();
+                this.bootstrapEnvironment = null;
             }
+            return super.stop();
         }
 
         @Override
         public Environment start() {
-            synchronized (catalog) {
-                if (bootstrapEnvironment == null && isRuntimeConfigured()) {
-                    bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
-                    startBootstrapEnvironment();
-                }
-                return super.start();
+            if (this.bootstrapEnvironment == null && isRuntimeConfigured()) {
+                BootstrapEnvironment bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
+                this.bootstrapEnvironment = bootstrapEnvironment;
+                startBootstrapEnvironment(bootstrapEnvironment);
             }
+            return super.start();
         }
 
         @Override
         protected synchronized List<PropertySource> readPropertySourceList(String name) {
-
+            BootstrapEnvironment bootstrapEnvironment = this.bootstrapEnvironment;
             if (bootstrapEnvironment != null) {
                 LOG.info("Reading bootstrap environment configuration");
 
                 refreshablePropertySources.addAll(bootstrapEnvironment.getRefreshablePropertySources());
 
                 String[] environmentNamesArray = getActiveNames().toArray(EMPTY_STRING_ARRAY);
-                BootstrapPropertySourceLocator bootstrapPropertySourceLocator = resolveBootstrapPropertySourceLocator(environmentNamesArray);
+                BootstrapPropertySourceLocator bootstrapPropertySourceLocator = resolveBootstrapPropertySourceLocator(bootstrapEnvironment, environmentNamesArray);
 
                 for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapEnvironment)) {
                     addPropertySource(propertySource);
@@ -1010,7 +1010,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
             return super.readPropertySourceList(name);
         }
 
-        private BootstrapPropertySourceLocator resolveBootstrapPropertySourceLocator(String... environmentNames) {
+        private BootstrapPropertySourceLocator resolveBootstrapPropertySourceLocator(BootstrapEnvironment bootstrapEnvironment, String... environmentNames) {
             if (this.bootstrapPropertySourceLocator == null) {
 
                 BootstrapApplicationContext bootstrapContext = new BootstrapApplicationContext(bootstrapEnvironment, environmentNames);
@@ -1033,7 +1033,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
                     environmentNames);
         }
 
-        private void startBootstrapEnvironment() {
+        private void startBootstrapEnvironment(BootstrapEnvironment bootstrapEnvironment) {
             // as the read of this environment sees them: within a refresh, without the property
             // sources it reads anew
             for (PropertySource source : getPropertySources()) {

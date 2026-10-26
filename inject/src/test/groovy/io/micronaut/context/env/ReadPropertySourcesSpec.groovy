@@ -4,11 +4,14 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.core.io.ResourceLoader
 import io.micronaut.core.order.Ordered
+import io.micronaut.core.util.StringUtils
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Timeout
 import spock.util.environment.RestoreSystemProperties
 
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -516,6 +519,77 @@ class ReadPropertySourcesSpec extends Specification {
         'once it has taken the registered ones, as' | false
     }
 
+    @RestoreSystemProperties
+    void "stop() from another thread while a refresh of a bootstrap enabled context reads the bootstrap configuration does not wait for it"() {
+        given:
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+        Path dir = Files.createTempDirectory('refresh-bootstrap-')
+        dir.resolve('bootstrap.yml').toFile().text = 'bootstrap.value: one\n'
+        CountingGate gate = new CountingGate()
+        ApplicationContext ctx = ApplicationContext.builder()
+                .overrideConfigLocations('file:' + dir)
+                .propertySources(gate)
+                .start()
+        Environment env = ctx.environment
+
+        when: "the refresh is parked while the new bootstrap environment reads the property sources"
+        gate.armAt(1)
+        Thread refresher = daemon('refresher') { env.refresh() }
+        assert gate.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        Thread stopper = daemon('stopper') { env.stop() }
+        stopper.join(WAIT_SECONDS * 1000L)
+        boolean stopperWaited = stopper.alive
+        gate.release.countDown()
+        refresher.join(WAIT_SECONDS * 1000L)
+
+        then:
+        !stopperWaited
+        !refresher.alive
+        !env.running
+
+        cleanup:
+        gate.release.countDown()
+        ctx?.close()
+        dir?.toFile()?.deleteDir()
+    }
+
+    @RestoreSystemProperties
+    void "a property source added while a refresh of a bootstrap enabled context processes the property sources does not wait for it, and is visible at once"() {
+        given:
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+        Path dir = Files.createTempDirectory('refresh-bootstrap-')
+        dir.resolve('bootstrap.yml').toFile().text = 'bootstrap.value: one\n'
+        CountingGate gate = new CountingGate()
+        ApplicationContext ctx = ApplicationContext.builder()
+                .overrideConfigLocations('file:' + dir)
+                .propertySources(gate)
+                .start()
+        Environment env = ctx.environment
+
+        when: "the refresh is parked where it processes the property sources, after the bootstrap environment has read them"
+        gate.armAt(2)
+        Thread refresher = daemon('refresher') { env.refresh() }
+        assert gate.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        Thread adder = daemon('adder') { env.addPropertySource(PropertySource.of('added', ['added.key': 'added'])) }
+        adder.join(WAIT_SECONDS * 1000L)
+        boolean adderWaited = adder.alive
+        String whileRead = env.getProperty('added.key', String).orElse(null)
+        gate.release.countDown()
+        refresher.join(WAIT_SECONDS * 1000L)
+
+        then:
+        !adderWaited
+        whileRead == 'added'
+        !refresher.alive
+        env.getProperty('added.key', String).get() == 'added'
+        env.getProperty('bootstrap.value', String).get() == 'one'
+
+        cleanup:
+        gate.release.countDown()
+        ctx?.close()
+        dir?.toFile()?.deleteDir()
+    }
+
     static ApplicationContextConfiguration withoutDefaultPropertySources() {
         ApplicationContext.builder()
                 .environments('test')
@@ -596,6 +670,39 @@ class ReadPropertySourcesSpec extends Specification {
         @Override
         Iterator<String> iterator() {
             pass()
+            return Collections.emptyIterator()
+        }
+    }
+
+    /**
+     * A property source without properties, read first, that parks the thread that reads it the
+     * given number of times once armed: the bootstrap environment of a refresh reads it first, and
+     * then the refresh itself.
+     */
+    static class CountingGate implements PropertySource {
+        final CountDownLatch entered = new CountDownLatch(1)
+        final CountDownLatch release = new CountDownLatch(1)
+        private final AtomicInteger countdown = new AtomicInteger()
+
+        void armAt(int read) {
+            countdown.set(read)
+        }
+
+        @Override
+        String getName() { 'counting-gate' }
+
+        @Override
+        int getOrder() { Ordered.HIGHEST_PRECEDENCE }
+
+        @Override
+        Object get(String key) { null }
+
+        @Override
+        Iterator<String> iterator() {
+            if (countdown.get() > 0 && countdown.decrementAndGet() == 0) {
+                entered.countDown()
+                release.await(3 * ReadPropertySourcesSpec.WAIT_SECONDS, TimeUnit.SECONDS)
+            }
             return Collections.emptyIterator()
         }
     }
