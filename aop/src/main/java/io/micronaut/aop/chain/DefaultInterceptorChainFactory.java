@@ -26,10 +26,13 @@ import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.ExecutableMethodsDefinition;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The chain factory. Candidates the caller does not supply are acquired through its
@@ -41,6 +44,7 @@ import java.util.Collection;
 public final class DefaultInterceptorChainFactory implements InterceptorChainFactory {
     private final InterceptorRegistry registry;
     private final InterceptorCandidateResolver candidateResolver;
+    private final Map<Class<?>, ExecutableMethodsDefinition<?>> proxyMethods = new ConcurrentHashMap<>();
 
     /**
      * @param registry The interceptor registry the invocations are selected by
@@ -61,6 +65,17 @@ public final class DefaultInterceptorChainFactory implements InterceptorChainFac
     @Override
     public InterceptorCandidateResolver candidateResolver() {
         return candidateResolver;
+    }
+
+    @Override
+    public @Nullable ExecutableMethodsDefinition<?> findProxyMethods(Class<?> proxyType) {
+        return proxyMethods.get(proxyType);
+    }
+
+    @Override
+    public ExecutableMethodsDefinition<?> keepProxyMethods(Class<?> proxyType, ExecutableMethodsDefinition<?> methods) {
+        ExecutableMethodsDefinition<?> kept = proxyMethods.putIfAbsent(proxyType, methods);
+        return kept != null ? kept : methods;
     }
 
     @Override

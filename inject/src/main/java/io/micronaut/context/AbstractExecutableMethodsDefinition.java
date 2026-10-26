@@ -506,6 +506,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private static final int ENTRY_VALUE = 0;
         private static final int ENTRY_ANNOTATION_VALUE = 1;
         private static final int ENTRY_ANNOTATION = 2;
+        private static final int ENTRY_COMPILED_VALUE = 3;
         private static final byte CACHE_NEVER = 0;
         private static final byte CACHE_STATIC = 1;
         private static final byte CACHE_PER_REVISION = 2;
@@ -556,6 +557,11 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          */
         private byte cacheMode;
         /**
+         * How values derived only from the compiled metadata can be kept: as {@link #cacheMode}, ignoring the
+         * evaluated expressions.
+         */
+        private byte compiledCacheMode;
+        /**
          * The properties that the placeholders of the metadata resolve from, set by the environment.
          */
         @Nullable
@@ -574,6 +580,21 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                 return (V) unmask(kept);
             }
             return (V) unmask(keep(metadata, revision, key, mask(factory.apply(this)), ENTRY_VALUE));
+        }
+
+        @Override
+        @SuppressWarnings({"unchecked", "NullAway"}) // V is nullable when the factory returns null
+        public <V extends @Nullable Object> V getCachedCompiledValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
+            AnnotationMetadata metadata = annotationMetadata;
+            long revision = revision(ENTRY_COMPILED_VALUE);
+            if (revision == NOT_CACHEABLE) {
+                return factory.apply(this);
+            }
+            Object kept = find(metadata, revision, key, ENTRY_COMPILED_VALUE);
+            if (kept == null) {
+                kept = keep(metadata, revision, key, new KeptCompiledValue(factory.apply(this)), ENTRY_COMPILED_VALUE);
+            }
+            return (V) ((KeptCompiledValue) kept).value;
         }
 
         @Override
@@ -648,7 +669,21 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          * invocation
          */
         private long revision() {
-            return switch (cacheMode) {
+            return revision(cacheMode);
+        }
+
+        /**
+         * The revision of what entries of the given kind depend on.
+         *
+         * @param kind The kind of entry
+         * @return The revision, as {@link #revision()} returns it
+         */
+        private long revision(int kind) {
+            return kind == ENTRY_COMPILED_VALUE ? revision(compiledCacheMode) : revision(cacheMode);
+        }
+
+        private long revision(byte mode) {
+            return switch (mode) {
                 case CACHE_STATIC -> 0;
                 case CACHE_PER_REVISION -> Objects.requireNonNull(properties).getRevision();
                 default -> NOT_CACHEABLE;
@@ -659,13 +694,13 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          * Computes how values derived from the metadata can be kept.
          */
         private void updateCacheMode() {
-            if (annotationMetadata.hasEvaluatedExpressions() || argumentsAnnotationsWithExpressions) {
-                cacheMode = CACHE_NEVER;
-            } else if (annotationMetadata.hasPropertyExpressions()) {
-                cacheMode = properties != null ? CACHE_PER_REVISION : CACHE_NEVER;
+            if (annotationMetadata.hasPropertyExpressions()) {
+                compiledCacheMode = properties != null ? CACHE_PER_REVISION : CACHE_NEVER;
             } else {
-                cacheMode = CACHE_STATIC;
+                compiledCacheMode = CACHE_STATIC;
             }
+            cacheMode = annotationMetadata.hasEvaluatedExpressions() || argumentsAnnotationsWithExpressions
+                ? CACHE_NEVER : compiledCacheMode;
         }
 
         /**
@@ -680,7 +715,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          * @return The kept entry
          */
         private synchronized Object keep(AnnotationMetadata metadata, long revision, Class<?> key, Object entry, int kind) {
-            if (metadata != annotationMetadata || revision() != revision) {
+            if (metadata != annotationMetadata || revision(kind) != revision) {
                 return entry;
             }
             Object[] values = cachedValues;
@@ -704,6 +739,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private static int entryKind(Object entry) {
             if (entry instanceof KeptAnnotationValue) {
                 return ENTRY_ANNOTATION_VALUE;
+            }
+            if (entry instanceof KeptCompiledValue) {
+                return ENTRY_COMPILED_VALUE;
             }
             return entry instanceof KeptAnnotation ? ENTRY_ANNOTATION : ENTRY_VALUE;
         }
@@ -1018,6 +1056,15 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      * @param annotation The annotation or {@code null} when the method doesn't have it
      */
     private record KeptAnnotation(@Nullable Annotation annotation) {
+    }
+
+    /**
+     * A value kept by {@code getCachedCompiledValue}, told apart from a value kept by {@code getCachedValue} under
+     * the same key.
+     *
+     * @param value The value
+     */
+    private record KeptCompiledValue(@Nullable Object value) {
     }
 
 }

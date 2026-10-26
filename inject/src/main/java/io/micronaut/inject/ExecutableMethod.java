@@ -107,6 +107,30 @@ public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReferenc
     }
 
     /**
+     * A value derived only from the compiled metadata of this method, computed once by the factory and kept for the
+     * next calls as {@link #getCachedValue(Class, Function)} keeps values, but also kept when the metadata has
+     * evaluated expressions.
+     *
+     * <p>The compiled metadata is the metadata as the compiler wrote it, with its property placeholders resolved:
+     * the factory may read the annotations, their members, and {@link #getTargetAnnotationMetadata()}, but must not
+     * read a member whose value is an evaluated expression, since the value is not computed again for the invocation
+     * that the expression depends on. Use it for values such as the interceptors bound to a method or the name of a
+     * member read for each invocation, where {@link #getCachedValue(Class, Function)} would compute the value on every
+     * call of a method that has an unrelated evaluated expression. The value is kept apart from the one kept by
+     * {@link #getCachedValue(Class, Function)} under the same key.</p>
+     *
+     * @param key     The key of the value
+     * @param factory Computes the value from the method, reading only its compiled metadata
+     * @param <V>     The value type
+     * @return The value
+     * @since 5.3.0
+     */
+    @Experimental
+    default <V extends @Nullable Object> V getCachedCompiledValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
+        return factory.apply(this);
+    }
+
+    /**
      * The value of the given annotation on this method, kept as {@link #getCachedValue(Class, Function)} keeps values.
      *
      * @param annotationType The annotation type
