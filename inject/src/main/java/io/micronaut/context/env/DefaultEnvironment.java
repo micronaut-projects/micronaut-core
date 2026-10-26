@@ -340,7 +340,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             log.debug("Starting environment {} for active names {}", this, getActiveNames());
             Generation reads = generation;
             if (lockReads(reads)) {
-                read(reads, false);
+                if (reads.published) {
+                    // a refresh of the stopped environment has started it meanwhile
+                    readAgainWhileAsked(reads);
+                } else {
+                    read(reads, false);
+                }
             }
         }
         return this;
@@ -601,6 +606,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             ownPropertySources = new ArrayList<>(read.own);
             // a refresh starts a stopped environment, as stop(); start() did
             running.set(true);
+            reads.published = true;
             reads.read = null;
             if (difference != null) {
                 if (difference.before == null) {
@@ -1512,6 +1518,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
          * that its read runs.
          */
         boolean askedItself;
+        /**
+         * Whether a read of the generation has been published. Written by the thread that holds
+         * the lock, before it lets go of it.
+         */
+        boolean published;
     }
 
     /**

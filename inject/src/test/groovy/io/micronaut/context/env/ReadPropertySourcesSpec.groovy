@@ -552,6 +552,48 @@ class ReadPropertySourcesSpec extends Specification {
         env.stop()
     }
 
+    void "a start of a stopped environment during its refresh does not read the property sources again once the refresh has published"() {
+        given:
+        AtomicInteger reads = new AtomicInteger()
+        ParkingEnvironment env = new ParkingEnvironment()
+        env.addPropertySource(new PropertySource() {
+            @Override
+            String getName() { 'counted' }
+
+            @Override
+            Object get(String key) { key == 'counted.key' ? 'value' : null }
+
+            @Override
+            Iterator<String> iterator() {
+                reads.incrementAndGet()
+                return ['counted.key'].iterator()
+            }
+        })
+        env.start()
+        env.stop()
+        reads.set(0)
+
+        when: "the stopped environment is refreshed, and another thread starts it while the refresh is parked before it reads"
+        Thread refresher = parkIn(env.stopping) { env.refresh() }
+        Thread starter = daemon('starter') { env.start() }
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(WAIT_SECONDS)
+        while (!(starter.state in [Thread.State.WAITING, Thread.State.TIMED_WAITING]) && System.nanoTime() < deadline) {
+            Thread.sleep(5)
+        }
+        release(env.stopping, refresher)
+        starter.join(WAIT_SECONDS * 1000L)
+
+        then: "the start waits for the refresh, which has started the environment, and reads nothing itself"
+        !starter.alive
+        reads.get() == 1
+        env.running
+        env.getProperty('counted.key', String).get() == 'value'
+
+        cleanup:
+        env.stopping.release.countDown()
+        env.stop()
+    }
+
     @RestoreSystemProperties
     void "stop() from another thread while a refresh of a bootstrap enabled context reads the bootstrap configuration does not wait for it"() {
         given:
