@@ -157,11 +157,11 @@ class RouteExecutionSpec extends Specification {
             return null
         }
 
-        when:
-        executor.execution(failing)
+        when: 'the preparation fails'
+        RouteExecution fallback = executor.execution(failing)
 
-        then:
-        thrown(IllegalStateException)
+        then: 'the route is executed by the compatibility execution, which fails like before'
+        fallback.getClass().simpleName == "Compatibility"
         ((DefaultRouteInfo<?>) failing).findPreparedExecution(executor) == null
 
         when:

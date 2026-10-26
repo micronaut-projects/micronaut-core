@@ -574,8 +574,14 @@ public final class RouteExecutor {
         if (prepared != null) {
             return (RouteExecution) prepared;
         }
-        // a failed preparation is not kept: the route is prepared again by the next request
-        RouteExecution execution = RouteExecution.prepare(this, routeInfo);
+        RouteExecution execution;
+        try {
+            execution = RouteExecution.prepare(this, routeInfo);
+        } catch (RuntimeException e) {
+            // the route is executed like before, which fails the way it did for this request, and
+            // a failed preparation is not kept: the route is prepared again by the next request
+            return compatibility;
+        }
         route.prepareExecution(this, execution);
         return execution;
     }
