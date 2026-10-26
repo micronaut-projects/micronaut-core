@@ -1543,6 +1543,8 @@ class Lowering:
                     unresolved = True  # a setter referenced, not called: it may be called on any class
                 if isinstance(node, ast.Constant) and node.value in setters + dunder_setters:
                     unresolved = True  # getattr(builtins, "setattr"): a setter looked up by its name
+                if isinstance(node, ast.Name) and node.id in ("exec", "eval", "compile") and isinstance(node.ctx, ast.Load):
+                    unresolved = True  # code run from a string may write anything on any class
                 if isinstance(node, ast.ImportFrom) and any(alias.name in setters + dunder_setters and alias.asname not in (None, alias.name)
                                                             for alias in node.names):
                     unresolved = True  # from builtins import setattr as patch: called by a name of its own
