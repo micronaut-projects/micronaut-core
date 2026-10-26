@@ -336,12 +336,15 @@ public sealed interface Ir {
      * Dispatched {@code python} otherwise (a method the stub does not bridge, an advised method whose
      * interceptor chain runs on the Python object, a method a subclass overrides, a call relying on
      * default arguments): the method of the Python object is invoked, as the Python code would.
+     * Dispatched {@code shared} for a compiled method of the class taking a list, set or dict: the
+     * shared entry of its compiled body is called, which works on the caller's collections where the
+     * stub's Java method would copy them, see {@link StaticBodyGenerator#generateShared}.
      *
      * @param name           The method name
-     * @param parameterTypes The Java parameter types of the stub method, for a {@code java} dispatch
+     * @param parameterTypes The Java parameter types of the stub method, for a {@code java} or {@code shared} dispatch
      * @param arguments      The arguments
      * @param type           The Java return type, {@code void} for none
-     * @param dispatch       {@code java} or {@code python}
+     * @param dispatch       {@code java}, {@code shared} or {@code python}
      */
     record InvokeSibling(String name,
                          List<String> parameterTypes,

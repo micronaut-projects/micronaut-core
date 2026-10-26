@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Turns the {@link Ir} of a compiled body into SourceGen statements inside a stub method. The
@@ -53,6 +54,10 @@ public final class StaticBodyGenerator {
     private static final TypeDef BOOLEAN = TypeDef.Primitive.BOOLEAN;
     private static final String VALUE_OF = "valueOf";
     private static final String OBJECT = "java.lang.Object";
+    private static final String SHORT = "short";
+    private static final String FLOAT = "float";
+    private static final String COPY = "copy";
+    private static final String SHARED = "shared";
 
     private static final ClassTypeDef ITERATOR = ClassTypeDef.of(Iterator.class);
     private static final ClassTypeDef VALUE_COERCIBLE_TYPE = ClassTypeDef.of("io.micronaut.context.python.ValueCoercible");
@@ -69,6 +74,8 @@ public final class StaticBodyGenerator {
     // every name the body uses: a temporary of the generator takes a name none of them has
     private final Set<String> names = new HashSet<>();
     private final Map<String, VariableDef.Local> typedNulls = new LinkedHashMap<>();
+    // whether the body is generated as its shared entry, which makes no copy of a collection parameter
+    private boolean shared;
     private int temporaries;
     // the Python line of the statement being generated, 0 when it is not known
     private int line;
@@ -103,7 +110,89 @@ public final class StaticBodyGenerator {
      * @return The statements
      */
     public static StatementDef generate(Ir.CompiledBody body, List<VariableDef.MethodParameter> methodParameters, SelfAccess self, boolean trace) {
+        return generate(body, methodParameters, self, trace, false);
+    }
+
+    /**
+     * Generates the statements of the shared entry of a compiled body: the body as it is, except that
+     * a list, set or dict parameter is not copied on entry. A compiled sibling calls it (an
+     * {@link Ir.InvokeSibling} dispatched {@code shared}) with its own collections, which the
+     * callee updates as Python's callee updates the caller's; the stub's Java method, which Java
+     * callers call, copies them as the bridge would and calls this entry, see {@link #generateEntry}.
+     *
+     * @param body             The body
+     * @param methodParameters The parameters of the shared entry, in order
+     * @param self             How the properties of {@code self} are reached
+     * @param trace            Whether the body counts its entries in {@code PythonStatic.entries()}
+     * @return The statements
+     */
+    public static StatementDef generateShared(Ir.CompiledBody body, List<VariableDef.MethodParameter> methodParameters, SelfAccess self, boolean trace) {
+        return generate(body, methodParameters, self, trace, true);
+    }
+
+    /**
+     * Generates the statements of the stub's Java method of a body with a shared entry: the copies
+     * of its collection parameters, as the body would make them, given to the shared entry.
+     *
+     * @param body             The body
+     * @param methodParameters The parameters of the stub method, in order
+     * @param sharedEntry      The call of the shared entry with the given arguments
+     * @return The statements
+     */
+    public static StatementDef generateEntry(Ir.CompiledBody body, List<VariableDef.MethodParameter> methodParameters, Function<List<ExpressionDef>, ExpressionDef> sharedEntry) {
+        Set<String> copied = copiedParameters(body);
+        List<ExpressionDef> arguments = new ArrayList<>(methodParameters.size());
+        for (int i = 0; i < methodParameters.size(); i++) {
+            VariableDef.MethodParameter parameter = methodParameters.get(i);
+            TypeDef parameterType = type(body.parameterTypes().get(i));
+            arguments.add(copied.contains(body.parameterNames().get(i))
+                ? PYTHON_STATIC.invokeStatic(COPY, List.of(parameterType), parameterType, parameter)
+                : parameter);
+        }
+        ExpressionDef call = sharedEntry.apply(arguments);
+        if (!Ir.VOID.equals(body.returnType())) {
+            return call.returning();
+        }
+        if (call instanceof StatementDef statement) {
+            return statement;
+        }
+        throw new IllegalStateException("The call of the shared entry of [" + body.key() + "] is no statement");
+    }
+
+    /**
+     * The collection parameters a body copies on entry: each lives in a local the body declares
+     * first, initialised with a copy of the argument (see {@code _shadow_reassigned_parameters}).
+     *
+     * @param body The body
+     * @return The names of the parameters
+     */
+    public static Set<String> copiedParameters(Ir.CompiledBody body) {
+        Set<String> copied = new HashSet<>();
+        for (Ir.Statement statement : body.body().statements()) {
+            if (!(statement instanceof Ir.Local local)) {
+                break;
+            }
+            if (copiedParameter(local.value()) instanceof Ir.Param param) {
+                copied.add(param.name());
+            }
+        }
+        return copied;
+    }
+
+    /**
+     * The parameter a value copies on entry, or {@code null}.
+     */
+    private static Ir.@Nullable Param copiedParameter(Ir.Expression value) {
+        if (value instanceof Ir.Helper helper && COPY.equals(helper.name()) && helper.arguments().size() == 1
+            && helper.arguments().get(0) instanceof Ir.Param param) {
+            return param;
+        }
+        return null;
+    }
+
+    private static StatementDef generate(Ir.CompiledBody body, List<VariableDef.MethodParameter> methodParameters, SelfAccess self, boolean trace, boolean shared) {
         StaticBodyGenerator generator = new StaticBodyGenerator(self, methodParameters);
+        generator.shared = shared;
         generator.names.addAll(body.parameterNames());
         collectNames(body.body(), generator.names);
         StatementDef statements = generator.statements(body.body());
@@ -375,7 +464,9 @@ public final class StaticBodyGenerator {
             case Ir.Local local -> {
                 VariableDef.Local variable = new VariableDef.Local(local.name(), type(local.type()));
                 locals.put(local.name(), variable);
-                yield new StatementDef.DefineAndAssign(variable, expression(local.value()));
+                Ir.@Nullable Param copied = shared ? copiedParameter(local.value()) : null;
+                // the shared entry works on the caller's collection itself
+                yield new StatementDef.DefineAndAssign(variable, expression(copied != null ? copied : local.value()));
             }
             case Ir.Assign assign -> local(assign.name()).assign(expression(assign.value()));
             case Ir.PutSelf put -> self.write(put.property(), type(put.type()), expression(put.value()), put.accessor());
@@ -429,7 +520,7 @@ public final class StaticBodyGenerator {
                 ExpressionDef.ConditionExpressionDef test = loopCondition(context, iterator.invoke("hasNext", BOOLEAN).isTrue());
                 VariableDef.Local variable = new VariableDef.Local(loop.variable(), type(loop.type()));
                 locals.put(loop.variable(), variable);
-                ExpressionDef element = cast(iterator.invoke("next", TypeDef.OBJECT), "java.lang.Object", loop.elementType());
+                ExpressionDef element = cast(iterator.invoke("next", TypeDef.OBJECT), OBJECT, loop.elementType());
                 StatementDef bind = new StatementDef.DefineAndAssign(variable, cast(element, loop.elementType(), loop.type()));
                 StatementDef body = loopBody(context, loop.body(), List.of());
                 out.add(test.whileLoop(StatementDef.multi(bind, body)));
@@ -493,6 +584,8 @@ public final class StaticBodyGenerator {
                 ? self.readFixed(property.property(), property.type(), type(property.type()))
                 : self.read(property.property(), property.type(), type(property.type()), property.accessor());
             case Ir.InvokeJava call -> invoke(call);
+            case Ir.InvokeSibling call when SHARED.equals(call.dispatch()) ->
+                self.invokeShared(call.name(), types(call.parameterTypes()), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
             case Ir.InvokeSibling call -> self.invoke(call.name(), types(call.parameterTypes()), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()), "java".equals(call.dispatch()));
             case Ir.InvokePython call -> self.invokeOn(pythonObject(call.receiver()), pythonClass(call.receiver()), call.name(), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
             case Ir.PythonMember member -> self.readOf(pythonObject(member.receiver()), pythonClass(member.receiver()), member.name(), member.type(), type(member.type()));
@@ -736,7 +829,7 @@ public final class StaticBodyGenerator {
             }
             return value;
         }
-        if ("java.lang.Object".equals(from)) {
+        if (OBJECT.equals(from)) {
             // an element of a collection or an iterator: unboxed as the host boundary would convert it
             return switch (to) {
                 case Ir.LONG -> PYTHON_STATIC.invokeStatic("toLong", List.of(TypeDef.OBJECT), LONG, value);
@@ -749,16 +842,16 @@ public final class StaticBodyGenerator {
             case Ir.LONG -> value.cast(LONG);
             case Ir.DOUBLE -> value.cast(DOUBLE);
             case "int" -> Ir.LONG.equals(from) ? MATH.invokeStatic("toIntExact", List.of(LONG), TypeDef.Primitive.INT, value) : value.cast(TypeDef.Primitive.INT);
-            case "short" -> Ir.LONG.equals(from) ? PYTHON_STATIC.invokeStatic("toShortExact", List.of(LONG), TypeDef.Primitive.SHORT, value) : value.cast(TypeDef.Primitive.SHORT);
+            case SHORT -> Ir.LONG.equals(from) ? PYTHON_STATIC.invokeStatic("toShortExact", List.of(LONG), TypeDef.Primitive.SHORT, value) : value.cast(TypeDef.Primitive.SHORT);
             case "byte" -> Ir.LONG.equals(from) ? PYTHON_STATIC.invokeStatic("toByteExact", List.of(LONG), TypeDef.Primitive.BYTE, value) : value.cast(TypeDef.Primitive.BYTE);
-            case "float" -> value.cast(TypeDef.Primitive.FLOAT);
+            case FLOAT -> value.cast(TypeDef.Primitive.FLOAT);
             // a boxed number is boxed from its primitive, which javac converts from the narrowed value
             case "java.lang.Integer" -> ClassTypeDef.of(Integer.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.INT), ClassTypeDef.of(Integer.class), cast(value, from, "int"));
             case "java.lang.Long" -> ClassTypeDef.of(Long.class).invokeStatic(VALUE_OF, List.of(LONG), ClassTypeDef.of(Long.class), cast(value, from, Ir.LONG));
-            case "java.lang.Short" -> ClassTypeDef.of(Short.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.SHORT), ClassTypeDef.of(Short.class), cast(value, from, "short"));
+            case "java.lang.Short" -> ClassTypeDef.of(Short.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.SHORT), ClassTypeDef.of(Short.class), cast(value, from, SHORT));
             case "java.lang.Byte" -> ClassTypeDef.of(Byte.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.BYTE), ClassTypeDef.of(Byte.class), cast(value, from, "byte"));
             case "java.lang.Double" -> ClassTypeDef.of(Double.class).invokeStatic(VALUE_OF, List.of(DOUBLE), ClassTypeDef.of(Double.class), cast(value, from, Ir.DOUBLE));
-            case "java.lang.Float" -> ClassTypeDef.of(Float.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.FLOAT), ClassTypeDef.of(Float.class), cast(value, from, "float"));
+            case "java.lang.Float" -> ClassTypeDef.of(Float.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.FLOAT), ClassTypeDef.of(Float.class), cast(value, from, FLOAT));
             case "java.lang.Boolean" -> ClassTypeDef.of(Boolean.class).invokeStatic(VALUE_OF, List.of(BOOLEAN), ClassTypeDef.of(Boolean.class), value);
             default -> value.cast(type(to));
         };
@@ -818,7 +911,7 @@ public final class StaticBodyGenerator {
 
     private static boolean isPrimitive(String typeName) {
         return switch (typeName) {
-            case "int", "long", "short", "byte", "char", "float", "double", "boolean" -> true;
+            case "int", "long", SHORT, "byte", "char", FLOAT, "double", "boolean" -> true;
             default -> false;
         };
     }
@@ -902,6 +995,21 @@ public final class StaticBodyGenerator {
          * @return The expression calling it
          */
         ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct);
+
+        /**
+         * A call of the shared entry of a compiled method of the class, which works on the caller's
+         * collections; without one, the method of the Python object, which does too.
+         *
+         * @param name           The method of the class to call on {@code self}
+         * @param parameterTypes The Java parameter types of the stub method
+         * @param arguments      The arguments, at the parameter types
+         * @param typeName       The Java return type as the IR spells it, {@code void} for none
+         * @param type           The Java return type
+         * @return The expression calling it
+         */
+        default ExpressionDef invokeShared(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+            return invoke(name, parameterTypes, arguments, typeName, type, false);
+        }
 
         /**
          * @param value     The Python object of another object of the compilation
