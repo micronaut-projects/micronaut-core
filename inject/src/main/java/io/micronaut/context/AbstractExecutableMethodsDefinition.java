@@ -566,6 +566,14 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          */
         @Nullable
         private PropertySourcePropertyResolver properties;
+        /**
+         * The environment and the context the method was last configured with: configuring it again with the same
+         * ones, as each proxy sharing the method does, keeps its values.
+         */
+        @Nullable
+        private Environment configuredEnvironment;
+        @Nullable
+        private BeanContext configuredBeanContext;
 
         @Override
         @SuppressWarnings({"unchecked", "NullAway", "java:S2637"}) // V is nullable when the factory returns null
@@ -773,6 +781,12 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public synchronized void configure(Environment environment) {
+            if (environment == configuredEnvironment) {
+                return;
+            }
+            configuredEnvironment = environment;
+            // the metadata of the context is wrapped again for the new environment
+            configuredBeanContext = null;
             cachedValues = null;
             if (declaredAnnotationMetadata.hasPropertyExpressions()) {
                 environmentAnnotationMetadata = new MethodAnnotationMetadata(declaredAnnotationMetadata, environment);
@@ -785,6 +799,10 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public synchronized void configure(BeanContext beanContext) {
+            if (beanContext == configuredBeanContext) {
+                return;
+            }
+            configuredBeanContext = beanContext;
             cachedValues = null;
             classLoader = beanContext.getClassLoader();
             if (annotationMetadata instanceof EvaluatedAnnotationMetadata current
