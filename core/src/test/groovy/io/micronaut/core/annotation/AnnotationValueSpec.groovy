@@ -493,6 +493,63 @@ class AnnotationValueSpec extends Specification {
         !noDefaults.matches(new AnnotationValue("test.Foo", [:] as Map<CharSequence, Object>, (Map<CharSequence, Object>) null))
     }
 
+    void "test matches() leaves out the non-binding members either side lists"() {
+        given: "a compiled occurrence listing its non-binding member, and one built at runtime without the list"
+        def defaults = [note: ""] as Map<CharSequence, Object>
+        def compiled = new AnnotationValue("test.Noted", [
+                value                                 : "one",
+                note                                  : "first",
+                (AnnotationUtil.NON_BINDING_ATTRIBUTE): ["note", AnnotationUtil.NON_BINDING_ATTRIBUTE] as String[]
+        ] as Map<CharSequence, Object>, defaults)
+        def built = new AnnotationValue("test.Noted", [value: "one", note: "other"] as Map<CharSequence, Object>, defaults)
+        def omitted = new AnnotationValue("test.Noted", [value: "one"] as Map<CharSequence, Object>, defaults)
+
+        expect: "the side without the list lacks the information, so the list of the other side applies, both ways"
+        compiled.matches(built)
+        built.matches(compiled)
+        compiled.matches(omitted)
+        omitted.matches(compiled)
+
+        and: "a binding member still decides"
+        !compiled.matches(new AnnotationValue("test.Noted", [value: "two", note: "first"] as Map<CharSequence, Object>, defaults))
+        !new AnnotationValue("test.Noted", [value: "two", note: "first"] as Map<CharSequence, Object>, defaults).matches(compiled)
+
+        and: "with neither side listing the member it is compared"
+        !built.matches(new AnnotationValue("test.Noted", [value: "one", note: "first"] as Map<CharSequence, Object>, defaults))
+    }
+
+    void "test matches() leaves out the union of the non-binding members both sides list"() {
+        given: "two occurrences each listing a different non-binding member"
+        def left = new AnnotationValue("test.Noted", [
+                value                                 : "one",
+                note                                  : "left",
+                debug                                 : true,
+                (AnnotationUtil.NON_BINDING_ATTRIBUTE): ["note"] as String[]
+        ] as Map<CharSequence, Object>)
+        def right = new AnnotationValue("test.Noted", [
+                value                                 : "one",
+                note                                  : "right",
+                debug                                 : false,
+                (AnnotationUtil.NON_BINDING_ATTRIBUTE): ["debug", AnnotationUtil.NON_BINDING_ATTRIBUTE] as String[]
+        ] as Map<CharSequence, Object>)
+
+        expect: "the members either lists take no part, and the list itself is never a member"
+        left.matches(right)
+        right.matches(left)
+    }
+
+    void "test matches() compares an empty string with the default it replaces"() {
+        given: "an annotation whose member defaults to something other than the empty string"
+        def defaults = [value: "default"] as Map<CharSequence, Object>
+        def empty = new AnnotationValue("test.Named", [value: ""] as Map<CharSequence, Object>, defaults)
+        def omitted = new AnnotationValue("test.Named", [:] as Map<CharSequence, Object>, defaults)
+
+        expect: "an empty string is a value of its own, the way an annotation instance compares it"
+        !empty.matches(omitted)
+        !omitted.matches(empty)
+        empty.matches(new AnnotationValue("test.Named", [value: ""] as Map<CharSequence, Object>, defaults))
+    }
+
     void "mutate().defaultValues() works on a value built without defaults"() {
         when:
         AnnotationValue<?> av = AnnotationValue.builder("x.Y").member("a", 1).build()

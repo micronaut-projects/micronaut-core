@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1521,6 +1522,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * does not have. A member can only be left out when it has a default, so filling the defaults in is what makes
      * every member comparable.</p>
      *
+     * <p>The members listed under {@link AnnotationUtil#NON_BINDING_ATTRIBUTE} by either value take no part, nor
+     * does that list itself. A value which does not list them, such as one built at runtime, merely lacks that
+     * information, so the members the other value lists are left out of both sides, and the comparison is
+     * symmetric.</p>
+     *
+     * <p>A member bound to the empty string is compared as that value: it does not match a value which leaves the
+     * member out when the default of the member is something else, as two annotation instances would not.</p>
+     *
      * @param other The other annotation value
      * @return Whether the two are the same annotation
      * @since 5.2.0
@@ -1547,20 +1556,58 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             // Values read from the same stored members, with the same defaults
             return true;
         }
-        if (completedSize(declared, defaults) != completedSize(otherDeclared, otherDefaults)) {
+        Set<String> nonBinding = nonBindingMembers(declared, otherDeclared);
+        if (completedSize(declared, defaults, nonBinding) != completedSize(otherDeclared, otherDefaults, nonBinding)) {
             return false;
         }
         for (Map.Entry<CharSequence, Object> member : declared.entrySet()) {
-            if (!matchesMember(member.getKey(), member.getValue(), otherDeclared, otherDefaults)) {
+            if (!isNonBinding(member.getKey(), nonBinding)
+                && !matchesMember(member.getKey(), member.getValue(), otherDeclared, otherDefaults)) {
                 return false;
             }
         }
         for (Map.Entry<CharSequence, Object> member : defaults.entrySet()) {
-            if (!declared.containsKey(member.getKey()) && !matchesMember(member.getKey(), member.getValue(), otherDeclared, otherDefaults)) {
+            if (!declared.containsKey(member.getKey()) && !isNonBinding(member.getKey(), nonBinding)
+                && !matchesMember(member.getKey(), member.getValue(), otherDeclared, otherDefaults)) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * @return The members either side lists as non-binding, with the list itself, or an empty set when neither
+     * side has a list
+     */
+    private static Set<String> nonBindingMembers(Map<CharSequence, Object> declared, Map<CharSequence, Object> otherDeclared) {
+        Object listed = declared.get(AnnotationUtil.NON_BINDING_ATTRIBUTE);
+        Object otherListed = otherDeclared.get(AnnotationUtil.NON_BINDING_ATTRIBUTE);
+        if (listed == null && otherListed == null) {
+            return Collections.emptySet();
+        }
+        Set<String> nonBinding = new HashSet<>(4);
+        nonBinding.add(AnnotationUtil.NON_BINDING_ATTRIBUTE);
+        addNonBinding(listed, nonBinding);
+        addNonBinding(otherListed, nonBinding);
+        return nonBinding;
+    }
+
+    private static void addNonBinding(@Nullable Object listed, Set<String> nonBinding) {
+        if (listed instanceof Object[] array) {
+            for (Object member : array) {
+                nonBinding.add(member.toString());
+            }
+        } else if (listed instanceof Collection<?> collection) {
+            for (Object member : collection) {
+                nonBinding.add(member.toString());
+            }
+        } else if (listed != null) {
+            nonBinding.add(listed.toString());
+        }
+    }
+
+    private static boolean isNonBinding(CharSequence member, Set<String> nonBinding) {
+        return !nonBinding.isEmpty() && nonBinding.contains(member.toString());
     }
 
     private static Map<CharSequence, Object> nonNullDefaults(@Nullable Map<CharSequence, Object> defaults) {
@@ -1568,12 +1615,21 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
-     * @return The number of members once the declared members are completed with the defaults
+     * @return The number of binding members once the declared members are completed with the defaults
      */
-    private static int completedSize(Map<CharSequence, Object> declared, Map<CharSequence, Object> defaults) {
+    private static int completedSize(Map<CharSequence, Object> declared,
+                                     Map<CharSequence, Object> defaults,
+                                     Set<String> nonBinding) {
         int size = declared.size();
+        if (!nonBinding.isEmpty()) {
+            for (CharSequence member : declared.keySet()) {
+                if (isNonBinding(member, nonBinding)) {
+                    size--;
+                }
+            }
+        }
         for (CharSequence member : defaults.keySet()) {
-            if (!declared.containsKey(member)) {
+            if (!declared.containsKey(member) && !isNonBinding(member, nonBinding)) {
                 size++;
             }
         }
