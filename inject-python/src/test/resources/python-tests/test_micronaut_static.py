@@ -1181,6 +1181,22 @@ class Pricing:
     def fill(self, xs: list[str], tag: str) -> None:
         xs.append(tag)
 
+    def filled_rounded(self, tag: str) -> int:
+        xs: list[str] = []
+        self.fill_rounded(xs, tag)
+        return len(xs)
+
+    def fill_rounded(self, xs: list[str], tag: str) -> None:
+        xs.append(str(round(len(tag) / 2)))
+
+    def ping(self, xs: list[str], n: int) -> int:
+        xs.append("ping")
+        return self.pong(xs, n - 1) if n > 0 else len(xs)
+
+    def pong(self, xs: list[str], n: int) -> int:
+        xs.append("pong")
+        return self.ping(xs, n - 1) if n > 0 else len(xs)
+
     def label_of(self, pair: tuple[str, str]) -> int:
         return len(pair)
 
@@ -2270,13 +2286,29 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("java", _uncast(hidden.right()).dispatch())  # the default the call relies on is filled in
         self.assertEqual(1, _uncast(list(_uncast(hidden.right()).arguments())[0]).value())
         self.assertEqual(1, self.bodies["hidden_call"].stats().bridgeCalls())
-        # fill appends to the caller's list, which the stub's Java method would copy: called through the Python object
+        # fill appends to the caller's list, which the stub's Java method would copy: fill is compiled
+        # (decided before the planner reaches it), so its shared entry is called, which makes no copy
         self.assertEqual("COMPILED", self.decisions["Pricing.filled"].outcome().name(), rules(self.decisions["Pricing.filled"]))
+        self.assertEqual("COMPILED", self.decisions["Pricing.fill"].outcome().name(), rules(self.decisions["Pricing.fill"]))
         statements = list(self.bodies["filled"].body().statements())
         fill = _uncast(statements[1].expression())
-        self.assertEqual(("fill", "python"), (fill.name(), fill.dispatch()))
+        self.assertEqual(("fill", "shared"), (fill.name(), fill.dispatch()))
+        self.assertEqual(["java.util.List<java.lang.String>", "java.lang.String"], list(fill.parameterTypes()))
         label_of = _uncast(_uncast(statements[2].value()).right())
         self.assertEqual(("label_of", "java"), (label_of.name(), label_of.dispatch()))  # a tuple is not updated in place
+        self.assertEqual((2, 0), (self.bodies["filled"].stats().javaCalls(), self.bodies["filled"].stats().bridgeCalls()))
+        # a callee that is not compiled is called through the Python object, which hands it the caller's list
+        self.assertEqual("SKIPPED", self.decisions["Pricing.fill_rounded"].outcome().name())
+        fill_rounded = _uncast(list(self.bodies["filled_rounded"].body().statements())[1].expression())
+        self.assertEqual(("fill_rounded", "python"), (fill_rounded.name(), fill_rounded.dispatch()))
+        # each decided once: pong when ping's lowering asks for it, which calls ping back while ping's
+        # decision is under way, so through the Python object; ping calls pong's shared entry
+        names = [decision.qualifiedName() for decision in self.planner.decisions]
+        self.assertEqual((1, 1), (names.count("Pricing.ping"), names.count("Pricing.pong")))
+        self.assertLess(names.index("Pricing.pong"), names.index("Pricing.ping"))
+        ping = _uncast(_uncast(list(self.bodies["ping"].body().statements())[-1].value()).then())
+        pong = _uncast(_uncast(list(self.bodies["pong"].body().statements())[-1].value()).then())
+        self.assertEqual([("pong", "shared"), ("ping", "python")], [(ping.name(), ping.dispatch()), (pong.name(), pong.dispatch())])
         via_property = _uncast(list(self.bodies["via_property"].body().statements())[0].value())
         self.assertEqual("doubled", via_property.left().property())
         self.assertEqual("double", via_property.left().type())
@@ -2809,14 +2841,32 @@ class Base:
     def counted(self) -> int:
         return self.__count
 
+    def gathered(self) -> int:
+        xs: list[str] = []
+        self.gather(xs)
+        self.keep(xs)
+        return len(xs)
+
+    def gather(self, xs: list[str]) -> None:
+        xs.append("base")
+
+    def keep(self, xs: list[str]) -> None:
+        xs.append("kept")
+
 
 class Inheriting(Base):
-    pass
+    def kept_here(self) -> int:
+        xs: list[str] = []
+        self.keep(xs)
+        return len(xs)
 
 
 class Overriding(Inheriting):
     def helper(self, n: int) -> int:
         return n * 2
+
+    def gather(self, xs: list[str]) -> None:
+        xs.append("overriding")
 '''
 
 
@@ -2839,6 +2889,16 @@ class SiblingTest(unittest.TestCase):
         total = _uncast(list(run.body().statements())[0].value())
         self.assertEqual("python", _uncast(_uncast(total.left()).right()).dispatch())  # Overriding.helper, a grandchild's
         self.assertEqual("java", _uncast(total.right()).dispatch())  # inherited by every subclass, overridden by none
+
+    def test_a_compiled_sibling_taking_a_list_is_called_virtually(self):
+        # Python calls the override of the object's class: an overridden callee is called through the
+        # Python object, one no subclass overrides through its shared entry
+        statements = list(self.bodies[("Base", "gathered")].body().statements())
+        gather, keep = _uncast(statements[1].expression()), _uncast(statements[2].expression())
+        self.assertEqual([("gather", "python"), ("keep", "shared")], [(gather.name(), gather.dispatch()), (keep.name(), keep.dispatch())])
+        # a method of a base has no shared entry in the subclass's stub
+        keep = _uncast(list(self.bodies[("Inheriting", "kept_here")].body().statements())[1].expression())
+        self.assertEqual(("keep", "python"), (keep.name(), keep.dispatch()))
 
     def test_a_none_test_of_a_sibling_result_and_a_mangled_attribute_are_refused(self):
         self.assertEqual(["unsupported-expression"], rules(self.decisions["Base.checked"]))
