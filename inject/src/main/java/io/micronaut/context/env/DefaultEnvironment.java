@@ -17,6 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.PropertyResolverDelegate;
+import io.micronaut.context.env.PropertySourcePropertyResolver.Build;
 import io.micronaut.context.env.yaml.YamlPropertySourceLoader;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
@@ -114,12 +115,24 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private final PropertySourcePropertyResolver propertyPlaceholderResolver;
     private final PropertyResolver propertyResolver;
 
-    private final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
+    /**
+     * The property sources that the last read has read itself, which the next read drops and
+     * reads again. Guarded by the monitor of {@link #propertySources}.
+     */
+    private List<PropertySource> refreshablePropertySources = List.of();
+    /**
+     * The registered property sources. Its monitor also guards the generation and what changes
+     * with a read; only work in memory is done while it is held.
+     */
     private final Map<String, PropertySource> propertySources = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
     private final Collection<PropertySourcesLocator> propertySourcesLocators;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
-    private final AtomicBoolean reading = new AtomicBoolean(false);
+    /**
+     * The generation of the environment, which {@link #stop()} replaces. Guarded by the monitor of
+     * {@link #propertySources}.
+     */
+    private Generation generation = new Generation();
     /**
      * While a refresh runs, what {@link #addPropertySource(PropertySource)} and
      * {@link #removePropertySource(PropertySource)} have changed since it started. A refresh that
@@ -213,11 +226,13 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
+        boolean process;
         synchronized (propertySources) {
-            internalAddPropertySource(propertySource);
+            propertySources.put(propertySource.getName(), propertySource);
             noteChangeWhileRefreshing(propertySource.getName(), propertySource);
+            process = isRunning() && !generation.reading;
         }
-        if (isRunning() && !reading.get()) {
+        if (process) {
             propertyPlaceholderResolver.resetCachesAndRememberedValues();
             internalProcessPropertySource(propertySource);
         }
@@ -226,11 +241,13 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public Environment removePropertySource(PropertySource propertySource) {
+        boolean reset;
         synchronized (propertySources) {
             propertySources.remove(propertySource.getName());
             noteChangeWhileRefreshing(propertySource.getName(), null);
+            reset = isRunning() && !generation.reading;
         }
-        if (isRunning() && !reading.get()) {
+        if (reset) {
             propertyPlaceholderResolver.resetCachesAndRememberedValues();
         }
         return this;
@@ -297,64 +314,75 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     public Environment start() {
         if (running.compareAndSet(false, true)) {
             LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
-            readProperties();
+            readProperties(true);
         }
         return this;
     }
 
-    private void readProperties() {
-        if (reading.compareAndSet(false, true)) {
-            try {
-                loadProperties();
-            } finally {
-                reading.set(false);
-            }
+    /**
+     * Reads the property sources into new catalogs, and publishes them in one step, so a
+     * concurrent lookup sees the properties either as they were before the read or as they are
+     * after it. A start publishes them after each property source as well. One read runs at a
+     * time; a read of a generation that a stop has ended publishes and registers nothing.
+     *
+     * @param starting Whether the environment starts
+     */
+    private void readProperties(boolean starting) {
+        Generation readGeneration;
+        synchronized (propertySources) {
+            readGeneration = generation;
         }
-    }
-
-    private void dropProperties() {
-        for (PropertySource refreshable : refreshablePropertySources) {
-            propertySources.remove(refreshable.getName());
+        if (Thread.holdsLock(readGeneration)) {
+            // A refresh from code that this thread runs while it reads: the read in progress reads
+            // the property sources.
+            return;
         }
-        propertyPlaceholderResolver.reset();
-    }
-
-    private void refreshProperties() {
-        // Rebuild into a replacement catalog and publish it in one step, so a concurrent lookup
-        // sees the properties either as they were before the refresh or as they are after it.
-        propertyPlaceholderResolver.refresh(() -> {
+        synchronized (readGeneration) {
             Map<String, PropertySource> previousSources;
             RefreshChanges changes;
             synchronized (propertySources) {
+                if (readGeneration != generation) {
+                    return;
+                }
                 previousSources = new LinkedHashMap<>(propertySources);
                 changes = new RefreshChanges(previousSources);
                 changedWhileRefreshing = changes;
+                readGeneration.reading = true;
+                // the property sources the last read has read itself are read again
+                for (PropertySource refreshable : refreshablePropertySources) {
+                    propertySources.remove(refreshable.getName());
+                }
             }
-            List<PropertySource> previousRefreshable = new ArrayList<>(refreshablePropertySources);
+            Build read = propertyPlaceholderResolver.startRead();
             boolean completed = false;
             try {
-                dropProperties();
-                readProperties();
+                List<PropertySource> refreshable = loadProperties(readGeneration, read, starting);
+                synchronized (propertySources) {
+                    if (readGeneration == generation) {
+                        refreshablePropertySources = refreshable;
+                        propertyPlaceholderResolver.publishRead(read, List.of());
+                    }
+                }
                 completed = true;
             } finally {
+                propertyPlaceholderResolver.endBuild(read);
                 synchronized (propertySources) {
-                    changedWhileRefreshing = null;
-                    if (!completed) {
-                        // The resolver keeps the catalog it published when the rebuild fails. Put back the
+                    readGeneration.reading = false;
+                    if (changedWhileRefreshing == changes) {
+                        changedWhileRefreshing = null;
+                    }
+                    if (!completed && readGeneration == generation) {
+                        // The resolver keeps the catalog it published when the read fails. Put back the
                         // property sources that catalog was built from, so the next refresh drops and reads
                         // the same sources again, and then what addPropertySource and removePropertySource
-                        // changed while the failed refresh ran, so that those changes are not undone.
+                        // changed while the failed read ran, so that those changes are not undone.
                         propertySources.clear();
                         propertySources.putAll(previousSources);
                         changes.applyTo(propertySources);
                     }
                 }
-                if (!completed) {
-                    refreshablePropertySources.clear();
-                    refreshablePropertySources.addAll(previousRefreshable);
-                }
             }
-        });
+        }
     }
 
     @Override
@@ -362,11 +390,24 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         return running.get();
     }
 
+    /**
+     * Stops the environment at once: its properties are empty and the property sources that the
+     * last read has read itself are dropped when it returns. A read in progress does not publish
+     * or register what it reads.
+     *
+     * @return This environment
+     */
     @Override
     public Environment stop() {
-        running.set(false);
-        reading.set(false);
-        dropProperties();
+        synchronized (propertySources) {
+            running.set(false);
+            generation = new Generation();
+            for (PropertySource refreshable : refreshablePropertySources) {
+                propertySources.remove(refreshable.getName());
+            }
+            refreshablePropertySources = List.of();
+            propertyPlaceholderResolver.publishEmpty();
+        }
         if (mutableConversionService instanceof DefaultMutableConversionService defaultMutableConversionService) {
             defaultMutableConversionService.reset();
         }
@@ -380,7 +421,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public Environment refresh() {
-        refreshProperties();
+        readProperties(false);
         return this;
     }
 
@@ -409,8 +450,15 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         return resourceLoader.forBase(basePath);
     }
 
-    private void loadProperties() {
-        refreshablePropertySources.clear();
+    /**
+     * Loads the property sources, and processes them into the read.
+     *
+     * @param readGeneration The generation of the read
+     * @param read           The read
+     * @param starting       Whether the environment starts, which publishes after each property source
+     * @return The property sources that the read has read itself
+     */
+    private List<PropertySource> loadProperties(Generation readGeneration, Build read, boolean starting) {
         List<PropertySource> propertySources = new ArrayList<>(configLocations.size());
         Set<String> preExistingSourceNames;
         synchronized (this.propertySources) {
@@ -440,9 +488,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             }
         }
 
-        for (PropertySource propertySource : propertySources) {
-            internalAddPropertySource(propertySource);
-        }
+        register(readGeneration, propertySources);
 
         if (!propertySourcesLocators.isEmpty()) {
             for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
@@ -450,27 +496,48 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 Collection<PropertySource> sources = propertySourcesLocator.load(this);
                 propertySources.addAll(sources);
                 if (isBootstrapLocator) {
-                    for (PropertySource source : sources) {
-                        internalAddPropertySource(source);
-                    }
+                    register(readGeneration, sources);
                 }
             }
         }
 
+        List<PropertySource> refreshable = new ArrayList<>(propertySources.size());
         for (PropertySource propertySource : propertySources) {
             if (!PropertySource.CONTEXT.equals(propertySource.getName()) && !preExistingSourceNames.contains(propertySource.getName())) {
-                refreshablePropertySources.add(propertySource);
+                refreshable.add(propertySource);
             }
         }
 
         OrderUtil.sortOrdered(propertySources);
         for (PropertySource propertySource : propertySources) {
             internalProcessPropertySource(propertySource);
+            if (starting) {
+                synchronized (this.propertySources) {
+                    if (readGeneration != generation) {
+                        // a stop has ended the start
+                        return refreshable;
+                    }
+                    propertyPlaceholderResolver.publishRead(read, List.of());
+                }
+            }
         }
+        return refreshable;
     }
 
-    private void internalAddPropertySource(PropertySource propertySource) {
-        propertySources.put(propertySource.getName(), propertySource);
+    /**
+     * Registers the property sources that a read has loaded or located, unless a stop has ended it.
+     *
+     * @param readGeneration The generation of the read
+     * @param sources        The property sources
+     */
+    private void register(Generation readGeneration, Collection<PropertySource> sources) {
+        synchronized (propertySources) {
+            if (readGeneration == generation) {
+                for (PropertySource source : sources) {
+                    propertySources.put(source.getName(), source);
+                }
+            }
+        }
     }
 
     private void internalProcessPropertySource(PropertySource propertySource) {
@@ -1087,6 +1154,19 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     @Override
     public MutableConversionService getConversionService() {
         return mutableConversionService;
+    }
+
+    /**
+     * A generation of the environment, from a stop to the next. The reads of a generation hold its
+     * monitor, so that one runs at a time.
+     */
+    private static final class Generation {
+        /**
+         * Whether a read of this generation is in progress: a property source added meanwhile is
+         * only registered, for the read to process. Guarded by the monitor of
+         * {@link DefaultEnvironment#propertySources}.
+         */
+        private boolean reading;
     }
 
     /**

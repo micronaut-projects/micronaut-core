@@ -84,24 +84,34 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     private final Logger log;
 
-    private final Object catalogLock = new Object();
     /**
-     * The catalogs and the caches derived from them, as lookups see them. Replaced as a whole, so a
-     * lookup that reads this field observes a state that is never partially built.
+     * Orders the publishes of states. Only work in memory is done while it is held: no property
+     * source, converter or other code of the application runs under it.
      */
-    @SuppressWarnings("java:S3077") // ResolverState is only ever published fully initialized
+    private final Object publishLock = new Object();
+    /**
+     * The catalogs and the caches derived from them, as lookups see them. Every change builds a new
+     * state off to the side, see {@link Build}, and publishes it by replacing this field under
+     * {@link #publishLock}. A published state is never written again, so a lookup that reads this
+     * field observes a state that is never partially built and never changes.
+     */
+    @SuppressWarnings("java:S3077") // ResolverState is only ever published fully built
     private volatile ResolverState state = new ResolverState();
     /**
-     * The state that catalog writes go into. The same instance as {@link #state}, except while a
-     * refresh builds a replacement that is not published yet. Guarded by {@link #catalogLock}.
+     * The build of the current thread on this resolver, if it builds a state: its lookups read the
+     * build, and its writes go into it. Removed from the thread when the outermost build ends.
      */
-    private ResolverState writeState = state;
+    private final ThreadLocal<Build> builds = new ThreadLocal<>();
     /**
-     * The thread {@link #refresh(Runnable)} is building a replacement state on, or {@code null}
-     * outside a refresh. Written under {@link #catalogLock}, read without it by every lookup.
+     * The number of threads that build a state on this resolver. It is zero unless a change is
+     * being built, which lets every lookup skip the per-thread check.
      */
-    @SuppressWarnings("java:S3077") // a thread reference, not a mutable object
-    private volatile Thread refreshingThread;
+    private final AtomicInteger builders = new AtomicInteger();
+    /**
+     * The publishes of the current thread while {@link #diff(Runnable)} runs a change. Removed from
+     * the thread when the change ends.
+     */
+    private final ThreadLocal<List<Publish>> publishes = new ThreadLocal<>();
     /**
      * The state that the lookups of the current thread are kept on while
      * {@link #onState(ResolverState, Supplier)} runs them a second time. The outermost second run
@@ -170,33 +180,34 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         }
     }
 
+    /**
+     * Empties the catalogs: those of the build of the current thread, or else the published ones.
+     */
     void reset() {
-        synchronized (catalogLock) {
-            ResolverState empty = new ResolverState();
-            writeState = empty;
-            if (refreshingThread == null) {
-                state = empty;
-            }
+        Build build = currentBuild();
+        if (build != null) {
+            build.state = new ResolverState();
+        } else {
+            publishEmpty();
         }
     }
 
     /**
-     * The state a lookup reads from. Outside a refresh that is the published state. On the thread
-     * that is rebuilding the catalogs it is the replacement being built, so the rebuild sees the
-     * properties it has contributed so far: a {@link PropertySource} whose keys depend on what the
-     * resolver already holds (micronaut-test-resources contributes only the keys the environment
-     * cannot resolve) must be answered from the catalog being built, not from the one the rebuild
-     * is replacing. Every other thread keeps reading the published state until the rebuild is
-     * published in one step, except for a thread that {@link #onState(ResolverState, Supplier)}
-     * keeps on the state a lookup has started with.
+     * The state a lookup reads from. That is the published state, except on a thread that builds a
+     * state, which reads its build: it sees the properties it has contributed so far. A
+     * {@link PropertySource} whose keys depend on what the resolver already holds
+     * (micronaut-test-resources contributes only the keys the environment cannot resolve) must be
+     * answered from the catalogs being built, not from the ones the build is replacing. Every other
+     * thread keeps reading the published state until the build is published in one step, except
+     * for a thread that {@link #onState(ResolverState, Supplier)} keeps on the state a lookup has
+     * started with.
      *
      * @return The state to read the catalogs and the caches from
      */
     private ResolverState readState() {
-        if (refreshingThread == Thread.currentThread()) {
-            // Only the refreshing thread takes this branch, and it holds `catalogLock` for the
-            // whole rebuild, so it reads a field that no other thread can be writing.
-            return writeState;
+        Build build = currentBuild();
+        if (build != null) {
+            return build.state;
         }
         // A plain read: only a thread that has counted itself in has to see the count, and a thread
         // sees what it has written. A stale count on any other thread only decides whether it makes
@@ -262,50 +273,180 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * Rebuilds the catalogs. The writes performed by {@code rebuild} go into a replacement state
-     * while lookups keep reading the current one, and the replacement is published in a single
-     * step once {@code rebuild} completes. A concurrent lookup therefore observes the properties
-     * either as they were before the rebuild or as they are after it, but never a half-built
-     * catalog. If {@code rebuild} throws, the replacement is discarded and the current state stays
-     * published.
+     * The build of the current thread on this resolver.
      *
-     * @param rebuild The rebuild to run
+     * @return The build, {@code null} if the thread builds no state
      */
-    void refresh(Runnable rebuild) {
-        synchronized (catalogLock) {
-            if (refreshingThread != null) {
-                // Already inside a refresh, its outermost call publishes.
-                rebuild.run();
-                return;
-            }
-            refreshingThread = Thread.currentThread();
-            try {
-                rebuild.run();
-                state = writeState;
-            } finally {
-                refreshingThread = null;
-                writeState = state;
+    private @Nullable Build currentBuild() {
+        // A plain read: only a thread that has counted itself in has to see the count, and a thread
+        // sees what it has written. A stale count on any other thread only decides whether it makes
+        // the per-thread check, which finds nothing there.
+        return builders.getPlain() != 0 ? builds.get() : null;
+    }
+
+    /**
+     * Starts a change on the current thread: a build on top of the published state. Until
+     * {@link #endBuild(Build)}, the lookups of the thread read the build, and the property sources
+     * it processes go into it. The build records what it processes, so that
+     * {@link #publishChange(Build)} can process it again on top of another state.
+     *
+     * @param keepMemory Whether the build keeps what the expressions of the published state have
+     *                   resolved to, rather than resolving them again
+     * @return The build
+     */
+    Build startChange(boolean keepMemory) {
+        ResolverState base = state;
+        return startBuild(new Build(base, new ResolverState(base, keepMemory ? base.rememberedValues : new ConcurrentHashMap<>(4)), keepMemory, new ArrayList<>(), currentBuild()));
+    }
+
+    /**
+     * Starts a read on the current thread: a build of new catalogs, from none. Until
+     * {@link #endBuild(Build)}, the lookups of the thread read the build, and the property sources
+     * it processes go into it. It is published with {@link #publishRead(Build, Collection)}.
+     *
+     * @return The build
+     */
+    Build startRead() {
+        return startBuild(new Build(null, new ResolverState(), false, null, currentBuild()));
+    }
+
+    private Build startBuild(Build build) {
+        builders.incrementAndGet();
+        builds.set(build);
+        return build;
+    }
+
+    /**
+     * Ends a build of the current thread. The thread goes back to the build it made before, if it
+     * started this one inside it, or else to the published state.
+     *
+     * @param build The build
+     */
+    void endBuild(Build build) {
+        if (build.enclosing != null) {
+            builds.set(build.enclosing);
+        } else {
+            builds.remove();
+        }
+        builders.decrementAndGet();
+    }
+
+    /**
+     * Publishes a change. If another state was published since the change started, what the change
+     * has recorded is processed again on top of that state, with no property source called.
+     *
+     * @param change The change, which has ended
+     */
+    void publishChange(Build change) {
+        synchronized (publishLock) {
+            ResolverState current = state;
+            if (current == change.base) {
+                publish(change.state);
+            } else {
+                ResolverState replayed = new ResolverState(current, change.keepMemory ? current.rememberedValues : change.state.rememberedValues);
+                processAgain(replayed, change);
+                publish(replayed);
             }
         }
     }
 
     /**
-     * Runs a change of the catalogs, such as a refresh, and returns what it has changed.
+     * Publishes what a read has built so far, with changes that it has to keep on top processed
+     * again on top of it. The read can go on building.
+     *
+     * @param read  The read
+     * @param onTop The changes to keep on top
+     */
+    void publishRead(Build read, Collection<Build> onTop) {
+        synchronized (publishLock) {
+            ResolverState built = new ResolverState(read.state, read.state.rememberedValues);
+            // the published state shares what the read has built, so the read copies what it writes into from now on
+            read.state.owned.clear();
+            for (Build change : onTop) {
+                processAgain(built, change);
+            }
+            publish(built);
+        }
+    }
+
+    /**
+     * Publishes empty catalogs, as a stopped environment has.
+     */
+    void publishEmpty() {
+        synchronized (publishLock) {
+            publish(new ResolverState());
+        }
+    }
+
+    /**
+     * Publishes the published catalogs again, with empty caches and with the expressions of the
+     * properties resolved again, as a property source added to or removed from a running
+     * environment does.
+     */
+    void resetCachesAndRememberedValues() {
+        synchronized (publishLock) {
+            publish(new ResolverState(state, new ConcurrentHashMap<>(4)));
+        }
+        resetCaches();
+    }
+
+    /**
+     * Processes what a change has recorded again, into a state that is not published yet. Only work
+     * in memory: no property source is called.
+     *
+     * @param target The state
+     * @param change The change
+     */
+    private void processAgain(ResolverState target, Build change) {
+        for (RawEntry entry : change.entries) {
+            processEntry(target, entry);
+        }
+    }
+
+    /**
+     * Publishes a state. Called with {@link #publishLock} held.
+     *
+     * @param published The state
+     */
+    private void publish(ResolverState published) {
+        ResolverState before = state;
+        state = published;
+        List<Publish> made = publishes.get();
+        if (made != null) {
+            made.add(new Publish(before, published));
+        }
+    }
+
+    /**
+     * Runs a change of the catalogs, such as a refresh, and returns what it has changed: the
+     * difference between each state the current thread has published while the change ran and the
+     * state published just before it. What another thread publishes meanwhile, a property source it
+     * adds for one, is not part of it. The states are compared once the change has ended, with no
+     * lock held, as comparing values runs their {@code equals}.
      *
      * @param change The change to run
-     * @return The properties that the change has changed
+     * @return The properties that the change has changed, with the value each had before
      */
     public Map<String, Object> diff(Runnable change) {
-        // Under the lock of the catalogs, which the refresh takes itself: the difference is between
-        // what was published before this change and what it has published. A property source that
-        // another thread adds, or another refresh, waits until the difference has been taken. The
-        // lock is taken before the change runs, as a refresh takes it before the environment locks
-        // its property sources, so the two locks are always taken in the same order.
-        synchronized (catalogLock) {
-            Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(state.catalog);
+        List<Publish> enclosing = publishes.get();
+        List<Publish> made = new ArrayList<>(2);
+        publishes.set(made);
+        try {
             change.run();
-            return diffCatalog(copiedCatalog, state.catalog);
+        } finally {
+            if (enclosing != null) {
+                enclosing.addAll(made);
+                publishes.set(enclosing);
+            } else {
+                publishes.remove();
+            }
         }
+        Map<String, Object> changes = new LinkedHashMap<>();
+        for (Publish publish : made) {
+            // a property that more than one publish has changed had the value of the first before
+            diffCatalog(publish.before().catalog, publish.after().catalog).forEach(changes::putIfAbsent);
+        }
+        return changes;
     }
 
 
@@ -378,17 +519,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     private static boolean hasChanged(Object newValue, Object oldValue) {
         return !Objects.deepEquals(newValue, oldValue);
-    }
-
-    private @Nullable Map<String, DefaultPropertyEntry>[] copyCatalog(@Nullable Map<String, DefaultPropertyEntry>[] catalog) {
-        Map<String, DefaultPropertyEntry>[] newCatalog = new Map[catalog.length];
-        for (int i = 0; i < catalog.length; i++) {
-            Map<String, DefaultPropertyEntry> entry = catalog[i];
-            if (entry != null) {
-                newCatalog[i] = new LinkedHashMap<>(entry);
-            }
-        }
-        return newCatalog;
     }
 
     /**
@@ -659,7 +789,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 Optional<T> converted;
                 if (entries != null) {
                     // iff entries is null, the value is from placeholderResolutionCache and doesn't need this step
-                    value = resolvePlaceHoldersIfNecessary(currentState, value, name, lookupRevision);
+                    value = resolvePlaceHoldersIfNecessary(currentState, value, name);
                     cache(currentState.placeholderResolutionCache, name, value, lookupRevision);
                 }
                 if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
@@ -951,101 +1081,121 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
+     * Processes a property source: into the build of the current thread, or else as a change of
+     * its own, built on top of the published state and then published.
+     *
      * @param properties The property source
      * @param convention The property convention
      */
-    @SuppressWarnings("MagicNumber")
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
-        synchronized (catalogLock) {
-            // The state the writes go into: the published one, or the replacement a refresh publishes
-            ResolverState target = writeState;
-            // odd while its catalogs change
-            target.revision.incrementAndGet();
-            try {
-                processProperties(target, properties, convention);
-            } finally {
-                target.revision.incrementAndGet();
-            }
+        Build build = currentBuild();
+        if (build != null) {
+            processInto(build, properties, convention);
+            return;
         }
+        Build change = startChange(true);
+        try {
+            processInto(change, properties, convention);
+        } finally {
+            endBuild(change);
+        }
+        publishChange(change);
     }
 
-    private void processProperties(ResolverState target, PropertySource properties, PropertySource.PropertyConvention convention) {
-        for (String property : properties) {
+    private void processInto(Build build, PropertySource properties, PropertySource.PropertyConvention convention) {
+        ResolverState target = build.state;
+        // odd while its catalogs change
+        target.revision.incrementAndGet();
+        try {
+            for (String property : properties) {
 
-            log.trace("Processing property key {}", property);
+                log.trace("Processing property key {}", property);
 
-            Object value = properties.get(property);
+                RawEntry entry = new RawEntry(property, properties.get(property), convention, properties.getOrigin());
+                if (build.entries != null) {
+                    build.entries.add(entry);
+                }
+                processEntry(target, entry);
+            }
+        } finally {
+            target.revision.incrementAndGet();
+        }
+        // A lookup of the building thread can cache a miss while the catalogs change.
+        resetCaches();
+    }
 
-            populateRawCatalog(target, property, value, convention, properties.getOrigin());
+    @SuppressWarnings("MagicNumber")
+    private void processEntry(ResolverState target, RawEntry rawEntry) {
+        String property = rawEntry.property();
+        Object value = rawEntry.value();
+        PropertySource.PropertyConvention convention = rawEntry.convention();
+        PropertySource.Origin origin = rawEntry.origin();
 
-            List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
-            boolean first = true;
-            for (String resolvedProperty : resolvedProperties) {
-                int i = resolvedProperty.indexOf('[');
-                if (i > -1) {
-                    String propertyName = resolvedProperty.substring(0, i);
-                    Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(propertyName, true, PropertyCatalog.GENERATED);
-                    if (entries != null) {
-                        entries.put(resolvedProperty, new DefaultPropertyEntry(
-                            resolvedProperty,
-                            value,
-                            property,
-                            properties.getOrigin()
-                        ));
-                        expandIndexedProperty(
-                            target,
-                            entries,
+        populateRawCatalog(target, property, value, convention, origin);
+
+        List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
+        boolean first = true;
+        for (String resolvedProperty : resolvedProperties) {
+            int i = resolvedProperty.indexOf('[');
+            if (i > -1) {
+                String propertyName = resolvedProperty.substring(0, i);
+                Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(target, propertyName, true, PropertyCatalog.GENERATED);
+                if (entries != null) {
+                    entries.put(resolvedProperty, new DefaultPropertyEntry(
+                        resolvedProperty,
+                        value,
+                        property,
+                        origin
+                    ));
+                    expandIndexedProperty(
+                        target,
+                        entries,
+                        propertyName,
+                        resolvedProperty.substring(i),
+                        value,
+                        property,
+                        origin
+                    );
+                }
+                if (first) {
+                    Map<String, DefaultPropertyEntry> normalized = resolveEntriesForKey(target, resolvedProperty, true, PropertyCatalog.NORMALIZED);
+                    if (normalized != null) {
+                        normalized.put(propertyName, new DefaultPropertyEntry(
                             propertyName,
-                            resolvedProperty.substring(i),
                             value,
                             property,
-                            properties.getOrigin()
-                        );
+                            origin
+                        ));
                     }
-                    if (first) {
-                        Map<String, DefaultPropertyEntry> normalized = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.NORMALIZED);
-                        if (normalized != null) {
-                            normalized.put(propertyName, new DefaultPropertyEntry(
-                                propertyName,
-                                value,
-                                property,
-                                properties.getOrigin()
-                            ));
-                        }
-                        first = false;
+                    first = false;
+                }
+            } else {
+                Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(target, resolvedProperty, true, PropertyCatalog.GENERATED);
+                if (entries != null) {
+                    if (value instanceof List || value instanceof Map) {
+                        collapseProperty(property, resolvedProperty, entries, value, origin);
                     }
-                } else {
-                    Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.GENERATED);
-                    if (entries != null) {
-                        if (value instanceof List || value instanceof Map) {
-                            collapseProperty(property, resolvedProperty, entries, value, properties.getOrigin());
-                        }
-                        entries.put(resolvedProperty, new DefaultPropertyEntry(
+                    entries.put(resolvedProperty, new DefaultPropertyEntry(
+                        resolvedProperty,
+                        value,
+                        property,
+                        origin
+                    ));
+                }
+                if (first) {
+                    Map<String, DefaultPropertyEntry> normalized = resolveEntriesForKey(target, resolvedProperty, true, PropertyCatalog.NORMALIZED);
+                    if (normalized != null) {
+                        normalized.put(resolvedProperty, new DefaultPropertyEntry(
                             resolvedProperty,
                             value,
                             property,
-                            properties.getOrigin()
+                            origin
                         ));
                     }
-                    if (first) {
-                        Map<String, DefaultPropertyEntry> normalized = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.NORMALIZED);
-                        if (normalized != null) {
-                            normalized.put(resolvedProperty, new DefaultPropertyEntry(
-                                resolvedProperty,
-                                value,
-                                property,
-                                properties.getOrigin()
-                            ));
-                        }
-                        first = false;
-                    }
+                    first = false;
                 }
             }
-
         }
-        // A lookup can cache a miss between reset() and catalog reinitialization.
-        // Clear those entries after the rebuilt catalog becomes visible.
-        resetCaches();
     }
 
     /**
@@ -1073,7 +1223,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         PropertySource.PropertyConvention convention,
         PropertySource.Origin origin) {
 
-        Map<String, DefaultPropertyEntry> rawEntries = resolveEntriesForKey(property, true, PropertyCatalog.RAW);
+        Map<String, DefaultPropertyEntry> rawEntries = resolveEntriesForKey(target, property, true, PropertyCatalog.RAW);
         if (rawEntries != null) {
             rawEntries.put(property, new DefaultPropertyEntry(
                 property,
@@ -1088,7 +1238,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             return;
         }
         String baseName = property.substring(0, bracket);
-        Map<String, DefaultPropertyEntry> baseEntries = resolveEntriesForKey(baseName, true, PropertyCatalog.RAW);
+        Map<String, DefaultPropertyEntry> baseEntries = resolveEntriesForKey(target, baseName, true, PropertyCatalog.RAW);
         if (baseEntries != null) {
             expandIndexedProperty(
                 target,
@@ -1131,7 +1281,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         Object value,
         String originalProperty,
         PropertySource.Origin origin) {
-        Map<Object, Object> copies = new IdentityHashMap<>(4);
+        IdentityHashMap<Object, Object> copies = new IdentityHashMap<>(4);
         DefaultPropertyEntry aggregate = entries.get(baseName);
         expandProperty(
             new Expansion(target, copies),
@@ -1261,12 +1411,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     @Nullable
     protected final Map<String, DefaultPropertyEntry> resolveEntriesForKey(String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
         if (allowCreate) {
-            // Writes go to the state being built, which is the published one outside of a refresh.
-            // The lock guards the read of `writeState`; every write path already holds it, and the
-            // lock is reentrant, so this only ever matters to an external caller that does not.
-            synchronized (catalogLock) {
-                return resolveEntriesForKey(writeState, name, true, propertyCatalog);
+            Build build = currentBuild();
+            if (build != null) {
+                return resolveEntriesForKey(build.state, name, true, propertyCatalog);
             }
+            // a published state is never written into
+            Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(state, name, false, propertyCatalog);
+            return entries != null ? Collections.unmodifiableMap(entries) : null;
         }
         return resolveEntriesForKey(readState(), name, propertyCatalog);
     }
@@ -1288,8 +1439,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             int index = firstChar - 65;
             if (index < catalog.length && index >= 0) {
                 Map<String, DefaultPropertyEntry> entries = catalog[index];
-                if (allowCreate && entries == null) {
-                    entries = new LinkedHashMap<>(5);
+                if (allowCreate && (entries == null || !resolverState.owned.contains(entries))) {
+                    // the map of the state it was built from, which may be published, is copied before the first write
+                    entries = entries == null ? new LinkedHashMap<>(5) : new LinkedHashMap<>(entries);
+                    resolverState.owned.add(entries);
                     catalog[index] = entries;
                 }
                 return entries;
@@ -1326,29 +1479,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * Resets the caches, and forgets what the expressions of the properties have resolved to, as a
-     * property source added to or removed from a running environment does.
-     */
-    void resetCachesAndRememberedValues() {
-        // Forgotten before the revision changes: a lookup that reads the new revision then finds the
-        // values forgotten, so what it caches for that revision is what is remembered again.
-        readState().rememberedValues.clear();
-        resetCaches();
-    }
-
-    /**
      * Resolves the placeholders of a property's text, with the memory of its expressions.
      *
-     * @param resolverState  The state the text was read from
-     * @param text           The text
-     * @param place          Where the text was found: the name it was looked up by, a {@link ListElement} or a {@link MapValue}
-     * @param lookupRevision The revision read before the catalogs
+     * @param resolverState The state the text was read from
+     * @param text          The text
+     * @param place         Where the text was found: the name it was looked up by, a {@link ListElement} or a {@link MapValue}
      * @return The text with its placeholders resolved
      */
-    private Object resolvePlaceholders(ResolverState resolverState, String text, Object place, long lookupRevision) {
+    private Object resolvePlaceholders(ResolverState resolverState, String text, Object place) {
         if (propertyPlaceholderResolver instanceof DefaultPropertyPlaceholderResolver placeholderResolver) {
             return placeholderResolver.resolveRequiredPlaceholdersObject(text, (placeholder, expression) ->
-                value -> remember(resolverState, place, text, new ExpressionPosition(placeholder, expression), value, lookupRevision));
+                value -> remember(resolverState, place, text, new ExpressionPosition(placeholder, expression), value));
         }
         return propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(text);
     }
@@ -1366,23 +1507,22 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * of the text, such as the property that {@code http://${app.host}:${random.port}/} names, are
      * resolved as before, by every lookup that does not find the value cached.</p>
      *
-     * <p>A lookup that read the text before a property source replaced it can finish after a later
-     * lookup has remembered the replacement. Like the caches, the memory only takes a text from a
-     * lookup that has read the catalogs as they still are, or from the thread that is changing them,
-     * which holds their lock and so reads them as they are. It also takes it when nothing is
-     * remembered at the place: what is remembered for a text is only used by a lookup that finds the
-     * same text.</p>
+     * <p>A state built on top of another shares what that one remembers, unless it resolves the
+     * expressions again. A lookup that read the text from an older state can then finish after a
+     * lookup of a newer one has remembered another text at the place. So the memory only replaces
+     * a text with the text of a state at least as new as the one it was remembered from, or with
+     * that of the state the current thread builds. It also takes it when nothing is remembered at
+     * the place: what is remembered for a text is only used by a lookup that finds the same text.</p>
      *
-     * @param resolverState  The state the text was read from
-     * @param place          Where the text was found, see {@link #resolvePlaceholders(ResolverState, String, Object, long)}
-     * @param text           The text
-     * @param position       The position of the expression in the text
-     * @param value          Resolves the expression
-     * @param lookupRevision The revision read before the catalogs
+     * @param resolverState The state the text was read from
+     * @param place         Where the text was found, see {@link #resolvePlaceholders(ResolverState, String, Object)}
+     * @param text          The text
+     * @param position      The position of the expression in the text
+     * @param value         Resolves the expression
      * @return What the expression resolves to
      */
     private Object remember(ResolverState resolverState, Object place, String text, ExpressionPosition position,
-                            Supplier<Object> value, long lookupRevision) {
+                            Supplier<Object> value) {
         RememberedText remembered = resolverState.rememberedValues.get(place);
         if (remembered != null && remembered.text().equals(text)) {
             Object rememberedValue = remembered.values().get(position);
@@ -1391,10 +1531,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             }
         }
         Object resolved = value.get();
-        boolean changingCatalogs = Thread.holdsLock(catalogLock);
+        Build build = currentBuild();
+        boolean building = build != null && build.state == resolverState;
         Object[] result = {resolved};
-        // Checked within compute, which a lookup at the place by another thread waits for: by the time
-        // another lookup can read a text that this one has not read, the revision has changed.
+        // Checked within compute, which a lookup at the place by another thread waits for.
         resolverState.rememberedValues.compute(place, (key, earlier) -> {
             if (earlier != null && earlier.text().equals(text)) {
                 // what a lookup of another thread may have remembered for the expression meanwhile
@@ -1404,15 +1544,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 }
                 return earlier;
             }
+            // States share what they remember when one is built on top of another: a lookup of an
+            // older state does not replace what a newer one has remembered.
             boolean current = earlier == null
-                || changingCatalogs
-                || ((lookupRevision & 1) == 0 && resolverState.revision.get() == lookupRevision);
+                || building
+                || resolverState.sequence >= earlier.sequence();
             if (!current) {
                 return earlier;
             }
             Map<ExpressionPosition, Object> values = new ConcurrentHashMap<>(2);
             values.put(position, resolved);
-            return new RememberedText(text, values);
+            return new RememberedText(text, values, resolverState.sequence);
         });
         return result[0];
     }
@@ -1486,27 +1628,26 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @return The value with its placeholders resolved
      */
     private Object resolvePlaceHoldersIfNecessary(ResolverState resolverState, Object value) {
-        return resolvePlaceHoldersIfNecessary(resolverState, value, null, 0);
+        return resolvePlaceHoldersIfNecessary(resolverState, value, null);
     }
 
     /**
      * Resolves the placeholders of a value. The expressions that remember what they resolve to,
      * such as the random ones, keep it for the place the text was found at.
      *
-     * @param resolverState  The state the value was read from, which the properties the
-     *                       placeholders name are read from too
-     * @param value          The value
-     * @param place          Where the value was found: the name it was looked up by, a {@link ListElement}
-     *                       or a {@link MapValue}; {@code null} if nothing is remembered
-     * @param lookupRevision The revision read before the catalogs
+     * @param resolverState The state the value was read from, which the properties the
+     *                      placeholders name are read from too
+     * @param value         The value
+     * @param place         Where the value was found: the name it was looked up by, a {@link ListElement}
+     *                      or a {@link MapValue}; {@code null} if nothing is remembered
      * @return The value with its placeholders resolved
      */
-    private Object resolvePlaceHoldersIfNecessary(ResolverState resolverState, Object value, @Nullable Object place, long lookupRevision) {
+    private Object resolvePlaceHoldersIfNecessary(ResolverState resolverState, Object value, @Nullable Object place) {
         if (value instanceof CharSequence) {
             String str = value.toString();
             if (str.contains(propertyPlaceholderResolver.getPrefix())) {
                 return onState(resolverState, () -> place != null
-                    ? resolvePlaceholders(resolverState, str, place, lookupRevision)
+                    ? resolvePlaceholders(resolverState, str, place)
                     : propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(str));
             }
             // without a placeholder there is nothing to resolve
@@ -1518,14 +1659,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 Object elementPlace = place != null ? new ListElement(place, i.nextIndex()) : null;
                 final Object o = i.next();
                 if (o instanceof CharSequence) {
-                    i.set(resolvePlaceHoldersIfNecessary(resolverState, o, elementPlace, lookupRevision));
+                    i.set(resolvePlaceHoldersIfNecessary(resolverState, o, elementPlace));
                 } else if (o instanceof Map<?,?> submap) {
                     Map<Object, Object> newMap = CollectionUtils.newLinkedHashMap(submap.size());
                     for (Map.Entry<?, ?> entry : submap.entrySet()) {
                         final Object k = entry.getKey();
                         final Object v = entry.getValue();
                         Object valuePlace = elementPlace != null ? new MapValue(elementPlace, k) : null;
-                        newMap.put(k, resolvePlaceHoldersIfNecessary(resolverState, v, valuePlace, lookupRevision));
+                        newMap.put(k, resolvePlaceHoldersIfNecessary(resolverState, v, valuePlace));
                     }
                     i.set(newMap);
                 }
@@ -1560,13 +1701,28 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * The mutable state of the resolver: the property catalogs and the caches derived from them.
-     * Holding them together means a refresh can build a replacement without touching what lookups
-     * are reading, and publish it with a single write to {@link #state}. A lookup racing with that
-     * switch keeps reading the state it started from, so a value it computes from the previous
-     * catalogs is cached against those catalogs rather than leaking into the new ones.
+     * The state of the resolver: the property catalogs and the caches derived from them. Holding
+     * them together means a change can build a new state without touching what lookups are reading,
+     * and publish it with a single write to {@link #state}. A lookup racing with that switch keeps
+     * reading the state it started from, so a value it computes from the previous catalogs is
+     * cached against those catalogs rather than leaking into the new ones.
+     *
+     * <p>A state built on top of another starts with the maps of that one, which it copies before
+     * it first writes into them, see {@link #owned}. Only the thread that builds a state writes into
+     * it, and only until it is published.</p>
      */
     private static final class ResolverState {
+
+        /**
+         * Orders the states by when they were created, see {@link #sequence}.
+         */
+        private static final AtomicLong SEQUENCE = new AtomicLong();
+
+        /**
+         * Where the state comes in the order the states were created: one built on top of another
+         * comes after it.
+         */
+        private final long sequence = SEQUENCE.incrementAndGet();
 
         /**
          * Changed by every change of the catalogs of this state the caches are filled from: a property source
@@ -1583,12 +1739,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         @SuppressWarnings("MagicNumber")
         private static final int CATALOG_SIZE = 58;
 
-        private final @Nullable Map<String, DefaultPropertyEntry>[] catalog = new Map[CATALOG_SIZE];
-        private final @Nullable Map<String, DefaultPropertyEntry>[] rawCatalog = new Map[CATALOG_SIZE];
-        private final @Nullable Map<String, DefaultPropertyEntry>[] nonGenerated = new Map[CATALOG_SIZE];
+        private final @Nullable Map<String, DefaultPropertyEntry>[] catalog;
+        private final @Nullable Map<String, DefaultPropertyEntry>[] rawCatalog;
+        private final @Nullable Map<String, DefaultPropertyEntry>[] nonGenerated;
         /**
-         * The lists and maps of the values of this state that it may write into, by identity: those
-         * it has created or copied. Guarded by {@code catalogLock}.
+         * The maps of the catalogs, and the lists and maps of the values, that this state may write
+         * into, by identity: those it has created or copied. Every other one is shared with the state
+         * it was built from, or with a property source.
          */
         private final Set<Object> owned = Collections.newSetFromMap(new IdentityHashMap<>());
 
@@ -1604,14 +1761,93 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          * the texts to, by the place the text was found at: the name it was looked up by, a
          * {@link ListElement} or a {@link MapValue}. Unlike the caches it is kept when a property
          * source is processed. It holds one entry per looked-up name, or place in a list, whose text
-         * holds, or held, such an expression. A refresh publishes another state, so the expressions
-         * are resolved again after a refresh.
+         * holds, or held, such an expression. A state built on top of another can share it, as the
+         * states that a read publishes do. A read starts with a new one, so the expressions are
+         * resolved again after a refresh.
          */
-        private final Map<Object, RememberedText> rememberedValues = new ConcurrentHashMap<>(4);
+        private final Map<Object, RememberedText> rememberedValues;
         /**
          * Cache for values <i>after</i> conversion.
          */
         private final Map<ConversionCacheKey, CachedValue> resolvedValueCache = new ConcurrentHashMap<>(20);
+
+        /**
+         * An empty state.
+         */
+        ResolverState() {
+            catalog = new Map[CATALOG_SIZE];
+            rawCatalog = new Map[CATALOG_SIZE];
+            nonGenerated = new Map[CATALOG_SIZE];
+            rememberedValues = new ConcurrentHashMap<>(4);
+        }
+
+        /**
+         * A state built on top of another, with its catalogs and empty caches.
+         *
+         * @param base             The state it is built on
+         * @param rememberedValues What the expressions resolve to, the memory of the base or a new one
+         */
+        ResolverState(ResolverState base, Map<Object, RememberedText> rememberedValues) {
+            catalog = base.catalog.clone();
+            rawCatalog = base.rawCatalog.clone();
+            nonGenerated = base.nonGenerated.clone();
+            this.rememberedValues = rememberedValues;
+        }
+    }
+
+    /**
+     * A state that a thread builds, and the state it is built on.
+     */
+    static final class Build {
+        /**
+         * The published state that a change is built on, {@code null} for a read.
+         */
+        private final @Nullable ResolverState base;
+        /**
+         * Whether the build shares what the expressions resolve to with its base.
+         */
+        private final boolean keepMemory;
+        /**
+         * What a change has processed, in order, to process it again on top of another state;
+         * {@code null} for a read.
+         */
+        private final @Nullable List<RawEntry> entries;
+        /**
+         * The build that the thread made before this one, which it goes back to when this one ends.
+         */
+        private final @Nullable Build enclosing;
+        /**
+         * The state being built.
+         */
+        private ResolverState state;
+
+        private Build(@Nullable ResolverState base, ResolverState state, boolean keepMemory, @Nullable List<RawEntry> entries, @Nullable Build enclosing) {
+            this.base = base;
+            this.state = state;
+            this.keepMemory = keepMemory;
+            this.entries = entries;
+            this.enclosing = enclosing;
+        }
+    }
+
+    /**
+     * A property as a property source has given it.
+     *
+     * @param property   The property key, as the property source gives it
+     * @param value      The value
+     * @param convention The convention of the property source
+     * @param origin     The origin of the property source
+     */
+    private record RawEntry(String property, Object value, PropertySource.PropertyConvention convention, PropertySource.Origin origin) {
+    }
+
+    /**
+     * A state published, and the state published before it.
+     *
+     * @param before The state published before
+     * @param after  The state published
+     */
+    private record Publish(ResolverState before, ResolverState after) {
     }
 
     /**
@@ -1620,7 +1856,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @param target The state the property is processed into, which owns what the expansion creates and copies
      * @param copies The containers the expansion has copied, and their copies
      */
-    private record Expansion(ResolverState target, Map<Object, Object> copies) {
+    private record Expansion(ResolverState target, IdentityHashMap<Object, Object> copies) {
 
         @SuppressWarnings("unchecked")
         List<Object> writableList(@Nullable Object container, Consumer<Object> containerSet) {
@@ -1660,10 +1896,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     /**
      * What the expressions of a text have resolved to.
      *
-     * @param text   The text
-     * @param values What its expressions have resolved to, by their position in the text
+     * @param text     The text
+     * @param values   What its expressions have resolved to, by their position in the text
+     * @param sequence The sequence of the state the text was read from
      */
-    private record RememberedText(String text, Map<ExpressionPosition, Object> values) {
+    private record RememberedText(String text, Map<ExpressionPosition, Object> values, long sequence) {
     }
 
     /**
