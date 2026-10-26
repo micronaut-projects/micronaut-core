@@ -378,6 +378,44 @@ class DecoratorFormTest(unittest.TestCase):
             # Outside the source root the imports cannot be resolved and the module is left alone
             self.assertTrue(ast_equal(ast.parse(source), MicronautRuntimeTransformer(java_class_element, no_class_elements).visit(ast.parse(source))))
 
+    def test_shared_scan_cache_does_not_keep_answers_of_a_cut_short_import_cycle(self):
+        import itertools
+        with tempfile.TemporaryDirectory() as source_root:
+            package = os.path.join(source_root, "cycle")
+            os.makedirs(package)
+            sources = {
+                # a re-exports auth from b, b imports a back, c applies auth imported from a
+                "a": "from .b import auth\n",
+                "b": (
+                    "from micronaut.core.bind.annotation import Bindable\n"
+                    "from .a import auth as again\n"
+                    "@Bindable\n"
+                    "def auth():\n"
+                    "    def decorator(target):\n"
+                    "        return target\n"
+                    "    return decorator\n"
+                ),
+                "c": (
+                    "from .a import auth\n"
+                    "@auth\n"
+                    "class View:\n"
+                    "    pass\n"
+                ),
+            }
+            for name, text in sources.items():
+                with open(os.path.join(package, name + ".py"), "w", encoding="utf-8") as module:
+                    module.write(text)
+            for order in itertools.permutations(sources):
+                with self.subTest(order=order):
+                    # one compilation: the modules share the scan caches, in any transform order
+                    caches = {}
+                    for name in order:
+                        transformer = MicronautTransformer(java_class_element, java_class_elements, True, "cycle", source_root, caches=caches)
+                        code = unparse(transformer.visit(ast.parse(sources[name])))
+                        if name == "c":
+                            self.assertIn("@auth()\nclass View", code)
+                    self.assertFalse(caches["loading"])
+
     def test_generated_decorator_is_a_factory(self):
         transformer = MicronautTransformer(java_class_element, no_class_elements)
         transformer.visit(ast.parse("from micronaut.context.annotation import Executable, Replaces\n"))
