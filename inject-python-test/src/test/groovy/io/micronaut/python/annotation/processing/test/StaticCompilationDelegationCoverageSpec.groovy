@@ -559,11 +559,11 @@ class Lists:
         xs: list[str] = []
         return self.fill(xs, n) + len(xs)
 
-    def tagged(self, tag: str) -> int:
+    def tagged(self, tag: str) -> str:
         xs: list[str] = []
         self.tag(xs, tag)
         self.tag(xs, tag)
-        return len(xs)
+        return "tagged " + tag
 
 @Singleton
 @CompileStatic(False)
@@ -577,7 +577,7 @@ class Caller:
        'Lists.tagged': 'once'])
 
         then: "the Python caller of filled keeps the Python body, which promotes; tagged runs its Java body once, whose delegate calls tag through the Python object"
-        results.off == '1237940039285380274899124225 2'
+        results.off == '1237940039285380274899124225 tagged a'
         results.all == results.off
         results['entries.Lists.filled'] == 0
         results['entries.Lists.tagged'] == 1
