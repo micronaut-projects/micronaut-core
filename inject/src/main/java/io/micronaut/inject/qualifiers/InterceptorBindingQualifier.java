@@ -312,9 +312,25 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
             for (AnnotationValue<?> declared : annotationMetadata.getAnnotationValuesByName(annotationName)) {
                 occurrences.add(boundMembers(declared, keepNonBinding));
             }
-        } else {
+            collectRetained(annotationMetadata, annotationName, keepNonBinding, occurrences);
+            return;
+        }
+        if (annotationMetadata.hasAnnotation(annotationName)) {
             annotationMetadata.findAnnotation(annotationName).ifPresent(declared -> occurrences.add(boundMembers(declared, keepNonBinding)));
         }
+        int declared = occurrences.size();
+        collectRetained(annotationMetadata, annotationName, keepNonBinding, occurrences);
+        if (occurrences.size() == declared && !annotationMetadata.hasAnnotation(annotationName)) {
+            // only composed, by annotations retaining nothing as compiled before the retained tree: the stereotype
+            // the metadata flattens them into, which merges the members of every composing annotation, is all there is
+            annotationMetadata.findAnnotation(annotationName).ifPresent(flattened -> occurrences.add(boundMembers(flattened, keepNonBinding)));
+        }
+    }
+
+    private static void collectRetained(AnnotationMetadata annotationMetadata,
+                                        String annotationName,
+                                        boolean keepNonBinding,
+                                        Set<AnnotationValue<?>> occurrences) {
         for (AnnotationValue<?> composing : annotationMetadata.getAnnotationValuesByStereotype(annotationName)) {
             collectRetained(composing, annotationName, keepNonBinding, occurrences);
         }
