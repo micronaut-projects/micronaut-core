@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.sse;
 
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -34,6 +35,7 @@ import java.time.Duration;
  * @author Denis Stepanov
  * @since 5.3.0
  */
+@Experimental
 public final class EventStreamState {
 
     /**
