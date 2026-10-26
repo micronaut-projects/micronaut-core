@@ -63,6 +63,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
@@ -949,20 +950,15 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
         private final ApplicationContextConfiguration configuration;
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
         /**
-         * The bootstrap environment created last, which stop() stops.
+         * The bootstrap environments the reads of the property sources have created, which stop()
+         * stops.
          */
-        private volatile BootstrapEnvironment bootstrapEnvironment;
+        private final Set<BootstrapEnvironment> bootstrapEnvironments = ConcurrentHashMap.newKeySet();
         /**
-         * The bootstrap environment that the start on the current thread has created, which its
-         * read reads: another thread's start or stop can replace the one above meanwhile.
+         * The bootstrap environment that the read of the property sources on the current thread
+         * has created, which it reads.
          */
         private final ThreadLocal<BootstrapEnvironment> startedBootstrapEnvironment = new ThreadLocal<>();
-        /**
-         * The thread whose stop() is that of a refresh, which leaves the environment running: its
-         * start() reads the bootstrap configuration again.
-         */
-        @SuppressWarnings("java:S3077") // a thread reference, not a mutable object
-        private volatile Thread refreshing;
         private final boolean bootstrapEnabled;
 
         RuntimeConfiguredEnvironment(ApplicationContextConfiguration configuration, boolean bootstrapEnabled) {
@@ -977,39 +973,30 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
 
         @Override
         public Environment stop() {
-            BootstrapEnvironment bootstrapEnvironment = this.bootstrapEnvironment;
-            if (bootstrapEnvironment != null) {
+            for (BootstrapEnvironment bootstrapEnvironment : bootstrapEnvironments) {
                 bootstrapEnvironment.stop();
-                this.bootstrapEnvironment = null;
+                bootstrapEnvironments.remove(bootstrapEnvironment);
             }
-            Environment environment = super.stop();
-            if (isRunning()) {
-                refreshing = Thread.currentThread();
-            }
-            return environment;
+            return super.stop();
         }
 
         @Override
-        public Environment start() {
-            // Only a start that reads the property sources reads the bootstrap configuration: that
-            // of a stopped environment, or that of a refresh. A start of the running environment
-            // from another thread, during a refresh or not, does not.
-            boolean refresh = refreshing == Thread.currentThread();
-            if (isRuntimeConfigured() && (refresh || !isRunning())) {
-                if (refresh) {
-                    refreshing = null;
-                }
-                BootstrapEnvironment bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
-                this.bootstrapEnvironment = bootstrapEnvironment;
-                startedBootstrapEnvironment.set(bootstrapEnvironment);
-                try {
-                    startBootstrapEnvironment(bootstrapEnvironment);
-                    return super.start();
-                } finally {
-                    startedBootstrapEnvironment.remove();
-                }
+        protected void readPropertySources(String name) {
+            if (!isRuntimeConfigured()) {
+                super.readPropertySources(name);
+                return;
             }
-            return super.start();
+            // Only a read of the property sources reads the bootstrap configuration: the start of
+            // a stopped environment, or a refresh. It reads the bootstrap environment it creates.
+            BootstrapEnvironment bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
+            bootstrapEnvironments.add(bootstrapEnvironment);
+            startedBootstrapEnvironment.set(bootstrapEnvironment);
+            try {
+                startBootstrapEnvironment(bootstrapEnvironment);
+                super.readPropertySources(name);
+            } finally {
+                startedBootstrapEnvironment.remove();
+            }
         }
 
         @Override
