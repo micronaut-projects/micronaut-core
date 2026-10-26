@@ -94,6 +94,25 @@ create TracedGarage
         context.close()
     }
 
+    void "the parameters of a creator method are constructor parameters, not factory method parameters"() {
+        given:
+        def tracer = new RecordingTracer()
+        def context = builder().beanResolutionTracer(tracer).start()
+
+        when:
+        context.getBean(TracedCreated)
+
+        then:
+        tracer.eventsAsText() == '''\
+create TracedCreated
+  inject CONSTRUCTOR TracedCreated.of(spark)
+    create TracedSpark <- TracedCreated'''
+        tracer.violations.isEmpty()
+
+        cleanup:
+        context.close()
+    }
+
     void "a failed creation is reported for the failing bean and each bean it fails, after their injection points completed"() {
         given:
         def tracer = new RecordingTracer()
@@ -260,6 +279,110 @@ failed TracedBroken: BeanInstantiationException'''
         context.getBean(TracedEngine).fuel != null
 
         cleanup:
+        context.close()
+    }
+
+    void "a tracer throwing from an end callback does not keep the other tracers from ending the creation"() {
+        given:
+        def recording = new RecordingTracer()
+        def throwing = new RecordingTracer() {
+            @Override
+            void traceBeanCreated(BeanResolutionTracer.Resolution resolution, BeanDefinition<?> beanDefinition) {
+                if (beanDefinition.beanType == TracedSpark) {
+                    throw new IllegalStateException("Tracer failed")
+                }
+            }
+        }
+        // the end callbacks run in reverse: the throwing tracer is called first
+        def context = builder().beanResolutionTracer(recording).beanResolutionTracer(throwing).start()
+
+        when:
+        context.getBean(TracedSpark)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == 'Tracer failed'
+        recording.events == ['create TracedSpark']
+        recording.violations.isEmpty()
+
+        cleanup:
+        context.close()
+    }
+
+    void "a tracer throwing from a start callback still sees the creation or the injection end"() {
+        given:
+        def recording = new RecordingTracer()
+        def throwing = new RecordingTracer() {
+            @Override
+            void traceInjectBean(BeanResolutionTracer.Resolution resolution, BeanResolutionTracer.Injection injection) {
+                super.traceInjectBean(resolution, injection)
+                if (injection.declaringBean.beanType == TracedEngine) {
+                    throw new IllegalStateException("Tracer failed")
+                }
+            }
+        }
+        def context = builder().beanResolutionTracer(recording).beanResolutionTracer(throwing).start()
+
+        when:
+        context.getBean(TracedEngine)
+
+        then:
+        def e = thrown(BeanInstantiationException)
+        e.message.contains('Tracer failed')
+        recording.eventsAsText() == '''\
+create TracedEngine
+  inject CONSTRUCTOR TracedEngine.<init>(spark)
+failed TracedEngine: BeanInstantiationException'''
+        recording.violations.isEmpty()
+        throwing.violations.isEmpty()
+
+        when: "the path of the resolution was left as it was"
+        recording.events.clear()
+        def other = builder().beanResolutionTracer(recording).start()
+        other.getBean(TracedEngine)
+
+        then:
+        recording.events.first() == 'create TracedEngine'
+        recording.violations.isEmpty()
+
+        cleanup:
+        context.close()
+        other?.close()
+    }
+
+    void "a copy of a resolution context keeps the tracer of its source"() {
+        given:
+        def tracer = new RecordingTracer()
+        def context = builder()
+                .beanResolutionTrace(BeanResolutionTraceMode.STANDARD_OUT, '.+TracedEngine')
+                .beanResolutionTracer(tracer)
+                .start()
+        def resolutionContext = context.newResolutionContext(context.getBeanDefinition(TracedEngine), null)
+
+        expect: "the source is traced by the tracer of the mode, which the trace patterns select"
+        resolutionContext.tracer.is(context.combinedTracer)
+        resolutionContext.copy().tracer.is(resolutionContext.tracer)
+
+        cleanup:
+        context.close()
+    }
+
+    void "the standard out trace mode reports a bean created with createBean"() {
+        given:
+        def out = new ByteArrayOutputStream()
+        def originalOut = System.out
+        System.setOut(new PrintStream(out, true))
+        def context = builder().beanResolutionTrace(BeanResolutionTraceMode.STANDARD_OUT, '.+TracedGarage').start()
+
+        when:
+        context.createBean(TracedGarage)
+        def output = out.toString().replaceAll(/\u001B\[[;\d]*m/, "")
+
+        then:
+        output =~ /Created .*TracedGarage in \d+ms/
+
+        cleanup:
+        System.setOut(originalOut)
         context.close()
     }
 

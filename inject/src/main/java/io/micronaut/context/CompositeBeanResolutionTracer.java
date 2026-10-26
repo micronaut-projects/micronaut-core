@@ -29,10 +29,12 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Hands every callback to several tracers in order.
+ * Hands every callback to several tracers in order. Every tracer receives each callback, even when another
+ * tracer throws: the failures are rethrown once all of them received it, the first with the others suppressed.
  *
  * @since 5.3.0
  */
+@SuppressWarnings("java:S1181") // every tracer must receive its callback, whatever another tracer throws
 final class CompositeBeanResolutionTracer implements BeanResolutionTracer {
 
     private final BeanResolutionTracer[] tracers;
@@ -97,72 +99,163 @@ final class CompositeBeanResolutionTracer implements BeanResolutionTracer {
 
     @Override
     public void traceInitialConfiguration(Environment environment, Collection<BeanDefinitionReference<Object>> beanReferences, Collection<DisabledBean<?>> disabledBeans) {
+        Throwable failure = null;
         for (BeanResolutionTracer tracer : tracers) {
-            tracer.traceInitialConfiguration(environment, beanReferences, disabledBeans);
+            try {
+                tracer.traceInitialConfiguration(environment, beanReferences, disabledBeans);
+            } catch (RuntimeException | Error e) {
+                failure = collect(failure, e);
+            }
         }
+        rethrow(failure);
     }
 
     @Override
     public void traceBeanCreation(Resolution resolution, BeanDefinition<?> beanDefinition, Argument<?> beanType) {
+        Throwable failure = null;
         for (BeanResolutionTracer tracer : tracers) {
-            tracer.traceBeanCreation(resolution, beanDefinition, beanType);
+            try {
+                tracer.traceBeanCreation(resolution, beanDefinition, beanType);
+            } catch (RuntimeException | Error e) {
+                failure = collect(failure, e);
+            }
         }
+        rethrow(failure);
     }
 
     @Override
     public <T> void traceBeanResolved(Resolution resolution, Argument<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable T bean) {
+        Throwable failure = null;
         for (BeanResolutionTracer tracer : tracers) {
-            tracer.traceBeanResolved(resolution, beanType, qualifier, bean);
+            try {
+                tracer.traceBeanResolved(resolution, beanType, qualifier, bean);
+            } catch (RuntimeException | Error e) {
+                failure = collect(failure, e);
+            }
         }
+        rethrow(failure);
     }
 
     @Override
     public <T> void traceBeanDisabled(Resolution resolution, Argument<T> beanType, @Nullable Qualifier<T> qualifier, String disabledBeanMessage) {
+        Throwable failure = null;
         for (BeanResolutionTracer tracer : tracers) {
-            tracer.traceBeanDisabled(resolution, beanType, qualifier, disabledBeanMessage);
+            try {
+                tracer.traceBeanDisabled(resolution, beanType, qualifier, disabledBeanMessage);
+            } catch (RuntimeException | Error e) {
+                failure = collect(failure, e);
+            }
         }
+        rethrow(failure);
     }
 
     @Override
     public <T> void traceValueResolved(Resolution resolution, Argument<T> argument, String property, @Nullable T value) {
+        Throwable failure = null;
         for (BeanResolutionTracer tracer : tracers) {
-            tracer.traceValueResolved(resolution, argument, property, value);
+            try {
+                tracer.traceValueResolved(resolution, argument, property, value);
+            } catch (RuntimeException | Error e) {
+                failure = collect(failure, e);
+            }
         }
+        rethrow(failure);
     }
 
     @Override
     public void traceBeanCreated(Resolution resolution, BeanDefinition<?> beanDefinition) {
+        Throwable failure = null;
         // in reverse, so that the tracers nest like the creations they trace
         for (int i = tracers.length - 1; i >= 0; i--) {
-            tracers[i].traceBeanCreated(resolution, beanDefinition);
+            try {
+                tracers[i].traceBeanCreated(resolution, beanDefinition);
+            } catch (RuntimeException | Error e) {
+                failure = collect(failure, e);
+            }
         }
+        rethrow(failure);
     }
 
     @Override
     public void traceBeanCreationFailed(Resolution resolution, BeanDefinition<?> beanDefinition, Throwable failure) {
+        Throwable tracerFailure = null;
         for (int i = tracers.length - 1; i >= 0; i--) {
-            tracers[i].traceBeanCreationFailed(resolution, beanDefinition, failure);
+            try {
+                tracers[i].traceBeanCreationFailed(resolution, beanDefinition, failure);
+            } catch (RuntimeException | Error e) {
+                tracerFailure = collect(tracerFailure, e);
+            }
         }
+        rethrow(tracerFailure);
     }
 
     @Override
     public void traceInjectBean(Resolution resolution, Injection injection) {
+        Throwable failure = null;
         for (BeanResolutionTracer tracer : tracers) {
-            tracer.traceInjectBean(resolution, injection);
+            try {
+                tracer.traceInjectBean(resolution, injection);
+            } catch (RuntimeException | Error e) {
+                failure = collect(failure, e);
+            }
         }
+        rethrow(failure);
     }
 
     @Override
     public void traceInjectComplete(Resolution resolution, Injection injection) {
+        Throwable failure = null;
         for (int i = tracers.length - 1; i >= 0; i--) {
-            tracers[i].traceInjectComplete(resolution, injection);
+            try {
+                tracers[i].traceInjectComplete(resolution, injection);
+            } catch (RuntimeException | Error e) {
+                failure = collect(failure, e);
+            }
         }
+        rethrow(failure);
     }
 
     @Override
     public void traceContextShutdown(BeanContext beanContext) {
+        Throwable failure = null;
         for (BeanResolutionTracer tracer : tracers) {
-            tracer.traceContextShutdown(beanContext);
+            try {
+                tracer.traceContextShutdown(beanContext);
+            } catch (RuntimeException | Error e) {
+                failure = collect(failure, e);
+            }
+        }
+        rethrow(failure);
+    }
+
+    /**
+     * Collects the failure of a tracer, so that the other tracers still receive the callback.
+     *
+     * @param failure The failure collected so far, if any
+     * @param next The failure of a tracer
+     * @return The first failure, the others suppressed in it
+     */
+    private static Throwable collect(@Nullable Throwable failure, Throwable next) {
+        if (failure == null) {
+            return next;
+        }
+        if (failure != next) {
+            failure.addSuppressed(next);
+        }
+        return failure;
+    }
+
+    /**
+     * Rethrows the failures collected once every tracer received the callback.
+     *
+     * @param failure The first failure, if any
+     */
+    private static void rethrow(@Nullable Throwable failure) {
+        if (failure instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+        if (failure instanceof Error error) {
+            throw error;
         }
     }
 }

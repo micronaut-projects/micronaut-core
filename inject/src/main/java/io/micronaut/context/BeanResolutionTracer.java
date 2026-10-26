@@ -69,7 +69,10 @@ import java.util.List;
  * <p>Callbacks run on the path that resolves every bean, so they should be fast. A tracer must not throw: an
  * exception thrown by a callback propagates to, and fails, the resolution being traced, except one thrown by
  * {@link #traceBeanCreationFailed(Resolution, BeanDefinition, Throwable)}, which is added as suppressed to the
- * failure of the creation. A callback must not create beans either.</p>
+ * failure of the creation. Even then the pairing holds: the other tracers still receive the callback, and a
+ * creation or an injection whose start callback throws is ended at once with
+ * {@link #traceBeanCreationFailed(Resolution, BeanDefinition, Throwable)} or
+ * {@link #traceInjectComplete(Resolution, Injection)}. A callback must not create beans either.</p>
  *
  * @since 5.3.0
  */
@@ -281,7 +284,7 @@ public interface BeanResolutionTracer {
         BeanDefinition<?> getDeclaringBean();
 
         /**
-         * @return The name of the field or method, or of the constructor, that declares the injection point
+         * @return The name of the field or method that declares the injection point, {@code <init>} for a constructor
          */
         String getMemberName();
 
@@ -291,7 +294,8 @@ public interface BeanResolutionTracer {
         Argument<?> getArgument();
 
         /**
-         * The qualifier the injection point declares, such as {@code @Named}, computed when it is asked for.
+         * The qualifier the injection point declares, such as {@code @Named}, resolved once, when it is first asked
+         * for.
          *
          * @return The qualifier, or {@code null} for none
          */
@@ -302,11 +306,11 @@ public interface BeanResolutionTracer {
          */
         enum Kind {
             /**
-             * A parameter of a constructor.
+             * A parameter of a constructor, or of a static {@link io.micronaut.core.annotation.Creator} method of the bean.
              */
             CONSTRUCTOR,
             /**
-             * A parameter of the factory method that produces a bean.
+             * A parameter of the {@link io.micronaut.context.annotation.Factory} method that produces a bean.
              */
             FACTORY_METHOD,
             /**
