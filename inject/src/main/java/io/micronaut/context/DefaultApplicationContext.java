@@ -949,10 +949,20 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
         private final ApplicationContextConfiguration configuration;
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
         /**
-         * Replaced by a stop or a start, which can be on another thread than a read in progress:
-         * a read uses the one it finds when it reads the bootstrap configuration.
+         * The bootstrap environment created last, which stop() stops.
          */
         private volatile BootstrapEnvironment bootstrapEnvironment;
+        /**
+         * The bootstrap environment that the start on the current thread has created, which its
+         * read reads: another thread's start or stop can replace the one above meanwhile.
+         */
+        private final ThreadLocal<BootstrapEnvironment> startedBootstrapEnvironment = new ThreadLocal<>();
+        /**
+         * The thread whose stop() is that of a refresh, which leaves the environment running: its
+         * start() reads the bootstrap configuration again.
+         */
+        @SuppressWarnings("java:S3077") // a thread reference, not a mutable object
+        private volatile Thread refreshing;
         private final boolean bootstrapEnabled;
 
         RuntimeConfiguredEnvironment(ApplicationContextConfiguration configuration, boolean bootstrapEnabled) {
@@ -972,22 +982,39 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
                 bootstrapEnvironment.stop();
                 this.bootstrapEnvironment = null;
             }
-            return super.stop();
+            Environment environment = super.stop();
+            if (isRunning()) {
+                refreshing = Thread.currentThread();
+            }
+            return environment;
         }
 
         @Override
         public Environment start() {
-            if (this.bootstrapEnvironment == null && isRuntimeConfigured()) {
+            // Only a start that reads the property sources reads the bootstrap configuration: that
+            // of a stopped environment, or that of a refresh. A start of the running environment
+            // from another thread, during a refresh or not, does not.
+            boolean refresh = refreshing == Thread.currentThread();
+            if (isRuntimeConfigured() && (refresh || !isRunning())) {
+                if (refresh) {
+                    refreshing = null;
+                }
                 BootstrapEnvironment bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
                 this.bootstrapEnvironment = bootstrapEnvironment;
-                startBootstrapEnvironment(bootstrapEnvironment);
+                startedBootstrapEnvironment.set(bootstrapEnvironment);
+                try {
+                    startBootstrapEnvironment(bootstrapEnvironment);
+                    return super.start();
+                } finally {
+                    startedBootstrapEnvironment.remove();
+                }
             }
             return super.start();
         }
 
         @Override
         protected synchronized List<PropertySource> readPropertySourceList(String name) {
-            BootstrapEnvironment bootstrapEnvironment = this.bootstrapEnvironment;
+            BootstrapEnvironment bootstrapEnvironment = startedBootstrapEnvironment.get();
             if (bootstrapEnvironment != null) {
                 LOG.info("Reading bootstrap environment configuration");
 
