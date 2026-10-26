@@ -54,12 +54,12 @@ annotation class KeptTarget
 class KeepInterceptor : MethodInterceptor<Any, Any> {
     val methods = mutableListOf<Any>()
     val values = mutableListOf<Any>()
-    val compiledValues = mutableListOf<Any>()
+    val unevaluatedValues = mutableListOf<Any>()
 
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         methods.add(context.executableMethod)
         values.add(context.getCachedValue(Probe::class.java) { m -> Probe(m.stringValue(Kept::class.java, "name").orElse(null)) })
-        compiledValues.add(context.getCachedCompiledValue(Probe::class.java) { m -> Probe(m.stringValue(Kept::class.java, "name").orElse(null)) })
+        unevaluatedValues.add(context.getCachedUnevaluatedValue(Probe::class.java) { m -> Probe(m.stringValue(Kept::class.java, "name").orElse(null)) })
         return context.proceed()
     }
 }
@@ -88,7 +88,7 @@ open class Target {
     def setup() {
         interceptor().methods.clear()
         interceptor().values.clear()
-        interceptor().compiledValues.clear()
+        interceptor().unevaluatedValues.clear()
     }
 
     void "the proxies of a #type bean share the methods and the values they keep"() {
@@ -103,13 +103,13 @@ open class Target {
         interceptor().methods.size() == 2
         interceptor().methods[0].is(interceptor().methods[1])
         interceptor().values[0].is(interceptor().values[1])
-        interceptor().compiledValues[0].is(interceptor().compiledValues[1])
+        interceptor().unevaluatedValues[0].is(interceptor().unevaluatedValues[1])
 
         where:
         type << ['test.Proto', 'test.Target']
     }
 
-    void "a value derived from the compiled metadata is kept by a method with evaluated expressions"() {
+    void "a value derived from the unevaluated metadata is kept by a method with evaluated expressions"() {
         when:
         def first = getBean(context, 'test.Evaluated')
         def second = getBean(context, 'test.Evaluated')
@@ -120,8 +120,8 @@ open class Target {
         interceptor().methods[0].is(interceptor().methods[1])
         // the expressions can depend on the invocation: the value is computed for each one
         !interceptor().values[0].is(interceptor().values[1])
-        interceptor().compiledValues[0].is(interceptor().compiledValues[1])
-        interceptor().compiledValues[0].name == 'evaluated'
+        interceptor().unevaluatedValues[0].is(interceptor().unevaluatedValues[1])
+        interceptor().unevaluatedValues[0].name == 'evaluated'
     }
 
     private Object interceptor() {

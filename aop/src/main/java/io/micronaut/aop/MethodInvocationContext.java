@@ -81,12 +81,12 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
      */
     @Experimental
     @Override
-    default <V extends @Nullable Object> V getCachedCompiledValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
+    default <V extends @Nullable Object> V getCachedUnevaluatedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
         ExecutableMethod<T, R> executableMethod = getExecutableMethod();
         if (executableMethod == this) {
             return factory.apply(this);
         }
-        return executableMethod.getCachedCompiledValue(key, factory);
+        return executableMethod.getCachedUnevaluatedValue(key, factory);
     }
 
     @Experimental

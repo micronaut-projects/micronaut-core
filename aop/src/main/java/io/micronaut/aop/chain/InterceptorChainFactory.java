@@ -26,7 +26,6 @@ import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.ExecutableMethodsDefinition;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
@@ -50,20 +49,6 @@ public sealed interface InterceptorChainFactory permits DefaultInterceptorChainF
      */
     @UsedByGeneratedCode
     InterceptorCandidateResolver candidateResolver();
-
-    /**
-     * The executable methods shared by the proxies of the given type created by this context: those of the first
-     * proxy of the type. Every instance of a non-singleton proxy then invokes the same methods, which keep the values
-     * derived from them for the definition instead of one instance. The factory is a bean of one context: the
-     * methods, and the values they keep, are dropped with it.
-     *
-     * @param proxyType The generated proxy type
-     * @param methods   The methods created by the calling proxy
-     * @return The methods shared by the proxies of the type
-     * @since 5.3.0
-     */
-    @UsedByGeneratedCode
-    ExecutableMethodsDefinition<?> shareProxyMethods(Class<?> proxyType, ExecutableMethodsDefinition<?> methods);
 
     /**
      * Builds a method invocation from interceptors already selected for its target. Generated proxies retain the

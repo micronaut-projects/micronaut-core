@@ -291,6 +291,13 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return precalculatedInfo.requiresMethodProcessing;
     }
 
+    /**
+     * @return The methods of this definition, owned by the context that loaded it
+     */
+    final @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition() {
+        return executableMethodsDefinition;
+    }
+
     @Override
     public final <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class<?>... argumentTypes) {
         if (executableMethodsDefinition == null) {

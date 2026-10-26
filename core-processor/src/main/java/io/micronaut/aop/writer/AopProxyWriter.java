@@ -27,6 +27,7 @@ import io.micronaut.aop.chain.InterceptorCandidateResolver;
 import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.aop.chain.TargetInterceptors;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
+import io.micronaut.context.AbstractExecutableMethodsDefinition;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanDependencyGroup;
 import io.micronaut.context.BeanDefinitionRegistry;
@@ -45,7 +46,6 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.ExecutableMethodsDefinition;
 import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
@@ -195,8 +195,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         BeanLocator.class, "getBean", Argument.class);
     private static final Method GET_CANDIDATE_RESOLVER = ReflectionUtils.getRequiredInternalMethod(
         InterceptorChainFactory.class, "candidateResolver");
-    private static final Method SHARE_PROXY_METHODS = ReflectionUtils.getRequiredInternalMethod(
-        InterceptorChainFactory.class, "shareProxyMethods", Class.class, ExecutableMethodsDefinition.class);
+    private static final Method PROXY_METHODS = ReflectionUtils.getRequiredInternalMethod(
+        AbstractExecutableMethodsDefinition.class, "proxyMethods", BeanContext.class, Class.class, Qualifier.class, AbstractExecutableMethodsDefinition.class);
     private static final FieldDef FIELD_CANDIDATE_RESOLVER = FieldDef.builder("$interceptorCandidates", TypeDef.of(InterceptorCandidateResolver.class))
         .addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
     private static final FieldDef FIELD_CHAIN_FACTORY = FieldDef.builder("$interceptorChainFactory", TypeDef.of(InterceptorChainFactory.class))
@@ -1003,9 +1003,13 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         } else {
             executableMethodsInstance = executableMethodsType.instantiate();
         }
-        // the instances of the proxy created by a context share the methods, and the values they keep
-        ExpressionDef executableMethods = aThis.field(FIELD_CHAIN_FACTORY)
-            .invoke(SHARE_PROXY_METHODS, ExpressionDef.constant(ClassTypeDef.of(proxyType)), executableMethodsInstance)
+        // the instances of the proxy created by a context share the methods of its definition, and the values they keep
+        ExpressionDef executableMethods = ClassTypeDef.of(AbstractExecutableMethodsDefinition.class)
+            .invokeStatic(PROXY_METHODS,
+                parameters.get(constructor.findParameterIndex(BEAN_CONTEXT_PARAMETER)),
+                ExpressionDef.constant(ClassTypeDef.of(proxyType)),
+                parameters.get(constructor.findParameterIndex(QUALIFIER_PARAMETER)),
+                executableMethodsInstance)
             .cast(executableMethodsType);
         AtomicInteger index = new AtomicInteger();
         return executableMethods.newLocal("executableMethods", executableMethodsVar -> StatementDef.multi(
