@@ -139,6 +139,80 @@ class EventStreamDecoderSpec extends Specification {
         data(events) == ["a", "b"]
     }
 
+    void "a retry-only block sets the reconnection time of the state without an event"() {
+        given:
+        EventStreamState state = new EventStreamState()
+        EventStreamDecoder decoder = new EventStreamDecoder(1024, state)
+
+        when:
+        List<Event<byte[]>> events = decoder.decode("retry: 50\n\n".getBytes(StandardCharsets.UTF_8))
+
+        then:
+        events.isEmpty()
+        state.reconnectionTime == Duration.ofMillis(50)
+        state.lastEventId == null
+
+        when:
+        events = decoder.decode("data: hi\n\n".getBytes(StandardCharsets.UTF_8))
+
+        then:
+        describe(events) == [["hi", null, null, null]]
+        state.reconnectionTime == Duration.ofMillis(50)
+    }
+
+    void "the reconnection time is set as soon as the retry field is read"() {
+        given:
+        EventStreamState state = new EventStreamState()
+        EventStreamDecoder decoder = new EventStreamDecoder(1024, state)
+
+        when:
+        decoder.decode("retry: 70\nretry: x\n".getBytes(StandardCharsets.UTF_8))
+
+        then:
+        state.reconnectionTime == Duration.ofMillis(70)
+    }
+
+    void "an id-only block sets the last event id of the state without an event"() {
+        given:
+        EventStreamState state = new EventStreamState()
+        EventStreamDecoder decoder = new EventStreamDecoder(1024, state)
+
+        when:
+        List<Event<byte[]>> events = decoder.decode("id: 7\n\n".getBytes(StandardCharsets.UTF_8))
+
+        then:
+        events.isEmpty()
+        state.lastEventId == "7"
+        state.reconnectionTime == null
+
+        when:
+        events = decoder.decode("id: 8\n".getBytes(StandardCharsets.UTF_8))
+
+        then: "the id is only taken at the end of the block"
+        events.isEmpty()
+        state.lastEventId == "7"
+
+        when:
+        events = decoder.decode("\ndata: a\n\n".getBytes(StandardCharsets.UTF_8))
+
+        then:
+        state.lastEventId == "8"
+        describe(events) == [["a", "8", null, null]]
+    }
+
+    void "normal events are the same with or without a state"() {
+        given:
+        String stream = "id: 1\nevent: e\nretry: 10\ndata: a\n\nretry: 20\n\ndata: b\n\nid: 2\n\ndata: c\n\n"
+        EventStreamState state = new EventStreamState()
+        EventStreamDecoder withState = new EventStreamDecoder(1024, state)
+
+        expect:
+        describe(withState.decode(stream.getBytes(StandardCharsets.UTF_8))) == describe(decode(stream))
+        describe(decode(stream)) == [["a", "1", "e", Duration.ofMillis(10)], ["b", "1", null, null], ["c", "2", null, null]]
+        state.lastEventId == "2"
+        state.reconnectionTime == Duration.ofMillis(20)
+    }
+
     private static List<Event<byte[]>> decode(String... pieces) {
         return decode(pieces.collect { it.getBytes(StandardCharsets.UTF_8) } as byte[][])
     }

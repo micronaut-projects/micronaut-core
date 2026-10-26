@@ -77,12 +77,24 @@ public final class EventStreamDecoder {
     private @Nullable String id;
     private @Nullable String name;
     private @Nullable Duration retry;
+    private final @Nullable EventStreamState state;
 
     /**
      * @param maxBufferSize The maximum size of a line, and of the data of one event
      */
     public EventStreamDecoder(long maxBufferSize) {
+        this(maxBufferSize, null);
+    }
+
+    /**
+     * @param maxBufferSize The maximum size of a line, and of the data of one event
+     * @param state         The state that follows the last event id and the reconnection time of
+     *                      every block, also of a block that dispatches no event, or {@code null}
+     * @since 5.3.0
+     */
+    public EventStreamDecoder(long maxBufferSize, @Nullable EventStreamState state) {
         this.maxBufferSize = maxBufferSize;
+        this.state = state;
     }
 
     /**
@@ -270,6 +282,10 @@ public final class EventStreamDecoder {
                 if (!value.isEmpty() && value.chars().allMatch(c -> c >= '0' && c <= '9')) {
                     try {
                         retry = Duration.ofMillis(Long.parseLong(value));
+                        if (state != null) {
+                            // the reconnection time is set as soon as the field is read
+                            state.reconnectionTime(retry);
+                        }
                     } catch (NumberFormatException e) {
                         // too large, ignored
                     }
@@ -283,6 +299,10 @@ public final class EventStreamDecoder {
     }
 
     private @Nullable Event<byte[]> dispatch() {
+        if (state != null && id != null) {
+            // the last event id is set whether or not the block has data
+            state.lastEventId(id);
+        }
         if (!hasData) {
             // an event without data is not dispatched
             name = null;

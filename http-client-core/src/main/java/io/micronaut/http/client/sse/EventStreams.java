@@ -210,6 +210,7 @@ public final class EventStreams {
      * @param maxBufferSize   The maximum size of a line, and of the data of one event
      * @param decorate        Decorates a failure of the events like the other failures of the
      *                        client, e.g. with its service id
+     * @param state           The reconnection state to update, or {@code null}
      * @param <B>             The event data type
      * @return The response, whose body is the events
      */
@@ -218,7 +219,8 @@ public final class EventStreams {
                                                                               MessageBodyHandlerRegistry handlerRegistry,
                                                                               Argument<B> eventType,
                                                                               long maxBufferSize,
-                                                                              UnaryOperator<HttpClientException> decorate) {
+                                                                              UnaryOperator<HttpClientException> decorate,
+                                                                              @Nullable EventStreamState state) {
         UnaryOperator<Throwable> wrap = error -> error instanceof DataDecodeFailure failure && failure.getCause() != null
             ? failure.getCause()
             : wrap(error, decorate);
@@ -239,7 +241,7 @@ public final class EventStreams {
                 }
                 return decoded;
             };
-            return ElementsResponse.of(response, new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize), rawFailures), wrap, true));
+            return ElementsResponse.of(response, new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize, state), rawFailures), wrap, true));
         } catch (RuntimeException e) {
             body.close();
             throw e;

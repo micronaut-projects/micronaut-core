@@ -71,6 +71,7 @@ import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
+import io.micronaut.http.client.sse.EventStreamState;
 import io.micronaut.http.client.sse.EventStreams;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecException;
@@ -1625,11 +1626,12 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             // as JSON, would otherwise do so, and the body would yield no event
             httpRequest.getHeaders().set(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM);
         }
+        EventStreamState state = request.getAttribute(EventStreamState.ATTRIBUTE, EventStreamState.class).orElse(null);
         // as it always did, the event stream sends the request with the context of the subscriber
         return afterSubscribe(() -> {
             PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
             return toMono(exchangeElementsFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType, shouldBufferErrorBody(errorType),
-                (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate)), propagatedContext)
+                (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate, state)), propagatedContext)
                 .onErrorMap(t -> t instanceof HttpClientException ? t : decorate(new HttpClientException("Error consuming Server Sent Events: " + t.getMessage(), t)))
                 .flatMapMany(AbstractHttpClient::elements);
         });
