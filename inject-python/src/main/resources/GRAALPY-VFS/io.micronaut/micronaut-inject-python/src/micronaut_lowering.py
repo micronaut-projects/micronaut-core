@@ -2825,7 +2825,8 @@ class Lowering:
                          for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
             self.java_calls += 1
             self.compilation_calls += 1
-            # the stub's Java method of a method no subclass overrides: its compiled body, or the bridge to Python
+            # the stub's Java method of a method no subclass overrides (or the shared entry of its compiled
+            # body, a Java call too): its compiled body, or the bridge to Python
             self.callees.append(function_node)
             declared = OBJECT if hint is None and return_type != VOID else return_type
             call = InvokeSibling(name, parameter_types, arguments, declared, "shared" if shares else "java")
