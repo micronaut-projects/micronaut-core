@@ -1491,7 +1491,7 @@ class Lowering:
             # member is None for a computed name; a special method or args written on an instance changes
             # neither how its class creates its exceptions nor the message of one created before
             nonlocal unresolved
-            special = member is not None and member != "args"
+            special = member != "args"  # a computed name may be a special method too
             if isinstance(receiver, ast.Name):
                 if receiver.id == "self":
                     return
@@ -1500,7 +1500,7 @@ class Lowering:
                     specials.add(receiver.id)
             elif isinstance(receiver, ast.Attribute):
                 if receiver.attr == "__class__":
-                    unresolved = unresolved or member != "args"  # self.__class__.__str__ = ...: the class of an object
+                    unresolved = unresolved or special  # self.__class__.__str__ = ...: the class of an object
                 else:
                     receivers.add(receiver.attr)
             elif special:

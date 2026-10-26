@@ -1994,15 +1994,34 @@ class Gate:
         raise Plain(n)
 '''
 
+COMPUTED = '''
+from jakarta.inject import Singleton
+
+
+class Plain(Exception):
+    pass
+
+
+def install(cls, name, value):
+    setattr(cls, name, value)
+
+
+@Singleton
+class Gate:
+    def plain(self, n: int) -> int:
+        raise Plain(n)
+'''
+
 
 class LazyExceptionPatchingTest(unittest.TestCase):
     """A special method written on a class the compilation cannot name may be any exception class's: every raise is eager."""
 
     def test_a_special_method_written_on_an_unknown_class_keeps_every_raise_eager(self):
-        decisions, planner = plan(PATCHING, MODE_ALL, facts=FakeFacts())
-        body = {body.methodName(): body for body in planner.bodies}["plain"]
-        self.assertEqual("COMPILED", decisions["Gate.plain"].outcome().name(), rules(decisions["Gate.plain"]))
-        self.assertFalse(list(body.body().statements())[0].exception().lazy())
+        for source in (PATCHING, COMPUTED):
+            decisions, planner = plan(source, MODE_ALL, facts=FakeFacts())
+            body = {body.methodName(): body for body in planner.bodies}["plain"]
+            self.assertEqual("COMPILED", decisions["Gate.plain"].outcome().name(), rules(decisions["Gate.plain"]))
+            self.assertFalse(list(body.body().statements())[0].exception().lazy())
 
 
 class LazyExceptionTest(unittest.TestCase):
