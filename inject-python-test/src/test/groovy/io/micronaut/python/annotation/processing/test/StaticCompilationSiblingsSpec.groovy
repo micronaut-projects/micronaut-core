@@ -194,6 +194,60 @@ class Calc:
         context?.close()
     }
 
+    void "a compiled sibling taking a list works on the caller's list as Java code, an overridden one through the Python object"() {
+        given:
+        Map results = [:]
+        Map<String, StaticCompilationDecision> compiled = [:]
+        [StaticCompilationMode.OFF, StaticCompilationMode.ALL].each { StaticCompilationMode m ->
+            mode = m
+            decisions.clear()
+            def context = buildContext('''
+from jakarta.inject import Singleton
+
+@Singleton
+class Collector:
+    def collected(self) -> str:
+        xs: list[str] = []
+        self.gather(xs)
+        self.keep(xs)
+        return ",".join(xs)
+
+    def gather(self, xs: list[str]) -> None:
+        xs.append("gathered")
+
+    def keep(self, xs: list[str]) -> None:
+        xs.append("kept")
+
+@Singleton
+class Special(Collector):
+    def gather(self, xs: list[str]) -> None:
+        xs.append("special")
+''')
+            try {
+                def collector = getBean(context, 'python.Collector')
+                def special = getBean(context, 'python.Special')
+                PythonStatic.resetEntries()
+                results[m] = [collector: collector.collected(), special: special.collected()]
+                if (m == StaticCompilationMode.ALL) {
+                    decisions.each { compiled[it.qualifiedName()] = it }
+                    results[m].ran = ['Collector#collected', 'Collector#gather', 'Collector#keep', 'Special#gather'].collect { PythonStatic.entries("python.$it".toString()) }
+                }
+            } finally {
+                context.close()
+            }
+        }
+
+        expect:
+        results[StaticCompilationMode.ALL].findAll { it.key != 'ran' } == results[StaticCompilationMode.OFF]
+        results[StaticCompilationMode.OFF] == [collector: 'gathered,kept', special: 'special,kept']
+
+        and: "keep, which no subclass overrides, ran compiled in both calls; gather, which Special overrides, ran as Python would dispatch it"
+        ['Collector.collected', 'Collector.gather', 'Collector.keep', 'Special.gather'].every { compiled[it].outcome() == StaticCompilationDecision.Outcome.COMPILED }
+        compiled['Collector.collected'].stats().javaCalls() == 1
+        compiled['Collector.collected'].stats().bridgeCalls() == 1
+        results[StaticCompilationMode.ALL].ran == [2, 0, 2, 0]
+    }
+
     private static Object invoke(Closure<?> call) {
         try {
             return call()
