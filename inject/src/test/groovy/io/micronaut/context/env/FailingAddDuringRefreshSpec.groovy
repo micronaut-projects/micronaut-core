@@ -15,22 +15,23 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * Property sources that fail when they are added while a start or a refresh reads the property
  * sources, and adds made while a refresh fails. An add that fails publishes nothing and leaves its
- * property source registered; while a read is in progress its failure is logged rather than thrown,
- * and the read is not failed by it. A read that fails publishes nothing more and takes back nothing
- * an add has published. The threads are parked at fixed points, and every wait is bounded.
+ * property source registered; while a refresh is in progress its failure is logged rather than
+ * thrown, and the refresh is not failed by it. A refresh that fails publishes nothing more and takes
+ * back nothing an add has published. The threads are parked at fixed points, and every wait is
+ * bounded.
  */
 @Timeout(60)
-class FailingAddDuringReadSpec extends Specification {
+class FailingAddDuringRefreshSpec extends Specification {
 
     private static final int WAIT_SECONDS = 10
 
-    void "a property source that fails, added while a #read processes the property sources and added again, fails neither the adds nor the read, publishes nothing, stays registered, and the next refresh fails on it: #source.name"() {
+    void "a property source that fails, added while a #refresh processes the property sources and added again, fails neither the adds nor the refresh, publishes nothing, stays registered, and the next refresh fails on it: #source.name"() {
         given:
         Gate gate = new Gate()
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         env.addPropertySource(PropertySource.of('data', ['app.value': 'a']))
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         Throwable failure = null
@@ -43,10 +44,10 @@ class FailingAddDuringReadSpec extends Specification {
             }
         }
 
-        when: "another thread adds it while the read is parked"
-        Thread reader = parkIn(gate) {
+        when: "another thread adds it while the refresh is parked"
+        Thread refresher = parkIn(gate) {
             try {
-                read == 'refresh' ? env.refresh() : env.start()
+                refresh == 'refresh' ? env.refresh() : env.start()
             } catch (Throwable t) {
                 failure = t
             }
@@ -61,18 +62,18 @@ class FailingAddDuringReadSpec extends Specification {
             add(PropertySource.of('late', ['late.key': 'late', 'foo[0]': 'x']))
             add(source)
         }
-        String lateDuringRead = env.getProperty('late.key', String).orElse(null)
-        List<Object> fooDuringRead = env.getProperty('foo', List).orElse(null)
-        release(gate, reader)
+        String lateDuringRefresh = env.getProperty('late.key', String).orElse(null)
+        List<Object> fooDuringRefresh = env.getProperty('foo', List).orElse(null)
+        release(gate, refresher)
 
-        then: "each failure is only logged, as a read is in progress, nothing of the failing one is published, and the other was visible at once"
+        then: "each failure is only logged, as a refresh is in progress, nothing of the failing one is published, and the other was visible at once"
         addFailures.empty
         failure == null
         !anyOfItVisible
-        lateDuringRead == 'late'
-        fooDuringRead == ['x']
+        lateDuringRefresh == 'late'
+        fooDuringRefresh == ['x']
 
-        and: "the read publishes what it has read with the other one"
+        and: "the refresh publishes what it has read with the other one"
         env.getProperty('app.value', String).get() == 'a'
         env.getProperty('late.key', String).get() == 'late'
         env.getProperty('foo', List).get() == ['x']
@@ -87,7 +88,7 @@ class FailingAddDuringReadSpec extends Specification {
         when:
         env.refresh()
 
-        then: "the next refresh reads it and fails on it, as a read fails on a registered property source"
+        then: "the next refresh reads it and fails on it, as a refresh fails on a registered property source"
         Throwable e = thrown()
         expected.isInstance(e)
         message == null || e.message == message
@@ -102,7 +103,7 @@ class FailingAddDuringReadSpec extends Specification {
         env.stop()
 
         where:
-        read      | source                                    | expected                  | message
+        refresh   | source                                    | expected                  | message
         'start'   | new FailingPropertySource()               | IllegalArgumentException  | 'failed to iterate the property source'
         'refresh' | new FailingPropertySource()               | IllegalArgumentException  | 'failed to iterate the property source'
         'start'   | new ErrorPropertySource()                 | NoClassDefFoundError      | 'a class the property source needs'
@@ -121,23 +122,23 @@ class FailingAddDuringReadSpec extends Specification {
         'refresh' | failsPartWay()                            | NumberFormatException     | null
     }
 
-    void "a registered property source added again while a #read is in progress, when it now #kind, fails neither the add nor the read, the read keeps what it read of it, and the next refresh fails on it"() {
+    void "a registered property source added again while a #refresh is in progress, when it now #kind, fails neither the add nor the refresh, the refresh keeps what it read of it, and the next refresh fails on it"() {
         given:
         Gate gate = new Gate()
         FailsOrChanges source = new FailsOrChanges(['m.value': 'v1'])
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         env.addPropertySource(source)
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         Throwable failure = null
         Throwable addFailure = null
 
-        when: "it is changed so that it fails, and added again, once the read has read it"
-        Thread reader = parkIn(gate) {
+        when: "it is changed so that it fails, and added again, once the refresh has read it"
+        Thread refresher = parkIn(gate) {
             try {
-                read == 'refresh' ? env.refresh() : env.start()
+                refresh == 'refresh' ? env.refresh() : env.start()
             } catch (Throwable t) {
                 failure = t
             }
@@ -157,15 +158,15 @@ class FailingAddDuringReadSpec extends Specification {
             }
         }
         int iterationsAfterAdd = source.iterations.get()
-        String duringRead = env.getProperty('m.value', String).orElse(null)
-        release(gate, reader)
+        String duringRefresh = env.getProperty('m.value', String).orElse(null)
+        release(gate, refresher)
 
         then: "the add read it again and failed, which is only logged, and published nothing"
         addFailure == null
-        iterationsAfterAdd == (read == 'start' ? 2 : 3)
-        duringRead == 'v1'
+        iterationsAfterAdd == (refresh == 'start' ? 2 : 3)
+        duringRefresh == 'v1'
 
-        and: "the read does not fail on it, and publishes exactly what it read of it before"
+        and: "the refresh does not fail on it, and publishes exactly what it read of it before"
         failure == null
         env.getProperty('m.value', String).get() == 'v1'
         !env.getProperty('m.extra', String).present
@@ -184,20 +185,20 @@ class FailingAddDuringReadSpec extends Specification {
         env.stop()
 
         where:
-        read      | kind                    | expected
+        refresh   | kind                    | expected
         'start'   | 'fails to be read'      | IllegalArgumentException
         'refresh' | 'fails to be read'      | IllegalArgumentException
         'start'   | 'fails to be processed' | NumberFormatException
         'refresh' | 'fails to be processed' | NumberFormatException
     }
 
-    void "a registered property source replaced, after a read has taken the registered property sources, by one that fails keeps its values until the next refresh, which fails on the replacement: #read, #kind"() {
+    void "a registered property source replaced, after a refresh has taken the registered property sources, by one that fails keeps its values until the next refresh, which fails on the replacement: #refresh, #kind"() {
         given:
         Gate gate = new Gate()
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         env.addPropertySource(PropertySource.of('data', ['app.value': 'v1'], 10))
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         PropertySource replacement = kind == 'fails to be read'
@@ -206,10 +207,10 @@ class FailingAddDuringReadSpec extends Specification {
         Throwable failure = null
         Throwable addFailure = null
 
-        when: "it is replaced while the read is parked in the gate, after it has read the replaced one"
-        Thread reader = parkIn(gate) {
+        when: "it is replaced while the refresh is parked in the gate, after it has read the replaced one"
+        Thread refresher = parkIn(gate) {
             try {
-                read == 'refresh' ? env.refresh() : env.start()
+                refresh == 'refresh' ? env.refresh() : env.start()
             } catch (Throwable t) {
                 failure = t
             }
@@ -221,14 +222,14 @@ class FailingAddDuringReadSpec extends Specification {
                 addFailure = t
             }
         }
-        String duringRead = env.getProperty('app.value', String).orElse(null)
-        release(gate, reader)
+        String duringRefresh = env.getProperty('app.value', String).orElse(null)
+        release(gate, refresher)
 
-        then: "the add is logged rather than thrown, as a read was in progress, and publishes nothing"
+        then: "the add is logged rather than thrown, as a refresh was in progress, and publishes nothing"
         addFailure == null
-        duringRead == 'v1'
+        duringRefresh == 'v1'
 
-        and: "the read publishes what it read from the replaced one, and the replacement is registered by its name"
+        and: "the refresh publishes what it read from the replaced one, and the replacement is registered by its name"
         failure == null
         env.getProperty('app.value', String).get() == 'v1'
         env.propertySources.find { it.name == 'data' }.is(replacement)
@@ -246,14 +247,14 @@ class FailingAddDuringReadSpec extends Specification {
         env.stop()
 
         where:
-        read      | kind                    | expected
+        refresh   | kind                    | expected
         'start'   | 'fails to be read'      | IllegalArgumentException
         'refresh' | 'fails to be read'      | IllegalArgumentException
         'start'   | 'fails to be processed' | NumberFormatException
         'refresh' | 'fails to be processed' | NumberFormatException
     }
 
-    void "a property source that a bootstrap locator returns, replaced while a refresh reads by one that fails to be processed, keeps what the locator returned, and the next refresh registers what the locator returns again"() {
+    void "a property source that a bootstrap locator returns, replaced during a refresh by one that fails to be processed, keeps what the locator returned, and the next refresh registers what the locator returns again"() {
         given: "a bootstrap locator that returns a new property source each time it loads"
         Gate gate = new Gate()
         ConsulLikeLocator locator = new ConsulLikeLocator({ int load -> [PropertySource.of('consul', ['consul.value': 'v' + load], 50)] })
@@ -265,7 +266,7 @@ class FailingAddDuringReadSpec extends Specification {
         Throwable addFailure = null
 
         when: "it is replaced while the refresh is parked once it has read what the locator returns"
-        Thread reader = parkIn(gate) {
+        Thread refresher = parkIn(gate) {
             try {
                 env.refresh()
             } catch (Throwable t) {
@@ -279,22 +280,22 @@ class FailingAddDuringReadSpec extends Specification {
                 addFailure = t
             }
         }
-        String duringRead = env.getProperty('consul.value', String).orElse(null)
-        release(gate, reader)
+        String duringRefresh = env.getProperty('consul.value', String).orElse(null)
+        release(gate, refresher)
 
         then: "the add is logged rather than thrown, and nothing of the replacement is published"
         failure == null
         addFailure == null
-        duringRead == 'v1'
+        duringRefresh == 'v1'
 
-        and: "the refresh publishes what the locator returned it, and leaves the replacement registered rather than what it read itself"
+        and: "the refresh publishes what the locator returned it, and leaves the replacement registered rather than what it loaded itself"
         env.getProperty('consul.value', String).get() == 'v2'
         env.propertySources.find { it.name == 'consul' }.is(replacement)
 
         when: "the environment is refreshed again"
         env.refresh()
 
-        then: "it takes the name back, as 5.2.x did: it does not read the replacement, and registers what the locator returns"
+        then: "it replaces the property source registered by that name, as 5.2.x did: it does not read the replacement, and registers what the locator returns"
         env.getProperty('consul.value', String).get() == 'v3'
         !env.propertySources.find { it.name == 'consul' }.is(replacement)
 
@@ -311,25 +312,25 @@ class FailingAddDuringReadSpec extends Specification {
         env.stop()
     }
 
-    void "a property source that fails to be read and adds #how when it is read, added while the environment reads, is read by the thread adding it and not by the read, and the add called last stays registered: #read"() {
+    void "a property source that fails to be read and adds #how when it is read, added while the environment refreshes, is read by the thread adding it and not by the refresh, and the add called last stays registered: #refresh"() {
         given:
         Gate gate = new Gate()
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         env.addPropertySource(PropertySource.of('data', ['app.value': 'a']))
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         // re-adds a new instance, nested, until it has been read three times: unbounded, the nesting
-        // would go on until the stack of the adding thread overflows, as it does outside a read
+        // would go on until the stack of the adding thread overflows, as it does outside a refresh
         ReAddsWhenRead source = new ReAddsWhenRead(env, how == 'a new instance by its name', 3)
         Throwable failure = null
         Throwable addFailure = null
 
-        when: "it is added while the read is parked"
-        Thread reader = parkIn(gate) {
+        when: "it is added while the refresh is parked"
+        Thread refresher = parkIn(gate) {
             try {
-                read == 'refresh' ? env.refresh() : env.start()
+                refresh == 'refresh' ? env.refresh() : env.start()
             } catch (Throwable t) {
                 failure = t
             }
@@ -342,14 +343,14 @@ class FailingAddDuringReadSpec extends Specification {
             }
         }
         int readsByAdd = source.reads.get()
-        release(gate, reader)
+        release(gate, refresher)
 
         then: "the adding thread read it, and failed, which is only logged: adding the instance being added is no change, and of nested adds by its name the one called last is registered"
         addFailure == null
         readsByAdd == (how == 'itself again' ? 1 : 3)
         env.propertySources.find { it.name == 'readds' }.is(how == 'itself again' ? source : source.last.get())
 
-        and: "the read finished without reading it, and published"
+        and: "the refresh finished without reading it, and published"
         failure == null
         source.reads.get() == readsByAdd
         env.getProperty('app.value', String).get() == 'a'
@@ -367,26 +368,26 @@ class FailingAddDuringReadSpec extends Specification {
         env.stop()
 
         where:
-        [read, how] << [['start', 'refresh'], ['itself again', 'a new instance by its name']].combinations()
+        [refresh, how] << [['start', 'refresh'], ['itself again', 'a new instance by its name']].combinations()
     }
 
-    void "a property source that fails in a way that cannot be described, added while the environment reads, does not fail the read, and the add only logs the failure and registers it: #how, #read"() {
+    void "a property source that fails in a way that cannot be described, added while the environment refreshes, does not fail the refresh, and the add only logs the failure and registers it: #how, #refresh"() {
         given:
         Gate gate = new Gate()
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         env.addPropertySource(PropertySource.of('data', ['app.value': 'a']))
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         PropertySource added = how == 'its message fails' ? new FailsWithoutMessage('bad-message') : new NameFailsLater('late-name', 3)
         Throwable failure = null
         Throwable addFailure = null
 
-        when: "it is added while the read is parked after it has taken the registered property sources"
-        Thread reader = parkIn(gate) {
+        when: "it is added while the refresh is parked after it has taken the registered property sources"
+        Thread refresher = parkIn(gate) {
             try {
-                read == 'refresh' ? env.refresh() : env.start()
+                refresh == 'refresh' ? env.refresh() : env.start()
             } catch (Throwable t) {
                 failure = t
             }
@@ -398,13 +399,13 @@ class FailingAddDuringReadSpec extends Specification {
                 addFailure = t
             }
         }
-        release(gate, reader)
+        release(gate, refresher)
 
-        then: "the read publishes what it has read"
+        then: "the refresh publishes what it has read"
         failure == null
         env.getProperty('app.value', String).get() == 'a'
 
-        and: "the add, made while a read is in progress, does not throw, and the property source stays registered"
+        and: "the add, made while a refresh is in progress, does not throw, and the property source stays registered"
         addFailure == null
         env.propertySources.any { it.is(added) }
 
@@ -413,11 +414,11 @@ class FailingAddDuringReadSpec extends Specification {
         env.stop()
 
         where:
-        [how, read] << [['its message fails', 'its name fails once read'], ['start', 'refresh']].combinations()
+        [how, refresh] << [['its message fails', 'its name fails once read'], ['start', 'refresh']].combinations()
     }
 
     void "a property source added while a refresh that fails runs is visible at once and stays visible and registered, and one removed stays removed with its properties, until the next refresh: #failure"() {
-        given: "a property source that, once armed, parks the read and then fails it"
+        given: "a property source that, once armed, parks the refresh and then fails it"
         AtomicBoolean fail = new AtomicBoolean()
         Throwable readFailure = failure
         Gate gate = new Gate({
@@ -433,7 +434,7 @@ class FailingAddDuringReadSpec extends Specification {
         env.addPropertySource(gate)
         env.start()
 
-        when: "a property source is added and another removed while a refresh reads, and the refresh then fails"
+        when: "a property source is added and another removed during a refresh, and the refresh then fails"
         data.put('app.value', 'b')
         fail.set(true)
         Throwable refreshFailure = null
@@ -448,11 +449,11 @@ class FailingAddDuringReadSpec extends Specification {
             env.addPropertySource(PropertySource.of('late', ['late.key': 'late']))
             env.removePropertySource(extra)
         }
-        String lateDuringRead = env.getProperty('late.key', String).orElse(null)
+        String lateDuringRefresh = env.getProperty('late.key', String).orElse(null)
         release(gate, refresher)
 
         then: "the property source added meanwhile was visible at once"
-        lateDuringRead == 'late'
+        lateDuringRefresh == 'late'
 
         and: "the refresh fails and publishes nothing it read, and does not take back what the add published"
         refreshFailure.is(failure)
@@ -500,7 +501,7 @@ class FailingAddDuringReadSpec extends Specification {
         Throwable refreshFailure = null
         Throwable addFailure = null
 
-        when: "one that fails to be read and one that can be read are added while a refresh reads, and the refresh then fails"
+        when: "one that fails to be read and one that can be read are added during a refresh, and the refresh then fails"
         fail.set(true)
         Thread refresher = parkIn(gate) {
             try {
@@ -517,12 +518,12 @@ class FailingAddDuringReadSpec extends Specification {
             }
             env.addPropertySource(PropertySource.of('late', ['late.key': 'late'], 100))
         }
-        String lateDuringRead = env.getProperty('late.key', String).orElse(null)
+        String lateDuringRefresh = env.getProperty('late.key', String).orElse(null)
         release(gate, refresher)
 
-        then: "the add that fails is logged rather than thrown, as a read was in progress, and the other was visible at once"
+        then: "the add that fails is logged rather than thrown, as a refresh was in progress, and the other was visible at once"
         addFailure == null
-        lateDuringRead == 'late'
+        lateDuringRefresh == 'late'
 
         and: "the refresh's own failure is thrown, and both stay registered"
         refreshFailure.is(readFailure)
@@ -580,18 +581,18 @@ class FailingAddDuringReadSpec extends Specification {
     }
 
     /**
-     * Runs the read on another thread, once the parking is armed, and returns that thread once the
-     * read is parked.
+     * Runs the refresh on another thread, once the parking is armed, and returns that thread once
+     * the refresh is parked.
      */
-    private static Thread parkIn(Parking parking, Closure<?> read) {
+    private static Thread parkIn(Parking parking, Closure<?> refresh) {
         parking.arm()
-        Thread reader = daemon('reader', read)
+        Thread refresher = daemon('refresher', refresh)
         assert parking.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        return reader
+        return refresher
     }
 
     /**
-     * Runs the change on another thread, which must finish while the read is parked.
+     * Runs the change on another thread, which must finish while the refresh is parked.
      */
     private static void changeWhileParked(Closure<?> change) {
         Thread changer = daemon('changer', change)
@@ -599,10 +600,10 @@ class FailingAddDuringReadSpec extends Specification {
         assert !changer.alive
     }
 
-    private static void release(Parking parking, Thread reader) {
+    private static void release(Parking parking, Thread refresher) {
         parking.release.countDown()
-        reader.join(WAIT_SECONDS * 1000L)
-        assert !reader.alive
+        refresher.join(WAIT_SECONDS * 1000L)
+        assert !refresher.alive
     }
 
     private static Thread daemon(String name, Closure<?> work) {
@@ -628,7 +629,7 @@ class FailingAddDuringReadSpec extends Specification {
             if (armed.compareAndSet(true, false)) {
                 reached.countDown()
                 // qualified: unqualified, Groovy resolves the name through get(String) of a property source
-                if (!release.await(FailingAddDuringReadSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                if (!release.await(FailingAddDuringRefreshSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
                     throw new IllegalStateException('the parked thread was never released')
                 }
                 return true

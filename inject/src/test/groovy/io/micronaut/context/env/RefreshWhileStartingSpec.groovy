@@ -75,7 +75,7 @@ class RefreshWhileStartingSpec extends Specification {
 
     /**
      * A property source processed after 'data' that, once armed, parks the thread that asks for its
-     * convention, which a read does before it processes it.
+     * convention, which a refresh does before it processes it.
      */
     static class Later implements PropertySource {
         final AtomicBoolean armed = new AtomicBoolean()

@@ -15,9 +15,10 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * Property sources added to and removed from a running environment, also while a start or a refresh
  * reads the property sources. An add is processed on top of the published properties and then
- * registered and published in one step. While a read is in progress, an add made before the read
- * has taken the registered property sources is only registered, for the read to process in its
- * order; one made after is published at once and handed over to the read, which keeps it on top.
+ * registered and published in one step. While a refresh is in progress, an add made before the
+ * refresh has taken the snapshot of the added property sources is only registered, for the refresh
+ * to process in its order; one made after is published at once and kept as a late add of the
+ * refresh, which keeps it on top.
  * The threads are parked at fixed points, and every wait is bounded.
  */
 @Timeout(60)
@@ -26,30 +27,30 @@ class AddPropertySourceDuringReadSpec extends Specification {
     private static final int WAIT_SECONDS = 10
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/13982')
-    void "a property source added while a #read processes the property sources is visible at once, and the read publishes it in its order"() {
-        given: "a property source of a higher order with the same key, and a gate that parks the read after the others"
+    void "a property source added while a #refresh processes the property sources is visible at once, and the refresh publishes it in its order"() {
+        given: "a property source of a higher order with the same key, and a gate that parks the refresh after the others"
         Gate gate = new Gate()
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         env.addPropertySource(PropertySource.of('data', ['app.value': 'a', 'shared.key': 'data'], 100))
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
 
-        when: "it is added while the read is parked"
-        Thread reader = parkIn(gate) { read == 'refresh' ? env.refresh() : env.start() }
+        when: "it is added while the refresh is parked"
+        Thread refresher = parkIn(gate) { refresh == 'refresh' ? env.refresh() : env.start() }
         changeWhileParked {
             env.addPropertySource(PropertySource.of('late', ['late.key': 'late', 'shared.key': 'late'], -100))
         }
-        String duringRead = env.getProperty('late.key', String).orElse(null)
-        String sharedDuringRead = env.getProperty('shared.key', String).orElse(null)
-        release(gate, reader)
+        String duringRefresh = env.getProperty('late.key', String).orElse(null)
+        String sharedDuringRefresh = env.getProperty('shared.key', String).orElse(null)
+        release(gate, refresher)
 
         then: "it was visible once added, on top, as an added property source is"
-        duringRead == 'late'
-        sharedDuringRead == 'late'
+        duringRefresh == 'late'
+        sharedDuringRefresh == 'late'
 
-        and: "the read publishes it in its order with what it has read, and it stays registered"
+        and: "the refresh publishes it in its order with what it has read, and it stays registered"
         env.getProperty('late.key', String).get() == 'late'
         env.getProperty('shared.key', String).get() == 'data'
         env.getProperty('app.value', String).get() == 'a'
@@ -67,11 +68,11 @@ class AddPropertySourceDuringReadSpec extends Specification {
         env.stop()
 
         where:
-        read << ['start', 'refresh']
+        refresh << ['start', 'refresh']
     }
 
-    void "a property source added before a read takes the registered property sources is only registered, and the read processes it in its order"() {
-        given: "a configuration that, once armed, parks the read while it loads the default property sources"
+    void "a property source added before a refresh takes the registered property sources is only registered, and the refresh processes it in its order"() {
+        given: "a configuration that, once armed, parks the refresh while it loads the default property sources"
         AtomicBoolean armed = new AtomicBoolean()
         CountDownLatch parked = new CountDownLatch(1)
         CountDownLatch release = new CountDownLatch(1)
@@ -101,13 +102,13 @@ class AddPropertySourceDuringReadSpec extends Specification {
         changeWhileParked {
             env.addPropertySource(PropertySource.of('early', ['early.key': 'early', 'shared.key': 'early'], -100))
         }
-        boolean visibleBeforeRead = env.containsProperty('early.key')
+        boolean visibleBeforeSnapshot = env.containsProperty('early.key')
         release.countDown()
         refresher.join(WAIT_SECONDS * 1000L)
 
         then: "the refresh has processed it, in its order"
         !refresher.alive
-        !visibleBeforeRead
+        !visibleBeforeSnapshot
         env.getProperty('early.key', String).get() == 'early'
         env.getProperty('shared.key', String).get() == 'data'
 
@@ -126,12 +127,12 @@ class AddPropertySourceDuringReadSpec extends Specification {
         PropertySource late = PropertySource.of('late', ['late.key': 'late'])
 
         when:
-        Thread reader = parkIn(gate) { env.refresh() }
+        Thread refresher = parkIn(gate) { env.refresh() }
         changeWhileParked {
             env.addPropertySource(late)
             env.removePropertySource(late)
         }
-        release(gate, reader)
+        release(gate, refresher)
 
         then:
         !env.getProperty('late.key', String).present
@@ -155,7 +156,7 @@ class AddPropertySourceDuringReadSpec extends Specification {
 
         when:
         data.put('app.value', 'b')
-        Thread reader = parkIn(gate) { env.refresh() }
+        Thread refresher = parkIn(gate) { env.refresh() }
         changeWhileParked {
             try {
                 env.addPropertySource(new FailsWhenIterated('failing'))
@@ -163,7 +164,7 @@ class AddPropertySourceDuringReadSpec extends Specification {
                 addFailure = t
             }
         }
-        release(gate, reader)
+        release(gate, refresher)
 
         then: "the add does not fail, and the refresh publishes what it read"
         addFailure == null
@@ -181,7 +182,7 @@ class AddPropertySourceDuringReadSpec extends Specification {
         env.stop()
     }
 
-    void "a property source that fails part way, added outside a read, publishes none of its properties and stays registered"() {
+    void "a property source that fails part way, added outside a refresh, publishes none of its properties and stays registered"() {
         given:
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         env.addPropertySource(PropertySource.of('data', ['app.value': 'a']))
@@ -336,18 +337,18 @@ class AddPropertySourceDuringReadSpec extends Specification {
     }
 
     /**
-     * Runs the read on another thread, once the gate is armed, and returns that thread once the
-     * read is parked in the gate.
+     * Runs the refresh on another thread, once the gate is armed, and returns that thread once the
+     * refresh is parked in the gate.
      */
-    private static Thread parkIn(Gate gate, Closure<?> read) {
+    private static Thread parkIn(Gate gate, Closure<?> refresh) {
         gate.arm()
-        Thread reader = daemon('reader', read)
+        Thread refresher = daemon('refresher', refresh)
         assert gate.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        return reader
+        return refresher
     }
 
     /**
-     * Runs the change on another thread, which must finish while the read is parked.
+     * Runs the change on another thread, which must finish while the refresh is parked.
      */
     private static void changeWhileParked(Closure<?> change) {
         Thread changer = daemon('changer', change)
@@ -355,10 +356,10 @@ class AddPropertySourceDuringReadSpec extends Specification {
         assert !changer.alive
     }
 
-    private static void release(Gate gate, Thread reader) {
+    private static void release(Gate gate, Thread refresher) {
         gate.release.countDown()
-        reader.join(WAIT_SECONDS * 1000L)
-        assert !reader.alive
+        refresher.join(WAIT_SECONDS * 1000L)
+        assert !refresher.alive
     }
 
     private static Thread daemon(String name, Closure<?> work) {

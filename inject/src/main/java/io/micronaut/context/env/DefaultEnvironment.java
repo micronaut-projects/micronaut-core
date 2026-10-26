@@ -17,7 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.PropertyResolverDelegate;
-import io.micronaut.context.env.PropertySourcePropertyResolver.Build;
+import io.micronaut.context.env.PropertySourcePropertyResolver.PendingState;
 import io.micronaut.context.env.yaml.YamlPropertySourceLoader;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
@@ -99,10 +99,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     );
     private static final String FILE_PREFIX = "file:";
     /**
-     * How long a start or a refresh waits for the read of the property sources in progress before
-     * it asks it to read again instead.
+     * How long a start or a refresh waits for the refresh in progress to end. After that it asks
+     * the refresh in progress to run once more, and returns.
      */
-    private static final int READ_WAIT_SECONDS = 2;
+    private static final int REFRESH_WAIT_SECONDS = 2;
 
     private final ClassPathResourceLoader resourceLoader;
     private final MutableConversionService mutableConversionService;
@@ -124,34 +124,33 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private final PropertyResolver propertyResolver;
 
     /**
-     * The registered property sources. Its monitor also guards the generation, the read in progress
-     * and the property sources the last read has read itself; only work in memory is done while it
-     * is held.
+     * The registered property sources. Its monitor also guards {@link #currentRun},
+     * {@link #refreshInProgress}, {@link #loadedSources} and {@link #addsInFlight}. Nothing but
+     * work in memory runs while it is held: no property source, loader or locator.
      */
     private final Map<String, PropertySource> propertySources = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
     private final Collection<PropertySourcesLocator> propertySourcesLocators;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     /**
-     * The generation of the environment, which {@link #stop()} replaces. Guarded by the monitor of
-     * {@link #propertySources}.
+     * The current run of the environment. {@link #stop()} replaces it, so a refresh that started
+     * before the stop can tell, and publishes nothing.
      */
-    private Generation generation = new Generation();
+    private Run currentRun = new Run();
     /**
-     * The read of the property sources in progress, if any. Guarded by the monitor of
-     * {@link #propertySources}.
+     * The start or refresh in progress, if any.
      */
-    private @Nullable Read read;
+    private @Nullable RefreshInProgress refreshInProgress;
     /**
-     * The property sources that the last read has loaded or located and registered itself, by name,
-     * which the next read drops and reads again. A name of one that was added or removed while the
-     * last read ran maps to {@code null}: the next read takes it back. Guarded by the monitor of
-     * {@link #propertySources}.
+     * The property sources the last refresh loaded itself (configuration files, default sources,
+     * bootstrap sources) and registered, by name. The next refresh unregisters them and loads them
+     * again. A name maps to {@code null} when an add or a remove of that name happened during the
+     * last refresh: that refresh did not register its own source, and the next one does.
      */
-    private Map<String, @Nullable PropertySource> ownSources = Map.of();
+    private Map<String, @Nullable PropertySource> loadedSources = Map.of();
     /**
-     * The property source being added by each name, the latest call: an add publishes only while
-     * it is still the latest change of its name. Guarded by the monitor of {@link #propertySources}.
+     * The property source being added under each name, by the latest call. An add publishes only
+     * if it is still the latest add of its name when it is done.
      */
     private final Map<String, PropertySource> addsInFlight = new HashMap<>();
 
@@ -239,18 +238,26 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     /**
-     * Adds a property source. On a running environment it is processed into a change on top of the
-     * published properties, on this thread and with no lock held, and then registered and published
-     * in one step, unless a later add or a remove of its name has come meanwhile. A property source
-     * added while a read of the property sources is in progress is only registered if the read has
-     * not taken the registered property sources yet, so that it processes it in its order. Added
-     * after that, it is handed over to the read as well, which publishes it in its order. If it fails
-     * to be processed, nothing of it is published and it stays registered.
+     * Adds a property source.
      *
-     * <p>The property source registered by its name is processed again on top, so that adding the
-     * registered property sources again in their order keeps their precedence, as a configuration
-     * watch does. It is not while the same property source is being added. One that the read in
-     * progress reads again itself is not handed over to it.</p>
+     * <ul>
+     * <li>On a stopped environment, or during a refresh that has not taken its snapshot of the
+     * added sources yet, it is only registered: the start or the refresh processes it.</li>
+     * <li>Otherwise it is processed on this thread, with no lock held, into a pending state built on
+     * the published properties. It is then registered and published in one step, unless a later
+     * add or a remove of the same name happened meanwhile.</li>
+     * <li>During a refresh that has taken its snapshot, it is also kept as a late add: the refresh
+     * applies it again, in its order, when it publishes. Not if the refresh processes that same
+     * instance itself.</li>
+     * </ul>
+     *
+     * <p>Adding the property source already registered under its name processes it again on top. A
+     * configuration watch relies on this: it adds the registered property sources again in their
+     * order to keep their precedence. Adding a property source while that same one is being added
+     * does nothing.</p>
+     *
+     * <p>If processing fails, nothing is published and the property source stays registered. During
+     * a refresh the failure is logged, as the refresh would have processed it anyway.</p>
      *
      * @param propertySource The property source
      * @return This environment
@@ -258,23 +265,21 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
         String name = propertySource.getName();
-        Read inRead;
+        RefreshInProgress duringRefresh;
         synchronized (propertySources) {
             if (addsInFlight.get(name) == propertySource) {
-                // being added: what that add publishes holds it
                 return this;
             }
-            if (!isRunning() || (read != null && !read.cut)) {
-                // the next start, or the read in progress, processes it in its order
+            if (!isRunning() || (refreshInProgress != null && refreshInProgress.addedSnapshot == null)) {
                 addsInFlight.remove(name);
                 register(name, propertySource);
                 return this;
             }
             addsInFlight.put(name, propertySource);
-            inRead = read;
+            duringRefresh = refreshInProgress;
         }
-        // what the expressions of the properties resolve to is kept while a read is in progress, as the read keeps it
-        Build change = propertyPlaceholderResolver.startChange(inRead != null);
+        // during a refresh, the values that expressions such as ${random.port} resolved to are kept, as the refresh keeps them
+        PendingState pending = propertyPlaceholderResolver.startPendingAdd(duringRefresh != null);
         try {
             internalProcessPropertySource(propertySource);
         } catch (Throwable e) {
@@ -285,28 +290,28 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                     register(name, propertySource);
                 }
             }
-            if (inRead == null) {
+            if (duringRefresh == null) {
                 throw e;
             }
-            // as when it was only registered while the property sources were read
-            logFailure("Failed to process property source {} added while the property sources are read", name, e);
+            logFailure("Failed to process property source {} added during a refresh", name, e);
             return this;
         } finally {
-            propertyPlaceholderResolver.endBuild(change);
+            propertyPlaceholderResolver.endPending(pending);
         }
         synchronized (propertySources) {
             if (addsInFlight.get(name) != propertySource) {
-                // a later add or a remove of the name has come meanwhile
+                // a later add or a remove of the same name happened meanwhile
                 return this;
             }
             addsInFlight.remove(name);
             register(name, propertySource);
             if (isRunning()) {
-                propertyPlaceholderResolver.publishChange(change);
-                if (read != null && read.cut && !read.reads(name, propertySource)) {
-                    // the latest by its name, which the read publishes in its order
-                    read.handedOver.remove(name);
-                    read.handedOver.put(name, change);
+                propertyPlaceholderResolver.publishAdd(pending);
+                RefreshInProgress refresh = refreshInProgress;
+                if (refresh != null && refresh.addedSnapshot != null && !refresh.processesItself(name, propertySource)) {
+                    // re-inserted, so the late adds stay in the order they were made
+                    refresh.lateAdds.remove(name);
+                    refresh.lateAdds.put(name, pending);
                 }
             }
         }
@@ -314,7 +319,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     /**
-     * Removes the property source registered by the name of the given one. Its properties stay
+     * Removes the property source registered under the name of the given one. Its properties stay
      * until the next refresh.
      *
      * @param propertySource The property source
@@ -327,11 +332,12 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         synchronized (propertySources) {
             propertySources.remove(name);
             addsInFlight.remove(name);
-            if (read != null) {
-                read.changedNames.add(name);
-                read.handedOver.remove(name);
+            RefreshInProgress refresh = refreshInProgress;
+            if (refresh != null) {
+                refresh.namesChanged.add(name);
+                refresh.lateAdds.remove(name);
             }
-            reset = isRunning() && read == null;
+            reset = isRunning() && refresh == null;
         }
         if (reset) {
             propertyPlaceholderResolver.resetCachesAndRememberedValues();
@@ -340,8 +346,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     /**
-     * Registers a property source that is added. Called with the monitor of
-     * {@link #propertySources} held.
+     * Registers an added property source. Called with the monitor of {@link #propertySources} held.
      *
      * @param name           The name of the property source
      * @param propertySource The property source
@@ -349,8 +354,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private void register(String name, PropertySource propertySource) {
         if (propertySources.get(name) != propertySource) {
             propertySources.put(name, propertySource);
-            if (read != null) {
-                read.changedNames.add(name);
+            if (refreshInProgress != null) {
+                refreshInProgress.namesChanged.add(name);
             }
         }
     }
@@ -406,8 +411,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     /**
-     * The registered property sources. On the thread that reads the property sources, they are as
-     * the read sees them, see {@link #view(Read)}.
+     * The registered property sources. On the thread of a refresh in progress, they are the ones
+     * that refresh sees, see {@link #sourcesSeenBy(RefreshInProgress)}.
      *
      * @return A copy of the property sources
      */
@@ -416,9 +421,9 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         // A copy taken under the monitor of the map: property sources are added and removed while
         // the environment runs, and iterating a view of the map would then fail
         synchronized (propertySources) {
-            Read current = read;
-            if (current != null && current.thread == Thread.currentThread()) {
-                return List.copyOf(view(current).values());
+            RefreshInProgress refresh = refreshInProgress;
+            if (refresh != null && refresh.thread == Thread.currentThread()) {
+                return List.copyOf(sourcesSeenBy(refresh).values());
             }
             return List.copyOf(propertySources.values());
         }
@@ -428,62 +433,64 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     public Environment start() {
         if (running.compareAndSet(false, true)) {
             LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
-            read(true);
+            refreshProperties(true);
         }
         return this;
     }
 
     @Override
     public Environment refresh() {
-        read(false);
+        refreshProperties(false);
         return this;
     }
 
     /**
-     * Reads the property sources, one read at a time per generation. A caller that the read in
-     * progress keeps waiting longer than {@link #READ_WAIT_SECONDS} asks it to read again, and
-     * returns: the read in progress reads once more before it ends, and publishes what the caller
-     * asked for then. A refresh called from code that runs in the read, on its thread, asks that too,
-     * once per read at most, so that code that refreshes whenever it runs cannot keep the read going.
+     * Loads and processes all property sources again. One refresh runs at a time.
+     *
+     * <p>If the refresh in progress does not end within {@link #REFRESH_WAIT_SECONDS}, the caller
+     * asks it to run once more before it ends, and returns. That extra run publishes what the
+     * caller asked for. A refresh called on the refreshing thread, by a property source or a
+     * locator, asks for the same, at most once per refresh, so that code that refreshes every time
+     * it runs cannot keep the refresh going forever.</p>
      *
      * @param starting Whether the environment starts
      */
-    private void read(boolean starting) {
-        Generation readGeneration;
+    private void refreshProperties(boolean starting) {
+        Run run;
         synchronized (propertySources) {
-            readGeneration = generation;
+            run = currentRun;
         }
-        if (readGeneration.readLock.isHeldByCurrentThread()) {
-            if (!readGeneration.askedItself) {
-                readGeneration.askedItself = true;
+        if (run.refreshLock.isHeldByCurrentThread()) {
+            if (!run.refreshedFromInside) {
+                run.refreshedFromInside = true;
                 synchronized (propertySources) {
-                    readGeneration.readAgain = true;
+                    run.refreshRequested = true;
                 }
             }
             return;
         }
-        if (!lockToRead(readGeneration)) {
+        if (!lockOrRequestRefresh(run)) {
             return;
         }
-        readGeneration.askedItself = false;
+        run.refreshedFromInside = false;
         try {
-            readOnce(readGeneration, starting);
+            refreshOnce(run, starting);
         } finally {
-            readAgainAndUnlock(readGeneration);
+            refreshAgainIfRequestedAndUnlock(run);
         }
     }
 
     /**
-     * Takes the read lock of a generation, waiting for the read in progress at most
-     * {@link #READ_WAIT_SECONDS}. If it does not end in time, it is asked to read again.
+     * Takes the refresh lock, waiting at most {@link #REFRESH_WAIT_SECONDS}. If the refresh in
+     * progress has not ended by then, it is asked to run once more instead.
      *
-     * @param readGeneration The generation
-     * @return Whether the lock was taken; if not, the read in progress reads again
+     * @param run The run of the environment
+     * @return Whether the lock was taken
      */
-    private boolean lockToRead(Generation readGeneration) {
-        ReentrantLock readLock = readGeneration.readLock;
+    private boolean lockOrRequestRefresh(Run run) {
+        ReentrantLock refreshLock = run.refreshLock;
         try {
-            if (readLock.tryLock(READ_WAIT_SECONDS, TimeUnit.SECONDS)) {
+            if (refreshLock.tryLock(REFRESH_WAIT_SECONDS, TimeUnit.SECONDS)) {
                 return true;
             }
         } catch (InterruptedException e) {
@@ -491,76 +498,76 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         }
         while (true) {
             synchronized (propertySources) {
-                // checked under the monitor that the read in progress unlocks under, see readAgainAndUnlock
-                if (readLock.isLocked()) {
-                    readGeneration.readAgain = true;
+                // the refresh in progress checks the request and unlocks under this monitor, so the request cannot be missed
+                if (refreshLock.isLocked()) {
+                    run.refreshRequested = true;
                     return false;
                 }
             }
-            // the read in progress has just ended
-            if (readLock.tryLock()) {
+            // the refresh in progress has just ended
+            if (refreshLock.tryLock()) {
                 return true;
             }
         }
     }
 
     /**
-     * Reads the property sources again for as long as another caller has asked for it, then lets
-     * the next read take the lock. A failure of a read again is logged, as its callers have
-     * returned.
+     * Refreshes again for as long as another caller has asked for it, then unlocks. A failure is
+     * logged, as the callers that asked have already returned.
      *
-     * @param readGeneration The generation, whose read lock the current thread holds
+     * @param run The run of the environment, whose refresh lock the current thread holds
      */
-    private void readAgainAndUnlock(Generation readGeneration) {
+    private void refreshAgainIfRequestedAndUnlock(Run run) {
         while (true) {
             synchronized (propertySources) {
-                if (!readGeneration.readAgain || readGeneration != generation) {
-                    readGeneration.readAgain = false;
-                    readGeneration.readLock.unlock();
+                if (!run.refreshRequested || run != currentRun) {
+                    run.refreshRequested = false;
+                    run.refreshLock.unlock();
                     return;
                 }
-                readGeneration.readAgain = false;
+                run.refreshRequested = false;
             }
             try {
-                readOnce(readGeneration, false);
+                refreshOnce(run, false);
             } catch (Throwable e) {
                 // Throwable, as a property source written in Groovy or Kotlin can throw a checked exception
-                logFailure("Failed to read the property sources of {} again", this, e);
+                logFailure("Failed to refresh {} again", this, e);
             }
         }
     }
 
     /**
-     * Reads the property sources once, into new catalogs, and publishes them in one step: a
-     * concurrent lookup sees the properties as they were before the read or as they are after it.
-     * A start publishes after each property source as well. A read that a stop has overtaken
-     * publishes and registers nothing, and a read that fails publishes and registers nothing more.
+     * Refreshes once: processes all property sources into a pending state, off to the side, and
+     * publishes it in one step. A concurrent lookup sees the properties as they were before or as
+     * they are after. A start also publishes after each property source. A refresh that a stop has
+     * overtaken publishes and registers nothing. A refresh that fails publishes and registers
+     * nothing more.
      *
-     * @param readGeneration The generation of the read
-     * @param starting       Whether the environment starts
+     * @param run      The run of the environment
+     * @param starting Whether the environment starts
      */
-    private void readOnce(Generation readGeneration, boolean starting) {
-        Build build = propertyPlaceholderResolver.startRead();
+    private void refreshOnce(Run run, boolean starting) {
+        PendingState pending = propertyPlaceholderResolver.startPendingRefresh();
         try {
-            Read current;
+            RefreshInProgress refresh;
             synchronized (propertySources) {
-                if (readGeneration != generation) {
+                if (run != currentRun) {
                     return;
                 }
-                current = new Read(readGeneration, build, ownSources);
-                read = current;
+                refresh = new RefreshInProgress(run, pending, loadedSources);
+                refreshInProgress = refresh;
             }
             try {
-                loadAndProcess(current, starting);
+                loadAndProcess(refresh, starting);
             } finally {
                 synchronized (propertySources) {
-                    if (read == current) {
-                        read = null;
+                    if (refreshInProgress == refresh) {
+                        refreshInProgress = null;
                     }
                 }
             }
         } finally {
-            propertyPlaceholderResolver.endBuild(build);
+            propertyPlaceholderResolver.endPending(pending);
         }
     }
 
@@ -570,9 +577,9 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     /**
-     * Stops the environment at once: its properties are empty and the property sources that the
-     * last read has read itself are dropped when it returns. A read in progress does not publish
-     * or register what it reads.
+     * Stops the environment without waiting for a refresh in progress. When it returns, the
+     * properties are empty and the property sources the last refresh loaded itself are
+     * unregistered. A refresh in progress publishes and registers nothing.
      *
      * @return This environment
      */
@@ -580,10 +587,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     public Environment stop() {
         synchronized (propertySources) {
             running.set(false);
-            generation = new Generation();
-            read = null;
-            ownSources.forEach(this::unregister);
-            ownSources = Map.of();
+            currentRun = new Run();
+            refreshInProgress = null;
+            loadedSources.forEach(this::unregister);
+            loadedSources = Map.of();
             propertyPlaceholderResolver.publishEmpty();
         }
         if (mutableConversionService instanceof DefaultMutableConversionService defaultMutableConversionService) {
@@ -623,18 +630,18 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     /**
-     * Loads and locates the property sources, and processes them, with the registered ones, into
-     * the read.
+     * Loads the configuration files and the default property sources, runs the locators, takes the
+     * snapshot of the added property sources, and processes them all, in their order, into the
+     * pending state of the refresh. Then registers what the refresh loaded itself and publishes.
      *
-     * @param read     The read
+     * @param refresh  The refresh
      * @param starting Whether the environment starts, which publishes after each property source
      */
-    private void loadAndProcess(Read read, boolean starting) {
-        // the configuration files and the default property sources
+    private void loadAndProcess(RefreshInProgress refresh, boolean starting) {
         List<PropertySource> loaded = new ArrayList<>(configLocations.size());
         if (configuration.isEnableDefaultPropertySources()) {
             loaded.addAll(readPropertySourceList(applicationName));
-            addDefaultPropertySources(read, loaded);
+            addDefaultPropertySources(refresh, loaded);
             String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
             if (propertySourcesSystemProperty != null) {
                 loaded.addAll(readPropertySourceListFromFiles(propertySourcesSystemProperty));
@@ -644,21 +651,21 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 loaded.addAll(readPropertySourceListFromFiles(propertySourcesEnv));
             }
         }
-        read.addOwn(loaded, propertySources);
-        // what the locators return; those of a bootstrap locator are registered as the files are
+        refresh.addLoaded(loaded, propertySources);
+        // what a bootstrap locator returns is registered like the configuration files; what other locators return is not
         List<PropertySource> located = new ArrayList<>();
         for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
             Collection<PropertySource> sources = propertySourcesLocator.load(this);
             located.addAll(sources);
             if (propertySourcesLocator instanceof BootstrapLocatorMarker) {
-                read.addOwn(sources, propertySources);
+                refresh.addLoaded(sources, propertySources);
             }
         }
 
         List<PropertySource> sources = new ArrayList<>(loaded);
-        for (PropertySource registered : cut(read)) {
-            if (!sources.contains(registered)) {
-                sources.add(registered);
+        for (PropertySource added : snapshotAdded(refresh)) {
+            if (!sources.contains(added)) {
+                sources.add(added);
             }
         }
         sources.addAll(located);
@@ -667,103 +674,104 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             internalProcessPropertySource(propertySource);
             if (starting) {
                 synchronized (propertySources) {
-                    if (read.generation != generation) {
-                        // a stop has overtaken the start
+                    if (refresh.run != currentRun) {
+                        // stopped during the start
                         return;
                     }
-                    publish(read);
+                    publish(refresh);
                 }
             }
         }
 
         synchronized (propertySources) {
-            if (read.generation != generation) {
+            if (refresh.run != currentRun) {
                 return;
             }
-            // an add or a remove of a name during the read wins over what the reads have loaded
-            read.previousOwn.forEach((name, source) -> {
-                if (!read.changedNames.contains(name)) {
+            // an add or a remove of a name during the refresh wins over what the refreshes loaded under that name
+            refresh.previouslyLoaded.forEach((name, source) -> {
+                if (!refresh.namesChanged.contains(name)) {
                     unregister(name, source);
                 }
             });
-            Map<String, PropertySource> own = new LinkedHashMap<>();
-            read.own.forEach((name, source) -> {
-                boolean ownName = !PropertySource.CONTEXT.equals(name);
-                if (read.changedNames.contains(name)) {
-                    // What was added or removed by the name during the read stays until the next
-                    // read, which takes the name back, as 5.2.x dropped it by name when it read again.
-                    if (ownName) {
-                        own.put(name, null);
+            Map<String, PropertySource> registeredNow = new LinkedHashMap<>();
+            refresh.loaded.forEach((name, source) -> {
+                boolean remembered = !PropertySource.CONTEXT.equals(name);
+                if (refresh.namesChanged.contains(name)) {
+                    // What was added or removed under the name during the refresh stays until the
+                    // next refresh, which replaces it, as 5.2.x dropped such a name on its next refresh.
+                    if (remembered) {
+                        registeredNow.put(name, null);
                     }
-                } else if (!propertySources.containsKey(name) || read.takesBack(name)) {
-                    // A property source registered by a name the last read did not read itself stays,
-                    // as 5.2.x kept a name registered before a read.
+                } else if (!propertySources.containsKey(name) || refresh.replacesRegistered(name)) {
+                    // A property source registered under a name that no refresh loaded stays,
+                    // as 5.2.x kept a name registered before a refresh.
                     propertySources.put(name, source);
-                    if (ownName) {
-                        own.put(name, source);
+                    if (remembered) {
+                        registeredNow.put(name, source);
                     }
                 }
             });
-            ownSources = own;
-            publish(read);
+            loadedSources = registeredNow;
+            publish(refresh);
         }
     }
 
     /**
-     * The registered property sources as a read sees them: without those the last read has read
-     * itself, and with those this read has read itself so far, as it registers them when it ends.
-     * Called with the monitor of {@link #propertySources} held.
+     * The registered property sources as a refresh sees them: without those the last refresh
+     * loaded, which this one loads again, and with those this refresh has loaded so far, which it
+     * registers when it ends. Called with the monitor of {@link #propertySources} held.
      *
-     * @param read The read
+     * @param refresh The refresh
      * @return The property sources, by name
      */
-    private Map<String, PropertySource> view(Read read) {
-        Map<String, PropertySource> view = new LinkedHashMap<>(propertySources);
-        read.previousOwn.forEach((name, source) -> {
-            if (view.get(name) == source) {
-                view.remove(name);
+    private Map<String, PropertySource> sourcesSeenBy(RefreshInProgress refresh) {
+        Map<String, PropertySource> seen = new LinkedHashMap<>(propertySources);
+        refresh.previouslyLoaded.forEach((name, source) -> {
+            if (seen.get(name) == source) {
+                seen.remove(name);
             }
         });
-        read.own.forEach((name, source) -> {
-            if (read.takesBack(name)) {
-                view.put(name, source);
+        refresh.loaded.forEach((name, source) -> {
+            if (refresh.replacesRegistered(name)) {
+                seen.put(name, source);
             } else {
-                view.putIfAbsent(name, source);
+                seen.putIfAbsent(name, source);
             }
         });
-        return view;
+        return seen;
     }
 
     /**
-     * Takes the registered property sources that a read processes, the input cut: those of its view
-     * that it has not read itself, see {@link #view(Read)}. A property source added from then on is
-     * handed over to the read, see {@link #addPropertySource(PropertySource)}.
+     * Takes the snapshot of the added property sources that a refresh processes: the registered
+     * ones it does not load itself. A property source added after this is a late add, see
+     * {@link #addPropertySource(PropertySource)}.
      *
-     * @param read The read
-     * @return The registered property sources
+     * @param refresh The refresh
+     * @return The added property sources, in the order they are registered
      */
-    private List<PropertySource> cut(Read read) {
+    private List<PropertySource> snapshotAdded(RefreshInProgress refresh) {
         synchronized (propertySources) {
-            read.cut = true;
-            List<PropertySource> registered = new ArrayList<>(propertySources.size());
+            List<PropertySource> added = new ArrayList<>(propertySources.size());
             propertySources.forEach((name, source) -> {
-                if (read.previousOwn.get(name) != source && !read.takesBack(name)) {
-                    registered.add(source);
-                    read.input.add(source);
+                if (refresh.previouslyLoaded.get(name) != source && !refresh.replacesRegistered(name)) {
+                    added.add(source);
                 }
             });
-            return registered;
+            Set<PropertySource> snapshot = Collections.newSetFromMap(new IdentityHashMap<>());
+            snapshot.addAll(added);
+            refresh.addedSnapshot = snapshot;
+            return added;
         }
     }
 
     /**
-     * Publishes what a read has built so far, with the property sources handed over to it on top.
-     * Called with the monitor of {@link #propertySources} held.
+     * Publishes what a refresh has processed so far, with its late adds, in their order. Called
+     * with the monitor of {@link #propertySources} held.
      *
-     * @param read The read
+     * @param refresh The refresh
      */
-    private void publish(Read read) {
-        propertyPlaceholderResolver.publishRead(read.build, read.handedOver.values());
+    private void publish(RefreshInProgress refresh) {
+        propertyPlaceholderResolver.publishRefresh(refresh.pending, refresh.lateAdds.values());
     }
 
     /**
@@ -866,15 +874,15 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     /**
-     * Adds the default property sources that are not registered, as the read sees them.
+     * Adds the default property sources that are not registered, as the refresh sees them.
      *
-     * @param read            The read
+     * @param refresh         The refresh
      * @param propertySources The list of property sources
      */
-    private void addDefaultPropertySources(Read read, List<PropertySource> propertySources) {
+    private void addDefaultPropertySources(RefreshInProgress refresh, List<PropertySource> propertySources) {
         Map<String, PropertySource> registered;
         synchronized (this.propertySources) {
-            registered = view(read);
+            registered = sourcesSeenBy(refresh);
         }
         if (!registered.containsKey(SystemPropertiesPropertySource.NAME)) {
             propertySources.add(new SystemPropertiesPropertySource());
@@ -925,11 +933,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     /**
-     * Drops the property source loaders, so that the next read of the property sources creates new
-     * instances. The bootstrap context, which refreshes its environment rather than being created
-     * again, calls this before each refresh: a loader then sees a refresh as it did when every read
-     * of the bootstrap configuration had a new environment, and one that returns its property source
-     * only once keeps returning it.
+     * Drops the property source loaders, so that the next refresh creates new instances. The
+     * bootstrap context, which refreshes its environment rather than being created again, calls
+     * this before each refresh: a loader then sees a refresh as it did when every read of the
+     * bootstrap configuration had a new environment, and one that returns its property source only
+     * once keeps returning it.
      */
     void resetPropertySourceLoaders() {
         synchronized (this) {
@@ -1401,115 +1409,117 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     /**
-     * A generation of the environment, from a stop to the next.
+     * One run of the environment, from a start to the stop. A refresh that started in an earlier
+     * run publishes and registers nothing.
      */
-    private static final class Generation {
+    private static final class Run {
         /**
-         * Held by the read of the generation in progress, so that one runs at a time.
+         * Held by the refresh in progress, so that one runs at a time.
          */
-        private final ReentrantLock readLock = new ReentrantLock();
+        private final ReentrantLock refreshLock = new ReentrantLock();
         /**
-         * Whether the read in progress is asked to read again before it ends. Guarded by the
-         * monitor of {@link DefaultEnvironment#propertySources}.
+         * Whether another caller asked the refresh in progress to run once more before it ends.
+         * Guarded by the monitor of {@link DefaultEnvironment#propertySources}.
          */
-        private boolean readAgain;
+        private boolean refreshRequested;
         /**
-         * Whether the thread that holds the read lock has asked itself to read again since it took
-         * the lock. Only that thread uses it.
+         * Whether the refreshing thread has asked for a refresh itself since it took the lock. Only
+         * that thread uses it.
          */
-        private boolean askedItself;
+        private boolean refreshedFromInside;
     }
 
     /**
-     * A read of the property sources in progress. Its fields that are not final are guarded by the
-     * monitor of {@link DefaultEnvironment#propertySources}.
+     * A start or a refresh in progress. Its fields that are not final are guarded by the monitor of
+     * {@link DefaultEnvironment#propertySources}.
      */
-    private static final class Read {
-        private final Generation generation;
-        private final Build build;
+    private static final class RefreshInProgress {
+        private final Run run;
         /**
-         * The thread that reads, which sees the registered property sources through the
-         * {@link DefaultEnvironment#view(Read) view} of the read.
+         * The properties being built, which are published when the refresh ends.
+         */
+        private final PendingState pending;
+        /**
+         * The refreshing thread. It sees the property sources returned by
+         * {@link DefaultEnvironment#sourcesSeenBy(RefreshInProgress)}.
          */
         private final Thread thread = Thread.currentThread();
         /**
-         * The property sources that the last read has read itself, by name. This read reads them
-         * again, so they are left out of its view and of its input, by identity.
+         * What the last refresh loaded itself, by name, see {@link DefaultEnvironment#loadedSources}.
+         * This refresh loads them again.
          */
-        private final Map<String, @Nullable PropertySource> previousOwn;
+        private final Map<String, @Nullable PropertySource> previouslyLoaded;
         /**
-         * The property sources that this read has loaded or located itself so far, by name, which
-         * it registers when it ends.
+         * What this refresh has loaded itself so far, by name: configuration files, default
+         * property sources and what a bootstrap locator returned. Registered when it ends.
          */
-        private final Map<String, PropertySource> own = new LinkedHashMap<>();
+        private final Map<String, PropertySource> loaded = new LinkedHashMap<>();
         /**
-         * Whether the read has taken the registered property sources it processes, see
-         * {@link DefaultEnvironment#cut(Read)}. A property source added before is only registered,
-         * for the read to process in its order.
+         * The added property sources that this refresh processes, by identity. {@code null} until
+         * the refresh takes this snapshot, see {@link DefaultEnvironment#snapshotAdded(RefreshInProgress)}.
+         * Before that, an added property source is only registered, and lands in the snapshot.
          */
-        private boolean cut;
+        private @Nullable Set<PropertySource> addedSnapshot;
         /**
-         * The registered property sources that the read has taken at its cut, by identity.
+         * The property sources added after the snapshot, the latest by each name, in the order
+         * they were added. The refresh applies them again, in their order, when it publishes.
          */
-        private final Set<PropertySource> input = Collections.newSetFromMap(new IdentityHashMap<>());
+        private final Map<String, PendingState> lateAdds = new LinkedHashMap<>();
         /**
-         * The property sources added since the cut, the latest one by each name, which the read
-         * keeps on top of what it publishes.
+         * The names under which a property source was added or removed during the refresh. The
+         * refresh does not register what it loaded itself under such a name.
          */
-        private final Map<String, Build> handedOver = new LinkedHashMap<>();
-        /**
-         * The names of the property sources that were added or removed during the read: the read
-         * does not register what it has read itself by such a name.
-         */
-        private final Set<String> changedNames = new HashSet<>();
+        private final Set<String> namesChanged = new HashSet<>();
 
-        private Read(Generation generation, Build build, Map<String, @Nullable PropertySource> previousOwn) {
-            this.generation = generation;
-            this.build = build;
-            this.previousOwn = previousOwn;
+        private RefreshInProgress(Run run, PendingState pending, Map<String, @Nullable PropertySource> previouslyLoaded) {
+            this.run = run;
+            this.pending = pending;
+            this.previouslyLoaded = previouslyLoaded;
         }
 
         /**
-         * Adds property sources that the read has loaded or located itself. Called by the thread
-         * that reads, which asks for their names with no lock held, as a name is code of the
-         * property source.
+         * Adds property sources that this refresh has loaded itself. Their names are taken with no
+         * lock held, as {@link PropertySource#getName()} is code of the property source.
          *
          * @param sources The property sources
-         * @param monitor The monitor that guards the read
+         * @param monitor The monitor that guards the refresh
          */
-        private void addOwn(Collection<PropertySource> sources, Object monitor) {
+        private void addLoaded(Collection<PropertySource> sources, Object monitor) {
             Map<String, PropertySource> named = new LinkedHashMap<>();
             for (PropertySource source : sources) {
                 named.put(source.getName(), source);
             }
             synchronized (monitor) {
-                own.putAll(named);
+                loaded.putAll(named);
             }
         }
 
         /**
-         * Whether the read processes the given property source itself: one it has taken at its
-         * cut, read itself, or reads again as one the last read has read. Called with the monitor
-         * of {@link DefaultEnvironment#propertySources} held.
+         * Whether this refresh processes the given property source itself: it is in the snapshot,
+         * this refresh loaded it, or the last refresh loaded it and this one loads it again. Called
+         * with the monitor of {@link DefaultEnvironment#propertySources} held.
          *
          * @param name   The name of the property source
          * @param source The property source
-         * @return Whether the read processes it
+         * @return Whether the refresh processes it
          */
-        private boolean reads(String name, PropertySource source) {
-            return input.contains(source) || own.get(name) == source || previousOwn.get(name) == source;
+        private boolean processesItself(String name, PropertySource source) {
+            return (addedSnapshot != null && addedSnapshot.contains(source))
+                || loaded.get(name) == source
+                || previouslyLoaded.get(name) == source;
         }
 
         /**
-         * Whether the read registers what it has read itself by a name the last read owned, in
-         * place of whatever is registered by it, as 5.2.x dropped such a name when it read again.
-         * Called with the monitor of {@link DefaultEnvironment#propertySources} held.
+         * Whether this refresh registers what it loaded under the given name in place of whatever
+         * is registered under it: the last refresh loaded that name too, and nobody added or
+         * removed it during this one. 5.2.x dropped such a name on its next refresh. Called with
+         * the monitor of {@link DefaultEnvironment#propertySources} held.
          *
          * @param name The name
-         * @return Whether the read takes the name back
+         * @return Whether the refresh replaces the registered property source
          */
-        private boolean takesBack(String name) {
-            return own.containsKey(name) && previousOwn.containsKey(name) && !changedNames.contains(name);
+        private boolean replacesRegistered(String name) {
+            return loaded.containsKey(name) && previouslyLoaded.containsKey(name) && !namesChanged.contains(name);
         }
     }
 }

@@ -7,13 +7,13 @@ import spock.lang.Specification
 import spock.lang.Timeout
 
 /**
- * What a property source sees of the environment while a start or a refresh reads it: the thread
- * that reads sees what it has read so far, before any of it is published, and the random values it
- * draws are those later lookups get. A property source is asked for its values and its origin
- * property by property, as it is read.
+ * What a property source sees of the environment while a start or a refresh reads it: the
+ * refreshing thread sees the pending state of the refresh, what it has read so far, before any of
+ * it is published, and the random values it draws are those later lookups get. A property source is
+ * asked for its values and its origin property by property, as it is read.
  */
 @Timeout(60)
-class ReadOwnBuildSpec extends Specification {
+class RefreshPendingStateSpec extends Specification {
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/13913')
     void "a property source that reads a random port while the environment starts gets the port later lookups return, and after a refresh the port that refresh draws"() {
@@ -41,7 +41,7 @@ class ReadOwnBuildSpec extends Specification {
         env.stop()
     }
 
-    void "a property source whose values resolve its own earlier properties gives them, as each is read once the one before is processed: #read"() {
+    void "a property source whose values resolve its own earlier properties gives them, as each is read once the one before is processed: #refresh"() {
         given: "a property source whose url names its host, a host that changes before the refresh"
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         SelfReferencing source = new SelfReferencing(env)
@@ -49,7 +49,7 @@ class ReadOwnBuildSpec extends Specification {
 
         when:
         env.start()
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             source.host = 'h2'
             env.refresh()
         }
@@ -61,7 +61,7 @@ class ReadOwnBuildSpec extends Specification {
         env.stop()
 
         where:
-        read      | url
+        refresh   | url
         'start'   | 'http://h/'
         'refresh' | 'http://h2/'
     }

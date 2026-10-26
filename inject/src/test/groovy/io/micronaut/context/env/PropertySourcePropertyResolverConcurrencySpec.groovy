@@ -70,12 +70,12 @@ class PropertySourcePropertyResolverConcurrencySpec extends Specification {
         def token = resolver.getProperty("token", String).get()
 
         when:
-        def read = resolver.startRead()
+        def refresh = resolver.startPendingRefresh()
         try {
             resolver.addPropertySource(PropertySource.of("replacement", ["token": '${random.uuid}']))
             throw new IllegalStateException("refresh failed")
         } finally {
-            resolver.endBuild(read)
+            resolver.endPending(refresh)
         }
 
         then:

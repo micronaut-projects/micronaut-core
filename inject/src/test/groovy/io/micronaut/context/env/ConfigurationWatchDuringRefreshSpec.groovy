@@ -16,12 +16,12 @@ import java.util.concurrent.atomic.AtomicReference
  * A configuration watch, as micronaut-discovery-client's Consul watch is, that replaces a changed
  * property source by a new instance of its name and adds every registered property source again by
  * order to keep their precedence, while a refresh reads the property sources. Each add is published
- * at once, and the read publishes what it has read and the adds handed over to it in their order, so
- * a property source of a higher order keeps winning a shared key. The refresh is parked once it has
- * taken the registered property sources, and every wait is bounded.
+ * at once and kept as a late add, and the refresh publishes what it has read and its late adds in
+ * their order, so a property source of a higher order keeps winning a shared key. The refresh is
+ * parked once it has taken the registered property sources, and every wait is bounded.
  */
 @Timeout(60)
-class ConfigurationWatchDuringReadSpec extends Specification {
+class ConfigurationWatchDuringRefreshSpec extends Specification {
 
     private static final int WAIT_SECONDS = 10
 
@@ -146,13 +146,13 @@ class ConfigurationWatchDuringReadSpec extends Specification {
                 .sort { it.order }
                 .each { env.addPropertySource(it) }
         }
-        String kDuringRead = env.getProperty('k', String).orElse(null)
-        String xDuringRead = env.getProperty('x.only', String).orElse(null)
+        String kDuringRefresh = env.getProperty('k', String).orElse(null)
+        String xDuringRefresh = env.getProperty('x.only', String).orElse(null)
         release(gate, refresher)
 
         then: "the new value was visible at once, and the property source of the highest order still wins the shared key"
-        kDuringRead == 'B'
-        xDuringRead == '2'
+        kDuringRefresh == 'B'
+        xDuringRefresh == '2'
         outcome == 'succeeds' ? failure == null : failure instanceof IllegalStateException
 
         and: "so it is once the refresh has ended, and the replacement is registered"
@@ -165,7 +165,7 @@ class ConfigurationWatchDuringReadSpec extends Specification {
         fail.set(false)
         env.refresh()
 
-        then: "it takes the name of what it locates itself back, as 5.2.x did, and registers what the locator returns"
+        then: "it replaces the property source registered by the name of what it locates itself, as 5.2.x did, and registers what the locator returns"
         env.getProperty('k', String).get() == 'B'
         env.getProperty('x.only', String).get() == '2'
         !env.propertySources.find { it.name == 'consul-x' }.is(replacement)
@@ -187,7 +187,7 @@ class ConfigurationWatchDuringReadSpec extends Specification {
         outcome << ['succeeds', 'fails']
     }
 
-    void "a property source a bootstrap locator returned two reads before, added again while a refresh reads, stays registered until the next refresh, which registers what the locator returns by that name again"() {
+    void "a property source a bootstrap locator returned two refreshes before, added again during a refresh, stays registered until the next refresh, which registers what the locator returns by that name again"() {
         given:
         ConsulLikeLocator locator = new ConsulLikeLocator({ int load -> [PropertySource.of('consul-app', ['app.value': 'v' + load, ('only.v' + load): 'x'], 100)] })
         Gate gate = new Gate()
@@ -197,7 +197,7 @@ class ConfigurationWatchDuringReadSpec extends Specification {
         PropertySource started = env.propertySources.find { it.name == 'consul-app' }
         env.refresh()
 
-        when: "a watch adds again, while the next refresh reads, the copy it took at start"
+        when: "a watch adds again, during the next refresh, the copy it took at start"
         Thread refresher = parkIn(gate) { env.refresh() }
         changeWhileParked {
             env.addPropertySource(started)
@@ -214,13 +214,13 @@ class ConfigurationWatchDuringReadSpec extends Specification {
         env.getProperty('only.v1', String).present
         !env.getProperty('only.v2', String).present
 
-        and: "the copy stays registered by that name, as an add during the read wins over what the read located"
+        and: "the copy stays registered by that name, as an add during the refresh wins over what the refresh located"
         env.propertySources.find { it.name == 'consul-app' }.is(started)
 
         when: "the environment is refreshed again"
         env.refresh()
 
-        then: "it takes the name back, as 5.2.x did: what the locator returns now is read and registered, and the copy is not read"
+        then: "it replaces the copy registered by that name, as 5.2.x did: what the locator returns now is read and registered, and the copy is not read"
         env.getProperty('app.value', String).get() == 'v4'
         env.getProperty('only.v4', String).present
         !env.getProperty('only.v1', String).present
@@ -260,18 +260,18 @@ class ConfigurationWatchDuringReadSpec extends Specification {
     }
 
     /**
-     * Runs the read on another thread, once the parking is armed, and returns that thread once the
-     * read is parked.
+     * Runs the refresh on another thread, once the parking is armed, and returns that thread once
+     * the refresh is parked.
      */
-    private static Thread parkIn(Parking parking, Closure<?> read) {
+    private static Thread parkIn(Parking parking, Closure<?> refresh) {
         parking.arm()
-        Thread reader = daemon('reader', read)
+        Thread refresher = daemon('refresher', refresh)
         assert parking.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        return reader
+        return refresher
     }
 
     /**
-     * Runs the change on another thread, which must finish while the read is parked.
+     * Runs the change on another thread, which must finish while the refresh is parked.
      */
     private static void changeWhileParked(Closure<?> change) {
         Thread changer = daemon('changer', change)
@@ -279,10 +279,10 @@ class ConfigurationWatchDuringReadSpec extends Specification {
         assert !changer.alive
     }
 
-    private static void release(Parking parking, Thread reader) {
+    private static void release(Parking parking, Thread refresher) {
         parking.release.countDown()
-        reader.join(WAIT_SECONDS * 1000L)
-        assert !reader.alive
+        refresher.join(WAIT_SECONDS * 1000L)
+        assert !refresher.alive
     }
 
     private static Thread daemon(String name, Closure<?> work) {
@@ -308,7 +308,7 @@ class ConfigurationWatchDuringReadSpec extends Specification {
             if (armed.compareAndSet(true, false)) {
                 reached.countDown()
                 // qualified: unqualified, Groovy resolves the name through get(String) of a property source
-                if (!release.await(ConfigurationWatchDuringReadSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                if (!release.await(ConfigurationWatchDuringRefreshSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
                     throw new IllegalStateException('the parked thread was never released')
                 }
                 return true

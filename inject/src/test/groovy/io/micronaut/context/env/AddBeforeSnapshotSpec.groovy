@@ -15,37 +15,37 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Property sources added, replaced or removed while a start or a refresh loads the configuration
- * files or runs the locators, before it takes the registered property sources. Such a change is
- * only registered, and the read processes what is registered then in its order, as 4.10.31 did.
- * The threads are parked at fixed points, and every wait is bounded.
+ * files or runs the locators, before it takes the snapshot of the added property sources. Such a
+ * change is only registered, and the refresh processes what is registered then in its order, as
+ * 4.10.31 did. The threads are parked at fixed points, and every wait is bounded.
  */
 @Timeout(60)
-class AddBeforeInputCutSpec extends Specification {
+class AddBeforeSnapshotSpec extends Specification {
 
     private static final int WAIT_SECONDS = 10
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/14138')
-    void "a property source added while a #read loads the configuration files is only registered, is read by it in its order, and stays registered for the next refresh"() {
-        given: "a configuration that, once armed, parks the read while it loads the default property sources, as the issue's reproducer does"
+    void "a property source added while a #refresh loads the configuration files is only registered, is read by it in its order, and stays registered for the next refresh"() {
+        given: "a configuration that, once armed, parks the refresh while it loads the default property sources, as the issue's reproducer does"
         Parking park = new Parking()
         DefaultEnvironment env = new DefaultEnvironment(parkingInDefaults(park))
         env.addPropertySource(PropertySource.of('higher', ['order.value': 'higher'], 100))
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
 
-        when: "another thread adds a property source of a lower order that sets the same key, while the read is parked"
-        Thread reader = parkIn(park) { read == 'refresh' ? env.refresh() : env.start() }
+        when: "another thread adds a property source of a lower order that sets the same key, while the refresh is parked"
+        Thread refresher = parkIn(park) { refresh == 'refresh' ? env.refresh() : env.start() }
         changeWhileParked {
             env.addPropertySource(PropertySource.of('lower', ['order.value': 'lower', 'lower.key': 'lower'], -100))
         }
-        boolean visibleBeforeRead = env.containsProperty('lower.key')
-        boolean registeredBeforeRead = env.propertySources*.name.contains('lower')
-        release(park, reader)
+        boolean visibleBeforeSnapshot = env.containsProperty('lower.key')
+        boolean registeredBeforeSnapshot = env.propertySources*.name.contains('lower')
+        release(park, refresher)
 
-        then: "it is only registered, and the read processes it once, in its order, so the property source of the higher order keeps the key"
-        !visibleBeforeRead
-        registeredBeforeRead
+        then: "it is only registered, and the refresh processes it once, in its order, so the property source of the higher order keeps the key"
+        !visibleBeforeSnapshot
+        registeredBeforeSnapshot
         env.getProperty('lower.key', String).get() == 'lower'
         env.getProperty('order.value', String).get() == 'higher'
         env.propertySources*.name.contains('lower')
@@ -63,10 +63,10 @@ class AddBeforeInputCutSpec extends Specification {
         env.stop()
 
         where:
-        read << ['start', 'refresh']
+        refresh << ['start', 'refresh']
     }
 
-    void "a property source that a property sources locator adds while the environment reads is processed by that read in its order, and by every refresh"() {
+    void "a property source that a property sources locator adds while the environment refreshes is processed by that refresh in its order, and by every refresh"() {
         given: "a locator that adds a new property source to the environment each time, rather than returning it"
         List<PropertySource> added = new CopyOnWriteArrayList<>()
         List<Boolean> inViewOfLocator = new CopyOnWriteArrayList<>()
@@ -105,7 +105,7 @@ class AddBeforeInputCutSpec extends Specification {
         env.stop()
     }
 
-    void "a property source whose value comes from the environment is given the value of a change made while the read loads the configuration files, and the next refresh keeps the change: #change, #read"() {
+    void "a property source whose value comes from the environment is given the value of a change made while the refresh loads the configuration files, and the next refresh keeps the change: #change, #refresh"() {
         given: "a property source whose value is computed from another property each time it is read"
         Parking park = new Parking()
         DefaultEnvironment env = new DefaultEnvironment(parkingInDefaults(park))
@@ -115,12 +115,12 @@ class AddBeforeInputCutSpec extends Specification {
             env.addPropertySource(base)
         }
         env.addPropertySource(new CopiesProperty(env, 'base.url', 'derived.url', 100))
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
 
-        when: "what it is computed from changes while the read is parked where it reads the default property sources"
-        Thread reader = parkIn(park) { read == 'refresh' ? env.refresh() : env.start() }
+        when: "what it is computed from changes while the refresh is parked where it reads the default property sources"
+        Thread refresher = parkIn(park) { refresh == 'refresh' ? env.refresh() : env.start() }
         changeWhileParked {
             if (change == 'removed') {
                 env.removePropertySource(base)
@@ -128,14 +128,14 @@ class AddBeforeInputCutSpec extends Specification {
                 env.addPropertySource(replacement)
             }
         }
-        String beforeCut = env.getProperty('base.url', String).orElse(null)
-        release(park, reader)
+        String beforeSnapshot = env.getProperty('base.url', String).orElse(null)
+        release(park, refresher)
         Map<String, Object> published = [base: env.getProperty('base.url', String).orElse(null), derived: env.getProperty('derived.url', String).orElse(null)]
 
-        then: "the change is only registered until the read takes the registered property sources"
-        beforeCut == (read == 'refresh' && change != 'added' ? 'old' : null)
+        then: "the change is only registered until the refresh takes the registered property sources"
+        beforeSnapshot == (refresh == 'refresh' && change != 'added' ? 'old' : null)
 
-        and: "the read processes it in its order, so the value computed from it is the changed one"
+        and: "the refresh processes it in its order, so the value computed from it is the changed one"
         published == [base: change == 'removed' ? null : 'new', derived: change == 'removed' ? null : 'new']
         change == 'removed' ? !env.propertySources*.name.contains('base') : env.propertySources.find { it.name == 'base' }.is(replacement)
 
@@ -148,27 +148,27 @@ class AddBeforeInputCutSpec extends Specification {
         env.stop()
 
         where:
-        [change, read] << [['added', 'replaced', 'removed'], ['start', 'refresh']].combinations()
+        [change, refresh] << [['added', 'replaced', 'removed'], ['start', 'refresh']].combinations()
     }
 
-    void "a registered property source that fails now, removed or replaced while the read loads the configuration files, is not read and does not fail the read: #fails, #change, #read"() {
+    void "a registered property source that fails now, removed or replaced while the refresh loads the configuration files, is not read and does not fail the refresh: #fails, #change, #refresh"() {
         given:
         Parking park = new Parking()
         DefaultEnvironment env = new DefaultEnvironment(parkingInDefaults(park))
         env.addPropertySource(PropertySource.of('data', ['app.value': 'a']))
         FailsWhenSet flaky = new FailsWhenSet(fails)
         env.addPropertySource(flaky)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         flaky.fail.set(true)
         PropertySource replacement = PropertySource.of('flaky', ['flaky.key': 'new'], 0)
         Throwable failure = null
 
-        when: "it is removed or replaced while the read is parked where it reads the default property sources"
-        Thread reader = parkIn(park) {
+        when: "it is removed or replaced while the refresh is parked where it reads the default property sources"
+        Thread refresher = parkIn(park) {
             try {
-                read == 'refresh' ? env.refresh() : env.start()
+                refresh == 'refresh' ? env.refresh() : env.start()
             } catch (Throwable t) {
                 failure = t
             }
@@ -180,9 +180,9 @@ class AddBeforeInputCutSpec extends Specification {
                 env.addPropertySource(replacement)
             }
         }
-        release(park, reader)
+        release(park, refresher)
 
-        then: "the read does not read it, as it takes the registered property sources once it has loaded the configuration files"
+        then: "the refresh does not read it, as it takes the registered property sources once it has loaded the configuration files"
         failure == null
         env.getProperty('app.value', String).get() == 'a'
         env.getProperty('flaky.key', String).orElse(null) == (change == 'removed' ? null : 'new')
@@ -197,7 +197,7 @@ class AddBeforeInputCutSpec extends Specification {
         env.stop()
 
         where:
-        [fails, change, read] << [['its order', 'its read'], ['removed', 'replaced'], ['start', 'refresh']].combinations()
+        [fails, change, refresh] << [['its order', 'its read'], ['removed', 'replaced'], ['start', 'refresh']].combinations()
     }
 
     void "a property source that replaces a registered one while a refresh runs a locator is only registered, is read by the refresh in place of the one it replaced, and fails the refresh when it fails to be read"() {
@@ -223,11 +223,11 @@ class AddBeforeInputCutSpec extends Specification {
         changeWhileParked {
             env.addPropertySource(replacement)
         }
-        String duringRead = env.getProperty('flaky.key', String).orElse(null)
+        String duringRefresh = env.getProperty('flaky.key', String).orElse(null)
         release(locator, refresher)
 
         then: "the replacement was only registered"
-        duringRead == 'flaky'
+        duringRefresh == 'flaky'
 
         and: "the refresh fails on the replacement, not on the one it replaced, and what was published stays"
         failure instanceof NumberFormatException
@@ -302,7 +302,7 @@ class AddBeforeInputCutSpec extends Specification {
 
     /**
      * The configuration of an environment that reads the default property sources, and none of the
-     * environment variables, and that, once armed, parks the read where it creates the environment
+     * environment variables, and that, once armed, parks the refresh where it creates the environment
      * variables property source: after it has read the configuration files and before it takes the
      * registered property sources. With the given locator and configuration files, if any.
      */
@@ -317,11 +317,11 @@ class AddBeforeInputCutSpec extends Specification {
             @Override
             List<String> getEnvironmentVariableIncludes() {
                 park.pass()
-                return ['MICRONAUT_ADD_BEFORE_INPUT_CUT_SPEC_NONE']
+                return ['MICRONAUT_ADD_BEFORE_SNAPSHOT_SPEC_NONE']
             }
 
             @Override
-            List<String> getOverrideConfigLocations() { dir != null ? ['file:' + dir] : ['file:/nonexistent-add-before-input-cut-spec'] }
+            List<String> getOverrideConfigLocations() { dir != null ? ['file:' + dir] : ['file:/nonexistent-add-before-snapshot-spec'] }
 
             @Override
             Collection<PropertySourcesLocator> getPropertySourcesLocators() { locator != null ? [locator] : [] }
@@ -346,18 +346,18 @@ class AddBeforeInputCutSpec extends Specification {
     }
 
     /**
-     * Runs the read on another thread, once the parking is armed, and returns that thread once the
-     * read is parked.
+     * Runs the refresh on another thread, once the parking is armed, and returns that thread once
+     * the refresh is parked.
      */
-    private static Thread parkIn(Parking parking, Closure<?> read) {
+    private static Thread parkIn(Parking parking, Closure<?> refresh) {
         parking.arm()
-        Thread reader = daemon('reader', read)
+        Thread refresher = daemon('refresher', refresh)
         assert parking.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        return reader
+        return refresher
     }
 
     /**
-     * Runs the change on another thread, which must finish while the read is parked.
+     * Runs the change on another thread, which must finish while the refresh is parked.
      */
     private static void changeWhileParked(Closure<?> change) {
         Thread changer = daemon('changer', change)
@@ -365,10 +365,10 @@ class AddBeforeInputCutSpec extends Specification {
         assert !changer.alive
     }
 
-    private static void release(Parking parking, Thread reader) {
+    private static void release(Parking parking, Thread refresher) {
         parking.release.countDown()
-        reader.join(WAIT_SECONDS * 1000L)
-        assert !reader.alive
+        refresher.join(WAIT_SECONDS * 1000L)
+        assert !refresher.alive
     }
 
     private static Thread daemon(String name, Closure<?> work) {
@@ -394,7 +394,7 @@ class AddBeforeInputCutSpec extends Specification {
             if (armed.compareAndSet(true, false)) {
                 reached.countDown()
                 // qualified: unqualified, Groovy resolves the name through get(String) of a property source
-                if (!release.await(AddBeforeInputCutSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                if (!release.await(AddBeforeSnapshotSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
                     throw new IllegalStateException('the parked thread was never released')
                 }
                 return true
@@ -404,7 +404,7 @@ class AddBeforeInputCutSpec extends Specification {
     }
 
     /**
-     * A property sources locator that parks the read, once armed, and locates nothing.
+     * A property sources locator that parks the refresh, once armed, and locates nothing.
      */
     static class Locator extends Parking implements PropertySourcesLocator {
         @Override

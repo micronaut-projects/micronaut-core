@@ -86,28 +86,27 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private final Logger log;
 
     /**
-     * Orders the publishes of states. Only work in memory is done while it is held: no property
-     * source, converter or other code of the application runs under it.
+     * Held while a state is published. Nothing but work in memory runs while it is held: no
+     * property source, converter or other application code.
      */
     private final Object publishLock = new Object();
     /**
-     * The catalogs and the caches derived from them, as lookups see them. Every change builds a new
-     * state off to the side, see {@link Build}, and publishes it by replacing this field under
-     * {@link #publishLock}. A published state is never written again, so a lookup that reads this
-     * field observes a state that is never partially built and never changes.
+     * The published state: the catalogs and their caches, as lookups see them. An add or a refresh
+     * prepares a {@link PendingState} off to the side and publishes it by replacing this field.
+     * A published state never changes, so a lookup never sees a half-built one.
      */
     @SuppressWarnings("java:S3077") // ResolverState is only ever published fully built
     private volatile ResolverState state = new ResolverState();
     /**
-     * The build of the current thread on this resolver, if it builds a state: its lookups read the
-     * build, and its writes go into it. Removed from the thread when the outermost build ends.
+     * The pending state of the current thread, if it is preparing one. That thread's lookups read
+     * it, and the property sources it processes go into it.
      */
-    private final ThreadLocal<Build> builds = new ThreadLocal<>();
+    private final ThreadLocal<PendingState> pendingStates = new ThreadLocal<>();
     /**
-     * The number of threads that build a state on this resolver. It is zero unless a change is
-     * being built, which lets every lookup skip the per-thread check.
+     * How many threads are preparing a pending state. While it is zero, a lookup skips the
+     * per-thread check.
      */
-    private final AtomicInteger builders = new AtomicInteger();
+    private final AtomicInteger pendingThreads = new AtomicInteger();
     /**
      * The publishes of the current thread while {@link #diff(Runnable)} runs a change. Removed from
      * the thread when the change ends.
@@ -182,33 +181,32 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * Empties the catalogs: those of the build of the current thread, or else the published ones.
+     * Empties the catalogs: those of the current thread's pending state, or else the published ones.
      */
     void reset() {
-        Build build = currentBuild();
-        if (build != null) {
-            build.state = new ResolverState();
+        PendingState pending = currentPending();
+        if (pending != null) {
+            pending.state = new ResolverState();
         } else {
             publishEmpty();
         }
     }
 
     /**
-     * The state a lookup reads from. That is the published state, except on a thread that builds a
-     * state, which reads its build: it sees the properties it has contributed so far. A
+     * The state a lookup reads. That is the published state, except on a thread that prepares a
+     * pending state: it reads the pending one, with what it has processed so far. A
      * {@link PropertySource} whose keys depend on what the resolver already holds
-     * (micronaut-test-resources contributes only the keys the environment cannot resolve) must be
-     * answered from the catalogs being built, not from the ones the build is replacing. Every other
-     * thread keeps reading the published state until the build is published in one step, except
-     * for a thread that {@link #onState(ResolverState, Supplier)} keeps on the state a lookup has
-     * started with.
+     * (micronaut-test-resources only contributes the keys the environment cannot resolve) must be
+     * answered from the catalogs being built, not from the ones they replace. Every other thread
+     * keeps reading the published state, except for a thread that
+     * {@link #onState(ResolverState, Supplier)} keeps on the state a lookup has started with.
      *
      * @return The state to read the catalogs and the caches from
      */
     private ResolverState readState() {
-        Build build = currentBuild();
-        if (build != null) {
-            return build.state;
+        PendingState pending = currentPending();
+        if (pending != null) {
+            return pending.state;
         }
         // A plain read: only a thread that has counted itself in has to see the count, and a thread
         // sees what it has written. A stale count on any other thread only decides whether it makes
@@ -274,124 +272,124 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * The build of the current thread on this resolver.
+     * The pending state of the current thread.
      *
-     * @return The build, {@code null} if the thread builds no state
+     * @return The pending state, {@code null} if the thread prepares none
      */
-    private @Nullable Build currentBuild() {
-        // A plain read: only a thread that has counted itself in has to see the count, and a thread
-        // sees what it has written. A stale count on any other thread only decides whether it makes
-        // the per-thread check, which finds nothing there.
-        return builders.getPlain() != 0 ? builds.get() : null;
+    private @Nullable PendingState currentPending() {
+        // A plain read: a thread that has counted itself in sees its own write. On any other thread a
+        // stale count only decides whether it makes the per-thread check, which finds nothing there.
+        return pendingThreads.getPlain() != 0 ? pendingStates.get() : null;
     }
 
     /**
-     * Starts a change on the current thread: a build on top of the published state. Until
-     * {@link #endBuild(Build)}, the lookups of the thread read the build, and the property sources
-     * it processes go into it. The build records what it processes, so that
-     * {@link #publishChange(Build)} can process it again on top of another state.
+     * Starts a pending state for an add on the current thread, as a copy of the published state.
+     * Until {@link #endPending(PendingState)}, the thread's lookups read it and the property
+     * sources it processes go into it.
      *
-     * @param keepMemory Whether the build keeps what the expressions of the published state have
-     *                   resolved to, rather than resolving them again
-     * @return The build
+     * @param keepRememberedValues Whether to keep the values that expressions such as
+     *                             {@code ${random.port}} resolved to in the published state,
+     *                             rather than resolving them again
+     * @return The pending state
      */
-    Build startChange(boolean keepMemory) {
+    PendingState startPendingAdd(boolean keepRememberedValues) {
         ResolverState base = state;
-        return startBuild(new Build(base, new ResolverState(base, keepMemory ? base.rememberedValues : new ConcurrentHashMap<>(4)), keepMemory, currentBuild()));
+        ResolverState copy = new ResolverState(base, keepRememberedValues ? base.rememberedValues : new ConcurrentHashMap<>(4));
+        return startPending(new PendingState(base, copy, keepRememberedValues, currentPending()));
     }
 
     /**
-     * Starts a read on the current thread: a build of new catalogs, from none. Until
-     * {@link #endBuild(Build)}, the lookups of the thread read the build, and the property sources
-     * it processes go into it. The build records what it processes, so that
-     * {@link #publishRead(Build, Collection)} can process it again with changes in their order.
+     * Starts a pending state for a refresh on the current thread, empty. Until
+     * {@link #endPending(PendingState)}, the thread's lookups read it and the property sources it
+     * processes go into it.
      *
-     * @return The build
+     * @return The pending state
      */
-    Build startRead() {
-        return startBuild(new Build(null, new ResolverState(), false, currentBuild()));
+    PendingState startPendingRefresh() {
+        return startPending(new PendingState(null, new ResolverState(), false, currentPending()));
     }
 
-    private Build startBuild(Build build) {
-        builders.incrementAndGet();
-        builds.set(build);
-        return build;
+    private PendingState startPending(PendingState pending) {
+        pendingThreads.incrementAndGet();
+        pendingStates.set(pending);
+        return pending;
     }
 
     /**
-     * Ends a build of the current thread. The thread goes back to the build it made before, if it
-     * started this one inside it, or else to the published state.
+     * Ends a pending state of the current thread. The thread goes back to the pending state it
+     * had before, if it started this one inside it, or else to the published state.
      *
-     * @param build The build
+     * @param pending The pending state
      */
-    void endBuild(Build build) {
-        if (build.enclosing != null) {
-            builds.set(build.enclosing);
+    void endPending(PendingState pending) {
+        if (pending.outer != null) {
+            pendingStates.set(pending.outer);
         } else {
-            builds.remove();
+            pendingStates.remove();
         }
-        builders.decrementAndGet();
+        pendingThreads.decrementAndGet();
     }
 
     /**
-     * Publishes a change. If another state was published since the change started, what the change
-     * has recorded is processed again on top of that state, with no property source called.
+     * Publishes the pending state of an add. If another state was published since the add
+     * started, the add is replayed on top of that state, from what it processed, with no property
+     * source called.
      *
-     * @param change The change, which has ended
+     * @param pending The pending state of the add, which has ended
      */
-    void publishChange(Build change) {
+    void publishAdd(PendingState pending) {
         synchronized (publishLock) {
             ResolverState current = state;
-            if (current == change.base) {
-                publish(change.state);
+            if (current == pending.base) {
+                publish(pending.state);
             } else {
-                ResolverState replayed = new ResolverState(current, change.keepMemory ? current.rememberedValues : change.state.rememberedValues);
-                processAgain(replayed, change);
+                ResolverState replayed = new ResolverState(current, pending.keepsRememberedValues ? current.rememberedValues : pending.state.rememberedValues);
+                replay(replayed, pending);
                 publish(replayed);
             }
         }
-        Build enclosing = change.enclosing;
-        if (enclosing != null) {
-            // A change made by code that runs while its thread builds another state, a property source
-            // that adds one, for example: the thread sees it in what it goes on building. An enclosing
-            // change keeps it with what it has recorded; a read is handed it, see publishRead.
-            processAgain(enclosing.state, change);
-            if (enclosing.base != null) {
-                enclosing.recorded.addAll(change.recorded);
+        PendingState outer = pending.outer;
+        if (outer != null) {
+            // An add made while the same thread prepares another pending state, by a property source
+            // that adds one, for example: the thread sees it in what it goes on preparing. An outer add
+            // keeps it with what it processed; a refresh gets it as a late add, see publishRefresh.
+            replay(outer.state, pending);
+            if (outer.base != null) {
+                outer.processed.addAll(pending.processed);
             }
         }
     }
 
     /**
-     * Publishes what a read has built so far, with the changes handed over to it. The read can go
-     * on building. The changes are kept in their order: the property sources the read has processed
-     * and the changes are processed again together, sorted by order, as the next read would.
+     * Publishes what a refresh has processed so far, with its late adds. The refresh can go on
+     * processing. The late adds keep their order: what the refresh processed and the late adds are
+     * replayed together, sorted by order, as the next refresh would process them.
      *
-     * @param read    The read
-     * @param changes The changes handed over to the read
+     * @param refresh  The pending state of the refresh
+     * @param lateAdds The pending states of the adds made after the refresh took its snapshot
      */
-    void publishRead(Build read, Collection<Build> changes) {
+    void publishRefresh(PendingState refresh, Collection<PendingState> lateAdds) {
         synchronized (publishLock) {
-            ResolverState built;
-            if (changes.isEmpty()) {
-                built = new ResolverState(read.state, read.state.rememberedValues);
-                // the published state shares what the read has built, so the read copies what it writes into from now on
-                read.state.owned.clear();
+            ResolverState published;
+            if (lateAdds.isEmpty()) {
+                published = new ResolverState(refresh.state, refresh.state.rememberedValues);
+                // the published state shares the refresh's maps, so the refresh copies a map before it next writes into it
+                refresh.state.owned.clear();
             } else {
-                built = new ResolverState(read.state.rememberedValues);
-                List<Recorded> inOrder = new ArrayList<>(read.recorded);
-                for (Build change : changes) {
-                    inOrder.addAll(change.recorded);
+                published = new ResolverState(refresh.state.rememberedValues);
+                List<ProcessedSource> inOrder = new ArrayList<>(refresh.processed);
+                for (PendingState add : lateAdds) {
+                    inOrder.addAll(add.processed);
                 }
-                // stable: a change comes after what the read has processed of the same order
-                inOrder.sort(Comparator.comparingInt(Recorded::order));
-                for (Recorded recorded : inOrder) {
-                    for (RawEntry entry : recorded.entries()) {
-                        processEntry(built, entry);
+                // a stable sort: a late add comes after what the refresh processed with the same order
+                inOrder.sort(Comparator.comparingInt(ProcessedSource::order));
+                for (ProcessedSource source : inOrder) {
+                    for (RawEntry entry : source.entries()) {
+                        processEntry(published, entry);
                     }
                 }
             }
-            publish(built);
+            publish(published);
         }
     }
 
@@ -417,15 +415,15 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * Processes what a change has recorded again, into a state that is not published yet. Only work
-     * in memory: no property source is called.
+     * Processes what a pending state processed again, into another state that is not published.
+     * Only work in memory: no property source is called.
      *
-     * @param target The state
-     * @param change The change
+     * @param target  The state to process into
+     * @param pending The pending state to replay
      */
-    private void processAgain(ResolverState target, Build change) {
-        for (Recorded recorded : change.recorded) {
-            for (RawEntry entry : recorded.entries()) {
+    private void replay(ResolverState target, PendingState pending) {
+        for (ProcessedSource source : pending.processed) {
+            for (RawEntry entry : source.entries()) {
                 processEntry(target, entry);
             }
         }
@@ -1108,37 +1106,37 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * Processes a property source: into the build of the current thread, or else as a change of
-     * its own, built on top of the published state and then published.
+     * Processes a property source: into the current thread's pending state, or else as an add of
+     * its own, which is published.
      *
      * @param properties The property source
      * @param convention The property convention
      */
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
-        Build build = currentBuild();
-        if (build != null) {
-            processInto(build, properties, convention);
+        PendingState pending = currentPending();
+        if (pending != null) {
+            processInto(pending, properties, convention);
             return;
         }
-        Build change = startChange(true);
+        PendingState add = startPendingAdd(true);
         try {
-            processInto(change, properties, convention);
+            processInto(add, properties, convention);
         } finally {
-            endBuild(change);
+            endPending(add);
         }
-        publishChange(change);
+        publishAdd(add);
     }
 
-    private void processInto(Build build, PropertySource properties, PropertySource.PropertyConvention convention) {
-        ResolverState target = build.state;
-        List<RawEntry> recorded = new ArrayList<>();
-        build.recorded.add(new Recorded(properties.getOrder(), recorded));
+    private void processInto(PendingState pending, PropertySource properties, PropertySource.PropertyConvention convention) {
+        ResolverState target = pending.state;
+        List<RawEntry> entries = new ArrayList<>();
+        pending.processed.add(new ProcessedSource(properties.getOrder(), entries));
         for (String property : properties) {
 
             log.trace("Processing property key {}", property);
 
             RawEntry entry = new RawEntry(property, properties.get(property), convention, properties.getOrigin());
-            recorded.add(entry);
+            entries.add(entry);
             processEntry(target, entry);
         }
         resetCaches();
@@ -1431,9 +1429,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     @Nullable
     protected final Map<String, DefaultPropertyEntry> resolveEntriesForKey(String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
         if (allowCreate) {
-            Build build = currentBuild();
-            if (build != null) {
-                return resolveEntriesForKey(build.state, name, true, propertyCatalog);
+            PendingState pending = currentPending();
+            if (pending != null) {
+                return resolveEntriesForKey(pending.state, name, true, propertyCatalog);
             }
             // a published state is never written into
             Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(state, name, false, propertyCatalog);
@@ -1529,7 +1527,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * expressions again. A lookup that read the text from an older state can then finish after a
      * lookup of a newer one has remembered another text at the place. So the memory only replaces
      * a text with the text of a state at least as new as the one it was remembered from, or with
-     * that of the state the current thread builds. It also takes it when nothing is remembered at
+     * that of the current thread's pending state. It also takes it when nothing is remembered at
      * the place: what is remembered for a text is only used by a lookup that finds the same text.</p>
      *
      * @param resolverState The state the text was read from
@@ -1549,8 +1547,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             }
         }
         Object resolved = value.get();
-        Build build = currentBuild();
-        boolean building = build != null && build.state == resolverState;
+        PendingState pending = currentPending();
+        boolean preparing = pending != null && pending.state == resolverState;
         Object[] result = {resolved};
         // Checked within compute, which a lookup at the place by another thread waits for.
         resolverState.rememberedValues.compute(place, (key, earlier) -> {
@@ -1565,7 +1563,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             // States share what they remember when one is built on top of another: a lookup of an
             // older state does not replace what a newer one has remembered.
             boolean current = earlier == null
-                || building
+                || preparing
                 || resolverState.sequence >= earlier.sequence();
             if (!current) {
                 return earlier;
@@ -1718,13 +1716,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     /**
      * The state of the resolver: the property catalogs and the caches derived from them. Holding
-     * them together means a change can build a new state without touching what lookups are reading,
-     * and publish it with a single write to {@link #state}. A lookup racing with that switch keeps
-     * reading the state it started from, so a value it computes from the previous catalogs is
-     * cached against those catalogs rather than leaking into the new ones.
+     * them together means an add or a refresh can prepare a new state without touching what lookups
+     * are reading, and publish it with a single write to {@link #state}. A lookup racing with that
+     * switch keeps reading the state it started from, so a value it computes from the previous
+     * catalogs is cached against those catalogs rather than leaking into the new ones.
      *
-     * <p>A state built on top of another starts with the maps of that one, which it copies before
-     * it first writes into them, see {@link #owned}. Only the thread that builds a state writes into
+     * <p>A state copied from another starts with the maps of that one, and copies a map before it
+     * first writes into it, see {@link #owned}. Only the thread that prepares a state writes into
      * it, and only until it is published.</p>
      */
     private static final class ResolverState {
@@ -1773,9 +1771,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          * the texts to, by the place the text was found at: the name it was looked up by, a
          * {@link ListElement} or a {@link MapValue}. Unlike the caches it is kept when a property
          * source is processed. It holds one entry per looked-up name, or place in a list, whose text
-         * holds, or held, such an expression. A state built on top of another can share it, as the
-         * states that a read publishes do. A read starts with a new one, so the expressions are
-         * resolved again after a refresh.
+         * holds, or held, such an expression. A state copied from another can share it, as the
+         * states that a refresh publishes do. A refresh starts with a new one, so the expressions
+         * are resolved again after a refresh.
          */
         private final Map<Object, RememberedText> rememberedValues;
         /**
@@ -1817,46 +1815,49 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * A state that a thread builds, and the state it is built on.
+     * A state that one thread prepares off to the side, for an add or a refresh. Lookups on other
+     * threads don't see it until it is published.
      */
-    static final class Build {
+    static final class PendingState {
         /**
-         * The published state that a change is built on, {@code null} for a read.
+         * The published state an add started from, {@code null} for a refresh, which starts empty.
          */
         private final @Nullable ResolverState base;
         /**
-         * Whether the build shares what the expressions resolve to with its base.
+         * Whether an add keeps the values that expressions resolved to in its base.
          */
-        private final boolean keepMemory;
+        private final boolean keepsRememberedValues;
         /**
-         * What the build has processed, by property source, in order: to process a change again on
-         * top of another state, and a read again with the changes handed over to it.
+         * What was processed, by property source, in order. Kept so that an add can be replayed on
+         * a newer published state, and a late add with a refresh, without calling the property
+         * sources again.
          */
-        private final List<Recorded> recorded = new ArrayList<>();
+        private final List<ProcessedSource> processed = new ArrayList<>();
         /**
-         * The build that the thread made before this one, which it goes back to when this one ends.
+         * The pending state the thread had before this one, which it goes back to when this one
+         * ends.
          */
-        private final @Nullable Build enclosing;
+        private final @Nullable PendingState outer;
         /**
-         * The state being built.
+         * The state being prepared.
          */
         private ResolverState state;
 
-        private Build(@Nullable ResolverState base, ResolverState state, boolean keepMemory, @Nullable Build enclosing) {
+        private PendingState(@Nullable ResolverState base, ResolverState state, boolean keepsRememberedValues, @Nullable PendingState outer) {
             this.base = base;
             this.state = state;
-            this.keepMemory = keepMemory;
-            this.enclosing = enclosing;
+            this.keepsRememberedValues = keepsRememberedValues;
+            this.outer = outer;
         }
     }
 
     /**
-     * What a build has processed of a property source.
+     * The properties a pending state processed from one property source.
      *
      * @param order   The order of the property source
      * @param entries Its properties, in the order they were processed
      */
-    private record Recorded(int order, List<RawEntry> entries) {
+    private record ProcessedSource(int order, List<RawEntry> entries) {
     }
 
     /**

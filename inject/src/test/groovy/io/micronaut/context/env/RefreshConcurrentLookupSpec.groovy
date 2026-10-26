@@ -205,7 +205,7 @@ class RefreshConcurrentLookupSpec extends Specification {
         assert gate.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
         secondRefresh.start()
         new PollingConditions(timeout: WAIT_SECONDS).eventually {
-            // waits, at most two seconds, for the read lock the first holds
+            // waits, at most two seconds, for the refresh lock the first holds
             assert secondRefresh.state == Thread.State.TIMED_WAITING
         }
         data.put('flag.value', 'a')

@@ -14,46 +14,46 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 
 /**
- * One read of the property sources at a time. A start or a refresh waits at most two seconds for the
- * read in progress; if that does not end in time, it asks it to read once more and returns, and the
- * read in progress reads again before it ends. A refresh from code that runs in the read, on its
- * thread, asks for that once per read at most. The threads are parked at fixed points, and every
+ * One refresh at a time. A start or a refresh waits at most two seconds for the refresh in
+ * progress; if that does not end in time, it asks it to run once more and returns, and the refresh
+ * in progress refreshes again before it ends. A refresh from code that runs in the refresh, on its
+ * thread, asks for that once per refresh at most. The threads are parked at fixed points, and every
  * wait is bounded.
  */
 @Timeout(60)
-class ReadLockSpec extends Specification {
+class RefreshLockSpec extends Specification {
 
     private static final int WAIT_SECONDS = 10
 
-    void "a property source that refreshes the environment every time it is read makes a #read read once more, and no more, leaving nothing out, and the extra read publishes"() {
+    void "a property source that refreshes the environment every time it is read makes a #refresh run once more, and no more, leaving nothing out, and the extra refresh publishes"() {
         given:
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         RefreshesWhenRead refreshing = new RefreshesWhenRead(env)
         env.addPropertySource(PropertySource.of('data', ['app.value': 'a']))
         env.addPropertySource(refreshing)
         env.addPropertySource(PropertySource.of('after', ['after.key': 'after']))
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
             refreshing.reads.set(0)
         }
         Throwable failure = null
 
         when:
-        Thread reader = daemon('reader') {
+        Thread refresher = daemon('refresher') {
             try {
-                read == 'refresh' ? env.refresh() : env.start()
+                refresh == 'refresh' ? env.refresh() : env.start()
             } catch (Throwable t) {
                 failure = t
             }
         }
-        reader.join(WAIT_SECONDS * 1000L)
+        refresher.join(WAIT_SECONDS * 1000L)
 
-        then: "it was read twice: by the read, and by the one more read that its refreshes asked for"
-        !reader.alive
+        then: "it was read twice: by the refresh, and by the one more refresh that its refreshes asked for"
+        !refresher.alive
         failure == null
         refreshing.reads.get() == 2
 
-        and: "nothing is left out, and what the extra read has read is published"
+        and: "nothing is left out, and what the extra refresh has read is published"
         env.getProperty('refreshing.reads', Integer).get() == 2
         env.getProperty('app.value', String).get() == 'a'
         env.getProperty('after.key', String).get() == 'after'
@@ -62,10 +62,10 @@ class ReadLockSpec extends Specification {
         env.stop()
 
         where:
-        read << ['start', 'refresh']
+        refresh << ['start', 'refresh']
     }
 
-    void "a refresh from a thread that holds a lock the refresh in progress needs returns after about two seconds without its change, and the refresh in progress then reads again and applies it: #method"() {
+    void "a refresh from a thread that holds a lock the refresh in progress needs returns after about two seconds without its change, and the refresh in progress then refreshes again and applies it: #method"() {
         given: "a property source, read after 'data', that once armed waits for a lock of the application"
         Map<String, Object> data = ['app.value': 'a']
         ReentrantLock appLock = new ReentrantLock()
@@ -121,7 +121,7 @@ class ReadLockSpec extends Specification {
         and: "the second reports no change, as it has published none"
         diff == reported
 
-        and: "the first got the lock once the second released it, and read again: the change is applied"
+        and: "the first got the lock once the second released it, and refreshed again: the change is applied"
         !first.alive
         needsLock.gotLock.get()
         env.getProperty('app.value', String).get() == 'b'
@@ -136,7 +136,7 @@ class ReadLockSpec extends Specification {
         'refreshAndDiff' | [:]
     }
 
-    void "a refreshAndDiff that reads again for a refresh that could not wait for it reports its own change and that of the extra read, and the refresh that asked for it reports none"() {
+    void "a refreshAndDiff that refreshes again for a refresh that could not wait for it reports its own change and that of the extra refresh, and the refresh that asked for it reports none"() {
         given: "a refresh that can be parked once it has read the values, before it publishes them"
         Map<String, Object> data = ['first.value': 'a', 'second.value': 'x']
         Gate gate = new Gate()
@@ -162,7 +162,7 @@ class ReadLockSpec extends Specification {
         secondValueWhileParked == 'x'
         secondDiff == [:]
 
-        and: "the first read again, and reports both changes, each with the value it had before"
+        and: "the first refreshed again, and reports both changes, each with the value it had before"
         firstDiff == ['first.value': 'a', 'second.value': 'x']
         env.getProperty('first.value', String).get() == 'b'
         env.getProperty('second.value', String).get() == 'y'
@@ -172,33 +172,33 @@ class ReadLockSpec extends Specification {
         env.stop()
     }
 
-    void "a property source whose code refreshes the environment, added while the environment reads, is visible at once, and the read reads once more before it ends: #read"() {
+    void "a property source whose code refreshes the environment, added while the environment refreshes, is visible at once, and the refresh runs once more before it ends: #refresh"() {
         given:
         Gate gate = new Gate()
         Map<String, Object> data = ['app.value': 'a']
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         env.addPropertySource(new MapPropertySource('data', data))
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         RefreshesWhenIterated refreshing = new RefreshesWhenIterated(env)
 
-        when: "it is added while the read is parked, and the add reads it, which refreshes the environment"
-        Thread reader = parkIn(gate) { read == 'refresh' ? env.refresh() : env.start() }
+        when: "it is added while the refresh is parked, and the add reads it, which refreshes the environment"
+        Thread refresher = parkIn(gate) { refresh == 'refresh' ? env.refresh() : env.start() }
         data.put('app.value', 'b')
         changeWhileParked {
             env.addPropertySource(refreshing)
         }
         String addedWhileParked = env.getProperty('refreshing.key', String).orElse(null)
         String valueWhileParked = env.getProperty('app.value', String).orElse(null)
-        release(gate, reader)
+        release(gate, refresher)
 
-        then: "the add returned while the read was parked, its refresh having waited for the read at most two seconds, and it was visible at once"
+        then: "the add returned while the refresh was parked, its refresh having waited for the one in progress at most two seconds, and it was visible at once"
         addedWhileParked == 'refreshing'
         valueWhileParked == 'a'
 
-        and: "the read reads once more before it ends, for the refresh the add has run"
+        and: "the refresh runs once more before it ends, for the refresh the add has run"
         env.getProperty('app.value', String).get() == 'b'
         env.getProperty('refreshing.key', String).get() == 'refreshing'
         env.propertySources*.name.contains('refreshing')
@@ -208,10 +208,10 @@ class ReadLockSpec extends Specification {
         env.stop()
 
         where:
-        read << ['start', 'refresh']
+        refresh << ['start', 'refresh']
     }
 
-    void "a property source added and the environment refreshed by another thread while the start is parked: the add is visible at once, the refresh returns once it has waited two seconds, and the start reads once more: #how"() {
+    void "a property source added and the environment refreshed by another thread while the start is parked: the add is visible at once, the refresh returns once it has waited two seconds, and the start runs once more: #how"() {
         given:
         Gate gate = new Gate()
         Map<String, Object> data = ['app.value': 'a']
@@ -222,7 +222,7 @@ class ReadLockSpec extends Specification {
         Map<String, Object> diff = null
 
         when: "the start is parked after it has taken the registered property sources"
-        Thread reader = parkIn(gate) { env.start() }
+        Thread starter = parkIn(gate) { env.start() }
 
         and: "another thread adds a property source and refreshes the environment"
         data.put('app.value', 'b')
@@ -239,16 +239,16 @@ class ReadLockSpec extends Specification {
             }
         }
         new PollingConditions(timeout: WAIT_SECONDS).eventually {
-            // waits, at most two seconds, for the read lock the start holds
+            // waits, at most two seconds, for the refresh lock the start holds
             assert other.state == Thread.State.TIMED_WAITING
         }
         other.join(WAIT_SECONDS * 1000L)
         boolean otherDoneWhileParked = !other.alive
         String addedWhileParked = env.getProperty('x.key', String).orElse(null)
         String valueWhileParked = env.getProperty('app.value', String).orElse(null)
-        release(gate, reader)
+        release(gate, starter)
 
-        then: "the other thread returned while the start was parked, its refresh not read yet"
+        then: "the other thread returned while the start was parked, its refresh not run yet"
         otherDoneWhileParked
         failure == null
         how == 'refresh' || diff == [:]
@@ -280,18 +280,18 @@ class ReadLockSpec extends Specification {
     }
 
     /**
-     * Runs the read on another thread, once the parking is armed, and returns that thread once the
-     * read is parked.
+     * Runs the refresh on another thread, once the parking is armed, and returns that thread once
+     * the refresh is parked.
      */
-    private static Thread parkIn(Parking parking, Closure<?> read) {
+    private static Thread parkIn(Parking parking, Closure<?> refresh) {
         parking.arm()
-        Thread reader = daemon('reader', read)
+        Thread refresher = daemon('refresher', refresh)
         assert parking.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        return reader
+        return refresher
     }
 
     /**
-     * Runs the change on another thread, which must finish while the read is parked.
+     * Runs the change on another thread, which must finish while the refresh is parked.
      */
     private static void changeWhileParked(Closure<?> change) {
         Thread changer = daemon('changer', change)
@@ -299,10 +299,10 @@ class ReadLockSpec extends Specification {
         assert !changer.alive
     }
 
-    private static void release(Parking parking, Thread reader) {
+    private static void release(Parking parking, Thread refresher) {
         parking.release.countDown()
-        reader.join(WAIT_SECONDS * 1000L)
-        assert !reader.alive
+        refresher.join(WAIT_SECONDS * 1000L)
+        assert !refresher.alive
     }
 
     private static Thread daemon(String name, Closure<?> work) {
@@ -328,7 +328,7 @@ class ReadLockSpec extends Specification {
             if (armed.compareAndSet(true, false)) {
                 reached.countDown()
                 // qualified: unqualified, Groovy resolves the name through get(String) of a property source
-                if (!release.await(ReadLockSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                if (!release.await(RefreshLockSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
                     throw new IllegalStateException('the parked thread was never released')
                 }
                 return true
@@ -442,7 +442,7 @@ class ReadLockSpec extends Specification {
             if (armed.compareAndSet(true, false)) {
                 entered.countDown()
                 // qualified: unqualified, Groovy resolves the name through get(String) of this property source
-                if (lock.tryLock(ReadLockSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                if (lock.tryLock(RefreshLockSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
                     gotLock.set(true)
                     lock.unlock()
                 }

@@ -14,17 +14,18 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Property sources added while a start or a refresh reads the property sources, once the read has
- * taken the registered ones. Such an add is processed on its own thread, published at once and
- * handed over to the read, the latest by each name, and the read publishes it with what it has read,
- * in their order. The threads are parked at fixed points, and every wait is bounded.
+ * Property sources added while a start or a refresh reads the property sources, once the refresh
+ * has taken the snapshot of the added property sources. Such an add is processed on its own thread,
+ * published at once and kept as a late add of the refresh, the latest by each name, and the refresh
+ * publishes the late adds with what it has read, in their order. The threads are parked at fixed
+ * points, and every wait is bounded.
  */
 @Timeout(60)
-class AddAfterInputCutSpec extends Specification {
+class AddAfterSnapshotSpec extends Specification {
 
     private static final int WAIT_SECONDS = 10
 
-    void "property sources added while a #read processes the property sources, one while the add of the other is in progress, are each visible once added, the read does not wait for the add in progress, and the locators run once"() {
+    void "property sources added while a #refresh processes the property sources, one while the add of the other is in progress, are each visible once added, the refresh does not wait for the add in progress, and the locators run once"() {
         given: "a locator that counts its loads, and a property source that, once armed, parks the thread that processes it"
         Gate gate = new Gate()
         ParkingPropertySource first = new ParkingPropertySource('first', ['first.key': 'first', 'shared.key': 'first'])
@@ -39,13 +40,13 @@ class AddAfterInputCutSpec extends Specification {
         DefaultEnvironment env = new DefaultEnvironment(withLocator(locator))
         env.addPropertySource(PropertySource.of('data', ['app.value': 'a']))
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         loads.set(0)
 
-        when: "one is added while the read is parked in the gate and parks the thread adding it while it is processed, and another is added meanwhile"
-        Thread reader = parkIn(gate) { read == 'refresh' ? env.refresh() : env.start() }
+        when: "one is added while the refresh is parked in the gate and parks the thread adding it while it is processed, and another is added meanwhile"
+        Thread refresher = parkIn(gate) { refresh == 'refresh' ? env.refresh() : env.start() }
         first.arm()
         Thread firstAdder = daemon('first-adder') { env.addPropertySource(first) }
         assert first.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
@@ -53,7 +54,7 @@ class AddAfterInputCutSpec extends Specification {
             env.addPropertySource(PropertySource.of('second', ['second.key': 'second', 'shared.key': 'second']))
         }
 
-        then: "the second add waited for neither the read nor the first add, and is registered and visible at once"
+        then: "the second add waited for neither the refresh nor the first add, and is registered and visible at once"
         env.getProperty('second.key', String).orElse(null) == 'second'
         env.getProperty('shared.key', String).orElse(null) == 'second'
         env.propertySources*.name.contains('second')
@@ -62,10 +63,10 @@ class AddAfterInputCutSpec extends Specification {
         !env.containsProperty('first.key')
         !env.propertySources*.name.contains('first')
 
-        when: "the read is released while the first add is still parked"
-        release(gate, reader)
+        when: "the refresh is released while the first add is still parked"
+        release(gate, refresher)
 
-        then: "the read has not waited for the first add, and publishes the second with what it has read"
+        then: "the refresh has not waited for the first add, and publishes the second with what it has read"
         firstAdder.alive
         env.getProperty('second.key', String).get() == 'second'
         env.getProperty('shared.key', String).get() == 'second'
@@ -76,7 +77,7 @@ class AddAfterInputCutSpec extends Specification {
         when: "the first add is released"
         release(first, firstAdder)
 
-        then: "it is published on top of what the read and the second add have published"
+        then: "it is published on top of what the refresh and the second add have published"
         env.getProperty('first.key', String).get() == 'first'
         env.getProperty('shared.key', String).get() == 'first'
         env.getProperty('second.key', String).get() == 'second'
@@ -84,7 +85,7 @@ class AddAfterInputCutSpec extends Specification {
         env.getProperty('app.value', String).get() == 'a'
         env.propertySources*.name.containsAll(['first', 'second'])
 
-        and: "the locators were run once, by the read"
+        and: "the locators were run once, by the refresh"
         loads.get() == 1
 
         and: "a later refresh reads both in the order they were registered, which keeps the value the adds published"
@@ -99,11 +100,11 @@ class AddAfterInputCutSpec extends Specification {
         env.stop()
 
         where:
-        read << ['start', 'refresh']
+        refresh << ['start', 'refresh']
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/13914')
-    void "a property source whose add began while a refresh read and ends after it, and one added once the refresh has ended, wait for nothing, and the add that ends last is on top until the next refresh reads both in their order"() {
+    void "a property source whose add began during a refresh and ends after it, and one added once the refresh has ended, wait for nothing, and the add that ends last is on top until the next refresh reads both in their order"() {
         given: "a property source with an immutable list that, once armed, parks the thread adding it while it is processed, and one of a higher order that sets an element of that list"
         Gate gate = new Gate()
         ParkingPropertySource late = new ParkingPropertySource('late', ['foo': List.of('a'), 'late.key': 'late'])
@@ -241,7 +242,7 @@ class AddAfterInputCutSpec extends Specification {
         env.getProperty('app.value', String).get() == 'a'
         env.propertySources*.name == ['data', 'gate', 'other1', 'waits']
 
-        when: "the next refresh reads it on the reading thread"
+        when: "the next refresh reads it on the refreshing thread"
         env.refresh()
 
         then: "the addition it waits for finishes at once there too"
@@ -255,23 +256,23 @@ class AddAfterInputCutSpec extends Specification {
         env.stop()
     }
 
-    void "a property source added again as the same instance with other values while a #read is in progress is processed again and its new values are visible at once; the read publishes what it has read of it if it reads it itself: #added"() {
+    void "a property source added again as the same instance with other values while a #refresh is in progress is processed again and its new values are visible at once; the refresh publishes what it has read of it if it reads it itself: #added"() {
         given:
         Gate gate = new Gate()
         Map<String, Object> values = ['m.value': 'v1']
         PropertySource mutable = new MapPropertySource('mutable', values)
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
-        if (added == 'registered before the read') {
+        if (added == 'registered before the refresh') {
             env.addPropertySource(mutable)
         }
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
 
-        when: "it is added again with other values while the read is parked"
-        Thread reader = parkIn(gate) { read == 'refresh' ? env.refresh() : env.start() }
-        if (added == 'added during the read') {
+        when: "it is added again with other values while the refresh is parked"
+        Thread refresher = parkIn(gate) { refresh == 'refresh' ? env.refresh() : env.start() }
+        if (added == 'added during the refresh') {
             changeWhileParked {
                 env.addPropertySource(mutable)
             }
@@ -282,14 +283,14 @@ class AddAfterInputCutSpec extends Specification {
             env.addPropertySource(mutable)
         }
         String whileParked = env.getProperty('m.value', String).orElse(null)
-        release(gate, reader)
+        release(gate, refresher)
 
         then: "adding the registered instance again processed it again, on top, at once"
         beforeAddedAgain == 'v1'
         whileParked == 'v2'
 
-        and: "a read that has taken it at its cut publishes what it has read of it, as 5.2.x did; one that has not keeps the new values on top, and it stays registered"
-        env.getProperty('m.value', String).get() == afterRead
+        and: "a refresh that has taken it in its snapshot publishes what it has read of it, as 5.2.x did; one that has not keeps the new values on top, and it stays registered"
+        env.getProperty('m.value', String).get() == afterRefresh
         env.propertySources.find { it.name == 'mutable' }.is(mutable)
 
         when:
@@ -304,11 +305,11 @@ class AddAfterInputCutSpec extends Specification {
         env.stop()
 
         where:
-        read      | added                        | afterRead | nextDiff
-        'start'   | 'registered before the read' | 'v1'      | ['m.value': 'v1']
-        'refresh' | 'registered before the read' | 'v1'      | ['m.value': 'v1']
-        'start'   | 'added during the read'      | 'v2'      | [:]
-        'refresh' | 'added during the read'      | 'v2'      | [:]
+        refresh   | added                           | afterRefresh | nextDiff
+        'start'   | 'registered before the refresh' | 'v1'         | ['m.value': 'v1']
+        'refresh' | 'registered before the refresh' | 'v1'         | ['m.value': 'v1']
+        'start'   | 'added during the refresh'      | 'v2'         | [:]
+        'refresh' | 'added during the refresh'      | 'v2'         | [:]
     }
 
     void "a property source that the code of another one adds, while the other one is added during a refresh, is published as registered, also once a refresh reads the other one and it adds another"() {
@@ -331,13 +332,13 @@ class AddAfterInputCutSpec extends Specification {
         changeWhileParked {
             env.addPropertySource(adding)
         }
-        String nestedDuringRead = env.getProperty('nested.key', String).orElse(null)
-        String addingDuringRead = env.getProperty('adding.key', String).orElse(null)
+        String nestedDuringRefresh = env.getProperty('nested.key', String).orElse(null)
+        String addingDuringRefresh = env.getProperty('adding.key', String).orElse(null)
         release(gate, refresher)
 
         then: "both were visible at once"
-        nestedDuringRead == 'n1'
-        addingDuringRead == 'adding'
+        nestedDuringRefresh == 'n1'
+        addingDuringRefresh == 'adding'
 
         and: "the refresh keeps both, and the nested one published is the one registered"
         failure == null
@@ -345,7 +346,7 @@ class AddAfterInputCutSpec extends Specification {
         env.getProperty('nested.key', String).get() == 'n1'
         env.propertySources.find { it.name == 'nested' }.get('nested.key') == 'n1'
 
-        when: "the environment is refreshed again, which reads it, so that it adds another nested one on the reading thread"
+        when: "the environment is refreshed again, which reads it, so that it adds another nested one on the refreshing thread"
         env.refresh()
 
         then: "the nested one added last is published and registered"
@@ -358,7 +359,7 @@ class AddAfterInputCutSpec extends Specification {
         env.stop()
     }
 
-    void "a property source added while a refresh reads, whose values come from the environment, gives those of the properties published when it is added, until the next refresh reads it in its order"() {
+    void "a property source added during a refresh, whose values come from the environment, gives those of the properties published when it is added, until the next refresh reads it in its order"() {
         given:
         Gate gate = new Gate()
         CountingLocator locator = new CountingLocator()
@@ -371,13 +372,13 @@ class AddAfterInputCutSpec extends Specification {
         changeWhileParked {
             env.addPropertySource(new CopiesProperty(env, 'loc.value', 'copy.value', 100))
         }
-        String locDuringRead = env.getProperty('loc.value', String).orElse(null)
-        String copyDuringRead = env.getProperty('copy.value', String).orElse(null)
+        String locDuringRefresh = env.getProperty('loc.value', String).orElse(null)
+        String copyDuringRefresh = env.getProperty('copy.value', String).orElse(null)
         release(gate, refresher)
 
         then: "it was processed at once, on top of the published properties"
-        locDuringRead == 'v1'
-        copyDuringRead == 'v1'
+        locDuringRefresh == 'v1'
+        copyDuringRefresh == 'v1'
 
         and: "the refresh publishes it with the values it was processed with, without running its code again"
         env.getProperty('loc.value', String).get() == 'v2'
@@ -396,7 +397,7 @@ class AddAfterInputCutSpec extends Specification {
         env.stop()
     }
 
-    void "a registered property source whose values come from the environment, added again while a refresh reads, is processed again with what is published then, and the refresh publishes what it computes itself, as 5.2.x did"() {
+    void "a registered property source whose values come from the environment, added again during a refresh, is processed again with what is published then, and the refresh publishes what it computes itself, as 5.2.x did"() {
         given:
         Gate gate = new Gate()
         CountingLocator locator = new CountingLocator()
@@ -415,11 +416,11 @@ class AddAfterInputCutSpec extends Specification {
         changeWhileParked {
             env.addPropertySource(derived)
         }
-        String duringRead = env.getProperty('derived.url', String).orElse(null)
+        String duringRefresh = env.getProperty('derived.url', String).orElse(null)
         release(gate, refresher)
 
         then: "the add processed it again on top of the published properties, which the refresh had not changed yet"
-        duringRead == 'v1'
+        duringRefresh == 'v1'
 
         and: "the refresh, which has read it itself, publishes what it has computed, and reports its own changes"
         env.getProperty('loc.value', String).get() == 'v2'
@@ -439,7 +440,7 @@ class AddAfterInputCutSpec extends Specification {
         env.stop()
     }
 
-    void "a property source added while a refresh reads, by the name of one a locator returns, is published after the located one of the same order, whose other properties stay"() {
+    void "a property source added during a refresh, by the name of one a locator returns, is published after the located one of the same order, whose other properties stay"() {
         given:
         Gate gate = new Gate()
         DefaultEnvironment env = new DefaultEnvironment(withLocator(new Locator(PropertySource.of('remote', ['a': '1', 'b': '1'], 10))))
@@ -452,13 +453,13 @@ class AddAfterInputCutSpec extends Specification {
         changeWhileParked {
             env.addPropertySource(added)
         }
-        String aDuringRead = env.getProperty('a', String).orElse(null)
-        String bDuringRead = env.getProperty('b', String).orElse(null)
+        String aDuringRefresh = env.getProperty('a', String).orElse(null)
+        String bDuringRefresh = env.getProperty('b', String).orElse(null)
         release(gate, refresher)
 
         then: "it was processed at once, on top of the published properties"
-        aDuringRead == '2'
-        bDuringRead == '1'
+        aDuringRefresh == '2'
+        bDuringRefresh == '1'
 
         and: "the refresh publishes it after the located one of the same order, and it is registered"
         env.getProperty('a', String).get() == '2'
@@ -480,28 +481,28 @@ class AddAfterInputCutSpec extends Specification {
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/13982')
-    void "a property source of a lower order that sets a list a registered one sets an element of, added #cut the #read takes the registered property sources, is processed by the read in its order: #kind"() {
-        given: "a registered property source that sets an element of a list, a locator that parks the read before it takes the registered property sources, and a gate that parks it after"
+    void "a property source of a lower order that sets a list a registered one sets an element of, added #relativeToSnapshot the #refresh takes the registered property sources, is processed by the refresh in its order: #kind"() {
+        given: "a registered property source that sets an element of a list, a locator that parks the refresh before it takes the registered property sources, and a gate that parks it after"
         Locator locator = new Locator()
         Gate gate = new Gate()
         DefaultEnvironment env = new DefaultEnvironment(withLocator(locator))
         env.addPropertySource(PropertySource.of('p', ['p.ok': 'p', 'foo[0]': 'x'], 100))
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         Map<String, Object> values = ['foo': List.of('a'), 'a.ok': 'a']
         if (kind == 'fails part way') {
             values['a.bad[99999999999]'] = 'x'
         }
-        Parking parking = cut == 'before' ? locator : gate
+        Parking parking = relativeToSnapshot == 'before' ? locator : gate
         Throwable failure = null
         Throwable addFailure = null
 
-        when: "it is added while the read is parked"
-        Thread reader = parkIn(parking) {
+        when: "it is added while the refresh is parked"
+        Thread refresher = parkIn(parking) {
             try {
-                read == 'refresh' ? env.refresh() : env.start()
+                refresh == 'refresh' ? env.refresh() : env.start()
             } catch (Throwable t) {
                 failure = t
             }
@@ -513,18 +514,18 @@ class AddAfterInputCutSpec extends Specification {
                 addFailure = t
             }
         }
-        String addedDuringRead = env.getProperty('a.ok', String).orElse(null)
-        String elementDuringRead = env.getProperty('foo[0]', String).orElse(null)
-        release(parking, reader)
+        String addedDuringRefresh = env.getProperty('a.ok', String).orElse(null)
+        String elementDuringRefresh = env.getProperty('foo[0]', String).orElse(null)
+        release(parking, refresher)
 
         then: "the add is not thrown, and the property source stays registered: added before, it was only registered; added after, it was published at once, unless it failed"
         addFailure == null
         env.propertySources*.name.contains('a')
-        addedDuringRead == duringAdded
-        elementDuringRead == duringElement
+        addedDuringRefresh == duringAdded
+        elementDuringRefresh == duringElement
 
-        and: "the read has processed it in its order: added before, one that fails part way fails the read, and otherwise the registered one sets the element of a copy of the immutable list"
-        failure?.getClass() == readFails
+        and: "the refresh has processed it in its order: added before, one that fails part way fails the refresh, and otherwise the registered one sets the element of a copy of the immutable list"
+        failure?.getClass() == refreshFails
         env.getProperty('p.ok', String).orElse(null) == pOk
         env.getProperty('a.ok', String).orElse(null) == aOk
         env.getProperty('foo[0]', String).orElse(null) == element
@@ -551,19 +552,19 @@ class AddAfterInputCutSpec extends Specification {
         env.stop()
 
         where: "a start that fails on its first property source has published nothing"
-        cut      | read      | kind                 | duringAdded | duringElement | readFails             | pOk  | aOk  | element | nextFails
-        'after'  | 'start'   | 'fails part way'     | null        | 'x'           | null                  | 'p'  | null | 'x'     | NumberFormatException
-        'after'  | 'refresh' | 'fails part way'     | null        | 'x'           | null                  | 'p'  | null | 'x'     | NumberFormatException
-        'after'  | 'start'   | 'only sets the list' | 'a'         | 'a'           | null                  | 'p'  | 'a'  | 'x'     | null
-        'after'  | 'refresh' | 'only sets the list' | 'a'         | 'a'           | null                  | 'p'  | 'a'  | 'x'     | null
-        'before' | 'start'   | 'fails part way'     | null        | null          | NumberFormatException | null | null | null    | NumberFormatException
-        'before' | 'refresh' | 'fails part way'     | null        | 'x'           | NumberFormatException | 'p'  | null | 'x'     | NumberFormatException
-        'before' | 'start'   | 'only sets the list' | null        | null          | null                  | 'p'  | 'a'  | 'x'     | null
-        'before' | 'refresh' | 'only sets the list' | null        | 'x'           | null                  | 'p'  | 'a'  | 'x'     | null
+        relativeToSnapshot | refresh   | kind                 | duringAdded | duringElement | refreshFails          | pOk  | aOk  | element | nextFails
+        'after'            | 'start'   | 'fails part way'     | null        | 'x'           | null                  | 'p'  | null | 'x'     | NumberFormatException
+        'after'            | 'refresh' | 'fails part way'     | null        | 'x'           | null                  | 'p'  | null | 'x'     | NumberFormatException
+        'after'            | 'start'   | 'only sets the list' | 'a'         | 'a'           | null                  | 'p'  | 'a'  | 'x'     | null
+        'after'            | 'refresh' | 'only sets the list' | 'a'         | 'a'           | null                  | 'p'  | 'a'  | 'x'     | null
+        'before'           | 'start'   | 'fails part way'     | null        | null          | NumberFormatException | null | null | null    | NumberFormatException
+        'before'           | 'refresh' | 'fails part way'     | null        | 'x'           | NumberFormatException | 'p'  | null | 'x'     | NumberFormatException
+        'before'           | 'start'   | 'only sets the list' | null        | null          | null                  | 'p'  | 'a'  | 'x'     | null
+        'before'           | 'refresh' | 'only sets the list' | null        | 'x'           | null                  | 'p'  | 'a'  | 'x'     | null
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/13915')
-    void "a refreshAndDiff reports the change it has read, and of a property source added #cut it takes the registered property sources only what putting it in its order changes"() {
+    void "a refreshAndDiff reports the change it has read, and of a property source added #relativeToSnapshot it takes the registered property sources only what putting it in its order changes"() {
         given: "a changed value, a registered property source that sets an element of a list, a locator that parks the refresh before it takes the registered property sources, and a gate that parks it after"
         Gate gate = new Gate()
         Locator locator = new Locator()
@@ -573,7 +574,7 @@ class AddAfterInputCutSpec extends Specification {
         env.addPropertySource(PropertySource.of('p', ['p.ok': 'p', 'foo[0]': 'x'], 100))
         env.addPropertySource(gate)
         env.start()
-        Parking parking = cut == 'before' ? locator : gate
+        Parking parking = relativeToSnapshot == 'before' ? locator : gate
         Map<String, Object> diff = null
         Throwable failure = null
         Throwable addFailure = null
@@ -594,17 +595,17 @@ class AddAfterInputCutSpec extends Specification {
                 addFailure = t
             }
         }
-        String lateDuringRead = env.getProperty('late.key', String).orElse(null)
-        String elementDuringRead = env.getProperty('foo[0]', String).orElse(null)
-        String valueDuringRead = env.getProperty('app.value', String).orElse(null)
+        String lateDuringRefresh = env.getProperty('late.key', String).orElse(null)
+        String elementDuringRefresh = env.getProperty('foo[0]', String).orElse(null)
+        String valueDuringRefresh = env.getProperty('app.value', String).orElse(null)
         release(parking, refresher)
 
         then: "added after, it was visible at once, on top of what was published, which the refresh had not changed yet; added before, it was only registered"
         failure == null
         addFailure == null
-        lateDuringRead == duringLate
-        elementDuringRead == duringElement
-        valueDuringRead == 'a'
+        lateDuringRefresh == duringLate
+        elementDuringRefresh == duringElement
+        valueDuringRefresh == 'a'
 
         and: "the refresh publishes it in its order, and reports its own change: the element the registered one sets back, but not the property source added after"
         valuesOf(diff) == reported
@@ -628,9 +629,9 @@ class AddAfterInputCutSpec extends Specification {
         env.stop()
 
         where:
-        cut      | duringLate | duringElement | reported
-        'after'  | 'late'     | 'a'           | ['app.value': 'a', 'foo[0]': 'a', 'foo': ['a']]
-        'before' | null       | 'x'           | ['app.value': 'a', 'late.key': 'late']
+        relativeToSnapshot | duringLate | duringElement | reported
+        'after'            | 'late'     | 'a'           | ['app.value': 'a', 'foo[0]': 'a', 'foo': ['a']]
+        'before'           | null       | 'x'           | ['app.value': 'a', 'late.key': 'late']
     }
 
     void "the difference of a refresh holds a change made before it takes the registered property sources, and not a property source added after, which the add has published itself: #change"() {
@@ -658,27 +659,27 @@ class AddAfterInputCutSpec extends Specification {
                 env.removePropertySource(x)
             }
         }
-        boolean firstVisibleBeforeCut = env.containsProperty('first.key')
-        String xBeforeCut = env.getProperty('x.value', String).orElse(null)
-        List<String> registeredBeforeCut = env.propertySources*.name
+        boolean firstVisibleBeforeSnapshot = env.containsProperty('first.key')
+        String xBeforeSnapshot = env.getProperty('x.value', String).orElse(null)
+        List<String> registeredBeforeSnapshot = env.propertySources*.name
         gate.arm()
         locator.release.countDown()
         assert gate.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
         changeWhileParked {
             env.addPropertySource(PropertySource.of('second', ['second.key': 'second']))
         }
-        String secondAfterCut = env.getProperty('second.key', String).orElse(null)
+        String secondAfterSnapshot = env.getProperty('second.key', String).orElse(null)
         release(gate, refresher)
 
         then: "the change made before was only registered, and the refresh reads it as part of its change"
-        !firstVisibleBeforeCut
-        xBeforeCut == 'old'
-        registeredBeforeCut.contains('first') == (change == 'added')
-        registeredBeforeCut.contains('x') == (change != 'removed')
+        !firstVisibleBeforeSnapshot
+        xBeforeSnapshot == 'old'
+        registeredBeforeSnapshot.contains('first') == (change == 'added')
+        registeredBeforeSnapshot.contains('x') == (change != 'removed')
         valuesOf(diff) == reported
 
         and: "the one added after was published by the add, and is kept, but is not reported as the refresh's change"
-        secondAfterCut == 'second'
+        secondAfterSnapshot == 'second'
         env.getProperty('second.key', String).get() == 'second'
         env.getProperty('app.value', String).get() == 'b'
         env.getProperty('first.key', String).orElse(null) == (change == 'added' ? 'first' : null)
@@ -698,22 +699,22 @@ class AddAfterInputCutSpec extends Specification {
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/13914')
-    void "a property source that sets an element of an immutable list another one has set, added while the environment reads, overrides it on a copy at once, and the read keeps it: #read"() {
+    void "a property source that sets an element of an immutable list another one has set, added while the environment refreshes, overrides it on a copy at once, and the refresh keeps it: #refresh"() {
         given: "a registered property source with a list that cannot be changed"
         Gate gate = new Gate()
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         env.addPropertySource(PropertySource.of('base', ['foo': List.of('a')]))
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         Throwable failure = null
         Throwable addFailure = null
 
-        when: "one that sets an element of it is added while the read is parked after the others"
-        Thread reader = parkIn(gate) {
+        when: "one that sets an element of it is added while the refresh is parked after the others"
+        Thread refresher = parkIn(gate) {
             try {
-                read == 'refresh' ? env.refresh() : env.start()
+                refresh == 'refresh' ? env.refresh() : env.start()
             } catch (Throwable t) {
                 failure = t
             }
@@ -725,16 +726,16 @@ class AddAfterInputCutSpec extends Specification {
                 addFailure = t
             }
         }
-        String elementDuringRead = env.getProperty('foo[0]', String).orElse(null)
-        String keyDuringRead = env.getProperty('overriding.key', String).orElse(null)
-        release(gate, reader)
+        String elementDuringRefresh = env.getProperty('foo[0]', String).orElse(null)
+        String keyDuringRefresh = env.getProperty('overriding.key', String).orElse(null)
+        release(gate, refresher)
 
         then: "the add does not fail, and is visible at once"
         addFailure == null
-        elementDuringRead == 'x'
-        keyDuringRead == 'overriding'
+        elementDuringRefresh == 'x'
+        keyDuringRefresh == 'overriding'
 
-        and: "the read publishes it after the one of the same order it has read"
+        and: "the refresh publishes it after the one of the same order it has read"
         failure == null
         env.getProperty('foo[0]', String).get() == 'x'
         env.getRequiredProperty('foo', List) == ['x']
@@ -755,18 +756,18 @@ class AddAfterInputCutSpec extends Specification {
         env.stop()
 
         where:
-        read << ['start', 'refresh']
+        refresh << ['start', 'refresh']
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/13914')
-    void "a property source added while the environment reads, which writes into a registered one's nested list, is visible at once without that list being written, and the read publishes none of it once it #change: #read"() {
+    void "a property source added while the environment refreshes, which writes into a registered one's nested list, is visible at once without that list being written, and the refresh publishes none of it once it #change: #refresh"() {
         given: "a registered property source with a list of maps"
         Gate gate = new Gate()
         List<Object> nested = new ArrayList<Object>([new LinkedHashMap<String, Object>(['a': '1'])])
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         env.addPropertySource(PropertySource.of('a', ['foo': nested], 0))
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         Map<String, Object> values = ['foo[0].c': 'leak', 'x.key': 'x']
@@ -777,10 +778,10 @@ class AddAfterInputCutSpec extends Specification {
         PropertySource replacement = PropertySource.of('x', ['x.key': 'x2'], 10)
         Throwable failure = null
 
-        when: "it is added while the read is parked after it has taken the registered property sources"
-        Thread reader = parkIn(gate) {
+        when: "it is added while the refresh is parked after it has taken the registered property sources"
+        Thread refresher = parkIn(gate) {
             try {
-                read == 'refresh' ? env.refresh() : env.start()
+                refresh == 'refresh' ? env.refresh() : env.start()
             } catch (Throwable t) {
                 failure = t
             }
@@ -790,7 +791,7 @@ class AddAfterInputCutSpec extends Specification {
         }
         String added = env.getProperty('foo[0].c', String).orElse(null)
 
-        and: "it is removed or replaced while the read is still parked"
+        and: "it is removed or replaced while the refresh is still parked"
         changeWhileParked {
             if (change == 'is removed') {
                 env.removePropertySource(x)
@@ -799,16 +800,16 @@ class AddAfterInputCutSpec extends Specification {
             }
         }
         String changed = env.getProperty('foo[0].c', String).orElse(null)
-        String keyDuringRead = env.getProperty('x.key', String).orElse(null)
-        release(gate, reader)
+        String keyDuringRefresh = env.getProperty('x.key', String).orElse(null)
+        release(gate, refresher)
 
-        then: "what it wrote was visible once it was added, unless it failed, and stayed until the read published"
+        then: "what it wrote was visible once it was added, unless it failed, and stayed until the refresh published"
         failure == null
         added == (change == 'fails part way' ? null : 'leak')
         changed == added
-        keyDuringRead == (change == 'is removed' ? 'x' : (change == 'is replaced' ? 'x2' : null))
+        keyDuringRefresh == (change == 'is removed' ? 'x' : (change == 'is replaced' ? 'x2' : null))
 
-        and: "the read publishes none of it, and the registered list was never written"
+        and: "the refresh publishes none of it, and the registered list was never written"
         env.getProperty('foo[0].a', String).get() == '1'
         !env.getProperty('foo[0].c', String).present
         env.getProperty('x.key', String).orElse(null) == (change == 'is replaced' ? 'x2' : null)
@@ -836,31 +837,31 @@ class AddAfterInputCutSpec extends Specification {
         env.stop()
 
         where:
-        [change, read] << [['fails part way', 'is removed', 'is replaced'], ['start', 'refresh']].combinations()
+        [change, refresh] << [['fails part way', 'is removed', 'is replaced'], ['start', 'refresh']].combinations()
     }
 
-    void "a registered property source added again while the read is parked reading it is processed again at once on the adding thread, which does not wait for the read: #read"() {
+    void "a registered property source added again while the refresh is parked reading it is processed again at once on the adding thread, which does not wait for the refresh: #refresh"() {
         given:
         CountsReaders counting = new CountsReaders()
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         env.addPropertySource(counting)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
 
-        when: "it is added again while the read is parked reading it"
-        Thread reader = parkIn(counting) { read == 'refresh' ? env.refresh() : env.start() }
+        when: "it is added again while the refresh is parked reading it"
+        Thread refresher = parkIn(counting) { refresh == 'refresh' ? env.refresh() : env.start() }
         changeWhileParked {
             env.addPropertySource(counting)
         }
         int overlapsWhileParked = counting.overlaps.get()
-        release(counting, reader)
+        release(counting, refresher)
 
-        then: "the add read it while the read was reading it, rather than waiting for the read"
+        then: "the add read it while the refresh was reading it, rather than waiting for the refresh"
         overlapsWhileParked == 1
         counting.overlaps.get() == 1
 
-        and: "the read publishes it, and the same instance stays registered"
+        and: "the refresh publishes it, and the same instance stays registered"
         env.getProperty('counting.key', String).get() == 'counting'
         env.propertySources*.name == ['counting']
         env.propertySources.first().is(counting)
@@ -870,10 +871,10 @@ class AddAfterInputCutSpec extends Specification {
         env.stop()
 
         where:
-        read << ['start', 'refresh']
+        refresh << ['start', 'refresh']
     }
 
-    void "a property source replaced while a refresh reads, by an add called after one that is still processing the property source it replaces, keeps the replacement, in the registry and in the properties: the refresh #outcome"() {
+    void "a property source replaced during a refresh, by an add called after one that is still processing the property source it replaces, keeps the replacement, in the registry and in the properties: the refresh #outcome"() {
         given:
         AtomicBoolean fail = new AtomicBoolean()
         Gate gate = new Gate({
@@ -888,7 +889,7 @@ class AddAfterInputCutSpec extends Specification {
         PropertySource replacement = PropertySource.of('lower', ['lower.key': 'replacement'], -100)
         Throwable refreshFailure = null
 
-        when: "it is added, then a refresh starts, and another thread replaces it while the refresh reads"
+        when: "it is added, then a refresh starts, and another thread replaces it during the refresh"
         first.arm()
         Thread adder = daemon('adder') { env.addPropertySource(first) }
         assert first.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
@@ -940,7 +941,7 @@ class AddAfterInputCutSpec extends Specification {
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/13914')
-    void "a registered property source whose map an indexed key puts into itself does not fail a read that a property source is added during, and its map is not changed: #read"() {
+    void "a registered property source whose map an indexed key puts into itself does not fail a refresh that a property source is added during, and its map is not changed: #refresh"() {
         given:
         Gate gate = new Gate()
         HoldsItself holdsItself = new HoldsItself()
@@ -948,19 +949,19 @@ class AddAfterInputCutSpec extends Specification {
         env.addPropertySource(holdsItself)
         env.addPropertySource(PropertySource.of('data', ['app.value': 'a']))
         env.addPropertySource(gate)
-        if (read != 'start') {
+        if (refresh != 'start') {
             env.start()
         }
         Map<String, Object> diff = null
         Throwable failure = null
 
-        when: "a property source is added while the read is parked after it has taken the registered property sources"
-        Thread reader = parkIn(gate) {
+        when: "a property source is added while the refresh is parked after it has taken the registered property sources"
+        Thread refresher = parkIn(gate) {
             try {
-                if (read == 'refreshAndDiff') {
+                if (refresh == 'refreshAndDiff') {
                     diff = env.refreshAndDiff()
                 } else {
-                    read == 'refresh' ? env.refresh() : env.start()
+                    refresh == 'refresh' ? env.refresh() : env.start()
                 }
             } catch (Throwable t) {
                 failure = t
@@ -969,12 +970,12 @@ class AddAfterInputCutSpec extends Specification {
         changeWhileParked {
             env.addPropertySource(PropertySource.of('late', ['late.key': 'late']))
         }
-        String duringRead = env.getProperty('late.key', String).orElse(null)
-        release(gate, reader)
+        String duringRefresh = env.getProperty('late.key', String).orElse(null)
+        release(gate, refresher)
 
-        then: "the added one was visible at once and is kept with what the read publishes"
+        then: "the added one was visible at once and is kept with what the refresh publishes"
         failure == null
-        duringRead == 'late'
+        duringRefresh == 'late'
         env.getProperty('late.key', String).get() == 'late'
         env.getProperty('m.a', String).get() == '1'
         env.getProperty('app.value', String).get() == 'a'
@@ -984,14 +985,14 @@ class AddAfterInputCutSpec extends Specification {
         holdsItself.given.every { !it.containsKey('self') }
 
         and: "the difference compares the maps without failing, and holds nothing: the added one is in both"
-        read != 'refreshAndDiff' || diff == [:]
+        refresh != 'refreshAndDiff' || diff == [:]
 
         cleanup:
         gate.release.countDown()
         env.stop()
 
         where:
-        read << ['start', 'refresh', 'refreshAndDiff']
+        refresh << ['start', 'refresh', 'refreshAndDiff']
     }
 
     /**
@@ -1032,18 +1033,18 @@ class AddAfterInputCutSpec extends Specification {
     }
 
     /**
-     * Runs the read on another thread, once the parking is armed, and returns that thread once the
-     * read is parked.
+     * Runs the refresh on another thread, once the parking is armed, and returns that thread once
+     * the refresh is parked.
      */
-    private static Thread parkIn(Parking parking, Closure<?> read) {
+    private static Thread parkIn(Parking parking, Closure<?> refresh) {
         parking.arm()
-        Thread reader = daemon('reader', read)
+        Thread refresher = daemon('refresher', refresh)
         assert parking.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        return reader
+        return refresher
     }
 
     /**
-     * Runs the change on another thread, which must finish while the read is parked.
+     * Runs the change on another thread, which must finish while the refresh is parked.
      */
     private static void changeWhileParked(Closure<?> change) {
         Thread changer = daemon('changer', change)
@@ -1051,10 +1052,10 @@ class AddAfterInputCutSpec extends Specification {
         assert !changer.alive
     }
 
-    private static void release(Parking parking, Thread reader) {
+    private static void release(Parking parking, Thread refresher) {
         parking.release.countDown()
-        reader.join(WAIT_SECONDS * 1000L)
-        assert !reader.alive
+        refresher.join(WAIT_SECONDS * 1000L)
+        assert !refresher.alive
     }
 
     private static Thread daemon(String name, Closure<?> work) {
@@ -1080,7 +1081,7 @@ class AddAfterInputCutSpec extends Specification {
             if (armed.compareAndSet(true, false)) {
                 reached.countDown()
                 // qualified: unqualified, Groovy resolves the name through get(String) of a property source
-                if (!release.await(AddAfterInputCutSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                if (!release.await(AddAfterSnapshotSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
                     throw new IllegalStateException('the parked thread was never released')
                 }
                 return true
@@ -1090,7 +1091,7 @@ class AddAfterInputCutSpec extends Specification {
     }
 
     /**
-     * A property sources locator that parks the read, once armed, and returns the given property
+     * A property sources locator that parks the refresh, once armed, and returns the given property
      * sources.
      */
     static class Locator extends Parking implements PropertySourcesLocator {

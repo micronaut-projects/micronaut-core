@@ -124,7 +124,7 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
         env.stop()
     }
 
-    void "a refresh that runs while a property source added outside a read is processed does not wait for it, an add made meanwhile is visible at once, and the parked add lands on top of both until the next refresh reads them in their order: the refresh #outcome"() {
+    void "a refresh that runs while a property source added outside a refresh is processed does not wait for it, an add made meanwhile is visible at once, and the parked add lands on top of both until the next refresh reads them in their order: the refresh #outcome"() {
         given: "a property source of a higher order, one that fails to be read once asked to, and a locator that notes when it runs"
         List<String> events = Collections.synchronizedList([])
         PropertySourcesLocator locator = new PropertySourcesLocator() {
@@ -321,7 +321,7 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
     }
 
     void "a property source whose values come from the environment, added before a refresh that then fails takes the registered property sources, shows nothing that refresh read, and the next refresh gives it what that one reads"() {
-        given: "a locator that locates a new value each time and, once armed, parks the read before it does, and a property source of a higher order than the one added that fails to be read once asked to"
+        given: "a locator that locates a new value each time and, once armed, parks the refresh before it does, and a property source of a higher order than the one added that fails to be read once asked to"
         ParkingCountingLocator locator = new ParkingCountingLocator()
         FailsWhenAsked flaky = new FailsWhenAsked(200)
         DefaultEnvironment env = new DefaultEnvironment(withLocator(locator))
@@ -826,18 +826,18 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
     }
 
     /**
-     * Runs the read on another thread, once the parking is armed, and returns that thread once the
-     * read is parked.
+     * Runs the refresh on another thread, once the parking is armed, and returns that thread once
+     * the refresh is parked.
      */
-    private static Thread parkIn(Parking parking, Closure<?> read) {
+    private static Thread parkIn(Parking parking, Closure<?> refresh) {
         parking.arm()
-        Thread reader = daemon('reader', read)
+        Thread refresher = daemon('refresher', refresh)
         assert parking.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        return reader
+        return refresher
     }
 
     /**
-     * Runs the change on another thread, which must finish while the read is parked.
+     * Runs the change on another thread, which must finish while the refresh is parked.
      */
     private static void changeWhileParked(Closure<?> change) {
         Thread changer = daemon('changer', change)
@@ -845,10 +845,10 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
         assert !changer.alive
     }
 
-    private static void release(Parking parking, Thread reader) {
+    private static void release(Parking parking, Thread refresher) {
         parking.release.countDown()
-        reader.join(WAIT_SECONDS * 1000L)
-        assert !reader.alive
+        refresher.join(WAIT_SECONDS * 1000L)
+        assert !refresher.alive
     }
 
     private static Thread daemon(String name, Closure<?> work) {
@@ -884,7 +884,7 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
     }
 
     /**
-     * A property sources locator that parks the read, once armed.
+     * A property sources locator that parks the refresh, once armed.
      */
     static class Locator extends Parking implements PropertySourcesLocator {
         @Override
@@ -1038,7 +1038,7 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
     }
 
     /**
-     * A property sources locator that, once armed, parks the read, and then returns a new property
+     * A property sources locator that, once armed, parks the refresh, and then returns a new property
      * source each time it loads them.
      */
     static class ParkingCountingLocator extends Parking implements PropertySourcesLocator {
@@ -1184,7 +1184,7 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
     }
 
     /**
-     * A property sources locator that parks the read once {@link #park} is set, and fails it while
+     * A property sources locator that parks the refresh once {@link #park} is set, and fails it while
      * {@link #fail} is set.
      */
     static class ScriptedLocator implements PropertySourcesLocator {
@@ -1207,7 +1207,7 @@ class AddPropertySourceWhileRefreshingSpec extends Specification {
     }
 
     /**
-     * A property sources locator that, once armed, parks the read and then fails.
+     * A property sources locator that, once armed, parks the refresh and then fails.
      */
     static class FailsWhenArmed implements PropertySourcesLocator {
         final AtomicBoolean armed = new AtomicBoolean()

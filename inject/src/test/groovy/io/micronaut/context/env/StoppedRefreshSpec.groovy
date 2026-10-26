@@ -13,34 +13,34 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * A start or a refresh that a stop overtakes while it reads the property sources, with a property
  * source added or the environment started again meanwhile. The stop returns at once and empties the
- * environment; the overtaken read publishes and registers nothing, not even an add handed over to
- * it, and a start after the stop reads at once. The read is parked inside a property source, and
- * every wait is bounded.
+ * environment; the overtaken refresh publishes and registers nothing, not even its late adds, and a
+ * start after the stop reads the property sources at once. The refresh is parked inside a property
+ * source, and every wait is bounded.
  */
 @Issue('https://github.com/micronaut-projects/micronaut-core/issues/14141')
 @Timeout(60)
-class StoppedReadSpec extends Specification {
+class StoppedRefreshSpec extends Specification {
 
     private static final int WAIT_SECONDS = 10
 
-    void "an environment stopped while a #read is parked is empty once the stop returns, and the read publishes nothing after it, also when #change"() {
-        given: "a property source that, once armed, parks the read where it reads it, before the others"
+    void "an environment stopped while a #refresh is parked is empty once the stop returns, and the refresh publishes nothing after it, also when #change"() {
+        given: "a property source that, once armed, parks the refresh where it reads it, before the others"
         ParkingPropertySource first = new ParkingPropertySource('first', ['first.key': 'f'])
         PropertySource data = PropertySource.of('data', ['app.value': 'a'], 10)
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
         env.addPropertySource(first)
         env.addPropertySource(data)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         Throwable failure = null
-        String addedDuringRead = null
+        String addedDuringRefresh = null
         String startedAgain = null
 
-        when: "it is stopped while the read is parked"
-        Thread reader = parkIn(first) {
+        when: "it is stopped while the refresh is parked"
+        Thread refresher = parkIn(first) {
             try {
-                read == 'refresh' ? env.refresh() : env.start()
+                refresh == 'refresh' ? env.refresh() : env.start()
             } catch (Throwable t) {
                 failure = t
             }
@@ -49,7 +49,7 @@ class StoppedReadSpec extends Specification {
             changeWhileParked {
                 env.addPropertySource(PropertySource.of('q', ['q.key': 'q']))
             }
-            addedDuringRead = env.getProperty('q.key', String).orElse(null)
+            addedDuringRefresh = env.getProperty('q.key', String).orElse(null)
         }
         changeWhileParked {
             env.stop()
@@ -62,18 +62,18 @@ class StoppedReadSpec extends Specification {
             }
             startedAgain = env.getProperty('first.key', String).orElse(null)
         }
-        boolean parkedMeanwhile = reader.alive
-        release(first, reader)
+        boolean parkedMeanwhile = refresher.alive
+        release(first, refresher)
 
         then: "the stop returned at once and left the environment empty; an add made before it was visible at once"
         emptyAfterStop
-        addedDuringRead == qKey
+        addedDuringRefresh == qKey
 
-        and: "a start after the stop does not wait for the parked read, and reads at once"
+        and: "a start after the stop does not wait for the parked refresh, and reads the property sources at once"
         parkedMeanwhile
         startedAgain == firstKey
 
-        and: "the parked read publishes nothing once released, not even what was handed over to it"
+        and: "the parked refresh publishes nothing once released, not even its late adds"
         failure == null
         !env.getProperty('app.value', String).present
         env.getProperty('first.key', String).orElse(null) == firstKey
@@ -88,7 +88,7 @@ class StoppedReadSpec extends Specification {
         env.removePropertySource(data)
         env.start()
 
-        then: "it reads what is registered, an add made during the stopped read included"
+        then: "it reads what is registered, an add made during the stopped refresh included"
         !env.getProperty('app.value', String).present
         env.getProperty('first.key', String).get() == 'f'
         env.getProperty('q.key', String).orElse(null) == qKey
@@ -98,7 +98,7 @@ class StoppedReadSpec extends Specification {
         env.stop()
 
         where:
-        [read, change] << [['start', 'refresh'], ['a property source is added meanwhile', 'it is started again meanwhile']].combinations()
+        [refresh, change] << [['start', 'refresh'], ['a property source is added meanwhile', 'it is started again meanwhile']].combinations()
         firstKey = change == 'it is started again meanwhile' ? 'f' : null
         qKey = change == 'a property source is added meanwhile' ? 'q' : null
     }
@@ -115,18 +115,18 @@ class StoppedReadSpec extends Specification {
     }
 
     /**
-     * Runs the read on another thread, once the parking is armed, and returns that thread once the
-     * read is parked.
+     * Runs the refresh on another thread, once the parking is armed, and returns that thread once
+     * the refresh is parked.
      */
-    private static Thread parkIn(ParkingPropertySource parking, Closure<?> read) {
+    private static Thread parkIn(ParkingPropertySource parking, Closure<?> refresh) {
         parking.arm()
-        Thread reader = daemon('reader', read)
+        Thread refresher = daemon('refresher', refresh)
         assert parking.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        return reader
+        return refresher
     }
 
     /**
-     * Runs the change on another thread, which must finish while the read is parked.
+     * Runs the change on another thread, which must finish while the refresh is parked.
      */
     private static void changeWhileParked(Closure<?> change) {
         Thread changer = daemon('changer', change)
@@ -134,10 +134,10 @@ class StoppedReadSpec extends Specification {
         assert !changer.alive
     }
 
-    private static void release(ParkingPropertySource parking, Thread reader) {
+    private static void release(ParkingPropertySource parking, Thread refresher) {
         parking.release.countDown()
-        reader.join(WAIT_SECONDS * 1000L)
-        assert !reader.alive
+        refresher.join(WAIT_SECONDS * 1000L)
+        assert !refresher.alive
     }
 
     private static Thread daemon(String name, Closure<?> work) {
@@ -178,8 +178,8 @@ class StoppedReadSpec extends Specification {
             if (armed.compareAndSet(true, false)) {
                 reached.countDown()
                 // qualified: unqualified, Groovy resolves the name through get(String) of this property source
-                if (!release.await(StoppedReadSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
-                    throw new IllegalStateException('the parked read was never released')
+                if (!release.await(StoppedRefreshSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException('the parked refresh was never released')
                 }
             }
             return values.keySet().iterator()

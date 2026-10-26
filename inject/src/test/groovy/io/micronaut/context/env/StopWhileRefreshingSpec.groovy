@@ -13,14 +13,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 
 /**
- * {@code Environment#stop()} while another thread reads the property sources. The stop returns at
- * once and the environment is empty when it returns; the read in progress publishes and registers
- * nothing. The read is parked inside a property source while the stop runs, and every wait is
- * bounded.
+ * {@code Environment#stop()} while another thread refreshes the environment. The stop returns at
+ * once and the environment is empty when it returns; the refresh in progress publishes and
+ * registers nothing. The refresh is parked inside a property source while the stop runs, and every
+ * wait is bounded.
  */
 @Issue('https://github.com/micronaut-projects/micronaut-core/issues/14141')
 @Timeout(60)
-class StopWhileReadingSpec extends Specification {
+class StopWhileRefreshingSpec extends Specification {
 
     private static final int WAIT_SECONDS = 10
 
@@ -88,7 +88,7 @@ class StopWhileReadingSpec extends Specification {
             Iterator<String> iterator() {
                 if (needLock.get()) {
                     // qualified: unqualified, Groovy resolves the name through get(String) of this property source
-                    if (appLock.tryLock(StopWhileReadingSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                    if (appLock.tryLock(StopWhileRefreshingSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
                         refreshGotLock.set(true)
                         appLock.unlock()
                     }
@@ -208,7 +208,7 @@ class StopWhileReadingSpec extends Specification {
             if (armed.compareAndSet(true, false)) {
                 entered.countDown()
                 // qualified: unqualified, Groovy resolves the name through get(String) of this property source
-                if (!release.await(StopWhileReadingSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                if (!release.await(StopWhileRefreshingSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
                     throw new IllegalStateException('the gate was never released')
                 }
             }
@@ -218,7 +218,7 @@ class StopWhileReadingSpec extends Specification {
 
     /**
      * A property source processed after 'data' that, once armed, parks the thread that asks for its
-     * convention, which a read does before it processes it.
+     * convention, which a refresh does before it processes it.
      */
     static class Later implements PropertySource {
         final AtomicBoolean armed = new AtomicBoolean()
@@ -242,7 +242,7 @@ class StopWhileReadingSpec extends Specification {
             if (armed.compareAndSet(true, false)) {
                 parked.countDown()
                 // qualified: unqualified, Groovy resolves the name through get(String) of this property source
-                if (!release.await(StopWhileReadingSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                if (!release.await(StopWhileRefreshingSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
                     throw new IllegalStateException('the start was never released')
                 }
             }

@@ -17,20 +17,21 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * The property sources a read reads itself: the configuration files, the default property sources
- * and what a bootstrap locator returns. The thread that reads sees them in place of those the read
- * before read itself, other threads see the registered ones until the read ends, and the read
- * registers its own unless its name was added or removed during the read, or is held by a property
- * source it has not read itself. The threads are parked at fixed points, and every wait is bounded.
+ * The property sources a refresh loads itself: the configuration files, the default property
+ * sources and what a bootstrap locator returns. The refreshing thread sees them in place of those
+ * the previous refresh loaded, other threads see the registered ones until the refresh ends, and
+ * the refresh registers each source it loaded unless its name was added or removed during the
+ * refresh, or is held by a property source it has not loaded itself. The threads are parked at
+ * fixed points, and every wait is bounded.
  */
 @Timeout(60)
-class ReadOwnSourcesSpec extends Specification {
+class RefreshLoadedSourcesSpec extends Specification {
 
     private static final int WAIT_SECONDS = 10
 
     void "a system property keeps its value, and the system properties and environment variables property sources stay registered, however often the environment is refreshed"() {
         given:
-        System.setProperty('read.own.sources.spec.foo', '1')
+        System.setProperty('refresh.loaded.sources.spec.foo', '1')
         DefaultEnvironment env = new DefaultEnvironment(ApplicationContext.builder()
                 .environments('test')
                 .deduceEnvironment(false) as ApplicationContextConfiguration)
@@ -40,7 +41,7 @@ class ReadOwnSourcesSpec extends Specification {
         when: "the environment is refreshed twice"
         List<List<Object>> afterRefresh = (1..2).collect {
             env.refresh()
-            [env.getProperty('read.own.sources.spec.foo', String).orElse(null), env.propertySources*.name.findAll { it in defaults }.sort()]
+            [env.getProperty('refresh.loaded.sources.spec.foo', String).orElse(null), env.propertySources*.name.findAll { it in defaults }.sort()]
         }
 
         then:
@@ -49,19 +50,19 @@ class ReadOwnSourcesSpec extends Specification {
         env.propertySources.find { it.name == EnvironmentPropertySource.NAME } instanceof EnvironmentPropertySource
 
         cleanup:
-        System.clearProperty('read.own.sources.spec.foo')
+        System.clearProperty('refresh.loaded.sources.spec.foo')
         env.stop()
     }
 
-    void "a property sources locator sees the configuration file and the default property sources of the read that runs it, another thread sees those of the read before until the read ends, and a property source registered by its own name stays registered"() {
+    void "a property sources locator sees the configuration file and the default property sources of the refresh that runs it, another thread sees those of the previous refresh until the refresh ends, and a property source registered by its own name stays registered"() {
         given: "a configuration file, the default property sources, a locator that looks at the property sources, and a property source of the user's"
-        Path dir = Files.createTempDirectory('read-own-sources-view-')
+        Path dir = Files.createTempDirectory('refresh-loaded-sources-view-')
         Files.writeString(dir.resolve('application.properties'), 'file.value=file\n')
         ViewingLocator locator = new ViewingLocator()
         DefaultEnvironment env = new DefaultEnvironment(readingDefaults(null, dir, locator))
         PropertySource user = PropertySource.of('user', ['user.value': 'user'])
         env.addPropertySource(user)
-        List<String> own = ['application', SystemPropertiesPropertySource.NAME, EnvironmentPropertySource.NAME]
+        List<String> loaded = ['application', SystemPropertiesPropertySource.NAME, EnvironmentPropertySource.NAME]
 
         when: "the environment starts and is refreshed twice"
         env.start()
@@ -71,18 +72,18 @@ class ReadOwnSourcesSpec extends Specification {
             registered << byName(env.propertySources)
         }
 
-        then: "the locator ran once for each read"
+        then: "the locator ran once for each refresh"
         locator.seen.size() == 3
         locator.others.size() == 3
 
-        and: "each read saw the property sources it read itself, which it registered"
-        (0..2).every { int i -> own.every { String name -> locator.seen[i][name] != null && locator.seen[i][name].is(registered[i][name]) } }
+        and: "each refresh saw the property sources it loaded itself, which it registered"
+        (0..2).every { int i -> loaded.every { String name -> locator.seen[i][name] != null && locator.seen[i][name].is(registered[i][name]) } }
 
-        and: "a refresh did not see those that the read before read itself, which another thread still saw while the refresh ran"
-        (1..2).every { int i -> own.every { String name -> !locator.seen[i].values().any { it.is(registered[i - 1][name]) } } }
-        (1..2).every { int i -> own.every { String name -> locator.others[i][name] != null && locator.others[i][name].is(registered[i - 1][name]) } }
+        and: "a refresh did not see those that the previous refresh loaded itself, which another thread still saw while the refresh ran"
+        (1..2).every { int i -> loaded.every { String name -> !locator.seen[i].values().any { it.is(registered[i - 1][name]) } } }
+        (1..2).every { int i -> loaded.every { String name -> locator.others[i][name] != null && locator.others[i][name].is(registered[i - 1][name]) } }
 
-        and: "every read saw the property source of the user's, and it stays registered"
+        and: "every refresh saw the property source of the user's, and it stays registered"
         locator.seen.every { it['user'].is(user) }
         registered.every { it['user'].is(user) }
         env.getProperty('user.value', String).get() == 'user'
@@ -93,7 +94,7 @@ class ReadOwnSourcesSpec extends Specification {
         dir.toFile().deleteDir()
     }
 
-    void "a property source added during a refresh by the name of a default property source that the refresh reads itself is registered in its place, and the next refresh keeps it: added #phase"() {
+    void "a property source added during a refresh by the name of a default property source that the refresh loads itself is registered in its place, and the next refresh keeps it: added #phase"() {
         given: "the default property sources, and a gate that parks the refresh after it has processed them, once armed"
         Parking defaults = new Parking()
         Gate gate = new Gate()
@@ -113,7 +114,7 @@ class ReadOwnSourcesSpec extends Specification {
         }
         release(parking, refresher)
 
-        then: "the refresh has not registered the property source it read by that name in its place"
+        then: "the refresh has not registered the property source it loaded by that name in its place"
         env.propertySources.find { it.name == SystemPropertiesPropertySource.NAME }.is(mine)
         env.getProperty('mine.value', String).orElse(null) == 'mine'
 
@@ -134,8 +135,8 @@ class ReadOwnSourcesSpec extends Specification {
     }
 
     void "a property source registered before the start by the name of one that #kind gives stays registered, and the start and every refresh read both"() {
-        given: "a property source of the user's registered by the name of what the read reads itself"
-        Path dir = Files.createTempDirectory('read-own-sources-')
+        given: "a property source of the user's registered by the name of what the refresh loads itself"
+        Path dir = Files.createTempDirectory('refresh-loaded-sources-')
         Path file = dir.resolve('application.properties')
         if (kind == 'a configuration file') {
             Files.writeString(file, 'own.key=v1\n')
@@ -170,7 +171,7 @@ class ReadOwnSourcesSpec extends Specification {
         env.getProperty('registered.key', String).get() == 'registered'
         env.getProperty('own.key', String).get() == 'v1'
 
-        when: "what the read reads itself changes, and the environment is refreshed twice"
+        when: "what the refresh loads itself changes, and the environment is refreshed twice"
         if (kind == 'a configuration file') {
             Files.writeString(file, 'own.key=v2\n')
         } else {
@@ -196,9 +197,9 @@ class ReadOwnSourcesSpec extends Specification {
         kind << ['a configuration file', 'a bootstrap locator']
     }
 
-    void "a property source added while the environment reads, by the name of a configuration file's, is processed after the file's properties and registered in place of the file until the next refresh, which takes the name back: #read"() {
+    void "a property source added while the environment refreshes, by the name of a configuration file's, is processed after the file's properties and registered in place of the file until the next refresh, which replaces it: #refresh"() {
         given:
-        Path dir = Files.createTempDirectory('read-own-sources-')
+        Path dir = Files.createTempDirectory('refresh-loaded-sources-')
         Path file = dir.resolve('application.properties')
         Files.writeString(file, 'file.only=f\nk=f\n')
         Gate gate = new Gate()
@@ -216,27 +217,27 @@ class ReadOwnSourcesSpec extends Specification {
             List<String> getOverrideConfigLocations() { ['file:' + dir] }
         })
         env.addPropertySource(gate)
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
         PropertySource added = PropertySource.of('application', ['k': 'x', 'x.only': 'x'], 50)
 
-        when: "it is added while the read is parked, after it has read the file"
-        Thread reader = parkIn(gate) { read == 'refresh' ? env.refresh() : env.start() }
+        when: "it is added while the refresh is parked, after it has read the file"
+        Thread refresher = parkIn(gate) { refresh == 'refresh' ? env.refresh() : env.start() }
         changeWhileParked {
             env.addPropertySource(added)
         }
-        String fileOnlyDuringRead = env.getProperty('file.only', String).orElse(null)
-        String kDuringRead = env.getProperty('k', String).orElse(null)
-        String xOnlyDuringRead = env.getProperty('x.only', String).orElse(null)
-        release(gate, reader)
+        String fileOnlyDuringRefresh = env.getProperty('file.only', String).orElse(null)
+        String kDuringRefresh = env.getProperty('k', String).orElse(null)
+        String xOnlyDuringRefresh = env.getProperty('x.only', String).orElse(null)
+        release(gate, refresher)
 
         then: "it was processed at once, on top of the properties published so far"
-        fileOnlyDuringRead == 'f'
-        kDuringRead == 'x'
-        xOnlyDuringRead == 'x'
+        fileOnlyDuringRefresh == 'f'
+        kDuringRefresh == 'x'
+        xOnlyDuringRefresh == 'x'
 
-        and: "the read publishes it after the file it has read, of a lower order, and registers it rather than the file"
+        and: "the refresh publishes it after the file it has read, of a lower order, and registers it rather than the file"
         env.getProperty('file.only', String).get() == 'f'
         env.getProperty('k', String).get() == 'x'
         env.getProperty('x.only', String).get() == 'x'
@@ -246,7 +247,7 @@ class ReadOwnSourcesSpec extends Specification {
         env.refresh()
         env.refresh()
 
-        then: "the next refresh registers the file by its name again, as 5.2.x dropped such a name when it read again"
+        then: "the next refresh registers the file by its name again, as 5.2.x dropped such a name when it refreshed again"
         env.getProperty('file.only', String).get() == 'f'
         env.getProperty('k', String).get() == 'f'
         !env.getProperty('x.only', String).present
@@ -258,12 +259,12 @@ class ReadOwnSourcesSpec extends Specification {
         dir.toFile().deleteDir()
 
         where:
-        read << ['start', 'refresh']
+        refresh << ['start', 'refresh']
     }
 
-    void "a configuration file's property source that the previous read loaded, added again while a refresh reads, #phase, is not handed over: the refresh publishes and registers what it reads from the file now, which #file"() {
+    void "a configuration file's property source that the previous refresh loaded, added again during a refresh, #phase, is not kept as a late add: the refresh publishes and registers what it reads from the file now, which #file"() {
         given: "configuration files, a configuration that parks the refresh before it takes the registered property sources, and a gate that parks it after"
-        Path dir = Files.createTempDirectory('read-own-sources-')
+        Path dir = Files.createTempDirectory('refresh-loaded-sources-')
         Files.writeString(dir.resolve('application.properties'), 'base=1\n')
         Path testFile = dir.resolve('application-test.properties')
         Files.writeString(testFile, 't.value=v1\nt.removed=x\n')
@@ -278,7 +279,7 @@ class ReadOwnSourcesSpec extends Specification {
         previous != null
         env.getProperty('t.value', String).get() == 'v1'
 
-        when: "the file changes, and the property source the previous read loaded from it is added again while a refresh is parked"
+        when: "the file changes, and the property source the previous refresh loaded from it is added again while a refresh is parked"
         if (file == 'has changed') {
             Files.writeString(testFile, 't.value=v2\n')
         } else {
@@ -297,7 +298,7 @@ class ReadOwnSourcesSpec extends Specification {
         valueDuringRefresh == 'v1'
         removedDuringRefresh == 'x'
 
-        and: "the refresh publishes what it has read from the file now, and registers the property source it has read in place of the previous one"
+        and: "the refresh publishes what it has read from the file now, and registers the property source it has loaded in place of the previously loaded one"
         env.getProperty('t.value', String).orElse(null) == valueAfter
         !env.getProperty('t.removed', String).present
         env.getProperty('base', String).get() == '1'
@@ -320,7 +321,7 @@ class ReadOwnSourcesSpec extends Specification {
         valueAfter = file == 'has changed' ? 'v2' : null
     }
 
-    void "a property source a bootstrap locator returned to the previous read, added again while a refresh reads, #phase, is not handed over: the refresh publishes and registers what the locator #kind"() {
+    void "a property source a bootstrap locator returned to the previous refresh, added again during a refresh, #phase, is not kept as a late add: the refresh publishes and registers what the locator #kind"() {
         given: "a bootstrap locator that parks the refresh, once armed, before it takes the registered property sources, and a gate that parks it after"
         Map<String, Object> sameValues = ['app.value': 'v1']
         MapPropertySource same = new MapPropertySource('consul-app', sameValues)
@@ -356,7 +357,7 @@ class ReadOwnSourcesSpec extends Specification {
         then: "added before, it was only registered; added after, it was processed again at once"
         duringRefresh == during
 
-        and: "the refresh publishes what it has read itself, and registers what the locator returned it"
+        and: "the refresh publishes what it has loaded itself, and registers what the locator returned it"
         env.getProperty('app.value', String).orElse(null) == after
         kind == 'no longer returns' ? !env.propertySources*.name.contains('consul-app') : true
         kind == 'returns now, a new instance' ? !env.propertySources.find { it.name == 'consul-app' }.is(previous) : true
@@ -384,7 +385,7 @@ class ReadOwnSourcesSpec extends Specification {
         'once it has taken them'                          | 'no longer returns'                                        | 'v1'   | null  | null
     }
 
-    void "a configuration file property source whose name waits for another thread to add a property source does not keep that add waiting, and both are published: #read"() {
+    void "a configuration file property source whose name waits for another thread to add a property source does not keep that add waiting, and both are published: #refresh"() {
         given: "a loader that gives a property source whose name, when first asked for, waits for another thread to add one"
         AddsWhenNamed named = new AddsWhenNamed()
         DefaultEnvironment env = new DefaultEnvironment(new ApplicationContextConfiguration() {
@@ -395,21 +396,21 @@ class ReadOwnSourcesSpec extends Specification {
             Optional<Boolean> getDeduceEnvironments() { Optional.of(false) }
 
             @Override
-            List<String> getEnvironmentVariableIncludes() { ['MICRONAUT_READ_OWN_SOURCES_SPEC_NONE'] }
+            List<String> getEnvironmentVariableIncludes() { ['MICRONAUT_REFRESH_LOADED_SOURCES_SPEC_NONE'] }
         })
         named.env = env
         env.@propertySourceLoaderList = [new GivesSource(named)]
-        if (read == 'refresh') {
+        if (refresh == 'refresh') {
             env.start()
         }
 
         when:
         named.armed.set(true)
-        Thread reader = daemon('reader') { read == 'refresh' ? env.refresh() : env.start() }
-        reader.join(WAIT_SECONDS * 1000L)
+        Thread refresher = daemon('refresher') { refresh == 'refresh' ? env.refresh() : env.start() }
+        refresher.join(WAIT_SECONDS * 1000L)
 
-        then: "the other thread's add does not wait for the read, and both are published and registered"
-        !reader.alive
+        then: "the other thread's add does not wait for the refresh, and both are published and registered"
+        !refresher.alive
         named.addedInTime
         env.getProperty('own.key', String).get() == 'own'
         env.getProperty('other.key', String).get() == 'other'
@@ -420,12 +421,12 @@ class ReadOwnSourcesSpec extends Specification {
         env.stop()
 
         where:
-        read << ['start', 'refresh']
+        refresh << ['start', 'refresh']
     }
 
     /**
      * The configuration of an environment that reads the default property sources, and none of the
-     * environment variables, and that, once the given parking is armed, parks the read where it
+     * environment variables, and that, once the given parking is armed, parks the refresh where it
      * creates the environment variables property source: after it has read the configuration files
      * and before it takes the registered property sources. With the configuration files of the
      * given directory, if any, and the given locator, if any.
@@ -441,11 +442,11 @@ class ReadOwnSourcesSpec extends Specification {
             @Override
             List<String> getEnvironmentVariableIncludes() {
                 park?.pass()
-                return ['READ_OWN_SOURCES_SPEC_NO_SUCH_VARIABLE']
+                return ['REFRESH_LOADED_SOURCES_SPEC_NO_SUCH_VARIABLE']
             }
 
             @Override
-            List<String> getOverrideConfigLocations() { dir != null ? ['file:' + dir] : ['file:/nonexistent-read-own-sources-spec'] }
+            List<String> getOverrideConfigLocations() { dir != null ? ['file:' + dir] : ['file:/nonexistent-refresh-loaded-sources-spec'] }
 
             @Override
             Collection<PropertySourcesLocator> getPropertySourcesLocators() { locator != null ? [locator] : [] }
@@ -478,18 +479,18 @@ class ReadOwnSourcesSpec extends Specification {
     }
 
     /**
-     * Runs the read on another thread, once the parking is armed, and returns that thread once the
-     * read is parked.
+     * Runs the refresh on another thread, once the parking is armed, and returns that thread once
+     * the refresh is parked.
      */
-    private static Thread parkIn(Parking parking, Closure<?> read) {
+    private static Thread parkIn(Parking parking, Closure<?> refresh) {
         parking.arm()
-        Thread reader = daemon('reader', read)
+        Thread refresher = daemon('refresher', refresh)
         assert parking.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        return reader
+        return refresher
     }
 
     /**
-     * Runs the change on another thread, which must finish while the read is parked.
+     * Runs the change on another thread, which must finish while the refresh is parked.
      */
     private static void changeWhileParked(Closure<?> change) {
         Thread changer = daemon('changer', change)
@@ -497,10 +498,10 @@ class ReadOwnSourcesSpec extends Specification {
         assert !changer.alive
     }
 
-    private static void release(Parking parking, Thread reader) {
+    private static void release(Parking parking, Thread refresher) {
         parking.release.countDown()
-        reader.join(WAIT_SECONDS * 1000L)
-        assert !reader.alive
+        refresher.join(WAIT_SECONDS * 1000L)
+        assert !refresher.alive
     }
 
     private static Thread daemon(String name, Closure<?> work) {
@@ -526,7 +527,7 @@ class ReadOwnSourcesSpec extends Specification {
             if (armed.compareAndSet(true, false)) {
                 reached.countDown()
                 // qualified: unqualified, Groovy resolves the name through get(String) of a property source
-                if (!release.await(ReadOwnSourcesSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                if (!release.await(RefreshLoadedSourcesSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
                     throw new IllegalStateException('the parked thread was never released')
                 }
                 return true
@@ -575,7 +576,7 @@ class ReadOwnSourcesSpec extends Specification {
     }
 
     /**
-     * A bootstrap locator that, once armed, parks the read before it returns what the given closure
+     * A bootstrap locator that, once armed, parks the refresh before it returns what the given closure
      * gives for the number of the load.
      */
     static class BootstrapScriptedLocator extends Parking implements PropertySourcesLocator, BootstrapLocatorMarker {
@@ -594,7 +595,7 @@ class ReadOwnSourcesSpec extends Specification {
     }
 
     /**
-     * A property sources locator that records the property sources the read that runs it sees,
+     * A property sources locator that records the property sources the refresh that runs it sees,
      * and those another thread sees meanwhile, and locates nothing.
      */
     static class ViewingLocator implements PropertySourcesLocator {
@@ -608,7 +609,7 @@ class ReadOwnSourcesSpec extends Specification {
             Thread thread = new Thread({ other.set(named(environment.getPropertySources())) }, 'other-thread')
             thread.daemon = true
             thread.start()
-            thread.join(ReadOwnSourcesSpec.WAIT_SECONDS * 1000L)
+            thread.join(RefreshLoadedSourcesSpec.WAIT_SECONDS * 1000L)
             others.add(other.get() ?: [:])
             return []
         }

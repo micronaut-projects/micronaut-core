@@ -12,17 +12,17 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.function.Function
 
 /**
- * The code of the application that reading and adding the property sources runs: property sources,
- * property source loaders, property sources locators, converters, and the values a difference
- * compares. None of it runs with a lock of the environment held, so none of it can deadlock with
- * a thread that holds a lock it needs and waits for the environment.
+ * The code of the application that refreshing the environment and adding property sources runs:
+ * property sources, property source loaders, property sources locators, converters, and the values
+ * a difference compares. None of it runs with a lock of the environment held, so none of it can
+ * deadlock with a thread that holds a lock it needs and waits for the environment.
  */
 @Timeout(60)
-class NoLockWhileReadingSpec extends Specification {
+class NoLockWhileRefreshingSpec extends Specification {
 
     void "property sources, a property source loader, a property sources locator, a converter and the values a refreshAndDiff compares run with no lock of the environment held"() {
         given: "a property source loader that only this environment loads, a locator, and a property source that converts a property and gives a value whose equals is watched"
-        Path dir = Files.createTempDirectory('no-lock-while-reading-')
+        Path dir = Files.createTempDirectory('no-lock-while-refreshing-')
         URLClassLoader classLoader = probeLoaderClassLoader(dir)
         LockProbe probe = new LockProbe()
         DefaultEnvironment env = new DefaultEnvironment(probing(classLoader, dir, new ProbeLocator(probe)))
@@ -78,7 +78,7 @@ class NoLockWhileReadingSpec extends Specification {
             ClassLoader getClassLoader() { loader }
 
             @Override
-            List<String> getEnvironmentVariableIncludes() { ['NO_LOCK_WHILE_READING_SPEC_NO_SUCH_VARIABLE'] }
+            List<String> getEnvironmentVariableIncludes() { ['NO_LOCK_WHILE_REFRESHING_SPEC_NO_SUCH_VARIABLE'] }
 
             @Override
             List<String> getOverrideConfigLocations() { ['file:' + dir] }
@@ -96,7 +96,7 @@ class NoLockWhileReadingSpec extends Specification {
         Path services = dir.resolve('META-INF/services/' + PropertySourceLoader.name)
         Files.createDirectories(services.parent)
         Files.writeString(services, ProbeLoader.name)
-        return new URLClassLoader([dir.toUri().toURL()] as URL[], NoLockWhileReadingSpec.classLoader)
+        return new URLClassLoader([dir.toUri().toURL()] as URL[], NoLockWhileRefreshingSpec.classLoader)
     }
 
     /**
