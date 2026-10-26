@@ -16,8 +16,8 @@
 package io.micronaut.aop;
 
 import io.micronaut.aop.internal.InterceptorBindings;
-import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.naming.NameUtils;
@@ -28,9 +28,9 @@ import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -75,21 +75,32 @@ public final class ExactInterceptorBindingQualifier<T> extends FilteringQualifie
      */
     private final Map<String, List<List<AnnotationValue<?>>>> pointOccurrences;
     private final Set<String> interceptorTypes;
+    /**
+     * The interceptor types which resolve to a class, a bean of a subtype of which qualifies as well.
+     */
+    private final List<Class<?>> interceptorClasses;
 
     private ExactInterceptorBindingQualifier(InterceptorKind kind,
                                              Map<String, List<List<AnnotationValue<?>>>> pointOccurrences,
-                                             Set<String> interceptorTypes) {
+                                             Map<String, @Nullable Class<?>> interceptorTypes) {
         this.kind = kind;
         this.pointOccurrences = pointOccurrences;
-        this.interceptorTypes = interceptorTypes;
+        this.interceptorTypes = interceptorTypes.keySet();
+        List<Class<?>> classes = new ArrayList<>(interceptorTypes.size());
+        for (Class<?> type : interceptorTypes.values()) {
+            if (type != null) {
+                classes.add(type);
+            }
+        }
+        this.interceptorClasses = classes;
     }
 
     /**
      * Qualifies the beans bound to an interception point.
      *
      * <p>The occurrences of a binding annotation declared on a method replace those of its class, as the
-     * bindings themselves do. A point binding {@code @InterceptorBinding(interceptorType = ...)} also qualifies
-     * a bean of that type.</p>
+     * bindings themselves do. A point bound to an interceptor type, through {@code @Type} on its binding
+     * annotation, also qualifies a bean of that type or of a subtype of it.</p>
      *
      * @param interceptionPoint The metadata of the interception point, such as an executable method
      * @param kind              The kind of the bindings to compare
@@ -98,11 +109,10 @@ public final class ExactInterceptorBindingQualifier<T> extends FilteringQualifie
      */
     public static <T> ExactInterceptorBindingQualifier<T> of(AnnotationMetadata interceptionPoint, InterceptorKind kind) {
         Map<String, List<List<AnnotationValue<?>>>> occurrences = new LinkedHashMap<>();
-        Set<String> interceptorTypes = new LinkedHashSet<>();
+        Map<String, @Nullable Class<?>> interceptorTypes = new LinkedHashMap<>();
         for (AnnotationValue<?> binding : InterceptorBindings.resolveInterceptorValues(interceptionPoint, kind)) {
             binding.annotationClassValue(InterceptorBindingQualifier.META_MEMBER_INTERCEPTOR_TYPE)
-                .map(AnnotationClassValue::getName)
-                .ifPresent(interceptorTypes::add);
+                .ifPresent(type -> interceptorTypes.put(type.getName(), type.getType().orElse(null)));
             String annotationName = binding.stringValue().orElse(null);
             if (annotationName == null) {
                 continue;
@@ -118,9 +128,11 @@ public final class ExactInterceptorBindingQualifier<T> extends FilteringQualifie
      * Qualifies the beans bound to an interception point given by the occurrences of its binding annotations, such
      * as the annotations of a programmatic lookup.
      *
-     * <p>Each value is an occurrence of a binding annotation itself, repeatable annotations given one value per
-     * occurrence, rather than an annotation composing one. A value built without the defaults of its annotation
-     * takes those of the occurrence it is compared with, so it may leave a defaulted member out.</p>
+     * <p>Each value is an occurrence of a binding annotation, repeatable annotations given one value per
+     * occurrence. The binding annotations an occurrence composes and retains, read through
+     * {@link AnnotationValue#getStereotypes()}, are bindings of the point as well, as they are for a point read from
+     * metadata. A value built without the defaults of its annotation takes those of the occurrence it is compared
+     * with, so it may leave a defaulted member out.</p>
      *
      * @param occurrences The occurrences of the binding annotations of the point
      * @param kind        The kind of the bindings to compare
@@ -132,12 +144,21 @@ public final class ExactInterceptorBindingQualifier<T> extends FilteringQualifie
         Map<String, List<AnnotationValue<?>>> grouped = group(occurrences);
         Map<String, List<List<AnnotationValue<?>>>> pointOccurrences = LinkedHashMap.newLinkedHashMap(grouped.size());
         grouped.forEach((name, group) -> pointOccurrences.put(name, List.of(group)));
-        return new ExactInterceptorBindingQualifier<>(kind, pointOccurrences, Set.of());
+        return new ExactInterceptorBindingQualifier<>(kind, pointOccurrences, Map.of());
     }
 
     @Override
     public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
-        return interceptorTypes.contains(candidate.getBeanType().getName()) || matches(candidate.getAnnotationMetadata());
+        Class<T> candidateType = candidate.getBeanType();
+        if (interceptorTypes.contains(candidateType.getName())) {
+            return true;
+        }
+        for (Class<?> interceptorClass : interceptorClasses) {
+            if (interceptorClass.isAssignableFrom(candidateType)) {
+                return true;
+            }
+        }
+        return matches(candidate.getAnnotationMetadata());
     }
 
     /**
@@ -177,7 +198,8 @@ public final class ExactInterceptorBindingQualifier<T> extends FilteringQualifie
      * {@link InterceptorBinding#bindMembers()} and {@link InterceptorBinding#matchAllOccurrences()}: the point must
      * have the binding annotation, and every occurrence of the group must be the same annotation as one at the
      * point, which may declare more. A binding the point has without binding members applies by name. Each value
-     * is an occurrence of a binding annotation itself, repeatable annotations given one value per occurrence.</p>
+     * is an occurrence of a binding annotation, repeatable annotations given one value per occurrence, and the
+     * binding annotations an occurrence retains are bindings of the candidate as well.</p>
      *
      * @param candidateOccurrences The occurrences of the binding annotations of the candidate
      * @return Whether the candidate has at least one occurrence and every one of them applies at the point
@@ -195,12 +217,30 @@ public final class ExactInterceptorBindingQualifier<T> extends FilteringQualifie
         return true;
     }
 
+    /**
+     * The occurrences grouped by annotation, each followed by the occurrences it retains, as the retained tree is
+     * how an occurrence carries the binding annotations it composes.
+     */
     private static Map<String, List<AnnotationValue<?>>> group(Collection<? extends AnnotationValue<?>> occurrences) {
         Map<String, List<AnnotationValue<?>>> grouped = new LinkedHashMap<>();
         for (AnnotationValue<?> occurrence : occurrences) {
-            grouped.computeIfAbsent(occurrence.getAnnotationName(), k -> new ArrayList<>(2)).add(occurrence);
+            add(occurrence, grouped);
         }
         return grouped;
+    }
+
+    private static void add(AnnotationValue<?> occurrence, Map<String, List<AnnotationValue<?>>> grouped) {
+        grouped.computeIfAbsent(occurrence.getAnnotationName(), k -> new ArrayList<>(2)).add(occurrence);
+        List<AnnotationValue<?>> retained = occurrence.getStereotypes();
+        if (retained == null) {
+            return;
+        }
+        for (AnnotationValue<?> composed : retained) {
+            // a binding annotation retains the meta-annotation marking it as one, which binds nothing itself
+            if (!AnnotationUtil.ANN_INTERCEPTOR_BINDING.equals(composed.getAnnotationName())) {
+                add(composed, grouped);
+            }
+        }
     }
 
     /**
@@ -259,7 +299,79 @@ public final class ExactInterceptorBindingQualifier<T> extends FilteringQualifie
             return false;
         }
         ExactInterceptorBindingQualifier<?> that = (ExactInterceptorBindingQualifier<?>) o;
-        return kind == that.kind && pointOccurrences.equals(that.pointOccurrences) && interceptorTypes.equals(that.interceptorTypes);
+        return kind == that.kind && interceptorTypes.equals(that.interceptorTypes) && samePoint(pointOccurrences, that.pointOccurrences);
+    }
+
+    /**
+     * Whether two points hold the same occurrences, every member compared. {@link AnnotationValue#equals(Object)}
+     * passes over a member one side does not declare, and two qualifiers equal that way would share the beans a
+     * lookup caches for either.
+     */
+    private static boolean samePoint(Map<String, List<List<AnnotationValue<?>>>> point,
+                                     Map<String, List<List<AnnotationValue<?>>>> otherPoint) {
+        if (!point.keySet().equals(otherPoint.keySet())) {
+            return false;
+        }
+        for (Map.Entry<String, List<List<AnnotationValue<?>>>> entry : point.entrySet()) {
+            List<List<AnnotationValue<?>>> bindings = entry.getValue();
+            List<List<AnnotationValue<?>>> otherBindings = otherPoint.get(entry.getKey());
+            if (otherBindings == null || bindings.size() != otherBindings.size()) {
+                return false;
+            }
+            for (int i = 0; i < bindings.size(); i++) {
+                if (!sameValue(bindings.get(i), otherBindings.get(i))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameValue(@Nullable Object value, @Nullable Object otherValue) {
+        if (value == null || otherValue == null) {
+            return value == otherValue;
+        }
+        if (value instanceof AnnotationValue<?> occurrence) {
+            return otherValue instanceof AnnotationValue<?> other
+                && occurrence.getAnnotationName().equals(other.getAnnotationName())
+                && sameMembers(occurrence.getValues(), other.getValues())
+                && sameMembers(nonNull(occurrence.getDefaultValues()), nonNull(other.getDefaultValues()));
+        }
+        if (value instanceof Object[] array) {
+            return otherValue instanceof Object[] otherArray && sameElements(Arrays.asList(array), Arrays.asList(otherArray));
+        }
+        if (value instanceof List<?> list) {
+            return otherValue instanceof List<?> otherList && sameElements(list, otherList);
+        }
+        return !(otherValue instanceof AnnotationValue<?>) && AnnotationUtil.areEqual(value, otherValue);
+    }
+
+    private static boolean sameElements(List<?> elements, List<?> otherElements) {
+        if (elements.size() != otherElements.size()) {
+            return false;
+        }
+        for (int i = 0; i < elements.size(); i++) {
+            if (!sameValue(elements.get(i), otherElements.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameMembers(Map<CharSequence, Object> members, Map<CharSequence, Object> otherMembers) {
+        if (members.size() != otherMembers.size()) {
+            return false;
+        }
+        for (Map.Entry<CharSequence, Object> member : members.entrySet()) {
+            if (!otherMembers.containsKey(member.getKey()) || !sameValue(member.getValue(), otherMembers.get(member.getKey()))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static Map<CharSequence, Object> nonNull(@Nullable Map<CharSequence, Object> members) {
+        return members != null ? members : Map.of();
     }
 
     @Override

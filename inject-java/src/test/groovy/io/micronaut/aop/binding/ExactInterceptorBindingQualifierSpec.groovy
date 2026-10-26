@@ -121,6 +121,8 @@ class ExactInterceptorBindingQualifierSpec extends AbstractTypeElementSpec {
 
         where:
         method          | expected
+        'byType'        | ['SubTyped']
+        'composedPair'  | ['OnlyLeft']
         'scoped'        | ['ScopedX']
         'scopedY'       | []
         'high'          | ['High']
@@ -188,6 +190,37 @@ class ExactInterceptorBindingQualifierSpec extends AbstractTypeElementSpec {
         context.close()
     }
 
+    void 'an occurrence given with its retained tree contributes the bindings it composes'() {
+        given:
+        def context = buildContext(SOURCE)
+        def composed = context.getBeanDefinition(context.classLoader.loadClass('exactbinding.Holder'))
+            .getAnnotation('exactbinding.TaggedAB')
+
+        expect: "the stereotype retains the two occurrences it composes"
+        composed.getStereotypes()*.annotationName.findAll { it == 'exactbinding.Tag' }.size() == 2
+
+        and: "given as the point, its retained occurrences select the beans bound to them"
+        names(context, ExactInterceptorBindingQualifier.ofOccurrences([composed], InterceptorKind.AROUND)) == ['TagA', 'TagAB'] as Set
+
+        and: "given as the candidate, it requires itself and what it composes at the point"
+        ExactInterceptorBindingQualifier.ofOccurrences([composed], InterceptorKind.AROUND).matches([composed])
+        ExactInterceptorBindingQualifier.ofOccurrences([composed], InterceptorKind.AROUND).matches([tag(context, 'a')])
+        !ExactInterceptorBindingQualifier.ofOccurrences([tag(context, 'a'), tag(context, 'b')], InterceptorKind.AROUND).matches([composed])
+
+        cleanup:
+        context.close()
+    }
+
+    void 'qualifiers differing in the members their occurrences declare are not equal'() {
+        given: "two members that both have defaults, declared one on each side"
+        def left = AnnotationValue.builder('test.Pair').member('left', 'x').build()
+        def right = AnnotationValue.builder('test.Pair').member('right', 'y').build()
+
+        expect:
+        ExactInterceptorBindingQualifier.ofOccurrences([left], InterceptorKind.AROUND) !=
+            ExactInterceptorBindingQualifier.ofOccurrences([right], InterceptorKind.AROUND)
+    }
+
     void 'the qualifier is equal to one built from the same point'() {
         given:
         def context = buildContext(SOURCE)
@@ -225,7 +258,7 @@ import jakarta.inject.Singleton;
 import java.lang.annotation.*;
 
 @Retention(RetentionPolicy.RUNTIME)
-@java.lang.annotation.Target({ElementType.TYPE, ElementType.METHOD})
+@java.lang.annotation.Target({ElementType.TYPE, ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 @Repeatable(Tags.class)
 @InterceptorBinding(bindMembers = true, matchAllOccurrences = true)
 @interface Tag {
@@ -234,7 +267,7 @@ import java.lang.annotation.*;
 }
 
 @Retention(RetentionPolicy.RUNTIME)
-@java.lang.annotation.Target({ElementType.TYPE, ElementType.METHOD})
+@java.lang.annotation.Target({ElementType.TYPE, ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 @interface Tags {
     Tag[] value();
 }
@@ -297,7 +330,63 @@ enum Level { HIGH, LOW }
     Scope[] value();
 }
 
+@Retention(RetentionPolicy.RUNTIME)
+@java.lang.annotation.Target({ElementType.TYPE, ElementType.METHOD})
+@Tag("a")
+@Tag("b")
+@interface TaggedAB {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@java.lang.annotation.Target({ElementType.TYPE, ElementType.METHOD, ElementType.ANNOTATION_TYPE})
+@InterceptorBinding(bindMembers = true)
+@interface Pair {
+    String left() default "";
+    String right() default "";
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@java.lang.annotation.Target({ElementType.TYPE, ElementType.METHOD})
+@Pair(left = "x")
+@interface LeftX {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@java.lang.annotation.Target({ElementType.TYPE, ElementType.METHOD})
+@Pair(right = "y")
+@interface RightY {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@java.lang.annotation.Target({ElementType.TYPE, ElementType.METHOD})
+@Around
+@io.micronaut.context.annotation.Type(BaseTyped.class)
+@interface ByType {
+}
+
 interface Handler {
+}
+
+abstract class BaseTyped implements Handler {
+}
+
+@Singleton
+class SubTyped extends BaseTyped {
+}
+
+@Singleton
+@TaggedAB
+class Holder {
+}
+
+@Singleton
+@Pair(left = "x", right = "y")
+class Both implements Handler {
+}
+
+@Singleton
+@Pair(left = "x")
+class OnlyLeft implements Handler {
 }
 
 @Singleton
@@ -380,6 +469,14 @@ class Point {
 
 @Singleton
 class Members {
+    @ByType
+    public void byType() {
+    }
+
+    @LeftX
+    @RightY
+    public void composedPair() {
+    }
     @Scoped(@Scope(value = "x", note = "point"))
     public void scoped() {
     }
