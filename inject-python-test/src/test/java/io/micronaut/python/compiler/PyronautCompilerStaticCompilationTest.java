@@ -25,7 +25,10 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -73,16 +76,30 @@ class PyronautCompilerStaticCompilationTest {
         List<StaticCompilationDecision> decisions = new ArrayList<>();
         List<PythonDiagnostic> diagnostics = new ArrayList<>();
 
-        ClassLoader classLoader = PyronautCompiler.builder()
-            .pythonCode(SOURCE)
-            .staticCompilation(StaticCompilationMode.ALL)
-            .staticCompilationReport(directory.toFile())
-            .staticCompilationDecisionCallback(decisions::add)
-            .pythonDiagnosticCallback(diagnostics::add)
-            .build()
-            .buildClassLoader();
+        ByteArrayOutputStream console = new ByteArrayOutputStream();
+        PrintStream err = System.err;
+        ClassLoader classLoader;
+        System.setErr(new PrintStream(console, true, StandardCharsets.UTF_8));
+        try {
+            classLoader = PyronautCompiler.builder()
+                .pythonCode(SOURCE)
+                .staticCompilation(StaticCompilationMode.ALL)
+                .staticCompilationReport(directory.toFile())
+                .staticCompilationDecisionCallback(decisions::add)
+                .pythonDiagnosticCallback(diagnostics::add)
+                .build()
+                .buildClassLoader();
+        } finally {
+            System.setErr(err);
+        }
 
         assertNotNull(classLoader);
+        // the compilation says once that the feature is experimental, naming the mode and the report
+        String output = console.toString(StandardCharsets.UTF_8);
+        String note = "Static compilation of Python is experimental and in use (mode all)";
+        assertTrue(output.contains("NOTE: " + note), output);
+        assertEquals(output.indexOf(note), output.lastIndexOf(note), output);
+        assertTrue(output.contains("Review the decisions in " + directory), output);
         Map<String, StaticCompilationDecision> byName = decisions.stream().collect(Collectors.toMap(StaticCompilationDecision::qualifiedName, Function.identity()));
         assertEquals(Outcome.NOT_CANDIDATE, byName.get("PricingService.__init__").outcome());
         assertEquals(Outcome.COMPILED, byName.get("PricingService.total").outcome());
@@ -107,6 +124,7 @@ class PyronautCompilerStaticCompilationTest {
         String summary = Files.readString(directory.resolve(StaticCompilationReport.SUMMARY_FILE));
         assertTrue(summary.contains("COMPILED      PricingService.total"), summary);
         assertTrue(summary.contains("[unknown-type]"), summary);
+        assertTrue(summary.contains("              fix: "), summary);
         assertTrue(summary.contains("EXCLUDED      1"), summary);
     }
 
@@ -249,11 +267,12 @@ class PyronautCompilerStaticCompilationTest {
         JsonNode reasons = decision.get("reasons");
         assertEquals(1, reasons.size(), line);
         JsonNode reason = reasons.get(0);
-        assertEquals(List.of("rule", "message", "location"), propertyNames(reason), line);
+        assertEquals(List.of("rule", "message", "location", "hint"), propertyNames(reason), line);
         // the comprehension is lowered; the elements of the raw ArrayList it iterates have no type
         assertEquals("unknown-type", reason.get("rule").asString());
         assertEquals("the elements of the [java.util.ArrayList] have no static type", reason.get("message").asString());
         assertEquals(source + ":14:50", reason.get("location").asString());
+        assertTrue(reason.get("hint").asString().startsWith("Give the value a static type"), line);
 
         JsonNode stats = decision.get("stats");
         assertEquals(List.of("statements", "javaCalls", "bridgeCalls", "helperCalls"), propertyNames(stats), line);
@@ -277,6 +296,46 @@ class PyronautCompilerStaticCompilationTest {
         RuntimeException exception = assertThrows(RuntimeException.class, compiler::buildClassLoader);
 
         assertTrue(exception.getMessage().contains("[python:compile-static] [PricingService.describe] cannot be compiled statically"), exception.getMessage());
+    }
+
+    @Test
+    void theExperimentalNoteIsGivenOnlyWhenSomethingCompiles() {
+        // in mode off, a module mentioning CompileStatic records its functions, the switched off one EXCLUDED
+        String off = """
+            from jakarta.inject import Singleton
+            from micronaut.context.python.annotation import CompileStatic
+
+            @Singleton
+            class Service:
+                @CompileStatic(False)
+                def legacy(self, value: int) -> int:
+                    return value
+            """;
+        String on = off.replace("@CompileStatic(False)", "@CompileStatic");
+        for (String source : List.of(off, on)) {
+            List<StaticCompilationDecision> decisions = new ArrayList<>();
+            ByteArrayOutputStream console = new ByteArrayOutputStream();
+            PrintStream err = System.err;
+            System.setErr(new PrintStream(console, true, StandardCharsets.UTF_8));
+            try {
+                PyronautCompiler.builder()
+                    .pythonCode(source)
+                    .staticCompilationDecisionCallback(decisions::add)
+                    .build()
+                    .buildClassLoader();
+            } finally {
+                System.setErr(err);
+            }
+            String output = console.toString(StandardCharsets.UTF_8);
+            Outcome outcome = decisions.stream().filter(decision -> decision.qualifiedName().equals("Service.legacy")).findFirst().orElseThrow().outcome();
+            if (source.equals(off)) {
+                assertEquals(Outcome.EXCLUDED, outcome);
+                assertTrue(!output.contains("Static compilation of Python is experimental"), output);
+            } else {
+                assertEquals(Outcome.COMPILED, outcome);
+                assertTrue(output.contains("Static compilation of Python is experimental and in use (switched on by CompileStatic)"), output);
+            }
+        }
     }
 
     @Test

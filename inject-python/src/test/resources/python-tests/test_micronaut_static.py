@@ -1808,6 +1808,117 @@ class ExceptionHierarchyTest(unittest.TestCase):
         self.assertIn("[Stop] is not an exception class", decision.reasons()[0].message())
 
 
+HINTED = '''
+import inflect
+from dataclasses import dataclass
+from jakarta.inject import Singleton
+
+
+@dataclass(frozen=True)
+class Point:
+    x: int = 0
+
+
+class Shape:
+    @property
+    def area(self):
+        return 1
+
+
+class Base:
+    def run(self) -> int:
+        return self.scale(2)
+
+    @staticmethod
+    def scale(n: int) -> int:
+        return n
+
+
+class Sub(Base):
+    @staticmethod
+    def scale(n: int) -> int:
+        return n * 2
+
+
+class Rejected(Exception):
+    pass
+
+
+class Narrow(Rejected):
+    pass
+
+
+@Singleton
+class Gate:
+    def plural(self, sku: str) -> str:
+        return inflect.engine().plural(sku)
+
+    def area(self, shape: Shape) -> int:
+        return shape.area
+
+    def moved(self, point: Point) -> None:
+        point.x = 1
+
+    def branchy(self, flag: bool) -> int:
+        if flag:
+            value = 1
+        return value
+
+    def keyed(self, n: int) -> int:
+        return self._helper(n=n)
+
+    def grown(self, xs: list[int]) -> int:
+        for x in xs:
+            xs.append(x)
+        return 0
+
+    def flagged(self, names: dict[int, str]) -> str:
+        return names[True]
+
+    def _helper(self, n: int) -> int:
+        return n
+
+    def ordered(self, n: int) -> int:
+        try:
+            return n
+        except Rejected:
+            return -1
+        except Narrow:
+            return -2
+'''
+
+
+class HintTest(unittest.TestCase):
+    """The hint the report prints for a reason the planner gives: the one for the situation the message names."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.decisions, _ = plan(HINTED, MODE_ALL, facts=FakeFacts())
+
+    def test_each_reason_gets_the_hint_of_its_situation(self):
+        import java
+        hints = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationHints")
+        expectations = {
+            "Gate.plural": ("unknown-type", "[inflect] is a Python module outside the compilation", "Call a Java library instead"),
+            "Gate.area": ("unknown-type", "has no return hint", "Hint the return of the property."),
+            "Gate.moved": ("unsupported-statement", "frozen dataclass", "Create a new object instead"),
+            "Gate.branchy": ("unsupported-statement", "assigned on some paths only", "Assign the local before the branch"),
+            "Gate.keyed": ("sibling-call", "with keyword arguments", "Pass the arguments positionally"),
+            "Gate.ordered": ("unsupported-statement", "already catches it", "Put the clause for the subclass before"),
+            "Base.run": ("sibling-call", "a subclass of the compilation may override it", "Call the static method on its class"),
+            "Gate.grown": ("unsupported-statement", "ConcurrentModificationException", "Iterate over a copy"),
+            "Gate.flagged": ("unsupported-expression", "Python compares numbers across their types", "Give the keys or elements one type of number"),
+        }
+        for name, (rule, message, hint) in expectations.items():
+            decision = self.decisions[name]
+            reason = decision.reasons()[0]
+            self.assertEqual(rule, reason.rule(), f"{name}: {[(r.rule(), r.message()) for r in decision.reasons()]}")
+            self.assertIn(message, reason.message(), name)
+            given = hints.hint(reason)
+            self.assertIn(hint, given, name)
+            self.assertNotEqual(hints.hint(rule, ""), given, f"{name} gets the general hint of [{rule}]")
+
+
 ADVISED = '''
 from jakarta.inject import Singleton
 

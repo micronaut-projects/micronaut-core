@@ -309,6 +309,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private Consumer<ClassElement> classElementCallback;
     private Consumer<PythonDiagnostic> diagnosticCallback;
     private Consumer<StaticCompilationDecision> staticDecisionCallback;
+    private boolean experimentalNoteGiven;
     // the sources whose bytecode is compiled once the static compilation plan has rewritten their runtime trees
     private final List<PendingBytecode> pendingBytecode = new ArrayList<>();
     // the static compilation report directories written by this compilation, so elements sharing one keep each other's decisions
@@ -931,6 +932,18 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         boolean planned = configuration.mode() != StaticCompilationMode.OFF || !plan.decisions().isEmpty();
         if (!planned && plan.diagnostics().isEmpty()) {
             return;
+        }
+        // in mode off a CompileStatic text records every function, EXCLUDED: the note is for a compilation that compiles
+        boolean compiles = configuration.mode() != StaticCompilationMode.OFF
+            || plan.decisions().stream().anyMatch(decision -> decision.outcome() == StaticCompilationDecision.Outcome.COMPILED);
+        if (compiles && !experimentalNoteGiven) {
+            // once per compilation, whatever the number of rounds and applications
+            experimentalNoteGiven = true;
+            note("Static compilation of Python is experimental and in use (%s): the compiled bodies run as Java, with Python semantics reproduced by the compiler. %s; @CompileStatic(False) keeps a function in Python.",
+                configuration.mode() == StaticCompilationMode.OFF ? "switched on by CompileStatic" : "mode " + configuration.mode().optionValue(),
+                configuration.reportDirectory() != null
+                    ? "Review the decisions in " + configuration.reportDirectory()
+                    : "Set " + StaticCompilationMode.REPORT_OPTION + " to write the report of the decisions");
         }
         if (staticDecisionCallback != null) {
             plan.decisions().forEach(staticDecisionCallback);
