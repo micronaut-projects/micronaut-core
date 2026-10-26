@@ -60,6 +60,8 @@ public final class StaticBodyGenerator {
     private static final String SHARED_DISPATCH = "shared";
 
     private static final ClassTypeDef ITERATOR = ClassTypeDef.of(Iterator.class);
+    private static final ClassTypeDef VALUE_COERCIBLE_TYPE = ClassTypeDef.of("io.micronaut.context.python.ValueCoercible");
+    private static final ClassTypeDef POLYGLOT_VALUE_TYPE = ClassTypeDef.of("org.graalvm.polyglot.Value");
 
     private final SelfAccess self;
     private final Map<String, VariableDef.MethodParameter> parameters = new HashMap<>();
@@ -278,6 +280,14 @@ public final class StaticBodyGenerator {
                 call.arguments().forEach(a -> collectNames(a, names));
             }
             case Ir.InvokeSibling call -> call.arguments().forEach(a -> collectNames(a, names));
+            case Ir.InvokePython call -> {
+                collectNames(call.receiver(), names);
+                call.arguments().forEach(a -> collectNames(a, names));
+            }
+            case Ir.PythonMember member -> collectNames(member.receiver(), names);
+            case Ir.ModuleAttribute _ -> {
+                // a field of the script: no local names
+            }
             case Ir.NewJava construction -> construction.arguments().forEach(a -> collectNames(a, names));
             case Ir.Field field -> collectNames(field.receiver(), names);
             case Ir.Binary binary -> {
@@ -553,6 +563,9 @@ public final class StaticBodyGenerator {
             case Ir.InvokeSibling call when SHARED_DISPATCH.equals(call.dispatch()) ->
                 self.invokeShared(call.name(), types(call.parameterTypes()), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
             case Ir.InvokeSibling call -> self.invoke(call.name(), types(call.parameterTypes()), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()), "java".equals(call.dispatch()));
+            case Ir.InvokePython call -> self.invokeOn(pythonObject(call.receiver()), pythonClass(call.receiver()), call.name(), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
+            case Ir.PythonMember member -> self.readOf(pythonObject(member.receiver()), pythonClass(member.receiver()), member.name(), member.type(), type(member.type()));
+            case Ir.ModuleAttribute attribute -> self.injected(injectedField(attribute.name()), type(attribute.type()));
             case Ir.NewJava construction -> classType(construction.type()).instantiate(types(construction.parameterTypes()), arguments(construction.arguments(), construction.parameterTypes()));
             case Ir.StaticField field -> classType(field.owner()).getStaticField(field.name(), type(field.type()));
             case Ir.Field field -> expression(field.receiver()).field(field.name(), type(field.type()));
@@ -716,6 +729,32 @@ public final class StaticBodyGenerator {
             case Ir.BOOLEAN -> PYTHON_STATIC.invokeStatic("str", List.of(BOOLEAN), TypeDef.STRING, value);
             default -> PYTHON_STATIC.invokeStatic("str", List.of(TypeDef.OBJECT), TypeDef.STRING, value);
         };
+    }
+
+    /**
+     * @param attribute An injected attribute of a module
+     * @return The field of the module's generated class holding the injected bean
+     */
+    public static String injectedField(String attribute) {
+        return "injected_" + attribute;
+    }
+
+    /**
+     * The Python object behind a value of a generated class: every generated class is a
+     * {@code ValueCoercible}.
+     */
+    private ExpressionDef pythonObject(Ir.Expression receiver) {
+        return expression(receiver).cast(VALUE_COERCIBLE_TYPE).invoke("asPolyglotValue", POLYGLOT_VALUE_TYPE);
+    }
+
+    /**
+     * The name of the Python class of a receiver of the compilation, as an error names it.
+     */
+    private static String pythonClass(Ir.Expression receiver) {
+        String name = receiver.type();
+        int generics = name.indexOf('<');
+        name = generics < 0 ? name : name.substring(0, generics);
+        return name.substring(name.lastIndexOf('.') + 1).replace('$', '.');
     }
 
     private ExpressionDef.ConditionExpressionDef condition(Ir.Expression test) {
@@ -910,6 +949,27 @@ public final class StaticBodyGenerator {
         }
 
         /**
+         * @param value     The Python object of another object of the compilation
+         * @param owner     The name of its Python class, which a None result of a primitive hint names
+         * @param name      The method to invoke on it
+         * @param arguments The arguments, boxed
+         * @param typeName  The Java return type as the IR spells it, {@code void} for none
+         * @param type      The Java return type
+         * @return The expression invoking it and converting the result
+         */
+        ExpressionDef invokeOn(ExpressionDef value, String owner, String name, List<ExpressionDef> arguments, String typeName, TypeDef type);
+
+        /**
+         * @param value    The Python object of another object of the compilation
+         * @param owner    The name of its Python class, which a None value of a primitive hint names
+         * @param property The attribute to read
+         * @param typeName The Java type of the value as the IR spells it
+         * @param type     The Java type of the value
+         * @return The expression reading and converting it
+         */
+        ExpressionDef readOf(ExpressionDef value, String owner, String property, String typeName, TypeDef type);
+
+        /**
          * @param property The property
          * @param type     The Java type of the property
          * @param value    The value
@@ -917,5 +977,14 @@ public final class StaticBodyGenerator {
          * @return The statement writing it
          */
         StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor);
+
+        /**
+         * @param field The field of the generated class holding an injected attribute of a module
+         * @param type  The Java type of the bean
+         * @return The injected bean
+         */
+        default ExpressionDef injected(String field, TypeDef type) {
+            throw new IllegalStateException("A body of a class reads no injected attribute of a module");
+        }
     }
 }
