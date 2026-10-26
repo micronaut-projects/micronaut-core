@@ -2062,7 +2062,10 @@ class Gate:
                            # a setter not called where it is named may be called on any class
                            'patch = setattr\npatch(Plain, "__str__", lambda self: "patched")',
                            'install = type.__setattr__',
-                           'from builtins import setattr as patch\npatch(Plain, "__str__", lambda self: "patched")'):
+                           'from builtins import setattr as patch\npatch(Plain, "__str__", lambda self: "patched")',
+                           'getattr(builtins, "setattr")(Plain, "__init__", None)',
+                           # a cause the class defines is one the Java exception would not carry
+                           'Plain.__cause__ = None'):
             self.assertFalse(self._lazy(statements), statements)
         # an object's own attribute protocol writes no class
         self.assertTrue(self._lazy("class Tracked:\n    def __setattr__(self, name, value):\n        super().__setattr__(name, value)\n"))
