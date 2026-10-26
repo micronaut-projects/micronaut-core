@@ -42,6 +42,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -312,6 +313,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             try {
                 rebuild.run();
                 state = writeState;
+                state.ownedContainers.clear();
                 mirrorPublishedState();
             } finally {
                 refreshingThread = null;
@@ -813,7 +815,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                                 property,
                                 properties.getOrigin()
                             ));
+                            ownContainer(writeState, entries, propertyName);
                             expandProperty(
+                                writeState.ownedContainers,
                                 resolvedProperty.substring(i),
                                 val -> entries.put(propertyName, new DefaultPropertyEntry(
                                     propertyName,
@@ -883,10 +887,51 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             // are cleared directly: resetCaches() is a hook for subclasses, and this runs from the
             // constructor.
             clearLookupCaches(writeState);
+            if (writeState == state) {
+                // what lookups can now reach is written no more, see ownContainer
+                writeState.ownedContainers.clear();
+            }
         }
     }
 
-    private void expandProperty(String property, Consumer<Object> containerSet, Supplier<Object> containerGet, Object actualValue) {
+    /**
+     * Makes the list or the map that the entry of the given name holds one the state may write
+     * into. An indexed property, such as {@code app.list[0]}, is written into the list or the map
+     * that the entry of its name already holds. That one can be the value of a property source,
+     * stored by reference, or one that lookups reach through a published state: it is replaced by
+     * a copy the first time a property is written into it, so that neither the property source
+     * nor a lookup sees the write. The copy keeps the raw name and the origin of the entry.
+     *
+     * @param resolverState The state written into
+     * @param entries       The entries of the generated catalog that hold the name
+     * @param name          The name of the entry
+     */
+    private static void ownContainer(ResolverState resolverState, Map<String, DefaultPropertyEntry> entries, String name) {
+        DefaultPropertyEntry entry = entries.get(name);
+        if (entry != null) {
+            Object owned = ownContainer(resolverState.ownedContainers, entry.value());
+            if (owned != entry.value()) {
+                entries.put(name, new DefaultPropertyEntry(name, owned, entry.raw(), entry.origin()));
+            }
+        }
+    }
+
+    /**
+     * @param ownedContainers The lists and maps that the state may write into
+     * @param value           A value
+     * @return The value itself unless it is a list or a map the state may not write into, and a
+     * copy of it, which the state owns from then on, if it is
+     */
+    private static Object ownContainer(Set<Object> ownedContainers, Object value) {
+        if (!(value instanceof List || value instanceof Map) || ownedContainers.contains(value)) {
+            return value;
+        }
+        Object copy = value instanceof List<?> list ? new ArrayList<>(list) : new LinkedHashMap<>((Map<?, ?>) value);
+        ownedContainers.add(copy);
+        return copy;
+    }
+
+    private void expandProperty(Set<Object> ownedContainers, String property, Consumer<Object> containerSet, Supplier<Object> containerGet, Object actualValue) {
         if (StringUtils.isEmpty(property)) {
             containerSet.accept(actualValue);
             return;
@@ -896,7 +941,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (i == 0 && li > -1) {
             String propertyIndex = property.substring(1, li);
             String propertyRest = property.substring(li + 1);
-            Object container = containerGet.get();
+            Object container = writableContainer(ownedContainers, containerSet, containerGet.get());
             if (StringUtils.isDigits(propertyIndex)) {
                 int number = Integer.parseInt(propertyIndex);
                 List list;
@@ -904,21 +949,23 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                     list = theList;
                 } else {
                     list = new ArrayList<>(10);
+                    ownedContainers.add(list);
                     containerSet.accept(list);
                 }
                 fill(list, number, null);
 
-                expandProperty(propertyRest, val -> list.set(number, val), () -> list.get(number), actualValue);
+                expandProperty(ownedContainers, propertyRest, val -> list.set(number, val), () -> list.get(number), actualValue);
             } else {
                 Map map;
                 if (container instanceof Map theMap) {
                     map = theMap;
                 } else {
                     map = new LinkedHashMap(10);
+                    ownedContainers.add(map);
                     containerSet.accept(map);
                 }
 
-                expandProperty(propertyRest, val -> map.put(propertyIndex, val), () -> map.get(propertyIndex), actualValue);
+                expandProperty(ownedContainers, propertyRest, val -> map.put(propertyIndex, val), () -> map.get(propertyIndex), actualValue);
             }
         } else if (property.startsWith(".")) {
             String propertyName;
@@ -930,16 +977,31 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 propertyName = property.substring(1);
                 propertyRest = "";
             }
-            Object v = containerGet.get();
+            Object v = writableContainer(ownedContainers, containerSet, containerGet.get());
             Map map;
             if (v instanceof Map theMap) {
                 map = theMap;
             } else {
                 map = new LinkedHashMap(10);
+                ownedContainers.add(map);
                 containerSet.accept(map);
             }
-            expandProperty(propertyRest, val -> map.put(propertyName, val), () -> map.get(propertyName), actualValue);
+            expandProperty(ownedContainers, propertyRest, val -> map.put(propertyName, val), () -> map.get(propertyName), actualValue);
         }
+    }
+
+    /**
+     * @param ownedContainers The lists and maps that the state may write into
+     * @param containerSet    Puts a value in the place of the given one
+     * @param container       What a property is about to be written into
+     * @return The container, replaced in its place by a copy if the state may not write into it
+     */
+    private static Object writableContainer(Set<Object> ownedContainers, Consumer<Object> containerSet, Object container) {
+        Object owned = ownContainer(ownedContainers, container);
+        if (owned != container) {
+            containerSet.accept(owned);
+        }
+        return owned;
     }
 
     private void collapseProperty(
@@ -1252,6 +1314,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         private final Map<String, DefaultPropertyEntry>[] catalog = new Map[CATALOG_SIZE];
         private final Map<String, DefaultPropertyEntry>[] rawCatalog = new Map[CATALOG_SIZE];
         private final Map<String, DefaultPropertyEntry>[] nonGenerated = new Map[CATALOG_SIZE];
+        /**
+         * The lists and the maps of the generated catalog that the processing into this state has
+         * created or copied, and so may write into, see ownContainer. A state that is
+         * built while lookups read another one owns them until it is published; a state written
+         * into while lookups read it owns them while one property source is processed.
+         */
+        private final Set<Object> ownedContainers = Collections.newSetFromMap(new IdentityHashMap<>());
 
         private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
         /**
