@@ -190,6 +190,16 @@ class StaticPlanner:
             return self._decided[id(node)]
         return self._decide(module, None, None, function_def, node)
 
+    def decide_method(self, module, class_def, function_def, node):
+        """
+        The decision of a method of the class a compiled body calls, made now when the planner has
+        not reached it yet; None while the method's own decision is under way (a cycle of calls).
+        """
+        if id(node) in self._decided:
+            return self._decided[id(node)]
+        class_node = next((candidate for defined, candidate in module.classes if defined is class_def), None)
+        return self._decide(module, class_def, class_node, function_def, node)
+
     def body_of(self, node):
         """The compiled body of a decided function, or None."""
         return self._bodies.get(id(node))
@@ -415,9 +425,19 @@ class StaticPlanner:
         lowering = Lowering(self.checker, module, class_def, function_def, node, rules, class_model,
                             advised=lambda sibling: self._advice(class_def, sibling) is not None,
                             advised_method=class_def is not None and self._advice(class_def, function_def) is not None,
-                            java_layout=java_layout, planner=self, static=static)
+                            java_layout=java_layout, planner=self, static=static,
+                            compiled=lambda sibling, sibling_node: self._compiled_method(module, class_def, sibling, sibling_node))
         body = lowering.lower()
         return body, lowering.reasons
+
+    def _compiled_method(self, module, class_def, function_def, node):
+        """
+        Whether a method of the class is compiled, decided now when the planner has not reached it
+        yet; a method whose decision is under way (a cycle of calls) counts as not compiled, which
+        only costs the call its Java dispatch.
+        """
+        decision = self.decide_method(module, class_def, function_def, node) if node is not None else None
+        return decision is not None and decision.outcome().name() == "COMPILED" and self.body_of(node) is not None
 
     def _switched_accessors(self, class_def):
         """The property accessors a function-level switch turns on, as (accessor, kind) members."""
