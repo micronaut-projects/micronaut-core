@@ -49,6 +49,8 @@ public final class StaticBodyGenerator {
     private static final TypeDef BOOLEAN = TypeDef.Primitive.BOOLEAN;
     private static final String VALUE_OF = "valueOf";
     private static final String OBJECT = "java.lang.Object";
+    private static final String SHORT = "short";
+    private static final String FLOAT = "float";
 
     private final SelfAccess self;
     private final Map<String, VariableDef.MethodParameter> parameters = new HashMap<>();
@@ -369,16 +371,16 @@ public final class StaticBodyGenerator {
             case Ir.LONG -> value.cast(LONG);
             case Ir.DOUBLE -> value.cast(DOUBLE);
             case "int" -> Ir.LONG.equals(from) ? MATH.invokeStatic("toIntExact", List.of(LONG), TypeDef.Primitive.INT, value) : value.cast(TypeDef.Primitive.INT);
-            case "short" -> Ir.LONG.equals(from) ? PYTHON_STATIC.invokeStatic("toShortExact", List.of(LONG), TypeDef.Primitive.SHORT, value) : value.cast(TypeDef.Primitive.SHORT);
+            case SHORT -> Ir.LONG.equals(from) ? PYTHON_STATIC.invokeStatic("toShortExact", List.of(LONG), TypeDef.Primitive.SHORT, value) : value.cast(TypeDef.Primitive.SHORT);
             case "byte" -> Ir.LONG.equals(from) ? PYTHON_STATIC.invokeStatic("toByteExact", List.of(LONG), TypeDef.Primitive.BYTE, value) : value.cast(TypeDef.Primitive.BYTE);
-            case "float" -> value.cast(TypeDef.Primitive.FLOAT);
+            case FLOAT -> value.cast(TypeDef.Primitive.FLOAT);
             // a boxed number is boxed from its primitive, which javac converts from the narrowed value
             case "java.lang.Integer" -> ClassTypeDef.of(Integer.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.INT), ClassTypeDef.of(Integer.class), cast(value, from, "int"));
             case "java.lang.Long" -> ClassTypeDef.of(Long.class).invokeStatic(VALUE_OF, List.of(LONG), ClassTypeDef.of(Long.class), cast(value, from, Ir.LONG));
-            case "java.lang.Short" -> ClassTypeDef.of(Short.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.SHORT), ClassTypeDef.of(Short.class), cast(value, from, "short"));
+            case "java.lang.Short" -> ClassTypeDef.of(Short.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.SHORT), ClassTypeDef.of(Short.class), cast(value, from, SHORT));
             case "java.lang.Byte" -> ClassTypeDef.of(Byte.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.BYTE), ClassTypeDef.of(Byte.class), cast(value, from, "byte"));
             case "java.lang.Double" -> ClassTypeDef.of(Double.class).invokeStatic(VALUE_OF, List.of(DOUBLE), ClassTypeDef.of(Double.class), cast(value, from, Ir.DOUBLE));
-            case "java.lang.Float" -> ClassTypeDef.of(Float.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.FLOAT), ClassTypeDef.of(Float.class), cast(value, from, "float"));
+            case "java.lang.Float" -> ClassTypeDef.of(Float.class).invokeStatic(VALUE_OF, List.of(TypeDef.Primitive.FLOAT), ClassTypeDef.of(Float.class), cast(value, from, FLOAT));
             case "java.lang.Boolean" -> ClassTypeDef.of(Boolean.class).invokeStatic(VALUE_OF, List.of(BOOLEAN), ClassTypeDef.of(Boolean.class), value);
             default -> value.cast(type(to));
         };
@@ -449,6 +451,7 @@ public final class StaticBodyGenerator {
                     }
                 }
                 default -> {
+                    // other statements declare no local of their own
                 }
             }
         }
@@ -461,7 +464,7 @@ public final class StaticBodyGenerator {
 
     private static boolean isPrimitive(String typeName) {
         return switch (typeName) {
-            case "int", "long", "short", "byte", "char", "float", "double", "boolean" -> true;
+            case "int", "long", SHORT, "byte", "char", FLOAT, "double", "boolean" -> true;
             default -> false;
         };
     }
