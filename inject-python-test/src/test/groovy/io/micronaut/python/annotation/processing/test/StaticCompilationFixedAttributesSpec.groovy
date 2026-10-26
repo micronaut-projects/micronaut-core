@@ -137,7 +137,10 @@ class Front:
         compiled['Counting.label'].stats().bridgeCalls() == 1
 
         and: "the java bodies ran, and the class reports changes of the attributes of its objects"
-        results[StaticCompilationMode.ALL].java_runs >= 6
+        // the Java callers' five: Front, a Python caller, keeps the Python body of label, which calls Java
+        // (Math.min) and reads an int attribute a Python write may make too large for the Java int
+        results[StaticCompilationMode.ALL].java_runs == 5
+        compiled['Pricing.label'].delegation() == 'none(it has side effects (the call of [java.lang.Math.min]) and the int attribute [self.limit] may not fit a [int])'
         results[StaticCompilationMode.ALL].hooked == '_micronaut_fixed_setattr'
     }
 
