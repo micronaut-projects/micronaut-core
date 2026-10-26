@@ -131,6 +131,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String GENERATED_PROPERTY_MEMBERS = "io.micronaut.context.python.ValueCoercible$GeneratedPropertyMembers";
     private static final String GENERATED_PROPERTY_MEMBERS_CANONICAL = "io.micronaut.context.python.ValueCoercible.GeneratedPropertyMembers";
     private static final String MEMBER_PRE_DESTROY = "preDestroy";
+    private static final String COMPILED_FROM = "Compiled from ";
     private static final String PUT_MEMBER = "putMember";
     private static final String CLASS_FIELD = "class";
     public static final TypeDef POLYGLOT_CONTEXT = TypeDef.of(Context.class);
@@ -4991,7 +4992,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 method.addParameter(ParameterDef.of(body.parameterNames().get(i), StaticBodyGenerator.type(body.parameterTypes().get(i))));
             }
             if (body.span() != null) {
-                method.addJavadoc("Compiled from " + body.span().location());
+                method.addJavadoc(COMPILED_FROM + body.span().location());
             }
             delegate.addMethod(method.build((aThis, parameters) -> {
                 VariableDef.MethodParameter self = parameters.get(0);
@@ -5033,7 +5034,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 method.addParameter(ParameterDef.of(body.parameterNames().get(i), StaticBodyGenerator.type(body.parameterTypes().get(i))));
             }
             if (body.span() != null) {
-                method.addJavadoc("Compiled from " + body.span().location() + ", working on the caller's collections");
+                method.addJavadoc(COMPILED_FROM + body.span().location() + ", working on the caller's collections");
             }
             builder.addMethod(method.build((aThis, parameters) ->
                 StaticBodyGenerator.generateShared(body, parameters, selfAccess(model, aThis), plan.trace())));
@@ -5181,7 +5182,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (compiledBody != null && compiledBody.parameterNames().size() == parameterDefs.size()) {
             // the body runs as Java: no crossing into Python for callers of the stub
             if (compiledBody.span() != null) {
-                methodBuilder.addJavadoc("Compiled from " + compiledBody.span().location());
+                methodBuilder.addJavadoc(COMPILED_FROM + compiledBody.span().location());
             }
             boolean trace = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get().trace();
             if (!StaticBodyGenerator.copiedParameters(compiledBody).isEmpty()) {
