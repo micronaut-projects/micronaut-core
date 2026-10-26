@@ -203,6 +203,27 @@ def module_plain() -> str:
         all['blocking'].startsWith('blocking-') && all['module/blocking'].startsWith('blocking-')
     }
 
+    void "micronaut.python.static.event-loop false runs a compiled route that never enters Python on io"() {
+        given:
+        mode = StaticCompilationMode.ALL
+        ApplicationContext context = buildContext(SOURCE, true, PROPERTIES + ['micronaut.python.static.event-loop': false])
+        def server = context.getBean(EmbeddedServer)
+        server.start()
+        def client = context.createBean(HttpClient, server.URL).toBlocking()
+
+        expect: "the routes the default keeps on the event loop run on io, as interpreted ones do"
+        compiled('ThreadController.plain') && compiled('module_plain')
+        client.retrieve('/threads/plain').startsWith('io-')
+        client.retrieve('/module/plain').startsWith('io-')
+        client.retrieve('/threads/introspected', Map).thread.startsWith('io-')
+
+        and: "@ExecuteOn is still honoured"
+        client.retrieve('/threads/blocking').startsWith('blocking-')
+
+        cleanup:
+        context?.close()
+    }
+
     private static boolean onEventLoop(String thread) {
         // the Netty event loop, default-eventLoopGroup-N-M
         assert thread.toLowerCase(Locale.ROOT).contains('eventloop'), thread

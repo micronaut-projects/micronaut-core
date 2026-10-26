@@ -17,10 +17,12 @@ package io.micronaut.context.python;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.python.annotation.EventLoopSafe;
 import io.micronaut.context.python.annotation.PythonClass;
 import io.micronaut.core.type.TypeInformation;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.scheduling.TaskExecutors;
@@ -42,13 +44,21 @@ import java.util.function.Supplier;
  * Micronaut's default executor selection available for Java code. A Python method
  * annotated with {@link ExecuteOn} runs on the executor it names, as a Java method does.
  * A method whose statically compiled body never enters Python ({@link EventLoopSafe})
- * stays on the event loop when the default selection keeps a Java method there.
+ * stays on the event loop when the default selection keeps a Java method there, unless
+ * {@value #EVENT_LOOP_PROPERTY} is {@code false}.
  */
 @Singleton
 @Replaces(DefaultExecutorSelector.class)
 final class PythonExecutorSelector extends DefaultExecutorSelector {
 
+    /**
+     * Whether a route whose compiled body never enters Python stays on the event loop, as a Java
+     * route does; {@code false} runs it on the IO executor as an interpreted route. Defaults to {@code true}.
+     */
+    static final String EVENT_LOOP_PROPERTY = "micronaut.python.static.event-loop";
+
     private final Supplier<ExecutorService> ioExecutor;
+    private final boolean eventLoop;
 
     /**
      * Default constructor.
@@ -56,14 +66,17 @@ final class PythonExecutorSelector extends DefaultExecutorSelector {
      * @param beanLocator The bean locator
      * @param ioExecutor The IO executor
      * @param blockingExecutor The blocking executor
+     * @param eventLoop Whether a compiled route that never enters Python may stay on the event loop
      */
     @Inject
     PythonExecutorSelector(
         BeanLocator beanLocator,
         @Named(TaskExecutors.IO) BeanProvider<ExecutorService> ioExecutor,
-        @Named(TaskExecutors.BLOCKING) BeanProvider<ExecutorService> blockingExecutor) {
+        @Named(TaskExecutors.BLOCKING) BeanProvider<ExecutorService> blockingExecutor,
+        @Property(name = EVENT_LOOP_PROPERTY, defaultValue = StringUtils.TRUE) boolean eventLoop) {
         super(beanLocator, ioExecutor, blockingExecutor);
         this.ioExecutor = SupplierUtil.memoized(ioExecutor::get);
+        this.eventLoop = eventLoop;
     }
 
     @Override
@@ -72,7 +85,7 @@ final class PythonExecutorSelector extends DefaultExecutorSelector {
         if (isPythonMethod(method) && !Objects.requireNonNull(method).hasStereotype(ExecuteOn.class)) {
             TypeInformation<?> returnType = method.getReturnType();
             if (!returnType.isAsyncOrReactive()) {
-                if (method.hasAnnotation(EventLoopSafe.class)) {
+                if (eventLoop && method.hasAnnotation(EventLoopSafe.class)) {
                     // a compiled body that runs no Python runs where a Java method runs; when the default
                     // selection offloads it (to the blocking executor, which may use virtual threads), the
                     // IO executor runs it as any other Python method: a fixed attribute is read from the

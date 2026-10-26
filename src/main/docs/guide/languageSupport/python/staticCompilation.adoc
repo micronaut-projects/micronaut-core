@@ -278,6 +278,11 @@ An interpreted Python route runs on the `io` executor (see the threading section
 * every function of the compilation it calls through Java, a sibling (one taking a list, set or dict through the shared entry of its compiled body), a method of a service it holds, or a module-level function, is compiled and never enters Python in turn; for a method of another class, so does every override of a subclass of the compilation. Calls that form a cycle (recursion included) keep the route on `io`.
 
 The first read of an attribute fixed at construction reaches the Python object, once per object (see <<staticCompilationFixedAttributes>>): a controller reading its injected services enters Python on the first request to it only, which the event loop accepts as it accepts a Java route's lazy initialization. Java code a body calls, the interceptors of an advised route and the encoding of the response run where they run for a Java route: a compiled route that calls blocking Java code, such as a JDBC repository or a blocking HTTP client, blocks the event loop as the same Java route would, and a Java service that calls back into Python, or an interceptor written in Python, runs on the event loop too. Annotate such a route with `@ExecuteOn(TaskExecutors.IO)`, or with `@ExecuteOn(TaskExecutors.BLOCKING)` once the `blocking` executor uses platform threads (see the threading section), as its Java counterpart would be. When the thread selection of the server offloads routes (`micronaut.server.thread-selection: AUTO`), a compiled route runs on `io` as an interpreted one does, not on the `blocking` executor, whose virtual threads cannot run Python.
+
+To keep every Python route on `io`, compiled or not, set `micronaut.python.static.event-loop` to `false` (it defaults to `true`); `@ExecuteOn` still names the executor of a route:
+
+[configuration]
+----
 micronaut:
   python:
     static:
