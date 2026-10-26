@@ -43,6 +43,8 @@ Reason = java.type("io.micronaut.python.processing.staticcompile.StaticCompilati
 Stats = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Stats")
 Delegation = java.type("io.micronaut.python.processing.staticcompile.StaticDelegation")
 ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
+EventLoopSafety = java.type("io.micronaut.python.processing.staticcompile.EventLoopSafety")
+PythonEntries = java.type("io.micronaut.python.processing.staticcompile.Ir$PythonEntries")
 MICRONAUT_TEST = "io.micronaut.test.extensions.junit5.annotation.MicronautTest"
 
 MODE_OFF = "off"
@@ -124,6 +126,8 @@ class StaticPlanner:
         self._ineligibility = {}  # id(class_def) -> why the class generates no stub, or None: asked once per class
         self._decided = {}        # id(node) -> the decision, or None while it is being made
         self._bodies = {}         # id(node) -> the compiled body
+        # id(node) -> (what in the compiled body enters Python or None, the functions it calls through Java)
+        self._python_entries = {}
         self._class_scopes = {}   # id(module) -> the resolution of each of its classes
         # the classes already reported for a class-level switch they can never honour
         self._reported_classes = set()
@@ -147,6 +151,7 @@ class StaticPlanner:
         self._ineligibility = {}
         self._decided = {}
         self._bodies = {}
+        self._python_entries = {}
         self._class_scopes = {}
         self._reported_classes = set()
         self._fixed = {}
@@ -170,7 +175,37 @@ class StaticPlanner:
                         self._decide(module, class_def, class_node, function_def, function_node(class_node, function_def.name()))
                     else:
                         self._decide_accessor(class_def, function_def, accessor)
+        self._record_python_entries()
         return list(self.decisions)
+
+    def _record_python_entries(self):
+        """
+        Gives every compiled body what may make it enter Python (``Ir.PythonEntries``), from which
+        ``EventLoopSafety.safeBodies`` keeps a compiled route that never enters Python on the event loop,
+        as a Java route is: what in the body enters Python by itself (``EventLoopSafety.pythonEntry``,
+        and what the lowering knows of the calls of the compilation it makes through Java: an accessor
+        of a stub that is not introspected, a member it cannot follow), the compiled functions it calls
+        through Java (a call of a function that is not compiled runs its Python body through the bridge),
+        and the generated constructors it calls. The first read of an attribute fixed at construction
+        reaches the Python object, once per object, and is allowed.
+        """
+        marked = {}
+        for node_key, body in list(self._bodies.items()):
+            facts = self._python_entries.get(node_key)
+            if facts is None:
+                continue
+            entry, callees, constructions = facts
+            keys = []
+            for callee in callees:
+                compiled = self._bodies.get(id(callee)) if callee is not None else None
+                if compiled is None:
+                    entry = entry or "calls a function of the compilation that is not compiled, through the bridge"
+                    break
+                keys.append(compiled.key())
+            replaced = body.withPythonEntries(PythonEntries(entry, keys, constructions))
+            marked[body.key()] = replaced
+            self._bodies[node_key] = replaced
+        self.bodies = [marked.get(body.key(), body) for body in self.bodies]
 
     def module_of_path(self, path):
         """The module of the compilation whose source has the path, normalized (normcase, normpath, abspath), or None."""
@@ -198,8 +233,10 @@ class StaticPlanner:
 
     def decide_method(self, model, function_def, node):
         """
-        The decision of a method of a class of the compilation a compiled body calls, made now when the
-        planner has not reached it yet; None while its own decision is under way (a cycle of calls).
+        The decision of a method of a class of the compilation (its PythonClassModel) a compiled body
+        calls, made now when the planner has not reached it yet: the lowering asks whether a sibling is
+        compiled (its shared entry, see _compiled_method) and whether a callee may overflow where Python
+        promotes (Lowering._computes). None while the method's own decision is under way (a cycle of calls).
         """
         if id(node) in self._decided:
             return self._decided[id(node)]
@@ -443,9 +480,24 @@ class StaticPlanner:
         lowering = Lowering(self.checker, module, class_def, function_def, node, rules, class_model,
                             advised=lambda sibling: self._advice(class_def, sibling) is not None,
                             advised_method=class_def is not None and self._advice(class_def, function_def) is not None,
-                            java_layout=java_layout, planner=self, static=static)
+                            java_layout=java_layout, planner=self, static=static,
+                            compiled=lambda sibling, sibling_node: self._compiled_method(class_model, sibling, sibling_node))
         body = lowering.lower()
+        if body is not None:
+            classes = getattr(self.checker, "python_classes", None)
+            by_qualified = classes.by_qualified if classes is not None else {}
+            entry = lowering.python_entry or EventLoopSafety.pythonEntry(body, lambda name: name in by_qualified)
+            self._python_entries[id(node)] = (entry, list(lowering.callees), list(lowering.constructions))
         return body, lowering.reasons
+
+    def _compiled_method(self, model, function_def, node):
+        """
+        Whether a method of the class is compiled, decided now when the planner has not reached it
+        yet; a method whose decision is under way (a cycle of calls) counts as not compiled, which
+        only costs the call its Java dispatch.
+        """
+        decision = self.decide_method(model, function_def, node) if node is not None and model is not None else None
+        return decision is not None and decision.outcome().name() == "COMPILED" and self.body_of(node) is not None
 
     def _switched_accessors(self, class_def):
         """The property accessors a function-level switch turns on, as (accessor, kind) members."""

@@ -336,12 +336,15 @@ public sealed interface Ir {
      * Dispatched {@code python} otherwise (a method the stub does not bridge, an advised method whose
      * interceptor chain runs on the Python object, a method a subclass overrides, a call relying on
      * default arguments): the method of the Python object is invoked, as the Python code would.
+     * Dispatched {@code shared} for a compiled method of the class taking a list, set or dict: the
+     * shared entry of its compiled body is called, which works on the caller's collections where the
+     * stub's Java method would copy them, see {@link StaticBodyGenerator#generateShared}.
      *
      * @param name           The method name
-     * @param parameterTypes The Java parameter types of the stub method, for a {@code java} dispatch
+     * @param parameterTypes The Java parameter types of the stub method, for a {@code java} or {@code shared} dispatch
      * @param arguments      The arguments
      * @param type           The Java return type, {@code void} for none
-     * @param dispatch       {@code java} or {@code python}
+     * @param dispatch       {@code java}, {@code shared} or {@code python}
      */
     record InvokeSibling(String name,
                          List<String> parameterTypes,
@@ -412,13 +415,32 @@ public sealed interface Ir {
      * the Python class called with the arguments, the Python exception wrapped in the generated Java
      * class through its {@code Value} constructor, as the runtime wraps a Python exception that
      * reaches Java code. Its Java value is the {@code RuntimeException} a {@code raise} throws.
+     * <p>
+     * A lazy exception is created as the Java exception alone, with the message
+     * {@code BaseException.__str__} gives the arguments: its generated class creates the Python
+     * exception from the class reference and the arguments the first time the Python object is
+     * needed (it reaches Python, or an exception handler converts it). The planner makes an
+     * exception lazy only when nothing of its class can tell the difference: neither the class
+     * nor a Python base defines {@code __new__}, {@code __init__}, {@code __str__}, {@code __repr__}
+     * or {@code args}, and its builtin base takes its arguments as {@code BaseException} does.
      *
      * @param type      The generated class, a RuntimeException
      * @param arguments The arguments of the Python class, boxed
+     * @param lazy      Whether the Python exception is created when it is first needed
      */
-    record NewPythonException(String type, List<Expression> arguments) implements Expression {
+    record NewPythonException(String type, List<Expression> arguments, boolean lazy) implements Expression {
         public NewPythonException {
             arguments = List.copyOf(arguments);
+        }
+
+        /**
+         * An exception created through its Python class when it is raised.
+         *
+         * @param type      The generated class, a RuntimeException
+         * @param arguments The arguments of the Python class, boxed
+         */
+        public NewPythonException(String type, List<Expression> arguments) {
+            this(type, arguments, false);
         }
     }
 
@@ -593,6 +615,9 @@ public sealed interface Ir {
      * @param callsCompiledCode Whether the body calls code of the compilation that computes a result of its
      *                       own (a compiled function, a method of a Python class through its generated class),
      *                       which may overflow where Python promotes
+     * @param pythonEntries  What may make the body enter Python, which decides whether a route whose body
+     *                       it is runs on the event loop (see {@link EventLoopSafety}); {@code null} when the
+     *                       planner did not find it out
      */
     record CompiledBody(String className,
                         String methodName,
@@ -608,7 +633,8 @@ public sealed interface Ir {
                         boolean moduleLevel,
                         ExceptionCrossing exceptions,
                         List<String> pythonParameters,
-                        boolean callsCompiledCode) {
+                        boolean callsCompiledCode,
+                        @Nullable PythonEntries pythonEntries) {
         public CompiledBody {
             Objects.requireNonNull(className, "className");
             Objects.requireNonNull(exceptions, "exceptions");
@@ -627,6 +653,16 @@ public sealed interface Ir {
         }
 
         /**
+         * @param entries What may make the body enter Python
+         * @return The body with them
+         */
+        public CompiledBody withPythonEntries(PythonEntries entries) {
+            return new CompiledBody(className, methodName, parameterNames, parameterTypes, returnType,
+                body, span, stats, wrapsCheckedExceptions, advised, staticMethod, moduleLevel, exceptions, pythonParameters, callsCompiledCode,
+                entries);
+        }
+
+        /**
          * @return The key of the body: the class and the method
          */
         public String key() {
@@ -640,6 +676,25 @@ public sealed interface Ir {
          */
         public static String key(String className, String methodName) {
             return className + "#" + methodName;
+        }
+    }
+
+    /**
+     * What may make a compiled body enter Python, as the planner finds it: what in the body does by
+     * itself, the compiled functions of the compilation it calls through Java, and the generated
+     * classes it constructs, which enter Python unless their generated constructor only assigns Java
+     * fields. {@link EventLoopSafety#safeBodies} decides from them, over the whole plan, which bodies
+     * never enter Python.
+     *
+     * @param entry         What in the body enters Python by itself, or {@code null} for nothing
+     * @param callees       The keys ({@link CompiledBody#key()}) of the compiled bodies the body calls
+     * @param constructions The constructors of generated classes the body calls, as
+     *                      {@code <class>#<number of parameters>}
+     */
+    record PythonEntries(@Nullable String entry, List<String> callees, List<String> constructions) {
+        public PythonEntries {
+            callees = List.copyOf(callees);
+            constructions = List.copyOf(constructions);
         }
     }
 

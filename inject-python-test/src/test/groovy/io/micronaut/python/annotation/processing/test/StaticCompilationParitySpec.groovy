@@ -57,6 +57,10 @@ class Invalid(ValueError):
     """A class extending another builtin exception: generated as a RuntimeException too."""
 
 
+class NarrowRejected(Rejected):
+    """A subclass without __init__: raised lazily too, its Python exception of its own class."""
+
+
 class Coded(Exception):
     def __init__(self, code: int):
         super().__init__(f"code {code}")
@@ -235,6 +239,21 @@ class Calc:
         if key == "":
             raise Invalid(key, None, 1.5, True)
         return len(key)
+
+    def rejecting_many(self, key: str) -> int:
+        if key != "":
+            raise Rejected(key, 'say "hi"', -0.0, 1e16, None, 7, False)
+        return 0
+
+    def rejecting_none(self, n: int) -> int:
+        if n < 0:
+            raise Rejected(None)
+        return n
+
+    def narrow_rejecting(self, n: int) -> int:
+        if n < 0:
+            raise NarrowRejected(f"narrow {n}")
+        return n
 
     def caught_invalid(self, key: str) -> int:
         try:
@@ -630,6 +649,18 @@ class Calc:
         xs: list[str] = ["a"]
         return self.extended(xs)
 
+    def appended(self) -> str:
+        xs: list[str] = ["a"]
+        sizes: dict[str, int] = {}
+        n = self.append_to(xs, sizes, "b")
+        n = self.append_to(xs, sizes, "c") + n
+        return f"{n} {len(xs)} {len(sizes)} {sizes['c']}"
+
+    def append_to(self, xs: list[str], sizes: dict[str, int], tag: str) -> int:
+        xs.append(tag)
+        sizes[tag] = len(xs)
+        return len(xs)
+
     def which_none(self) -> str:
         return StaticOverloads.which(None)
 
@@ -829,7 +860,7 @@ class Holder:
         ["ambiguous", 1, 2],
         ["biggest", 1.0d, Double.NaN], ["biggest", Double.NaN, 1.0d], ["biggest", -0.0d, 0.0d], ["biggest", 0.0d, -0.0d], ["biggest", 1.0d, 2.5d],
         ["within", "b", "abc"], ["within", null, "abc"],
-        ["filled"], ["extending"],
+        ["filled"], ["extending"], ["appended"],
         ["mixed_max", 3, 2.5d],
         ["gained"],
     ]
@@ -878,6 +909,9 @@ class Holder:
                 results[m]['invalid-thrown'] = raisedBy { calc.invalid('') }
                 results[m]['reraised-thrown'] = raisedBy { calc.reraised(-1) }
                 results[m]['java-message-thrown'] = raisedBy { calc.java_message(-1) }
+                results[m]['many-thrown'] = raisedBy { calc.rejecting_many("it's") }
+                results[m]['none-thrown'] = raisedBy { calc.rejecting_none(-1) }
+                results[m]['narrow-thrown'] = raisedBy { calc.narrow_rejecting(-1) }
                 PythonStatic.resetEntries()
                 results[m]['once'] = calc.python_catching_once('')
                 results[m]['mixed'] = calc.python_catching_mixed('')
@@ -888,6 +922,10 @@ class Holder:
                     assert PythonStatic.entries('python.Calc#mixed_crossing') == 0
                 }
                 results[m]['int_default'] = calc.int_default(new LinkedHashMap<>([tea: 1.5d]))
+                // a Java caller's collections are copied, as the bridge hands Python copies
+                List<String> given = new ArrayList<>(['x'])
+                Map<String, Integer> sizes = new LinkedHashMap<>()
+                results[m]['append_to'] = [calc.append_to(given, sizes, 'y'), given, sizes]
                 def holder = getBean(context, 'python.Holder')
                 results[m]['holder'] = [holder.empty(), holder.label(), holder.form_text()]
                 if (m == StaticCompilationMode.ALL) {
@@ -908,11 +946,14 @@ class Holder:
                     // what may be rebound or overridden while the program runs is not bound at compile time
                     assert !compiled.any { it in ['module_rated', 'module_dup', 'module_shadow', 'Scaler.run', 'Calc.calls_rebound'] }, decisions.toString()
                     assert compiled.contains('module_wrapped'), 'the decorated function compiles; its wrapper calls it, and it delegates to its static Java method'
-                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet() - ['misordered', 'ordered', 'java_catching', 'java_in_try', 'raises_returned', 'python_catching', 'python_catching_coded', 'python_catching_delegated', 'python_catching_once', 'python_catching_mixed']).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.twice', 'module_twice', 'module_upper', 'module_lengths', 'module_any', 'Calc.fill']), decisions.toString()
+                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet() - ['misordered', 'ordered', 'java_catching', 'java_in_try', 'raises_returned', 'python_catching', 'python_catching_coded', 'python_catching_delegated', 'python_catching_once', 'python_catching_mixed']).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.twice', 'module_twice', 'module_upper', 'module_lengths', 'module_any', 'Calc.fill', 'Calc.append_to']), decisions.toString()
                     REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
                     }
+                    // the compiled callee works on the compiled caller's collections as Java code: no bridge call
+                    def appended = decisions.find { it.qualifiedName() == 'Calc.appended' }
+                    assert appended.stats().bridgeCalls() == 0 && appended.stats().javaCalls() == 2, appended.toString()
                     HOLDER_REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Holder.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
@@ -949,6 +990,8 @@ class Holder:
         results[StaticCompilationMode.OFF][["within", null, "abc"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["filled"].toString()] == 1
         results[StaticCompilationMode.OFF][["extending"].toString()] == "a,bTrue1True"
+        results[StaticCompilationMode.OFF][["appended"].toString()] == "5 3 2 3"
+        results[StaticCompilationMode.OFF]['append_to'] == [2, ['x'], [:]]
         results[StaticCompilationMode.OFF][["mixed_max", 3, 2.5d].toString()] == "3 2.5"
         results[StaticCompilationMode.OFF]['int_default'] == "0"
         results[StaticCompilationMode.OFF][["gained"].toString()] == "1.5|1"
@@ -1004,6 +1047,10 @@ class Holder:
         results[StaticCompilationMode.OFF]['invalid-thrown'] == "python.Invalid: ('', None, 1.5, True)"
         results[StaticCompilationMode.OFF]['reraised-thrown'] == 'python.Rejected: negative -1'
         results[StaticCompilationMode.OFF]['java-message-thrown'] == 'python.Rejected: java'
+        // the message of a lazily created exception is BaseException.__str__ of its arguments
+        results[StaticCompilationMode.OFF]['many-thrown'] == '''python.Rejected: ("it's", 'say "hi"', -0.0, 1e+16, None, 7, False)'''
+        results[StaticCompilationMode.OFF]['none-thrown'] == 'python.Rejected: None'
+        results[StaticCompilationMode.OFF]['narrow-thrown'] == 'python.NarrowRejected: narrow -1'
         results[StaticCompilationMode.OFF]['once'] == 'rejected: module empty'
         results[StaticCompilationMode.OFF]['mixed'] == 'rejected: module empty'
         results[StaticCompilationMode.OFF][["java_in_try", -1].toString()] == -1

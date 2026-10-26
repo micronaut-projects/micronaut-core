@@ -30,7 +30,7 @@ class StaticCompilationPlanTest {
     private static Ir.CompiledBody body(String className, String methodName) {
         return new Ir.CompiledBody(className, methodName, List.of(), List.of(), Ir.VOID, new Ir.Body(List.of()),
             SourceSpan.at("app/calc.py", 3, 5), new StaticCompilationDecision.Stats(0, 0, 0, 0), false, false, false, false,
-            Ir.ExceptionCrossing.UNTRANSLATED, List.of(), false);
+            Ir.ExceptionCrossing.UNTRANSLATED, List.of(), false, null);
     }
 
     @Test

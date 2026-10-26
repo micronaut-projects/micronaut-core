@@ -1309,6 +1309,22 @@ class Pricing:
     def fill(self, xs: list[str], tag: str) -> None:
         xs.append(tag)
 
+    def filled_rounded(self, tag: str) -> int:
+        xs: list[str] = []
+        self.fill_rounded(xs, tag)
+        return len(xs)
+
+    def fill_rounded(self, xs: list[str], tag: str) -> None:
+        xs.append(str(round(len(tag) / 2)))
+
+    def ping(self, xs: list[str], n: int) -> int:
+        xs.append("ping")
+        return self.pong(xs, n - 1) if n > 0 else len(xs)
+
+    def pong(self, xs: list[str], n: int) -> int:
+        xs.append("pong")
+        return self.ping(xs, n - 1) if n > 0 else len(xs)
+
     def label_of(self, pair: tuple[str, str]) -> int:
         return len(pair)
 
@@ -1765,6 +1781,11 @@ class ExceptionClassTest(unittest.TestCase):
         self.assertEqual(4, len(numbered.arguments()))  # an int, a float, a bool and None reach Python as themselves
         # the Python class creates the exception as a generated constructor creates its Python object
         self.assertEqual((1, 0), (self.bodies["raises_own"].stats().javaCalls(), self.bodies["raises_own"].stats().bridgeCalls()))
+        # a class without __init__ (nor a base with one) creates it lazily, the Java exception carrying the arguments
+        self.assertTrue(construction.lazy())
+        self.assertTrue(self._thrown("raises_narrow").exception().lazy())
+        self.assertTrue(numbered.lazy())
+        self.assertFalse(coded.lazy())  # Coded.__init__ decides what its Python exception holds
 
     def test_catching_the_class_catches_the_generated_exception(self):
         for name in ("catches_own", "catches_both", "reraises", "narrowed"):
@@ -1812,6 +1833,237 @@ class ExceptionClassTest(unittest.TestCase):
             self.assertEqual("SKIPPED", decision.outcome().name(), name)
             self.assertEqual("python-exception", decision.reasons()[0].rule(), f"{name}: {rules(decision)}")
             self.assertIn(message, decision.reasons()[0].message(), name)
+
+
+LAZY = '''
+from jakarta.inject import Singleton
+
+
+def registered(cls):
+    return cls
+
+
+class Plain(Exception):
+    """Created lazily."""
+    code = 3
+
+    def describe(self) -> str:
+        return "plain"
+
+
+class Valued(ValueError):
+    pass
+
+
+class Mixin:
+    def hint(self) -> str:
+        return "mixin"
+
+
+class Mixed(Plain, Mixin):
+    pass
+
+
+class Initialized(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
+class Inherits(Initialized):
+    pass
+
+
+class Spelled(Exception):
+    def __str__(self):
+        return "spelled"
+
+
+class Represented(Exception):
+    def __repr__(self):
+        return "represented"
+
+
+class Created(Exception):
+    def __new__(cls, *args):
+        return super().__new__(cls, *args)
+
+
+class Finalized(Exception):
+    def __del__(self):
+        pass
+
+
+class Argued(Exception):
+    args = ("fixed",)
+
+
+class Reassigned(Exception):
+    def reset(self) -> None:
+        self.args = ()
+
+
+@registered
+class Decorated(Exception):
+    pass
+
+
+class Keyed(KeyError):
+    pass
+
+
+class Spelled2(Spelled):
+    pass
+
+
+class Patched(Exception):
+    pass
+
+
+Patched.__str__ = lambda self: "patched"
+
+
+class Set(Exception):
+    pass
+
+
+setattr(Set, "args", ())
+
+
+class Aliased(Exception):
+    pass
+
+
+Other = Aliased
+Other.__init__ = lambda self, *arguments: None
+
+
+@Singleton
+class Gate:
+    def plain(self, n: int) -> int:
+        raise Plain(n)
+
+    def valued(self, n: int) -> int:
+        raise Valued("bad", n)
+
+    def mixed(self, n: int) -> int:
+        raise Mixed()
+
+    def initialized(self, n: int) -> int:
+        raise Initialized("init")
+
+    def inherits(self, n: int) -> int:
+        raise Inherits("init")
+
+    def spelled(self, n: int) -> int:
+        raise Spelled("x")
+
+    def represented(self, n: int) -> int:
+        raise Represented("x")
+
+    def created(self, n: int) -> int:
+        raise Created("x")
+
+    def finalized(self, n: int) -> int:
+        raise Finalized("x")
+
+    def argued(self, n: int) -> int:
+        raise Argued("x")
+
+    def reassigned(self, n: int) -> int:
+        raise Reassigned("x")
+
+    def decorated(self, n: int) -> int:
+        raise Decorated("x")
+
+    def keyed(self, n: int) -> int:
+        raise Keyed("x")
+
+    def spelled_base(self, n: int) -> int:
+        raise Spelled2("x")
+
+    def patched(self, n: int) -> int:
+        raise Patched("x")
+
+    def set(self, n: int) -> int:
+        raise Set("x")
+
+    def aliased(self, n: int) -> int:
+        raise Aliased("x")
+'''
+
+
+PATCHING = '''
+from jakarta.inject import Singleton
+
+
+class Plain(Exception):
+    pass
+
+
+def respell(cls):
+    cls.__str__ = lambda self: "respelled"
+
+
+@Singleton
+class Gate:
+    def plain(self, n: int) -> int:
+        raise Plain(n)
+'''
+
+COMPUTED = '''
+from jakarta.inject import Singleton
+
+
+class Plain(Exception):
+    pass
+
+
+def install(cls, name, value):
+    setattr(cls, name, value)
+
+
+@Singleton
+class Gate:
+    def plain(self, n: int) -> int:
+        raise Plain(n)
+'''
+
+
+class LazyExceptionPatchingTest(unittest.TestCase):
+    """A special method written on a class the compilation cannot name may be any exception class's: every raise is eager."""
+
+    def test_a_special_method_written_on_an_unknown_class_keeps_every_raise_eager(self):
+        for source in (PATCHING, COMPUTED):
+            decisions, planner = plan(source, MODE_ALL, facts=FakeFacts())
+            body = {body.methodName(): body for body in planner.bodies}["plain"]
+            self.assertEqual("COMPILED", decisions["Gate.plain"].outcome().name(), rules(decisions["Gate.plain"]))
+            self.assertFalse(list(body.body().statements())[0].exception().lazy())
+
+
+class LazyExceptionTest(unittest.TestCase):
+    """A raise creates the Java exception alone when nothing of its class can tell the Python exception it is created from apart."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.decisions, cls.planner = plan(LAZY, MODE_ALL, facts=FakeFacts())
+        cls.bodies = {body.methodName(): body for body in cls.planner.bodies}
+
+    def _construction(self, name):
+        self.assertEqual("COMPILED", self.decisions[f"Gate.{name}"].outcome().name(), f"{name}: {rules(self.decisions[f'Gate.{name}'])}")
+        construction = list(self.bodies[name].body().statements())[0].exception()
+        self.assertEqual("NewPythonException", construction.getClass().getSimpleName())
+        return construction
+
+    def test_a_class_taking_its_arguments_as_base_exception_does_is_created_lazily(self):
+        for name in ("plain", "valued", "mixed"):
+            self.assertTrue(self._construction(name).lazy(), name)
+        # the same Java and compilation calls as an eager raise: the planner's view of the body is unchanged
+        self.assertEqual((1, 0), (self.bodies["plain"].stats().javaCalls(), self.bodies["plain"].stats().bridgeCalls()))
+
+    def test_a_class_that_could_tell_the_difference_is_created_when_it_is_raised(self):
+        for name in ("initialized", "inherits", "spelled", "represented", "created", "finalized", "argued", "reassigned",
+                     "decorated", "keyed", "spelled_base", "patched", "set", "aliased"):
+            self.assertFalse(self._construction(name).lazy(), name)
 
 
 HIERARCHY = '''
@@ -2398,13 +2650,29 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("java", _uncast(hidden.right()).dispatch())  # the default the call relies on is filled in
         self.assertEqual(1, _uncast(list(_uncast(hidden.right()).arguments())[0]).value())
         self.assertEqual(1, self.bodies["hidden_call"].stats().bridgeCalls())
-        # fill appends to the caller's list, which the stub's Java method would copy: called through the Python object
+        # fill appends to the caller's list, which the stub's Java method would copy: fill is compiled
+        # (decided before the planner reaches it), so its shared entry is called, which makes no copy
         self.assertEqual("COMPILED", self.decisions["Pricing.filled"].outcome().name(), rules(self.decisions["Pricing.filled"]))
+        self.assertEqual("COMPILED", self.decisions["Pricing.fill"].outcome().name(), rules(self.decisions["Pricing.fill"]))
         statements = list(self.bodies["filled"].body().statements())
         fill = _uncast(statements[1].expression())
-        self.assertEqual(("fill", "python"), (fill.name(), fill.dispatch()))
+        self.assertEqual(("fill", "shared"), (fill.name(), fill.dispatch()))
+        self.assertEqual(["java.util.List<java.lang.String>", "java.lang.String"], list(fill.parameterTypes()))
         label_of = _uncast(_uncast(statements[2].value()).right())
         self.assertEqual(("label_of", "java"), (label_of.name(), label_of.dispatch()))  # a tuple is not updated in place
+        self.assertEqual((2, 0), (self.bodies["filled"].stats().javaCalls(), self.bodies["filled"].stats().bridgeCalls()))
+        # a callee that is not compiled is called through the Python object, which hands it the caller's list
+        self.assertEqual("SKIPPED", self.decisions["Pricing.fill_rounded"].outcome().name())
+        fill_rounded = _uncast(list(self.bodies["filled_rounded"].body().statements())[1].expression())
+        self.assertEqual(("fill_rounded", "python"), (fill_rounded.name(), fill_rounded.dispatch()))
+        # each decided once: pong when ping's lowering asks for it, which calls ping back while ping's
+        # decision is under way, so through the Python object; ping calls pong's shared entry
+        names = [decision.qualifiedName() for decision in self.planner.decisions]
+        self.assertEqual((1, 1), (names.count("Pricing.ping"), names.count("Pricing.pong")))
+        self.assertLess(names.index("Pricing.pong"), names.index("Pricing.ping"))
+        ping = _uncast(_uncast(list(self.bodies["ping"].body().statements())[-1].value()).then())
+        pong = _uncast(_uncast(list(self.bodies["pong"].body().statements())[-1].value()).then())
+        self.assertEqual([("pong", "shared"), ("ping", "python")], [(ping.name(), ping.dispatch()), (pong.name(), pong.dispatch())])
         via_property = _uncast(list(self.bodies["via_property"].body().statements())[0].value())
         self.assertEqual("doubled", via_property.left().property())
         self.assertEqual("double", via_property.left().type())
@@ -2995,14 +3263,32 @@ class Base:
     def counted(self) -> int:
         return self.__count
 
+    def gathered(self) -> int:
+        xs: list[str] = []
+        self.gather(xs)
+        self.keep(xs)
+        return len(xs)
+
+    def gather(self, xs: list[str]) -> None:
+        xs.append("base")
+
+    def keep(self, xs: list[str]) -> None:
+        xs.append("kept")
+
 
 class Inheriting(Base):
-    pass
+    def kept_here(self) -> int:
+        xs: list[str] = []
+        self.keep(xs)
+        return len(xs)
 
 
 class Overriding(Inheriting):
     def helper(self, n: int) -> int:
         return n * 2
+
+    def gather(self, xs: list[str]) -> None:
+        xs.append("overriding")
 '''
 
 
@@ -3025,6 +3311,16 @@ class SiblingTest(unittest.TestCase):
         total = _uncast(list(run.body().statements())[0].value())
         self.assertEqual("python", _uncast(_uncast(total.left()).right()).dispatch())  # Overriding.helper, a grandchild's
         self.assertEqual("java", _uncast(total.right()).dispatch())  # inherited by every subclass, overridden by none
+
+    def test_a_compiled_sibling_taking_a_list_is_called_virtually(self):
+        # Python calls the override of the object's class: an overridden callee is called through the
+        # Python object, one no subclass overrides through its shared entry
+        statements = list(self.bodies[("Base", "gathered")].body().statements())
+        gather, keep = _uncast(statements[1].expression()), _uncast(statements[2].expression())
+        self.assertEqual([("gather", "python"), ("keep", "shared")], [(gather.name(), gather.dispatch()), (keep.name(), keep.dispatch())])
+        # a method of a base has no shared entry in the subclass's stub
+        keep = _uncast(list(self.bodies[("Inheriting", "kept_here")].body().statements())[1].expression())
+        self.assertEqual(("keep", "python"), (keep.name(), keep.dispatch()))
 
     def test_a_none_test_of_a_sibling_result_and_a_mangled_attribute_are_refused(self):
         self.assertEqual(["unsupported-expression"], rules(self.decisions["Base.checked"]))
@@ -3582,6 +3878,213 @@ class ObjectsOfTheCompilationTest(unittest.TestCase):
         # a dataclass's __repr__ is generated, not in its source; a Python toString takes precedence in the stub
         for name in ("form", "unspelled", "renamed"):
             self.assertEqual(("SKIPPED", ["unsupported-expression"]), self._decided(name), name)
+
+
+
+EVENT_LOOP = '''
+class Rejected(Exception):
+    pass
+
+
+class Refused(Exception):
+    def __str__(self) -> str:
+        return "refused"
+
+
+class Item:
+    def __init__(self, n: int):
+        self.n = n
+
+
+class Point:
+    def __init__(self, x: int, y: int):
+        self.x = x
+        self.y = y
+
+
+class Origin:
+    def __init__(self, x: int, y: int):
+        self.x = x
+        self.y = y
+
+
+class Leaf:
+    def __init__(self, n: int, item: Item):
+        self.n = n
+        self.item = item
+
+    def plain(self, a: int) -> int:
+        return a + 1
+
+    def fixed(self) -> int:
+        return self.n
+
+    def calls_plain(self, a: int) -> int:
+        return self.plain(a) + self.fixed()
+
+    def calls_private(self, a: int) -> int:
+        return self._private(a)
+
+    def _private(self, a: int) -> int:
+        return a
+
+    def raising(self, a: int) -> int:
+        if a < 0:
+            raise Refused("negative")
+        return a
+
+    def calls_raising(self, a: int) -> int:
+        return self.raising(a)
+
+    def raising_lazily(self, a: int) -> int:
+        if a < 0:
+            raise Rejected("negative")
+        return a
+
+    def catches_lazily(self, a: int) -> int:
+        try:
+            if a < 0:
+                raise Rejected("negative")
+            return a
+        except Rejected:
+            return 0
+
+    def ping(self, a: int) -> int:
+        if a <= 0:
+            return 0
+        return self.pong(a - 1)
+
+    def pong(self, a: int) -> int:
+        return self.ping(a)
+
+    def builds(self, a: int) -> Item:
+        return Item(a)
+
+    def builds_point(self, a: int) -> Point:
+        return Point(a, a)
+
+    def builds_origin(self) -> Origin:
+        return Origin(0, 0)
+
+    def reads_item(self) -> int:
+        return self.item.n
+
+    def counts_items(self, items: set[Item]) -> int:
+        return len(items)
+
+    def counts_names(self, names: set[str]) -> int:
+        return len(names)
+
+    def fill(self, xs: list[str]) -> None:
+        xs.append("filled")
+
+    def fills(self) -> int:
+        xs: list[str] = []
+        self.fill(xs)
+        return len(xs)
+
+
+class Caller:
+    def __init__(self, leaf: Leaf):
+        self.leaf = leaf
+
+    def through_leaf(self, a: int) -> int:
+        return self.leaf.calls_plain(a)
+
+    def through_private(self, a: int) -> int:
+        return self.leaf.calls_private(a)
+
+
+def twice(n: int) -> int:
+    return n * 2
+
+
+def twice_twice(n: int) -> int:
+    return twice(twice(n))
+'''
+
+
+class EventLoopSafetyTest(unittest.TestCase):
+    """Which compiled bodies never enter Python: the planner's Ir.PythonEntries, decided over the plan by EventLoopSafety."""
+
+    def setUp(self):
+        import java
+        self.decisions, self.planner = plan(EVENT_LOOP, MODE_ALL, facts=FixedFacts(introspected=["pkg.Point"]))
+        self.bodies = {(body.methodName() if body.moduleLevel() else body.className().rsplit(".", 1)[-1] + "." + body.methodName()): body
+                       for body in self.planner.bodies}
+        safety = java.type("io.micronaut.python.processing.staticcompile.EventLoopSafety")
+        # the stub generator tells which generated constructors only assign Java fields: here Point's
+        self.safe = set(safety.safeBodies(list(self.planner.bodies), lambda constructor: constructor == "pkg.Point#2"))
+
+    def _safe(self, name):
+        decision = self.decisions[name]
+        self.assertEqual("COMPILED", decision.outcome().name(), rules(decision))
+        return self.bodies[name].key() in self.safe
+
+    def test_a_body_calling_java_and_compiled_safe_siblings_is_safe(self):
+        self.assertTrue(self._safe("Leaf.plain"))
+        # the first read of an attribute fixed at construction reaches the Python object once per object
+        self.assertTrue(self._safe("Leaf.fixed"))
+        self.assertTrue(self._safe("Leaf.calls_plain"))
+        # through a compiled method of another object of the compilation
+        self.assertTrue(self._safe("Caller.through_leaf"))
+
+    def test_module_functions_calling_compiled_functions_are_safe(self):
+        self.assertTrue(self._safe("twice"))
+        self.assertTrue(self._safe("twice_twice"))
+
+    def test_a_call_through_the_python_object_is_unsafe_and_so_are_its_callers(self):
+        self.assertFalse(self._safe("Leaf.calls_private"))
+        self.assertFalse(self._safe("Caller.through_private"))
+
+    def test_a_raise_of_a_python_exception_class_is_unsafe_and_so_are_its_callers(self):
+        self.assertFalse(self._safe("Leaf.raising"))
+        self.assertFalse(self._safe("Leaf.calls_raising"))
+
+    def test_a_call_of_the_shared_entry_of_a_compiled_sibling_is_a_java_call(self):
+        # fill takes the caller's list: its compiled body is called through its shared entry, in Java
+        call = _uncast(list(self.bodies["Leaf.fills"].body().statements())[1].expression())
+        self.assertEqual(("fill", "shared"), (call.name(), call.dispatch()))
+        self.assertEqual(["pkg.Leaf#fill"], list(self.bodies["Leaf.fills"].pythonEntries().callees()))
+        self.assertTrue(self._safe("Leaf.fills"))
+
+    def test_a_lazy_raise_creates_no_python_exception_and_is_safe(self):
+        # Refused defines __str__: its raise creates the exception through its Python class. Rejected takes
+        # its arguments as BaseException does: the raise creates the Java exception alone, and a clause
+        # of the body catches it without its Python exception being created
+        self.assertFalse(self._thrown_lazily("Leaf.raising"))
+        self.assertTrue(self._thrown_lazily("Leaf.raising_lazily"))
+        self.assertTrue(self._safe("Leaf.raising_lazily"))
+        self.assertTrue(self._safe("Leaf.catches_lazily"))
+
+    def _thrown_lazily(self, name):
+        thrown = list(list(self.bodies[name].body().statements())[0].then().statements())[0].exception()
+        self.assertEqual("NewPythonException", thrown.getClass().getSimpleName(), name)
+        return thrown.lazy()
+
+    def test_a_cycle_of_calls_is_unsafe(self):
+        self.assertFalse(self._safe("Leaf.ping"))
+        self.assertFalse(self._safe("Leaf.pong"))
+
+    def test_constructing_a_python_class_or_reading_an_object_through_its_accessor_is_unsafe(self):
+        self.assertFalse(self._safe("Leaf.builds"))
+        self.assertFalse(self._safe("Leaf.reads_item"))
+
+    def test_constructing_an_introspected_class_is_safe_where_its_constructor_only_assigns_java_fields(self):
+        self.assertEqual(["pkg.Point#2"], list(self.bodies["Leaf.builds_point"].pythonEntries().constructions()))
+        self.assertTrue(self._safe("Leaf.builds_point"))
+        # Origin is no introspected class: its generated constructor creates the Python object
+        self.assertFalse(self._safe("Leaf.builds_origin"))
+
+    def test_copying_a_set_of_python_objects_hashes_them(self):
+        # the body works on a copy of a set parameter: a hashed collection of Python objects runs their __hash__
+        self.assertFalse(self._safe("Leaf.counts_items"))
+        self.assertTrue(self._safe("Leaf.counts_names"))
+
+    def test_the_planner_records_what_enters_python(self):
+        entries = self.bodies["Leaf.calls_private"].pythonEntries()
+        self.assertEqual("calls [_private] through the Python object", entries.entry())
+        self.assertEqual(["pkg.Leaf#plain", "pkg.Leaf#fixed"], list(self.bodies["Leaf.calls_plain"].pythonEntries().callees()))
 
 
 if __name__ == "__main__":

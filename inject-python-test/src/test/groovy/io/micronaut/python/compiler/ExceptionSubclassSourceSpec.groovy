@@ -113,6 +113,89 @@ public Coded(int code, String detail) {
         assertGeneratedSourceDoesNotContain(pythonCode, 'public Narrow(String message)')
     }
 
+    void "a Python exception class without __init__ can create its Python exception lazily"() {
+        given:
+        def pythonCode = '''
+class EmailAlreadyUsed(Exception):
+    """Raised when an email address is already registered."""
+
+
+class Coded(ValueError):
+    def __init__(self, code: int):
+        super().__init__(code)
+
+
+class Narrow(EmailAlreadyUsed):
+    pass
+'''
+
+        expect: "a compiled raise passes the class reference, public on an exception class, and the arguments"
+        assertGeneratedSourceContains(pythonCode, 'public static final PythonContextRuntime.PythonClassReference __PYTHON_CLASS_REFERENCE =')
+        assertGeneratedSourceContains(pythonCode, 'protected transient volatile Value graalpyInternalValue;')
+        assertGeneratedSourceContains(pythonCode, '''
+public EmailAlreadyUsed(PythonContextRuntime.PythonClassReference pythonClassReference, Object[] arguments) {
+    super(PythonExceptions.argumentsMessage(arguments));
+    this.graalpyInternalLazyClassReference = pythonClassReference;
+    this.graalpyInternalLazyArguments = arguments;
+  }
+''')
+        and: "the Python exception is created on the first asPolyglotValue()"
+        assertGeneratedSourceContains(pythonCode, '''
+    Value value = this.graalpyInternalValue;
+    if (value == null && this.graalpyInternalLazyClassReference != null) {
+      synchronized (this) {
+        value = this.graalpyInternalValue;
+        if (value == null) {
+          this.graalpyInternalValue = PythonContextRuntime.newInstance(this.graalpyInternalLazyClassReference, this.graalpyInternalLazyArguments);
+''')
+        and: "a subclass hands its own class reference up"
+        assertGeneratedSourceContains(pythonCode, '''
+public Narrow(PythonContextRuntime.PythonClassReference pythonClassReference, Object[] arguments) {
+    super(pythonClassReference, arguments);
+  }
+''')
+        and: "a class declaring __init__ creates its Python exception when it is raised"
+        assertGeneratedSourceDoesNotContain(pythonCode, 'public Coded(PythonContextRuntime.PythonClassReference')
+    }
+
+    void "a compiled raise creates a lazy exception with the static class reference, an eager one through its Python class"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+
+
+class Rejected(Exception):
+    pass
+
+
+class Coded(Exception):
+    def __init__(self, code: int):
+        super().__init__(f"code {code}")
+
+
+@Singleton
+class Gate:
+    def lazy(self, n: int) -> int:
+        if n < 0:
+            raise Rejected("negative", n)
+        return n
+
+    def eager(self, n: int) -> int:
+        if n < 0:
+            raise Coded(n)
+        return n
+'''
+        def sources = compile(pythonCode, ["-A${io.micronaut.python.processing.staticcompile.StaticCompilationMode.OPTION}=all".toString()])
+            .findAll { it.toUri().toString().endsWith("/SOURCE_OUTPUT/python/Gate.java") }
+        def gate = sources*.getCharContent(true)*.toString().join('\n')
+
+        expect: "no class reference is allocated per raise, and the lazy raise does not enter Python"
+        gate.contains('throw new python.Rejected(Rejected.__PYTHON_CLASS_REFERENCE, new Object[]{"negative",PythonStatic.box((long) n)});')
+        gate.contains('throw PythonStatic.raised(Coded.class, PythonContextRuntime.newInstance(Coded.__PYTHON_CLASS_REFERENCE, new Object[]{PythonStatic.box((long) n)}));')
+        // the only class reference created is the one of Gate itself
+        gate.count('new io.micronaut.context.python.PythonContextRuntime.PythonClassReference(') == 1
+    }
+
     void "a super constructor call that matches no Java constructor fails compilation"() {
         given:
         def pythonCode = '''

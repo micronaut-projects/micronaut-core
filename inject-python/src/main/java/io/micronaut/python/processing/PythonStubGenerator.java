@@ -207,6 +207,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String COMPILED_SELF = "__mnSelf";
     // the Python object a stub extending a Python class stub last bound to the compiled bodies of its classes
     private static final String COMPILED_BOUND_FIELD = "graalpyInternalCompiledValue";
+    private static final String LAZY_CLASS_REFERENCE_FIELD = "graalpyInternalLazyClassReference";
+    private static final String LAZY_ARGUMENTS_FIELD = "graalpyInternalLazyArguments";
+    private static final String PYTHON_CLASS_REFERENCE_FIELD = "__PYTHON_CLASS_REFERENCE";
+    // the prefix of the shared entry of a compiled body: a private name, which the stub bridges no Python method under
+    private static final String SHARED_ENTRY_PREFIX = "__mnShared_";
     public static final ClassTypeDef PYTHON_ASYNCIO_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonAsyncioRuntime");
     public static final ClassTypeDef PYTHON_CONTEXT_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime");
     public static final ClassTypeDef PYTHON_JAVA_BASES = ClassTypeDef.of("io.micronaut.context.python.PythonJavaBases");
@@ -331,6 +336,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private final Map<String, InterfaceEntry> interfaceDefs = new LinkedHashMap<>();
     private final Map<String, AnnotationEntry> annotationDefs = new LinkedHashMap<>();
     private final Map<String, Boolean> junitExtensionAnnotations = new HashMap<>();
+    /**
+     * The constructors generated so far that only assign Java fields, as {@code <class>#<number of parameters>}:
+     * calling one does not enter Python (see {@code EventLoopSafety#safeBodies}).
+     */
+    private final Set<String> pythonFreeConstructors = new HashSet<>();
     private Map<String, ClassElement> allClasses = Map.of();
 
     public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
@@ -603,7 +613,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (isMemberStub(classElement) && classElement.isStatic()) {
                         builder.addModifiers(Modifier.STATIC);
                     }
-                    FieldDef pythonClassReference = pythonClassReferenceField("__PYTHON_CLASS_REFERENCE", classElement);
+                    FieldDef pythonClassReference = pythonClassReferenceField(PYTHON_CLASS_REFERENCE_FIELD, classElement, classElement.isAssignable(Throwable.class));
                     builder.addField(pythonClassReference);
                     for (GenericPlaceholderElement placeholder : classElement.getDeclaredGenericPlaceholders()) {
                         builder.addTypeVariable(TypeDef.variable(placeholder.getVariableName()));
@@ -1029,7 +1039,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             if (!isIntrospectedBean && !isJunit5Test) {
                 // an owned object is replaced when its application shut down, under the stub's monitor,
                 // and read without it by every other thread
-                pythonValueBuilder.addModifiers(extendsHostClass ? Modifier.FINAL : Modifier.VOLATILE);
+                // (a lazy exception creates its Python object when it is first needed, see hasLazyExceptionConstructor)
+                pythonValueBuilder.addModifiers(extendsHostClass && !hasLazyExceptionConstructor(element) ? Modifier.FINAL : Modifier.VOLATILE);
             }
             pythonValue = pythonValueBuilder.build();
             stateBuilder.addField(pythonValue);
@@ -1416,6 +1427,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     })
             );
         }
+        if (!isJunit5Test && hasLazyExceptionConstructor(model.element())) {
+            addLazyExceptionConstructor(model);
+        }
 
     }
 
@@ -1510,6 +1524,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         if (declaresCompiledDelegate(model)) {
             builder.addInnerType(compiledDelegate(model));
+            addSharedEntries(model, builder);
         }
         if (readsFixedAttributes(model)) {
             builder.addMethod(fixedReset(model));
@@ -1960,7 +1975,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         return StatementDef.multi(
                             returnInterceptedTargetValue(aThis),
                             returnObjectUnderConstruction(model, aThis),
-                            aThis.field(pythonValueFinal).returning()
+                            !extendsPythonClass && hasLazyExceptionConstructor(element)
+                                ? lazyExceptionValue(model, aThis, pythonValueFinal)
+                                : aThis.field(pythonValueFinal).returning()
                         );
                     }
                     // an owned object is created again when the application it was created in has shut
@@ -2088,6 +2105,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * Part of {@link #visitClass} extracted verbatim; locals come from the model.
      */
+    /**
+     * Whether a generated constructor only assigns Java fields, so that calling it does not enter Python.
+     * Known for the classes this generator has visited; any other is taken to enter Python.
+     *
+     * @param constructor The constructor, as {@code <class>#<number of parameters>}
+     * @return Whether it only assigns Java fields
+     */
+    public boolean constructsWithoutPython(String constructor) {
+        return pythonFreeConstructors.contains(constructor);
+    }
+
     private void addFactoryMethods(ClassStubModel model) {
         ClassDef.ClassDefBuilder builder = model.builder();
         boolean isAopProxy = model.isAopProxy();
@@ -2159,6 +2187,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             // them. Any other Python base only wraps the Python object, which then has to exist up front.
             final int[] superConstructorParameterIndexes = extendsPythonClass ? pythonSuperConstructorParameterIndexes(superType, parameters) : null;
             final boolean requiresPythonInstance = extendsPythonClass && superConstructorParameterIndexes == null;
+            if (!constructsJavaBaseFirst(model, isAbstractIntroCtor) && !(extendsJavaBase && !isJunit5Test)
+                && isIntrospectedBean && constructorParametersBackedByFields
+                && !hasConfigurationBuilderProperty && !hasDynamicBeanProperties && !extendsPythonClass) {
+                // the constructor below only assigns the Java fields: the Python object is created when first needed
+                pythonFreeConstructors.add(element.getName() + "#" + parameters.length);
+            }
                 builder.addMethod(
                 constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                     if (constructsJavaBaseFirst(model, isAbstractIntroCtor)) {
@@ -2292,6 +2326,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             final boolean appliesPythonDefaults = isIntrospectedBean
                 && beanProperties.stream().anyMatch(PythonStubGenerator::hasPythonDefaultValue)
                 && isPythonConstructibleWithoutArguments(element);
+            if (!isJunit5Test && !constructsJavaBaseFirst(model, isAbstractIntroNoArg) && !extendsJavaBase
+                && isIntrospectedBean && !hasConfigurationBuilderProperty && !appliesPythonDefaults) {
+                // the constructor below keeps the bean lazy: the Python object is created when first needed
+                pythonFreeConstructors.add(element.getName() + "#0");
+            }
             builder.addMethod(constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                 if (isJunit5Test) {
                     return StatementDef.multi();
@@ -4058,8 +4097,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     static FieldDef pythonClassReferenceField(String fieldName, ClassElement element) {
-        return FieldDef.builder(fieldName)
-            .ofType(PYTHON_CLASS_REFERENCE)
+        return pythonClassReferenceField(fieldName, element, false);
+    }
+
+    /**
+     * @param fieldName The field
+     * @param element   The Python class
+     * @param visible   Whether the field is public: the class reference of an exception class, which a
+     *                  compiled raise in another package passes to its generated class
+     * @return The static field holding the class reference of the Python class
+     */
+    private static FieldDef pythonClassReferenceField(String fieldName, ClassElement element, boolean visible) {
+        FieldDef.FieldDefBuilder field = FieldDef.builder(fieldName)
+            .ofType(PYTHON_CLASS_REFERENCE);
+        if (visible) {
+            field.addModifiers(Modifier.PUBLIC);
+        }
+        return field
             .addModifiers(Modifier.STATIC, Modifier.FINAL)
             .initializer(pythonClassReferenceExpression(element))
             .build();
@@ -5167,6 +5221,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
 
             @Override
+            public ExpressionDef invokeShared(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+                if (hasSharedEntry(model, name)) {
+                    return aThis.invoke(SHARED_ENTRY_PREFIX + name, parameterTypes, type, arguments);
+                }
+                return members.invoke(name, parameterTypes, arguments, typeName, type, false);
+            }
+
+            @Override
             public ExpressionDef invokeOn(ExpressionDef value, String owner, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
                 return members.invokeOn(value, owner, name, arguments, typeName, type);
             }
@@ -5361,7 +5423,89 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static ExpressionDef compiledPythonClassReference(VisitorContext context, String type) {
         ClassElement element = context.getClassElement(type)
             .orElseThrow(() -> new IllegalStateException("A compiled body creates an object of [" + type + "], which is no class of the compilation"));
-        return pythonClassReferenceExpression(element);
+        // the static field of the generated class of the exception class, public there, rather than a new reference per raise
+        return javaClassType(element).getStaticField(PYTHON_CLASS_REFERENCE_FIELD, PYTHON_CLASS_REFERENCE);
+    }
+
+    /**
+     * Whether the generated class of a Python exception class has the constructor a compiled raise
+     * creates a lazy exception with: {@code E(PythonClassReference, Object[])}, the Java exception
+     * alone, whose Python exception is created from the class reference and the arguments when it
+     * is first needed (see {@code Ir.NewPythonException}). The generated class extends
+     * {@code RuntimeException} for a builtin exception base, directly or through the generated classes
+     * of Python bases, and neither it nor those bases declare {@code __init__}: the arguments are the
+     * {@code args} of the Python exception, and the constructor takes no constructor's place. The
+     * planner decides which raises are lazy, with the stricter rule of the lowering.
+     *
+     * @param element The Python class
+     * @return Whether the generated class has the lazy constructor
+     */
+    static boolean hasLazyExceptionConstructor(ClassElement element) {
+        if (!(element instanceof AbstractPythonClassElement pythonClass) || pythonClass.getNativeType().constructor() != null) {
+            return false;
+        }
+        ClassElement superType = element.getSuperType().orElse(null);
+        if (superType instanceof AbstractPythonClassElement) {
+            return hasLazyExceptionConstructor(superType);
+        }
+        return superType != null && RuntimeException.class.getName().equals(superType.getName())
+            && pythonClass.getNativeType().bases().stream().anyMatch(base -> base.nativeException());
+    }
+
+    /**
+     * The constructor {@code E(PythonClassReference, Object[])} of a lazy exception (see
+     * {@link #hasLazyExceptionConstructor}): the Java message is {@code BaseException.__str__} of the
+     * arguments; the root stub keeps the class reference and the arguments for {@code asPolyglotValue()},
+     * a subclass stub hands its own class reference up.
+     */
+    private static void addLazyExceptionConstructor(ClassStubModel model) {
+        ClassDef.ClassDefBuilder builder = model.builder();
+        boolean root = !model.extendsPythonClass();
+        if (root) {
+            builder.addField(FieldDef.builder(LAZY_CLASS_REFERENCE_FIELD)
+                .ofType(PYTHON_CLASS_REFERENCE)
+                .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
+                .build());
+            builder.addField(FieldDef.builder(LAZY_ARGUMENTS_FIELD)
+                .ofType(TypeDef.OBJECT.array())
+                .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
+                .build());
+        }
+        builder.addMethod(MethodDef.constructor()
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter(ParameterDef.of(PYTHON_CLASS_REFERENCE_PARAMETER, PYTHON_CLASS_REFERENCE))
+            .addParameter(ParameterDef.of("arguments", TypeDef.OBJECT.array()))
+            .build((aThis, methodParameters) -> {
+                if (!root) {
+                    return aThis.superRef().invokeSuperConstructor(List.of(PYTHON_CLASS_REFERENCE, TypeDef.OBJECT.array()), methodParameters.get(0), methodParameters.get(1));
+                }
+                return StatementDef.multi(
+                    aThis.superRef().invokeSuperConstructor(List.of(TypeDef.STRING), PYTHON_EXCEPTIONS.invokeStatic("argumentsMessage", List.of(TypeDef.OBJECT.array()), TypeDef.STRING, methodParameters.get(1))),
+                    aThis.field(LAZY_CLASS_REFERENCE_FIELD, PYTHON_CLASS_REFERENCE).assign(methodParameters.get(0)),
+                    aThis.field(LAZY_ARGUMENTS_FIELD, TypeDef.OBJECT.array()).assign(methodParameters.get(1))
+                );
+            }));
+    }
+
+    /**
+     * The {@code asPolyglotValue()} statements of the root stub of a lazy exception: the Python exception,
+     * created from the class reference and the arguments on the first call, under the monitor of the
+     * exception so concurrent callers share one.
+     */
+    private static StatementDef lazyExceptionValue(ClassStubModel model, VariableDef.This aThis, FieldDef pythonValue) {
+        VariableDef.Field classReference = aThis.field(LAZY_CLASS_REFERENCE_FIELD, PYTHON_CLASS_REFERENCE);
+        ExpressionDef created = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, List.of(PYTHON_CLASS_REFERENCE, TypeDef.OBJECT.array()), POLYGLOT_VALUE,
+            classReference, aThis.field(LAZY_ARGUMENTS_FIELD, TypeDef.OBJECT.array()));
+        return aThis.field(pythonValue).newLocal(VALUE_PARAMETER, value -> StatementDef.multi(
+            value.isNull().and(classReference.isNonNull()).doIf(new StatementDef.Synchronized(aThis, StatementDef.multi(
+                value.assign(aThis.field(pythonValue)),
+                value.isNull().doIf(StatementDef.multi(
+                    assignPythonValue(model, aThis, created),
+                    value.assign(aThis.field(pythonValue))
+                ))
+            ))),
+            value.returning()
+        ));
     }
 
     /**
@@ -5597,6 +5741,44 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * Whether the stub declares the shared entry of the compiled body of a method of its own class.
+     */
+    private static boolean hasSharedEntry(ClassStubModel model, String name) {
+        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
+        Ir.CompiledBody body = plan == null ? null : plan.body(model.element().getName(), name);
+        return body != null && !body.staticMethod() && !StaticBodyGenerator.copiedParameters(body).isEmpty();
+    }
+
+    /**
+     * The shared entries of the compiled bodies of the stub's own class taking a list, set or dict:
+     * a private method running the body without copying those collections. A compiled sibling
+     * calls it with its own collections, which the callee updates as Python's callee updates the
+     * caller's, and the stub's Java method calls it with copies, as the bridge would hand Python
+     * copies of a Java caller's collections. It is private: the call is not virtual, which the
+     * lowering only dispatches to when no subclass of the compilation overrides the method and no
+     * advice intercepts it.
+     */
+    private void addSharedEntries(ClassStubModel model, ClassDef.ClassDefBuilder builder) {
+        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
+        for (Ir.CompiledBody body : plan.bodiesOf(model.element().getName())) {
+            // a static method's body has no instance to run a private entry on
+            if (body.staticMethod() || StaticBodyGenerator.copiedParameters(body).isEmpty()) {
+                continue;
+            }
+            TypeDef returnType = Ir.VOID.equals(body.returnType()) ? TypeDef.VOID : StaticBodyGenerator.type(body.returnType());
+            MethodDef.MethodDefBuilder method = MethodDef.builder(SHARED_ENTRY_PREFIX + body.methodName()).addModifiers(Modifier.PRIVATE).returns(returnType);
+            for (int i = 0; i < body.parameterNames().size(); i++) {
+                method.addParameter(ParameterDef.of(body.parameterNames().get(i), StaticBodyGenerator.type(body.parameterTypes().get(i))));
+            }
+            if (body.span() != null) {
+                method.addJavadoc("Compiled from " + body.span().location() + ", working on the caller's collections");
+            }
+            builder.addMethod(method.build((aThis, parameters) ->
+                StaticBodyGenerator.generateShared(body, parameters, selfAccess(model, aThis), plan.trace())));
+        }
+    }
+
+    /**
      * The assignment of the Python object of the stub, binding the object to the stub when the class
      * has compiled bodies.
      */
@@ -5795,6 +5977,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 methodBuilder.addJavadoc(COMPILED_FROM + compiledBody.span().location());
             }
             boolean trace = staticCompilationPlan(visitorContext).trace();
+            if (model != null && !compiledBody.staticMethod() && !StaticBodyGenerator.copiedParameters(compiledBody).isEmpty()) {
+                // a Java caller's collections are copied, as the bridge copies them, and the body runs in its shared entry
+                TypeDef returnType = Ir.VOID.equals(compiledBody.returnType()) ? TypeDef.VOID : StaticBodyGenerator.type(compiledBody.returnType());
+                List<TypeDef> parameterTypes = compiledBody.parameterTypes().stream().map(StaticBodyGenerator::type).toList();
+                builder.addMethod(methodBuilder.build((aThis, methodParameters) -> StatementDef.multi(
+                    compiledBody.advised() ? adviceChain(aThis, compiledBody.methodName(), compiledBody.parameterTypes(), methodParameters, methodSourceReturnType) : StatementDef.multi(),
+                    StaticBodyGenerator.generateEntry(compiledBody, methodParameters, arguments ->
+                        aThis.invoke(SHARED_ENTRY_PREFIX + compiledBody.methodName(), parameterTypes, returnType, arguments)))));
+                return;
+            }
             builder.addMethod(methodBuilder.build((aThis, methodParameters) -> StatementDef.multi(
                 compiledBody.advised() && model != null ? adviceChain(aThis, compiledBody.methodName(), compiledBody.parameterTypes(), methodParameters, methodSourceReturnType) : StatementDef.multi(),
                 StaticBodyGenerator.generate(compiledBody, methodParameters, model != null ? selfAccess(model, aThis) : scriptSelfAccess(visitorContext, aThis), trace))));

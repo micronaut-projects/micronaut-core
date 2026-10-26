@@ -40,7 +40,7 @@ class StaticDelegationTest {
     private static Ir.CompiledBody body(String className, boolean staticMethod, boolean moduleLevel, Ir.ExceptionCrossing exceptions, List<String> types, String returnType, Ir.Statement... statements) {
         List<String> names = IntStream.range(0, types.size()).mapToObj(i -> "p" + i).toList();
         return new Ir.CompiledBody(className, "run", names, types, returnType, new Ir.Body(List.of(statements)),
-            SourceSpan.at("app/calc.py", 3, 5), new StaticCompilationDecision.Stats(statements.length, 0, 0, 0), false, false, staticMethod, moduleLevel, exceptions, List.of(), false);
+            SourceSpan.at("app/calc.py", 3, 5), new StaticCompilationDecision.Stats(statements.length, 0, 0, 0), false, false, staticMethod, moduleLevel, exceptions, List.of(), false, null);
     }
 
     private static Ir.Expression param(String type) {
@@ -241,7 +241,7 @@ class StaticDelegationTest {
     void aPlainClassOfTheCompilationIsTakenAsThePythonObject() {
         Ir.CompiledBody plain = new Ir.CompiledBody("app.Greeter", "run", List.of("user"), List.of("app.User"), Ir.STRING,
             new Ir.Body(List.of(new Ir.Return(new Ir.Const("a", Ir.STRING)))), SourceSpan.at("app/calc.py", 3, 5),
-            new StaticCompilationDecision.Stats(1, 0, 0, 0), false, false, false, false, Ir.ExceptionCrossing.UNTRANSLATED, List.of("User"), false);
+            new StaticCompilationDecision.Stats(1, 0, 0, 0), false, false, false, false, Ir.ExceptionCrossing.UNTRANSLATED, List.of("User"), false, null);
         assertEquals("Greeter#run#owner=app.Greeter#kinds=python:User#retry", StaticDelegation.target(plain));
         // without the Python class, a Java object of the generated class only
         assertEquals("Outer$Calc#run#owner=app.Outer$Calc#kinds=java:app.User#retry",
@@ -270,7 +270,7 @@ class StaticDelegationTest {
         assertEquals("once", StaticDelegation.status(body(List.of(Ir.STRING), Ir.VOID, sent)));
         Ir.CompiledBody computing = new Ir.CompiledBody("app.Outer$Calc", "run", List.of("p0"), List.of(Ir.STRING), Ir.VOID,
             new Ir.Body(List.of(sent)), SourceSpan.at("app/calc.py", 3, 5), new StaticCompilationDecision.Stats(1, 0, 0, 0),
-            false, false, false, false, Ir.ExceptionCrossing.UNTRANSLATED, List.of(), true);
+            false, false, false, false, Ir.ExceptionCrossing.UNTRANSLATED, List.of(), true, null);
         assertEquals("none(it has side effects (the call of [self.send]) and a call of code of the compilation raises where Python promotes)",
             StaticDelegation.status(computing));
         assertTrue(StaticDelegation.promotes(computing));
