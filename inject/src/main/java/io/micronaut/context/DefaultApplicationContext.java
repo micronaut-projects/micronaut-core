@@ -810,39 +810,70 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                     loading = true;
                 }
                 LOG.info("Reading bootstrap environment configuration");
+                // the bootstrap context this load uses, which it closes when it ends if a close came meanwhile
+                ApplicationContext used = reused;
+                boolean read = false;
+                Throwable failure = null;
                 try {
-                    return reused != null ? readAgain(reused) : readWithNewContext(environment, closesBefore);
+                    Collection<PropertySource> bootstrapPropertySources;
+                    if (reused != null) {
+                        // A refresh reuses the bootstrap context and its beans, which run until the
+                        // application context stops. Its environment reads the bootstrap configuration
+                        // again, with new property source loaders, and its locator reads the distributed
+                        // configuration again. Beans built from the bootstrap configuration keep the values
+                        // they were built with.
+                        BootstrapLocatorMarker.refreshBootstrapEnvironment(reused.getEnvironment());
+                        bootstrapPropertySources = readPropertySources(reused);
+                    } else {
+                        used = startBootstrapContext(environment);
+                        bootstrapPropertySources = readPropertySources(used);
+                    }
+                    read = true;
+                    return bootstrapPropertySources;
+                } catch (Throwable e) {
+                    // Throwable, as a locator written in Groovy or Kotlin can throw a checked exception
+                    failure = e;
+                    throw e;
                 } finally {
-                    boolean closedMeanwhile;
+                    boolean closeUsed;
+                    // in one step with clearing loading, so that a close either sees the load running or the context kept
                     synchronized (this) {
                         loading = false;
-                        closedMeanwhile = closes != closesBefore;
+                        if (closes != closesBefore) {
+                            // a close took the bootstrap context out, or found none yet, and left it to this load
+                            closeUsed = true;
+                        } else if (reused == null) {
+                            // a new bootstrap context is kept for the next loads once it has read the configuration
+                            closeUsed = !read;
+                            if (read) {
+                                this.bootstrapContext = used;
+                            }
+                        } else {
+                            // a refresh that failed to read keeps the bootstrap context of the start
+                            closeUsed = false;
+                        }
                     }
-                    if (reused != null && closedMeanwhile) {
-                        // the close took the bootstrap context out while this load used it, and left it to this load
-                        reused.close();
+                    if (closeUsed && used != null) {
+                        try {
+                            used.close();
+                        } catch (RuntimeException | Error closeFailure) {
+                            if (failure == null) {
+                                throw closeFailure;
+                            }
+                            failure.addSuppressed(closeFailure);
+                        }
                     }
                 }
             }
         }
 
         /**
-         * Reads the bootstrap configuration again with the bootstrap context of an earlier load. A
-         * refresh reuses the bootstrap context and its beans, which run until the application
-         * context stops. Its environment reads the bootstrap configuration again, with new property
-         * source loaders, and its locator reads the distributed configuration again. Beans built
-         * from the bootstrap configuration keep the values they were built with.
+         * Creates and starts a bootstrap context. One that fails to start is closed.
+         *
+         * @param environment The environment of the application context
+         * @return The bootstrap context
          */
-        private static Collection<PropertySource> readAgain(ApplicationContext bootstrapContext) {
-            BootstrapLocatorMarker.refreshBootstrapEnvironment(bootstrapContext.getEnvironment());
-            return readPropertySources(bootstrapContext);
-        }
-
-        /**
-         * Reads the bootstrap configuration with a new bootstrap context, which is kept for the
-         * next loads unless this locator was closed meanwhile.
-         */
-        private Collection<PropertySource> readWithNewContext(Environment environment, long closesBefore) {
+        private ApplicationContext startBootstrapContext(Environment environment) {
             ApplicationContext bootstrapContext = new DefaultApplicationContext(bootstrapConfiguration);
             try {
                 PropertySource contextSource = contextSource(environment);
@@ -851,18 +882,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                 }
                 bootstrapContext.registerSingleton(BootstrapContextAccess.class, () -> parentContext, null, false);
                 bootstrapContext.start();
-                Collection<PropertySource> bootstrapPropertySources = readPropertySources(bootstrapContext);
-                boolean kept;
-                synchronized (this) {
-                    kept = closes == closesBefore;
-                    if (kept) {
-                        this.bootstrapContext = bootstrapContext;
-                    }
-                }
-                if (!kept) {
-                    bootstrapContext.close();
-                }
-                return bootstrapPropertySources;
+                return bootstrapContext;
             } catch (Throwable e) {
                 // Throwable, as a locator written in Groovy or Kotlin can throw a checked exception
                 try {

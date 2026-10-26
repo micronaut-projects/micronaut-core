@@ -112,6 +112,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * the thread when the change ends.
      */
     private final ThreadLocal<List<Publish>> publishes = new ThreadLocal<>();
+    /**
+     * The property names of environment variables, which it caches. Guarded by its own monitor.
+     */
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
 
     /**
@@ -174,25 +177,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         PendingState pending = currentPending();
         if (pending != null) {
             pending.state = new ResolverState();
+            pending.processed.clear();
         } else {
             publishEmpty();
         }
     }
 
-    /**
-     * The state a lookup reads. That is the published state, except on a thread that prepares a
-     * pending state: it reads the pending one, with what it has processed so far. A
-     * {@link PropertySource} whose keys depend on what the resolver already holds
-     * (micronaut-test-resources only contributes the keys the environment cannot resolve) must be
-     * answered from the catalogs being built, not from the ones they replace. Every other thread
-     * reads the published state.
-     *
-     * <p>A lookup reads the state once, and does everything else from that state: the placeholders
-     * of the values it finds are resolved in it too, see {@link StateLookups}. So a refresh
-     * published while the lookup runs cannot mix new values into its result.</p>
-     *
-     * @return The state to read the catalogs and the caches from
-     */
+    // The state a lookup reads, once: the published state, or on a thread that prepares a pending
+    // state, the pending one, as a property source whose keys depend on what is already resolved
+    // (micronaut-test-resources) must see what has been processed so far. The lookup resolves its
+    // placeholders in the same state, see StateLookups.
     private ResolverState readState() {
         PendingState pending = currentPending();
         if (pending != null) {
@@ -213,19 +207,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * Starts a pending state for an add on the current thread, as a copy of the published state.
-     * Until {@link #endPending(PendingState)}, the thread's lookups read it and the property
-     * sources it processes go into it.
+     * Starts a pending state for an add on the current thread: a copy of the published state, or
+     * of the thread's pending state when a property source adds one while it is processed. Until
+     * {@link #endPending(PendingState)}, the thread's lookups read it and its processing goes into it.
      *
-     * @param keepRememberedValues Whether to keep the values that expressions such as
-     *                             {@code ${random.port}} resolved to in the published state,
-     *                             rather than resolving them again
+     * @param keepRememberedValues Whether to keep what expressions such as {@code ${random.port}}
+     *                             resolved to in the copied state
      * @return The pending state
      */
     PendingState startPendingAdd(boolean keepRememberedValues) {
+        PendingState outer = currentPending();
         ResolverState base = state;
-        ResolverState copy = new ResolverState(base, keepRememberedValues ? base.rememberedValues : new ConcurrentHashMap<>(4));
-        return startPending(new PendingState(base, copy, keepRememberedValues, currentPending()));
+        ResolverState from = outer != null ? outer.state : base;
+        ResolverState copy = new ResolverState(from, keepRememberedValues ? from.rememberedValues : new ConcurrentHashMap<>(4));
+        return startPending(new PendingState(base, copy, keepRememberedValues, outer));
     }
 
     /**
@@ -262,15 +257,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     /**
      * Publishes the pending state of an add. If another state was published since the add
-     * started, the add is replayed on top of that state, from what it processed, with no property
-     * source called.
+     * started, or the add copied another pending state of its thread, the add is replayed on top
+     * of the published state, from what it processed, with no property source called.
      *
      * @param pending The pending state of the add, which has ended
      */
     void publishAdd(PendingState pending) {
+        PendingState outer = pending.outer;
         synchronized (publishLock) {
             ResolverState current = state;
-            if (current == pending.base) {
+            if (current == pending.base && outer == null) {
                 publish(pending.state);
             } else {
                 ResolverState replayed = new ResolverState(current, pending.keepsRememberedValues ? current.rememberedValues : pending.state.rememberedValues);
@@ -278,14 +274,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 publish(replayed);
             }
         }
-        PendingState outer = pending.outer;
         if (outer != null) {
             // An add made while the same thread prepares another pending state, by a property source
             // that adds one, for example: the thread sees it in what it goes on preparing. An outer add
-            // keeps it with what it processed; a refresh gets it as a late add, see publishRefresh.
+            // keeps what it processed where it was processed, so a replay of the outer add writes in
+            // the same order. A refresh rebuilds what it publishes from what it processed itself, and
+            // gets the add as a late add, see publishRefresh.
             replay(outer.state, pending);
             if (outer.base != null) {
                 outer.processed.addAll(pending.processed);
+            } else {
+                outer.tookNestedAdds = true;
             }
         }
     }
@@ -301,7 +300,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     void publishRefresh(PendingState refresh, Collection<PendingState> lateAdds) {
         synchronized (publishLock) {
             ResolverState published;
-            if (lateAdds.isEmpty()) {
+            if (lateAdds.isEmpty() && !refresh.tookNestedAdds) {
                 published = new ResolverState(refresh.state, refresh.state.rememberedValues);
                 // the published state shares the refresh's maps, so the refresh copies a map before it next writes into it
                 refresh.state.owned.clear();
@@ -1090,14 +1089,15 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     private void processInto(PendingState pending, PropertySource properties, PropertySource.PropertyConvention convention) {
         ResolverState target = pending.state;
-        List<RawEntry> entries = new ArrayList<>();
-        pending.processed.add(new ProcessedSource(properties.getOrder(), entries));
+        int order = properties.getOrder();
+        // identifies this processing of the property source among the runs of what was processed
+        Object processing = new Object();
         for (String property : properties) {
 
             log.trace("Processing property key {}", property);
 
             RawEntry entry = new RawEntry(property, properties.get(property), convention, properties.getOrigin());
-            entries.add(entry);
+            pending.record(processing, order, entry);
             processEntry(target, entry);
         }
         resetCaches();
@@ -1474,39 +1474,22 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(text);
     }
 
-    /**
-     * What an expression of a property's text resolves to, the value remembered for it if there is one.
-     *
-     * <p>Some expressions, such as {@code random.port}, resolve to another value every time, and the
-     * cache of resolved values is not used after a property source is processed. A property source
-     * that reads such a value while the property sources are being processed would be left with one
-     * that no later lookup returns. So the resolvers of such expressions, the
-     * {@link RememberingPropertyExpressionResolver}s, remember what an expression has resolved to
-     * here, with the text, by the place the text was found at and the position of the expression in
-     * it. It is used again for as long as a lookup finds the same text there. The other expressions
-     * of the text, such as the property that {@code http://${app.host}:${random.port}/} names, are
-     * resolved as before, by every lookup that does not find the value cached.</p>
-     *
-     * <p>A state built on top of another shares what that one remembers, unless it resolves the
-     * expressions again. A lookup that read the text from an older state can then finish after a
-     * lookup of a newer one has remembered another text at the place. So the memory only replaces
-     * a text with the text of a state at least as new as the one it was remembered from, or with
-     * that of the current thread's pending state. It also takes it when nothing is remembered at
-     * the place: what is remembered for a text is only used by a lookup that finds the same text.</p>
-     *
-     * @param resolverState The state the text was read from
-     * @param place         Where the text was found, see {@link #resolvePlaceholders(ResolverState, String, Object)}
-     * @param text          The text
-     * @param position      The position of the expression in the text
-     * @param value         Resolves the expression
-     * @return What the expression resolves to
-     */
+    // What an expression of a property's text resolves to, the value remembered for it if any.
+    // Expressions such as random.port resolve to another value every time, so their resolvers, the
+    // RememberingPropertyExpressionResolvers, keep what they resolved to with the text, by the place
+    // the text was found at, for as long as lookups find the same text there. States copied from one
+    // another share this memory, so only a lookup of a state at least as new as the one that
+    // remembered a text, or of the current thread's pending state, replaces it with another text.
     private Object remember(ResolverState resolverState, Object place, String text, ExpressionPosition position,
                             Supplier<Object> value) {
         RememberedText remembered = resolverState.rememberedValues.get(place);
         if (remembered != null && remembered.text().equals(text)) {
             Object rememberedValue = remembered.values().get(position);
             if (rememberedValue != null) {
+                if (remembered.sequence() < resolverState.sequence) {
+                    // the text is still that of a newer state: a lookup of an older state must not replace it
+                    resolverState.rememberedValues.computeIfPresent(place, (key, earlier) -> newest(earlier, text, resolverState));
+                }
                 return rememberedValue;
             }
         }
@@ -1522,7 +1505,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 if (other != null) {
                     result[0] = other;
                 }
-                return earlier;
+                return newest(earlier, text, resolverState);
             }
             // States share what they remember when one is built on top of another: a lookup of an
             // older state does not replace what a newer one has remembered.
@@ -1539,30 +1522,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return result[0];
     }
 
-    /**
-     * Reads a cached value. Only a published state, which never changes, uses its caches.
-     *
-     * @param resolverState The state the cache belongs to
-     * @param cache         The cache
-     * @param key           The key
-     * @param <K>           The key type
-     * @param <V>           The value type
-     * @return The cached value, or {@code null}
-     */
+    // A state that finds the remembered text again makes it its own, so that an overtaken lookup of
+    // an older state, which found another text there, does not replace it.
+    private static RememberedText newest(RememberedText remembered, String text, ResolverState resolverState) {
+        if (remembered.text().equals(text) && remembered.sequence() < resolverState.sequence) {
+            return new RememberedText(remembered.text(), remembered.values(), resolverState.sequence);
+        }
+        return remembered;
+    }
+
+    // Only a published state, which never changes, uses its caches.
     private static <K, V> @Nullable V cached(ResolverState resolverState, Map<K, V> cache, K key) {
         return resolverState.published ? cache.get(key) : null;
     }
 
-    /**
-     * Caches a value read from the catalogs of a state, if it is published.
-     *
-     * @param resolverState The state the cache belongs to
-     * @param cache         The cache
-     * @param key           The key
-     * @param value         The value
-     * @param <K>           The key type
-     * @param <V>           The value type
-     */
     private static <K, V> void cache(ResolverState resolverState, Map<K, V> cache, K key, V value) {
         if (resolverState.published) {
             cache.put(key, value);
@@ -1654,7 +1627,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     private List<String> resolvePropertiesForConvention(String property, PropertySource.PropertyConvention convention) {
         if (convention == PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE) {
-            return environmentProperties.findPropertyNamesForEnvironmentVariable(property);
+            // its cache is a plain map, and property sources are processed on more than one thread at a time
+            synchronized (environmentProperties) {
+                return environmentProperties.findPropertyNamesForEnvironmentVariable(property);
+            }
         }
         return Collections.singletonList(
                 NameUtils.hyphenate(property, true)
@@ -1838,9 +1814,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          */
         private final boolean keepsRememberedValues;
         /**
-         * What was processed, by property source, in order. Kept so that an add can be replayed on
-         * a newer published state, and a late add with a refresh, without calling the property
-         * sources again.
+         * What was processed, in the order it was written: runs of properties of one property
+         * source. Kept so that an add can be replayed on a newer published state, and a late add
+         * with a refresh, without calling the property sources again. An add made while a property
+         * source was processed splits that source's properties into two runs, around its own.
          */
         private final List<ProcessedSource> processed = new ArrayList<>();
         /**
@@ -1852,6 +1829,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          * The state being prepared.
          */
         private ResolverState state;
+        /**
+         * Whether, for a refresh, adds made on its thread while it processed were written into
+         * its state. They are not among what it processed, so what it publishes is rebuilt from
+         * that, with the adds that are still late adds.
+         */
+        private boolean tookNestedAdds;
 
         private PendingState(@Nullable ResolverState base, ResolverState state, boolean keepsRememberedValues, @Nullable PendingState outer) {
             this.base = base;
@@ -1859,15 +1842,32 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             this.keepsRememberedValues = keepsRememberedValues;
             this.outer = outer;
         }
+
+        /**
+         * Records a property as processed.
+         *
+         * @param processing Identifies the processing of the property source
+         * @param order      The order of the property source
+         * @param entry      The property
+         */
+        private void record(Object processing, int order, RawEntry entry) {
+            ProcessedSource last = processed.isEmpty() ? null : processed.getLast();
+            if (last == null || last.processing() != processing) {
+                last = new ProcessedSource(processing, order, new ArrayList<>());
+                processed.add(last);
+            }
+            last.entries().add(entry);
+        }
     }
 
     /**
-     * The properties a pending state processed from one property source.
+     * A run of properties that a pending state processed from one property source.
      *
-     * @param order   The order of the property source
-     * @param entries Its properties, in the order they were processed
+     * @param processing Identifies the processing of the property source the run belongs to
+     * @param order      The order of the property source
+     * @param entries    The properties, in the order they were processed
      */
-    private record ProcessedSource(int order, List<RawEntry> entries) {
+    private record ProcessedSource(Object processing, int order, List<RawEntry> entries) {
     }
 
     /**

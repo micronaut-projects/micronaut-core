@@ -995,6 +995,38 @@ class AddAfterSnapshotSpec extends Specification {
         refresh << ['start', 'refresh', 'refreshAndDiff']
     }
 
+    void "a registered property source added again after another one was added by its name while the refresh processes the property sources replaces that late add, and the refresh publishes it: #refresh"() {
+        given: "a registered property source, and a gate that parks the refresh once it has taken the registered property sources"
+        PropertySource first = PropertySource.of('named', ['app.value': 'first'])
+        PropertySource second = PropertySource.of('named', ['app.value': 'second'])
+        Gate gate = new Gate()
+        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
+        env.addPropertySource(first)
+        env.addPropertySource(gate)
+        if (refresh != 'start') {
+            env.start()
+        }
+
+        when: "while the refresh is parked, another property source is added by the name, and then the registered one again"
+        Thread refresher = parkIn(gate) { refresh == 'start' ? env.start() : env.refresh() }
+        changeWhileParked {
+            env.addPropertySource(second)
+            env.addPropertySource(first)
+        }
+        release(gate, refresher)
+
+        then: "the latest add decides, in the registry and in the properties"
+        env.propertySources.find { it.name == 'named' }.is(first)
+        env.getProperty('app.value', String).get() == 'first'
+
+        cleanup:
+        gate.release.countDown()
+        env.stop()
+
+        where:
+        refresh << ['start', 'refresh']
+    }
+
     /**
      * The configuration of an environment that holds the property sources a test gives it and
      * nothing of the machine it runs on.

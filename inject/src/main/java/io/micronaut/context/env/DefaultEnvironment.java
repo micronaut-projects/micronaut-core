@@ -143,9 +143,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private @Nullable RefreshInProgress refreshInProgress;
     /**
      * The property sources the last refresh loaded itself (configuration files, default sources,
-     * bootstrap sources) and registered, by name. The next refresh unregisters them and loads them
-     * again. A name maps to {@code null} when an add or a remove of that name happened during the
-     * last refresh: that refresh did not register its own source, and the next one does.
+     * bootstrap sources) and registered, by name. The next refresh, and a stop, drop whatever is
+     * registered under these names, as 5.2.x did. A name maps to {@code null} when an add or a
+     * remove of that name happened during the last refresh: that refresh did not register its own
+     * source, and the next one does.
      */
     private Map<String, @Nullable PropertySource> loadedSources = Map.of();
     /**
@@ -248,7 +249,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * add or a remove of the same name happened meanwhile.</li>
      * <li>During a refresh that has taken its snapshot, it is also kept as a late add: the refresh
      * applies it again, in its order, when it publishes. Not if the refresh processes that same
-     * instance itself.</li>
+     * instance itself; it then replaces an earlier late add of its name.</li>
      * </ul>
      *
      * <p>Adding the property source already registered under its name processes it again on top. A
@@ -256,8 +257,9 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * order to keep their precedence. Adding a property source while that same one is being added
      * does nothing.</p>
      *
-     * <p>If processing fails, nothing is published and the property source stays registered. During
-     * a refresh the failure is logged, as the refresh would have processed it anyway.</p>
+     * <p>If processing fails, nothing is published and the property source stays registered, so the
+     * next refresh processes it. During a refresh the failure is logged, not thrown, as 5.2.x only
+     * registered an add made during a refresh.</p>
      *
      * @param propertySource The property source
      * @return This environment
@@ -308,10 +310,12 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             if (isRunning()) {
                 propertyPlaceholderResolver.publishAdd(pending);
                 RefreshInProgress refresh = refreshInProgress;
-                if (refresh != null && refresh.addedSnapshot != null && !refresh.processesItself(name, propertySource)) {
-                    // re-inserted, so the late adds stay in the order they were made
+                if (refresh != null && refresh.addedSnapshot != null) {
+                    // the latest add of a name decides; re-inserted, so the late adds stay in the order they were made
                     refresh.lateAdds.remove(name);
-                    refresh.lateAdds.put(name, pending);
+                    if (!refresh.processesItself(name, propertySource)) {
+                        refresh.lateAdds.put(name, pending);
+                    }
                 }
             }
         }
@@ -688,10 +692,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             if (refresh.run != currentRun) {
                 return;
             }
-            // an add or a remove of a name during the refresh wins over what the refreshes loaded under that name
-            refresh.previouslyLoaded.forEach((name, source) -> {
-                if (!refresh.namesChanged.contains(name)) {
-                    unregister(name, source);
+            // Whatever is registered under a name the last refresh loaded goes, by name, as 5.2.x
+            // dropped such names on every refresh, unless it was added or removed during this one.
+            refresh.previouslyLoaded.keySet().forEach(name -> {
+                if (refresh.reloads(name)) {
+                    propertySources.remove(name);
                 }
             });
             Map<String, PropertySource> registeredNow = new LinkedHashMap<>();
@@ -703,7 +708,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                     if (remembered) {
                         registeredNow.put(name, null);
                     }
-                } else if (!propertySources.containsKey(name) || refresh.replacesRegistered(name)) {
+                } else if (!propertySources.containsKey(name)) {
                     // A property source registered under a name that no refresh loaded stays,
                     // as 5.2.x kept a name registered before a refresh.
                     propertySources.put(name, source);
@@ -718,34 +723,25 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     /**
-     * The registered property sources as a refresh sees them: without those the last refresh
-     * loaded, which this one loads again, and with those this refresh has loaded so far, which it
-     * registers when it ends. Called with the monitor of {@link #propertySources} held.
+     * The registered property sources as a refresh sees them: without those it replaces, see
+     * {@link RefreshInProgress#replaces(String, PropertySource)}, and with those this refresh has
+     * loaded so far, which it registers when it ends. Called with the monitor of
+     * {@link #propertySources} held.
      *
      * @param refresh The refresh
      * @return The property sources, by name
      */
     private Map<String, PropertySource> sourcesSeenBy(RefreshInProgress refresh) {
         Map<String, PropertySource> seen = new LinkedHashMap<>(propertySources);
-        refresh.previouslyLoaded.forEach((name, source) -> {
-            if (seen.get(name) == source) {
-                seen.remove(name);
-            }
-        });
-        refresh.loaded.forEach((name, source) -> {
-            if (refresh.replacesRegistered(name)) {
-                seen.put(name, source);
-            } else {
-                seen.putIfAbsent(name, source);
-            }
-        });
+        seen.entrySet().removeIf(registered -> refresh.replaces(registered.getKey(), registered.getValue()));
+        refresh.loaded.forEach(seen::putIfAbsent);
         return seen;
     }
 
     /**
      * Takes the snapshot of the added property sources that a refresh processes: the registered
-     * ones it does not load itself. A property source added after this is a late add, see
-     * {@link #addPropertySource(PropertySource)}.
+     * ones it does not replace, see {@link RefreshInProgress#replaces(String, PropertySource)}. A
+     * property source added after this is a late add, see {@link #addPropertySource(PropertySource)}.
      *
      * @param refresh The refresh
      * @return The added property sources, in the order they are registered
@@ -754,7 +750,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         synchronized (propertySources) {
             List<PropertySource> added = new ArrayList<>(propertySources.size());
             propertySources.forEach((name, source) -> {
-                if (refresh.previouslyLoaded.get(name) != source && !refresh.replacesRegistered(name)) {
+                if (!refresh.replaces(name, source)) {
                     added.add(source);
                 }
             });
@@ -773,19 +769,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      */
     private void publish(RefreshInProgress refresh) {
         propertyPlaceholderResolver.publishRefresh(refresh.pending, refresh.lateAdds.values());
-    }
-
-    /**
-     * Unregisters a property source, if it is the one registered by its name. Called with the
-     * monitor of {@link #propertySources} held.
-     *
-     * @param name   The name
-     * @param source The property source, {@code null} for none
-     */
-    private void unregister(String name, @Nullable PropertySource source) {
-        if (source != null && propertySources.get(name) == source) {
-            propertySources.remove(name);
-        }
     }
 
     private void internalProcessPropertySource(PropertySource propertySource) {
@@ -1370,12 +1353,18 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     @Override
     public void close() {
         // Everything is closed and the environment is stopped even when something fails to close:
-        // the first failure is thrown at the end, with the later ones suppressed by it.
+        // the first failure is thrown at the end, with the later ones suppressed by it. It is stopped
+        // first, so that a refresh in progress reads nothing more from a locator closed after.
         RuntimeException failure = null;
+        try {
+            stop();
+        } catch (RuntimeException e) {
+            failure = e;
+        }
         try {
             propertyPlaceholderResolver.close();
         } catch (Exception e) {
-            failure = new RuntimeException("Failed to close property placeholder resolver: " + e.getMessage(), e);
+            failure = addFailure(failure, new RuntimeException("Failed to close property placeholder resolver: " + e.getMessage(), e));
         }
         for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
             if (propertySourcesLocator instanceof Closeable closeable) {
@@ -1385,11 +1374,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                     failure = addFailure(failure, new RuntimeException("Failed to close property sources locator " + propertySourcesLocator.getClass() + ": " + e.getMessage(), e));
                 }
             }
-        }
-        try {
-            stop();
-        } catch (RuntimeException e) {
-            failure = addFailure(failure, e);
         }
         if (failure != null) {
             throw failure;
@@ -1447,7 +1431,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         private final Thread thread = Thread.currentThread();
         /**
          * What the last refresh loaded itself, by name, see {@link DefaultEnvironment#loadedSources}.
-         * This refresh loads them again.
+         * This refresh drops their names, see {@link #reloads(String)}.
          */
         private final Map<String, @Nullable PropertySource> previouslyLoaded;
         /**
@@ -1511,16 +1495,30 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         }
 
         /**
-         * Whether this refresh registers what it loaded under the given name in place of whatever
-         * is registered under it: the last refresh loaded that name too, and nobody added or
-         * removed it during this one. 5.2.x dropped such a name on its next refresh. Called with
-         * the monitor of {@link DefaultEnvironment#propertySources} held.
+         * Whether this refresh drops, when it ends, whatever is registered under the given name:
+         * the last refresh loaded that name, and nobody added or removed it during this one. 5.2.x
+         * dropped such names on every refresh. Called with the monitor of
+         * {@link DefaultEnvironment#propertySources} held.
          *
          * @param name The name
-         * @return Whether the refresh replaces the registered property source
+         * @return Whether the refresh drops the name
          */
-        private boolean replacesRegistered(String name) {
-            return loaded.containsKey(name) && previouslyLoaded.containsKey(name) && !namesChanged.contains(name);
+        private boolean reloads(String name) {
+            return previouslyLoaded.containsKey(name) && !namesChanged.contains(name);
+        }
+
+        /**
+         * Whether this refresh replaces the given registered property source, so it neither sees
+         * it nor processes it: it drops its name, see {@link #reloads(String)}, or it is the very
+         * instance the last refresh loaded, which this one loads again. Called with the monitor of
+         * {@link DefaultEnvironment#propertySources} held.
+         *
+         * @param name       The name
+         * @param registered The property source registered under the name
+         * @return Whether the refresh replaces it
+         */
+        private boolean replaces(String name, PropertySource registered) {
+            return reloads(name) || previouslyLoaded.get(name) == registered;
         }
     }
 }

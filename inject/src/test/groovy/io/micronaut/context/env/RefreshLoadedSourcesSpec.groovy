@@ -94,7 +94,7 @@ class RefreshLoadedSourcesSpec extends Specification {
         dir.toFile().deleteDir()
     }
 
-    void "a property source added during a refresh by the name of a default property source that the refresh loads itself is registered in its place, and the next refresh keeps it: added #phase"() {
+    void "a property source added during a refresh by the name of a default property source that the refresh loads itself is registered in its place until the next refresh, which replaces it: added #phase"() {
         given: "the default property sources, and a gate that parks the refresh after it has processed them, once armed"
         Parking defaults = new Parking()
         Gate gate = new Gate()
@@ -121,9 +121,9 @@ class RefreshLoadedSourcesSpec extends Specification {
         when: "the environment is refreshed again"
         env.refresh()
 
-        then: "it is not dropped, and it is read"
-        env.propertySources.find { it.name == SystemPropertiesPropertySource.NAME }.is(mine)
-        env.getProperty('mine.value', String).orElse(null) == 'mine'
+        then: "the refresh drops the name the last refresh loaded and registers its own property source, as 5.2.x did"
+        env.propertySources.find { it.name == SystemPropertiesPropertySource.NAME } instanceof SystemPropertiesPropertySource
+        env.getProperty('mine.value', String).orElse(null) == null
 
         cleanup:
         defaults.release.countDown()
@@ -405,6 +405,32 @@ class RefreshLoadedSourcesSpec extends Specification {
         env.stop()
     }
 
+    void "a property source registered between refreshes by the name of what a bootstrap locator returned is dropped by a refresh that the locator returns nothing to, as 5.2.x did"() {
+        given: "a bootstrap locator, as the Consul configuration client is, whose key is then deleted"
+        ConsulLikeLocator locator = new ConsulLikeLocator({ int load -> load == 1 ? [PropertySource.of('consul-app', ['app.value': 'v1'], 100)] : [] })
+        DefaultEnvironment env = new DefaultEnvironment(withLocator(locator))
+        env.start()
+
+        when: "a configuration watch replaces it between refreshes, and the next refresh loads nothing by its name"
+        env.addPropertySource(PropertySource.of('consul-app', ['app.value': 'watched'], 100))
+        env.refresh()
+
+        then: "the name is dropped, and its keys are gone"
+        !env.propertySources*.name.contains('consul-app')
+        !env.containsProperty('app.value')
+
+        when: "the key comes back"
+        locator.sources = { int load -> [PropertySource.of('consul-app', ['app.value': 'v' + load], 100)] }
+        env.refresh()
+
+        then: "the refresh registers and publishes what the locator returns"
+        env.propertySources.find { it.name == 'consul-app' }.get('app.value') == 'v3'
+        env.getProperty('app.value', String).get() == 'v3'
+
+        cleanup:
+        env.stop()
+    }
+
     void "a configuration file property source whose name waits for another thread to add a property source does not keep that add waiting, and both are published: #refresh"() {
         given: "a loader that gives a property source whose name, when first asked for, waits for another thread to add one"
         AddsWhenNamed named = new AddsWhenNamed()
@@ -582,7 +608,7 @@ class RefreshLoadedSourcesSpec extends Specification {
      * each time it loads them.
      */
     static class ConsulLikeLocator implements PropertySourcesLocator, BootstrapLocatorMarker {
-        private final Closure<List<PropertySource>> sources
+        volatile Closure<List<PropertySource>> sources
         private final AtomicInteger loads = new AtomicInteger()
 
         ConsulLikeLocator(Closure<List<PropertySource>> sources) {
