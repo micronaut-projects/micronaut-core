@@ -608,10 +608,15 @@ class Slotted:
 
 
 LOWERED = '''
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Protocol
 from jakarta.inject import Inject, Singleton
 from java.lang import Exception, RuntimeException
 from micronaut.context.annotation import Executable
+
+
+class Shelf(Protocol):
+    def size(self) -> int:
+        ...
 
 
 class Cart:
@@ -937,6 +942,12 @@ class Pricing:
 
     def tagged(self, cart: Cart, n: int) -> int:
         return cart.tag(n)
+
+    def shelved(self, shelf: Shelf) -> int:
+        return shelf.size()
+
+    def shelf_made(self) -> int:
+        return Shelf().size()
 
     def tagged_afresh(self, n: int) -> int:
         return Cart(n, "x").tag(n)
@@ -1264,6 +1275,13 @@ class LoweringTest(unittest.TestCase):
         branch = statements[1]
         self.assertEqual("result", list(branch.then().statements())[0].name())
         self.assertEqual("-", list(branch.orElse().statements())[0].value().op())
+
+    def test_a_protocol_is_called_through_its_interface_and_never_constructed(self):
+        shelved = _uncast(list(self.bodies["shelved"].body().statements())[0].value())
+        self.assertEqual("InvokeJava", shelved.getClass().getSimpleName())
+        self.assertTrue(shelved.owner().endswith("Shelf"), shelved.owner())
+        self.assertEqual("SKIPPED", self.decisions["Pricing.shelf_made"].outcome().name())
+        self.assertEqual(["unsupported-expression"], rules(self.decisions["Pricing.shelf_made"]))
 
     def test_a_static_method_is_called_on_a_plain_receiver_only(self):
         tagged = _uncast(list(self.bodies["tagged"].body().statements())[0].value())
