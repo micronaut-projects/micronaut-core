@@ -18,11 +18,10 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
-import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.form.FormData;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -32,14 +31,14 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
+import java.util.function.UnaryOperator;
 import java.util.function.Function;
 
 /**
@@ -50,14 +49,13 @@ import java.util.function.Function;
  * @param prefixUri    The prefix of the locator route
  * @param declaration  The declaration of the locator route, which its terminal ends
  * @param context      Provides the body of a request
- * @param bodyHandlers The message body readers
  * @param consumes     The media types a handler route consumes by default
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute declaration, RouteConditionContext context,
-                          MessageBodyHandlerRegistry bodyHandlers, List<MediaType> consumes) implements LocatorSpec {
+                          List<MediaType> consumes) implements LocatorSpec {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultLocatorSpec.class);
 
@@ -74,31 +72,16 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
             LocatorBodySpec<B> body = (LocatorBodySpec<B>) body();
             return body;
         }
-        // the reader a handler route of the body selects for the media types it consumes by default
-        MessageBodyReader<B> defaultReader = bodyHandlers.findReader(bodyType, consumes).orElse(null);
+        // a body without a content type is bound like the body of a handler route, which
+        // decodes it with the media type it consumes by default: no route is matched yet to select it
         MediaType defaultType = consumes.getFirst();
-        return new Body<>(this, null, (request, bound) -> readBody(request, bound, bodyType, defaultReader, defaultType));
-    }
-
-    /**
-     * Read the body decoded to a type, like the {@code @Body} argument of a handler route: a body
-     * without a content type is decoded with the reader the route selects for the media type it
-     * consumes by default, instead of being converted, since no route is matched yet to select it.
-     */
-    private static <B extends @Nullable Object> CompletionStage<? extends B> readBody(HttpRequest<?> request, AsyncRequestBody bound,
-                                                                                    Argument<B> bodyType, @Nullable MessageBodyReader<B> defaultReader,
-                                                                                    MediaType defaultType) {
-        if (defaultReader == null || request.getContentType().isPresent() || !bound.hasBody()) {
-            // a request without a body is located with null or fails, like a missing @Body argument
-            return bound.copy().body(bodyType);
-        }
-        return bound.copy().bytes(Integer.MAX_VALUE).thenApply(bytes ->
-            defaultReader.read(bodyType, defaultType, request.getHeaders(), new ByteArrayInputStream(bytes)));
+        return new Body<>(this, null, request -> request.getContentType().isPresent() ? request : new DefaultContentType<>(request, defaultType),
+            bound -> bound.copy().body(bodyType));
     }
 
     @Override
     public LocatorBodySpec<AsyncRequestBody> body() {
-        return new Body<>(this, null, (request, bound) -> CompletableFuture.completedFuture(bound.copy()));
+        return new Body<>(this, null, UnaryOperator.identity(), bound -> CompletableFuture.completedFuture(bound.copy()));
     }
 
     @Override
@@ -106,7 +89,7 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
         // the form of a copy is the one form of the request; a request whose body is not a form,
         // e.g. a GET or a JSON body for a located route, is located with the empty form, and its
         // body is left unread to the located route
-        return new Body<>(this, request -> isForm(request) ? null : FormData.empty(), (request, bound) -> bound.copy().form());
+        return new Body<>(this, request -> isForm(request) ? null : FormData.empty(), UnaryOperator.identity(), bound -> bound.copy().form());
     }
 
     /**
@@ -124,12 +107,14 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
      *
      * @param spec     The locator route
      * @param unread   The body to locate a request with without reading its body, {@code null} when it is read; {@code null} to read every body
+     * @param binding  The request the body is bound from, e.g. with a default content type
      * @param reader   Reads the body from a copy of the body of the request
      * @param <B>      The type of the body
      */
     record Body<B extends @Nullable Object>(DefaultLocatorSpec spec,
                                             @Nullable Function<HttpRequest<?>, @Nullable B> unread,
-                                            BiFunction<HttpRequest<?>, AsyncRequestBody, CompletionStage<? extends B>> reader) implements LocatorBodySpec<B> {
+                                            UnaryOperator<HttpRequest<?>> binding,
+                                            Function<AsyncRequestBody, CompletionStage<? extends B>> reader) implements LocatorBodySpec<B> {
 
         @Override
         public <T> void locate(BodyLocatorHandler<B, ? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
@@ -155,7 +140,7 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
                 // nothing is bound, copied or buffered
                 return Objects.requireNonNull(locator.locate(request, pathVariables, without), () -> "The locator returned no stage: " + locator);
             }
-            AsyncRequestBody bound = context.locatorBody(request);
+            AsyncRequestBody bound = context.locatorBody(binding.apply(request));
             if (bound == null) {
                 throw new IllegalStateException("No HTTP server provides the body of the request " + request.getMethodName()
                     + " " + request.getPath() + " to its route locator");
@@ -166,7 +151,7 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
             CompletionStage<? extends @Nullable T> stage = null;
             try {
                 // the located route reads the body of the request again
-                stage = reader.apply(request, bound).thenCompose(body -> propagated.propagate(() -> {
+                stage = reader.apply(bound).thenCompose(body -> propagated.propagate(() -> {
                     try {
                         return Objects.requireNonNull(locator.locate(request, pathVariables, body), () -> "The locator returned no stage: " + locator);
                     } catch (Exception e) {
@@ -265,6 +250,28 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
                     LOG.warn("Failed to release the body read by the route locator of an abandoned request", error);
                 }
             });
+        }
+    }
+
+    /**
+     * A request without a content type, bound as if it had the one a handler route consumes by
+     * default, e.g. {@code application/json}: the body is decoded by the binders of the server,
+     * with their checks, e.g. of a missing required body, and a body a filter replaced is that body.
+     *
+     * @param <B> The body type
+     */
+    private static final class DefaultContentType<B> extends HttpRequestWrapper<B> {
+        private final Optional<MediaType> contentType;
+
+        @SuppressWarnings("unchecked")
+        DefaultContentType(HttpRequest<?> request, MediaType contentType) {
+            super((HttpRequest<B>) request);
+            this.contentType = Optional.of(contentType);
+        }
+
+        @Override
+        public Optional<MediaType> getContentType() {
+            return contentType;
         }
     }
 }

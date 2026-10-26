@@ -183,6 +183,33 @@ class HandlerRouteLocatorBodyTest {
     }
 
     @Test
+    void aJsonNullWithoutAContentTypeIsAMissingRequiredBody() throws Exception {
+        String response = raw("POST /orders/route", "null");
+        assertTrue(response.startsWith("HTTP/1.1 400"), response);
+        assertEquals(0, recorder.calls.get(), "the locator is not called");
+    }
+
+    @Test
+    void aBodyAPreMatchingFilterReplacedWithoutAContentTypeIsTheBodyOfTheLocator() throws Exception {
+        String response = raw("POST /replaced/orders/route", "ignored");
+        assertTrue(response.startsWith("HTTP/1.1 200"), response);
+        assertTrue(response.endsWith("replaced: order 9"), response);
+    }
+
+    /**
+     * A raw request without a content type: the HTTP client would add one.
+     */
+    private static String raw(String requestLine, String body) throws Exception {
+        try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+            OutputStream out = socket.getOutputStream();
+            out.write((requestLine + " HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nContent-Length: " + body.length()
+                + "\r\n\r\n" + body).getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            return new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    @Test
     void anAsyncLocatorOfTheFormThatLocatesNothingIsNotFound() {
         BlockingHttpClient blocking = client.toBlocking();
         HttpRequest<?> request = HttpRequest.POST("/accounts/9/greet", "token=none&name=Ann").contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
@@ -222,6 +249,17 @@ class HandlerRouteLocatorBodyTest {
 
     @Introspected
     record Order(String kind, int id) {
+    }
+
+    @ServerFilter("/replaced/**")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class ReplacingFilter {
+        @RequestFilter
+        @PreMatching
+        void replace(MutableHttpRequest<?> request) {
+            request.uri(URI.create(request.getPath().substring("/replaced".length())));
+            ((MutableHttpRequest<Object>) request).body(new Order("replaced", 9));
+        }
     }
 
     @ServerFilter("/rewritten/**")

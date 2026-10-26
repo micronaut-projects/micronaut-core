@@ -248,10 +248,10 @@ public final class RouteAssembly {
     }
 
     /**
-     * @return What a route locator that reads the body needs: the server and the body readers
+     * @return What the router asks the server for a request, e.g. the body for a route locator
      */
-    public LocatorSupport locatorSupport() {
-        return new LocatorSupport(conditionContext, messageBodyHandlerRegistry);
+    public RouteConditionContext routeConditionContext() {
+        return conditionContext;
     }
 
     /**
