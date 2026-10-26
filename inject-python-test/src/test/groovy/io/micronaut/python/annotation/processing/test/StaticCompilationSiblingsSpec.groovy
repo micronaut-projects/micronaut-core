@@ -304,6 +304,154 @@ class Special(Collector):
         results[StaticCompilationMode.ALL].ran == [2, 0, 2, 0]
     }
 
+    void "the order pricing of the runtime benchmark calls price as Java code"() {
+        given:
+        mode = StaticCompilationMode.ALL
+        def context = buildContext(PRICING)
+        def pricing = getBean(context, 'python.PricingService')
+        ClassLoader loader = pricing.getClass().getClassLoader()
+        def line = { String sku, int quantity, int price -> loader.loadClass('python.OrderLine').newInstance(sku, quantity, price) }
+        def order = loader.loadClass('python.OrderRequest').newInstance('acme', 'EUR', 'DE', [line("BK-1", 10, 250), line("", 1, 1), line("EL-2", 1, 1000)])
+        Map<String, StaticCompilationDecision> compiled = decisions.collectEntries { [it.qualifiedName(), it] }
+        PythonStatic.resetEntries()
+
+        when:
+        def quote = pricing.quote(order)
+
+        then: "quote and price are compiled, and quote reaches price through its shared entry, not Python"
+        ['PricingService.quote', 'PricingService.price'].every { compiled[it].outcome() == StaticCompilationDecision.Outcome.COMPILED }
+        PythonStatic.entries('python.PricingService#quote') == 1
+        PythonStatic.entries('python.PricingService#price') == 1
+        quote.summary == 'acme: 2 lines, 3748 EUR'
+        quote.rejected == ['']
+
+        cleanup:
+        context?.close()
+    }
+
+    // the services of the runtime benchmark (perf python-static/python-app), introspected in place of serde, without the Java exception
+    static final String PRICING = '''
+from dataclasses import dataclass, field
+from jakarta.inject import Singleton
+from micronaut.core.annotation import Introspected
+
+
+class InvalidLine(Exception):
+    pass
+
+
+@Introspected
+@dataclass
+class OrderLine:
+    sku: str = ""
+    quantity: int = 0
+    unitPriceCents: int = 0
+
+
+@Introspected
+@dataclass
+class OrderRequest:
+    customer: str = ""
+    currency: str = ""
+    country: str = ""
+    lines: list[OrderLine] = field(default_factory=list)
+
+
+@Introspected
+@dataclass
+class LineQuote:
+    sku: str
+    quantity: int
+    unitPriceCents: int
+    discountPercent: int
+    totalCents: int
+
+
+@Introspected
+@dataclass
+class OrderQuote:
+    customer: str
+    currency: str
+    lines: list[LineQuote]
+    rejected: list[str]
+    subtotalCents: int
+    discountCents: int
+    taxCents: int
+    totalCents: int
+    summary: str
+
+
+@Singleton
+class LineValidator:
+
+    def check(self, line: OrderLine) -> None:
+        if len(line.sku) == 0:
+            raise InvalidLine("empty sku")
+        if line.quantity <= 0:
+            raise InvalidLine("quantity must be positive: " + line.sku)
+        if line.unitPriceCents < 0:
+            raise InvalidLine("negative price: " + line.sku)
+
+
+@Singleton
+class PricingService:
+
+    def __init__(self, validator: LineValidator):
+        self.validator = validator
+
+    def discount_percent(self, sku: str, quantity: int) -> int:
+        percent = 0
+        if sku.startswith("BK"):
+            percent = 5
+        elif sku.startswith("EL"):
+            percent = 10
+        elif sku.startswith("TO"):
+            percent = 15
+        if quantity >= 10:
+            percent += 5
+        return percent
+
+    def tax_per_mille(self, country: str) -> int:
+        if country == "DE":
+            return 190
+        if country == "FR":
+            return 200
+        if country == "GB":
+            return 200
+        if country == "US":
+            return 0
+        return 210
+
+    def quote(self, order: OrderRequest) -> OrderQuote:
+        valid: list[OrderLine] = []
+        rejected: list[str] = []
+        for line in order.lines:
+            try:
+                self.validator.check(line)
+            except InvalidLine:
+                rejected.append(line.sku)
+                continue
+            valid.append(line)
+        return self.price(order, valid, rejected)
+
+    def price(self, order: OrderRequest, valid: list[OrderLine], rejected: list[str]) -> OrderQuote:
+        quotes: list[LineQuote] = []
+        subtotal = 0
+        discount = 0
+        for line in valid:
+            gross = line.quantity * line.unitPriceCents
+            percent = self.discount_percent(line.sku, line.quantity)
+            off = gross * percent // 100
+            subtotal += gross
+            discount += off
+            quotes.append(LineQuote(line.sku, line.quantity, line.unitPriceCents, percent, gross - off))
+        net = subtotal - discount
+        tax = net * self.tax_per_mille(order.country) // 1000
+        total = net + tax
+        summary = f"{order.customer}: {len(quotes)} lines, {total} {order.currency}"
+        return OrderQuote(order.customer, order.currency, quotes, rejected, subtotal, discount, tax, total, summary)
+'''
+
     private static Object invoke(Closure<?> call) {
         try {
             return call()
