@@ -1514,9 +1514,11 @@ class Lowering:
         """
         The classes that code of the compilation may give one of the EAGER_EXCEPTION_MEMBERS after their
         definition, by name: an assignment or a deletion (E.__str__ = ..., app.errors.E.__init__ = ...),
-        or a setattr or delattr with such a member or a computed name, on a name, on a name bound to it
+        or a setattr or delattr with such a member or a computed name (builtins.setattr, type.__setattr__(E, ...),
+        object.__setattr__(E, ...) and E.__setattr__(...) included), on a name, on a name bound to it
         (Alias = E; Alias.__str__ = ...) or on the last attribute of a qualified name; a write on self is
-        one on an instance. A special method written on anything else (cls.__str__ = ...,
+        one on an instance. A setter referenced but not called (patch = setattr, type.__setattr__ passed on)
+        may write anything anywhere: the set then holds "*". A special method written on anything else (cls.__str__ = ...,
         type(e).__init__ = ..., self.__class__.__str__ = ...) may reach any class: the set then holds "*".
         Collected once per compilation over the ASTs of its modules.
         """
@@ -1550,8 +1552,30 @@ class Lowering:
             elif special:
                 unresolved = True  # type(e).__init__ = ...
 
+        setters = ("setattr", "delattr")
+        dunder_setters = ("__setattr__", "__delattr__")
+
+        def setter_call(call):
+            """The (receiver, member) a call of setattr or delattr writes, in any of its spellings, or None."""
+            func = call.func
+            if (isinstance(func, ast.Name) and func.id in setters) or (isinstance(func, ast.Attribute) and func.attr in setters):
+                return (call.args[0], call.args[1]) if len(call.args) >= 2 else (None, None)
+            if isinstance(func, ast.Attribute) and func.attr in dunder_setters:
+                owner = func.value
+                if isinstance(owner, ast.Call) and isinstance(owner.func, ast.Name) and owner.func.id == "super":
+                    return None  # super().__setattr__(name, value): the object's own attribute protocol
+                if (isinstance(owner, ast.Name) and owner.id in ("type", "object")) or (isinstance(owner, ast.Attribute) and owner.attr in ("type", "object")):
+                    # type.__setattr__(E, name, value): the unbound slot, the object first
+                    return (call.args[0], call.args[1]) if len(call.args) >= 2 else (None, None)
+                return (owner, call.args[0]) if call.args else (None, None)
+            return None
+
         for tree in trees:
+            called = {id(node.func) for node in ast.walk(tree) if isinstance(node, ast.Call)}
             for node in ast.walk(tree):
+                if id(node) not in called and ((isinstance(node, ast.Name) and node.id in setters and isinstance(node.ctx, ast.Load))
+                                               or (isinstance(node, ast.Attribute) and node.attr in setters + dunder_setters)):
+                    unresolved = True  # a setter referenced, not called: it may be called on any class
                 targets = ()
                 if isinstance(node, ast.Assign):
                     targets = node.targets
@@ -1568,13 +1592,15 @@ class Lowering:
                     for element in (target.elts if isinstance(target, (ast.Tuple, ast.List)) else (target,)):
                         if isinstance(element, ast.Attribute) and element.attr in EAGER_EXCEPTION_MEMBERS:
                             written(element.value, element.attr)
-                if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("setattr", "delattr")
-                        and len(node.args) >= 2):
-                    member = node.args[1]
-                    if not isinstance(member, ast.Constant):
-                        written(node.args[0], None)
+                setter = setter_call(node) if isinstance(node, ast.Call) else None
+                if setter is not None:
+                    receiver, member = setter
+                    if receiver is None:
+                        unresolved = True  # setattr(*arguments): any class, any member
+                    elif not isinstance(member, ast.Constant):
+                        written(receiver, None)
                     elif member.value in EAGER_EXCEPTION_MEMBERS:
-                        written(node.args[0], member.value)
+                        written(receiver, member.value)
         def reached(start):
             """The name and the names bound to it, transitively."""
             found = set()
@@ -2883,7 +2909,8 @@ class Lowering:
             # compiled delegate a Python caller runs, which has no stub and no shared entry, a call through
             # the Python object (SelfAccess.invokeShared), as a "java" one is there; compilation_calls
             # counts it as Python code of the compilation (see _exception_crossing)
-            # the stub's Java method of a method no subclass overrides: its compiled body, or the bridge to Python
+            # the stub's Java method of a method no subclass overrides (or the shared entry of its compiled
+            # body, a Java call too): its compiled body, or the bridge to Python
             self.callees.append(function_node)
             declared = OBJECT if hint is None and return_type != VOID else return_type
             call = InvokeSibling(name, parameter_types, arguments, declared, "shared" if shares else "java")
