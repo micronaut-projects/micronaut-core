@@ -30,6 +30,11 @@ import io.micronaut.python.imports.ResolvedModule;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
 import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.staticcompile.StaticCompilationConfiguration;
+import io.micronaut.python.processing.staticcompile.StaticCompilationDecision;
+import io.micronaut.python.processing.staticcompile.StaticCompilationMode;
+import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
+import io.micronaut.python.processing.staticcompile.StaticCompilationReport;
 import io.micronaut.python.processing.typecheck.JavaInstanceAliases;
 import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
 import io.micronaut.python.processing.typecheck.TypeCheckMode;
@@ -55,6 +60,7 @@ import javax.lang.model.element.TypeElement;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -91,14 +97,15 @@ import java.util.stream.Collectors;
  * each registered processor. The options below are declared by this processor's
  * {@link io.micronaut.inject.visitor.TypeElementVisitor}s, which a tool enumerating processors
  * never sees; {@code TypeElementVisitorProcessor} aggregates its visitors' options for the same
- * reason, and this processor loads its visitors too late in a round to do that dynamically.
+ * reason, and this processor loads its visitors too late in a round to do that dynamically. The
+ * options the processor reads itself (the source root, the bytecode cache, type checking and
+ * static compilation) are added by {@link #getSupportedOptions()}, which advertises both.
  *
  * @author Micronaut
  * @since 5.2.0
  */
 @SupportedAnnotationTypes(PythonAnnotationProcessor.PYTHON_APPLICATION_ANNOTATION)
 @SupportedOptions({
-    PythonAnnotationProcessor.SOURCE_ROOT_OPTION,
     PythonClassExclusions.OPTION,
     PythonReflectionGate.OPTION,
     PythonReflectionGate.WARNINGS_OPTION,
@@ -301,6 +308,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
     private Consumer<PythonDiagnostic> diagnosticCallback;
+    private Consumer<StaticCompilationDecision> staticDecisionCallback;
+    // the static compilation report directories written by this compilation, so elements sharing one keep each other's decisions
+    private final Set<Path> reportDirectories = new HashSet<>();
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
     private ClassLoader classLoader;
     private boolean compilePythonBytecode;
@@ -333,6 +343,16 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         this.diagnosticCallback = callback;
     }
 
+    /**
+     * Set the callback to be invoked for each static compilation decision, before the report is written.
+     *
+     * @param callback The callback function
+     * @since 5.3.0
+     */
+    public void setStaticCompilationDecisionCallback(Consumer<StaticCompilationDecision> callback) {
+        this.staticDecisionCallback = callback;
+    }
+
     @Override
     public Set<String> getSupportedOptions() {
         Set<String> options = new HashSet<>(super.getSupportedOptions());
@@ -340,7 +360,39 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         options.add(BYTECODE_OPTION);
         options.add(TypeCheckMode.OPTION);
         options.add(TypeCheckMode.ANNOTATIONS_OPTION);
+        options.add(StaticCompilationMode.OPTION);
+        options.add(StaticCompilationMode.REPORT_OPTION);
+        options.add(StaticCompilationMode.STRICT_OPTION);
+        options.add(StaticCompilationMode.ANNOTATIONS_OPTION);
         return options;
+    }
+
+    /**
+     * The static compilation requested through the processor options.
+     */
+    private StaticCompilationConfiguration staticCompilationConfiguration() {
+        Map<String, String> options = processingEnv.getOptions();
+        StaticCompilationMode mode;
+        try {
+            mode = StaticCompilationMode.fromOption(options.get(StaticCompilationMode.OPTION));
+        } catch (IllegalArgumentException e) {
+            throw new ProcessingException(null, e.getMessage());
+        }
+        String report = options.get(StaticCompilationMode.REPORT_OPTION);
+        boolean strict = Boolean.parseBoolean(options.get(StaticCompilationMode.STRICT_OPTION));
+        return new StaticCompilationConfiguration(
+            mode,
+            report == null || report.isBlank() ? null : Path.of(report.trim()),
+            strict,
+            optionList(options.get(StaticCompilationMode.ANNOTATIONS_OPTION))
+        );
+    }
+
+    private static List<String> optionList(String value) {
+        return value == null ? List.of() : Arrays.stream(value.split(","))
+            .map(String::trim)
+            .filter(name -> !name.isEmpty())
+            .toList();
     }
 
     /**
@@ -644,6 +696,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             // Every class of the compilation is modelled and registered: check the Python code against
             // the Java types it uses, and stop before any stub is generated when the check fails
             reportDiagnostics(parser.typeCheck(processingEnvironment.visitorContext()), transformedList, element, originatingElement);
+            planStaticCompilation(processingEnvironment, transformedList, element, originatingElement);
 
             Map<String, String> allDecorators = new LinkedHashMap<>();
             Map<String, List<Map<String, String>>> allImports = new LinkedHashMap<>();
@@ -820,7 +873,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 transformedList,
                 Arrays.asList(srcDirs),
                 javaVisitorContext,
-                typeCheckConfiguration()
+                typeCheckConfiguration(),
+                staticCompilationConfiguration()
             );
             Map<String, ClassDef> retained = PythonClassExclusions.retain(
                 environment.classes(),
@@ -843,6 +897,65 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         } catch (Exception e) {
             throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
         }
+    }
+
+    /**
+     * Decides which function bodies could be compiled statically, hands every decision to the
+     * callback, writes the report when a directory is configured, and reports the explicit
+     * switches that cannot be honoured.
+     */
+    private void planStaticCompilation(PythonProcessingEnvironment processingEnvironment,
+                                       List<PythonAstParser.TransformResult> transformedList,
+                                       TypeElement element,
+                                       ClassElement originatingElement) {
+        StaticCompilationPlan plan = parser.staticPlan(processingEnvironment.visitorContext());
+        StaticCompilationConfiguration configuration = staticCompilationConfiguration();
+        boolean planned = configuration.mode() != StaticCompilationMode.OFF || !plan.decisions().isEmpty();
+        if (!planned && plan.diagnostics().isEmpty()) {
+            return;
+        }
+        if (staticDecisionCallback != null) {
+            plan.decisions().forEach(staticDecisionCallback);
+        }
+        if (planned && configuration.reportDirectory() != null) {
+            // an incremental build planned the affected sources: the ones it was given and the ones
+            // it transformed, so a source whose functions are gone loses its previous decisions
+            Set<String> plannedSources = null;
+            if (incrementalSources != null) {
+                plannedSources = new HashSet<>(incrementalSources);
+                for (PythonAstParser.TransformResult transformResult : transformedList) {
+                    plannedSources.add(PythonAstParser.sourcePathOf(transformResult.originalSource()));
+                }
+                for (StaticCompilationDecision decision : plan.decisions()) {
+                    if (decision.sourcePath() != null) {
+                        plannedSources.add(decision.sourcePath());
+                    }
+                }
+            }
+            boolean incremental = plannedSources != null;
+            Path reportDirectory = configuration.reportDirectory().toAbsolutePath().normalize();
+            if (!reportDirectories.add(reportDirectory) && plannedSources == null) {
+                // an earlier element of this compilation wrote to the same directory: keep its decisions
+                plannedSources = new HashSet<>();
+                for (PythonAstParser.TransformResult transformResult : transformedList) {
+                    plannedSources.add(PythonAstParser.sourcePathOf(transformResult.originalSource()));
+                }
+                for (StaticCompilationDecision decision : plan.decisions()) {
+                    if (decision.sourcePath() != null) {
+                        plannedSources.add(decision.sourcePath());
+                    }
+                }
+            }
+            try {
+                StaticCompilationReport.write(reportDirectory, configuration.mode(), plan.decisions(), plannedSources, incremental);
+            } catch (UncheckedIOException e) {
+                IOException cause = e.getCause();
+                throw new ProcessingException(originatingElement, "Cannot write the static compilation report to the directory ["
+                    + reportDirectory + "] given by the option " + StaticCompilationMode.REPORT_OPTION + ": "
+                    + (cause.getMessage() != null ? cause.getMessage() : cause.toString()));
+            }
+        }
+        reportDiagnostics(plan.diagnostics(), transformedList, element, originatingElement);
     }
 
     /**
