@@ -2061,7 +2061,8 @@ class Gate:
                            'Plain.__setattr__(Plain, "__str__", None)',
                            # a setter not called where it is named may be called on any class
                            'patch = setattr\npatch(Plain, "__str__", lambda self: "patched")',
-                           'install = type.__setattr__'):
+                           'install = type.__setattr__',
+                           'from builtins import setattr as patch\npatch(Plain, "__str__", lambda self: "patched")'):
             self.assertFalse(self._lazy(statements), statements)
         # an object's own attribute protocol writes no class
         self.assertTrue(self._lazy("class Tracked:\n    def __setattr__(self, name, value):\n        super().__setattr__(name, value)\n"))

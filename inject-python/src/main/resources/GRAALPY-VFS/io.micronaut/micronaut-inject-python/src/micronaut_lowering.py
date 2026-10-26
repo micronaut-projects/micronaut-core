@@ -1533,6 +1533,9 @@ class Lowering:
                 if id(node) not in called and ((isinstance(node, ast.Name) and node.id in setters and isinstance(node.ctx, ast.Load))
                                                or (isinstance(node, ast.Attribute) and node.attr in setters + dunder_setters)):
                     unresolved = True  # a setter referenced, not called: it may be called on any class
+                if isinstance(node, ast.ImportFrom) and any(alias.name in setters + dunder_setters and alias.asname not in (None, alias.name)
+                                                            for alias in node.names):
+                    unresolved = True  # from builtins import setattr as patch: called by a name of its own
                 targets = ()
                 if isinstance(node, ast.Assign):
                     targets = node.targets
