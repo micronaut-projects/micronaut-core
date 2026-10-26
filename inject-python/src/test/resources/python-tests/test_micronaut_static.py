@@ -2065,7 +2065,9 @@ class Gate:
                            'from builtins import setattr as patch\npatch(Plain, "__str__", lambda self: "patched")',
                            'getattr(builtins, "setattr")(Plain, "__init__", None)',
                            # a cause the class defines is one the Java exception would not carry
-                           'Plain.__cause__ = None'):
+                           'Plain.__cause__ = None',
+                           # a parameter spelled as a class of the compilation may be any class
+                           'class cls:\n    pass\n\n\ndef patch(cls):\n    cls.__str__ = lambda self: "patched"'):
             self.assertFalse(self._lazy(statements), statements)
         # an object's own attribute protocol writes no class
         self.assertTrue(self._lazy("class Tracked:\n    def __setattr__(self, name, value):\n        super().__setattr__(name, value)\n"))
@@ -3913,6 +3915,15 @@ class ObjectsOfTheCompilationTest(unittest.TestCase):
 
 
 EVENT_LOOP = '''
+from dataclasses import dataclass
+
+
+@dataclass
+class Pair:
+    left: int
+    right: int
+
+
 class Rejected(Exception):
     pass
 
@@ -3997,6 +4008,12 @@ class Leaf:
     def builds_origin(self) -> Origin:
         return Origin(0, 0)
 
+    def reads_left(self, pair: Pair) -> int:
+        return pair.left
+
+    def reads_right(self, pair: Pair) -> int:
+        return pair.right
+
     def reads_item(self) -> int:
         return self.item.n
 
@@ -4047,12 +4064,12 @@ class EventLoopSafetyTest(unittest.TestCase):
 
     def setUp(self):
         import java
-        self.decisions, self.planner = plan(EVENT_LOOP, MODE_ALL, facts=FixedFacts(introspected=["pkg.Point"]))
+        self.decisions, self.planner = plan(EVENT_LOOP, MODE_ALL, facts=FixedFacts(introspected=["pkg.Point", "pkg.Pair"]))
         self.bodies = {(body.methodName() if body.moduleLevel() else body.className().rsplit(".", 1)[-1] + "." + body.methodName()): body
                        for body in self.planner.bodies}
         safety = java.type("io.micronaut.python.processing.staticcompile.EventLoopSafety")
         # the stub generator tells which generated constructors only assign Java fields: here Point's
-        self.safe = set(safety.safeBodies(list(self.planner.bodies), lambda constructor: constructor == "pkg.Point#2"))
+        self.safe = set(safety.safeBodies(list(self.planner.bodies), lambda member: member in ("pkg.Point#2", "pkg.Pair.left")))
 
     def _safe(self, name):
         decision = self.decisions[name]
@@ -4119,6 +4136,13 @@ class EventLoopSafetyTest(unittest.TestCase):
         self.assertTrue(self._safe("Leaf.builds_point"))
         # Origin is no introspected class: its generated constructor creates the Python object
         self.assertFalse(self._safe("Leaf.builds_origin"))
+
+    def test_an_accessor_of_an_introspected_class_is_safe_where_it_only_touches_its_field(self):
+        # the stub generator tells which accessors read their Java field: here left's, not right's (a
+        # bean-style getter of the class would make it call Python)
+        self.assertEqual(["pkg.Pair.left"], list(self.bodies["Leaf.reads_left"].pythonEntries().constructions()))
+        self.assertTrue(self._safe("Leaf.reads_left"))
+        self.assertFalse(self._safe("Leaf.reads_right"))
 
     def test_copying_a_set_of_python_objects_hashes_them(self):
         # the body works on a copy of a set parameter: a hashed collection of Python objects runs their __hash__

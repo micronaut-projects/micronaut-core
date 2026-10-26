@@ -92,6 +92,11 @@ class ThreadController:
     def introspected(self) -> Stamp:
         return Stamp(Thread.currentThread().getName(), 1)
 
+    @Get(value="/introspected-read", produces="text/plain")
+    def introspected_read(self) -> str:
+        stamp = Stamp(Thread.currentThread().getName(), 1)
+        return stamp.thread
+
     @Get(value="/plain-object", produces="text/plain")
     def plain_object(self) -> str:
         name = Thread.currentThread().getName()
@@ -176,11 +181,12 @@ def module_plain() -> str:
                 threads[m] = ['plain', 'sibling', 'python-sibling', 'service', 'plain-object', 'lazy-raise', 'eager-raise', 'blocking'].collectEntries { String route ->
                     [(route): client.retrieve("/threads/$route".toString())]
                 } + ['module/plain': client.retrieve('/module/plain'), 'module/blocking': client.retrieve('/module/blocking'),
-                     'introspected': client.retrieve('/threads/introspected', Map).thread as String]
+                     'introspected': client.retrieve('/threads/introspected', Map).thread as String,
+                     'introspected-read': client.retrieve('/threads/introspected-read')]
                 if (m == StaticCompilationMode.ALL) {
                     ['ThreadController.plain', 'ThreadController.sibling', 'ThreadController.named', 'ThreadController.python_sibling',
                      'ThreadController.service', 'Clock.thread', 'module_plain', 'ThreadController.introspected',
-                     'ThreadController.plain_object', 'ThreadController.lazy_raise', 'ThreadController.eager_raise'].each { compiled(it) }
+                     'ThreadController.plain_object', 'ThreadController.lazy_raise', 'ThreadController.eager_raise', 'ThreadController.introspected_read'].each { compiled(it) }
                 }
             } finally {
                 context.close()
@@ -194,7 +200,7 @@ def module_plain() -> str:
         off['blocking'].startsWith('blocking-') && off['module/blocking'].startsWith('blocking-')
 
         and: "compiled, a route calling Java, a compiled sibling or a compiled service, or building an introspected object, or raising and catching an exception class created lazily, stays on the event loop"
-        ['plain', 'sibling', 'service', 'module/plain', 'introspected', 'lazy-raise'].every { onEventLoop(all[it]) }
+        ['plain', 'sibling', 'service', 'module/plain', 'introspected', 'introspected-read', 'lazy-raise'].every { onEventLoop(all[it]) }
 
         and: "a route calling a sibling through the Python object, or creating a Python object, an exception included, runs on io, and @ExecuteOn is honoured"
         all['python-sibling'].startsWith('io-')
