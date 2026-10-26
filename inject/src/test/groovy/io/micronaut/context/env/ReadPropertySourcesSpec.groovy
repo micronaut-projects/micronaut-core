@@ -594,6 +594,51 @@ class ReadPropertySourcesSpec extends Specification {
         env.stop()
     }
 
+    void "stop() from the code of a property source that a refresh processes again as it publishes leaves the environment stopped"() {
+        given: "a property source read last that parks the refresh once armed, and one that stops the environment the second time it is read"
+        Gate gate = new Gate(Ordered.LOWEST_PRECEDENCE)
+        Map<String, Object> data = ['app.value': 'old']
+        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
+        env.addPropertySource(new MapPropertySource('data', data))
+        env.addPropertySource(gate)
+        env.start()
+        AtomicInteger reads = new AtomicInteger()
+        PropertySource stopping = new PropertySource() {
+            @Override
+            String getName() { 'stopping' }
+
+            @Override
+            Object get(String key) { key == 'stopping.key' ? 'value' : null }
+
+            @Override
+            Iterator<String> iterator() {
+                if (reads.incrementAndGet() == 2) {
+                    env.stop()
+                }
+                return ['stopping.key'].iterator()
+            }
+        }
+
+        when: "it is added once the refresh has taken the registered property sources, and processed again as the refresh publishes"
+        data.put('app.value', 'new')
+        gate.arm()
+        Thread refresher = daemon('refresher') { env.refresh() }
+        assert gate.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        env.addPropertySource(stopping)
+        gate.release.countDown()
+        refresher.join(WAIT_SECONDS * 1000L)
+
+        then: "nothing the refresh read is published: the stopped environment answers what it held when stopped"
+        !refresher.alive
+        reads.get() == 2
+        !env.running
+        env.getProperty('app.value', String).get() == 'old'
+
+        cleanup:
+        gate.release.countDown()
+        env.stop()
+    }
+
     @RestoreSystemProperties
     void "stop() from another thread while a refresh of a bootstrap enabled context reads the bootstrap configuration does not wait for it"() {
         given:

@@ -270,20 +270,26 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * Publishes the state the read of the current thread has written into, with the given
-     * property sources processed on top of it once more. Those are the ones that other threads
-     * added, and processed into the published state, since the read took the property sources it
-     * reads. They are processed as their threads did, but without registering them again and
-     * without the hooks for subclasses. Called with the catalog lock held.
+     * Processes a property source once more into the state the read of the current thread writes
+     * into, on top of what it holds: one that another thread added, and processed into the
+     * published state, since the read took the property sources it reads. It is processed as its
+     * thread did, but without registering it again and without the hooks for subclasses. Called
+     * with the catalog lock held.
      *
-     * @param build          What the read has written into
-     * @param addedMeanwhile The property sources to process on top
+     * @param propertySource The property source
+     */
+    void processAgain(PropertySource propertySource) {
+        processProperties(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
+    }
+
+    /**
+     * Publishes the state the read of the current thread has written into. Called with the
+     * catalog lock held.
+     *
+     * @param build What the read has written into
      * @return The generated catalog that was published until now
      */
-    Map<String, DefaultPropertyEntry>[] publish(Build build, List<PropertySource> addedMeanwhile) {
-        for (PropertySource propertySource : addedMeanwhile) {
-            processProperties(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
-        }
+    Map<String, DefaultPropertyEntry>[] publishState(Build build) {
         ResolverState previous = state;
         state = build.state;
         state.ownedContainers.clear();

@@ -587,21 +587,24 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             if (reads != generation) {
                 return false;
             }
-            List<PropertySource> addedMeanwhile = new ArrayList<>(read.addedMeanwhile.size());
             for (PropertySource added : read.addedMeanwhile) {
                 // the latest by its name, unless removed since
                 if (this.propertySources.get(added.getName()) == added) {
-                    addedMeanwhile.add(added);
+                    processAgain(added);
                 }
             }
-            Map<String, DefaultPropertyEntry>[] before = publish(read, addedMeanwhile);
+            if (reads != generation) {
+                // stopped by the code of a property source processed again
+                return false;
+            }
+            Map<String, DefaultPropertyEntry>[] before = publishState(read);
             for (PropertySource earlier : read.earlier) {
                 this.propertySources.remove(earlier.getName(), earlier);
             }
-            for (PropertySource processed : read.processed.values()) {
-                if (!read.changedNames.contains(processed.getName())) {
-                    this.propertySources.put(processed.getName(), processed);
-                }
+            for (Map.Entry<String, PropertySource> processed : read.processed.entrySet()) {
+                // in one step with the check, against an add or a remove that notes the name
+                this.propertySources.compute(processed.getKey(), (name, registered) ->
+                    read.changedNames.contains(name) ? registered : processed.getValue());
             }
             ownPropertySources = new ArrayList<>(read.own);
             // a refresh starts a stopped environment, as stop(); start() did
