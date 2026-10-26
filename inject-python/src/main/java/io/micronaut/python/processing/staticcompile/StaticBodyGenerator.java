@@ -57,7 +57,7 @@ public final class StaticBodyGenerator {
     private static final String SHORT = "short";
     private static final String FLOAT = "float";
     private static final String COPY = "copy";
-    private static final String SHARED = "shared";
+    private static final String SHARED_DISPATCH = "shared";
 
     private static final ClassTypeDef ITERATOR = ClassTypeDef.of(Iterator.class);
     private static final ClassTypeDef VALUE_COERCIBLE_TYPE = ClassTypeDef.of("io.micronaut.context.python.ValueCoercible");
@@ -582,7 +582,7 @@ public final class StaticBodyGenerator {
             case Ir.LocalRef ref -> local(ref.name());
             case Ir.SelfProperty property -> self.read(property.property(), property.type(), type(property.type()), property.accessor());
             case Ir.InvokeJava call -> invoke(call);
-            case Ir.InvokeSibling call when SHARED.equals(call.dispatch()) ->
+            case Ir.InvokeSibling call when SHARED_DISPATCH.equals(call.dispatch()) ->
                 self.invokeShared(call.name(), types(call.parameterTypes()), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
             case Ir.InvokeSibling call -> self.invoke(call.name(), types(call.parameterTypes()), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()), "java".equals(call.dispatch()));
             case Ir.InvokePython call -> self.invokeOn(pythonObject(call.receiver()), pythonClass(call.receiver()), call.name(), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
