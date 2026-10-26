@@ -762,9 +762,15 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         private final ApplicationContext parentContext;
         /**
          * The bootstrap context, from the first successful {@link #load(Environment)} until this
-         * locator is closed.
+         * locator is closed. Guarded by this locator's monitor, which is only held to read or
+         * replace it: a load or a close never waits for the other.
          */
         private @Nullable ApplicationContext bootstrapContext;
+        /**
+         * How often this locator has been closed, so that a load that ends after a close does not
+         * keep the bootstrap context it has created. Guarded by this locator's monitor.
+         */
+        private long closes;
 
         private BootstrapPropertySourcesLocator(ApplicationContextConfiguration bootstrapConfiguration, ApplicationContext parentContext) {
             this.bootstrapConfiguration = bootstrapConfiguration;
@@ -772,21 +778,26 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         }
 
         @Override
-        public synchronized Collection<PropertySource> load(Environment environment) {
+        public Collection<PropertySource> load(Environment environment) {
             LOG.info("Reading bootstrap environment configuration");
 
-            ApplicationContext bootstrapContext = this.bootstrapContext;
-            if (bootstrapContext != null) {
+            ApplicationContext reused;
+            long closesBefore;
+            synchronized (this) {
+                reused = this.bootstrapContext;
+                closesBefore = closes;
+            }
+            if (reused != null) {
                 // A refresh reuses the bootstrap context and its beans, which run until the
                 // application context stops. Its environment reads the bootstrap configuration
                 // again, with new property source loaders, and its locator reads the distributed
                 // configuration again. Beans built from the bootstrap configuration keep the values
                 // they were built with.
-                BootstrapLocatorMarker.refreshBootstrapEnvironment(bootstrapContext.getEnvironment());
-                return readPropertySources(bootstrapContext);
+                BootstrapLocatorMarker.refreshBootstrapEnvironment(reused.getEnvironment());
+                return readPropertySources(reused);
             }
 
-            bootstrapContext = new DefaultApplicationContext(bootstrapConfiguration);
+            ApplicationContext bootstrapContext = new DefaultApplicationContext(bootstrapConfiguration);
             try {
                 PropertySource contextSource = contextSource(environment);
                 if (contextSource != null) {
@@ -795,7 +806,17 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                 bootstrapContext.registerSingleton(BootstrapContextAccess.class, () -> parentContext, null, false);
                 bootstrapContext.start();
                 Collection<PropertySource> bootstrapPropertySources = readPropertySources(bootstrapContext);
-                this.bootstrapContext = bootstrapContext;
+                boolean kept;
+                synchronized (this) {
+                    // not kept if the locator was closed meanwhile, or another load has kept its own
+                    kept = closes == closesBefore && this.bootstrapContext == null;
+                    if (kept) {
+                        this.bootstrapContext = bootstrapContext;
+                    }
+                }
+                if (!kept) {
+                    bootstrapContext.close();
+                }
                 return bootstrapPropertySources;
             } catch (Throwable e) {
                 // Throwable, as a locator written in Groovy or Kotlin can throw a checked exception
@@ -840,10 +861,18 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
             return bootstrapPropertySources;
         }
 
+        /**
+         * Closes the bootstrap context, without waiting for a load in progress: a load that ends
+         * after this closes the bootstrap context it has created.
+         */
         @Override
-        public synchronized void close() {
-            ApplicationContext bootstrapContext = this.bootstrapContext;
-            this.bootstrapContext = null;
+        public void close() {
+            ApplicationContext bootstrapContext;
+            synchronized (this) {
+                bootstrapContext = this.bootstrapContext;
+                this.bootstrapContext = null;
+                closes++;
+            }
             if (bootstrapContext != null) {
                 bootstrapContext.close();
             }
