@@ -31,7 +31,7 @@ import ast
 import java
 
 from micronaut_typecheck import Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, function_node, switch_value
-from micronaut_lowering import Lowering
+from micronaut_lowering import JAVA_RESERVED_NAMES, Lowering
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
 Decision = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision")
@@ -317,11 +317,15 @@ class StaticPlanner:
         """Why the signature has no fixed Java layout, and which hints resolve to no type."""
         reasons = []
         bindings = None
+        if function_def.name() in JAVA_RESERVED_NAMES:
+            reasons.append(("java-reserved-name", f"method name [{function_def.name()}] cannot be declared in Java", span))
         if getattr(self.checker, "facts", None) is not None and node is not None:
             unit = CheckUnit(module.source_path, function_def.name(), function_def, node, class_def, None, module)
             bindings = Bindings(self.checker, unit)
         for argument in function_def.arguments().arguments():
             argument_span = argument.span() or span
+            if argument.name() in JAVA_RESERVED_NAMES:
+                reasons.append(("java-reserved-name", f"parameter [{argument.name()}] cannot be declared in Java", argument_span))
             if argument.variadic():
                 if node is None:
                     reasons.append(("varargs-signature", f"parameter [{argument.name()}] collects a variable number of arguments", argument_span))
@@ -413,4 +417,167 @@ def _describe(node):
     return _NAMES.get(type(node), f"a {type(node).__name__} node")
 
 
-__all__ = ["StaticPlanner", "CompileScope", "MODE_OFF", "MODE_ANNOTATED", "MODE_ALL", "MODES", "RULE"]
+# the class attribute through which the rewritten methods of a class reach the Java bodies of its bound
+# objects (PythonStatic.COMPILED_MEMBER): None until an object of the class is bound
+JAVA_INSTANCE_MEMBER = "__micronaut_compiled__"
+
+
+def apply_delegation(tree, targets):
+    """
+    Rewrite the compiled functions of a runtime module tree so that, on an object bound to its
+    Java stub, the Java body runs instead of the Python one::
+
+        class Calc:
+            __micronaut_compiled__ = None
+
+            def total(self, quantity, unit_price):
+                __mn_java = __class__.__micronaut_compiled__
+                if __mn_java is not None:
+                    __mn_java = __mn_java.call(self, 'app.Calc', 'total', (quantity, unit_price), ('int', 'float'), True)
+                    if __mn_java is not None:
+                        return __mn_java[0]
+                ...the original body, for objects created in Python...
+
+    The rewritten function names the class it is defined in (``__class__``) and the generated
+    class of that class, so ``super().total()`` from a subclass runs the base's Java body, not the
+    override. The binding of an object lives outside it, in the registry the class attribute
+    holds once an object of the class is bound (``micronaut_runtime``): a copy of the object is
+    not bound and runs the Python body on its own attributes. The registry runs the Java body only
+    when every argument has the exact Python type and range of its Java parameter, and runs the
+    Python body when a body that may be run again fails, see ``StaticDelegation``.
+
+    ``targets`` are ``Class#method#owner=<generated class>#kinds=<kind,...>#retry`` (``#once``
+    for a body that is not run again) strings, a nested class as ``Outer$Inner``; a target without
+    its kinds is not delegated. Returns how many functions were rewritten.
+    """
+    wanted = {}
+    for target in targets:
+        class_name, method, *rest = target.split("#")
+        options = dict(part.split("=", 1) if "=" in part else (part, True) for part in rest)
+        if "kinds" not in options:
+            continue
+        kinds = tuple(kind for kind in options["kinds"].split(",") if kind)
+        wanted.setdefault(class_name, {})[method] = (options.get("owner", class_name), kinds, "retry" in options)
+    count = 0
+    for class_node, path in _classes(tree):
+        methods = wanted.get("$".join(path))
+        if not methods:
+            continue
+        rewritten = 0
+        for statement in class_node.body:
+            if isinstance(statement, ast.FunctionDef) and statement.name in methods and not _delegates(statement):
+                owner, kinds, retry = methods[statement.name]
+                if not _receives_self(statement, kinds):
+                    continue
+                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, owner, kinds, retry)
+                ast.fix_missing_locations(statement)
+                rewritten += 1
+        if rewritten and not _declares_member(class_node):
+            member = ast.Assign(targets=[ast.Name(id=JAVA_INSTANCE_MEMBER, ctx=ast.Store())], value=ast.Constant(value=None))
+            _locate([member], class_node.lineno, class_node.col_offset)
+            class_node.body.insert(_docstring_offset(class_node), member)
+        count += rewritten
+    return count
+
+
+def _classes(tree, path=()):
+    for node in getattr(tree, "body", ()):
+        if isinstance(node, ast.ClassDef):
+            here = path + (node.name,)
+            yield node, here
+            yield from _classes(node, here)
+
+
+def _docstring_offset(function):
+    body = function.body
+    return 1 if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str) else 0
+
+
+DELEGATE_LOCAL = "__mn_java"
+
+
+def _declares_member(class_node):
+    return any(isinstance(statement, ast.Assign) and any(isinstance(target, ast.Name) and target.id == JAVA_INSTANCE_MEMBER for target in statement.targets)
+               for statement in class_node.body)
+
+
+def _receives_self(function, kinds):
+    """Whether the function takes the object and exactly the parameters the Java body does, positionally."""
+    args = function.args
+    positional = list(args.posonlyargs) + list(args.args)
+    return bool(positional) and len(positional) - 1 == len(kinds) and args.vararg is None and args.kwarg is None and not args.kwonlyargs
+
+
+def _delegates(function):
+    """Whether the function is already rewritten: its first statement reads the registry of its class."""
+    body = function.body
+    first = body[_docstring_offset(function)] if len(body) > _docstring_offset(function) else None
+    return (isinstance(first, ast.Assign) and isinstance(first.value, ast.Attribute) and first.value.attr == JAVA_INSTANCE_MEMBER
+            and isinstance(first.value.value, ast.Name) and first.value.value.id == "__class__")
+
+
+def _temporary(function):
+    """A name for the delegate that no parameter or name of the function uses."""
+    used = {node.arg for node in ast.walk(function.args) if isinstance(node, ast.arg)}
+    used |= {node.id for node in ast.walk(function) if isinstance(node, ast.Name)}
+    name = DELEGATE_LOCAL
+    suffix = 0
+    while name in used:
+        suffix += 1
+        name = f"{DELEGATE_LOCAL}_{suffix}"
+    return name
+
+
+def _locate(statements, line, column):
+    for statement in statements:
+        for node in ast.walk(statement):
+            if isinstance(node, (ast.stmt, ast.expr)):
+                node.lineno = node.end_lineno = line
+                node.col_offset = node.end_col_offset = column
+
+
+def _delegation(function, owner, kinds, retry):
+    args = function.args
+    positional = list(args.posonlyargs) + list(args.args)
+    receiver = positional[0].arg
+    names = [argument.arg for argument in positional[1:]]
+    temporary = _temporary(function)
+
+    def load(name):
+        return ast.Name(id=name, ctx=ast.Load())
+
+    lookup = ast.Assign(
+        targets=[ast.Name(id=temporary, ctx=ast.Store())],
+        value=ast.Attribute(value=load("__class__"), attr=JAVA_INSTANCE_MEMBER, ctx=ast.Load()),
+    )
+    call = ast.Assign(
+        targets=[ast.Name(id=temporary, ctx=ast.Store())],
+        value=ast.Call(
+            func=ast.Attribute(value=load(temporary), attr="call", ctx=ast.Load()),
+            args=[
+                load(receiver),
+                ast.Constant(value=owner),
+                ast.Constant(value=function.name),
+                ast.Tuple(elts=[load(name) for name in names], ctx=ast.Load()),
+                ast.Tuple(elts=[ast.Constant(value=kind) for kind in kinds], ctx=ast.Load()),
+                ast.Constant(value=retry),
+            ],
+            keywords=[],
+        ),
+    )
+    returned = ast.If(
+        test=ast.Compare(left=load(temporary), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
+        body=[ast.Return(value=ast.Subscript(value=load(temporary), slice=ast.Constant(value=0), ctx=ast.Load()))],
+        orelse=[],
+    )
+    guard = ast.If(
+        test=ast.Compare(left=load(temporary), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
+        body=[call, returned],
+        orelse=[],
+    )
+    statements = [lookup, guard]
+    _locate(statements, function.lineno, function.col_offset)
+    return statements
+
+
+__all__ = ["StaticPlanner", "CompileScope", "MODE_OFF", "MODE_ANNOTATED", "MODE_ALL", "MODES", "RULE", "apply_delegation"]
