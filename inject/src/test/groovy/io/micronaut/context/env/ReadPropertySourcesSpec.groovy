@@ -519,6 +519,39 @@ class ReadPropertySourcesSpec extends Specification {
         'once it has taken the registered ones, as' | false
     }
 
+    void "a refresh that stop() has dropped, while it still reads, does not change the property sources that a start after the stop owns"() {
+        given: "an environment whose configuration file has another value each time it is read, and a property source read last"
+        Gate gate = new Gate(Ordered.LOWEST_PRECEDENCE)
+        FileReadingEnvironment env = new FileReadingEnvironment()
+        env.addPropertySource(gate)
+        env.start()
+
+        when: "a refresh is parked before it reads, and the environment is stopped and started, the start parked once it has read its file"
+        Thread refresher = parkIn(env.stopping) { env.refresh() }
+        env.stop()
+        gate.arm()
+        Thread starter = daemon('starter') { env.start() }
+        assert gate.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
+
+        and: "the dropped refresh reads its file meanwhile, and then the start publishes"
+        release(env.stopping, refresher)
+        gate.release.countDown()
+        starter.join(WAIT_SECONDS * 1000L)
+
+        and: "the next refresh reads the file again"
+        env.refresh()
+
+        then: "it reads the file as it is now, not as the start read it"
+        !starter.alive
+        env.files.get() == 4
+        env.getProperty('app.value', String).get() == 'v4'
+
+        cleanup:
+        env.stopping.release.countDown()
+        gate.release.countDown()
+        env.stop()
+    }
+
     @RestoreSystemProperties
     void "stop() from another thread while a refresh of a bootstrap enabled context reads the bootstrap configuration does not wait for it"() {
         given:
@@ -731,6 +764,36 @@ class ReadPropertySourcesSpec extends Specification {
             Environment environment = super.start()
             publishing.pass()
             return environment
+        }
+    }
+
+    /**
+     * An environment whose configuration file, named {@code application}, has another value each
+     * time it is read, and that parks the thread that stops it once armed. It reads no system
+     * properties and no environment variables.
+     */
+    static class FileReadingEnvironment extends DefaultEnvironment {
+        final Parking stopping = new Parking()
+        final AtomicInteger files = new AtomicInteger()
+
+        FileReadingEnvironment() {
+            super({ ['test'] } as ApplicationContextConfiguration)
+        }
+
+        @Override
+        Environment stop() {
+            stopping.pass()
+            return super.stop()
+        }
+
+        @Override
+        protected List<PropertySource> readPropertySourceList(String name) {
+            return [PropertySource.of('application', ['app.value': 'v' + files.incrementAndGet()])]
+        }
+
+        @Override
+        protected void addDefaultPropertySources(List<PropertySource> propertySources) {
+            // only the file
         }
     }
 

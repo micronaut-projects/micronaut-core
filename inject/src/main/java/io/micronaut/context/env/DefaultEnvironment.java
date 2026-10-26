@@ -50,6 +50,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -110,7 +111,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     private static final int READ_WAIT_SECONDS = 2;
     protected final ClassPathResourceLoader resourceLoader;
-    protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
+    protected final List<PropertySource> refreshablePropertySources = new RefreshablePropertySources();
     protected final MutableConversionService mutableConversionService;
     private EnvironmentsAndPackage environmentsAndPackage;
     private final Set<String> names;
@@ -128,11 +129,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     private volatile Generation generation = new Generation();
     /**
-     * The refreshable property sources of the last read that was published: the next read reads
-     * them anew, rather than as registered ones, and stop() drops them. Guarded by the catalog
-     * lock.
+     * The refreshable property sources of the last read that was published, which
+     * {@link #refreshablePropertySources} holds outside a read: the next read reads them anew,
+     * rather than as registered ones, and stop() drops them. Replaced with the catalog lock held.
      */
-    private List<PropertySource> ownPropertySources = Collections.emptyList();
+    @SuppressWarnings("java:S3077") // replaced as a whole
+    private volatile List<PropertySource> ownPropertySources = new ArrayList<>();
     /**
      * What the {@link #refreshAndDiff()} of the current thread compares.
      */
@@ -364,7 +366,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 for (PropertySource own : ownPropertySources) {
                     this.propertySources.remove(own.getName(), own);
                 }
-                ownPropertySources = Collections.emptyList();
+                ownPropertySources = new ArrayList<>();
                 reset();
             }
         }
@@ -537,7 +539,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     if (reads == generation) {
                         // What a failed read registered of its own, the next read reads anew.
                         Set<PropertySource> own = identitySet(ownPropertySources);
-                        own.addAll(refreshablePropertySources);
+                        own.addAll(read.own);
                         ownPropertySources = new ArrayList<>(own);
                     }
                 }
@@ -596,7 +598,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     this.propertySources.put(processed.getName(), processed);
                 }
             }
-            ownPropertySources = new ArrayList<>(refreshablePropertySources);
+            ownPropertySources = new ArrayList<>(read.own);
             // a refresh starts a stopped environment, as stop(); start() did
             running.set(true);
             reads.read = null;
@@ -1525,6 +1527,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
          */
         final Set<PropertySource> earlier;
         /**
+         * Its own refreshable property sources, which {@link #refreshablePropertySources} holds
+         * on its thread: at first those of the reads before it.
+         */
+        final List<PropertySource> own;
+        /**
          * The names by which other threads have added or removed a property source while it
          * reads.
          */
@@ -1554,6 +1561,51 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             this.generation = generation;
             this.refresh = refresh;
             this.earlier = identitySet(earlier);
+            this.own = new ArrayList<>(earlier);
+        }
+    }
+
+    /**
+     * The refreshable property sources: on the thread of a read those of that read, which become
+     * those of the environment once it is published, and on any other thread those of the last
+     * read that was published. So a read that stop() has dropped, while it still runs, does not
+     * write into those of a read that starts after the stop.
+     */
+    private final class RefreshablePropertySources extends AbstractList<PropertySource> {
+
+        @Override
+        public PropertySource get(int index) {
+            return sources().get(index);
+        }
+
+        @Override
+        public int size() {
+            return sources().size();
+        }
+
+        @Override
+        public PropertySource set(int index, PropertySource element) {
+            return sources().set(index, element);
+        }
+
+        @Override
+        public void add(int index, PropertySource element) {
+            sources().add(index, element);
+        }
+
+        @Override
+        public PropertySource remove(int index) {
+            return sources().remove(index);
+        }
+
+        @Override
+        public void clear() {
+            sources().clear();
+        }
+
+        private List<PropertySource> sources() {
+            Read read = currentEnvironmentRead();
+            return read != null ? read.own : ownPropertySources;
         }
     }
 
