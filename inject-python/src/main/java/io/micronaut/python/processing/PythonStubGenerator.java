@@ -206,6 +206,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String COMPILED_SELF = "__mnSelf";
     // the Python object a stub extending a Python class stub last bound to the compiled bodies of its classes
     private static final String COMPILED_BOUND_FIELD = "graalpyInternalCompiledValue";
+    // the prefix of the shared entry of a compiled body: a private name, which the stub bridges no Python method under
+    private static final String SHARED_ENTRY_PREFIX = "__mnShared_";
     public static final ClassTypeDef PYTHON_ASYNCIO_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonAsyncioRuntime");
     public static final ClassTypeDef PYTHON_CONTEXT_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime");
     public static final ClassTypeDef PYTHON_JAVA_BASES = ClassTypeDef.of("io.micronaut.context.python.PythonJavaBases");
@@ -1501,6 +1503,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         if (declaresCompiledDelegate(model)) {
             builder.addInnerType(compiledDelegate(model));
+            addSharedEntries(model, builder);
         }
         declareStaticAdvice(model);
 
@@ -5153,6 +5156,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
 
             @Override
+            public ExpressionDef invokeShared(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+                if (hasSharedEntry(model, name)) {
+                    return aThis.invoke(SHARED_ENTRY_PREFIX + name, parameterTypes, type, arguments);
+                }
+                return members.invoke(name, parameterTypes, arguments, typeName, type, false);
+            }
+
+            @Override
             public ExpressionDef invokeOn(ExpressionDef value, String owner, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
                 return members.invokeOn(value, owner, name, arguments, typeName, type);
             }
@@ -5465,6 +5476,44 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * Whether the stub declares the shared entry of the compiled body of a method of its own class.
+     */
+    private static boolean hasSharedEntry(ClassStubModel model, String name) {
+        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
+        Ir.CompiledBody body = plan == null ? null : plan.body(model.element().getName(), name);
+        return body != null && !body.staticMethod() && !StaticBodyGenerator.copiedParameters(body).isEmpty();
+    }
+
+    /**
+     * The shared entries of the compiled bodies of the stub's own class taking a list, set or dict:
+     * a private method running the body without copying those collections. A compiled sibling
+     * calls it with its own collections, which the callee updates as Python's callee updates the
+     * caller's, and the stub's Java method calls it with copies, as the bridge would hand Python
+     * copies of a Java caller's collections. It is private: the call is not virtual, which the
+     * lowering only dispatches to when no subclass of the compilation overrides the method and no
+     * advice intercepts it.
+     */
+    private void addSharedEntries(ClassStubModel model, ClassDef.ClassDefBuilder builder) {
+        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
+        for (Ir.CompiledBody body : plan.bodiesOf(model.element().getName())) {
+            // a static method's body has no instance to run a private entry on
+            if (body.staticMethod() || StaticBodyGenerator.copiedParameters(body).isEmpty()) {
+                continue;
+            }
+            TypeDef returnType = Ir.VOID.equals(body.returnType()) ? TypeDef.VOID : StaticBodyGenerator.type(body.returnType());
+            MethodDef.MethodDefBuilder method = MethodDef.builder(SHARED_ENTRY_PREFIX + body.methodName()).addModifiers(Modifier.PRIVATE).returns(returnType);
+            for (int i = 0; i < body.parameterNames().size(); i++) {
+                method.addParameter(ParameterDef.of(body.parameterNames().get(i), StaticBodyGenerator.type(body.parameterTypes().get(i))));
+            }
+            if (body.span() != null) {
+                method.addJavadoc("Compiled from " + body.span().location() + ", working on the caller's collections");
+            }
+            builder.addMethod(method.build((aThis, parameters) ->
+                StaticBodyGenerator.generateShared(body, parameters, selfAccess(model, aThis), plan.trace())));
+        }
+    }
+
+    /**
      * The assignment of the Python object of the stub, binding the object to the stub when the class
      * has compiled bodies.
      */
@@ -5608,6 +5657,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 methodBuilder.addJavadoc(COMPILED_FROM + compiledBody.span().location());
             }
             boolean trace = staticCompilationPlan(visitorContext).trace();
+            if (model != null && !compiledBody.staticMethod() && !StaticBodyGenerator.copiedParameters(compiledBody).isEmpty()) {
+                // a Java caller's collections are copied, as the bridge copies them, and the body runs in its shared entry
+                TypeDef returnType = Ir.VOID.equals(compiledBody.returnType()) ? TypeDef.VOID : StaticBodyGenerator.type(compiledBody.returnType());
+                List<TypeDef> parameterTypes = compiledBody.parameterTypes().stream().map(StaticBodyGenerator::type).toList();
+                builder.addMethod(methodBuilder.build((aThis, methodParameters) -> StatementDef.multi(
+                    compiledBody.advised() ? adviceChain(aThis, compiledBody.methodName(), compiledBody.parameterTypes(), methodParameters, methodSourceReturnType) : StatementDef.multi(),
+                    StaticBodyGenerator.generateEntry(compiledBody, methodParameters, arguments ->
+                        aThis.invoke(SHARED_ENTRY_PREFIX + compiledBody.methodName(), parameterTypes, returnType, arguments)))));
+                return;
+            }
             builder.addMethod(methodBuilder.build((aThis, methodParameters) -> StatementDef.multi(
                 compiledBody.advised() && model != null ? adviceChain(aThis, compiledBody.methodName(), compiledBody.parameterTypes(), methodParameters, methodSourceReturnType) : StatementDef.multi(),
                 StaticBodyGenerator.generate(compiledBody, methodParameters, model != null ? selfAccess(model, aThis) : scriptSelfAccess(visitorContext, aThis), trace))));
