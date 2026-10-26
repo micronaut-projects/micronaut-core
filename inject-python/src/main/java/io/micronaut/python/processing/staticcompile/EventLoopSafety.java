@@ -38,7 +38,8 @@ import java.util.function.Predicate;
  *     a sibling dispatched {@code python});</li>
  *     <li>a read of an attribute of {@code self} that is not fixed at construction, or a property, and
  *     an assignment of one;</li>
- *     <li>a raise of a Python exception class, which creates the exception through its Python class;</li>
+ *     <li>a raise of a Python exception class that creates the exception through its Python class (a
+ *     lazy one, {@link Ir.NewPythonException#lazy()}, creates the Java exception alone);</li>
  *     <li>a read of a constant of a generated class;</li>
  *     <li>rendering, comparing or hashing a value whose type names a generated class: its
  *     {@code toString}, {@code equals} or {@code hashCode} may be the Python object's.</li>
@@ -166,7 +167,10 @@ public final class EventLoopSafety {
                 : scan(call.arguments(), pythonClass);
             case Ir.InvokePython call -> "calls [" + call.name() + "] through the Python object";
             case Ir.PythonMember member -> "reads [" + member.name() + "] through the Python object";
-            case Ir.NewPythonException construction -> "raises [" + construction.type() + "], which its Python class creates";
+            // a lazy exception is the Java exception alone: its Python exception is created when Python needs it
+            case Ir.NewPythonException construction -> construction.lazy()
+                ? scan(construction.arguments(), pythonClass)
+                : "raises [" + construction.type() + "], which its Python class creates";
             // a construction of a generated class is the planner's: its constructor may create the Python object
             case Ir.NewJava construction -> scan(construction.arguments(), pythonClass);
             case Ir.StaticField field -> pythonClass.test(erased(field.owner()))

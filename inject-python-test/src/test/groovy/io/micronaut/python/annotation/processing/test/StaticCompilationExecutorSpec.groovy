@@ -46,6 +46,15 @@ class Plain:
         self.thread = thread
 
 
+class Rejected(Exception):
+    pass
+
+
+class Refused(Exception):
+    def __str__(self) -> str:
+        return "refused"
+
+
 @Singleton
 class Clock:
     def thread(self) -> str:
@@ -88,6 +97,26 @@ class ThreadController:
         name = Thread.currentThread().getName()
         Plain(name)
         return name
+
+    @Get(value="/lazy-raise", produces="text/plain")
+    def lazy_raise(self) -> str:
+        name = Thread.currentThread().getName()
+        try:
+            if len(name) > 0:
+                raise Rejected(name)
+            return "unnamed"
+        except Rejected:
+            return name
+
+    @Get(value="/eager-raise", produces="text/plain")
+    def eager_raise(self) -> str:
+        name = Thread.currentThread().getName()
+        try:
+            if len(name) > 0:
+                raise Refused(name)
+            return "unnamed"
+        except Refused:
+            return name
 
     @Get(value="/blocking", produces="text/plain")
     @ExecuteOn(TaskExecutors.BLOCKING)
@@ -144,14 +173,14 @@ def module_plain() -> str:
                 def server = context.getBean(EmbeddedServer)
                 server.start()
                 def client = context.createBean(HttpClient, server.URL).toBlocking()
-                threads[m] = ['plain', 'sibling', 'python-sibling', 'service', 'plain-object', 'blocking'].collectEntries { String route ->
+                threads[m] = ['plain', 'sibling', 'python-sibling', 'service', 'plain-object', 'lazy-raise', 'eager-raise', 'blocking'].collectEntries { String route ->
                     [(route): client.retrieve("/threads/$route".toString())]
                 } + ['module/plain': client.retrieve('/module/plain'), 'module/blocking': client.retrieve('/module/blocking'),
                      'introspected': client.retrieve('/threads/introspected', Map).thread as String]
                 if (m == StaticCompilationMode.ALL) {
                     ['ThreadController.plain', 'ThreadController.sibling', 'ThreadController.named', 'ThreadController.python_sibling',
                      'ThreadController.service', 'Clock.thread', 'module_plain', 'ThreadController.introspected',
-                     'ThreadController.plain_object'].each { compiled(it) }
+                     'ThreadController.plain_object', 'ThreadController.lazy_raise', 'ThreadController.eager_raise'].each { compiled(it) }
                 }
             } finally {
                 context.close()
@@ -164,11 +193,12 @@ def module_plain() -> str:
         off.findAll { route, thread -> !route.contains('blocking') }.every { route, thread -> thread.startsWith('io-') }
         off['blocking'].startsWith('blocking-') && off['module/blocking'].startsWith('blocking-')
 
-        and: "compiled, a route calling Java, a compiled sibling or a compiled service, or building an introspected object, stays on the event loop"
-        ['plain', 'sibling', 'service', 'module/plain', 'introspected'].every { onEventLoop(all[it]) }
+        and: "compiled, a route calling Java, a compiled sibling or a compiled service, or building an introspected object, or raising and catching an exception class created lazily, stays on the event loop"
+        ['plain', 'sibling', 'service', 'module/plain', 'introspected', 'lazy-raise'].every { onEventLoop(all[it]) }
 
-        and: "a route calling a sibling through the Python object, or creating a Python object, runs on io, and @ExecuteOn is honoured"
+        and: "a route calling a sibling through the Python object, or creating a Python object, an exception included, runs on io, and @ExecuteOn is honoured"
         all['python-sibling'].startsWith('io-')
+        all['eager-raise'].startsWith('io-')
         all['plain-object'].startsWith('io-')
         all['blocking'].startsWith('blocking-') && all['module/blocking'].startsWith('blocking-')
     }

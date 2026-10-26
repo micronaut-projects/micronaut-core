@@ -336,12 +336,15 @@ public sealed interface Ir {
      * Dispatched {@code python} otherwise (a method the stub does not bridge, an advised method whose
      * interceptor chain runs on the Python object, a method a subclass overrides, a call relying on
      * default arguments): the method of the Python object is invoked, as the Python code would.
+     * Dispatched {@code shared} for a compiled method of the class taking a list, set or dict: the
+     * shared entry of its compiled body is called, which works on the caller's collections where the
+     * stub's Java method would copy them, see {@link StaticBodyGenerator#generateShared}.
      *
      * @param name           The method name
-     * @param parameterTypes The Java parameter types of the stub method, for a {@code java} dispatch
+     * @param parameterTypes The Java parameter types of the stub method, for a {@code java} or {@code shared} dispatch
      * @param arguments      The arguments
      * @param type           The Java return type, {@code void} for none
-     * @param dispatch       {@code java} or {@code python}
+     * @param dispatch       {@code java}, {@code shared} or {@code python}
      */
     record InvokeSibling(String name,
                          List<String> parameterTypes,
@@ -411,13 +414,32 @@ public sealed interface Ir {
      * the Python class called with the arguments, the Python exception wrapped in the generated Java
      * class through its {@code Value} constructor, as the runtime wraps a Python exception that
      * reaches Java code. Its Java value is the {@code RuntimeException} a {@code raise} throws.
+     * <p>
+     * A lazy exception is created as the Java exception alone, with the message
+     * {@code BaseException.__str__} gives the arguments: its generated class creates the Python
+     * exception from the class reference and the arguments the first time the Python object is
+     * needed (it reaches Python, or an exception handler converts it). The planner makes an
+     * exception lazy only when nothing of its class can tell the difference: neither the class
+     * nor a Python base defines {@code __new__}, {@code __init__}, {@code __str__}, {@code __repr__}
+     * or {@code args}, and its builtin base takes its arguments as {@code BaseException} does.
      *
      * @param type      The generated class, a RuntimeException
      * @param arguments The arguments of the Python class, boxed
+     * @param lazy      Whether the Python exception is created when it is first needed
      */
-    record NewPythonException(String type, List<Expression> arguments) implements Expression {
+    record NewPythonException(String type, List<Expression> arguments, boolean lazy) implements Expression {
         public NewPythonException {
             arguments = List.copyOf(arguments);
+        }
+
+        /**
+         * An exception created through its Python class when it is raised.
+         *
+         * @param type      The generated class, a RuntimeException
+         * @param arguments The arguments of the Python class, boxed
+         */
+        public NewPythonException(String type, List<Expression> arguments) {
+            this(type, arguments, false);
         }
     }
 
