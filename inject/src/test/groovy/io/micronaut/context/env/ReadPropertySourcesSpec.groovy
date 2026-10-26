@@ -835,6 +835,27 @@ class ReadPropertySourcesSpec extends Specification {
         env.stop()
     }
 
+    void "a property source added while a refresh reads goes among what it has processed in the order it processed it"() {
+        given:
+        ReplacesWhenStarted env = new ReplacesWhenStarted()
+        env.addPropertySource(PropertySource.of('extra', ['extra.key': 'first'], 50))
+        env.start()
+
+        when: "the thread of the refresh replaces it with one of a lower order once it has read, and another thread adds one of a still lower order"
+        env.replacement = PropertySource.of('extra', ['extra.key': 'replaced'], 0)
+        Thread refresher = parkIn(env.publishing) { env.refresh() }
+        env.addPropertySource(PropertySource.of('lowest', ['lowest.key': 'lowest'], -100))
+        release(env.publishing, refresher)
+
+        then: "the replacement, processed last, stays over what it replaced"
+        env.getProperty('extra.key', String).get() == 'replaced'
+        env.getProperty('lowest.key', String).get() == 'lowest'
+
+        cleanup:
+        env.publishing.release.countDown()
+        env.stop()
+    }
+
     @RestoreSystemProperties
     void "stop() from another thread while a refresh of a bootstrap enabled context reads the bootstrap configuration does not wait for it"() {
         given:

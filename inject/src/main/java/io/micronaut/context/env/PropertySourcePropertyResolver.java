@@ -273,30 +273,43 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * Writes the given property sources into the state the read of the current thread writes
      * into, in their order among the property sources the read has processed. They are ones that
      * other threads added, and processed into the published state, since the read took the
-     * property sources it reads. The properties are those recorded as each was processed, so no
-     * code of a property source runs: the property sources the read has processed of a higher
-     * order are written again after them, as recorded too. Called with the catalog lock held.
+     * property sources it reads. Each one goes where the read would have processed it: before the
+     * first property source the read has processed of a higher order. What the read has processed
+     * from there on is written again after it, in the order the read processed it. The properties
+     * are those recorded as each was processed, so no code of a property source runs. Called with
+     * the catalog lock held.
      *
      * @param build          What the read writes into
      * @param addedMeanwhile The property sources added meanwhile, as processed
      */
     void writeInOrder(Build build, List<Processed> addedMeanwhile) {
-        int lowest = Integer.MAX_VALUE;
-        for (Processed added : addedMeanwhile) {
-            lowest = Math.min(lowest, added.order);
-        }
-        List<Processed> written = new ArrayList<>();
-        for (Processed read : build.recorded) {
-            if (read.order > lowest) {
-                written.add(read);
+        List<Processed> recorded = build.recorded;
+        // a stable sort: of the same order, the one added later comes later
+        List<Processed> added = new ArrayList<>(addedMeanwhile);
+        added.sort(Comparator.comparingInt(processed -> processed.order));
+        // where each goes: the higher its order, the later, so these do not decrease
+        int[] before = new int[added.size()];
+        for (int a = 0; a < added.size(); a++) {
+            int i = 0;
+            while (i < recorded.size() && recorded.get(i).order <= added.get(a).order) {
+                i++;
             }
+            before[a] = i;
         }
-        written.addAll(addedMeanwhile);
-        // a stable sort: one added meanwhile comes after one the read processed of the same order
-        written.sort(Comparator.comparingInt(processed -> processed.order));
-        for (Processed processed : written) {
-            writeProperties(processed.origin, processed.values, processed.convention);
+        int next = 0;
+        for (int i = before[0]; i < recorded.size(); i++) {
+            for (; next < added.size() && before[next] == i; next++) {
+                write(added.get(next));
+            }
+            write(recorded.get(i));
         }
+        for (; next < added.size(); next++) {
+            write(added.get(next));
+        }
+    }
+
+    private void write(Processed processed) {
+        writeProperties(processed.origin, processed.values, processed.convention);
     }
 
     /**
