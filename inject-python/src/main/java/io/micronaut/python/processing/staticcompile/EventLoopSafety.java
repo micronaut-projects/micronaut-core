@@ -41,7 +41,8 @@ import java.util.function.Predicate;
  *     <li>a raise of a Python exception class that creates the exception through its Python class (a
  *     lazy one, {@link Ir.NewPythonException#lazy()}, creates the Java exception alone);</li>
  *     <li>a read of a constant of a generated class;</li>
- *     <li>rendering, comparing or hashing a value whose type names a generated class: its
+ *     <li>rendering, comparing or hashing a value whose type names a generated class
+ *     or {@code Object}: its
  *     {@code toString}, {@code equals} or {@code hashCode} may be the Python object's.</li>
  * </ul>
  *
@@ -61,6 +62,8 @@ public final class EventLoopSafety {
     private static final Set<String> REFERENCE_HELPERS = Set.of(
         "list", "tuple", "copyOfList", "copyOfTuple", "append", "at", "setAt", "len", "group"
     );
+
+    private static final String OBJECT = "java.lang.Object";
 
     private EventLoopSafety() {
     }
@@ -223,11 +226,12 @@ public final class EventLoopSafety {
     }
 
     /**
-     * Whether a Java type, or one of its type arguments or its element type, is a generated class.
+     * Whether a Java type, or one of its type arguments or its element type, is a generated class, or
+     * {@code Object}, which may hold the object of one (a parameter hinted {@code object}, a mixed literal).
      */
     private static boolean mentions(String type, Predicate<String> pythonClass) {
         for (String name : type.split("[<>,\\[\\]\\s]+")) {
-            if (!name.isEmpty() && pythonClass.test(name)) {
+            if (!name.isEmpty() && (pythonClass.test(name) || OBJECT.equals(name) || "?".equals(name))) {
                 return true;
             }
         }
