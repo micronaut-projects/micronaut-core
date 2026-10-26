@@ -249,6 +249,20 @@ class StaticDelegationTest {
     }
 
     @Test
+    void anIntAttributeReadFromPythonMayNotFitTheJavaInteger() {
+        // a Python int attribute or property converts to a long, which an int beyond its range fails: a body
+        // without side effects runs again in Python, one with side effects keeps the Python body
+        Ir.Expression count = new Ir.SelfProperty("count", Ir.LONG, true, false);
+        assertEquals("retry", StaticDelegation.status(body(List.of(), Ir.LONG, new Ir.Return(count))));
+        Ir.Expression sent = new Ir.InvokeJava(null, "app.Sender", "send", List.of(Ir.LONG), List.of(count), Ir.STRING);
+        assertEquals("none(it has side effects (the call of [app.Sender.send]) and the int attribute [self.count] may not fit a [long])",
+            StaticDelegation.status(body(List.of(), Ir.STRING, new Ir.Return(sent))));
+        Ir.Expression total = new Ir.PythonMember(new Ir.Param("p0", "app.Cart", "app.Cart"), "total", Ir.LONG, true);
+        assertEquals("none(it has side effects (the property [total]) and the int attribute [total] may not fit a [long])",
+            StaticDelegation.status(body(List.of("app.Cart"), Ir.LONG, new Ir.Return(total))));
+    }
+
+    @Test
     void aNarrowingThatCannotOverflowDoesNotPromote() {
         // an int parameter used as a long and narrowed back always fits
         Ir.Expression held = new Ir.Param("p0", Ir.LONG, "int");

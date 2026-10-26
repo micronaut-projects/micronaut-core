@@ -92,6 +92,8 @@ public final class StaticDelegation {
     private static final Set<String> BUILDING_HELPERS = Set.of("list", "set", "map", "copyOfList", "copyOfSet", "copyOfMap", "split");
     private static final Set<String> UPDATING_HELPERS = Set.of("put", "putAll");
     // the integer types narrower than a long, by their width in bits
+    // the Java integer types a Python int converts to, which an int beyond their range fails
+    private static final Set<String> INTEGER_TYPES = Set.of(Ir.LONG, INT, SHORT, BYTE, "java.lang.Long", "java.lang.Integer", "java.lang.Short", "java.lang.Byte");
     private static final Map<String, Integer> NARROW_TYPES = Map.of(INT, 32, SHORT, 16, BYTE, 8, "java.lang.Integer", 32, "java.lang.Short", 16, "java.lang.Byte", 8);
     private static final String JAVA_KIND = "java:";
     // the Java types of the values that are hashable in Python whatever they hold
@@ -438,9 +440,12 @@ public final class StaticDelegation {
                 }
                 case Ir.Return ret -> visit(ret.value());
                 case Ir.Eval eval -> visit(eval.expression());
-                case Ir.Const _, Ir.Param _, Ir.LocalRef _, Ir.SelfProperty _, Ir.StaticField _ -> {
+                case Ir.Const _, Ir.Param _, Ir.LocalRef _, Ir.StaticField _ -> {
                     // reading a value has no side effect and cannot overflow
                 }
+                case Ir.SelfProperty property ->
+                    // an int attribute of the Python object may outgrow the Java integer it converts to
+                    promotes(INTEGER_TYPES.contains(property.type()), "the int attribute [self." + property.property() + "] may not fit a [" + property.type() + "]");
                 case Ir.Field field -> visit(field.receiver());
                 case Ir.ModuleAttribute _ -> {
                     // an injected bean of the module, read from a field of the module's generated class
@@ -450,6 +455,7 @@ public final class StaticDelegation {
                         // a @property of another object runs its getter, which may do anything
                         sideEffect("the property [" + member.name() + "]");
                     }
+                    promotes(INTEGER_TYPES.contains(member.type()), "the int attribute [" + member.name() + "] may not fit a [" + member.type() + "]");
                     visit(member.receiver());
                 }
                 case Ir.Binary binary -> {
