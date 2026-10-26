@@ -42,7 +42,12 @@ class FakeFacts:
         return FakeAnnotation() if name == "io.micronaut.core.annotation.Introspected" else None
 
     def isAssignable(self, source, target):
-        return source == target
+        supertypes = {
+            "java.util.List": {"java.util.Collection", "java.lang.Iterable"},
+            "java.util.Set": {"java.util.Collection", "java.lang.Iterable"},
+            "java.util.Collection": {"java.lang.Iterable"},
+        }
+        return source == target or target in supertypes.get(source, ())
 
 
 def plan(source, mode, strict=False, path="module.py", facts=None):
@@ -95,6 +100,15 @@ class Finder:
             token = "t"
             return token
         return "n"
+
+    def merged(self, extra: dict[str, str]) -> dict[str, str]:
+        return {"a": "b", **extra, "c": "d"}
+
+    def view(self, name: str, count: int):
+        return {"name": name, "count": count}
+
+    def copied(self, values: list[str]) -> list[str]:
+        return list(values)
 
     def counted(self, n: int) -> int | None:
         return n if n > 0 else None
@@ -152,6 +166,26 @@ class CorpusFindingsTest(unittest.TestCase):
 
     def test_an_unhinted_return_compiles_as_object(self):
         self.assertEqual("java.lang.Object", self._compiled("unhinted").returnType())
+
+    def test_a_dict_unpacking_builds_the_map_in_order(self):
+        returned = self._returned("merged")
+        self.assertEqual("Helper", returned.getClass().getSimpleName())
+        self.assertEqual("put", returned.name())
+        self.assertEqual("putAll", list(returned.arguments())[0].name())
+        self.assertEqual("map", list(list(returned.arguments())[0].arguments())[0].name())
+        self.assertEqual("java.util.Map<java.lang.String,java.lang.String>", returned.type())
+
+    def test_a_literal_of_mixed_values_holds_objects(self):
+        body = self._compiled("view")
+        self.assertEqual("java.lang.Object", body.returnType())
+        returned = self._returned("view")
+        self.assertEqual("java.util.Map<java.lang.String,java.lang.Object>", returned.type())
+
+    def test_list_of_a_collection_copies_it(self):
+        returned = self._returned("copied")
+        self.assertEqual("Helper", returned.getClass().getSimpleName())
+        self.assertEqual("copyOfList", returned.name())
+        self.assertEqual("java.util.List<java.lang.String>", returned.type())
 
     def test_a_local_read_inside_its_branch_only_is_declared_there(self):
         body = self._compiled("maybe")
@@ -550,7 +584,7 @@ class Pricing:
         return self.truncate(n)
 
     def builtin(self, name: str) -> int:
-        return len(name)
+        return round(len(name) / 2)
 
     def power(self, base: int, exponent: int) -> int:
         return base ** exponent
@@ -668,11 +702,56 @@ class Pricing:
             pass
         i = 2
         return i
+
+    def collected(self, names: list[str], limit: int) -> list[str]:
+        picked: list[str] = []
+        for name in names:
+            if len(picked) >= limit:
+                break
+            if name in picked or not name.strip():
+                continue
+            picked.append(name.upper())
+        return picked
+
+    def indexed(self, values: list[int], index: int) -> int:
+        first = values[0]
+        return first + values[index] + len(values)
+
+    def priced(self, prices: dict[str, float], name: str) -> float:
+        if name in prices:
+            return prices[name]
+        return prices.get("default", 0.0)
+
+    def parsed(self, text: str) -> int:
+        parts = text.split(",")
+        total = 0
+        for part in parts:
+            total += int(part)
+        return max(total, 0)
+
+    def mixed(self) -> list[int]:
+        return [1, "x"]
+
+    def maybe_missing(self, values: dict[str, int]) -> bool:
+        return values.get("x") is None
+
+    def appended(self, values: list[int]) -> bool:
+        return values.append(1) is None
+
+    def crossed(self, values: list[int]) -> bool:
+        return 1.0 in values
+
+    def charred(self, text: str) -> bool:
+        return 1 in text
+
+    def counted(self, counts: dict[str, int], values: list[str]) -> int:
+        counts["added"] = len(values)
+        return counts["added"]
     def lazy_message(self, n: int, d: int) -> int:
         assert n > 0, f"{10 // d}"
         return n
 
-    def counted(self) -> int:
+    def bumped(self) -> int:
         self.count += 1
         return self.count
 
@@ -709,6 +788,15 @@ class Pricing:
 
     def literal_compare(self, x: float) -> bool:
         return x > 100
+
+    def mixed_max(self, n: int, x: float) -> float:
+        return max(n, x)
+
+    def float_max(self, x: float, y: float) -> float:
+        return max(x, y) + min(x, y)
+
+    def int_default(self, prices: dict[str, float]) -> float:
+        return prices.get("x", 0)
 
     def several(self, n: int, x: float) -> int:
         power = n ** n
@@ -773,6 +861,13 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("result", list(branch.then().statements())[0].name())
         self.assertEqual("-", list(branch.orElse().statements())[0].value().op())
 
+    def test_a_literal_of_mixed_elements_holds_objects(self):
+        # [1, "x"] hinted list[int]: the literal holds Objects, cast through the raw type; Python checks the hint no more
+        self.assertEqual("COMPILED", self.decisions["Pricing.mixed"].outcome().name(), rules(self.decisions["Pricing.mixed"]))
+        returned = list(self.bodies["mixed"].body().statements())[0].value()
+        self.assertEqual("Cast", returned.getClass().getSimpleName())
+        self.assertEqual("java.util.List<java.lang.Object>", returned.operand().type())
+
     def test_self_properties_are_read_through_the_stub(self):
         with_rate = self.bodies["with_rate"]
         product = list(with_rate.body().statements())[0].value()
@@ -798,11 +893,16 @@ class LoweringTest(unittest.TestCase):
             "raises_python": "python-exception",
             "shadowed": "python-exception",  # without Java facts the exception types are unknown; with them the order is refused
             "tried": "unsupported-statement",
+            "maybe_missing": "python-builtin-not-lowered",
+            "crossed": "unsupported-expression",
+            "charred": "unsupported-expression",
             "mixed_local": "unknown-type",
             "hinted_float": "unknown-type",
             "mixed_conditional": "unsupported-expression",
             "float_power": "unsupported-expression",
             "maybe_concat": "unknown-type",
+            "mixed_max": "unsupported-expression",
+            "int_default": "unsupported-expression",
         }
         for name, rule in expectations.items():
             decision = self.decisions[f"Pricing.{name}"]
@@ -857,6 +957,37 @@ class LoweringTest(unittest.TestCase):
         tried = list(self.bodies["guarded_by_java"].body().statements())[1]  # after the shadow of n
         self.assertIsNotNone(tried.finallyBody())
 
+    def test_collections_and_strings_lower_to_helpers(self):
+        for name in ("collected", "indexed", "priced", "parsed"):
+            self.assertEqual("COMPILED", self.decisions[f"Pricing.{name}"].outcome().name(), f"{name}: {[(r.rule(), r.message()) for r in self.decisions[f'Pricing.{name}'].reasons()]}")
+        collected = self.bodies["collected"]
+        self.assertEqual("java.util.List<java.lang.String>", collected.returnType())
+        statements = list(collected.body().statements())
+        self.assertEqual("names_", statements[0].name())  # the list parameter is worked on as a copy
+        self.assertEqual("copy", statements[0].value().name())
+        self.assertEqual("picked", statements[1].name())
+        self.assertEqual("list", statements[1].value().name())
+        indexed = list(self.bodies["indexed"].body().statements())  # [0] is the copy of the list parameter
+        self.assertEqual("long", indexed[1].type())
+        self.assertEqual("at", indexed[1].value().operand().name())
+        priced = list(self.bodies["priced"].body().statements())  # [0] is the copy of the dict parameter
+        self.assertEqual("contains", priced[1].test().name())
+        self.assertEqual("item", list(priced[1].then().statements())[0].value().operand().name())
+        parsed = list(self.bodies["parsed"].body().statements())
+        self.assertEqual("java.util.List<java.lang.String>", parsed[0].value().type())
+        self.assertEqual("max", parsed[-1].value().operand().name())
+        self.assertEqual("InvokeJava", parsed[-1].value().operand().getClass().getSimpleName())  # Math.max of longs
+        # floats keep the earlier argument unless a later one is strictly greater (smaller), as Python does with NaN and -0.0
+        float_max = list(self.bodies["float_max"].body().statements())[0].value()
+        self.assertEqual(["Helper", "max"], [float_max.left().getClass().getSimpleName(), float_max.left().name()])
+        self.assertEqual(["Helper", "min"], [float_max.right().getClass().getSimpleName(), float_max.right().name()])
+        counted = list(self.bodies["counted"].body().statements())  # [0] and [1] copy the parameters
+        self.assertEqual("setItem", counted[2].expression().name())
+        appended = list(self.bodies["appended"].body().statements())[1].value()  # after the copy of the parameter
+        self.assertEqual("is None", appended.op())
+        self.assertEqual("append", appended.left().name())
+        self.assertEqual("none", appended.left().type())
+
     def test_assertions_raise_through_the_helper(self):
         guarded = self.bodies["guarded"]
         statements = list(guarded.body().statements())
@@ -877,7 +1008,7 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("//", list(formatted.parts())[0].op())
 
     def test_an_int_attribute_is_updated_in_place(self):
-        statements = list(self.bodies["counted"].body().statements())
+        statements = list(self.bodies["bumped"].body().statements())
         self.assertEqual("PutSelf", statements[0].getClass().getSimpleName())
         self.assertEqual("int", statements[0].type())
         self.assertEqual("+", statements[0].value().operand().op())
@@ -1019,6 +1150,40 @@ class Calc:
         return n
 ''')
         self.assertEqual(0, apply_delegation(tree, ["Calc#keyword#owner=app.Calc#kinds=int#retry"]))
+
+    def test_a_collection_the_java_body_returns_reaches_a_python_caller_as_a_python_one(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class Calc:
+    def names(self) -> list[str]:
+        return ["python"]
+
+    def prices(self) -> dict[str, int]:
+        return {"python": 1}
+''')
+        self.assertEqual(2, apply_delegation(tree, ["Calc#names#owner=app.Calc#kinds=#once#list", "Calc#prices#owner=app.Calc#kinds=#once#dict"]))
+
+        class JavaMap:
+            """A Java map, read through its interop members."""
+
+            def keySet(self):
+                return ["java"]
+
+            def get(self, key):
+                return 2
+
+        class Registry:
+            """Binds every object: the Java bodies answer with Java collections."""
+
+            def call(self, instance, owner, method, arguments, kinds, retry):
+                return (("java",) if method == "names" else JavaMap(),)
+
+        namespace = {}
+        exec(compile(tree, "delegated.py", "exec"), namespace)
+        calc = namespace["Calc"]()
+        namespace["Calc"].__micronaut_compiled__ = Registry()
+        self.assertEqual(["java"], calc.names())
+        self.assertEqual({"java": 2}, calc.prices())
 
 
 OBJECTS = '''

@@ -63,4 +63,35 @@ class PythonStaticTest {
         IllegalStateException right = assertThrows(IllegalStateException.class, () -> PythonStatic.concat("a", null));
         assertTrue(right.getMessage().startsWith("TypeError"), right.getMessage());
     }
+
+    @Test
+    void maxAndMinOfFloatsKeepTheEarlierArgumentAsPythonDoes() {
+        assertEquals(1.0, PythonStatic.max(1.0, Double.NaN));
+        assertTrue(Double.isNaN(PythonStatic.max(Double.NaN, 1.0)));
+        assertEquals(1.0, PythonStatic.min(1.0, Double.NaN));
+        assertEquals(Double.doubleToRawLongBits(-0.0), Double.doubleToRawLongBits(PythonStatic.max(-0.0, 0.0)));
+        assertEquals(Double.doubleToRawLongBits(0.0), Double.doubleToRawLongBits(PythonStatic.min(0.0, -0.0)));
+        assertEquals(2.5, PythonStatic.max(1.0, 2.5));
+        assertEquals(1.0, PythonStatic.min(1.0, 2.5));
+    }
+
+    @Test
+    void noneInAStringRaisesAsPythonDoes() {
+        assertTrue(PythonStatic.contains("abc", "b"));
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> PythonStatic.contains("abc", null));
+        assertTrue(error.getMessage().startsWith("TypeError"), error.getMessage());
+    }
+
+    @Test
+    void veryLongLiteralsAreReadWithoutExhaustingTheStack() {
+        // a backtracking matcher recursing once per digit group overflowed the stack on such literals
+        String grouped = "1_".repeat(100_000) + "1";
+        assertThrows(ArithmeticException.class, () -> PythonStatic.toInt(grouped));
+        assertEquals(Double.POSITIVE_INFINITY, PythonStatic.toFloat(grouped));
+        assertEquals(0.5, PythonStatic.toFloat("0." + "0".repeat(100_000) + "5e100000"), 0.0);
+        assertEquals(1_000L, PythonStatic.toInt("1_000"));
+        assertEquals(2.5e3, PythonStatic.toFloat("2_5.0e2"), 0.0);
+        assertThrows(IllegalArgumentException.class, () -> PythonStatic.toInt("1__0"));
+        assertThrows(IllegalArgumentException.class, () -> PythonStatic.toFloat("1_.5"));
+    }
 }

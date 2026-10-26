@@ -162,11 +162,71 @@ class Calc:
     def keyed(self, prices: dict[str, int]) -> int:
         total = 0
         for name in prices:
-            if name == "a":
-                total += 1
-            else:
-                total += 10
+            total += len(name)
         return total
+
+    def collected(self, names: list[str], limit: int) -> list[str]:
+        picked: list[str] = []
+        for name in names:
+            if len(picked) >= limit:
+                break
+            if name in picked or not name.strip():
+                continue
+            picked.append(name.upper())
+        return picked
+
+    def indexed(self, values: list[int], index: int) -> int:
+        first = values[0]
+        return first + values[index] + len(values)
+
+    def priced(self, prices: dict[str, float], name: str) -> float:
+        if name in prices:
+            return prices[name]
+        return prices.get("default", -1.0)
+
+    def parsed(self, text: str) -> str:
+        parts = text.split(",")
+        total = 0
+        for part in parts:
+            total += int(part.strip())
+        return f"{max(total, 0)} {min(total, 10)} {abs(total)} {float(total) / 2}"
+
+    def tagged(self, names: list[str]) -> dict[str, int]:
+        lengths: dict[str, int] = {}
+        for name in names:
+            lengths[name] = len(name)
+        return lengths
+
+    def joined(self, names: list[str]) -> str:
+        return ", ".join(names) + "|" + "-".join(["a", "b"]) + "|" + "x y  z".split()[2] + "|" + "abc"[1] + "|" + "abc"[-1]
+
+    def counted(self, counts: dict[str, int], values: list[str]) -> int:
+        values.append("more")
+        counts["added"] = len(values)
+        return counts["added"] + counts.get("x", 0)
+
+    def unicode(self, text: str) -> str:
+        return text[0] + "|" + str(len(text)) + "|" + text[-1] + "|" + text.upper() + "|" + text.lower() + "|" + str("a" in text)
+
+    def maybe_count(self, n: int) -> int | None:
+        return n if n > 0 else None
+
+    def merged(self, extra: dict[str, str]) -> dict[str, str]:
+        return {"a": "1", **extra, "z": "9"}
+
+    def viewed(self, name: str):
+        return {"name": name, "n": 1}
+
+    def copied(self, values: list[str]) -> list[str]:
+        result = list(values)
+        result.append("z")
+        return result
+
+    def rows(self) -> list:
+        return self.mapped()
+
+    def mapped(self) -> list[dict]:
+        return [{"a": 1}]
 
     def branch_local(self, flag: bool) -> str:
         if flag:
@@ -234,6 +294,20 @@ class Calc:
     def query(self, spec: str) -> str:
         return URL(spec).getQuery() + "?"
 
+    def biggest(self, a: float, b: float) -> str:
+        return f"{max(a, b)} {min(a, b)}"
+
+    def within(self, part: str, text: str) -> bool:
+        return part in text
+
+    def fill(self, xs: list[str]) -> None:
+        xs.append("a")
+
+    def filled(self) -> int:
+        xs: list[str] = []
+        self.fill(xs)
+        return len(xs)
+
     def which_none(self) -> str:
         return StaticOverloads.which(None)
 
@@ -263,6 +337,12 @@ class Calc:
 
     def ambiguous(self, a: int, b: int) -> str:
         return StaticOverloads.pick(a, b)
+
+    def mixed_max(self, a: int, b: float) -> str:
+        return f"{max(a, b)} {min(b, a)}"
+
+    def int_default(self, prices: dict[str, float]) -> str:
+        return f"{prices.get('x', 0)}"
 
 @Singleton
 class Pair:
@@ -315,6 +395,7 @@ class Holder:
         ["label", 2, "pen"],
         ["ratio", 1, 4], ["ratio", 1, 0],
         ["parity", 3], ["parity", 8],
+        ["unicode", "\uD83D\uDE00ab"], ["unicode", "i\u00DF"],
         ["floor", -7, 2], ["floor", 7, -2], ["floor", 7, 0],
         ["floats", -7.5d, 2.0d], ["floats", 1.0d, 3.0d],
         ["spell", true, 1e16d, 0.1d], ["spell", false, 2.0d, 1e-5d],
@@ -329,6 +410,7 @@ class Holder:
         ["checked", 3], ["checked", 0],
         ["boxed", 3, 2.5d], ["boxed", 2147483647, 1e16d],
         ["signed", 1.0d, 0.1d], ["signed", -4.0d, 2.0d], ["signed", 4.0d, -2.0d],
+        ["parsed", "1, 2,3"], ["parsed", "-7"], ["parsed", "x"],
         ["host", "http://example.com/x"], ["host", "not a url"],
         ["entry", "k", 3],
         ["summed", 10, 3, 7], ["summed", 10, 0, 0], ["summed", 0, 0, 0],
@@ -337,6 +419,7 @@ class Holder:
         ["relooped", 3], ["relooped", 0],
         ["safe_host", "http://example.com/x"], ["safe_host", "not a url"],
         ["strict_host", ""], ["strict_host", "http://example.com/x"],
+        ["maybe_count", 3], ["maybe_count", 0],
         ["branch_local", true], ["branch_local", false],
         ["guarded", 3], ["guarded", 0],
         ["boxed_none", "no.such.property"], ["boxed_none", "micronaut.static.parity"],
@@ -356,11 +439,16 @@ class Holder:
         ["float_power", -8.0d, 0.5d], ["float_power", 0.0d, -1.0d],
         ["maybe_concat", true],
         ["ambiguous", 1, 2],
+        ["biggest", 1.0d, Double.NaN], ["biggest", Double.NaN, 1.0d], ["biggest", -0.0d, 0.0d], ["biggest", 0.0d, -0.0d], ["biggest", 1.0d, 2.5d],
+        ["within", "b", "abc"], ["within", null, "abc"],
+        ["filled"],
+        ["mixed_max", 3, 2.5d],
     ]
 
     // the fixture methods the compiler must refuse: compiled, each would differ from its Python body
     static final Map<String, String> REFUSED = [mixed_local: "unknown-type", mixed_conditional: "unsupported-expression", float_power: "unsupported-expression",
-                                                maybe_concat: "unknown-type", ambiguous: "ambiguous-overload"]
+                                                maybe_concat: "unknown-type", ambiguous: "ambiguous-overload", mixed_max: "unsupported-expression",
+                                                int_default: "unsupported-expression"]
     // truthiness from __len__, a toString the stub bridges instead of __str__, a dataclass's generated __repr__
     static final Map<String, String> HOLDER_REFUSED = [empty: "truthiness-of-java-object", label: "unsupported-expression", form_text: "unsupported-expression"]
 
@@ -380,12 +468,24 @@ class Holder:
                 results[m]['words'] = calc.words(new ArrayList<>(['a', 'skip', 'b']))
                 results[m]['keyed'] = calc.keyed(new LinkedHashMap<>([bb: 2, a: 1]))
                 results[m]['edge'] = calc.edge(0)
+                results[m]['collected'] = calc.collected(new ArrayList<>(['b', ' ', 'a', 'b', 'c']), 2)
+                results[m]['indexed'] = calc.indexed(new ArrayList<>([5, 6, 7]), -1)
+                results[m]['indexed-out'] = invoke(calc, ['indexed', new ArrayList<>([5]), 3])
+                results[m]['priced'] = [calc.priced(new LinkedHashMap<>([tea: 1.5d]), 'tea'), calc.priced(new LinkedHashMap<>([tea: 1.5d]), 'milk')]
+                results[m]['tagged'] = calc.tagged(new ArrayList<>(['a', 'bb']))
+                results[m]['joined'] = calc.joined(new ArrayList<>(['x', 'y']))
+                results[m]['counted'] = calc.counted(new LinkedHashMap<>([x: 1]), new ArrayList<>(['a', 'b']))
+                results[m]['rows'] = calc.rows().collect { row -> row.collectEntries { k, v -> [(k.toString()): v] } }
+                results[m]['merged'] = calc.merged(new LinkedHashMap<>([b: '2', a: '3'])).collectEntries { k, v -> [(k.toString()): v.toString()] }
+                results[m]['viewed'] = calc.viewed('v').collectEntries { k, v -> [(k.toString()): v.toString()] }
+                results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
+                results[m]['int_default'] = calc.int_default(new LinkedHashMap<>([tea: 1.5d]))
                 def holder = getBean(context, 'python.Holder')
                 results[m]['holder'] = [holder.empty(), holder.label(), holder.form_text()]
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    // guarded calls a sibling method, which has no static lowering yet: it runs in Python in both modes
-                    assert compiled.containsAll((CASES*.get(0).unique() - ['guarded'] - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge']), decisions.toString()
+                    // guarded, filled and rows call sibling methods, which have no static lowering yet: they run in Python in both modes
+                    assert compiled.containsAll((CASES*.get(0).unique() - ['guarded', 'filled'] - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.fill']), decisions.toString()
                     REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
@@ -414,6 +514,14 @@ class Holder:
         results[StaticCompilationMode.OFF][["above", 8192, 9007199254740992.0d].toString()] == true
         results[StaticCompilationMode.OFF][["below", 8192, Double.NaN].toString()] == false
         results[StaticCompilationMode.OFF][["exclaim", null].toString()] == "raised"
+        results[StaticCompilationMode.OFF][["biggest", 1.0d, Double.NaN].toString()] == "1.0 1.0"
+        results[StaticCompilationMode.OFF][["biggest", Double.NaN, 1.0d].toString()] == "nan nan"
+        results[StaticCompilationMode.OFF][["biggest", -0.0d, 0.0d].toString()] == "-0.0 -0.0"
+        results[StaticCompilationMode.OFF][["biggest", 0.0d, -0.0d].toString()] == "0.0 0.0"
+        results[StaticCompilationMode.OFF][["within", null, "abc"].toString()] == "raised"
+        results[StaticCompilationMode.OFF][["filled"].toString()] == 1
+        results[StaticCompilationMode.OFF][["mixed_max", 3, 2.5d].toString()] == "3 2.5"
+        results[StaticCompilationMode.OFF]['int_default'] == "0"
         results[StaticCompilationMode.OFF][["query", "http://example.com/x"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["mixed_local", true].toString()] == "2"
         results[StaticCompilationMode.OFF][["ratio", 1, 0].toString()] == "raised"
@@ -421,7 +529,18 @@ class Holder:
         results[StaticCompilationMode.OFF][["entry", "k", 3].toString()] == "k=3"
         results[StaticCompilationMode.OFF]['pair'] == true
         results[StaticCompilationMode.OFF]['words'] == 'a;b;'
-        results[StaticCompilationMode.OFF]['keyed'] == 11
+        results[StaticCompilationMode.OFF]['keyed'] == 3
+        results[StaticCompilationMode.OFF]['collected'] == ['B', 'A']
+        results[StaticCompilationMode.OFF]['indexed'] == 15
+        results[StaticCompilationMode.OFF]['indexed-out'] == 'raised'
+        results[StaticCompilationMode.OFF]['priced'] == [1.5d, -1.0d]
+        results[StaticCompilationMode.OFF]['tagged'] == [a: 1, bb: 2]
+        results[StaticCompilationMode.OFF]['joined'] == 'x, y|a-b|z|b|c'
+        results[StaticCompilationMode.OFF]['merged'] == [a: '3', b: '2', z: '9']
+        results[StaticCompilationMode.OFF]['viewed'] == [name: 'v', n: '1']
+        results[StaticCompilationMode.OFF]['copied'] == ['a', 'z']
+        results[StaticCompilationMode.OFF][["parsed", "1, 2,3"].toString()] == '6 6 6 3.0'
+        results[StaticCompilationMode.OFF][["parsed", "x"].toString()] == 'raised'
         results[StaticCompilationMode.OFF]['edge'] == 1
         results[StaticCompilationMode.OFF][["guarded", 0].toString()] == -1
         results[StaticCompilationMode.OFF][["branch_local", true].toString()] == 'tTrue'
