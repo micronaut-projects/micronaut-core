@@ -43,6 +43,34 @@ class IndexedPropertyOverrideSpec extends Specification {
         env.stop()
     }
 
+    void "a list nested in a list is looked up with the element an indexed property overrides, also by its own name"() {
+        given:
+        List<Object> tags = new ArrayList<>(['x', 'y'])
+        List<Object> row = new ArrayList<>([1, 2])
+        DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
+        env.addPropertySource(PropertySource.of('declares', [
+                'app.servers': new ArrayList<>([new LinkedHashMap<>([host: 'a', tags: tags])]),
+                'app.matrix' : new ArrayList<>([row])
+        ], 1))
+        env.addPropertySource(PropertySource.of('overrides', ['app.servers[0].tags[0]': 'z', 'app.matrix[0][1]': 9], 2))
+
+        when:
+        env.start()
+
+        then:
+        env.getProperty('app.servers', List).get() == [[host: 'a', tags: ['z', 'y']]]
+        env.getProperty('app.servers[0].tags', List).get() == ['z', 'y']
+        env.getProperty('app.matrix', List).get() == [[1, 9]]
+        env.getProperty('app.matrix[0]', List).get() == [1, 9]
+
+        and: "the property source still holds what it declares"
+        tags == ['x', 'y']
+        row == [1, 2]
+
+        cleanup:
+        env.stop()
+    }
+
     void "a list is declared again once the property source that overrides an element of it is removed and the environment refreshed"() {
         given:
         PropertySource overrides = PropertySource.of('overrides', ['app.list[0]': 'z'], 2)

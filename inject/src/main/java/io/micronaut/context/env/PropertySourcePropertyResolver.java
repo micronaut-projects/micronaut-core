@@ -931,6 +931,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                         ownContainer(target, entries, propertyName);
                         expandProperty(
                             target.ownedContainers,
+                            entries,
+                            propertyName,
                             resolvedProperty.substring(i),
                             val -> entries.put(propertyName, new DefaultPropertyEntry(
                                 propertyName,
@@ -1043,7 +1045,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return copy;
     }
 
-    private void expandProperty(Set<Object> ownedContainers, String property, Consumer<Object> containerSet, Supplier<Object> containerGet, Object actualValue) {
+    /**
+     * Writes the rest of an indexed property into the container its path names.
+     *
+     * @param ownedContainers The lists and maps that the state may write into
+     * @param entries         The entries of the generated catalog that hold the property
+     * @param path            The name of the container, as the entries of a list or a map a property
+     *                        source declares are named: {@code app.list[0]}, {@code app.map.key}
+     * @param property        The rest of the indexed property
+     * @param containerSet    Puts a value in the place of the container
+     * @param containerGet    Gets the container
+     * @param actualValue     The value of the property
+     */
+    private void expandProperty(Set<Object> ownedContainers, Map<String, DefaultPropertyEntry> entries, String path, String property,
+                                Consumer<Object> containerSet, Supplier<Object> containerGet, Object actualValue) {
         if (StringUtils.isEmpty(property)) {
             containerSet.accept(actualValue);
             return;
@@ -1053,7 +1068,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (i == 0 && li > -1) {
             String propertyIndex = property.substring(1, li);
             String propertyRest = property.substring(li + 1);
-            Object container = writableContainer(ownedContainers, containerSet, containerGet.get());
+            Object container = writableContainer(ownedContainers, entries, path, containerSet, containerGet.get());
             if (StringUtils.isDigits(propertyIndex)) {
                 int number = Integer.parseInt(propertyIndex);
                 List list;
@@ -1066,7 +1081,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 }
                 fill(list, number, null);
 
-                expandProperty(ownedContainers, propertyRest, val -> list.set(number, val), () -> list.get(number), actualValue);
+                expandProperty(ownedContainers, entries, path + "[" + number + "]", propertyRest, val -> list.set(number, val), () -> list.get(number), actualValue);
             } else {
                 Map map;
                 if (container instanceof Map theMap) {
@@ -1077,7 +1092,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                     containerSet.accept(map);
                 }
 
-                expandProperty(ownedContainers, propertyRest, val -> map.put(propertyIndex, val), () -> map.get(propertyIndex), actualValue);
+                expandProperty(ownedContainers, entries, path + "." + propertyIndex, propertyRest, val -> map.put(propertyIndex, val), () -> map.get(propertyIndex), actualValue);
             }
         } else if (property.startsWith(".")) {
             String propertyName;
@@ -1089,7 +1104,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 propertyName = property.substring(1);
                 propertyRest = "";
             }
-            Object v = writableContainer(ownedContainers, containerSet, containerGet.get());
+            Object v = writableContainer(ownedContainers, entries, path, containerSet, containerGet.get());
             Map map;
             if (v instanceof Map theMap) {
                 map = theMap;
@@ -1098,20 +1113,28 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 ownedContainers.add(map);
                 containerSet.accept(map);
             }
-            expandProperty(ownedContainers, propertyRest, val -> map.put(propertyName, val), () -> map.get(propertyName), actualValue);
+            expandProperty(ownedContainers, entries, path + "." + propertyName, propertyRest, val -> map.put(propertyName, val), () -> map.get(propertyName), actualValue);
         }
     }
 
     /**
      * @param ownedContainers The lists and maps that the state may write into
+     * @param entries         The entries of the generated catalog that hold the property
+     * @param path            The name of the container
      * @param containerSet    Puts a value in the place of the given one
      * @param container       What a property is about to be written into
-     * @return The container, replaced in its place by a copy if the state may not write into it
+     * @return The container, replaced in its place by a copy if the state may not write into it.
+     * The entry by its name, which a list of a property source has, then holds the copy too.
      */
-    private static Object writableContainer(Set<Object> ownedContainers, Consumer<Object> containerSet, Object container) {
+    private static Object writableContainer(Set<Object> ownedContainers, Map<String, DefaultPropertyEntry> entries, String path,
+                                            Consumer<Object> containerSet, Object container) {
         Object owned = ownContainer(ownedContainers, container);
         if (owned != container) {
             containerSet.accept(owned);
+            DefaultPropertyEntry entry = entries.get(path);
+            if (entry != null && entry.value() == container) {
+                entries.put(path, new DefaultPropertyEntry(path, owned, entry.raw(), entry.origin()));
+            }
         }
         return owned;
     }
