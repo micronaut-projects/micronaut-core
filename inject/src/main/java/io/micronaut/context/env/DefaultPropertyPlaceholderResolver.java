@@ -137,16 +137,19 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
     /**
      * Resolves the placeholders of a property's text as {@link #resolveRequiredPlaceholdersObject(String)}
-     * does. The expression resolvers that remember what an expression resolves to keep it in the
-     * given memory.
+     * does, but looks the properties they name up in the given resolver. A lookup passes a resolver
+     * that reads the same properties it read the text from, so that a refresh published meanwhile
+     * cannot mix in values of the new properties. The expression resolvers that remember what an
+     * expression resolves to keep it in the given memory.
      *
-     * @param str    The text
-     * @param memory The memory of the expressions of the text
+     * @param str     The text
+     * @param lookups Where the properties that the placeholders name are looked up
+     * @param memory  The memory of the expressions of the text, {@code null} if nothing is remembered
      * @return The resolved value
      * @throws ConfigurationException If the placeholders cannot be resolved
      */
-    Object resolveRequiredPlaceholdersObject(String str, PlaceholderMemory memory) throws ConfigurationException {
-        List<Segment> segments = buildSegments(str, true, memory);
+    Object resolveRequiredPlaceholdersObject(String str, PropertyResolver lookups, @Nullable PlaceholderMemory memory) throws ConfigurationException {
+        List<Segment> segments = buildSegments(str, true, lookups, memory);
         return resolveRequiredPlaceholdersObject(segments);
     }
 
@@ -204,7 +207,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      * @since 4.2.0
      */
     private List<Segment> buildSegments(String str, boolean failOnIncomplete) {
-        return buildSegments(str, failOnIncomplete, null);
+        return buildSegments(str, failOnIncomplete, null, null);
     }
 
     /**
@@ -212,10 +215,11 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      *
      * @param str The placeholder
      * @param failOnIncomplete True if should fail on incomplete placeholder, empty list will be returned otherwise
+     * @param lookups Where the properties that the placeholders name are looked up, {@code null} for the environment
      * @param memory The memory of the expressions of the text, {@code null} if nothing is remembered
      * @return The list of segments
      */
-    private List<Segment> buildSegments(String str, boolean failOnIncomplete, @Nullable PlaceholderMemory memory) {
+    private List<Segment> buildSegments(String str, boolean failOnIncomplete, @Nullable PropertyResolver lookups, @Nullable PlaceholderMemory memory) {
         List<Segment> segments = new ArrayList<>();
         String value = str;
         int i = value.indexOf(PREFIX);
@@ -230,7 +234,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             int suffixIdx = value.indexOf(SUFFIX);
             if (suffixIdx > -1) {
                 String expr = value.substring(0, suffixIdx).trim();
-                segments.add(new PlaceholderSegment(expr, memory, segments.size()));
+                segments.add(new PlaceholderSegment(expr, lookups, memory, segments.size()));
                 value = value.substring(suffixIdx + SUFFIX.length());
             } else if (failOnIncomplete) {
                 throw new ConfigurationException("Incomplete placeholder definitions detected: " + str);
@@ -256,7 +260,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      */
     @Nullable
     protected <T> T resolveExpression(String context, String expression, Class<T> type) {
-        return resolveExpression(context, expression, type, null);
+        return resolveExpression(context, expression, type, environment, null);
     }
 
     /**
@@ -266,22 +270,24 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      * @param context The context of the expression
      * @param expression The expression
      * @param type The class
+     * @param lookups Where the property that the expression names is looked up
      * @param memory The memory of the expression, {@code null} if nothing is remembered
      * @param <T> The type the expression should be converted to
      * @return The resolved and converted expression
      */
     @Nullable
-    private <T> T resolveExpression(String context, String expression, Class<T> type, RememberingPropertyExpressionResolver.@Nullable Memory memory) {
+    private <T> T resolveExpression(String context, String expression, Class<T> type, PropertyResolver lookups,
+                                    RememberingPropertyExpressionResolver.@Nullable Memory memory) {
         for (PropertyExpressionResolver expressionResolver : getExpressionResolvers()) {
             Optional<T> value = memory != null && expressionResolver instanceof RememberingPropertyExpressionResolver remembering
-                ? remembering.resolve(environment, conversionService, expression, type, memory)
-                : expressionResolver.resolve(environment, conversionService, expression, type);
+                ? remembering.resolve(lookups, conversionService, expression, type, memory)
+                : expressionResolver.resolve(lookups, conversionService, expression, type);
             if (value.isPresent()) {
                 return value.get();
             }
         }
-        if (environment.containsProperty(expression)) {
-            return environment.getProperty(expression, type)
+        if (lookups.containsProperty(expression)) {
+            return lookups.getProperty(expression, type)
                     .orElseThrow(() ->
                             new ConfigurationException("Could not resolve expression: [" + expression + "] in placeholder ${" + context + "}"));
         }
@@ -443,6 +449,8 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
         @Nullable
         private String defaultValue;
         @Nullable
+        private final PropertyResolver lookups;
+        @Nullable
         private final PlaceholderMemory memory;
         private final int index;
 
@@ -453,16 +461,18 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
          *                    any prefix or suffix
          */
         PlaceholderSegment(String placeholder) {
-            this(placeholder, null, 0);
+            this(placeholder, null, null, 0);
         }
 
         /**
          * @param placeholder The placeholder value without any prefix or suffix
+         * @param lookups     Where the properties that the expressions name are looked up, {@code null} for the environment
          * @param memory      The memory of the expressions of the text, {@code null} if nothing is remembered
          * @param index       The index of the placeholder among the segments of the text
          */
-        PlaceholderSegment(String placeholder, @Nullable PlaceholderMemory memory, int index) {
+        PlaceholderSegment(String placeholder, @Nullable PropertyResolver lookups, @Nullable PlaceholderMemory memory, int index) {
             this.placeholder = placeholder;
+            this.lookups = lookups;
             this.memory = memory;
             this.index = index;
             findExpressions(placeholder);
@@ -481,9 +491,10 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             for (int i = 0; i < expressions.size(); i++) {
                 String expression = expressions.get(i);
                 // the expressions are resolved in order, so one is only resolved if those before it are not set
-                T value = memory == null
+                T value = lookups == null && memory == null
                     ? resolveExpression(placeholder, expression, type)
-                    : resolveExpression(placeholder, expression, type, memory.forExpression(index, i));
+                    : resolveExpression(placeholder, expression, type, lookups != null ? lookups : environment,
+                        memory != null ? memory.forExpression(index, i) : null);
                 if (value != null) {
                     return value;
                 }

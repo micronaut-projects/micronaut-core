@@ -112,19 +112,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * the thread when the change ends.
      */
     private final ThreadLocal<List<Publish>> publishes = new ThreadLocal<>();
-    /**
-     * The state that the lookups of the current thread are kept on while
-     * {@link #onState(ResolverState, Supplier)} runs them a second time. The outermost second run
-     * removes it from the thread when it ends. A thread that made a lookup while another was in a
-     * second run keeps an entry without a value, as {@link ThreadLocal#get()} leaves one. The
-     * holder is a JDK type, so that a thread that outlives this resolver keeps nothing of it.
-     */
-    private final ThreadLocal<Object[]> pinnedState = new ThreadLocal<>();
-    /**
-     * The number of threads whose lookups are kept on a state that way. It is zero unless a
-     * refresh has just overtaken a lookup, which lets every other lookup skip the per-thread check.
-     */
-    private final AtomicInteger pinnedThreads = new AtomicInteger();
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
 
     /**
@@ -198,8 +185,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * {@link PropertySource} whose keys depend on what the resolver already holds
      * (micronaut-test-resources only contributes the keys the environment cannot resolve) must be
      * answered from the catalogs being built, not from the ones they replace. Every other thread
-     * keeps reading the published state, except for a thread that
-     * {@link #onState(ResolverState, Supplier)} keeps on the state a lookup has started with.
+     * reads the published state.
+     *
+     * <p>A lookup reads the state once, and does everything else from that state: the placeholders
+     * of the values it finds are resolved in it too, see {@link StateLookups}. So a refresh
+     * published while the lookup runs cannot mix new values into its result.</p>
      *
      * @return The state to read the catalogs and the caches from
      */
@@ -208,67 +198,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (pending != null) {
             return pending.state;
         }
-        // A plain read: only a thread that has counted itself in has to see the count, and a thread
-        // sees what it has written. A stale count on any other thread only decides whether it makes
-        // the per-thread check, which finds nothing there.
-        if (pinnedThreads.getPlain() != 0) {
-            Object[] pinned = pinnedState.get();
-            if (pinned != null && pinned[0] != null) {
-                return (ResolverState) pinned[0];
-            }
-        }
         return state;
-    }
-
-    /**
-     * Runs lookups that come back into this resolver and have to read the given state, the one
-     * their caller has read the values from. Resolving a placeholder, for one, looks the properties
-     * it names up in this resolver again. Nearly always no refresh is published while the lookups
-     * run, so that state is all they have read. If one was published, they may have read what it
-     * published as well, and their result, or the failure they ended in, may be that of neither
-     * state: they are then run again, with the lookups of the current thread kept on the given
-     * state.
-     *
-     * @param resolverState The state the lookups have to read
-     * @param lookups       The lookups, which can be run more than once
-     * @param <R>           The result type
-     * @return The result of the lookups
-     */
-    private <R> R onState(ResolverState resolverState, Supplier<R> lookups) {
-        try {
-            R result = lookups.get();
-            if (readState() == resolverState) {
-                return result;
-            }
-        } catch (RuntimeException e) {
-            if (readState() == resolverState) {
-                throw e;
-            }
-        }
-        Object[] pinned = pinnedState.get();
-        if (pinned == null) {
-            pinned = new Object[1];
-            pinnedState.set(pinned);
-        }
-        // what a second run that encloses this one keeps the thread on, nothing otherwise
-        Object enclosing = pinned[0];
-        boolean counted = false;
-        try {
-            pinnedThreads.incrementAndGet();
-            counted = true;
-            pinned[0] = resolverState;
-            return lookups.get();
-        } finally {
-            // a plain store first: nothing that can fail may leave the thread on the state
-            pinned[0] = enclosing;
-            if (enclosing == null) {
-                // the outermost second run leaves no holder on the thread
-                pinnedState.remove();
-            }
-            if (counted) {
-                pinnedThreads.decrementAndGet();
-            }
-        }
     }
 
     /**
@@ -577,10 +507,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     @Override
     public boolean containsProperty(@Nullable String name) {
+        return containsPropertyIn(readState(), name);
+    }
+
+    private boolean containsPropertyIn(ResolverState currentState, @Nullable String name) {
         if (StringUtils.isEmpty(name)) {
             return false;
         }
-        ResolverState currentState = readState();
         Boolean result = cached(currentState, currentState.containsCache, name);
         if (result == null) {
             for (PropertyCatalog convention : CONVENTIONS) {
@@ -602,11 +535,15 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     @Override
     public boolean containsProperties(@Nullable String name) {
+        return containsPropertiesIn(readState(), name);
+    }
+
+    private boolean containsPropertiesIn(ResolverState currentState, @Nullable String name) {
         if (StringUtils.isEmpty(name)) {
             return false;
         }
         for (PropertyCatalog propertyCatalog : CONVENTIONS) {
-            Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(name, false, propertyCatalog);
+            Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(currentState, name, propertyCatalog);
             if (entries != null) {
                 if (entries.containsKey(name)) {
                     return true;
@@ -631,10 +568,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     @Override
     public Collection<String> getPropertyEntries(String name, PropertyCatalog propertyCatalog) {
+        return getPropertyEntriesIn(readState(), name, propertyCatalog);
+    }
+
+    private Collection<String> getPropertyEntriesIn(ResolverState currentState, String name, PropertyCatalog propertyCatalog) {
         if (StringUtils.isEmpty(name)) {
             return Collections.emptySet();
         }
-        Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(name, false, propertyCatalog);
+        Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(currentState, name, propertyCatalog);
         if (entries == null) {
             return Collections.emptySet();
         }
@@ -659,10 +600,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     @Override
     public Set<List<String>> getPropertyPathMatches(String pathPattern) {
+        return getPropertyPathMatchesIn(readState(), pathPattern);
+    }
+
+    private Set<List<String>> getPropertyPathMatchesIn(ResolverState currentState, String pathPattern) {
         if (StringUtils.isEmpty(pathPattern)) {
             return Collections.emptySet();
         }
-        Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(pathPattern, false, null);
+        Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(currentState, pathPattern, null);
         if (entries == null) {
             return Collections.emptySet();
         }
@@ -700,46 +645,45 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     @Override
     public Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
+        return getPropertiesIn(readState(), name, keyFormat);
+    }
+
+    private Map<String, Object> getPropertiesIn(ResolverState currentState, @Nullable String name, @Nullable StringConvention keyFormat) {
         if (StringUtils.isEmpty(name)) {
             return Collections.emptyMap();
         }
-        // one state for the entries and for the placeholders that their values hold
-        return onState(readState(), () -> resolveProperties(name, keyFormat));
-    }
-
-    private Map<String, Object> resolveProperties(String name, @Nullable StringConvention keyFormat) {
-        Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(name, false, keyFormat == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED);
-        if (entries != null) {
-            if (keyFormat == null) {
-                keyFormat = StringConvention.RAW;
-            }
-            return resolveSubMap(
-                    name,
-                    entries,
-                    ConversionContext.MAP,
-                    keyFormat,
-                    MapFormat.MapTransformation.FLAT
-            );
-        } else {
-            entries = resolveEntriesForKey(name, false, PropertyCatalog.GENERATED);
-            if (keyFormat == null) {
-                keyFormat = StringConvention.RAW;
-            }
+        Map<String, DefaultPropertyEntry> entries = resolveEntriesForKey(currentState, name, keyFormat == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED);
+        if (entries == null) {
+            entries = resolveEntriesForKey(currentState, name, PropertyCatalog.GENERATED);
             if (entries == null) {
                 return Collections.emptyMap();
             }
-            return resolveSubMap(
-                    name,
-                    entries,
-                    ConversionContext.MAP,
-                    keyFormat,
-                    MapFormat.MapTransformation.FLAT
-            );
         }
+        return resolveSubMap(
+                currentState,
+                name,
+                entries,
+                ConversionContext.MAP,
+                keyFormat != null ? keyFormat : StringConvention.RAW,
+                MapFormat.MapTransformation.FLAT
+        );
     }
 
     @Override
     public <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext) {
+        return getPropertyIn(readState(), name, conversionContext);
+    }
+
+    /**
+     * Looks a property up in the given state, the only one this lookup reads.
+     *
+     * @param currentState      The state
+     * @param name              The name of the property
+     * @param conversionContext The conversion context
+     * @param <T>               The type to convert the value to
+     * @return The converted value, if the property is set
+     */
+    private <T> Optional<T> getPropertyIn(ResolverState currentState, String name, ArgumentConversionContext<T> conversionContext) {
         if (StringUtils.isEmpty(name)) {
             return Optional.empty();
         }
@@ -747,9 +691,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         Class<T> requiredType = conversionContext.getArgument().getType();
         boolean cacheableType = ClassUtils.isJavaLangType(requiredType);
         ConversionCacheKey cacheKey = new ConversionCacheKey(name, requiredType);
-        // A single read of the state, so the catalogs and the caches this lookup consults cannot be
-        // replaced underneath it by a concurrent refresh.
-        ResolverState currentState = readState();
         Object cached = cacheableType ? cached(currentState, currentState.resolvedValueCache, cacheKey) : null;
         if (cached != null) {
             return cached == NO_VALUE ? Optional.empty() : Optional.of((T) cached);
@@ -994,16 +935,26 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @return The subproperties
      */
     protected Properties resolveSubProperties(String name, Map<String, DefaultPropertyEntry> entries, ArgumentConversionContext<?> conversionContext) {
+        return resolveSubProperties(readState(), name, entries, conversionContext);
+    }
+
+    /**
+     * Resolves the properties under a name from the given state, which the entries were read from.
+     *
+     * @param currentState      The state
+     * @param name              The property name
+     * @param entries           The entries
+     * @param conversionContext The conversion context
+     * @return The subproperties
+     */
+    private Properties resolveSubProperties(ResolverState currentState, String name, Map<String, DefaultPropertyEntry> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         Properties properties = new Properties();
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
         StringConvention keyConvention = annotationMetadata.enumValue(MapFormat.class, "keyFormat", StringConvention.class)
                                                            .orElse(null);
-        // The state of this thread. A lookup of this class comes here through onState, which makes
-        // it the state the entries were read from.
-        ResolverState currentState = readState();
         if (keyConvention == StringConvention.RAW) {
-            entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
+            entries = resolveEntriesForKey(currentState, name, PropertyCatalog.RAW);
         }
         String prefix = name + '.';
         entries.entrySet().stream()
@@ -1021,11 +972,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return properties;
     }
 
-    private Properties resolveSubProperties(ResolverState resolverState, String name, Map<String, DefaultPropertyEntry> entries, ArgumentConversionContext<?> conversionContext) {
-        // through the overridable method, which reads the state of the current thread
-        return onState(resolverState, () -> resolveSubProperties(name, entries, conversionContext));
-    }
-
     /**
      * @param name              The property name
      * @param entries           The entries
@@ -1033,23 +979,31 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @return The submap
      */
     protected Map<String, Object> resolveSubMap(String name, Map<String, DefaultPropertyEntry> entries, ArgumentConversionContext<?> conversionContext) {
+        return resolveSubMap(readState(), name, entries, conversionContext);
+    }
+
+    /**
+     * Resolves the map under a name from the given state, which the entries were read from.
+     *
+     * @param currentState      The state
+     * @param name              The property name
+     * @param entries           The entries
+     * @param conversionContext The conversion context
+     * @return The submap
+     */
+    private Map<String, Object> resolveSubMap(ResolverState currentState, String name, Map<String, DefaultPropertyEntry> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
         StringConvention keyConvention = annotationMetadata.enumValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(null);
         if (keyConvention == StringConvention.RAW) {
-            entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
+            entries = resolveEntriesForKey(currentState, name, PropertyCatalog.RAW);
         }
         MapFormat.MapTransformation transformation = annotationMetadata.enumValue(
                 MapFormat.class,
                 "transformation",
                 MapFormat.MapTransformation.class)
                 .orElse(MapFormat.MapTransformation.NESTED);
-        return resolveSubMap(name, entries, conversionContext, keyConvention, transformation);
-    }
-
-    private Map<String, Object> resolveSubMap(ResolverState resolverState, String name, Map<String, DefaultPropertyEntry> entries, ArgumentConversionContext<?> conversionContext) {
-        // through the overridable method, which reads the state of the current thread
-        return onState(resolverState, () -> resolveSubMap(name, entries, conversionContext));
+        return resolveSubMap(currentState, name, entries, conversionContext, keyConvention, transformation);
     }
 
     /**
@@ -1068,12 +1022,19 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             ArgumentConversionContext<?> conversionContext,
             @Nullable StringConvention keyConvention,
             MapFormat.MapTransformation transformation) {
+        return resolveSubMap(readState(), name, entries, conversionContext, keyConvention, transformation);
+    }
+
+    private Map<String, Object> resolveSubMap(
+            ResolverState currentState,
+            String name,
+            Map<String, DefaultPropertyEntry> entries,
+            ArgumentConversionContext<?> conversionContext,
+            @Nullable StringConvention keyConvention,
+            MapFormat.MapTransformation transformation) {
         final Argument<?> valueType = conversionContext.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT);
         boolean valueTypeIsList = List.class.isAssignableFrom(valueType.getType());
         Map<String, Object> subMap = CollectionUtils.newLinkedHashMap(entries.size());
-        // The state of this thread. A lookup of this class comes here through onState, which makes
-        // it the state the entries were read from.
-        ResolverState currentState = readState();
 
         String prefix = name + '.';
         for (Map.Entry<String, DefaultPropertyEntry> entry : entries.entrySet()) {
@@ -1495,17 +1456,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
-     * Resolves the placeholders of a property's text, with the memory of its expressions.
+     * Resolves the placeholders of a property's text. The properties they name are looked up in
+     * the state the text was read from, and the expressions that remember what they resolve to,
+     * such as the random ones, keep it for the place the text was found at.
      *
      * @param resolverState The state the text was read from
      * @param text          The text
-     * @param place         Where the text was found: the name it was looked up by, a {@link ListElement} or a {@link MapValue}
+     * @param place         Where the text was found: the name it was looked up by, a {@link ListElement}
+     *                      or a {@link MapValue}; {@code null} if nothing is remembered
      * @return The text with its placeholders resolved
      */
-    private Object resolvePlaceholders(ResolverState resolverState, String text, Object place) {
+    private Object resolvePlaceholders(ResolverState resolverState, String text, @Nullable Object place) {
         if (propertyPlaceholderResolver instanceof DefaultPropertyPlaceholderResolver placeholderResolver) {
-            return placeholderResolver.resolveRequiredPlaceholdersObject(text, (placeholder, expression) ->
-                value -> remember(resolverState, place, text, new ExpressionPosition(placeholder, expression), value));
+            return placeholderResolver.resolveRequiredPlaceholdersObject(text, new StateLookups(resolverState), place == null ? null
+                : (placeholder, expression) -> value -> remember(resolverState, place, text, new ExpressionPosition(placeholder, expression), value));
         }
         return propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(text);
     }
@@ -1660,9 +1624,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (value instanceof CharSequence) {
             String str = value.toString();
             if (str.contains(propertyPlaceholderResolver.getPrefix())) {
-                return onState(resolverState, () -> place != null
-                    ? resolvePlaceholders(resolverState, str, place)
-                    : propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(str));
+                return resolvePlaceholders(resolverState, str, place);
             }
             // without a placeholder there is nothing to resolve
             return str;
@@ -1711,6 +1673,54 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     public void close() throws Exception {
         if (propertyPlaceholderResolver instanceof AutoCloseable autoCloseable) {
             autoCloseable.close();
+        }
+    }
+
+    /**
+     * The lookups that resolving the placeholders of a value makes, in the state the value was read
+     * from. Whatever is published meanwhile, a lookup resolves its placeholders from the same
+     * properties it read its values from, and runs once.
+     */
+    private final class StateLookups implements PropertyResolver {
+        private final ResolverState lookupState;
+
+        private StateLookups(ResolverState lookupState) {
+            this.lookupState = lookupState;
+        }
+
+        @Override
+        public boolean containsProperty(String name) {
+            return containsPropertyIn(lookupState, name);
+        }
+
+        @Override
+        public boolean containsProperties(String name) {
+            return containsPropertiesIn(lookupState, name);
+        }
+
+        @Override
+        public <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext) {
+            return getPropertyIn(lookupState, name, conversionContext);
+        }
+
+        @Override
+        public Collection<String> getPropertyEntries(String name) {
+            return getPropertyEntriesIn(lookupState, name, PropertyCatalog.NORMALIZED);
+        }
+
+        @Override
+        public Collection<String> getPropertyEntries(String name, PropertyCatalog propertyCatalog) {
+            return getPropertyEntriesIn(lookupState, name, propertyCatalog);
+        }
+
+        @Override
+        public Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
+            return getPropertiesIn(lookupState, name, keyFormat);
+        }
+
+        @Override
+        public Collection<List<String>> getPropertyPathMatches(String pathPattern) {
+            return getPropertyPathMatchesIn(lookupState, pathPattern);
         }
     }
 
