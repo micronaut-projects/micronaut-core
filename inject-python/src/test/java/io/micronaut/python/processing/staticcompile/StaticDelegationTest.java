@@ -249,15 +249,16 @@ class StaticDelegationTest {
     }
 
     @Test
-    void aNarrowingThatCannotOverflowOrThatAJavaCallTakesDoesNotPromote() {
+    void aNarrowingThatCannotOverflowDoesNotPromote() {
         // an int parameter used as a long and narrowed back always fits
         Ir.Expression held = new Ir.Param("p0", Ir.LONG, "int");
         Ir.Expression call = new Ir.InvokeJava(null, "java.lang.Integer", "toHexString", List.of("int"), List.of(new Ir.Cast(held, "int")), Ir.STRING);
         assertEquals("once", StaticDelegation.status(body(List.of("int"), Ir.STRING, new Ir.Return(call))));
         assertEquals("retry", StaticDelegation.status(body(List.of("int"), "int", new Ir.Return(new Ir.Cast(held, "int")))));
-        // a long given to an int parameter of a Java call: Python fails the call as well
+        // a long given to an int parameter of a Java call: Python fails the call with an exception of its own
         Ir.Expression given = new Ir.InvokeJava(null, "java.lang.Integer", "toHexString", List.of("int"), List.of(new Ir.Cast(param(Ir.LONG), "int")), Ir.STRING);
-        assertEquals("once", StaticDelegation.status(body(List.of(Ir.LONG), Ir.STRING, new Ir.Return(given))));
+        assertEquals("none(it has side effects (the call of [java.lang.Integer.toHexString]) and the narrowing to [int] raises where Python promotes)",
+            StaticDelegation.status(body(List.of(Ir.LONG), Ir.STRING, new Ir.Return(given))));
         // a long returned as an int: Python returns the int whatever its size
         Ir.Expression count = new Ir.InvokeJava(null, "app.Repository", "count", List.of(), List.of(), Ir.LONG);
         assertEquals("none(it has side effects (the call of [app.Repository.count]) and the narrowing to [int] raises where Python promotes)",

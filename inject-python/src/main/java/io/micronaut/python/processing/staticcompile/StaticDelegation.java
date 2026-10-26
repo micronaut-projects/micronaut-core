@@ -373,13 +373,13 @@ public final class StaticDelegation {
         }
 
         /**
-         * The arguments of a Java call: an int beyond the range of a narrower Java parameter fails the
-         * call in Python as well (the boundary cannot convert it), so its narrowing promotes nothing.
+         * The arguments of a Java call. An int beyond the range of a narrower Java parameter fails the
+         * call in Python too, but with the exception the boundary raises, where the narrowing of the
+         * Java body throws an ArithmeticException: a narrowing that may not fit counts as promoting
+         * (see {@link #narrows}), so a body run once keeps the Python body.
          */
         void arguments(List<Ir.Expression> arguments) {
-            for (Ir.Expression argument : arguments) {
-                visit(argument instanceof Ir.Cast cast && NARROW_TYPES.containsKey(cast.type()) && Ir.LONG.equals(cast.operand().type()) ? cast.operand() : argument);
-            }
+            visit(arguments);
         }
 
         /**

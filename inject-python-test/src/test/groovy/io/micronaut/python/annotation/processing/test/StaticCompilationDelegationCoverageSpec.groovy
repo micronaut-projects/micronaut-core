@@ -441,6 +441,39 @@ class Caller:
         results['entries.Hex.widened'] == 1
     }
 
+    void "a long of a java call narrowed for another java call keeps the python body: python fails with the exception of its boundary"() {
+        when:
+        def results = parity('''
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
+from java.lang import Integer, Long
+
+@Singleton
+class Hexes:
+    def parsed(self, s: str) -> str:
+        return Integer.toHexString(Long.parseLong(s))
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def __init__(self, hexes: Hexes):
+        self.hexes = hexes
+
+    def probe(self) -> str:
+        try:
+            self.hexes.parsed("1099511627776")
+            failed = "none"
+        except Exception as e:
+            failed = type(e).__name__
+        return f"{self.hexes.parsed('255')} {failed}"
+''', ['Hexes.parsed': 'none(it has side effects (the call of [java.lang.Integer.toHexString]) and the narrowing to [int] raises where Python promotes)'])
+
+        then: "the Java body would raise ArithmeticException for a long beyond an int"
+        results.off.startsWith('ff ') && !results.off.endsWith(' none')
+        results.all == results.off
+        results['entries.Hexes.parsed'] == 0
+    }
+
     void "a stub creating its python object again after a restart forgets the values its slots kept"() {
         given:
         def first = buildContext('''
