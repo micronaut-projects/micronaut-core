@@ -657,14 +657,16 @@ class RefreshConcurrentLookupSpec extends Specification {
         refresher.start()
         assert parked.await(WAIT_SECONDS, TimeUnit.SECONDS)
         starter.start()
-        new PollingConditions(timeout: WAIT_SECONDS).eventually {
-            assert starter.state == Thread.State.BLOCKED
-        }
+        starter.join(WAIT_SECONDS * 1000L)
+        boolean starterWaited = starter.alive
         release.countDown()
         refresher.join(WAIT_SECONDS * 1000L)
         starter.join(WAIT_SECONDS * 1000L)
 
-        then: "the refresh published the properties it read itself: nothing changed"
+        then: "the start does not wait: to other threads the environment runs throughout the refresh"
+        !starterWaited
+
+        and: "the refresh published the properties it read itself: nothing changed"
         !refresher.alive
         !starter.alive
         diff != null
@@ -752,8 +754,9 @@ class RefreshConcurrentLookupSpec extends Specification {
         firstRefresh.start()
         assert gate.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
         secondRefresh.start()
+        // the second waits for the first, which it does for up to two seconds
         new PollingConditions(timeout: WAIT_SECONDS).eventually {
-            assert secondRefresh.state == Thread.State.BLOCKED
+            assert secondRefresh.state in [Thread.State.WAITING, Thread.State.TIMED_WAITING, Thread.State.BLOCKED]
         }
         data.put('flag.value', 'a')
         gate.release.countDown()

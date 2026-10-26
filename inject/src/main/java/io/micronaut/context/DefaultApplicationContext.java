@@ -1034,7 +1034,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
         }
 
         private void startBootstrapEnvironment() {
-            for (PropertySource source : propertySources.values()) {
+            // as the read of this environment sees them: within a refresh, without the property
+            // sources it reads anew
+            for (PropertySource source : getPropertySources()) {
                 bootstrapEnvironment.addPropertySource(source);
             }
             bootstrapEnvironment.start();

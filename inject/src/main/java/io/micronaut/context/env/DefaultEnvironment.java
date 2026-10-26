@@ -56,6 +56,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -65,7 +66,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -101,6 +104,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
     private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList("classpath:/", "file:config/");
+    /**
+     * How long a start or a refresh waits for another thread that reads the property sources, in
+     * seconds. After that, the other thread reads them once more in its place.
+     */
+    private static final int READ_WAIT_SECONDS = 2;
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
     protected final MutableConversionService mutableConversionService;
@@ -115,7 +123,20 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private Collection<PropertySourceLoader> propertySourceLoaderList;
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
     private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
-    private final AtomicBoolean reading = new AtomicBoolean(false);
+    /**
+     * The reads of the property sources since the environment was last stopped.
+     */
+    private volatile Generation generation = new Generation();
+    /**
+     * The refreshable property sources of the last read that was published: the next read reads
+     * them anew, rather than as registered ones, and stop() drops them. Guarded by the catalog
+     * lock.
+     */
+    private List<PropertySource> ownPropertySources = Collections.emptyList();
+    /**
+     * What the {@link #refreshAndDiff()} of the current thread compares.
+     */
+    private final ThreadLocal<Difference> differences = new ThreadLocal<>();
     private final Boolean deduceEnvironments;
     private final ApplicationContextConfiguration configuration;
     private final Collection<String> configLocations;
@@ -210,8 +231,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
+        noteChange(propertySource.getName(), propertySource);
         propertySources.put(propertySource.getName(), propertySource);
-        if (isRunning() && !reading.get()) {
+        if (isRunning() && !isReading()) {
             resetCaches();
             processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
         }
@@ -220,11 +242,37 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment removePropertySource(PropertySource propertySource) {
+        noteChange(propertySource.getName(), null);
         propertySources.remove(propertySource.getName());
-        if (isRunning() && !reading.get()) {
+        if (isRunning() && !isReading()) {
             resetCaches();
         }
         return this;
+    }
+
+    /**
+     * @return Whether a start or a refresh reads the property sources and has not taken the
+     * registered ones yet: a property source added meanwhile is only registered, and read with
+     * the others
+     */
+    private boolean isReading() {
+        Read read = generation.read;
+        return read != null && read.reading;
+    }
+
+    /**
+     * Notes that another thread adds or removes a property source by the given name while a start
+     * or a refresh reads: the read then does not register its own by that name, which would undo
+     * the change.
+     *
+     * @param name  The name
+     * @param added The property source added, {@code null} if one is removed
+     */
+    private void noteChange(String name, @Nullable PropertySource added) {
+        Read read = generation.read;
+        if (read != null && read != currentRead() && (added == null || propertySources.get(name) != added)) {
+            read.changedNames.add(name);
+        }
     }
 
     @Override
@@ -268,25 +316,29 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Collection<PropertySource> getPropertySources() {
-        return Collections.unmodifiableCollection(this.propertySources.values());
+        Read read = currentEnvironmentRead();
+        return Collections.unmodifiableCollection(read == null ? this.propertySources.values() : registeredFor(read).values());
     }
 
     @Override
     public Environment start() {
-        // A refresh holds the lock of the catalogs from before it stops this environment until it
-        // has published what it read. A start from another thread waits for that here, rather than
-        // taking the read over and leaving the refresh to publish a catalog it has not filled.
-        synchronized (catalog) {
-            if (running.compareAndSet(false, true)) {
+        Read read = currentEnvironmentRead();
+        if (read != null) {
+            // On the thread of a read: the start of a refresh reads the property sources, and a
+            // start from the code that a read runs does nothing.
+            if (read.refresh && !read.started) {
+                read.started = true;
                 log.debug("Starting environment {} for active names {}", this, getActiveNames());
-                if (reading.compareAndSet(false, true)) {
-                    try {
-                        readPropertySources(getPropertySourceRootName());
-                    } finally {
-                        // also when the read fails, or a property source added later is never processed
-                        reading.set(false);
-                    }
-                }
+                buildRefresh(read);
+                readPropertySources(getPropertySourceRootName());
+            }
+            return this;
+        }
+        if (running.compareAndSet(false, true)) {
+            log.debug("Starting environment {} for active names {}", this, getActiveNames());
+            Generation reads = generation;
+            if (lockReads(reads)) {
+                read(reads, false);
             }
         }
         return this;
@@ -299,26 +351,342 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment stop() {
-        synchronized (catalog) {
-            running.set(false);
-            reading.set(false);
-            this.propertySources.values().removeAll(refreshablePropertySources);
-            reset();
-            resetCaches();
+        Read read = currentEnvironmentRead();
+        if (read != null && read.refresh && !read.started) {
+            // the stop of a refresh, which reads the property sources into a new state
+            buildRefresh(read);
+        } else {
+            synchronized (catalog) {
+                // A read in progress publishes nothing from now on, and the next start does not
+                // wait for it.
+                generation = new Generation();
+                running.set(false);
+                for (PropertySource own : ownPropertySources) {
+                    this.propertySources.remove(own.getName(), own);
+                }
+                ownPropertySources = Collections.emptyList();
+                reset();
+            }
         }
+        resetCaches();
         return this;
     }
 
     @Override
     public Map<String, Object> refreshAndDiff() {
-        // Under the lock of the catalogs, which the refresh takes itself: the difference is between
-        // what was published before this refresh and what it has published. A property source that
-        // another thread adds to the catalogs, or another refresh, waits until it has been taken.
-        synchronized (catalog) {
-            Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(publishedCatalog());
+        Difference outer = differences.get();
+        Difference difference = new Difference();
+        differences.set(difference);
+        try {
             refresh();
-            return diffCatalog(copiedCatalog, publishedCatalog());
+        } finally {
+            if (outer != null) {
+                differences.set(outer);
+            } else {
+                differences.remove();
+            }
         }
+        // Compared once the lock of the catalogs is let go of: equals() is code of the values. If
+        // the refresh has published nothing, for it has left the read to another thread or the
+        // environment was stopped meanwhile, there is no difference of its own.
+        return difference.before == null ? new LinkedHashMap<>() : diffCatalog(difference.before, difference.after);
+    }
+
+    /**
+     * Refreshes the environment, see {@link AtomicRefresh#refresh()}. A refresh reads the property
+     * sources into a new state, through the {@link #stop()} and the {@link #start()} that
+     * subclasses override, and publishes it in one step, so that a lookup on another thread sees
+     * the properties either as they were or as they are once refreshed. One thread reads the
+     * property sources at a time. A refresh that finds another one reading waits for it at most
+     * {@value #READ_WAIT_SECONDS} seconds, and then leaves it to that thread to read them once
+     * more.
+     */
+    void refreshProperties() {
+        Read read = currentEnvironmentRead();
+        if (read != null) {
+            // From the code that a read runs, on its thread: the read is made once more when it is
+            // done. The thread asks for that once while it holds the lock of the reads, so that
+            // code which refreshes whenever it is read cannot keep it reading.
+            Generation reads = read.generation;
+            if (reads.askedItself) {
+                log.debug("Not reading the property sources once more again for a refresh made while they are read");
+            } else {
+                reads.askedItself = true;
+                reads.readAgain.set(true);
+            }
+            return;
+        }
+        Generation reads = generation;
+        if (lockReads(reads)) {
+            read(reads, true);
+        }
+    }
+
+    /**
+     * Takes the lock of the reads of the generation, waiting at most
+     * {@value #READ_WAIT_SECONDS} seconds for it. If another thread still holds it, that thread is
+     * asked to read the property sources once more, and the current one does not read them.
+     *
+     * @param reads The generation
+     * @return Whether the current thread holds the lock, and is to read
+     */
+    private boolean lockReads(Generation reads) {
+        boolean locked;
+        try {
+            locked = reads.readLock.tryLock(READ_WAIT_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            locked = false;
+        }
+        if (!locked) {
+            reads.readAgain.set(true);
+            // the thread that held the lock may have let it go before it could see the request
+            locked = reads.readLock.tryLock();
+        }
+        if (locked) {
+            reads.askedItself = false;
+        }
+        return locked;
+    }
+
+    /**
+     * Reads the property sources, and once more for as long as other threads ask for it, and then
+     * lets go of the lock of the reads, which the current thread holds.
+     *
+     * @param reads   The generation
+     * @param refresh Whether the first read is a refresh, or a start
+     */
+    private void read(Generation reads, boolean refresh) {
+        try {
+            reads.readAgain.set(false);
+            readOnce(reads, refresh);
+        } finally {
+            // also when the read has failed: a thread that asked for a read meanwhile has returned
+            readAgainWhileAsked(reads);
+        }
+    }
+
+    /**
+     * Refreshes once more for as long as other threads ask for it, and lets go of the lock of the
+     * reads, which the current thread holds.
+     *
+     * @param reads The generation
+     */
+    private void readAgainWhileAsked(Generation reads) {
+        boolean locked = true;
+        while (locked) {
+            try {
+                while (reads == generation && reads.readAgain.getAndSet(false)) {
+                    try {
+                        readOnce(reads, true);
+                    } catch (RuntimeException e) {
+                        log.error("Error refreshing the environment once more, as a refresh made while it was read asked for", e);
+                    }
+                }
+            } finally {
+                reads.readLock.unlock();
+            }
+            // a request made since the last check, by a thread that found the lock held
+            locked = reads == generation && reads.readAgain.get() && reads.readLock.tryLock();
+            if (locked) {
+                reads.askedItself = false;
+            }
+        }
+    }
+
+    /**
+     * Reads the property sources once. A start processes them into the published state, as it
+     * always has, so that lookups see each one once it is processed. A refresh reads them into a
+     * new state, through the {@link #stop()} and the {@link #start()} that subclasses override, and
+     * publishes it once read. Nothing is published once the environment has been stopped meanwhile.
+     *
+     * @param reads   The generation
+     * @param refresh Whether to refresh, or to start
+     */
+    private void readOnce(Generation reads, boolean refresh) {
+        Read read;
+        synchronized (catalog) {
+            if (reads != generation) {
+                return;
+            }
+            read = new Read(reads, refresh, ownPropertySources);
+            if (!refresh) {
+                // the state of this generation: what a stop() publishes later is not written into
+                buildInPlace(read);
+                read.reading = true;
+            }
+            reads.read = read;
+        }
+        beginRead(read);
+        boolean published = false;
+        try {
+            if (refresh) {
+                stop();
+                start();
+            } else {
+                readPropertySources(getPropertySourceRootName());
+            }
+            published = publish(read);
+        } finally {
+            endRead();
+            if (!published) {
+                synchronized (catalog) {
+                    if (reads.read == read) {
+                        reads.read = null;
+                    }
+                    if (reads == generation) {
+                        // What a failed read registered of its own, the next read reads anew.
+                        Set<PropertySource> own = identitySet(ownPropertySources);
+                        own.addAll(refreshablePropertySources);
+                        ownPropertySources = new ArrayList<>(own);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Makes the read of a refresh write into a new state, which lookups on other threads do not
+     * see until the refresh publishes it. From now on until it takes the registered property
+     * sources, a property source that another thread adds is only registered.
+     *
+     * @param read The read
+     */
+    private void buildRefresh(Read read) {
+        if (!read.isWriting()) {
+            buildNewState(read);
+            read.reading = true;
+        }
+    }
+
+    /**
+     * Publishes what the read has processed, unless the environment was stopped meanwhile. The
+     * property sources other threads have added since it took the registered ones are processed
+     * again on top. The property sources the read has processed are registered, and those of the
+     * reads before it it has read anew are dropped, except where another thread has added or
+     * removed one by the same name meanwhile.
+     *
+     * @param read The read
+     * @return Whether it was published
+     */
+    private boolean publish(Read read) {
+        if (!read.isWriting()) {
+            // a refresh whose stop() and start() have read nothing
+            return false;
+        }
+        Difference difference = differences.get();
+        synchronized (catalog) {
+            Generation reads = read.generation;
+            if (reads != generation) {
+                return false;
+            }
+            List<PropertySource> addedMeanwhile = new ArrayList<>(read.addedMeanwhile.size());
+            for (PropertySource added : read.addedMeanwhile) {
+                // the latest by its name, unless removed since
+                if (this.propertySources.get(added.getName()) == added) {
+                    addedMeanwhile.add(added);
+                }
+            }
+            Map<String, DefaultPropertyEntry>[] before = publish(read, addedMeanwhile);
+            for (PropertySource earlier : read.earlier) {
+                this.propertySources.remove(earlier.getName(), earlier);
+            }
+            for (PropertySource processed : read.processed.values()) {
+                if (!read.changedNames.contains(processed.getName())) {
+                    this.propertySources.put(processed.getName(), processed);
+                }
+            }
+            ownPropertySources = new ArrayList<>(refreshablePropertySources);
+            // a refresh starts a stopped environment, as stop(); start() did
+            running.set(true);
+            reads.read = null;
+            if (difference != null) {
+                if (difference.before == null) {
+                    difference.before = before;
+                }
+                difference.after = copyCatalog(publishedCatalog());
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Takes the registered property sources that the read of the current thread reads, where a
+     * read has always taken them: once it has loaded its files and read the bootstrap
+     * configuration. From now on a property source that another thread adds is processed when it
+     * is added, and processed again on top of what the read publishes. The refreshable property
+     * sources of the reads before it are left out: it reads them anew.
+     *
+     * @return The registered property sources to read
+     */
+    private Collection<PropertySource> takeRegistered() {
+        Read read = currentEnvironmentRead();
+        if (read == null) {
+            return this.propertySources.values();
+        }
+        synchronized (catalog) {
+            // First: a property source that is added once the registered ones have been taken
+            // must not be only registered, see beforeProcessing.
+            read.reading = false;
+            List<PropertySource> registered = new ArrayList<>(this.propertySources.size());
+            for (PropertySource propertySource : this.propertySources.values()) {
+                if (!read.earlier.contains(propertySource)) {
+                    registered.add(propertySource);
+                }
+            }
+            read.input = identitySet(registered);
+            return registered;
+        }
+    }
+
+    @Override
+    void beforeProcessing(PropertySource propertySource) {
+        // One registered before the read took the ones it reads is read in its order anyway.
+        Read read = generation.read;
+        if (read != null && read.input != null && !read.input.contains(propertySource)) {
+            read.addedMeanwhile.add(propertySource);
+        }
+    }
+
+    /**
+     * @return The read of the property sources on the current thread, or {@code null}
+     */
+    @Nullable
+    private Read currentEnvironmentRead() {
+        return currentRead() instanceof Read read ? read : null;
+    }
+
+    /**
+     * The registered property sources as the thread of a read sees them: without the refreshable
+     * ones of the reads before it, which it reads anew, and with those it has read so far.
+     *
+     * @param read The read
+     * @return The property sources, by name
+     */
+    private Map<String, PropertySource> registeredFor(Read read) {
+        Map<String, PropertySource> registered = new LinkedHashMap<>();
+        for (PropertySource propertySource : this.propertySources.values()) {
+            if (!read.earlier.contains(propertySource)) {
+                registered.put(propertySource.getName(), propertySource);
+            }
+        }
+        registered.putAll(read.processed);
+        return registered;
+    }
+
+    /**
+     * @param name The name of a property source
+     * @return Whether one is registered by the name, as the current thread sees the registered ones
+     */
+    private boolean isRegistered(String name) {
+        Read read = currentEnvironmentRead();
+        return read == null ? this.propertySources.containsKey(name) : registeredFor(read).containsKey(name);
+    }
+
+    private static Set<PropertySource> identitySet(Collection<PropertySource> propertySources) {
+        Set<PropertySource> set = Collections.newSetFromMap(new IdentityHashMap<>());
+        set.addAll(propertySources);
+        return set;
     }
 
     @Override
@@ -468,7 +836,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             propertySources = new ArrayList<>(this.propertySources.size());
         }
 
-        propertySources.addAll(this.propertySources.values());
+        propertySources.addAll(takeRegistered());
+        Read read = currentEnvironmentRead();
+        if (read != null && read.generation != generation) {
+            // stopped meanwhile: nothing it reads is published
+            return;
+        }
         OrderUtil.sortOrdered(propertySources);
         for (PropertySource propertySource : propertySources) {
             log.debug("Processing property source: {}", propertySource.getName());
@@ -592,10 +965,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param propertySources The list of property sources
      */
     protected void addDefaultPropertySources(List<PropertySource> propertySources) {
-        if (!this.propertySources.containsKey(SystemPropertiesPropertySource.NAME)) {
+        if (!isRegistered(SystemPropertiesPropertySource.NAME)) {
             propertySources.add(new SystemPropertiesPropertySource());
         }
-        if (!this.propertySources.containsKey(EnvironmentPropertySource.NAME) && configuration.isEnvironmentPropertySource()) {
+        if (!isRegistered(EnvironmentPropertySource.NAME) && configuration.isEnvironmentPropertySource()) {
             List<String> includes = configuration.getEnvironmentVariableIncludes();
             List<String> excludes = configuration.getEnvironmentVariableExcludes();
             if (this.names.contains(Environment.KUBERNETES)) {
@@ -1111,5 +1484,85 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static class EnvironmentsAndPackage {
         String aPackage;
         Set<String> enviroments = new LinkedHashSet<>(1);
+    }
+
+    /**
+     * The reads of the property sources between two stops of the environment. A stop starts a new
+     * generation, so a read still in progress publishes nothing, and the next start does not wait
+     * for it. One read of a generation runs at a time.
+     */
+    private static final class Generation {
+        /**
+         * Held by the thread that reads the property sources.
+         */
+        final ReentrantLock readLock = new ReentrantLock();
+        /**
+         * Set by a thread that asks the one holding the lock to read the property sources once
+         * more.
+         */
+        final AtomicBoolean readAgain = new AtomicBoolean();
+        /**
+         * The read in progress, set and cleared with the catalog lock held.
+         */
+        volatile Read read;
+        /**
+         * Whether the thread holding the lock has asked itself to read once more, from the code
+         * that its read runs.
+         */
+        boolean askedItself;
+    }
+
+    /**
+     * One read of the property sources: a start, or a refresh. Only its thread uses it, except
+     * where noted.
+     */
+    private static final class Read extends Build {
+        final Generation generation;
+        final boolean refresh;
+        /**
+         * The refreshable property sources of the reads before it, by identity: it reads them
+         * anew, rather than as registered ones.
+         */
+        final Set<PropertySource> earlier;
+        /**
+         * The names by which other threads have added or removed a property source while it
+         * reads.
+         */
+        final Set<String> changedNames = ConcurrentHashMap.newKeySet();
+        /**
+         * The property sources that other threads have added, and processed into the published
+         * state, since it took the registered ones. Guarded by the catalog lock.
+         */
+        final List<PropertySource> addedMeanwhile = new ArrayList<>();
+        /**
+         * The registered property sources it reads, by identity, once it has taken them. Guarded
+         * by the catalog lock.
+         */
+        Set<PropertySource> input;
+        /**
+         * Whether it reads but has not taken the registered property sources yet: one that another
+         * thread adds meanwhile is only registered, and read with the others. Written with the
+         * catalog lock held, except when the read starts to write.
+         */
+        volatile boolean reading;
+        /**
+         * Whether the start() of a refresh has been called.
+         */
+        boolean started;
+
+        Read(Generation generation, boolean refresh, List<PropertySource> earlier) {
+            this.generation = generation;
+            this.refresh = refresh;
+            this.earlier = identitySet(earlier);
+        }
+    }
+
+    /**
+     * What a {@link #refreshAndDiff()} compares: the generated catalog that was published before
+     * its refresh published, and a copy of the one it published last.
+     */
+    private static final class Difference {
+        Map<String, DefaultPropertyEntry>[] before;
+        Map<String, DefaultPropertyEntry>[] after;
     }
 }
