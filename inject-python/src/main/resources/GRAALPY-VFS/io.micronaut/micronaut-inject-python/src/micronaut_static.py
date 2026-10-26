@@ -22,9 +22,9 @@ function of the compilation as Java ``StaticCompilationDecision`` values:
   without a lowering, is ``SKIPPED`` with those reasons.
 
 An explicit ``@CompileStatic`` that cannot be honoured is reported as a warning (an error when the
-planner is strict): a function-level switch for every function it switches on, a class- or
-module-level one for each function it skips and once for a class that can never be compiled. Mode
-``all`` only warns for a function-level switch, since skipping is the expected common case there.
+planner is strict): a function-level switch warns whenever its function is not compiled, a class- or
+module-level one for each method of its scope that is ``SKIPPED``, except in mode ``all``, where
+skipping is the expected common case.
 """
 import ast
 
