@@ -364,6 +364,18 @@ class Calc:
         xs: list[str] = ["a"]
         return self.extended(xs)
 
+    def appended(self) -> str:
+        xs: list[str] = ["a"]
+        sizes: dict[str, int] = {}
+        n = self.append_to(xs, sizes, "b")
+        n = self.append_to(xs, sizes, "c") + n
+        return f"{n} {len(xs)} {len(sizes)} {sizes['c']}"
+
+    def append_to(self, xs: list[str], sizes: dict[str, int], tag: str) -> int:
+        xs.append(tag)
+        sizes[tag] = len(xs)
+        return len(xs)
+
     def which_none(self) -> str:
         return StaticOverloads.which(None)
 
@@ -542,7 +554,7 @@ class Holder:
         ["ambiguous", 1, 2],
         ["biggest", 1.0d, Double.NaN], ["biggest", Double.NaN, 1.0d], ["biggest", -0.0d, 0.0d], ["biggest", 0.0d, -0.0d], ["biggest", 1.0d, 2.5d],
         ["within", "b", "abc"], ["within", null, "abc"],
-        ["filled"], ["extending"],
+        ["filled"], ["extending"], ["appended"],
         ["mixed_max", 3, 2.5d],
         ["gained"],
     ]
@@ -583,15 +595,22 @@ class Holder:
                 results[m]['viewed'] = calc.viewed('v').collectEntries { k, v -> [(k.toString()): v.toString()] }
                 results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
                 results[m]['int_default'] = calc.int_default(new LinkedHashMap<>([tea: 1.5d]))
+                // a Java caller's collections are copied, as the bridge hands Python copies
+                List<String> given = new ArrayList<>(['x'])
+                Map<String, Integer> sizes = new LinkedHashMap<>()
+                results[m]['append_to'] = [calc.append_to(given, sizes, 'y'), given, sizes]
                 def holder = getBean(context, 'python.Holder')
                 results[m]['holder'] = [holder.empty(), holder.label(), holder.form_text()]
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.fill']), decisions.toString()
+                    assert compiled.containsAll((CASES*.get(0).unique() - REFUSED.keySet()).collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied', 'Calc.unhinted_name', 'Pair.built', 'Bag.doubled', 'Calc.fill', 'Calc.append_to']), decisions.toString()
                     REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Calc.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
                     }
+                    // the compiled callee works on the compiled caller's collections as Java code: no bridge call
+                    def appended = decisions.find { it.qualifiedName() == 'Calc.appended' }
+                    assert appended.stats().bridgeCalls() == 0 && appended.stats().javaCalls() == 2, appended.toString()
                     HOLDER_REFUSED.each { name, rule ->
                         def decision = decisions.find { it.qualifiedName() == "Holder.$name".toString() }
                         assert decision?.outcome() == StaticCompilationDecision.Outcome.SKIPPED && decision.reasons()[0].rule() == rule, decision.toString()
@@ -628,6 +647,8 @@ class Holder:
         results[StaticCompilationMode.OFF][["within", null, "abc"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["filled"].toString()] == 1
         results[StaticCompilationMode.OFF][["extending"].toString()] == "a,bTrue1True"
+        results[StaticCompilationMode.OFF][["appended"].toString()] == "5 3 2 3"
+        results[StaticCompilationMode.OFF]['append_to'] == [2, ['x'], [:]]
         results[StaticCompilationMode.OFF][["mixed_max", 3, 2.5d].toString()] == "3 2.5"
         results[StaticCompilationMode.OFF]['int_default'] == "0"
         results[StaticCompilationMode.OFF][["gained"].toString()] == "1.5|1"

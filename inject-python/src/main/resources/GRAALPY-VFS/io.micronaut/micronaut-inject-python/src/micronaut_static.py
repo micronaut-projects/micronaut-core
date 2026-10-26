@@ -103,6 +103,8 @@ class StaticPlanner:
         self.bodies = []
         self.diagnostics = []
         self._ineligibility = {}  # id(class_def) -> why the class generates no stub, or None: asked once per class
+        self._decided = {}        # id(node) -> the decision, or None while it is being made
+        self._bodies = {}         # id(node) -> the compiled body
         # the classes already reported for a class-level switch they can never honour
         self._reported_classes = set()
 
@@ -115,6 +117,8 @@ class StaticPlanner:
         """
         self.decisions = []
         self.diagnostics = []
+        self._decided = {}
+        self._bodies = {}
         self._reported_classes = set()
         if getattr(checker, "facts", None) is None and visitor_context is not None:
             checker.facts = TypeFacts(visitor_context)
@@ -136,9 +140,33 @@ class StaticPlanner:
                         self._decide_accessor(class_def, function_def, accessor)
         return list(self.decisions)
 
+    def decide_method(self, module, class_def, function_def, node):
+        """
+        The decision of a method of the class a compiled body calls, made now when the planner has
+        not reached it yet; None while the method's own decision is under way (a cycle of calls).
+        """
+        if id(node) in self._decided:
+            return self._decided[id(node)]
+        class_node = next((candidate for defined, candidate in module.classes if defined is class_def), None)
+        return self._decide(module, class_def, class_node, function_def, node)
+
+    def body_of(self, node):
+        """The compiled body of a decided function, or None."""
+        return self._bodies.get(id(node))
+
     # ---------------------------------------------------------------- one function
 
     def _decide(self, module, class_def, class_node, function_def, node):
+        if node is not None:
+            if id(node) in self._decided:
+                return self._decided[id(node)]
+            self._decided[id(node)] = None
+        decision = self._decision(module, class_def, class_node, function_def, node)
+        if node is not None:
+            self._decided[id(node)] = decision
+        return decision
+
+    def _decision(self, module, class_def, class_node, function_def, node):
         qualified = f"{class_def.name()}.{function_def.name()}" if class_def is not None else function_def.name()
         compiled, scope = self.scope.resolve(module.decorators, class_def.decorators() if class_def is not None else None, function_def.decorators())
         span = function_def.span()
@@ -171,6 +199,8 @@ class StaticPlanner:
             reason = ("pooled-module", "the module is served by a context pool; a body reaching a Python object has no context to reach it in", span)
             return self._record(qualified, span, "SKIPPED", scope, [reason], statements, explicit=scope != "MODE")
         self.bodies.append(body)
+        if node is not None:
+            self._bodies[id(node)] = body
         return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats())
 
     def _lower(self, module, class_def, function_def, node, java_layout=None):
@@ -187,9 +217,19 @@ class StaticPlanner:
         lowering = Lowering(self.checker, module, class_def, function_def, node, rules, class_model,
                             advised=lambda sibling: self._advice(class_def, sibling) is not None,
                             advised_method=class_def is not None and self._advice(class_def, function_def) is not None,
-                            java_layout=java_layout)
+                            java_layout=java_layout,
+                            compiled=lambda sibling, sibling_node: self._compiled_method(module, class_def, sibling, sibling_node))
         body = lowering.lower()
         return body, lowering.reasons
+
+    def _compiled_method(self, module, class_def, function_def, node):
+        """
+        Whether a method of the class is compiled, decided now when the planner has not reached it
+        yet; a method whose decision is under way (a cycle of calls) counts as not compiled, which
+        only costs the call its Java dispatch.
+        """
+        decision = self.decide_method(module, class_def, function_def, node) if node is not None else None
+        return decision is not None and decision.outcome().name() == "COMPILED" and self.body_of(node) is not None
 
     def _switched_accessors(self, class_def):
         """The property accessors a function-level switch turns on, as (accessor, kind) members."""
