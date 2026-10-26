@@ -5458,7 +5458,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 method.addParameter(ParameterDef.of(body.parameterNames().get(i), StaticBodyGenerator.type(body.parameterTypes().get(i))));
             }
             if (body.span() != null) {
-                method.addJavadoc("Compiled from " + body.span().location() + ", working on the caller's collections");
+                method.addJavadoc(COMPILED_FROM + body.span().location() + ", working on the caller's collections");
             }
             builder.addMethod(method.build((aThis, parameters) ->
                 StaticBodyGenerator.generateShared(body, parameters, selfAccess(model, aThis), plan.trace())));
