@@ -122,6 +122,14 @@ class Bag:
         flags: set[bool] = {True}
         return 1 in flags
 
+    def comprehended(self) -> int:
+        values = [1, "a", 1.0]
+        return len({v for v in values})
+
+    def keyed_comprehension(self) -> int:
+        values = [1, "a", True]
+        return len({v: 1 for v in values})
+
     def str_keyed(self, names: dict[str, int], key: str) -> int:
         names[key] = 1
         return names[key] + names.get("b", 0)
@@ -143,7 +151,7 @@ class Bag:
         ["parsed_float", "+infinity"], ["parsed_float", "1d"], ["parsed_float", "2f"], ["parsed_float", "0x1p3"],
         ["parsed_float", "1_"],
         ["flagged"], ["objects", 1], ["stored"], ["got", 1], ["added"], ["merged"], ["literal_keys"],
-        ["deduped", [1, 1.0d]], ["bool_member"], ["str_keyed", [b: 2], "a"],
+        ["deduped", [1, 1.0d]], ["bool_member"], ["comprehended"], ["keyed_comprehension"], ["str_keyed", [b: 2], "a"],
     ]
 
     void "collections and conversions agree with the Python bodies"() {
@@ -207,6 +215,8 @@ class Bag:
         results[StaticCompilationMode.OFF][["literal_keys"].toString()] == 1
         results[StaticCompilationMode.OFF][["deduped", [1, 1.0d]].toString()] == 1
         results[StaticCompilationMode.OFF][["bool_member"].toString()] == true
+        results[StaticCompilationMode.OFF][["comprehended"].toString()] == 2
+        results[StaticCompilationMode.OFF][["keyed_comprehension"].toString()] == 2
         results[StaticCompilationMode.OFF][["str_keyed", [b: 2], "a"].toString()] == 3
 
         and: "the bodies compile, except the membership tests Python's numeric equality decides"
@@ -217,7 +227,7 @@ class Bag:
               paired: 'compiled', parsed_int: 'compiled', parsed_float: 'compiled', mixed: ['unsupported-expression'], among: ['unsupported-expression']]
 
         and: "a key or element Python's numeric equality decides is refused in lookups, stores, additions, literals and set()"
-        def numeric = ['flagged', 'objects', 'stored', 'got', 'added', 'merged', 'literal_keys', 'deduped', 'bool_member']
+        def numeric = ['flagged', 'objects', 'stored', 'got', 'added', 'merged', 'literal_keys', 'deduped', 'bool_member', 'comprehended', 'keyed_comprehension']
         // every refused statement is a reason: stored has two
         numeric.collectEntries { [(it): compiled["Bag.$it".toString()].reasons()*.rule()] } == numeric.collectEntries { [(it): ['unsupported-expression'] * (it == 'stored' ? 2 : 1)] }
         numeric.findAll { !compiled["Bag.$it".toString()].reasons()[0].message().contains('Python compares numbers across their types') } == []

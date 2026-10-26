@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
+import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -3558,6 +3559,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     || (isJunit5TestModule && isScriptTestMethod(methodElement));
                 addBridgeMethod(BridgeMethodSpec.of(methodElement, scriptElement).junit5Test(isJunit5Test).script(true), builder, context, addedMethodNames);
             }
+            addCompiledModuleFunctions(builder, typeName, addedMethodNames, context, staticScriptSelfAccess(context, thisType));
 
             // Find injection fields (script attributes)
             List<PropertyElement> beanProperties = scriptElement.getBeanProperties();
@@ -4775,11 +4777,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     /**
      * The statically compiled body of a method of the class being generated, when the plan holds
-     * one for a bridge that can carry it: a plain instance method with its own signature.
+     * one for a bridge that can carry it: a plain instance method, or a static method, with its own signature.
      */
     private static Ir.@Nullable CompiledBody compiledBody(BridgeMethodSpec spec, @Nullable ClassStubModel model, VisitorContext context) {
         if (spec.junit5Test() || spec.introduced() || spec.returnTypeOverride() != null
-            || spec.method().isStatic() || spec.method().isAbstract() || isAsyncPythonMethod(spec.method())) {
+            || spec.method().isAbstract() || isAsyncPythonMethod(spec.method())) {
             return null;
         }
         if (model == null && !spec.script()) {
@@ -4788,7 +4790,37 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         StaticCompilationPlan plan = staticCompilationPlan(context);
         // a module-level function is a method of the module's generated class
         String className = model != null ? model.element().getName() : spec.owner().getName();
-        return plan == null ? null : plan.body(className, spec.method().getName());
+        Ir.CompiledBody body = plan == null ? null : plan.body(className, spec.method().getName());
+        // a static method compiles into the static bridge, an instance method into the instance one
+        return body != null && body.staticMethod() == spec.method().isStatic() ? body : null;
+    }
+
+    /**
+     * The plain functions of a module the plan compiled: static methods of the module's generated
+     * class, which bridges no Python function for them.
+     */
+    static void addCompiledModuleFunctions(ClassDef.ClassDefBuilder builder, String typeName, Set<String> addedMethodNames, VisitorContext context, StaticBodyGenerator.SelfAccess access) {
+        StaticCompilationPlan plan = staticCompilationPlan(context);
+        if (plan == null) {
+            return;
+        }
+        boolean trace = plan.trace();
+        for (Ir.CompiledBody body : plan.bodiesOf(typeName)) {
+            if (!body.moduleLevel() || !body.staticMethod() || !addedMethodNames.add(body.methodName())) {
+                continue;
+            }
+            MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(body.methodName())
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .returns(StaticBodyGenerator.type(body.returnType()));
+            for (int i = 0; i < body.parameterNames().size(); i++) {
+                methodBuilder.addParameter(ParameterDef.of(body.parameterNames().get(i), StaticBodyGenerator.type(body.parameterTypes().get(i))));
+            }
+            if (body.span() != null) {
+                methodBuilder.addJavadoc(COMPILED_FROM + body.span().location());
+            }
+            builder.addMethod(methodBuilder.build((aThis, methodParameters) ->
+                StaticBodyGenerator.generate(body, methodParameters, access, trace)));
+        }
     }
 
     /**
@@ -4934,15 +4966,30 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * How a static method of a module's generated class reaches what it needs: the injected
+     * attributes of the module are static fields of the class; there is no instance.
+     */
+    private StaticBodyGenerator.SelfAccess staticScriptSelfAccess(VisitorContext context, ClassTypeDef thisType) {
+        return scriptSelfAccess(context, thisType::getStaticField);
+    }
+
+    private StaticBodyGenerator.SelfAccess scriptSelfAccess(VisitorContext context, VariableDef.This aThis) {
+        return scriptSelfAccess(context, aThis::field);
+    }
+
+    /**
      * How the compiled body of a module-level function reaches Python objects: the module's
      * generated class has no {@code self}; the objects of the compilation the body holds are
      * reached through their own Python objects.
+     *
+     * @param context  The visitor context
+     * @param injected The read of an injected attribute of the module, by its field name and type
      */
-    private StaticBodyGenerator.SelfAccess scriptSelfAccess(VisitorContext context, VariableDef.This aThis) {
+    private StaticBodyGenerator.SelfAccess scriptSelfAccess(VisitorContext context, BiFunction<String, TypeDef, ExpressionDef> injected) {
         return new StaticBodyGenerator.SelfAccess() {
             @Override
             public ExpressionDef injected(String field, TypeDef type) {
-                return aThis.field(field, type);
+                return injected.apply(field, type);
             }
 
             @Override
@@ -4974,14 +5021,34 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * The access of a compiled body of a module served by a context pool: the planner compiles
-     * such a body only when it reaches no Python object, so nothing here is ever called.
+     * How a static method of a pooled module's generated class reaches what it needs: nothing of the
+     * module, whose injected beans live in the instance Micronaut creates, and no Python object.
+     */
+    static StaticBodyGenerator.SelfAccess pooledStaticAccess() {
+        return pooledScriptAccess((field, type) -> {
+            throw new IllegalStateException("A static method of a pooled module has no instance holding the injected [" + field + "]");
+        });
+    }
+
+    /**
+     * @param aThis The instance of the pooled module's generated class, holding its injected attributes
+     * @return The access of a compiled instance method of a pooled module
      */
     static StaticBodyGenerator.SelfAccess pooledScriptAccess(VariableDef.This aThis) {
+        return pooledScriptAccess(aThis::field);
+    }
+
+    /**
+     * The access of a compiled body of a module served by a context pool: the planner compiles
+     * such a body only when it reaches no Python object, so nothing here is ever called.
+     *
+     * @param injected The read of an injected attribute of the module, by its field name and type
+     */
+    private static StaticBodyGenerator.SelfAccess pooledScriptAccess(BiFunction<String, TypeDef, ExpressionDef> injected) {
         return new StaticBodyGenerator.SelfAccess() {
             @Override
             public ExpressionDef injected(String field, TypeDef type) {
-                return aThis.field(field, type);
+                return injected.apply(field, type);
             }
 
             @Override
@@ -5216,7 +5283,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     private static boolean declaresCompiledDelegate(ClassStubModel model) {
         StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
-        return plan != null && !plan.bodiesOf(model.element().getName()).isEmpty();
+        return plan != null && !instanceBodiesOf(plan, model.element().getName()).isEmpty();
+    }
+
+    /**
+     * The compiled bodies of the instance methods of a class, which its delegate carries: a static
+     * method or a module-level function is a static Java method of the generated class, which its
+     * Python callers call directly (see {@code apply_delegation}).
+     */
+    private static List<Ir.CompiledBody> instanceBodiesOf(StaticCompilationPlan plan, String className) {
+        List<Ir.CompiledBody> bodies = new ArrayList<>();
+        for (Ir.CompiledBody body : plan.bodiesOf(className)) {
+            if (!body.staticMethod() && !body.moduleLevel()) {
+                bodies.add(body);
+            }
+        }
+        return bodies;
     }
 
     /**
@@ -5257,7 +5339,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         List<ClassElement> owners = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (ClassElement current : chain) {
-            if (seen.add(current.getName()) && !plan.bodiesOf(current.getName()).isEmpty()) {
+            if (seen.add(current.getName()) && !instanceBodiesOf(plan, current.getName()).isEmpty()) {
                 owners.add(current);
             }
         }
@@ -5283,7 +5365,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ClassDef.ClassDefBuilder delegate = ClassDef.builder(model.element().getPackageName() + "." + COMPILED_DELEGATE)
             .addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL);
         delegate.addMethod(MethodDef.constructor().addModifiers(Modifier.PUBLIC).build((aThis, parameters) -> StatementDef.multi()));
-        for (Ir.CompiledBody body : plan.bodiesOf(model.element().getName())) {
+        for (Ir.CompiledBody body : instanceBodiesOf(plan, model.element().getName())) {
             TypeDef returnType = Ir.VOID.equals(body.returnType()) ? TypeDef.VOID : StaticBodyGenerator.type(body.returnType());
             MethodDef.MethodDefBuilder method = MethodDef.builder(body.methodName()).addModifiers(Modifier.PUBLIC).returns(returnType);
             // the Python object, under a name none of the Python parameters has
@@ -5314,7 +5396,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static boolean hasSharedEntry(ClassStubModel model, String name) {
         StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
         Ir.CompiledBody body = plan == null ? null : plan.body(model.element().getName(), name);
-        return body != null && !StaticBodyGenerator.copiedParameters(body).isEmpty();
+        return body != null && !body.staticMethod() && !StaticBodyGenerator.copiedParameters(body).isEmpty();
     }
 
     /**
@@ -5329,7 +5411,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private void addSharedEntries(ClassStubModel model, ClassDef.ClassDefBuilder builder) {
         StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
         for (Ir.CompiledBody body : plan.bodiesOf(model.element().getName())) {
-            if (StaticBodyGenerator.copiedParameters(body).isEmpty()) {
+            // a static method's body has no instance to run a private entry on
+            if (body.staticMethod() || StaticBodyGenerator.copiedParameters(body).isEmpty()) {
                 continue;
             }
             TypeDef returnType = Ir.VOID.equals(body.returnType()) ? TypeDef.VOID : StaticBodyGenerator.type(body.returnType());
@@ -5489,7 +5572,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 methodBuilder.addJavadoc(COMPILED_FROM + compiledBody.span().location());
             }
             boolean trace = staticCompilationPlan(visitorContext).trace();
-            if (model != null && !StaticBodyGenerator.copiedParameters(compiledBody).isEmpty()) {
+            if (model != null && !compiledBody.staticMethod() && !StaticBodyGenerator.copiedParameters(compiledBody).isEmpty()) {
                 // a Java caller's collections are copied, as the bridge copies them, and the body runs in its shared entry
                 TypeDef returnType = Ir.VOID.equals(compiledBody.returnType()) ? TypeDef.VOID : StaticBodyGenerator.type(compiledBody.returnType());
                 List<TypeDef> parameterTypes = compiledBody.parameterTypes().stream().map(StaticBodyGenerator::type).toList();

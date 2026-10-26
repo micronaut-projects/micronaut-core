@@ -85,8 +85,8 @@ class PricingService:
 
 A `CompileStatic` that switches a function on without the function being compiled gets a warning naming the first reason (an error when `micronaut.python.compile.static.strict` is `true`):
 
-* on a function, the switch warns whenever the function is not compiled, in every mode, including a function that can never be compiled (a static, async or special method, or a `@property` getter, setter or deleter);
-* on a class or a module, the switch warns once for each method of its scope that is skipped, except in mode `all`, where skipping is the expected common case and only function-level switches warn. Methods of the scope that are never candidates (a constructor, a dunder, a static method) are recorded as `NOT_CANDIDATE` in the report without a warning, so a class opt-in covering only such methods is silent: the report is the place to look. A class switch on a class that can never be compiled (an enum, a protocol, a pooled class, ...) warns once for the class, except in mode `all`; a module switch does not;
+* on a function, the switch warns whenever the function is not compiled, in every mode, including a function that can never be compiled (a class method, an async or special method, or a `@property` getter, setter or deleter);
+* on a class or a module, the switch warns once for each method of its scope that is skipped, except in mode `all`, where skipping is the expected common case and only function-level switches warn. Methods of the scope that are never candidates (a constructor, a dunder, a class method) are recorded as `NOT_CANDIDATE` in the report without a warning, so a class opt-in covering only such methods is silent: the report is the place to look. A class switch on a class that can never be compiled (an enum, a protocol, a pooled class, ...) warns once for the class, except in mode `all`; a module switch does not;
 * the mode alone never warns.
 
 The switch may also be imported from `pyronaut.build`, as `from pyronaut.build import CompileStatic` (aliased or not) or as a member of the module (`import pyronaut.build as pb`, then `@pb.CompileStatic`); `TypeChecked` likewise. The annotation is kept in the source only.
@@ -100,13 +100,13 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |Reason |Given when
 
 |`class-not-eligible`
-|The function has no ordinary Java class to compile into: a module-level function without a route, `@Executable`, scope or bean decorator (the others are methods of the module's generated class), an enum, a protocol, an interface, a class served by a context pool, a class declaring `__slots__` or `__getattr__`.
+|The function has no ordinary Java class to compile into: a function of a `MicronautTest` module (its tests), an enum, a protocol, an interface, a class served by a context pool, a class declaring `__slots__` or `__getattr__`.
 
 |`pooled-module`
 |The function belongs to a module that declares no scope (a module-level `@Controller` or `@Requires` is no scope), which the runtime serves from a pool of Python contexts, and its body reaches a Python object (an attribute of a class of the compilation, a method the generated class does not declare), which no context is leased for. A pooled route that only calls Java and the generated classes of the compilation is compiled and runs without leasing a context at all.
 
 |`special-method`, `async-function`, `generator-function`, `static-method`, `abstract-method`
-|The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, a static or class method, or an abstract method or one whose body is a placeholder (`...`): a call of it runs the implementation of the object.
+|The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, a class method (a `@staticmethod` is compiled, into the static Java method the stub declares for it), or an abstract method or one whose body is a placeholder (`...`): a call of it runs the implementation of the object.
 
 |`property-accessor`
 |A `@property` getter, setter or deleter: Python calls it through the attribute protocol of the object, so there is no method to compile. Only a function-level `CompileStatic` on the accessor gets this decision, and warns; an accessor nothing switches on has no decision.
@@ -124,7 +124,7 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |An expression has no static type (a value of a third-party module, a local assigned values of different types, a local assigned on some paths only and read after them), or `self.x` names nothing the class declares.
 
 |`dynamic-call`, `ambiguous-overload`, `kwargs-to-java`, `sibling-call`
-|A call resolves to no Java method or constructor, more than one overload fits the argument types equally well, keyword arguments are given to a Java method or a builtin, or a static, class, async or generator method of the class is called on `self`.
+|A call resolves to no Java method or constructor (a module-level function that is not compiled, one in a cycle of calls with its caller, or one the running program may rebind), more than one overload fits the argument types equally well, keyword arguments are given to a Java method or a builtin, or a class, async or generator method of the class, or a static method a subclass may override, is called on `self`.
 
 |`python-builtin-not-lowered`, `unsupported-statement`, `unsupported-expression`
 |A builtin, a method of a Python value, a statement kind or an expression kind outside the supported subset below, or a form of a supported statement that is not (see the list after the table).
@@ -179,6 +179,15 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |Calls on an introduction (`self.repository.find(...)`)
 |A Java call on the generated type of the introduction: a protocol compiles to a Java interface whose proxy Micronaut generates, and the abstract methods of an abstract introduction class that compilation switches on (in mode `all`, or under a `CompileStatic`) run the introduction's interceptors in the generated class, bound by the proxy. What an interceptor answers is converted to the return type as the bridge converts a Python result: an int to an `int` only when it fits, an integral float to an int, `None` to no primitive; an introduced method returning a type other than a primitive, its box, a string or an object keeps its bridge. With the interceptor's own body compiled, a repository declared in Python, as Micronaut Data declares one, runs as Java from the caller to the interceptor.
 
+|Module-level functions, `helper(x)`, `from .mappers import user_public`
+|A plain function of a module (no route, `@Executable`, scope or bean decorator) compiles into a `public static` method of the module's generated class, which a module gets when one of its functions compiles; a call of it from a compiled body, of the same module or importing it, is a static Java call, so a controller's helpers run as Java from the route down. Python callers of the function, and of a compiled `@staticmethod`, run the Java method too, through the generated class, under the checks the methods of a class delegate with: every argument must have the exact Python type and range of its Java parameter, and only a body without side effects delegates, its failure running the Python body, so the caller sees Python's result or exception; a body with side effects keeps the Python body for its Python callers. A call of a function that is not compiled keeps the caller in Python, and so does a call the running program may route elsewhere: a parameter or a local of the caller with the function's name, a function the module binds more than once (a second `def`, `f = wrap(f)`), inside an `if` or a `try`, through a `global` declaration or after a star import, or one carrying a decorator other than `CompileStatic`, which may wrap it. A module-level function named like a builtin (`def len`) hides the builtin, as in Python. A function the module defines twice is not compiled. Replacing a compiled function or constant from outside its module while the program runs (`mock.patch("app.mappers.user_public")`, `mappers.RATE = 5`) is not seen by compiled callers, which call the static Java method or hold the inlined value; leave such a module out of static compilation.
+
+|`@staticmethod`
+|Compiled into the static Java method the stub already declares; `Cls.helper(...)` is a static Java call, and so is `self.helper(...)` when no subclass of the compilation may override the method (Python looks it up on the class of `self`; `sibling-call` otherwise).
+
+|`[e for x in xs if c]`, `{e for ...}`, `{k: v for ...}`, `any(c for x in xs)`, `all(...)`
+|A loop over the iterable filling a fresh local declared just before the statement, which the expression then reads; `any` and `all` fill a boolean and leave the loop early. One `for` clause, no walrus; a comprehension inside `and`, `or`, `x if c else y`, a `while` condition or an `assert` message, or after anything the statement evaluates before it that may run code or raise (a call, a subscript, arithmetic, a property; not a name, a literal, a plain attribute of `self`, `len()`, `str()` of a number or a string, or a string concatenation of those), is refused, since the hoisted loop would run out of order.
+
 |Injected attributes of a module
 |A module-level function of the module's generated class reads an attribute the module injects (`repository: Annotated[BookRepository, Inject]`) from a field of that class, set when the bean is injected, and calls the bean as a Java object.
 
@@ -186,7 +195,7 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |The generated class of a class of the compilation: its constructor, which mirrors the hinted `__init__` or the fields of a dataclass, with keyword arguments matched by name and an omitted parameter filled with its literal default, `None`, or an empty `field(default_factory=list)`, `dict` or `set`; the accessor of a hinted attribute, else the attribute of the Python object; the setter of a hinted attribute, refused on a frozen dataclass; the Java method the generated class declares for the call (keywords and defaults matched the same way), else the method of the Python object.
 
 |Module-level constants (`ROLE_USER = "user"`)
-|Inlined as literals, including a constant imported from another module of the compilation.
+|Inlined as literals, including a constant imported from another module of the compilation, when the defining module binds the name once, in a statement of its own body, and no function declares it `global`; a constant that may be rebound is refused (`unknown-type`).
 
 |`self.x`, `self.x = v`
 |The Java field of an introspected class, else the attribute of the Python object; a `@property` always runs its Python getter or setter. An attribute `__init__` assigns a hinted parameter or a Java call or construction (`self._encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder()`) has that type in every method.
@@ -195,7 +204,7 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |The generated class's own Java method when it declares one for the call (a public method with a hinted signature the call fills exactly, that takes no `list`, `set` or `dict`, that no advice intercepts and no subclass of the compilation overrides), else the method of the Python object, which runs its interceptors, overrides and default arguments as Python would.
 |===
 
-Not compiled: comprehensions, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, calls of module-level functions, `isinstance`, `**` on floats, and `Optional` hints; nor the `else` clause of a `for`, `while` or `try` statement, unpacking in a `for` target other than `for k, v in mapping.items()` or in an assignment (`a, b = ...`), a chained assignment (`a = b = 0`) and a bare `except:`.
+Not compiled: generator expressions outside `any` and `all`, nested comprehensions with several `for` clauses, lambdas and nested functions, `with`, `match`, `del`, `global`, `nonlocal`, `yield`, slices, starred arguments, chained comparisons, class methods, `isinstance`, `**` on floats, and `Optional` hints; nor the `else` clause of a `for`, `while` or `try` statement, unpacking in a `for` target other than `for k, v in mapping.items()` or in an assignment (`a, b = ...`), a chained assignment (`a = b = 0`) and a bare `except:`.
 
 Refused as well, where the Java code would behave differently: a `for` loop whose body may change the collection it iterates (appending to it, storing or deleting an item, passing it to a call; Python goes on iterating, the Java iterator throws `ConcurrentModificationException`), and a lookup, store or membership test of a dict or set, or a dict or set literal, where Python's numeric equality decides (`1`, `1.0` and `True` are one key in Python and three in Java): a numeric or `bool` key among keys of another or of any type.
 

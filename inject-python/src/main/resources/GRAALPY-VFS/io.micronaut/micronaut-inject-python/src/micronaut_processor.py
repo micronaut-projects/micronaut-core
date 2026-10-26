@@ -306,6 +306,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.local_annotation_source_loading = set()
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
+        self.module_node = None  # The module's AST once visited: how it binds its names, for the static compilation
         self.annotation_instance_assignments = {}  # Module-level names bound to an annotation call, to diagnose Annotated[..., NAME]
         self.diagnostics = []  # The problems found in the module, as located PythonDiagnostic values
         self.current_class_nested_types = {}  # Track nested classes visible in the current class body
@@ -731,6 +732,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             case ast.Module():
                 # Process the module and create script element if we have script-level constructs
                 self.current_class = None
+                self.module_node = node
                 self.annotated_aliases.update(self._collect_annotated_aliases(node.body))
                 self.local_classes.update(
                     stmt.name for stmt in node.body if isinstance(stmt, ast.ClassDef)

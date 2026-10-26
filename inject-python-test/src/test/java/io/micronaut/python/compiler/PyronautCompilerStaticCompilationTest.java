@@ -87,7 +87,8 @@ class PyronautCompilerStaticCompilationTest {
         assertEquals(Outcome.NOT_CANDIDATE, byName.get("PricingService.__init__").outcome());
         assertEquals(Outcome.COMPILED, byName.get("PricingService.total").outcome());
         assertEquals(Outcome.SKIPPED, byName.get("PricingService.names").outcome());
-        assertEquals("unsupported-expression", byName.get("PricingService.names").reasons().get(0).rule());
+        // the comprehension is lowered; the elements of a raw ArrayList have no type
+        assertEquals("unknown-type", byName.get("PricingService.names").reasons().get(0).rule());
         assertEquals(Outcome.SKIPPED, byName.get("PricingService.describe").outcome());
         assertEquals(Outcome.EXCLUDED, byName.get("PricingService.legacy").outcome());
         assertNotNull(byName.get("PricingService.total").span());
@@ -105,7 +106,7 @@ class PyronautCompilerStaticCompilationTest {
         assertTrue(lines.get(1).startsWith("{\"record\":\"decision\",\"name\":\"PricingService.__init__\""), lines.get(1));
         String summary = Files.readString(directory.resolve(StaticCompilationReport.SUMMARY_FILE));
         assertTrue(summary.contains("COMPILED      PricingService.total"), summary);
-        assertTrue(summary.contains("[unsupported-expression]"), summary);
+        assertTrue(summary.contains("[unknown-type]"), summary);
         assertTrue(summary.contains("EXCLUDED      1"), summary);
     }
 
@@ -249,9 +250,10 @@ class PyronautCompilerStaticCompilationTest {
         assertEquals(1, reasons.size(), line);
         JsonNode reason = reasons.get(0);
         assertEquals(List.of("rule", "message", "location"), propertyNames(reason), line);
-        assertEquals("unsupported-expression", reason.get("rule").asString());
-        assertEquals("a list comprehension has no static lowering", reason.get("message").asString());
-        assertEquals(source + ":14:25", reason.get("location").asString());
+        // the comprehension is lowered; the elements of the raw ArrayList it iterates have no type
+        assertEquals("unknown-type", reason.get("rule").asString());
+        assertEquals("the elements of the [java.util.ArrayList] have no static type", reason.get("message").asString());
+        assertEquals(source + ":14:50", reason.get("location").asString());
 
         JsonNode stats = decision.get("stats");
         assertEquals(List.of("statements", "javaCalls", "bridgeCalls", "helperCalls"), propertyNames(stats), line);
