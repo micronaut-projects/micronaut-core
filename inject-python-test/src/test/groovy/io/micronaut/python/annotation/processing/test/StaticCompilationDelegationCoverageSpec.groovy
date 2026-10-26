@@ -539,4 +539,47 @@ class Caller:
         results['entries.Calc.hex'] == 2
         results['entries.Calc.bigger'] == 0
     }
+
+    void "a call of the shared entry of a sibling taking a list counts as a call of compiled code"() {
+        when: "filled calls fill, which may overflow, and tagged calls tag, which cannot, both with a list of their own"
+        def results = parity('''
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
+
+@Singleton
+class Lists:
+    def fill(self, xs: list[str], n: int) -> int:
+        xs.append("x")
+        return n * n * n
+
+    def tag(self, xs: list[str], tag: str) -> None:
+        xs.append(tag)
+
+    def filled(self, n: int) -> int:
+        xs: list[str] = []
+        return self.fill(xs, n) + len(xs)
+
+    def tagged(self, tag: str) -> int:
+        xs: list[str] = []
+        self.tag(xs, tag)
+        self.tag(xs, tag)
+        return len(xs)
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def __init__(self, lists: Lists):
+        self.lists = lists
+
+    def probe(self) -> str:
+        return f"{self.lists.filled(2 ** 30)} {self.lists.tagged('a')}"
+''', ['Lists.filled': 'none(it has side effects (the call of [self.fill]) and a call of code of the compilation raises where Python promotes)',
+       'Lists.tagged': 'once'])
+
+        then: "the Python caller of filled keeps the Python body, which promotes; tagged runs its Java body once, whose delegate calls tag through the Python object"
+        results.off == '1237940039285380274899124225 2'
+        results.all == results.off
+        results['entries.Lists.filled'] == 0
+        results['entries.Lists.tagged'] == 1
+    }
 }
