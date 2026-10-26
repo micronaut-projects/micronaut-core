@@ -213,6 +213,34 @@ class EventStreamDecoderSpec extends Specification {
         state.reconnectionTime == Duration.ofMillis(20)
     }
 
+    void "the decoder hands out the ids in delivery order, as markers for the blocks without data"() {
+        given:
+        EventStreamState state = new EventStreamState()
+        EventStreamDecoder decoder = new EventStreamDecoder(1024, state)
+        List<Event<byte[]>> events = []
+        byte[] piece = "id: 1\ndata: a\n\nid: 2\ndata: b\n\nid: 3\n\nretry: 5\n\n".getBytes(StandardCharsets.UTF_8)
+
+        when:
+        decoder.decode(piece, 0, piece.length, events::add)
+
+        then: "nothing is delivered yet, so the id is not taken, while the retry is"
+        state.lastEventId == null
+        state.reconnectionTime == Duration.ofMillis(5)
+        events.collect { EventStreamDecoder.isControl(it) } == [false, false, true]
+
+        when:
+        EventStreamDecoder.deliver(events[0], state)
+
+        then:
+        state.lastEventId == "1"
+
+        when:
+        events.drop(1).each { EventStreamDecoder.deliver(it, state) }
+
+        then:
+        state.lastEventId == "3"
+    }
+
     private static List<Event<byte[]>> decode(String... pieces) {
         return decode(pieces.collect { it.getBytes(StandardCharsets.UTF_8) } as byte[][])
     }
