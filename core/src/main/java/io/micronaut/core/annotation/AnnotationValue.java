@@ -1664,11 +1664,18 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * {@link #matches(AnnotationValue)} so that its non-binding members and defaults are honoured as well.
      */
     private static boolean matchesValue(Object value, Object otherValue) {
-        if (value instanceof AnnotationValue<?> annotation && otherValue instanceof AnnotationValue<?> otherAnnotation) {
-            return annotation.matches(otherAnnotation);
+        boolean container = isContainer(value);
+        boolean otherContainer = isContainer(otherValue);
+        if (!container && !otherContainer) {
+            if (value instanceof AnnotationValue<?> annotation) {
+                return otherValue instanceof AnnotationValue<?> otherAnnotation && annotation.matches(otherAnnotation);
+            }
+            return !(otherValue instanceof AnnotationValue<?>) && AnnotationUtil.areEqual(value, otherValue);
         }
-        if (!holdsAnnotations(value) && !holdsAnnotations(otherValue)) {
-            return AnnotationUtil.areEqual(value, otherValue);
+        if (container != otherContainer && !(value instanceof AnnotationValue<?>) && !(otherValue instanceof AnnotationValue<?>)) {
+            // a single value and an array of values are different values, unless the single value is an annotation
+            // a repeatable member holds once
+            return false;
         }
         List<?> values = asList(value);
         List<?> otherValues = asList(otherValue);
@@ -1685,17 +1692,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return true;
     }
 
-    private static boolean holdsAnnotations(Object value) {
-        if (value instanceof AnnotationValue<?>) {
-            return true;
-        }
-        if (value instanceof Object[] array) {
-            return array.length > 0 && array[0] instanceof AnnotationValue<?>;
-        }
-        if (value instanceof Collection<?> collection) {
-            return !collection.isEmpty() && collection.iterator().next() instanceof AnnotationValue<?>;
-        }
-        return false;
+    /**
+     * @return Whether the value holds values: an array of objects, of annotations for instance, or a collection
+     */
+    private static boolean isContainer(Object value) {
+        return value instanceof Object[] || value instanceof Collection<?>;
     }
 
     private static List<?> asList(Object value) {

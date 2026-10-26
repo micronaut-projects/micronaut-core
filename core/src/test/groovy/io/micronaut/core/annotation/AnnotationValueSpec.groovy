@@ -609,6 +609,27 @@ class AnnotationValueSpec extends Specification {
         !compiled.matches(new AnnotationValue("test.Scoped", [value: [x, y, y] as AnnotationValue[]] as Map<CharSequence, Object>))
     }
 
+    void "test matches() compares containers of nested annotations whichever shape holds them, empty or not"() {
+        given:
+        def x = new AnnotationValue("test.Scope", [value: "x"] as Map<CharSequence, Object>)
+
+        expect: "an empty array and an empty collection hold the same nothing"
+        new AnnotationValue("test.Scoped", [value: [] as AnnotationValue[]] as Map<CharSequence, Object>)
+                .matches(new AnnotationValue("test.Scoped", [value: []] as Map<CharSequence, Object>))
+        new AnnotationValue("test.Scoped", [value: []] as Map<CharSequence, Object>)
+                .matches(new AnnotationValue("test.Scoped", [value: [] as AnnotationValue[]] as Map<CharSequence, Object>))
+
+        and: "a nested annotation is not a string, whichever side it is on"
+        !new AnnotationValue("test.Scoped", [value: x] as Map<CharSequence, Object>)
+                .matches(new AnnotationValue("test.Scoped", [value: "x"] as Map<CharSequence, Object>))
+        !new AnnotationValue("test.Scoped", [value: "x"] as Map<CharSequence, Object>)
+                .matches(new AnnotationValue("test.Scoped", [value: x] as Map<CharSequence, Object>))
+
+        and: "a single string still differs from an array holding it, as before"
+        !new AnnotationValue("test.Named", [value: "x"] as Map<CharSequence, Object>)
+                .matches(new AnnotationValue("test.Named", [value: ["x"] as String[]] as Map<CharSequence, Object>))
+    }
+
     private static AnnotationValue<?> scoped(Map<String, Object> scope) {
         return new AnnotationValue("test.Scoped", [
                 scope: new AnnotationValue("test.Scope", scope as Map<CharSequence, Object>, (Map<CharSequence, Object>) null)
