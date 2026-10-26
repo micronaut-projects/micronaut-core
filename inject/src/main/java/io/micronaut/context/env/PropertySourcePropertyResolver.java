@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -296,18 +297,19 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     Build startChange(boolean keepMemory) {
         ResolverState base = state;
-        return startBuild(new Build(base, new ResolverState(base, keepMemory ? base.rememberedValues : new ConcurrentHashMap<>(4)), keepMemory, new ArrayList<>(), currentBuild()));
+        return startBuild(new Build(base, new ResolverState(base, keepMemory ? base.rememberedValues : new ConcurrentHashMap<>(4)), keepMemory, currentBuild()));
     }
 
     /**
      * Starts a read on the current thread: a build of new catalogs, from none. Until
      * {@link #endBuild(Build)}, the lookups of the thread read the build, and the property sources
-     * it processes go into it. It is published with {@link #publishRead(Build, Collection)}.
+     * it processes go into it. The build records what it processes, so that
+     * {@link #publishRead(Build, Collection)} can process it again with changes in their order.
      *
      * @return The build
      */
     Build startRead() {
-        return startBuild(new Build(null, new ResolverState(), false, null, currentBuild()));
+        return startBuild(new Build(null, new ResolverState(), false, currentBuild()));
     }
 
     private Build startBuild(Build build) {
@@ -351,28 +353,43 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         Build enclosing = change.enclosing;
         if (enclosing != null) {
             // A change made by code that runs while its thread builds another state, a property source
-            // that adds one, for example: the thread sees it in what it goes on building.
+            // that adds one, for example: the thread sees it in what it goes on building. An enclosing
+            // change keeps it with what it has recorded; a read is handed it, see publishRead.
             processAgain(enclosing.state, change);
-            if (enclosing.entries != null) {
-                enclosing.entries.addAll(change.entries);
+            if (enclosing.base != null) {
+                enclosing.recorded.addAll(change.recorded);
             }
         }
     }
 
     /**
-     * Publishes what a read has built so far, with changes that it has to keep on top processed
-     * again on top of it. The read can go on building.
+     * Publishes what a read has built so far, with the changes handed over to it. The read can go
+     * on building. The changes are kept in their order: the property sources the read has processed
+     * and the changes are processed again together, sorted by order, as the next read would.
      *
-     * @param read  The read
-     * @param onTop The changes to keep on top
+     * @param read    The read
+     * @param changes The changes handed over to the read
      */
-    void publishRead(Build read, Collection<Build> onTop) {
+    void publishRead(Build read, Collection<Build> changes) {
         synchronized (publishLock) {
-            ResolverState built = new ResolverState(read.state, read.state.rememberedValues);
-            // the published state shares what the read has built, so the read copies what it writes into from now on
-            read.state.owned.clear();
-            for (Build change : onTop) {
-                processAgain(built, change);
+            ResolverState built;
+            if (changes.isEmpty()) {
+                built = new ResolverState(read.state, read.state.rememberedValues);
+                // the published state shares what the read has built, so the read copies what it writes into from now on
+                read.state.owned.clear();
+            } else {
+                built = new ResolverState(read.state.rememberedValues);
+                List<Recorded> inOrder = new ArrayList<>(read.recorded);
+                for (Build change : changes) {
+                    inOrder.addAll(change.recorded);
+                }
+                // stable: a change comes after what the read has processed of the same order
+                inOrder.sort(Comparator.comparingInt(Recorded::order));
+                for (Recorded recorded : inOrder) {
+                    for (RawEntry entry : recorded.entries()) {
+                        processEntry(built, entry);
+                    }
+                }
             }
             publish(built);
         }
@@ -407,8 +424,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @param change The change
      */
     private void processAgain(ResolverState target, Build change) {
-        for (RawEntry entry : change.entries) {
-            processEntry(target, entry);
+        for (Recorded recorded : change.recorded) {
+            for (RawEntry entry : recorded.entries()) {
+                processEntry(target, entry);
+            }
         }
     }
 
@@ -1112,14 +1131,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     private void processInto(Build build, PropertySource properties, PropertySource.PropertyConvention convention) {
         ResolverState target = build.state;
+        List<RawEntry> recorded = new ArrayList<>();
+        build.recorded.add(new Recorded(properties.getOrder(), recorded));
         for (String property : properties) {
 
             log.trace("Processing property key {}", property);
 
             RawEntry entry = new RawEntry(property, properties.get(property), convention, properties.getOrigin());
-            if (build.entries != null) {
-                build.entries.add(entry);
-            }
+            recorded.add(entry);
             processEntry(target, entry);
         }
         resetCaches();
@@ -1768,10 +1787,19 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          * An empty state.
          */
         ResolverState() {
+            this(new ConcurrentHashMap<>(4));
+        }
+
+        /**
+         * An empty state.
+         *
+         * @param rememberedValues What the expressions resolve to
+         */
+        ResolverState(Map<Object, RememberedText> rememberedValues) {
             catalog = new Map[CATALOG_SIZE];
             rawCatalog = new Map[CATALOG_SIZE];
             nonGenerated = new Map[CATALOG_SIZE];
-            rememberedValues = new ConcurrentHashMap<>(4);
+            this.rememberedValues = rememberedValues;
         }
 
         /**
@@ -1801,10 +1829,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          */
         private final boolean keepMemory;
         /**
-         * What a change has processed, in order, to process it again on top of another state;
-         * {@code null} for a read.
+         * What the build has processed, by property source, in order: to process a change again on
+         * top of another state, and a read again with the changes handed over to it.
          */
-        private final @Nullable List<RawEntry> entries;
+        private final List<Recorded> recorded = new ArrayList<>();
         /**
          * The build that the thread made before this one, which it goes back to when this one ends.
          */
@@ -1814,13 +1842,21 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          */
         private ResolverState state;
 
-        private Build(@Nullable ResolverState base, ResolverState state, boolean keepMemory, @Nullable List<RawEntry> entries, @Nullable Build enclosing) {
+        private Build(@Nullable ResolverState base, ResolverState state, boolean keepMemory, @Nullable Build enclosing) {
             this.base = base;
             this.state = state;
             this.keepMemory = keepMemory;
-            this.entries = entries;
             this.enclosing = enclosing;
         }
+    }
+
+    /**
+     * What a build has processed of a property source.
+     *
+     * @param order   The order of the property source
+     * @param entries Its properties, in the order they were processed
+     */
+    private record Recorded(int order, List<RawEntry> entries) {
     }
 
     /**

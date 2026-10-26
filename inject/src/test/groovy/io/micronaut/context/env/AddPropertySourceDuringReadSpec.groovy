@@ -26,7 +26,7 @@ class AddPropertySourceDuringReadSpec extends Specification {
     private static final int WAIT_SECONDS = 10
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/13982')
-    void "a property source added while a #read processes the property sources is visible at once, and kept on top when the read publishes"() {
+    void "a property source added while a #read processes the property sources is visible at once, and the read publishes it in its order"() {
         given: "a property source of a higher order with the same key, and a gate that parks the read after the others"
         Gate gate = new Gate()
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
@@ -42,14 +42,16 @@ class AddPropertySourceDuringReadSpec extends Specification {
             env.addPropertySource(PropertySource.of('late', ['late.key': 'late', 'shared.key': 'late'], -100))
         }
         String duringRead = env.getProperty('late.key', String).orElse(null)
+        String sharedDuringRead = env.getProperty('shared.key', String).orElse(null)
         release(gate, reader)
 
-        then: "it was visible once added"
+        then: "it was visible once added, on top, as an added property source is"
         duringRead == 'late'
+        sharedDuringRead == 'late'
 
-        and: "the read keeps it on top of what it has read, and it stays registered"
+        and: "the read publishes it in its order with what it has read, and it stays registered"
         env.getProperty('late.key', String).get() == 'late'
-        env.getProperty('shared.key', String).get() == 'late'
+        env.getProperty('shared.key', String).get() == 'data'
         env.getProperty('app.value', String).get() == 'a'
         env.propertySources*.name.contains('late')
 
@@ -198,19 +200,25 @@ class AddPropertySourceDuringReadSpec extends Specification {
         env.stop()
     }
 
-    void "adding the property source that is registered by its name again is not a change"() {
-        given:
+    void "adding the registered property sources again in their order keeps their precedence, as a configuration watch does"() {
+        given: "a property source of a higher order than the one that changes, which sets the same key"
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
-        env.start()
         CountsIterations counting = new CountsIterations()
-
-        when:
+        env.addPropertySource(PropertySource.of('remote', ['app.value': 'remote-v1', 'app.remote': 'v1'], 10))
+        env.addPropertySource(PropertySource.of('override', ['app.value': 'override'], 20))
         env.addPropertySource(counting)
-        env.addPropertySource(counting)
+        env.start()
 
-        then:
-        counting.iterations.get() == 1
-        env.getProperty('counted.key', String).get() == 'counted'
+        when: "the changed property source replaces its name, and every registered one is added again by order"
+        List<PropertySource> updated = env.propertySources.collect {
+            it.name == 'remote' ? PropertySource.of('remote', ['app.value': 'remote-v2', 'app.remote': 'v2'], 10) : it
+        }
+        updated.sort { it.order }.each { env.addPropertySource(it) }
+
+        then: "the registered ones are processed again on top, in their order"
+        counting.iterations.get() == 2
+        env.getProperty('app.remote', String).get() == 'v2'
+        env.getProperty('app.value', String).get() == 'override'
 
         cleanup:
         env.stop()
