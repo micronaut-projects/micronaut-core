@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
@@ -24,10 +25,8 @@ import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -87,7 +86,7 @@ final class RequestConversionContexts {
 
         private final Argument<T> argument;
         private final RequestConversionContexts contexts;
-        private @Nullable List<ConversionError> conversionErrors;
+        private @Nullable ArgumentConversionContext<T> errors;
 
         RequestArgumentConversionContext(Argument<T> argument, RequestConversionContexts contexts) {
             this.argument = argument;
@@ -111,53 +110,38 @@ final class RequestConversionContexts {
 
         @Override
         public void reject(Exception exception) {
-            if (exception != null) {
-                addError(() -> exception);
-            }
+            errors().reject(exception);
         }
 
         @Override
         public void reject(Object value, Exception exception) {
-            if (exception != null) {
-                addError(new ConversionError() {
-                    @Override
-                    public Optional<Object> getOriginalValue() {
-                        return value != null ? Optional.of(value) : Optional.empty();
-                    }
-
-                    @Override
-                    public Exception getCause() {
-                        return exception;
-                    }
-                });
-            }
+            errors().reject(value, exception);
         }
 
-        private void addError(ConversionError error) {
-            List<ConversionError> errors = conversionErrors;
-            if (errors == null) {
-                errors = new ArrayList<>(3);
-                conversionErrors = errors;
+        /**
+         * The conversion errors are kept by a context of the argument that is created with the first error.
+         *
+         * @return The context that keeps the conversion errors
+         */
+        private ArgumentConversionContext<T> errors() {
+            ArgumentConversionContext<T> e = errors;
+            if (e == null) {
+                e = ConversionContext.of(argument);
+                errors = e;
             }
-            errors.add(error);
+            return e;
         }
 
         @Override
         public Optional<ConversionError> getLastError() {
-            List<ConversionError> errors = conversionErrors;
-            if (errors != null && !errors.isEmpty()) {
-                return Optional.of(errors.get(errors.size() - 1));
-            }
-            return Optional.empty();
+            ArgumentConversionContext<T> e = errors;
+            return e == null ? Optional.empty() : e.getLastError();
         }
 
         @Override
         public Iterator<ConversionError> iterator() {
-            List<ConversionError> errors = conversionErrors;
-            if (errors == null) {
-                return Collections.emptyIterator();
-            }
-            return Collections.unmodifiableCollection(errors).iterator();
+            ArgumentConversionContext<T> e = errors;
+            return e == null ? Collections.emptyIterator() : e.iterator();
         }
 
         @Override
