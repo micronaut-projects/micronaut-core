@@ -1222,13 +1222,25 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         RememberedText remembered = resolverState.rememberedValues.get(place);
         if (remembered != null && remembered.text().equals(text)) {
             Object rememberedValue = remembered.values().get(position);
-            if (rememberedValue != null) {
-                if (remembered.generation() < resolverState.generation) {
-                    // kept for the newest state that uses it, which no older state replaces
-                    resolverState.rememberedValues.computeIfPresent(place, (key, earlier) -> earlier.text().equals(text)
-                        && earlier.generation() < resolverState.generation ? new RememberedText(text, earlier.values(), resolverState.generation) : earlier);
-                }
+            if (rememberedValue != null && remembered.generation() >= resolverState.generation) {
                 return rememberedValue;
+            }
+            if (rememberedValue != null) {
+                // Chosen and kept for the newest state that uses it, which no older state replaces, in
+                // one step: if another lookup has replaced it meanwhile, this is a miss.
+                Object[] kept = {null};
+                resolverState.rememberedValues.computeIfPresent(place, (key, earlier) -> {
+                    Object earlierValue = earlier.text().equals(text) ? earlier.values().get(position) : null;
+                    if (earlierValue == null) {
+                        return earlier;
+                    }
+                    kept[0] = earlierValue;
+                    return earlier.generation() >= resolverState.generation ? earlier
+                        : new RememberedText(text, earlier.values(), resolverState.generation);
+                });
+                if (kept[0] != null) {
+                    return kept[0];
+                }
             }
         }
         Object resolved = value.get();
