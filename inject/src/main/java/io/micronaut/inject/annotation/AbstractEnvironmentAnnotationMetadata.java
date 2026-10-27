@@ -44,7 +44,9 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -59,15 +61,13 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
 
     private static final Object UNRESOLVED = new Object();
 
+    private static final String MEMBER_ANNOTATION_CLASS = "annotationClass";
+
     private final AnnotationMetadata targetMetadata;
 
     private final EnvironmentAnnotationMetadata environmentAnnotationMetadata;
 
-    private volatile @Nullable AnnotationMetadata declaredTargetMetadata;
-
-    private volatile @Nullable AnnotationMetadata declaredMetadata;
-
-    private volatile @Nullable SynthesizedAnnotations synthesizedAnnotations;
+    private final AtomicReference<LazyState> lazyState = new AtomicReference<>(LazyState.EMPTY);
 
     private final Function<Object, Object> mapFn = new Function<>() {
         @Override
@@ -121,32 +121,52 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
      */
     @Override
     public AnnotationMetadata getDeclaredMetadata() {
-        AnnotationMetadata metadata = this.declaredMetadata;
-        if (metadata == null) {
-            AnnotationMetadata declaredTarget = declaredTargetMetadata();
-            if (declaredTarget == targetMetadata) {
-                metadata = this;
-            } else {
-                // kept wrapped even without property expressions, the defaults of the annotation types can hold placeholders
-                metadata = new DeclaredEnvironmentAnnotationMetadata(declaredTarget, this);
-            }
-            this.declaredMetadata = metadata;
+        AnnotationMetadata metadata = lazyState().declaredMetadata();
+        if (metadata != null) {
+            return metadata;
         }
-        return metadata;
+        AnnotationMetadata declaredTarget = declaredTargetMetadata();
+        AnnotationMetadata newMetadata;
+        if (declaredTarget == targetMetadata) {
+            newMetadata = this;
+        } else {
+            // kept wrapped even without property expressions, the defaults of the annotation types can hold placeholders
+            newMetadata = new DeclaredEnvironmentAnnotationMetadata(declaredTarget, this);
+        }
+        while (true) {
+            LazyState state = lazyState();
+            AnnotationMetadata existing = state.declaredMetadata();
+            if (existing != null) {
+                return existing;
+            }
+            if (lazyState.compareAndSet(state, state.withDeclaredMetadata(newMetadata))) {
+                return newMetadata;
+            }
+        }
     }
 
     private AnnotationMetadata declaredTargetMetadata() {
-        AnnotationMetadata metadata = this.declaredTargetMetadata;
-        if (metadata == null) {
-            if (targetMetadata instanceof AnnotationMetadataHierarchy hierarchy && hierarchy.isDelegateDeclaredToAllElements()) {
-                // every layer of the hierarchy is declared
-                metadata = targetMetadata;
-            } else {
-                metadata = targetMetadata.getDeclaredMetadata();
-            }
-            this.declaredTargetMetadata = metadata;
+        AnnotationMetadata metadata = lazyState().declaredTargetMetadata();
+        if (metadata != null) {
+            return metadata;
         }
-        return metadata;
+        AnnotationMetadata newMetadata;
+        if (targetMetadata instanceof AnnotationMetadataHierarchy hierarchy && hierarchy.isDelegateDeclaredToAllElements()) {
+            // every layer of the hierarchy is declared
+            newMetadata = targetMetadata;
+        } else {
+            newMetadata = targetMetadata.getDeclaredMetadata();
+        }
+        while (true) {
+            LazyState state = lazyState();
+            AnnotationMetadata existing = state.declaredTargetMetadata();
+            if (existing != null) {
+                return existing;
+            }
+            if (lazyState.compareAndSet(state, state.withDeclaredTargetMetadata(newMetadata))) {
+                return newMetadata;
+            }
+        }
     }
 
     @Override
@@ -166,7 +186,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
         if (environment == null) {
             return environmentAnnotationMetadata.synthesize(annotationClass);
         }
-        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull(MEMBER_ANNOTATION_CLASS, annotationClass);
         return synthesizeForEnvironment(environment, annotationClass, annotationClass.getName(), false);
     }
 
@@ -187,7 +207,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
         if (environment == null) {
             return environmentAnnotationMetadata.synthesizeDeclared(annotationClass);
         }
-        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull(MEMBER_ANNOTATION_CLASS, annotationClass);
         return synthesizeForEnvironment(environment, annotationClass, annotationClass.getName(), true);
     }
 
@@ -208,7 +228,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
             return environmentAnnotationMetadata.synthesizeAll();
         }
         SynthesizedAnnotations synthesized = synthesizedAnnotations(environment);
-        Annotation[] annotations = synthesized.all;
+        Annotation[] annotations = synthesized.all.get();
         if (annotations == null) {
             annotations = synthesizeForEnvironment(environment, environmentAnnotationMetadata, false, synthesized, true);
         }
@@ -229,7 +249,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
             return declared.synthesizeDeclared();
         }
         SynthesizedAnnotations synthesized = synthesizedAnnotations(environment);
-        Annotation[] annotations = synthesized.declared;
+        Annotation[] annotations = synthesized.declared.get();
         if (annotations == null) {
             annotations = synthesizeForEnvironment(environment, declared, true, synthesized, false);
         }
@@ -337,7 +357,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
         }
     }
 
-    private static Function<Object, @Nullable Object> stringValuesMapper(Environment environment) {
+    private static UnaryOperator<@Nullable Object> stringValuesMapper(Environment environment) {
         PropertyPlaceholderResolver resolver = environment.getPlaceholderResolver();
         return val -> {
             @Nullable String[] values;
@@ -488,7 +508,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     @SuppressWarnings("unchecked")
     @Override
     public <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
-        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull(MEMBER_ANNOTATION_CLASS, annotationClass);
         Environment environment = getEnvironment();
         if (environment != null) {
 
@@ -505,7 +525,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     @SuppressWarnings("unchecked")
     @Override
     public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
-        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull(MEMBER_ANNOTATION_CLASS, annotationClass);
         Environment environment = getEnvironment();
         if (environment != null) {
 
@@ -649,9 +669,9 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
             return defaultValues;
         }
         // string arrays expand comma separated values like the environment annotation values do
-        Function<Object, @Nullable Object> arrayMapper = stringValuesMapper(environment);
+        UnaryOperator<@Nullable Object> arrayMapper = stringValuesMapper(environment);
         Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>(defaultValues.size());
-        defaultValues.forEach((member, value) -> resolvedValues.put(member, resolveOrKeep(value instanceof String[] ? arrayMapper : mapFn, value)));
+        defaultValues.forEach((member, value) -> resolvedValues.put(member, resolveOrKeep(value instanceof String[] ? arrayMapper : mapFn::apply, value)));
         return Collections.unmodifiableMap(resolvedValues);
     }
 
@@ -724,12 +744,21 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     private SynthesizedAnnotations synthesizedAnnotations(Environment environment) {
-        SynthesizedAnnotations synthesized = this.synthesizedAnnotations;
-        if (synthesized == null || synthesized.environment != environment) {
-            synthesized = new SynthesizedAnnotations(environment);
-            this.synthesizedAnnotations = synthesized;
+        while (true) {
+            LazyState state = lazyState();
+            SynthesizedAnnotations synthesized = state.synthesizedAnnotations();
+            if (synthesized != null && synthesized.environment == environment) {
+                return synthesized;
+            }
+            SynthesizedAnnotations newSynthesized = new SynthesizedAnnotations(environment);
+            if (lazyState.compareAndSet(state, state.withSynthesizedAnnotations(newSynthesized))) {
+                return newSynthesized;
+            }
         }
-        return synthesized;
+    }
+
+    private LazyState lazyState() {
+        return Objects.requireNonNull(lazyState.get());
     }
 
     @SuppressWarnings("unchecked")
@@ -738,7 +767,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
                                                               Class<T> annotationClass,
                                                               String sourceAnnotation,
                                                               boolean declared) {
-        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        ArgumentUtils.requireNonNull(MEMBER_ANNOTATION_CLASS, annotationClass);
         ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
         SynthesizedAnnotations synthesized = synthesizedAnnotations(environment);
         Map<String, Annotation> annotations = declared ? synthesized.declaredByName : synthesized.allByName;
@@ -775,9 +804,9 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
         Annotation[] array = annotations.toArray(AnnotationUtil.ZERO_ANNOTATIONS);
         if (!environmentDependent) {
             if (all) {
-                synthesized.all = array;
+                synthesized.all.set(array);
             } else {
-                synthesized.declared = array;
+                synthesized.declared.set(array);
             }
         }
         return array;
@@ -853,10 +882,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     private <T extends Annotation> ResolvedAnnotation<T> buildResolvedAnnotation(Environment environment, Class<T> annotationClass, AnnotationValue<T> value) {
         // the mapper of the environment annotation value also expands comma separated array values
         Function<Object, Object> valueMapper = new EnvironmentAnnotationValue<>(environment, value).getValueMapper();
-        if (valueMapper == null) {
-            valueMapper = Function.identity();
-        }
-        Function<Object, Object> mapper = valueMapper;
+        UnaryOperator<Object> mapper = valueMapper == null ? UnaryOperator.identity() : valueMapper::apply;
         Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>();
         boolean environmentDependent = false;
         for (Map.Entry<CharSequence, Object> entry : value.getValues().entrySet()) {
@@ -903,7 +929,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
      * Resolves the value, or keeps it when a placeholder cannot be resolved: the environment annotation value then
      * fails only when the member is read, like it does for the members that are not synthesized.
      */
-    private static Object resolveOrKeep(Function<Object, Object> mapper, Object value) {
+    private static Object resolveOrKeep(UnaryOperator<Object> mapper, Object value) {
         Object resolved = resolve(mapper, value);
         return resolved == UNRESOLVED ? value : resolved;
     }
@@ -913,7 +939,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
      *
      * @return The resolved value, or {@link #UNRESOLVED} when a placeholder cannot be resolved
      */
-    private static Object resolve(Function<Object, Object> mapper, Object value) {
+    private static Object resolve(UnaryOperator<Object> mapper, Object value) {
         try {
             return mapper.apply(value);
         } catch (ConfigurationException e) {
@@ -949,11 +975,37 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
         private final Environment environment;
         private final Map<String, Annotation> allByName = new ConcurrentHashMap<>();
         private final Map<String, Annotation> declaredByName = new ConcurrentHashMap<>();
-        private volatile Annotation @Nullable [] all;
-        private volatile Annotation @Nullable [] declared;
+        private final AtomicReference<Annotation @Nullable []> all = new AtomicReference<>();
+        private final AtomicReference<Annotation @Nullable []> declared = new AtomicReference<>();
 
         private SynthesizedAnnotations(Environment environment) {
             this.environment = environment;
+        }
+    }
+
+    /**
+     * The lazily computed declared metadata and synthesized annotations.
+     *
+     * @param declaredTargetMetadata The declared metadata of the target metadata
+     * @param declaredMetadata The environment aware declared metadata
+     * @param synthesizedAnnotations The synthesized annotations
+     */
+    private record LazyState(@Nullable AnnotationMetadata declaredTargetMetadata,
+                             @Nullable AnnotationMetadata declaredMetadata,
+                             @Nullable SynthesizedAnnotations synthesizedAnnotations) {
+
+        private static final LazyState EMPTY = new LazyState(null, null, null);
+
+        LazyState withDeclaredTargetMetadata(AnnotationMetadata metadata) {
+            return new LazyState(metadata, declaredMetadata, synthesizedAnnotations);
+        }
+
+        LazyState withDeclaredMetadata(AnnotationMetadata metadata) {
+            return new LazyState(declaredTargetMetadata, metadata, synthesizedAnnotations);
+        }
+
+        LazyState withSynthesizedAnnotations(SynthesizedAnnotations synthesized) {
+            return new LazyState(declaredTargetMetadata, declaredMetadata, synthesized);
         }
     }
 
