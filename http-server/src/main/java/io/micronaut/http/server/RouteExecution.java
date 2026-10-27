@@ -51,6 +51,12 @@ abstract sealed class RouteExecution {
      * Adapts the result of the route.
      */
     final RouteResult result;
+    /**
+     * Whether the arguments of the route are fulfilled without its binders, see
+     * {@link io.micronaut.web.router.DefaultUriRouteMatch#fulfillDirectly}: decided when the
+     * route is prepared, never for the compatibility execution.
+     */
+    boolean fulfillsDirectly;
 
     RouteExecution(RouteExecutor owner, RouteResult result) {
         this.owner = owner;

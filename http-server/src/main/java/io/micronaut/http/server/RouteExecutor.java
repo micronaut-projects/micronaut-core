@@ -37,6 +37,8 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.PathVariables;
+import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
@@ -71,6 +73,7 @@ import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
@@ -577,6 +580,7 @@ public final class RouteExecutor {
         RouteExecution execution;
         try {
             execution = RouteExecution.prepare(this, routeInfo);
+            execution.fulfillsDirectly = fulfillsDirectly(routeInfo);
         } catch (RuntimeException e) {
             // the route is executed like before, which fails the way it did for this request, and
             // a failed preparation is not kept: the route is prepared again by the next request
@@ -584,6 +588,28 @@ public final class RouteExecutor {
         }
         route.prepareExecution(this, execution);
         return execution;
+    }
+
+    /**
+     * Whether the arguments of a route are fulfilled without its binders: a route to a handler
+     * function whose arguments are the request as is, see
+     * {@link RequestBinderRegistry#bindsRequestAsIs}, and the path variables. A registry that
+     * binds the request otherwise, e.g. a replaced one, binds it.
+     *
+     * @param routeInfo The route
+     * @return Whether the route binds nothing
+     */
+    private boolean fulfillsDirectly(RouteInfo<?> routeInfo) {
+        if (!(routeInfo instanceof MethodBasedRouteInfo<?, ?> route) || !(route.getTargetMethod() instanceof HandlerMethod<?> handler)) {
+            return false;
+        }
+        RequestBinderRegistry registry = requestArgumentSatisfier.getBinderRegistry();
+        for (Argument<?> argument : handler.getArguments()) {
+            if (argument.getType() != PathVariables.class && !registry.bindsRequestAsIs(argument)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

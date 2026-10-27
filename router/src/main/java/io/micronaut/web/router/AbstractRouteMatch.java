@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -260,7 +261,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 setBindingResultOfFail(i, argument, pendingRequestBindingResult);
                 continue;
             }
-            Object value = getVariableValues().get(argumentPlan.argumentNames[i]);
+            Object value = variableValueOf(i);
             if (value != null) {
                 setValue(i, argument, value);
                 continue;
@@ -297,6 +298,66 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             }
         }
         checkIfFulfilled();
+    }
+
+    /**
+     * Fulfill the arguments of a route to a handler function that reads only the request and the
+     * path variables, without the argument binders: the request is the argument as is, like the
+     * binder of an {@code HttpRequest} without a body type gives it, and the path variables are
+     * decoded now, where the binders would decode them. A value already given with
+     * {@link #fulfill(Map)} is kept. The match is then fulfilled, as if it was bound.
+     *
+     * @param request The request
+     * @throws IllegalStateException if an argument is neither the request nor the path variables
+     * @since 5.3.0
+     */
+    @Internal
+    public final void fulfillDirectly(HttpRequest<?> request) {
+        if (fulfilled) {
+            return;
+        }
+        if (beforeBindersApplied) {
+            throw new IllegalStateException("Argument before filters already processed!");
+        }
+        @Nullable Object[] argumentValues = argumentValues();
+        for (int i = 0; i < argumentPlan.arguments.length; i++) {
+            if (argumentValues[i] != UNFULFILLED) {
+                continue;
+            }
+            Class<?> type = argumentPlan.arguments[i].getType();
+            if (type == PathVariables.class) {
+                argumentValues[i] = pathVariables();
+            } else if (type == HttpRequest.class) {
+                // decoded like the binders decode them, so a malformed variable fails the same
+                getVariableValues();
+                argumentValues[i] = request;
+            } else {
+                throw new IllegalStateException("The argument " + argumentPlan.arguments[i] + " of the route " + routeInfo + " is bound by a binder");
+            }
+        }
+        checkIfFulfilled();
+        beforeBindersApplied = true;
+        afterBindersApplied = true;
+    }
+
+    /**
+     * The path variables of the match, as a route to a handler function receives them.
+     */
+    private PathVariables pathVariables() {
+        return new DefaultPathVariables(getVariableValues(), rawVariableValues(), conversionService, resolvedTarget(), selectedMediaType());
+    }
+
+    /**
+     * The value of the path variable named like the argument: never for the request, which is
+     * not a path segment, so a variable named {@code request} does not hide the request. The
+     * variables are decoded either way, so a malformed one fails the same.
+     */
+    private @Nullable Object variableValueOf(int index) {
+        Map<String, Object> variables = getVariableValues();
+        if (HttpRequest.class.isAssignableFrom(argumentPlan.arguments[index].getType())) {
+            return null;
+        }
+        return variables.get(argumentPlan.argumentNames[index]);
     }
 
     /**
@@ -337,10 +398,10 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             Argument<Object> argument = (Argument<Object>) argumentPlan.arguments[i];
             if (argumentPlan.arguments[i].getType() == PathVariables.class) {
                 // a handler function's path variables come from the match, not a binder
-                setValue(i, argument, new DefaultPathVariables(getVariableValues(), rawVariableValues(), conversionService, resolvedTarget(), selectedMediaType()));
+                setValue(i, argument, pathVariables());
                 continue;
             }
-            Object value = getVariableValues().get(argumentPlan.argumentNames[i]);
+            Object value = variableValueOf(i);
             if (value != null) {
                 setValue(i, argument, value);
                 continue;

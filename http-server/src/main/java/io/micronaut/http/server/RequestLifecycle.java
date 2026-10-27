@@ -992,8 +992,13 @@ public class RequestLifecycle {
      */
     protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch, HttpRequest<?> request) {
         try {
-            // try to fulfill the argument requirements of the route
-            routeExecutor.requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(routeMatch, request);
+            if (routeMatch instanceof DefaultUriRouteMatch<?, ?> match && routeExecutor.execution(routeMatch.getRouteInfo()).fulfillsDirectly) {
+                // a handler function of the request and the path variables: nothing to bind
+                match.fulfillDirectly(request);
+            } else {
+                // try to fulfill the argument requirements of the route
+                routeExecutor.requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(routeMatch, request);
+            }
 
             FormRouteCompleter frc = FormFactory.getCompleterOrNull(request);
             if (frc != null) {
