@@ -42,6 +42,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.exceptions.response.Error;
@@ -380,6 +381,10 @@ public abstract class ResponseLifecycle {
             } else if (hse.getMessage() != null) {
                 errorResponse.body(hse.getMessage());
             }
+        } else if (t instanceof ContentLengthExceededException) {
+            // a streamed request body over the size limit, answered like ContentLengthExceededHandler
+            // does for a body that is read before the route returns
+            errorResponse = createContentLengthExceededResponse(request, t);
         } else {
             errorResponse = routeExecutor.createDefaultErrorResponse(request, t);
         }
@@ -387,6 +392,23 @@ public abstract class ResponseLifecycle {
             request,
             errorResponse
         );
+    }
+
+    private MutableHttpResponse<?> createContentLengthExceededResponse(HttpRequest<?> request, Throwable t) {
+        MutableHttpResponse<?> response = HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
+        try {
+            response = routeExecutor.getErrorResponseProcessor().processResponse(
+                ErrorContext.builder(request)
+                    .cause(t)
+                    .errorMessage(Objects.requireNonNullElse(t.getMessage(), "Unknown error"))
+                    .build(), response);
+        } catch (Exception e) {
+            routeExecutor.logException(e);
+        }
+        if (response.getContentType().isEmpty() && request.getMethod() != HttpMethod.HEAD) {
+            response.contentType(MediaType.APPLICATION_JSON_TYPE);
+        }
+        return response;
     }
 
     private MutableHttpResponse<?> createJsonSyntaxErrorResponse(HttpRequest<?> request, Throwable t) {
