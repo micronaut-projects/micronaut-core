@@ -881,8 +881,9 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
      */
     private <T extends Annotation> ResolvedAnnotation<T> buildResolvedAnnotation(Environment environment, Class<T> annotationClass, AnnotationValue<T> value) {
         // the mapper of the environment annotation value also expands comma separated array values
-        Function<Object, Object> valueMapper = new EnvironmentAnnotationValue<>(environment, value).getValueMapper();
-        UnaryOperator<Object> mapper = valueMapper == null ? UnaryOperator.identity() : valueMapper::apply;
+        UnaryOperator<Object> mapper = Optional.ofNullable(new EnvironmentAnnotationValue<>(environment, value).getValueMapper())
+            .<UnaryOperator<Object>>map(valueMapper -> valueMapper::apply)
+            .orElse(UnaryOperator.identity());
         Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>();
         boolean environmentDependent = false;
         for (Map.Entry<CharSequence, Object> entry : value.getValues().entrySet()) {
