@@ -27,7 +27,6 @@ import io.micronaut.aop.chain.InterceptorCandidateResolver;
 import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.aop.chain.TargetInterceptors;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
-import io.micronaut.context.AbstractExecutableMethodsDefinition;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanDependencyGroup;
 import io.micronaut.context.BeanDefinitionRegistry;
@@ -85,6 +84,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -195,8 +195,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         BeanLocator.class, "getBean", Argument.class);
     private static final Method GET_CANDIDATE_RESOLVER = ReflectionUtils.getRequiredInternalMethod(
         InterceptorChainFactory.class, "candidateResolver");
-    private static final Method PROXY_METHODS = ReflectionUtils.getRequiredInternalMethod(
-        AbstractExecutableMethodsDefinition.class, "proxyMethods", BeanContext.class, Class.class, Qualifier.class, AbstractExecutableMethodsDefinition.class);
+    private static final Method METHOD_FIND_BEAN_DEFINITION_BY_DEFINITION_CLASS = ReflectionUtils.getRequiredInternalMethod(
+        BeanDefinitionRegistry.class, "findBeanDefinitionByDefinitionClass", Class.class);
+    private static final Method METHOD_OPTIONAL_OR_ELSE = ReflectionUtils.getRequiredInternalMethod(Optional.class, "orElse", Object.class);
     private static final FieldDef FIELD_CANDIDATE_RESOLVER = FieldDef.builder("$interceptorCandidates", TypeDef.of(InterceptorCandidateResolver.class))
         .addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
     private static final FieldDef FIELD_CHAIN_FACTORY = FieldDef.builder("$interceptorChainFactory", TypeDef.of(InterceptorChainFactory.class))
@@ -283,6 +284,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
     private static final String FIELD_BEAN_QUALIFIER = "$beanQualifier";
     private static final String FIELD_PROXY_METHODS = "$proxyMethods";
+    private static final String PROXY_EXECUTABLE_METHODS = "$proxyExecutableMethods";
     private static final String FIELD_PROXY_BEAN_DEFINITION = "$proxyBeanDefinition";
 
     private final Set<ClassElement> defaultMethodInterfaceTypes = new LinkedHashSet<>();
@@ -966,7 +968,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
             bodyBuilders.add((aThis, methodParameters) -> initializeProxyTargetMethodsAndInterceptors(aThis, methodParameters, fields, interceptorsField, proxyMethodsField, interceptedMethods, targetField));
         } else {
-            bodyBuilders.add((aThis, methodParameters) -> initializeProxyMethodsAndInterceptors(aThis, methodParameters, Objects.requireNonNull(interceptorsField), proxyMethodsField, interceptedMethods));
+            // a proxy without intercepted methods has no executable methods to share
+            MethodDef proxyExecutableMethods = interceptedMethods.isEmpty() ? null : addProxyExecutableMethods();
+            bodyBuilders.add((aThis, methodParameters) -> initializeProxyMethodsAndInterceptors(aThis, methodParameters, Objects.requireNonNull(interceptorsField), proxyMethodsField, interceptedMethods, proxyExecutableMethods));
         }
 
         proxyBuilder.addMethod(MethodDef.constructor()
@@ -985,34 +989,23 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                                                List<VariableDef.MethodParameter> parameters,
                                                                FieldDef interceptorsField,
                                                                FieldDef proxyMethodsField,
-                                                               List<MethodElement> methods) {
-        if (methods.isEmpty()) {
+                                                               List<MethodElement> methods,
+                                                               @Nullable MethodDef proxyExecutableMethods) {
+        if (proxyExecutableMethods == null) {
             return StatementDef.multi();
         }
-        ExecutableMethodsDefinitionWriter methodsWriter;
-        if (executableMethodsDefinitionWriter == null) {
-            methodsWriter = proxyBeanDefinitionWriter.getExecutableMethodsWriter();
-        } else {
-            methodsWriter = executableMethodsDefinitionWriter;
-        }
-
-        ClassTypeDef executableMethodsType = methodsWriter.getClassTypeDef();
-        ExpressionDef.NewInstance executableMethodsInstance;
-        if (methodsWriter.isSupportsInterceptedProxy()) {
-            executableMethodsInstance = executableMethodsType.instantiate(TypeDef.Primitive.BOOLEAN.constant(true));
-        } else {
-            executableMethodsInstance = executableMethodsType.instantiate();
-        }
-        // the instances of the proxy created by a context share the methods of its definition, and the values they keep
-        ExpressionDef executableMethods = ClassTypeDef.of(AbstractExecutableMethodsDefinition.class)
-            .invokeStatic(PROXY_METHODS,
-                parameters.get(constructor.findParameterIndex(BEAN_CONTEXT_PARAMETER)),
-                ExpressionDef.constant(ClassTypeDef.of(proxyType)),
-                parameters.get(constructor.findParameterIndex(QUALIFIER_PARAMETER)),
-                executableMethodsInstance)
-            .cast(executableMethodsType);
+        ExecutableMethodsDefinitionWriter methodsWriter = proxyMethodsWriter();
+        ClassTypeDef definitionType = ClassTypeDef.of(proxyBeanDefinitionWriter.getBeanDefinitionName());
+        // the instances of the proxy created by a context share the methods kept by the definition the context loaded
+        ExpressionDef definition = parameters.get(constructor.findParameterIndex(BEAN_CONTEXT_PARAMETER))
+            .invoke(METHOD_FIND_BEAN_DEFINITION_BY_DEFINITION_CLASS, ExpressionDef.constant(definitionType))
+            .invoke(METHOD_OPTIONAL_OR_ELSE, ExpressionDef.nullValue())
+            .cast(definitionType);
         AtomicInteger index = new AtomicInteger();
-        return executableMethods.newLocal("executableMethods", executableMethodsVar -> StatementDef.multi(
+        return definition.newLocal("definition", definitionVar -> definitionVar.ifNonNull(
+            definitionVar.invoke(proxyExecutableMethods),
+            newProxyExecutableMethods(methodsWriter)
+        ).newLocal("executableMethods", executableMethodsVar -> StatementDef.multi(
             aThis.field(proxyMethodsField).assign(
                 ClassTypeDef.of(ExecutableMethod.class).array().instantiate(
                     methods.stream().map(methodElement ->
@@ -1040,7 +1033,45 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     ).toList()
                 )
             )
-        ));
+        )));
+    }
+
+    private ExecutableMethodsDefinitionWriter proxyMethodsWriter() {
+        if (executableMethodsDefinitionWriter == null) {
+            return proxyBeanDefinitionWriter.getExecutableMethodsWriter();
+        }
+        return executableMethodsDefinitionWriter;
+    }
+
+    private static ExpressionDef newProxyExecutableMethods(ExecutableMethodsDefinitionWriter methodsWriter) {
+        ClassTypeDef executableMethodsType = methodsWriter.getClassTypeDef();
+        if (methodsWriter.isSupportsInterceptedProxy()) {
+            return executableMethodsType.instantiate(TypeDef.Primitive.BOOLEAN.constant(true));
+        }
+        return executableMethodsType.instantiate();
+    }
+
+    /**
+     * Adds to the definition of the proxy the executable methods shared by the instances of the proxy, created for
+     * the first one. Each context loads its own definition, so the methods and the values they keep belong to it.
+     *
+     * @return The method of the definition returning the executable methods
+     */
+    private MethodDef addProxyExecutableMethods() {
+        ExecutableMethodsDefinitionWriter methodsWriter = proxyMethodsWriter();
+        ClassTypeDef executableMethodsType = methodsWriter.getClassTypeDef();
+        FieldDef field = FieldDef.builder(PROXY_EXECUTABLE_METHODS, executableMethodsType)
+            .addModifiers(Modifier.PRIVATE)
+            .build();
+        MethodDef method = MethodDef.builder(PROXY_EXECUTABLE_METHODS)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(executableMethodsType)
+            .build((aThis, methodParameters) -> new StatementDef.Synchronized(aThis, StatementDef.multi(
+                aThis.field(field).ifNull(aThis.field(field).assign(newProxyExecutableMethods(methodsWriter))),
+                aThis.field(field).returning()
+            )));
+        proxyBeanDefinitionWriter.addMember(field, method);
+        return method;
     }
 
     private StatementDef initializeProxyTargetMethodsAndInterceptors(VariableDef.This aThis,

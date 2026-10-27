@@ -30,9 +30,6 @@ import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ImmutableStringIntMap;
 import io.micronaut.core.util.ObjectUtils;
-import io.micronaut.context.exceptions.NonUniqueBeanException;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
@@ -79,11 +76,6 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     private List<ExecutableMethod<T, ?>> postConstructMethodsList;
     @Nullable
     private List<ExecutableMethod<T, ?>> preDestroyMethodsList;
-    /**
-     * The methods shared by the instances of the proxy of the bean.
-     */
-    @Nullable
-    private AbstractExecutableMethodsDefinition<T> proxyMethods;
 
     protected AbstractExecutableMethodsDefinition(MethodReference[] methodsReferences) {
         this.methodsReferences = methodsReferences;
@@ -107,49 +99,6 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      */
     AbstractExecutableMethodsDefinition<T> copy() {
         return new Copy<>(dispatcher);
-    }
-
-    /**
-     * The executable methods of a generated proxy, shared by the instances of the proxy created by a context: those
-     * of the first instance, kept by the definition of the proxy loaded by the context. Every instance of a
-     * non-singleton proxy then invokes the same methods, which keep the values derived from them for the definition
-     * instead of one instance. When the context has no single definition of the proxy type, the methods of the
-     * instance are its own.
-     *
-     * @param beanContext The context creating the proxy
-     * @param proxyType   The proxy type
-     * @param qualifier   The qualifier of the proxy
-     * @param methods     The methods created by the instance
-     * @param <T>         The proxy type
-     * @return The methods of the proxy
-     * @since 5.3.0
-     */
-    @UsedByGeneratedCode
-    public static <T> AbstractExecutableMethodsDefinition<T> proxyMethods(BeanContext beanContext,
-                                                                          Class<T> proxyType,
-                                                                          @Nullable Qualifier<T> qualifier,
-                                                                          AbstractExecutableMethodsDefinition<T> methods) {
-        BeanDefinition<T> definition;
-        try {
-            definition = beanContext.findBeanDefinition(proxyType, qualifier).orElse(null);
-        } catch (NonUniqueBeanException e) {
-            return methods;
-        }
-        while (definition instanceof DelegatingBeanDefinition<T> delegating) {
-            definition = delegating.getTarget();
-        }
-        if (definition instanceof AbstractInitializableBeanDefinition<T> initializable
-            && initializable.executableMethodsDefinition() instanceof AbstractExecutableMethodsDefinition<T> definitionMethods) {
-            return definitionMethods.keepProxyMethods(methods);
-        }
-        return methods;
-    }
-
-    private synchronized AbstractExecutableMethodsDefinition<T> keepProxyMethods(AbstractExecutableMethodsDefinition<T> methods) {
-        if (proxyMethods == null) {
-            proxyMethods = methods;
-        }
-        return proxyMethods;
     }
 
     @Override
