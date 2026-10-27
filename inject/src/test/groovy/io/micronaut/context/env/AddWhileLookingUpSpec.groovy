@@ -54,31 +54,6 @@ class AddWhileLookingUpSpec extends Specification {
         "getProperties(name)"         | { DefaultEnvironment e -> e.getProperties('app') }           | [first: 'one', second: 'two']           | [first: 'one', second: 'two', third: 'three']
     }
 
-    void "a lookup of a list built from indexed keys, parked while it reads an element, returns the list from before a property source that adds to it"() {
-        given:
-        ParkedValue parked = new ParkedValue('one')
-        DefaultEnvironment env = startedWith(PropertySource.of('data', ordered('list[0].a': parked, 'list[0].b': 'two')))
-
-        when: "another thread adds a key to the same element while the lookup reads it"
-        parked.armed.set(true)
-        Lookup looking = new Lookup({ env.getProperty('list', List).get() })
-        assert parked.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        env.addPropertySource(PropertySource.of('added', ['list[0].c': 'three']))
-        parked.release.countDown()
-        looking.join()
-
-        then:
-        looking.failure == null
-        looking.result == [[a: 'one', b: 'two']]
-
-        and:
-        env.getProperty('list', List).get() == [[a: 'one', b: 'two', c: 'three']]
-
-        cleanup:
-        parked.release.countDown()
-        env.stop()
-    }
-
     void "lookups that iterate only the names do not fail while another thread keeps adding names of the same first letter"() {
         given:
         Map<String, Object> values = [:]
@@ -283,29 +258,24 @@ class AddWhileLookingUpSpec extends Specification {
         env.stop()
     }
 
-    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/13914')
-    void "an indexed key of an added property source does not change the list of a property source processed before it"() {
+    void "a #kind under an indexed key that an added property source writes into is the same through the indexed key and through the list"() {
         given:
-        List<String> list = ['a', 'b']
-        DefaultEnvironment env = startedWith(PropertySource.of('first', [list: list]))
-        PropertySource added = PropertySource.of('added', ['list[0]': 'x'])
+        DefaultEnvironment env = startedWith(PropertySource.of('first', ['foo[0]': element]))
 
         when:
-        env.addPropertySource(added)
+        env.addPropertySource(PropertySource.of('added', [(key): 'x']))
 
         then:
-        env.getProperty('list', List).get() == ['x', 'b']
-
-        when: "the added property source is removed and the environment refreshed"
-        env.removePropertySource(added)
-        env.refresh()
-
-        then: "the list is the first property source's own again"
-        list == ['a', 'b']
-        env.getProperty('list', List).get() == ['a', 'b']
+        env.getProperty('foo', List).get() == [expected]
+        env.getProperty('foo[0]', type).get() == expected
 
         cleanup:
         env.stop()
+
+        where:
+        kind   | element    | key          | type | expected
+        'list' | ['a', 'b'] | 'foo[0][1]'  | List | ['a', 'x']
+        'map'  | [a: 'one'] | 'foo[0].b'   | Map  | [a: 'one', b: 'x']
     }
 
     private static DefaultEnvironment startedWith(PropertySource propertySource) {

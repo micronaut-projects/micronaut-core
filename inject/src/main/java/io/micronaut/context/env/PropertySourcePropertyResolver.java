@@ -53,8 +53,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -316,11 +314,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     /**
      * Adds property sources to the published catalogs. The writes of {@code add} go into a copy of
-     * the published state, which shares what the add does not write, and the copy is published in a
-     * single step once {@code add} completes, also if it fails, as the writes of a failed add have
-     * always been kept. A lookup on another thread therefore sees the properties either as they were
-     * before the add or as they are after it, and never a map that is being written. Inside a
-     * refresh, the add writes into the state the refresh is building, as before.
+     * the published state, which shares the first-letter maps the add does not write into, and the
+     * copy is published in a single step once {@code add} completes, also if it fails, as the writes
+     * of a failed add have always been kept. A lookup on another thread therefore never iterates a
+     * first-letter map that is being written. The lists and maps that indexed keys expand into are
+     * written in place, as before. Inside a refresh, the add writes into the state the refresh is
+     * building, as before.
      *
      * @param add The add to run
      */
@@ -1175,11 +1174,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (writeState.rawOwnedBases.add(baseName)) {
             DefaultPropertyEntry existing = baseEntries.get(baseName);
             if (existing != null) {
-                Object copy = deepCopyForRawExpansion(existing.value());
-                own(copy);
                 baseEntries.put(baseName, new DefaultPropertyEntry(
                     baseName,
-                    copy,
+                    deepCopyForRawExpansion(existing.value()),
                     existing.raw(),
                     existing.origin()
                 ));
@@ -1250,17 +1247,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         Object value,
         String originalProperty,
         PropertySource.Origin origin) {
-        DefaultPropertyEntry existing = entries.get(baseName);
-        if (existing != null && (existing.value() instanceof List || existing.value() instanceof Map)) {
-            // the copy of a list or map that a copy of the published state writes into keeps the key
-            // and the origin of its entry, as writing into the list or map in place does
-            writable(existing.value(), copy -> entries.put(baseName, new DefaultPropertyEntry(
-                baseName,
-                copy,
-                existing.raw(),
-                existing.origin()
-            )));
-        }
         expandProperty(
             indexSuffix,
             val -> entries.put(baseName, new DefaultPropertyEntry(
@@ -1289,10 +1275,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 int number = Integer.parseInt(propertyIndex);
                 List list;
                 if (container instanceof List<?> theList) {
-                    list = (List) writable(theList, containerSet);
+                    list = theList;
                 } else {
                     list = new ArrayList<>(10);
-                    own(list);
                     containerSet.accept(list);
                 }
                 fill(list, number, null);
@@ -1301,10 +1286,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             } else {
                 Map map;
                 if (container instanceof Map theMap) {
-                    map = (Map) writable(theMap, containerSet);
+                    map = theMap;
                 } else {
                     map = new LinkedHashMap(10);
-                    own(map);
                     containerSet.accept(map);
                 }
 
@@ -1323,53 +1307,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             Object v = containerGet.get();
             Map map;
             if (v instanceof Map theMap) {
-                map = (Map) writable(theMap, containerSet);
+                map = theMap;
             } else {
                 map = new LinkedHashMap(10);
-                own(map);
                 containerSet.accept(map);
             }
             expandProperty(propertyRest, val -> map.put(propertyName, val), () -> map.get(propertyName), actualValue);
-        }
-    }
-
-    /**
-     * The list or map that an expansion writes into. Outside a copy of the published state, the one
-     * found, as before. A copy writes only into a list or map it has made itself: one that the
-     * published state may hold is copied, a sorted map with its comparator, and put in its place, so
-     * the lists and maps the copy does not write into stay as they are.
-     *
-     * @param container    The list or map found
-     * @param containerSet Puts a list or map in its place
-     * @return The list or map to write into
-     */
-    private Object writable(Object container, Consumer<Object> containerSet) {
-        Set<Object> owned = writeState.ownedContainers;
-        if (owned == null || owned.contains(container)) {
-            return container;
-        }
-        Object copy;
-        if (container instanceof List<?> list) {
-            copy = new ArrayList<>(list);
-        } else if (container instanceof SortedMap sorted) {
-            copy = new TreeMap(sorted);
-        } else {
-            copy = new LinkedHashMap((Map) container);
-        }
-        owned.add(copy);
-        containerSet.accept(copy);
-        return copy;
-    }
-
-    /**
-     * Records a list or map that an expansion has made, which a copy of the published state may
-     * write into.
-     *
-     * @param container The list or map
-     */
-    private void own(Object container) {
-        if (writeState.ownedContainers != null) {
-            writeState.ownedContainers.add(container);
         }
     }
 
@@ -1757,12 +1700,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          * {@code null} for a state that is not a copy.
          */
         private final @Nullable Set<Map<String, DefaultPropertyEntry>> sharedMaps;
-        /**
-         * For a copy of a published state: the lists and maps of the catalogs that the copy has
-         * made itself, and may therefore expand indexed keys into. {@code null} for a state that is
-         * not a copy, which expands into the lists and maps in place.
-         */
-        private final @Nullable Set<Object> ownedContainers;
 
         private final Map<String, CachedValue> containsCache = new ConcurrentHashMap<>(20);
         /**
@@ -1788,7 +1725,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         ResolverState() {
             rememberedValues = new ConcurrentHashMap<>(4);
             sharedMaps = null;
-            ownedContainers = null;
         }
 
         /**
@@ -1808,7 +1744,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             addMaps(sharedMaps, rawCatalog);
             addMaps(sharedMaps, nonGenerated);
             rawOwnedBases.addAll(published.rawOwnedBases);
-            ownedContainers = Collections.newSetFromMap(new IdentityHashMap<>());
         }
 
         private static void addMaps(Set<Map<String, DefaultPropertyEntry>> maps, @Nullable Map<String, DefaultPropertyEntry>[] catalog) {
