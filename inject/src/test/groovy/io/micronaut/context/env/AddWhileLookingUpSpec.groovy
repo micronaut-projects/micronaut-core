@@ -2,8 +2,10 @@ package io.micronaut.context.env
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextConfiguration
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
+import io.micronaut.core.value.PropertyResolver
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Timeout
@@ -12,7 +14,9 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import java.util.function.Supplier
 
 /**
  * A lookup that iterates the properties while another thread adds a property source to the running
@@ -229,6 +233,31 @@ class AddWhileLookingUpSpec extends Specification {
 
         cleanup:
         release.countDown()
+        env.stop()
+    }
+
+    void "a value remembered while a property source is added is not resolved again after it"() {
+        given:
+        AtomicInteger resolved = new AtomicInteger()
+        DefaultEnvironment env = startedWith(PropertySource.of('data', ['app.value': '${counted}']))
+        env.placeholderResolver.@expressionResolvers = [new CountingResolver(resolved)]
+        ParksOnIteration parking = new ParksOnIteration('added', ['other.key': 'other'])
+
+        when: "another thread reads the value while a property source is added"
+        parking.armed.set(true)
+        Lookup adding = new Lookup({ env.addPropertySource(parking) })
+        assert parking.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        String during = env.getProperty('app.value', String).get()
+        parking.release.countDown()
+        adding.join()
+
+        then: "lookups after the add return it, without resolving the expression again"
+        adding.failure == null
+        env.getProperty('app.value', String).get() == during
+        resolved.get() == 1
+
+        cleanup:
+        parking.release.countDown()
         env.stop()
     }
 
@@ -521,6 +550,33 @@ class AddWhileLookingUpSpec extends Specification {
                 release.await(AddWhileLookingUpSpec.WAIT_SECONDS, TimeUnit.SECONDS)
             }
             return text
+        }
+    }
+
+    /**
+     * Resolves the expression counted to a new value every time it resolves it, and counts how often
+     * it does.
+     */
+    static class CountingResolver implements RememberingPropertyExpressionResolver {
+        final AtomicInteger resolved
+
+        CountingResolver(AtomicInteger resolved) {
+            this.resolved = resolved
+        }
+
+        @Override
+        <T> Optional<T> resolve(PropertyResolver propertyResolver, ConversionService conversionService, String expression, Class<T> requiredType) {
+            return expression == 'counted' ? conversionService.convert("v${resolved.incrementAndGet()}".toString(), requiredType) : Optional.empty()
+        }
+
+        @Override
+        <T> Optional<T> resolve(PropertyResolver propertyResolver, ConversionService conversionService, String expression, Class<T> requiredType,
+                                RememberingPropertyExpressionResolver.Memory memory) {
+            if (expression != 'counted') {
+                return Optional.empty()
+            }
+            Object value = memory.remember({ "v${resolved.incrementAndGet()}".toString() } as Supplier<Object>)
+            return conversionService.convert(value, requiredType)
         }
     }
 

@@ -1220,9 +1220,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     private Object remember(ResolverState resolverState, Object place, String text, ExpressionPosition position, Supplier<Object> value) {
         RememberedText remembered = resolverState.rememberedValues.get(place);
-        if (remembered != null && remembered.text().equals(text) && remembered.generation() >= resolverState.generation) {
+        if (remembered != null && remembered.text().equals(text)) {
             Object rememberedValue = remembered.values().get(position);
             if (rememberedValue != null) {
+                if (remembered.generation() < resolverState.generation) {
+                    // kept for the newest state that uses it, which no older state replaces
+                    resolverState.rememberedValues.computeIfPresent(place, (key, earlier) -> earlier.text().equals(text)
+                        && earlier.generation() < resolverState.generation ? new RememberedText(text, earlier.values(), resolverState.generation) : earlier);
+                }
                 return rememberedValue;
             }
         }
