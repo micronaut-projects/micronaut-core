@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
@@ -28,6 +29,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -50,6 +52,8 @@ import java.util.stream.Stream;
  */
 @Internal
 public abstract class AbstractEnvironmentAnnotationMetadata implements AnnotationMetadata {
+
+    private final AnnotationMetadata targetMetadata;
 
     private final EnvironmentAnnotationMetadata environmentAnnotationMetadata;
 
@@ -78,6 +82,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
      * @param targetMetadata The target annotation metadata
      */
     protected AbstractEnvironmentAnnotationMetadata(AnnotationMetadata targetMetadata) {
+        this.targetMetadata = targetMetadata;
         if (targetMetadata instanceof EnvironmentAnnotationMetadata metadata) {
             this.environmentAnnotationMetadata = metadata;
         } else {
@@ -97,6 +102,33 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
         return environmentAnnotationMetadata;
     }
 
+    /**
+     * Narrows the target metadata to its declared metadata, keeping the placeholder resolution of this metadata.
+     *
+     * @return The declared metadata
+     */
+    @Override
+    public AnnotationMetadata getDeclaredMetadata() {
+        AnnotationMetadata declaredMetadata = targetMetadata.getDeclaredMetadata();
+        if (declaredMetadata == targetMetadata) {
+            return this;
+        }
+        if (!declaredMetadata.hasPropertyExpressions()) {
+            return declaredMetadata;
+        }
+        return new DeclaredEnvironmentAnnotationMetadata(declaredMetadata, this);
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return environmentAnnotationMetadata.isEmpty();
+    }
+
+    @Override
+    public boolean hasPropertyExpressions() {
+        return environmentAnnotationMetadata.hasPropertyExpressions();
+    }
+
     @Nullable
     @Override
     public <T extends Annotation> T synthesize(Class<T> annotationClass) {
@@ -105,8 +137,52 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
 
     @Nullable
     @Override
+    public <T extends Annotation> T synthesize(Class<T> annotationClass, String sourceAnnotation) {
+        Environment environment = getEnvironment();
+        if (environment == null) {
+            return environmentAnnotationMetadata.synthesize(annotationClass, sourceAnnotation);
+        }
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        return environmentAnnotationMetadata.<T>findAnnotation(sourceAnnotation)
+            .map(value -> AnnotationMetadataSupport.buildAnnotation(annotationClass, new EnvironmentAnnotationValue<>(environment, value)))
+            .orElse(null);
+    }
+
+    @Nullable
+    @Override
     public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
         return environmentAnnotationMetadata.synthesizeDeclared(annotationClass);
+    }
+
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass, String sourceAnnotation) {
+        Environment environment = getEnvironment();
+        if (environment == null) {
+            return environmentAnnotationMetadata.synthesizeDeclared(annotationClass, sourceAnnotation);
+        }
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        return environmentAnnotationMetadata.<T>findDeclaredAnnotation(sourceAnnotation)
+            .map(value -> AnnotationMetadataSupport.buildAnnotation(annotationClass, new EnvironmentAnnotationValue<>(environment, value)))
+            .orElse(null);
+    }
+
+    @Override
+    public Annotation[] synthesizeAll() {
+        Environment environment = getEnvironment();
+        if (environment == null) {
+            return environmentAnnotationMetadata.synthesizeAll();
+        }
+        return synthesizeForEnvironment(environment, environmentAnnotationMetadata, false);
+    }
+
+    @Override
+    public Annotation[] synthesizeDeclared() {
+        Environment environment = getEnvironment();
+        if (environment == null) {
+            return environmentAnnotationMetadata.synthesizeDeclared();
+        }
+        return synthesizeForEnvironment(environment, environmentAnnotationMetadata, true);
     }
 
     @Override
@@ -314,6 +390,17 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
+        Environment environment = getEnvironment();
+        List<AnnotationValue<T>> values = environmentAnnotationMetadata.getAnnotationValuesByStereotype(stereotype);
+        if (environment != null) {
+            return values.stream().map(entries -> new EnvironmentAnnotationValue<>(environment, entries))
+                .collect(Collectors.toList());
+        }
+        return values;
+    }
+
+    @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {
         Environment environment = getEnvironment();
         List<AnnotationValue<T>> values = environmentAnnotationMetadata.getDeclaredAnnotationValuesByType(annotationType);
@@ -405,6 +492,36 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     @Override
+    public Set<String> getStereotypeAnnotationNames() {
+        return environmentAnnotationMetadata.getStereotypeAnnotationNames();
+    }
+
+    @Override
+    public Set<String> getDeclaredStereotypeAnnotationNames() {
+        return environmentAnnotationMetadata.getDeclaredStereotypeAnnotationNames();
+    }
+
+    @Override
+    public boolean isRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        return environmentAnnotationMetadata.isRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    public boolean isRepeatableAnnotation(String annotation) {
+        return environmentAnnotationMetadata.isRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    public Optional<String> findRepeatableAnnotation(Class<? extends Annotation> annotation) {
+        return environmentAnnotationMetadata.findRepeatableAnnotation(annotation);
+    }
+
+    @Override
+    public Optional<String> findRepeatableAnnotation(String annotation) {
+        return environmentAnnotationMetadata.findRepeatableAnnotation(annotation);
+    }
+
+    @Override
     public List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
         return environmentAnnotationMetadata.getDeclaredAnnotationNamesByStereotype(stereotype);
     }
@@ -462,6 +579,11 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     @Override
+    public Map<CharSequence, Object> getDefaultValues(String annotation) {
+        return environmentAnnotationMetadata.getDefaultValues(annotation);
+    }
+
+    @Override
     public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
         return environmentAnnotationMetadata.getDefaultValue(annotation, member, requiredType);
     }
@@ -514,6 +636,40 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
         }
     }
 
+    private Annotation[] synthesizeForEnvironment(Environment environment, AnnotationMetadata metadata, boolean declared) {
+        List<Annotation> annotations = new ArrayList<>();
+        synthesizeForEnvironment(environment, metadata, declared, annotations);
+        return annotations.toArray(AnnotationUtil.ZERO_ANNOTATIONS);
+    }
+
+    /**
+     * Synthesizes the annotations of each layer of a hierarchy, most specific first, like
+     * {@link AnnotationMetadataHierarchy#synthesizeAll()} and {@link AnnotationMetadataHierarchy#synthesizeDeclared()}.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void synthesizeForEnvironment(Environment environment, AnnotationMetadata metadata, boolean declared, List<Annotation> annotations) {
+        if (metadata instanceof AnnotationMetadataHierarchy hierarchy) {
+            List<AnnotationMetadata> layers = new ArrayList<>();
+            hierarchy.forEach(layers::add);
+            for (int i = layers.size() - 1; i >= 0; i--) {
+                synthesizeForEnvironment(environment, layers.get(i), declared, annotations);
+            }
+            return;
+        }
+        Set<String> annotationNames = declared ? metadata.getDeclaredAnnotationNames() : metadata.getAnnotationNames();
+        for (String annotationName : annotationNames) {
+            Class annotationClass = metadata.getAnnotationType(annotationName).orElse(null);
+            if (annotationClass != null) {
+                Optional<AnnotationValue<Annotation>> value = declared
+                    ? metadata.findDeclaredAnnotation(annotationName)
+                    : metadata.findAnnotation(annotationName);
+                value.ifPresent(av -> annotations.add(
+                    AnnotationMetadataSupport.buildAnnotation(annotationClass, new EnvironmentAnnotationValue<>(environment, av))
+                ));
+            }
+        }
+    }
+
     private void processMap(String annotation, Map<CharSequence, Object> finalValues, @Nullable Map<String, Map<CharSequence, Object>> allStereotypes) {
         if (allStereotypes != null) {
             Map<CharSequence, Object> values = allStereotypes.get(annotation);
@@ -522,6 +678,25 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
                     finalValues.putIfAbsent(entry.getKey(), entry.getValue());
                 }
             }
+        }
+    }
+
+    /**
+     * The declared metadata of an environment aware metadata, resolved against the same environment.
+     */
+    private static final class DeclaredEnvironmentAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
+
+        private final AbstractEnvironmentAnnotationMetadata parent;
+
+        DeclaredEnvironmentAnnotationMetadata(AnnotationMetadata declaredMetadata, AbstractEnvironmentAnnotationMetadata parent) {
+            super(declaredMetadata);
+            this.parent = parent;
+        }
+
+        @Nullable
+        @Override
+        protected Environment getEnvironment() {
+            return parent.getEnvironment();
         }
     }
 }
