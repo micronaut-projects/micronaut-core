@@ -219,7 +219,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         }
         if (isRunning() && !reading.get()) {
             propertyPlaceholderResolver.resetCachesAndRememberedValues();
-            internalProcessPropertySource(propertySource);
+            // into a copy of the published catalogs, which lookups on other threads keep reading until it is published
+            propertyPlaceholderResolver.addToCopy(() -> internalProcessPropertySource(propertySource));
         }
         return this;
     }
