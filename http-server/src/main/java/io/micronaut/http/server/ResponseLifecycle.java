@@ -395,40 +395,32 @@ public abstract class ResponseLifecycle {
     }
 
     private MutableHttpResponse<?> createContentLengthExceededResponse(HttpRequest<?> request, Throwable t) {
-        MutableHttpResponse<?> response = HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
-        try {
-            response = routeExecutor.getErrorResponseProcessor().processResponse(
-                ErrorContext.builder(request)
-                    .cause(t)
-                    .errorMessage(Objects.requireNonNullElse(t.getMessage(), "Unknown error"))
-                    .build(), response);
-        } catch (Exception e) {
-            routeExecutor.logException(e);
-        }
-        if (response.getContentType().isEmpty() && request.getMethod() != HttpMethod.HEAD) {
-            response.contentType(MediaType.APPLICATION_JSON_TYPE);
-        }
-        return response;
+        return processErrorResponse(request, HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE), ErrorContext.builder(request)
+            .cause(t)
+            .errorMessage(Objects.requireNonNullElse(t.getMessage(), "Unknown error"))
+            .build());
     }
 
     private MutableHttpResponse<?> createJsonSyntaxErrorResponse(HttpRequest<?> request, Throwable t) {
-        MutableHttpResponse<?> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
-        try {
-            response = routeExecutor.getErrorResponseProcessor().processResponse(
-                ErrorContext.builder(request)
-                    .cause(t)
-                    .error(new Error() {
-                        @Override
-                        public String getMessage() {
-                            return "Invalid JSON: " + t.getMessage();
-                        }
+        return processErrorResponse(request, HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON"), ErrorContext.builder(request)
+            .cause(t)
+            .error(new Error() {
+                @Override
+                public String getMessage() {
+                    return "Invalid JSON: " + t.getMessage();
+                }
 
-                        @Override
-                        public Optional<String> getTitle() {
-                            return Optional.of("Invalid JSON");
-                        }
-                    })
-                    .build(), response);
+                @Override
+                public Optional<String> getTitle() {
+                    return Optional.of("Invalid JSON");
+                }
+            })
+            .build());
+    }
+
+    private MutableHttpResponse<?> processErrorResponse(HttpRequest<?> request, MutableHttpResponse<?> response, ErrorContext errorContext) {
+        try {
+            response = routeExecutor.getErrorResponseProcessor().processResponse(errorContext, response);
         } catch (Exception e) {
             routeExecutor.logException(e);
         }
