@@ -129,12 +129,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     private long registrySnapshots;
     /**
-     * The snapshot that the start or the refresh in progress took. Guarded by the catalog lock.
+     * The snapshot that the start or the refresh in progress took. Guarded by the catalog lock: the
+     * monitor of {@link #catalog}, which {@link #start()}, {@link #stop()}, a refresh and the
+     * processing of a property source all hold.
      */
     private RegistrySnapshot pendingSnapshot;
     /**
      * The snapshot that the last start or refresh whose properties were published took. Guarded by
-     * the catalog lock.
+     * the catalog lock, the monitor of {@link #catalog}.
      */
     private RegistrySnapshot publishedSnapshot;
     /**
