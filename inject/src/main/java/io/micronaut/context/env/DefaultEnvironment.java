@@ -457,11 +457,14 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             }
         }
 
+        // what the locators return to this read, also when the same instance is registered already
+        Set<PropertySource> located = Collections.newSetFromMap(new IdentityHashMap<>());
         if (!propertySourcesLocators.isEmpty()) {
             for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
                 boolean isBootstrapLocator = propertySourcesLocator instanceof BootstrapLocatorMarker;
                 Collection<PropertySource> sources = propertySourcesLocator.load(this);
                 propertySources.addAll(sources);
+                located.addAll(sources);
                 if (isBootstrapLocator) {
                     for (PropertySource source : sources) {
                         internalAddPropertySource(source);
@@ -472,7 +475,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
         for (PropertySource propertySource : propertySources) {
             // only what a read loaded or located itself is refreshable: the next refresh drops it and loads it again
-            boolean loaded = !registered.contains(propertySource) || loadedBefore.contains(propertySource);
+            boolean loaded = !registered.contains(propertySource) || located.contains(propertySource) || loadedBefore.contains(propertySource);
             if (loaded && !PropertySource.CONTEXT.equals(propertySource.getName()) && !preExistingSourceNames.contains(propertySource.getName())) {
                 refreshablePropertySources.add(propertySource);
             }

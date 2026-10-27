@@ -91,6 +91,44 @@ class RefreshableSourcesSpec extends Specification {
         env.stop()
     }
 
+    void "a property source added while a refresh loads the default property sources, and returned by a #kind locator in that refresh, is dropped by a later refresh once the locator no longer returns it"() {
+        given: "a locator that returns a property source on the second load only"
+        ParkingConfiguration configuration = new ParkingConfiguration()
+        AtomicInteger loads = new AtomicInteger()
+        PropertySource shared = PropertySource.of('shared', ['shared.key': 'v1'], 100)
+        Closure<List<PropertySource>> sources = { loads.incrementAndGet() == 2 ? [shared] : [] }
+        configuration.locators = [kind == 'bootstrap' ? new BootstrapLike(sources) : new PlainLocator(sources)]
+        DefaultEnvironment env = new DefaultEnvironment(configuration)
+        env.start()
+
+        when: "another thread adds the same instance while the refresh, whose locator returns it, loads the default property sources"
+        configuration.arm()
+        Thread refresher = daemon('refresh') { env.refresh() }
+        assert configuration.parked.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        env.addPropertySource(shared)
+        configuration.release.countDown()
+        refresher.join(WAIT_SECONDS * 1000L)
+
+        then:
+        !refresher.alive
+        env.getProperty('shared.key', String).orElse(null) == 'v1'
+
+        when: "the environment is refreshed twice more, and the locator returns nothing"
+        env.refresh()
+        env.refresh()
+
+        then: "as a property source a read located itself, it is dropped"
+        !env.propertySources*.name.contains('shared')
+        !env.containsProperty('shared.key')
+
+        cleanup:
+        configuration.release.countDown()
+        env.stop()
+
+        where:
+        kind << ['plain', 'bootstrap']
+    }
+
     void "a property source added while a refresh loads the default property sources, by the name of one that refresh loads itself, is dropped by the next refresh"() {
         given:
         ParkingConfiguration configuration = new ParkingConfiguration()
@@ -244,6 +282,22 @@ class RefreshableSourcesSpec extends Specification {
 
         @Override
         Iterator<String> iterator() { Collections.emptyIterator() }
+    }
+
+    /**
+     * A locator whose property sources are processed but not registered.
+     */
+    static class PlainLocator implements PropertySourcesLocator {
+        private final Closure<List<PropertySource>> sources
+
+        PlainLocator(Closure<List<PropertySource>> sources) {
+            this.sources = sources
+        }
+
+        @Override
+        Collection<PropertySource> load(Environment environment) {
+            return sources.call()
+        }
     }
 
     /**
