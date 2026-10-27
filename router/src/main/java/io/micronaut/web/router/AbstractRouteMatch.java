@@ -391,6 +391,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         }
         RequestArgumentBinder<Object>[] argumentBinders = argumentPlan.binders(routeInfo, requestBinderRegistry).before;
         @Nullable Object[] argumentValues = argumentValues();
+        RequestConversionContexts conversionContexts = null;
         for (int i = 0; i < argumentPlan.arguments.length; i++) {
             if (argumentValues[i] != UNFULFILLED) {
                 continue;
@@ -408,11 +409,15 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             }
             RequestArgumentBinder<Object> argumentBinder = argumentBinders[i];
             if (argumentBinder != null) {
+                if (conversionContexts == null) {
+                    conversionContexts = new RequestConversionContexts(request);
+                }
                 fulfillValue(
                     i,
                     argumentBinder,
                     argument,
-                    request
+                    request,
+                    conversionContexts
                 );
             }
         }
@@ -433,17 +438,23 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             // unfulfilled, that has a postponed binder, is an argument the binder postponed
             PostponedRequestArgumentBinder<Object>[] argumentBinders = argumentPlan.binders(routeInfo, requestBinderRegistry).after;
             @Nullable Object[] argumentValues = argumentValues();
+            RequestConversionContexts conversionContexts = null;
             for (int i = 0; i < argumentPlan.arguments.length; i++) {
                 if (argumentValues[i] != UNFULFILLED) {
                     continue;
                 }
                 PostponedRequestArgumentBinder<Object> argumentBinder = argumentBinders[i];
                 if (argumentBinder != null) {
+                    if (conversionContexts == null) {
+                        // the filters may have changed the request
+                        conversionContexts = new RequestConversionContexts(request);
+                    }
                     fulfillValuePostponed(
                         i,
                         argumentBinder,
                         (Argument<Object>) argumentPlan.arguments[i],
-                        request
+                        request,
+                        conversionContexts
                     );
                 }
             }
@@ -455,27 +466,29 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     private <E> void fulfillValue(int index,
                                   RequestArgumentBinder<E> argumentBinder,
                                   Argument<E> argument,
-                                  HttpRequest<?> request) {
-        ArgumentConversionContext<E> conversionContext = newContext(argument, request);
+                                  HttpRequest<?> request,
+                                  RequestConversionContexts conversionContexts) {
+        ArgumentConversionContext<E> conversionContext = conversionContexts.newContext(argument);
         ArgumentBinder.BindingResult<E> bindingResult = argumentBinder.bind(conversionContext, request);
+        if (bindingResult.isPending()) {
+            // a pending result converts later, with the locale and the character encoding of the request as it is now
+            conversionContexts.resolve();
+        }
         fulfillValue(index, argument, bindingResult);
     }
 
     private <E> void fulfillValuePostponed(int index,
                                            PostponedRequestArgumentBinder<E> argumentBinder,
                                            Argument<E> argument,
-                                           HttpRequest<?> request) {
-        ArgumentConversionContext<E> conversionContext = newContext(argument, request);
+                                           HttpRequest<?> request,
+                                           RequestConversionContexts conversionContexts) {
+        ArgumentConversionContext<E> conversionContext = conversionContexts.newContext(argument);
         ArgumentBinder.BindingResult<E> bindingResult = argumentBinder.bindPostponed(conversionContext, request);
+        if (bindingResult.isPending()) {
+            // a pending result converts later, with the locale and the character encoding of the request as it is now
+            conversionContexts.resolve();
+        }
         fulfillValue(index, argument, bindingResult);
-    }
-
-    private <E> ArgumentConversionContext<E> newContext(Argument<E> argument, HttpRequest<?> request) {
-        return ConversionContext.of(
-            argument,
-            request.getLocale().orElse(null),
-            request.getCharacterEncoding()
-        );
     }
 
     private <E> void fulfillValue(int index, Argument<E> argument, ArgumentBinder.BindingResult<E> bindingResult) {
@@ -608,5 +621,4 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         }
         return result.get();
     }
-
 }

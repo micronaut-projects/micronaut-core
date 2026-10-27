@@ -25,8 +25,10 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Header;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
@@ -157,6 +159,8 @@ public class HandlerRoutesStackBenchmark {
         CTL_TEXT("/ctl/hello", null, "text/plain", "Hello World"),
         CTL_PATH_JSON("/ctl/items/42", null, "application/json", "{\"id\":42,\"name\":\"item\"}"),
         CTL_POST_JSON("/ctl/search", SEARCH_BODY, "application/json", "{\"listIndex\":4,\"stringIndex\":0}"),
+        CTL_QUERY("/ctl/query?name=bench&count=3", null, "text/plain", "bench 3"),
+        CTL_HEADER("/ctl/header", null, "text/plain", "bench"),
         FN_FILTERED("/fn/filtered/hello", null, "text/plain", "Hello World"),
         CTL_FILTERED("/ctl/filtered/hello", null, "text/plain", "Hello World");
 
@@ -183,6 +187,7 @@ public class HandlerRoutesStackBenchmark {
             }
             request.headers().add(HttpHeaderNames.CONTENT_LENGTH, request.content().readableBytes());
             request.headers().add(HttpHeaderNames.ACCEPT, contentType);
+            request.headers().add("X-Name", "bench");
             return request;
         }
     }
@@ -224,6 +229,18 @@ public class HandlerRoutesStackBenchmark {
         @Produces(MediaType.TEXT_PLAIN)
         String filteredHello() {
             return "Hello World";
+        }
+
+        @Get("/query")
+        @Produces(MediaType.TEXT_PLAIN)
+        String query(@QueryValue String name, @QueryValue int count) {
+            return name + " " + count;
+        }
+
+        @Get("/header")
+        @Produces(MediaType.TEXT_PLAIN)
+        String header(@Header("X-Name") String name) {
+            return name;
         }
     }
 

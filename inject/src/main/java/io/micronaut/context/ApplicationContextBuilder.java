@@ -77,6 +77,37 @@ public interface ApplicationContextBuilder {
     }
 
     /**
+     * Adds a tracer of bean resolution, which is active from the start of the context in addition to the tracer of
+     * the {@link BeanResolutionTraceMode} and to the other tracers.
+     *
+     * @param tracer The tracer
+     * @return This builder
+     * @since 5.3.0
+     * @see BeanResolutionTracer
+     */
+    @Experimental
+    default ApplicationContextBuilder beanResolutionTracer(BeanResolutionTracer tracer) {
+        return this;
+    }
+
+    /**
+     * Whether the tracers of bean resolution created by the {@link BeanResolutionTracerProvider} discovered with
+     * {@link java.util.ServiceLoader} are enabled. A provider can still activate its tracer when they are not, see
+     * {@link BeanResolutionTracerProvider#isEnabled(BeanResolutionTracerProvider.Activation)}.
+     *
+     * <p>Defaults to the value of the system property {@code micronaut.inject.trace.tracers} or the environment
+     * variable {@code MICRONAUT_INJECT_TRACE_TRACERS}, and otherwise to {@code false}.</p>
+     *
+     * @param enabled Whether discovered tracers are enabled
+     * @return This builder
+     * @since 5.3.0
+     */
+    @Experimental
+    default ApplicationContextBuilder beanResolutionTracerDiscovery(boolean enabled) {
+        return this;
+    }
+
+    /**
      * Whether to eager initialize {@link io.micronaut.context.annotation.ConfigurationProperties} beans.
      * @param eagerInitConfiguration True if configuration properties should be eagerly initialized
      * @return The context builder
