@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.CollectionUtils;
@@ -1008,6 +1009,13 @@ public class RequestLifecycle {
 
             // check if any argument binders are still waiting for data
             ExecutionFlow<?> routeWaitsFor = BasicHttpAttributes.getRouteWaitsFor(request);
+            if (frc == null) {
+                ImperativeExecutionFlow<?> done = routeWaitsFor.tryComplete();
+                if (done != null && done.getError() == null) {
+                    // nothing waits, the case of nearly every request: no continuation to create
+                    return ExecutionFlow.just(routeMatch);
+                }
+            }
             return routeWaitsFor.then(() -> {
                 if (frc != null) {
                     frc.stopDeadlockDetection();
