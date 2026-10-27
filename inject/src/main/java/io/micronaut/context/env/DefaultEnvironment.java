@@ -56,6 +56,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -116,6 +117,33 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
     private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
     private final AtomicBoolean reading = new AtomicBoolean(false);
+    /**
+     * Held while a property source is registered by an add and the count of snapshots read, and
+     * while a start or a refresh counts and takes its snapshot, so that one comes before the other.
+     * Nothing else runs with it held.
+     */
+    private final Object registrationLock = new Object();
+    /**
+     * How many snapshots of the registered property sources starts and refreshes have taken, see
+     * {@link #alreadyProcessed(PropertySource)}. Guarded by the registration lock.
+     */
+    private long registrySnapshots;
+    /**
+     * The snapshot that the start or the refresh in progress took. Guarded by the catalog lock: the
+     * monitor of {@link #catalog}, which {@link #start()}, {@link #stop()}, a refresh and the
+     * processing of a property source all hold.
+     */
+    private RegistrySnapshot pendingSnapshot;
+    /**
+     * The snapshot that the last start or refresh whose properties were published took. Guarded by
+     * the catalog lock, the monitor of {@link #catalog}.
+     */
+    private RegistrySnapshot publishedSnapshot;
+    /**
+     * For the property source the current thread adds: how many snapshots had been taken when it
+     * was registered.
+     */
+    private final ThreadLocal<Long> addedAfterSnapshot = new ThreadLocal<>();
     private final Boolean deduceEnvironments;
     private final ApplicationContextConfiguration configuration;
     private final Collection<String> configLocations;
@@ -210,12 +238,50 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
-        propertySources.put(propertySource.getName(), propertySource);
+        String name = propertySource.getName();
+        long snapshotsWhenRegistered;
+        synchronized (registrationLock) {
+            propertySources.put(name, propertySource);
+            snapshotsWhenRegistered = registrySnapshots;
+        }
         if (isRunning() && !reading.get()) {
-            resetCaches();
-            processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
+            Long outer = addedAfterSnapshot.get();
+            addedAfterSnapshot.set(snapshotsWhenRegistered);
+            try {
+                resetCaches();
+                processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
+            } finally {
+                if (outer == null) {
+                    addedAfterSnapshot.remove();
+                } else {
+                    addedAfterSnapshot.set(outer);
+                }
+            }
         }
         return this;
+    }
+
+    /**
+     * Whether a start or a refresh has processed the given property source, which the current
+     * thread adds, since it was registered: one that took its snapshot of the registered property
+     * sources after that, and whose properties are published. The add has then waited for it, and
+     * does not process the property source a second time, on top of the others. Called with the
+     * catalog lock held.
+     *
+     * @param propertySource The property source
+     * @return Whether it was processed already
+     */
+    @Override
+    boolean alreadyProcessed(PropertySource propertySource) {
+        Long snapshotsWhenRegistered = addedAfterSnapshot.get();
+        RegistrySnapshot snapshot = publishedSnapshot;
+        return snapshotsWhenRegistered != null && !reading.get() && snapshot != null
+            && snapshot.number() > snapshotsWhenRegistered && snapshot.propertySources().contains(propertySource);
+    }
+
+    @Override
+    void propertiesPublished() {
+        publishedSnapshot = pendingSnapshot;
     }
 
     @Override
@@ -282,6 +348,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 if (reading.compareAndSet(false, true)) {
                     try {
                         readPropertySources(getPropertySourceRootName());
+                        if (!isRefreshing()) {
+                            // a start writes where lookups read
+                            propertiesPublished();
+                        }
                     } finally {
                         // also when the read fails, or a property source added later is never processed
                         reading.set(false);
@@ -304,6 +374,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             reading.set(false);
             this.propertySources.values().removeAll(refreshablePropertySources);
             reset();
+            if (!isRefreshing()) {
+                // what it processed is published no more; within a refresh it stays published
+                // until the refresh publishes, and if the refresh fails it stays so
+                publishedSnapshot = null;
+            }
             resetCaches();
         }
         return this;
@@ -468,7 +543,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             propertySources = new ArrayList<>(this.propertySources.size());
         }
 
-        propertySources.addAll(this.propertySources.values());
+        long number;
+        List<PropertySource> registered;
+        synchronized (registrationLock) {
+            number = ++registrySnapshots;
+            registered = new ArrayList<>(this.propertySources.values());
+        }
+        Set<PropertySource> taken = Collections.newSetFromMap(new IdentityHashMap<>());
+        taken.addAll(registered);
+        pendingSnapshot = new RegistrySnapshot(number, taken);
+        propertySources.addAll(registered);
         OrderUtil.sortOrdered(propertySources);
         for (PropertySource propertySource : propertySources) {
             log.debug("Processing property source: {}", propertySource.getName());
@@ -1111,5 +1195,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static class EnvironmentsAndPackage {
         String aPackage;
         Set<String> enviroments = new LinkedHashSet<>(1);
+    }
+
+    /**
+     * The registered property sources a start or a refresh took, by identity.
+     *
+     * @param number          Which snapshot it is
+     * @param propertySources The property sources
+     */
+    private record RegistrySnapshot(long number, Set<PropertySource> propertySources) {
     }
 }
