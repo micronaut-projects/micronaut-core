@@ -244,6 +244,13 @@ public final class RouteAssembly {
     }
 
     /**
+     * @return What the router asks the server for a request, e.g. the body for a route locator
+     */
+    public RouteConditionContext routeConditionContext() {
+        return conditionContext;
+    }
+
+    /**
      * @return The URI routes
      */
     public List<UriRoute> uriRoutes() {

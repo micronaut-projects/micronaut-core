@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.typecheck;
 
 import io.micronaut.annotation.processing.PostponeToNextRoundException;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.AnnotationElement;
 import io.micronaut.inject.ast.ClassElement;
@@ -24,6 +25,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.util.PythonJavaTypes;
@@ -81,6 +83,7 @@ public final class TypeFacts {
     private final Map<String, Optional<AnnotationDescription>> annotations = new HashMap<>();
     private final Map<String, Optional<TypeDescription>> types = new HashMap<>();
     private final Map<String, Boolean> assignable = new HashMap<>();
+    private final Map<String, Boolean> interfaces = new HashMap<>();
 
     /**
      * @param visitorContext The context resolving the Java and Python classes of the compilation
@@ -109,7 +112,42 @@ public final class TypeFacts {
      * its classpath
      */
     public @Nullable TypeDescription describe(String qualifiedName) {
-        return types.computeIfAbsent(qualifiedName, name -> Optional.ofNullable(complete(() -> loadType(name)))).orElse(null);
+        return describe(qualifiedName, List.of());
+    }
+
+    /**
+     * Describes a parameterized Java type: its members with the type arguments substituted for the
+     * type variables of the type, so that {@code save} of a {@code CrudRepository<Owner, Integer>}
+     * returns an {@code Owner} and {@code findById} takes an {@code Integer}. A method type variable
+     * bound to a type ({@code <S extends E> S save(S)}) reads as its bound.
+     *
+     * @param qualifiedName The qualified name of the type
+     * @param typeArguments The qualified names of the type arguments, boxed, in declaration order;
+     *                      empty for the raw type
+     * @return The description, or {@code null} when the name is not a class of the compilation or
+     * its classpath
+     */
+    public @Nullable TypeDescription describe(String qualifiedName, List<String> typeArguments) {
+        List<String> arguments = List.copyOf(typeArguments);
+        String key = arguments.isEmpty() ? qualifiedName : qualifiedName + "<" + String.join(",", arguments) + ">";
+        return types.computeIfAbsent(key, name -> Optional.ofNullable(complete(() -> loadType(qualifiedName, arguments)))).orElse(null);
+    }
+
+    /**
+     * Whether a type is an interface: the one fact the planner needs of a class of the compilation,
+     * answered without describing every member of the type.
+     *
+     * @param qualifiedName The type
+     * @return Whether it is an interface; {@code false} for an unknown or incomplete type
+     */
+    public boolean isInterface(String qualifiedName) {
+        return interfaces.computeIfAbsent(qualifiedName, name -> {
+            Boolean result = complete(() -> {
+                ClassElement element = resolveClass(name);
+                return element != null && element.isInterface();
+            });
+            return result != null && result;
+        });
     }
 
     /**
@@ -228,10 +266,24 @@ public final class TypeFacts {
         return target != null && source != null && source.isAssignable(target);
     }
 
-    private @Nullable TypeDescription loadType(String qualifiedName) {
+    private @Nullable TypeDescription loadType(String qualifiedName, List<String> typeArguments) {
         ClassElement element = resolveClass(qualifiedName);
         if (element == null) {
             return null;
+        }
+        if (!typeArguments.isEmpty()) {
+            List<ClassElement> arguments = new ArrayList<>();
+            for (String argument : typeArguments) {
+                ClassElement resolved = resolveClass(argument);
+                if (resolved == null) {
+                    break;
+                }
+                arguments.add(resolved);
+            }
+            // the raw type when an argument is unknown or the count does not fit: never a wrong answer
+            if (arguments.size() == typeArguments.size() && arguments.size() == element.getDeclaredGenericPlaceholders().size()) {
+                element = element.withTypeArguments(arguments);
+            }
         }
         // the host exposes the public members; a Python subclass reaches the protected ones as well
         Map<String, List<MethodSignature>> methods = new LinkedHashMap<>();
@@ -314,10 +366,52 @@ public final class TypeFacts {
 
     private static MethodSignature signature(MethodElement method) {
         List<String> parameterTypes = new ArrayList<>();
+        List<String> erasedParameterTypes = new ArrayList<>();
         for (ParameterElement parameter : method.getParameters()) {
-            parameterTypes.add(typeName(parameter.getType()));
+            // the generic type is the declared one with the type arguments of a parameterized
+            // receiver substituted; a type variable left unbound reads as its erasure
+            parameterTypes.add(typeName(parameter.getGenericType()));
+            erasedParameterTypes.add(erasure(parameter.getType()));
         }
-        return new MethodSignature(parameterTypes, method.isVarArgs(), method.isStatic(), typeName(method.getReturnType()));
+        List<String> checkedExceptions = new ArrayList<>();
+        for (ClassElement thrown : method.getThrownTypes()) {
+            if (!thrown.isAssignable(RuntimeException.class) && !thrown.isAssignable(Error.class)) {
+                checkedExceptions.add(thrown.getName());
+            }
+        }
+        return new MethodSignature(parameterTypes, method.isVarArgs(), method.isStatic(), typeName(method.getGenericReturnType()), !checkedExceptions.isEmpty(), typeArguments(method.getGenericReturnType()),
+            checkedExceptions, method.isDefault(), erasedParameterTypes, erasure(method.getReturnType()));
+    }
+
+    /**
+     * The erasure of a declared type, which the method's descriptor names: a type variable is its
+     * first bound, erased in turn, or {@code Object}.
+     */
+    private static String erasure(ClassElement type) {
+        String dimensions = "[]".repeat(type.getArrayDimensions());
+        if (type instanceof GenericPlaceholderElement placeholder) {
+            List<? extends ClassElement> bounds = placeholder.getBounds();
+            return (bounds.isEmpty() ? Object.class.getName() : erasure(bounds.get(0))) + dimensions;
+        }
+        if (type.isTypeVariable() || type.isGenericPlaceholder() || type.isWildcard()) {
+            return Object.class.getName() + dimensions;
+        }
+        return type.getName() + dimensions;
+    }
+
+    /**
+     * The names of the type arguments of a parameterized type, empty when any of them is a type
+     * variable or a wildcard the compiled code could not name.
+     */
+    private static List<String> typeArguments(ClassElement type) {
+        List<String> names = new ArrayList<>();
+        for (ClassElement argument : type.getTypeArguments().values()) {
+            if (argument.isTypeVariable() || argument.isGenericPlaceholder() || argument.isWildcard()) {
+                return List.of();
+            }
+            names.add(typeName(argument));
+        }
+        return names;
     }
 
     /**
@@ -326,10 +420,26 @@ public final class TypeFacts {
      * leaves such a value alone.
      */
     private static String typeName(ClassElement type) {
-        if (type.isTypeVariable() || type.isGenericPlaceholder()) {
-            return Object.class.getName() + "[]".repeat(type.getArrayDimensions());
+        String dimensions = "[]".repeat(type.getArrayDimensions());
+        if (type instanceof GenericPlaceholderElement placeholder) {
+            // a type variable of a parameterized receiver reads as the type argument it resolves to
+            // (E save(E) on a CrudRepository<Owner, ID> takes and returns an Owner); one bound to a
+            // type (<S extends E> S save(S)) is at least its bound; an unbounded one says nothing
+            Optional<ClassElement> resolved = placeholder.getResolved();
+            if (resolved.isPresent() && !(resolved.get() instanceof GenericPlaceholderElement) && !resolved.get().isTypeVariable()) {
+                return typeName(resolved.get()) + dimensions;
+            }
+            for (ClassElement bound : placeholder.getBounds()) {
+                if (!bound.isTypeVariable() && !bound.isGenericPlaceholder() && !Object.class.getName().equals(bound.getName())) {
+                    return bound.getName() + dimensions;
+                }
+            }
+            return Object.class.getName() + dimensions;
         }
-        return type.getName() + "[]".repeat(type.getArrayDimensions());
+        if (type.isTypeVariable() || type.isGenericPlaceholder()) {
+            return Object.class.getName() + dimensions;
+        }
+        return type.getName() + dimensions;
     }
 
     private @Nullable AnnotationDescription loadAnnotation(String qualifiedName) {
@@ -340,7 +450,7 @@ public final class TypeFacts {
         boolean pythonDefined = PythonJavaTypes.isPythonClass(element);
         boolean annotation = element instanceof AnnotationElement || element.isAssignable(Annotation.class);
         if (!annotation) {
-            return new AnnotationDescription(element.getName(), false, pythonDefined, false, Map.of(), List.of());
+            return new AnnotationDescription(element.getName(), false, pythonDefined, false, false, false, false, false, Map.of(), List.of());
         }
         // an around or introduction binding applied to a class advises every method of the class,
         // whatever the annotation's own targets say
@@ -367,7 +477,18 @@ public final class TypeFacts {
         List<String> targets = element instanceof AnnotationElement annotationElement
             ? annotationElement.getTargets().stream().map(ElementType::name).sorted().toList()
             : List.of();
-        return new AnnotationDescription(element.getName(), true, pythonDefined, interceptorBinding, members, targets);
+        boolean validationConstraint = element.hasStereotype("jakarta.validation.Constraint") || "jakarta.validation.Valid".equals(element.getName());
+        // the annotations the stub generator bridges a module-level function for
+        boolean executable = element.hasStereotype("io.micronaut.context.annotation.Executable")
+            || element.hasStereotype("io.micronaut.aop.Around")
+            || element.hasStereotype(AnnotationUtil.SCOPE)
+            || element.hasStereotype("io.micronaut.context.annotation.Bean")
+            || "io.micronaut.context.annotation.Bean".equals(element.getName())
+            || "jakarta.annotation.PostConstruct".equals(element.getName())
+            || "jakarta.annotation.PreDestroy".equals(element.getName());
+        boolean scope = element.hasStereotype(AnnotationUtil.SCOPE);
+        boolean introduction = element.hasStereotype("io.micronaut.aop.Introduction");
+        return new AnnotationDescription(element.getName(), true, pythonDefined, interceptorBinding, validationConstraint, executable, scope, introduction, members, targets);
     }
 
     /**
@@ -445,11 +566,70 @@ public final class TypeFacts {
      * @param varargs        Whether the last parameter takes the remaining arguments
      * @param isStatic       Whether the method is static
      * @param returnType     The qualified name of the return type, {@code void} for none
+     * @param throwsChecked  Whether the method declares a checked exception
+     * @param returnTypeArguments The qualified names of the type arguments of the return type, in
+     *                       declaration order; empty when the return type is not parameterized or
+     *                       an argument is a type variable
+     * @param checkedExceptions The qualified names of the checked exceptions the method declares
+     * @param isDefault      Whether the method is a default method of an interface
+     * @param erasedParameterTypes The erasures of the declared parameter types, which the method's
+     *                       descriptor names: {@code Object} for a {@code T} the receiver binds to a
+     *                       type of {@code parameterTypes}
+     * @param erasedReturnType The erasure of the declared return type, which the method's descriptor
+     *                       names
      */
-    public record MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType) {
+    public record MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments,
+                                  List<String> checkedExceptions, boolean isDefault, List<String> erasedParameterTypes, String erasedReturnType) {
 
         public MethodSignature {
             parameterTypes = List.copyOf(parameterTypes);
+            returnTypeArguments = returnTypeArguments == null ? List.of() : List.copyOf(returnTypeArguments);
+            checkedExceptions = checkedExceptions == null ? List.of() : List.copyOf(checkedExceptions);
+            erasedParameterTypes = List.copyOf(erasedParameterTypes);
+        }
+
+        /**
+         * A signature whose declared types are the types it names.
+         *
+         * @param parameterTypes The parameter types
+         * @param varargs        Whether the last parameter takes the remaining arguments
+         * @param isStatic       Whether the method is static
+         * @param returnType     The return type
+         * @param throwsChecked  Whether the method declares a checked exception
+         * @param returnTypeArguments The type arguments of the return type
+         * @param checkedExceptions The qualified names of the checked exceptions the method declares
+         * @param isDefault      Whether the method is a default method of an interface
+         */
+        public MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments,
+                               List<String> checkedExceptions, boolean isDefault) {
+            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, returnTypeArguments, checkedExceptions, isDefault, parameterTypes, returnType);
+        }
+
+        /**
+         * A signature that names none of the checked exceptions it declares.
+         *
+         * @param parameterTypes      The parameter types
+         * @param varargs             Whether the last parameter takes the remaining arguments
+         * @param isStatic            Whether the method is static
+         * @param returnType          The return type
+         * @param throwsChecked       Whether the method declares a checked exception
+         * @param returnTypeArguments The type arguments of the return type
+         */
+        public MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked, List<String> returnTypeArguments) {
+            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, returnTypeArguments, List.of(), false);
+        }
+
+        /**
+         * A signature without type arguments of the return type.
+         *
+         * @param parameterTypes The parameter types
+         * @param varargs        Whether the last parameter takes the remaining arguments
+         * @param isStatic       Whether the method is static
+         * @param returnType     The return type
+         * @param throwsChecked  Whether the method declares a checked exception
+         */
+        public MethodSignature(List<String> parameterTypes, boolean varargs, boolean isStatic, String returnType, boolean throwsChecked) {
+            this(parameterTypes, varargs, isStatic, returnType, throwsChecked, List.of(), List.of(), false);
         }
 
         /**
@@ -478,6 +658,12 @@ public final class TypeFacts {
      * @param pythonDefined      Whether the type is generated from a Python definition
      * @param interceptorBinding Whether the annotation binds around or introduction advice, which a
      *                           class applies to all of its methods
+     * @param executable Whether the annotation makes a module-level function a method of the generated
+     *                   class: an executable, around, scope, bean or lifecycle annotation
+     * @param scope Whether the annotation is a scope
+     * @param introduction Whether the annotation is an introduction binding
+     * @param validationConstraint Whether the annotation is a validation constraint or {@code Valid},
+     *                           which advises the method it is applied to with validation
      * @param members            The members by name
      * @param targets            The names of the {@link ElementType}s the annotation may be applied to;
      *                           empty when unknown
@@ -486,6 +672,10 @@ public final class TypeFacts {
                                         boolean annotation,
                                         boolean pythonDefined,
                                         boolean interceptorBinding,
+                                        boolean validationConstraint,
+                                        boolean executable,
+                                        boolean scope,
+                                        boolean introduction,
                                         Map<String, MemberDescription> members,
                                         List<String> targets) {
 
