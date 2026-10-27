@@ -249,8 +249,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             addedAfterSnapshot.set(snapshotsWhenRegistered);
             try {
                 resetCaches();
-                // into a copy of the published catalogs, which lookups on other threads keep reading until it is published
-                addToCopy(() -> processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES));
+                processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
             } finally {
                 if (outer == null) {
                     addedAfterSnapshot.remove();
@@ -283,6 +282,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     void propertiesPublished() {
         publishedSnapshot = pendingSnapshot;
+    }
+
+    @Override
+    boolean processingAdd() {
+        return addedAfterSnapshot.get() != null;
     }
 
     @Override

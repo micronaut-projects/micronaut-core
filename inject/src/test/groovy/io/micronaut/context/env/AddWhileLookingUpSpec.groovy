@@ -232,6 +232,24 @@ class AddWhileLookingUpSpec extends Specification {
         env.stop()
     }
 
+    void "a processPropertySource override that waits for another thread to add a property source completes"() {
+        given:
+        WaitingEnvironment env = new WaitingEnvironment()
+        env.addPropertySource(PropertySource.of('data', ['app.first': 'one']))
+        env.start()
+
+        when: "the override, before it processes the added property source, waits for another thread's add"
+        env.addPropertySource(PropertySource.of('waiting', ['app.second': 'two']))
+
+        then:
+        env.otherAdd.get() == 'done'
+        env.getProperty('app.second', String).orElse(null) == 'two'
+        env.getProperty('app.other', String).orElse(null) == 'other'
+
+        cleanup:
+        env.stop()
+    }
+
     void "a property source that fails while it is added leaves the properties it added before it failed"() {
         given:
         DefaultEnvironment env = startedWith(PropertySource.of('data', ['app.first': 'one']))
@@ -503,6 +521,36 @@ class AddWhileLookingUpSpec extends Specification {
                 release.await(AddWhileLookingUpSpec.WAIT_SECONDS, TimeUnit.SECONDS)
             }
             return text
+        }
+    }
+
+    /**
+     * An environment whose processing of the property source named waiting first waits for another
+     * thread to add a property source.
+     */
+    static class WaitingEnvironment extends DefaultEnvironment {
+        final AtomicReference<String> otherAdd = new AtomicReference<>()
+
+        WaitingEnvironment() {
+            super(ApplicationContext.builder()
+                    .environments('test')
+                    .deduceEnvironment(false)
+                    .enableDefaultPropertySources(false) as ApplicationContextConfiguration)
+        }
+
+        @Override
+        protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
+            if (properties.name == 'waiting') {
+                Thread other = new Thread({
+                    addPropertySource(PropertySource.of('other', ['app.other': 'other']))
+                    otherAdd.compareAndSet(null, 'done')
+                }, 'other')
+                other.daemon = true
+                other.start()
+                other.join(WAIT_SECONDS * 1000L)
+                otherAdd.compareAndSet(null, 'still waiting')
+            }
+            super.processPropertySource(properties, convention)
         }
     }
 
