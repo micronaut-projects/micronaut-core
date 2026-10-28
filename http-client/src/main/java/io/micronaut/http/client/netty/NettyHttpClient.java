@@ -1644,12 +1644,19 @@ final class NettyHttpClient implements
                 if (!HttpUtil.isKeepAlive(response)) {
                     poolHandle.taint();
                 }
-                if (sink.isCancelled()) {
-                    // nobody takes the response of a cancelled exchange
+                if (sink.isCancelled() || !sink.tryComplete(new NettyClientByteBodyResponse(response, body, conversionService))) {
+                    // nobody takes the response of an exchange that was cancelled, or that
+                    // already failed because its streamed request body failed
                     body.close();
-                    return;
                 }
-                sink.complete(new NettyClientByteBodyResponse(response, body, conversionService));
+            }
+
+            @Override
+            public void bodyFailed(ChannelHandlerContext ctx, Throwable cause) {
+                // the rest of the body was not read, or can no longer be read, e.g. after an
+                // invalid chunk or content that cannot be decompressed: the connection cannot be
+                // reused
+                poolHandle.taint();
             }
 
             @Override
@@ -1703,6 +1710,10 @@ final class NettyHttpClient implements
             headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
             if (length.getAsLong() != 0 || permitsRequestBody(nettyRequest.method())) {
                 headers.set(HttpHeaderNames.CONTENT_LENGTH, length.getAsLong());
+            } else {
+                // no body is sent, so a length among the request headers is stale, e.g. that of
+                // a relayed body that is not sent again after a redirect
+                headers.remove(HttpHeaderNames.CONTENT_LENGTH);
             }
         } else {
             headers.remove(HttpHeaderNames.CONTENT_LENGTH);
