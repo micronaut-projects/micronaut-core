@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLogFormatParser.IndexedLogElement;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
@@ -74,7 +75,7 @@ public class AccessLog {
      */
     public void onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
         for (IndexedLogElement element: onRequestHeadersElements) {
-            elements[element.index] = element.onRequestHeaders(metadata, method, headers, uri, protocol);
+            elements[element.index] = escape(element.onRequestHeaders(metadata, method, headers, uri, protocol));
         }
     }
 
@@ -102,7 +103,7 @@ public class AccessLog {
      */
     public void onResponseHeaders(ChannelHandlerContext ctx, HttpHeaders headers, String status) {
         for (IndexedLogElement element: onResponseHeadersElements) {
-            elements[element.index] = element.onResponseHeaders(ctx, headers, status);
+            elements[element.index] = escape(element.onResponseHeaders(ctx, headers, status));
         }
     }
 
@@ -139,6 +140,42 @@ public class AccessLog {
             }
             accessLogger.info(b.toString());
         }
+    }
+
+    /**
+     * Escapes the control characters (C0, DEL and C1) of a request or response derived value,
+     * so that a client cannot inject line breaks or terminal escape sequences into the access log.
+     *
+     * @param value The value
+     * @return The value with each control character replaced by a {@code \xHH} escape
+     */
+    static @Nullable String escape(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        int length = value.length();
+        int i = 0;
+        while (i < length && !isControl(value.charAt(i))) {
+            i++;
+        }
+        if (i == length) {
+            return value;
+        }
+        StringBuilder builder = new StringBuilder(length + 8);
+        builder.append(value, 0, i);
+        for (; i < length; i++) {
+            char c = value.charAt(i);
+            if (isControl(c)) {
+                builder.append("\\x").append(Character.forDigit(c >> 4, 16)).append(Character.forDigit(c & 0xF, 16));
+            } else {
+                builder.append(c);
+            }
+        }
+        return builder.toString();
+    }
+
+    private static boolean isControl(char c) {
+        return c < 0x20 || (c >= 0x7F && c <= 0x9F);
     }
 
     private void resetIndexedLogElement(IndexedLogElement elt) {
