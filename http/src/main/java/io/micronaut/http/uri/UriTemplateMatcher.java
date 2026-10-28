@@ -338,8 +338,9 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                     boolean requiresSlash = i + 1 != segments.length;
                     int end = readText(uri, pos, requiresSlash);
                     if (end > pos) { // Deny empty path
-                        if (decodesToSeparator(uri, pos, end)) {
-                            // the handler receives the decoded value, which must still be a single segment
+                        if (decodesToDotSegment(uri, pos, end)) {
+                            // the handler receives the decoded value, an encoded separator may be part of it
+                            // (see the raw values of a route), but never to climb out of the segment
                             return null;
                         }
                         pos = end;
@@ -389,12 +390,22 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         }
     }
 
-    private static boolean decodesToSeparator(String uri, int from, int to) {
+    private static boolean decodesToDotSegment(String uri, int from, int to) {
         int percent = uri.indexOf('%', from);
         if (percent == -1 || percent >= to) {
             return false;
         }
-        return decodeSeparators(uri.substring(from, to)).indexOf('/') != -1;
+        String decoded = decodeSeparators(uri.substring(from, to));
+        if (decoded.indexOf('/') == -1 && decoded.indexOf('\\') == -1) {
+            return false;
+        }
+        for (String part : decoded.split("[/\\\\]", -1)) {
+            String name = part.replace("%2E", ".").replace("%2e", ".");
+            if (name.equals(".") || name.equals("..")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean matchesDecoded(Segment segment, String uri, Matcher rawMatcher) {
