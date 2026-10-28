@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -44,6 +45,7 @@ import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.InternalServerException;
+import io.micronaut.web.router.DefaultRouter;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
@@ -67,6 +69,7 @@ import io.netty.handler.codec.http.multipart.MixedAttribute;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
 
@@ -96,6 +99,10 @@ import java.util.function.Supplier;
  */
 @Internal
 public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T> {
+    /**
+     * Whether the connections of a listener that has no port expose the default routes.
+     */
+    static final AttributeKey<Boolean> LISTENER_EXPOSES_DEFAULT_ROUTES = AttributeKey.valueOf("micronaut.listener.exposes-default-routes");
 
     /**
      * Headers to exclude from the push promise sent to the client. We use
@@ -189,6 +196,28 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             this.bodyUnwrapped = built;
             return Optional.ofNullable(built);
         });
+        Boolean listenerExposes = channel != null ? listenerExposesDefaultRoutes(channel) : null;
+        if (listenerExposes != null) {
+            setAttribute(DefaultRouter.LISTENER_EXPOSES_DEFAULT_ROUTES, listenerExposes);
+        }
+    }
+
+    /**
+     * Whether the listener of a channel without a port exposes the default routes.
+     *
+     * @param channel The connection, or the HTTP/2 stream
+     * @return The setting of the listener, or {@code null} if it has a port
+     */
+    @Nullable
+    private static Boolean listenerExposesDefaultRoutes(Channel channel) {
+        if (channel.localAddress() instanceof InetSocketAddress) {
+            return null;
+        }
+        Boolean exposes = channel.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
+        if (exposes == null && channel.parent() != null) {
+            exposes = channel.parent().attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
+        }
+        return exposes;
     }
 
     /**

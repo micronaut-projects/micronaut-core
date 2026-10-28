@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.OrderUtil;
@@ -65,10 +66,19 @@ import java.util.stream.Stream;
 @Singleton
 public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatch<?>> {
 
+    /**
+     * The request attribute that tells whether the listener of a request exposes the default
+     * routes, set for the listeners that have no port, e.g. UNIX domain sockets.
+     */
+    @Internal
+    public static final String LISTENER_EXPOSES_DEFAULT_ROUTES = "micronaut.router.listener-exposes-default-routes";
+
     private final Map<String, List<UriRoute>> routesByMethod = new HashMap<>();
     private final List<StatusRoute> statusRoutes = new ArrayList<>();
     private final List<ErrorRoute> errorRoutes = new ArrayList<>();
     private final Set<Integer> exposedPorts;
+    private Set<Integer> ports;
+    private boolean defaultRoutesRestricted;
     private final List<FilterRoute> alwaysMatchesFilterRoutes = new ArrayList<>();
     private final List<FilterRoute> preconditionFilterRoutes = new ArrayList<>();
     private final Supplier<List<HttpFilter>> alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
@@ -166,7 +176,13 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public void applyDefaultPorts(List<Integer> ports) {
-        Predicate<HttpRequest<?>> portMatches = (httpRequest -> ports.contains(httpRequest.getServerAddress().getPort()));
+        this.ports = new HashSet<>(ports);
+        if (defaultRoutesRestricted) {
+            // the routes already check the ports, which may be applied more than once
+            return;
+        }
+        defaultRoutesRestricted = true;
+        Predicate<HttpRequest<?>> portMatches = this::exposesDefaultRoutes;
         for (List<UriRoute> routes : routesByMethod.values()) {
             for (int i = 0; i < routes.size(); i++) {
                 UriRoute route = routes.get(i);
@@ -175,6 +191,20 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 }
             }
         }
+    }
+
+    @Override
+    public boolean exposesDefaultRoutes(HttpRequest<?> request) {
+        Set<Integer> defaultPorts = ports;
+        if (defaultPorts == null) {
+            return true;
+        }
+        // a listener that has no port, e.g. a UNIX domain socket, tells whether it exposes them
+        Optional<Boolean> listenerExposes = request.getAttribute(LISTENER_EXPOSES_DEFAULT_ROUTES, Boolean.class);
+        if (listenerExposes.isPresent()) {
+            return listenerExposes.get();
+        }
+        return defaultPorts.contains(request.getServerAddress().getPort());
     }
 
     @NonNull

@@ -374,7 +374,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (routeMatch == null) {
 
             //Check if there is a file for the route before returning route not found
-            Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
+            // static resources are default routes, not served on a listener that does not expose them
+            Optional<? extends FileCustomizableResponseType> optionalFile = router.exposesDefaultRoutes(request) ? matchFile(requestPath) : Optional.empty();
 
             if (optionalFile.isPresent()) {
                 if (httpMethod != HttpMethod.GET && httpMethod != HttpMethod.HEAD) {

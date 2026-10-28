@@ -170,6 +170,8 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
 
         Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getUri().toString(), msg)
                 .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
+                // WebSocket endpoints are default routes, not upgraded on a listener that does not expose them
+                .filter(rm -> rm.getRoute().getPort() != null || router.exposesDefaultRoutes(msg))
                 .findFirst();
 
         MutableHttpResponse<?> proceed = HttpResponse.ok();
