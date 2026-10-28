@@ -43,6 +43,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -137,6 +138,10 @@ abstract class MultiplexedServerHandler {
         private BufferConsumer.@Nullable Upstream writerUpstream;
         @Nullable
         private InputStreamer streamer;
+        /**
+         * Whether the end of the request body was handed to {@link #streamer}.
+         */
+        private boolean inputEnded;
         /**
          * The writer of the streaming response, once it is up for writing.
          */
@@ -306,6 +311,7 @@ abstract class MultiplexedServerHandler {
             } else {
                 streamer.add(byteBodyFactory().readBufferFactory().adapt(data));
                 if (endOfStream) {
+                    inputEnded = true;
                     streamer.complete();
                 }
             }
@@ -325,6 +331,7 @@ abstract class MultiplexedServerHandler {
                 return;
             }
             if (streamer != null) {
+                inputEnded = true;
                 streamer.completeWithTrailers(trailers);
             } else if (!requestAccepted) {
                 // the full request arrived before read complete
@@ -400,6 +407,12 @@ abstract class MultiplexedServerHandler {
          */
         final void discardBufferedContent() {
             closed = true;
+            if (streamer != null && !inputEnded && !reset) {
+                // the body is streaming and will not receive any more data: fail it, so that its
+                // consumer stops waiting and releases what it holds. This runs before
+                // onStreamClosed sets reset, which would skip it
+                onRstStreamRead(new ClosedChannelException());
+            }
             if (bufferedContent != null) {
                 for (ByteBuf buf : bufferedContent) {
                     buf.release();
