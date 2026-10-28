@@ -181,6 +181,7 @@ import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -887,9 +888,18 @@ public class DefaultHttpClient implements
 
             boolean isJsonStream = response.getContentType().map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE)).orElse(false);
             boolean streamArray = !Iterable.class.isAssignableFrom(type.getType()) && !isJsonStream;
+            // bytes received since the last node was emitted. A node is emitted as soon as it is
+            // complete, so this bounds the size of the node that is being buffered
+            AtomicLong pendingNodeBytes = new AtomicLong();
+            long maxNodeSize = configuration.getMaxContentLength();
             Processor<byte[], JsonNode> jsonProcessor = mediaTypeCodec.getJsonMapper().createReactiveParser(p -> {
                 httpContentReactiveSequence.map(content -> {
                     ByteBuf chunk = content.content();
+                    long pending = pendingNodeBytes.addAndGet(chunk.readableBytes());
+                    if (pending > maxNodeSize) {
+                        chunk.release();
+                        throw new ContentLengthExceededException(maxNodeSize, pending);
+                    }
                     if (log.isTraceEnabled()) {
                         log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
                                 chunk.readableBytes(), request.getMethodName(), request.getUri());
@@ -903,6 +913,7 @@ public class DefaultHttpClient implements
                 }).subscribe(p);
             }, streamArray);
             return Flux.from(jsonProcessor)
+                    .doOnNext(jsonNode -> pendingNodeBytes.set(0))
                     .map(jsonNode -> mediaTypeCodec.decode(type, jsonNode));
         }).doOnTerminate(() -> {
             final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
