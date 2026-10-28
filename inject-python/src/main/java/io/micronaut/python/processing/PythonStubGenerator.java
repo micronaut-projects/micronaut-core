@@ -5876,17 +5876,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * What the priming method of a stub fills one slot with.
-     *
-     * @param slot      The slot
-     * @param property  The attribute
-     * @param converter The conversion of the attribute, as its reader converts it
-     * @param wrapper   Whether the type is the generated class of a plain class of the compilation
-     */
-    private record FixedPrime(FieldDef slot, String property, ExpressionDef converter, boolean wrapper) {
-    }
-
-    /**
      * The binding of the stored Python object of an introspected stub, when it stores one.
      */
     private static StatementDef bindStoredValue(ClassStubModel model, VariableDef.This aThis) {
@@ -8238,6 +8227,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         List<String> nestedMemberNames,
         String displayName,
         String cacheKey) {
+    }
+
+    /**
+     * What the priming method of a stub fills one slot with.
+     *
+     * @param slot      The slot
+     * @param property  The attribute
+     * @param converter The conversion of the attribute, as its reader converts it
+     * @param wrapper   Whether the type is the generated class of a plain class of the compilation
+     */
+    private record FixedPrime(FieldDef slot, String property, ExpressionDef converter, boolean wrapper) {
     }
 
     /**

@@ -651,6 +651,7 @@ public sealed interface Ir {
          * @param moduleLevel    Whether the function is a module-level function
          * @param exceptions     How the Java exception of a Python exception class the body throws reaches a Python caller
          */
+        @SuppressWarnings("checkstyle:ParameterNumber")
         public CompiledBody(String className, String methodName, List<String> parameterNames, List<String> parameterTypes,
                             String returnType, Body body, @Nullable SourceSpan span, StaticCompilationDecision.Stats stats,
                             boolean wrapsCheckedExceptions, boolean advised, boolean staticMethod, boolean moduleLevel,
