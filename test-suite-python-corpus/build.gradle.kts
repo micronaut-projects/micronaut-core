@@ -103,6 +103,15 @@ tasks.named<Test>("test") {
         inputs.files(override.map { files(it) }.orElse(files()))
             .withPropertyName("corpus.$corpus.dir").withPathSensitivity(PathSensitivity.RELATIVE)
     }
+    // the stage times StaticCompilationBudgetTest prints, one clock read per stage
+    systemProperty("micronaut.python.timings", "true")
+    // the budget test: -Pcorpus.budget.assert asserts the ratio of the modes, the others set the repeats
+    listOf("corpus.budget.rounds", "corpus.budget.warmup", "corpus.budget.copies", "corpus.budget.limit").forEach { name ->
+        providers.gradleProperty(name).orNull?.let { systemProperty(name, it) }
+    }
+    providers.gradleProperty("corpus.budget.assert").orNull?.let {
+        systemProperty("corpus.budget.assert", (it.isEmpty() || it.toBoolean()).toString())
+    }
     // the class paths of the applications, given to the compiler by the test
     doFirst {
         systemProperty("corpus.fullstack.classpath", fullstackClasspath.asPath)
