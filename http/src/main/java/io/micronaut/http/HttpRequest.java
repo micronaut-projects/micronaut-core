@@ -184,6 +184,10 @@ public interface HttpRequest<B> extends HttpMessage<B> {
                 if (text.indexOf(',') > -1) {
                     text = text.split(",")[0];
                 }
+                // the JDK caches per-locale data for every distinct tag, so ignore over-long tags
+                if (text.length() > 64) {
+                    return Locale.getDefault().toLanguageTag();
+                }
                 return text;
             })
             .map(Locale::forLanguageTag);
