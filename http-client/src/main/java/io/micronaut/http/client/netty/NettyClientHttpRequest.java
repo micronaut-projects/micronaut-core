@@ -119,11 +119,24 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
         return attributes;
     }
 
+    private static String encodeCookie(NettyCookie cookie) {
+        // the lax encoder does not validate: a ';' would end the pair and start another cookie
+        rejectSeparator("name", cookie.getName());
+        rejectSeparator("value", cookie.getValue());
+        return ClientCookieEncoder.LAX.encode(cookie.getNettyCookie());
+    }
+
+    private static void rejectSeparator(String what, String text) {
+        if (text != null && text.indexOf(';') >= 0) {
+            throw new IllegalArgumentException("Cookie " + what + " contains the invalid character ';'");
+        }
+    }
+
     @Override
     public MutableHttpRequest<B> cookie(Cookie cookie) {
         if (cookie instanceof NettyCookie) {
             NettyCookie nettyCookie = (NettyCookie) cookie;
-            String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+            String value = encodeCookie(nettyCookie);
             cookies.put(cookie.getName(), value);
             String headerValue;
             if (cookies.size() > 1) {
@@ -144,7 +157,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
             for (Cookie cookie: cookies) {
                 if (cookie instanceof NettyCookie) {
                     NettyCookie nettyCookie = (NettyCookie) cookie;
-                    String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+                    String value = encodeCookie(nettyCookie);
                     this.cookies.put(cookie.getName(), value);
                 } else {
                     throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
