@@ -21,6 +21,7 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
@@ -79,6 +80,16 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         if (msg.decoderResult().isFailure()) {
             ReferenceCountUtil.release(msg);
             exceptionCaught(ctx, msg.decoderResult().cause());
+            return;
+        }
+        // the state takes ownership of the message, but only of the kind it expects. Anything else
+        // is out of order, e.g. an HTTP/2 DATA frame before the HEADERS frame, and is released here
+        boolean expectResponse = state instanceof BeforeResponse;
+        if (expectResponse ? !(msg instanceof HttpResponse) : !(msg instanceof HttpContent)) {
+            ReferenceCountUtil.release(msg);
+            exceptionCaught(ctx, new HttpClientException(expectResponse ?
+                "Received response content before the response headers" :
+                "Received response headers before the end of the response content"));
             return;
         }
 
