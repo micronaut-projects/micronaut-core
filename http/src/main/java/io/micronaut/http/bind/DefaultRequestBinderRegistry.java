@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.http.bind;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -82,6 +83,10 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         new ConcurrentLinkedHashMap.Builder<TypeAndAnnotation, Optional<RequestArgumentBinder>>().maximumWeightedCapacity(CACHE_MAX_SIZE).build();
     private final List<RequestArgumentBinder<Object>> unmatchedBinders = new ArrayList<>();
     private final DefaultUnmatchedRequestArgumentBinder defaultUnmatchedRequestArgumentBinder;
+    /**
+     * The binder of the request itself, see {@link #bindsRequestAsIs(Argument)}.
+     */
+    private final RequestArgumentBinder<HttpRequest<?>> requestBinder;
 
     /**
      * @param conversionService The conversion service
@@ -117,7 +122,8 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         registerDefaultAnnotationBinders(byAnnotation);
 
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (RequestArgumentBinder<HttpHeaders>) (argument, source) -> () -> Optional.of(source.getHeaders()));
-        byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest<?>>) (argument, source) -> convertBodyIfNecessary(bodyAnnotationBinder, argument, source, RequestType.STANDARD));
+        requestBinder = (argument, source) -> convertBodyIfNecessary(bodyAnnotationBinder, argument, source, RequestType.STANDARD);
+        byType.put(Argument.of(HttpRequest.class).typeHashCode(), requestBinder);
         byType.put(Argument.of(ServerHttpRequest.class).typeHashCode(), (RequestArgumentBinder<ServerHttpRequest<?>>) (argument, source) -> {
             if (source instanceof ServerHttpRequest<?>) {
                 return convertBodyIfNecessary(bodyAnnotationBinder, argument, source, RequestType.SERVER);
@@ -172,6 +178,28 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     @Override
     public void addUnmatchedRequestArgumentBinder(RequestArgumentBinder<Object> binder) {
         unmatchedBinders.add(binder);
+    }
+
+    @Internal
+    @Override
+    public boolean bindsRequestAsIs(Argument<?> argument) {
+        // a subclass may find another binder than the one registered here
+        if (getClass() != DefaultRequestBinderRegistry.class
+            || argument.getType() != HttpRequest.class
+            || argument.getAnnotationMetadata().hasStereotype(Bindable.class)) {
+            return false;
+        }
+        // the request with a body type has its body converted, see convertBodyIfNecessary
+        Argument<?> bodyType = argument.getFirstTypeVariable().orElse(null);
+        if (bodyType != null && bodyType.getType() != Object.class && bodyType.getType() != Void.class) {
+            return false;
+        }
+        // not replaced by a binder added for the request
+        RequestArgumentBinder<?> binder = byType.get(argument.typeHashCode());
+        if (binder == null) {
+            binder = byType.get(Argument.of(argument.getType()).typeHashCode());
+        }
+        return binder == requestBinder;
     }
 
     @Override
@@ -284,7 +312,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 return new PendingRequestBindingResult<>() {
                     @Override
                     public boolean isPending() {
-                        return bodyBound instanceof PendingRequestBindingResult<Object> p && p.isPending();
+                        return bodyBound.isPending();
                     }
 
                     @Override
