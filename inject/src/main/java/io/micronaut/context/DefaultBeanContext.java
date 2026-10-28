@@ -5820,6 +5820,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 }
                 continue;
             }
+            // a configuration bean it received is left out of the closure, but one of a class the restart replaces may still
+            // be held, as nothing makes the bean copy its values rather than keep it
+            Class<?> replacedConfiguration = configuration.replacedBy(criteria);
+            if (replacedConfiguration != null) {
+                if (LOG_LIFECYCLE.isWarnEnabled()) {
+                    LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: it was made from configuration of the class [{}], which the restart replaces",
+                        registration.bean, replacedConfiguration.getName());
+                }
+                continue;
+            }
             // as does one refusing a singleton it holds, which would be retained with the closure otherwise
             if (refusals.isRefused(registration, closure.subList(1, closure.size()))) {
                 continue;
@@ -6113,6 +6123,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         private final Set<String> invalidatedBy;
         private final boolean observing;
         private Set<String> observed = Set.of();
+        private Set<Class<?>> leftOut = Set.of();
 
         ClosureConfiguration(Set<String> invalidatedBy, boolean observing) {
             this.invalidatedBy = invalidatedBy;
@@ -6137,7 +6148,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 return false;
             }
             if (isCovered(prefix, invalidatedBy)) {
-                return true;
+                return leaveOut(definition);
             }
             if (!observing) {
                 return false;
@@ -6148,7 +6159,33 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 }
                 observed.add(prefix);
             }
+            return leaveOut(definition);
+        }
+
+        private boolean leaveOut(BeanDefinition<?> definition) {
+            if (leftOut.isEmpty()) {
+                leftOut = new LinkedHashSet<>();
+            }
+            leftOut.add(definition.getBeanType());
             return true;
+        }
+
+        /**
+         * The first class of a configuration bean left out of the closure that the restart replaces: the next context
+         * binds the configuration again, but a retained bean that kept the instance, rather than copying its values,
+         * would keep the class of the generation that stops.
+         *
+         * @param criteria The criteria, which know what the restart replaces
+         * @return The class, or null when the restart replaces none
+         */
+        @Nullable
+        Class<?> replacedBy(RetentionCriteria criteria) {
+            for (Class<?> type : leftOut) {
+                if (criteria.isReplaced(type)) {
+                    return type;
+                }
+            }
+            return null;
         }
 
         /**
