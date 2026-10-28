@@ -164,8 +164,12 @@ jobs:
                 '' }}
       - name: "⏱ Assert the compile-time budget of static compilation"
         run: |
+          # five cold rounds, each compilation in a JVM of its own as a build compiles, with the arguments of the
+          # build's Python compile tasks (no JVMCI compiler, the default Truffle runtime)
           ./gradlew :test-suite-python-corpus:test -Ppython-ci --tests '*StaticCompilationBudgetTest' \
-            -Pcorpus.budget.assert --no-daemon
+            -Pcorpus.budget.assert -Pcorpus.budget.cold=5 -Pcorpus.budget.rounds=0 \
+            -Pcorpus.budget.jvm-args="-XX:+UnlockExperimentalVMOptions -XX:-UseJVMCICompiler -Dtruffle.TruffleRuntime=com.oracle.truffle.api.impl.DefaultTruffleRuntime" \
+            --no-daemon
       - name: "📊 Publish the budget"
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
