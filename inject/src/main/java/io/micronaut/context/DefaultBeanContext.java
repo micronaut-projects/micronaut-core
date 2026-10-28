@@ -487,6 +487,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     /**
+     * Whether the context is stopping or stopped: neither running nor starting. Unlike {@code !isRunning()}, false
+     * while the context starts, such as while a {@link StartupEvent} listener runs.
+     *
+     * @return Whether the context is stopping or stopped
+     * @since 5.3.0
+     */
+    @Internal
+    public boolean isStoppingOrStopped() {
+        return isShuttingDown();
+    }
+
+    /**
      * The start method will read all bean definition classes found on the classpath and initialize any pre-required
      * state.
      */
