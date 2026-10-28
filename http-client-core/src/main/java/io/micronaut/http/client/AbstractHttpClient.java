@@ -1694,8 +1694,13 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 if (!(handlerRegistry.getReader(type, List.of(mediaType)) instanceof ChunkedMessageBodyReader<O> reader)) {
                     throw new CodecException("No reader of the elements of a [" + mediaType + "] body");
                 }
-                Publisher<? extends O> decoded = reader.readChunked(type, mediaType, response.getHeaders(),
-                    response.byteBody().toByteBufferPublisher());
+                Publisher<ByteBuffer<?>> input = response.byteBody().toByteBufferPublisher();
+                Publisher<? extends O> decoded = Iterable.class.isAssignableFrom(type.getType())
+                    // a collection type reads a top-level JSON array as one value, which the
+                    // element-limited read would unwrap
+                    ? reader.readChunked(type, mediaType, response.getHeaders(), input)
+                    // every element is buffered in memory before it is decoded
+                    : reader.readChunked(type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize());
                 return new ElementResponse<>(response, decoded);
             }, Publisher.class, Flux::empty, response -> Flux.from(Objects.requireNonNull(response.body())).subscribe(new reactor.core.publisher.BaseSubscriber<O>() {
                 @Override
