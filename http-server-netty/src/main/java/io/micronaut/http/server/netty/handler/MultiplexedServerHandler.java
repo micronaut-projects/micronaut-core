@@ -44,6 +44,7 @@ import io.netty.handler.codec.http2.Http2Exception;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
@@ -91,6 +92,10 @@ abstract class MultiplexedServerHandler {
         private List<ByteBuf> bufferedContent;
         private BufferConsumer.Upstream writerUpstream;
         private InputStreamer streamer;
+        /**
+         * Whether the end of the request body was handed to {@link #streamer}.
+         */
+        private boolean inputEnded;
 
         private Object attachment;
 
@@ -172,22 +177,7 @@ abstract class MultiplexedServerHandler {
 
                 if (endOfStream) {
                     // we got the full message before readComplete
-                    ByteBuf fullBody;
-                    if (bufferedContent == null) {
-                        fullBody = data;
-                    } else {
-                        CompositeByteBuf composite = ctx.alloc().compositeBuffer();
-                        for (ByteBuf c : bufferedContent) {
-                            composite.addComponent(true, c);
-                        }
-                        composite.addComponent(true, data);
-                        fullBody = composite;
-                    }
-                    bufferedContent = null;
-
-                    requestAccepted = true;
-                    notifyDataConsumed(fullBody.readableBytes());
-                    requestHandler.accept(ctx, request, byteBodyFactory().createChecked(bodySizeLimits, fullBody), this);
+                    acceptFullBody(data);
                 } else {
                     if (bufferedContent == null) {
                         bufferedContent = new ArrayList<>();
@@ -197,6 +187,7 @@ abstract class MultiplexedServerHandler {
             } else {
                 streamer.add(byteBodyFactory().readBufferFactory().adapt(data));
                 if (endOfStream) {
+                    inputEnded = true;
                     streamer.complete();
                 }
             }
@@ -204,7 +195,55 @@ abstract class MultiplexedServerHandler {
         }
 
         /**
-         * Called on read complete. This makes the stream devolve into streaming mode, i.e. give up
+         * Accept the request with the buffered content and the given last piece as its full body.
+         *
+         * @param data The last piece of the body. Release ownership is transferred to this method
+         */
+        private void acceptFullBody(ByteBuf data) {
+            ByteBuf fullBody;
+            if (bufferedContent == null) {
+                fullBody = data;
+            } else {
+                CompositeByteBuf composite = ctx.alloc().compositeBuffer();
+                for (ByteBuf c : bufferedContent) {
+                    composite.addComponent(true, c);
+                }
+                composite.addComponent(true, data);
+                fullBody = composite;
+            }
+            bufferedContent = null;
+
+            requestAccepted = true;
+            notifyDataConsumed(fullBody.readableBytes());
+            requestHandler.accept(ctx, request, byteBodyFactory().createChecked(bodySizeLimits, fullBody), this);
+        }
+
+        /**
+         * Called when request trailers are read. The trailer values are not exposed to the
+         * application, but the END_STREAM flag they carry completes the request body.
+         *
+         * @param endOfStream Whether this is the last request packet
+         */
+        final void onTrailersRead(boolean endOfStream) {
+            if (!endOfStream || inputEnded || reset || closed || request == null) {
+                return;
+            }
+            if (streamer == null) {
+                if (requestAccepted) {
+                    // the request had no body and was accepted with the headers
+                    return;
+                }
+                // we got the full message before readComplete
+                acceptFullBody(Unpooled.EMPTY_BUFFER);
+            } else {
+                inputEnded = true;
+                streamer.complete();
+            }
+        }
+
+        /**
+         * Called on read complete.
+ This makes the stream devolve into streaming mode, i.e. give up
          * on buffering data in hopes of reading it all in one go.
          */
         final void devolveToStreaming() {
@@ -254,6 +293,11 @@ abstract class MultiplexedServerHandler {
          */
         final void discardBufferedContent() {
             closed = true;
+            if (streamer != null && !inputEnded && !reset) {
+                // the body is streaming and will not receive any more data: fail it, so that its
+                // consumer stops waiting and releases what it holds
+                onRstStreamRead(new ClosedChannelException());
+            }
             if (bufferedContent != null) {
                 for (ByteBuf buf : bufferedContent) {
                     buf.release();

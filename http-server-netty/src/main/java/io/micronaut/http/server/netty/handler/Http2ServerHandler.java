@@ -130,13 +130,15 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     @Override
     public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int streamDependency, short weight, boolean exclusive, int padding, boolean endOfStream) throws Http2Exception {
         io.netty.handler.codec.http2.Http2Stream str = connectionHandler.connection().stream(streamId);
-        Http2Stream stream = new Http2Stream(str);
-        Http2Stream existing = str.setProperty(streamKey, stream);
+        Http2Stream existing = str.getProperty(streamKey);
         if (existing != null) {
-            // ignore trailer and revert the setProperty. should not be hot path
-            str.setProperty(streamKey, existing);
+            // second HEADERS frame on the stream: trailers. Netty only accepts these with
+            // END_STREAM set, so this completes the request body.
+            existing.onTrailersRead(endOfStream);
             return;
         }
+        Http2Stream stream = new Http2Stream(str);
+        str.setProperty(streamKey, stream);
         HttpRequest request;
         try {
             request = HttpConversionUtil.toHttpRequest(streamId, headers, true);
