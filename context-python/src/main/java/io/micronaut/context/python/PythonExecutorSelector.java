@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.python.annotation.EventLoopSafe;
 import io.micronaut.context.python.annotation.PythonClass;
+import io.micronaut.context.python.annotation.PythonModule;
 import io.micronaut.core.type.TypeInformation;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
@@ -112,7 +113,9 @@ final class PythonExecutorSelector extends DefaultExecutorSelector {
             return false;
         }
         Class<?> declaringType = method.getDeclaringType();
+        // a module served by a context pool, or any other module (a singleton one implements ValueCoercible only)
         return declaringType.isAnnotationPresent(PythonClass.class)
+            || declaringType.isAnnotationPresent(PythonModule.class)
             || PooledValueCoercible.class.isAssignableFrom(declaringType);
     }
 }
