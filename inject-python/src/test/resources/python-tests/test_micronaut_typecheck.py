@@ -213,7 +213,7 @@ class Account:
 
 class FunctionNodeTest(unittest.TestCase):
     def test_a_name_defined_twice_maps_to_the_definition_on_the_recorded_line(self):
-        from micronaut_typecheck import _function_node
+        from micronaut_typecheck import function_node
         tree = ast.parse(ACCESSORS)
         class_node = tree.body[0]
 
@@ -232,8 +232,8 @@ class FunctionNodeTest(unittest.TestCase):
                 return self._span
 
         getter, setter = class_node.body
-        self.assertIs(getter, _function_node(class_node, "owner", Def(getter.lineno)))
-        self.assertIs(setter, _function_node(class_node, "owner", Def(setter.lineno)))
-        self.assertIs(getter, _function_node(class_node, "owner"))
+        self.assertIs(getter, function_node(class_node, "owner", Def(getter.lineno)))
+        self.assertIs(setter, function_node(class_node, "owner", Def(setter.lineno)))
+        self.assertIs(getter, function_node(class_node, "owner"))
 
 
