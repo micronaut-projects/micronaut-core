@@ -3,7 +3,8 @@
 Pinned copies of the Python sources of two real Pyronaut applications, compiled by
 `StaticCompilationCorpusTest` with the type checker at `error` and static compilation in mode
 `all`. The test asserts that both build, that the checker reports nothing, and that every
-decision of the static compiler (each function with its outcome) is the one recorded in
+decision of the static compiler (each function with its outcome, and for a compiled body whether
+its Python callers run the Java body: `delegation=retry|once|static|static-once|none(<why>)`) is the one recorded in
 `<name>.decisions.txt`: a regression in the compile rate of either project fails the build, and
 so does a change that loses some compiled bodies while gaining others.
 
