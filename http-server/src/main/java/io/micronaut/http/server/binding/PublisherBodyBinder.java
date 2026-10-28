@@ -115,9 +115,16 @@ public final class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<
                 if (reader.isPresent()) {
                     // the body is taken now, but only read once the route subscribes
                     Publisher<ByteBuffer<?>> input = UnconsumedBodyGuard.openWhenSubscribed(source, rootBody.move(), ByteBody::toByteBufferPublisher);
-                    // every element is buffered in memory before it is decoded
-                    Publisher<?> pub = reader.get().readChunked(targetType, mediaType, source.getHeaders(), input,
-                        bodyAnnotationBinder.maxRequestBufferSize());
+                    Publisher<?> pub;
+                    if (Iterable.class.isAssignableFrom(targetType.getType())) {
+                        // Publisher<List<T>> reads a top-level JSON array as one value, which the
+                        // element-limited read would unwrap
+                        pub = reader.get().readChunked(targetType, mediaType, source.getHeaders(), input);
+                    } else {
+                        // every element is buffered in memory before it is decoded
+                        pub = reader.get().readChunked(targetType, mediaType, source.getHeaders(), input,
+                            bodyAnnotationBinder.maxRequestBufferSize());
+                    }
                     return () -> Optional.of(convertPublisher(pub, context));
                 }
             }
