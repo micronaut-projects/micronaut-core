@@ -44,6 +44,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * A {@link MediaTypeCodec} that will encode {@link Event} objects in order to support Server Sent Events.
@@ -67,6 +68,7 @@ public class TextStreamCodec implements MediaTypeCodec {
     private static final byte[] RETRY_PREFIX = "retry: ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] COMMENT_PREFIX = ": ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
+    private static final Pattern LINE_BREAK = Pattern.compile("\r\n|\r|\n");
 
     private final BeanProvider<MediaTypeCodecRegistry> codecRegistryProvider;
     private final ByteBufferFactory byteBufferFactory;
@@ -162,37 +164,71 @@ public class TextStreamCodec implements MediaTypeCodec {
             body = jsonCodec.encode(data);
         }
         ByteBuffer eventData = allocator.buffer(body.length + 10);
-        writeAttribute(eventData, COMMENT_PREFIX, event.getComment());
-        writeAttribute(eventData, ID_PREFIX, event.getId());
-        writeAttribute(eventData, EVENT_PREFIX, event.getName());
+        String comment = event.getComment();
+        if (comment != null) {
+            // each line of the comment is a comment line of its own
+            for (String line : LINE_BREAK.split(comment, -1)) {
+                writeAttribute(eventData, COMMENT_PREFIX, line);
+            }
+        }
+        // the id and the name cannot contain line breaks, and clients ignore an id that contains NUL
+        writeAttribute(eventData, ID_PREFIX, removeChars(event.getId(), "\r\n\0"));
+        writeAttribute(eventData, EVENT_PREFIX, removeChars(event.getName(), "\r\n"));
         Duration retry = event.getRetry();
         if (retry != null) {
             writeAttribute(eventData, RETRY_PREFIX, String.valueOf(retry.toMillis()));
         }
 
-        // Write the data
-        int start = 0;
-        while (start < body.length) {
-            int end = indexOf(body, (byte) '\n', start);
-            if (end == -1) {
-                end = body.length - 1;
+        // Write the data, one data line per line. CRLF, LF and CR all end a line, and a trailing line
+        // break gets a final empty data line. Empty data gets no data line, so that clients don't
+        // dispatch an event, e.g. for a comment used as keep-alive
+        if (body.length > 0) {
+            int start = 0;
+            while (true) {
+                int end = indexOfLineBreak(body, start);
+                if (end == -1) {
+                    eventData.write(DATA_PREFIX).write(body, start, body.length - start).write(NEWLINE);
+                    break;
+                }
+                eventData.write(DATA_PREFIX).write(body, start, end - start).write(NEWLINE);
+                start = end + 1;
+                if (body[end] == '\r' && start < body.length && body[start] == '\n') {
+                    start++;
+                }
             }
-            eventData.write(DATA_PREFIX).write(body, start, end - start + 1);
-            start = end + 1;
         }
 
-        // Write new lines for event separation
-        eventData.write(NEWLINE).write(NEWLINE);
+        // Write new line for event separation
+        eventData.write(NEWLINE);
         return eventData;
     }
 
-    private static int indexOf(byte[] haystack, @SuppressWarnings("SameParameterValue") byte needle, int start) {
+    private static int indexOfLineBreak(byte[] haystack, int start) {
         for (int i = start; i < haystack.length; i++) {
-            if (haystack[i] == needle) {
+            if (haystack[i] == '\n' || haystack[i] == '\r') {
                 return i;
             }
         }
         return -1;
+    }
+
+    @Nullable
+    private static String removeChars(@Nullable String value, String chars) {
+        if (value == null) {
+            return null;
+        }
+        StringBuilder builder = null;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (chars.indexOf(c) != -1) {
+                if (builder == null) {
+                    builder = new StringBuilder(value.length()).append(value, 0, i);
+                }
+            } else if (builder != null) {
+                builder.append(c);
+            }
+        }
+        return builder == null ? value : builder.toString();
     }
 
     private MediaTypeCodecRegistry resolveMediaTypeCodecRegistry() {
