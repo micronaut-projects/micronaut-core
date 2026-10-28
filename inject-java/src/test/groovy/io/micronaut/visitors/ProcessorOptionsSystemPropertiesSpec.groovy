@@ -100,6 +100,43 @@ class Second {
         System.getProperty(OPTION) == 'previous'
     }
 
+    void 'the options of a compilation that ends without a final round are not seen by a later compilation'() {
+        when: 'javac cannot read a class generated in the first round, so it ends the processing without a final round'
+        compilerOptions = ["-A$OPTION=true".toString()]
+        OptionsVisitor.writeUnreadableClass = true
+        buildBeanDefinition('test.First', '''
+package test;
+
+@jakarta.inject.Singleton
+class First {
+}
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('bad class file')
+        OptionsVisitor.visitOptions == ['true']
+        OptionsVisitor.visitSystemProperties == ['true']
+
+        when:
+        OptionsVisitor.reset()
+        compilerOptions = []
+        buildBeanDefinition('test.Second', '''
+package test;
+
+@jakarta.inject.Singleton
+class Second {
+}
+''')
+
+        then:
+        OptionsVisitor.visitOptions == [null]
+        OptionsVisitor.visitSystemProperties == [null]
+        OptionsVisitor.finishOptions == [null]
+        OptionsVisitor.finishSystemProperties == [null]
+        System.getProperty(OPTION) == null
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         def visitor = new OptionsVisitor()
@@ -128,8 +165,10 @@ class Second {
         static List<String> visitSystemProperties = []
         static List<String> finishOptions = []
         static List<String> finishSystemProperties = []
+        static boolean writeUnreadableClass
 
         static void reset() {
+            writeUnreadableClass = false
             visitOptions = []
             visitSystemProperties = []
             finishOptions = []
@@ -140,6 +179,10 @@ class Second {
         void visitClass(ClassElement element, VisitorContext context) {
             visitOptions << context.options.get(OPTION)
             visitSystemProperties << System.getProperty(OPTION)
+            if (writeUnreadableClass) {
+                // an empty class file
+                context.visitClass(element.name + 'Unreadable', element).close()
+            }
         }
 
         @Override

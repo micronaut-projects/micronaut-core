@@ -36,6 +36,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
+import io.micronaut.inject.annotation.AnnotationBuilderRegistrations;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
@@ -233,6 +234,12 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public @NonNull ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
         return this.expressionCompilationContextFactory;
+    }
+
+    @Override
+    public AnnotationBuilderRegistrations getAnnotationBuilderRegistrations() {
+        // a context is created per source unit and phase, the compilation unit is shared by them
+        return AnnotationBuilderRegistrations.forCompilation(compilationUnit != null ? compilationUnit : sourceUnit);
     }
 
     @Override

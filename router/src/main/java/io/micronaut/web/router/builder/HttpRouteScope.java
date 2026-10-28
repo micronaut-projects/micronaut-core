@@ -422,6 +422,53 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
     }
 
     /**
+     * Route the requests under a prefix to the routes of a target that a locator locates on an
+     * executor, e.g. {@link io.micronaut.scheduling.TaskExecutors#BLOCKING}: the same as
+     * {@link #locate(String, LocatorHandler, Function)}, but the locator may block, e.g. to load
+     * the target from a database. The router runs the locator on the executor, with the
+     * propagated context of the request, and matches the rest of the path with the routes of the
+     * target when it returns, like {@link #locateAsync(String, AsyncLocatorHandler, Function)},
+     * whose rules apply: the target is located once per request, {@code null} answers
+     * {@code 404}, and an exception of the locator is answered by the error routes.
+     *
+     * <pre>{@code
+     * routes.locateOn(TaskExecutors.BLOCKING, "/orders/{id}",
+     *     (request, pathVariables) -> orders.find(pathVariables.getLong("id")), // blocks, null: 404
+     *     order -> orderRoutes);
+     * }</pre>
+     *
+     * <p>The executor is the one of the name that {@link io.micronaut.scheduling.annotation.ExecuteOn}
+     * and {@link HttpRouteSpec#executeOn(String)} select for a handler, looked up when the
+     * locator first runs. It runs the locator only: the located routes run on the executor
+     * of their own settings.</p>
+     *
+     * @param executorName The name of the executor that runs the locator
+     * @param prefixUri    The URI template of the prefix
+     * @param locator      Locates the target, or answers {@code null} for {@code 404}
+     * @param routesOf     The routes of a located target
+     * @param <T>          The type of the target
+     * @since 5.3.0
+     */
+    <T> void locateOn(String executorName, String prefixUri, LocatorHandler<? extends T> locator,
+                      Function<? super T, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix to one set of routes of the targets a locator locates on
+     * an executor, see {@link #locateOn(String, String, LocatorHandler, Function)}.
+     *
+     * @param executorName The name of the executor that runs the locator
+     * @param prefixUri    The URI template of the prefix
+     * @param locator      Locates the target, or answers {@code null} for {@code 404}
+     * @param routes       The routes of every located target
+     * @param <T>          The type of the target
+     * @since 5.3.0
+     */
+    default <T> void locateOn(String executorName, String prefixUri, LocatorHandler<? extends T> locator, LocatedRoutes<T> routes) {
+        Objects.requireNonNull(routes, "routes");
+        locateOn(executorName, prefixUri, locator, target -> routes);
+    }
+
+    /**
      * Route the requests under a prefix to the routes of a target located asynchronously, e.g.
      * loaded from a database: the same as {@link #locate(String, LocatorHandler, Function)}, but
      * the locator returns a stage of the target, and the router matches the rest of the path with
@@ -468,4 +515,21 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
         locateAsync(prefixUri, locator, target -> routes);
     }
 
+    /**
+     * Declare a locator route whose locator reads the body of the request, e.g. a form, before it
+     * locates the target: the body stage, {@link LocatorSpec#body(io.micronaut.core.type.Argument)},
+     * {@link LocatorSpec#body()} or {@link LocatorSpec#form()}, followed by the locator. The
+     * located routes read the body again. See {@link LocatorSpec}.
+     *
+     * <pre>{@code
+     * routes.locator("/accounts/{id}")
+     *     .form()
+     *     .locate((request, pathVariables, form) -> accounts.find(form.getString("token")), accountRoutes);
+     * }</pre>
+     *
+     * @param prefixUri The prefix, see {@link #locate(String, LocatorHandler, Function)}
+     * @return The body stage of the locator route
+     * @since 5.3.0
+     */
+    LocatorSpec locator(String prefixUri);
 }
