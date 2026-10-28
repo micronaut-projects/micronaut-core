@@ -16,13 +16,12 @@
 package io.micronaut.http.server.util;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.HttpDates;
 
 import java.time.Instant;
-import java.time.format.DateTimeFormatter;
 
 /**
- * Produces the value of the {@code Date} response header (RFC 1123, GMT). The text only changes
+ * Produces the value of the {@code Date} response header (IMF-fixdate, GMT). The text only changes
  * once per second, so it is cached in a {@link PerSecondCache} shared by every response writer
  * instead of being formatted for each response.
  *
@@ -38,7 +37,7 @@ public final class HttpDateHeader {
     /**
      * The {@code Date} header value for the current wall-clock time.
      *
-     * @return The RFC 1123 text
+     * @return The IMF-fixdate text
      */
     public static String now() {
         return CACHE.now();
@@ -48,13 +47,13 @@ public final class HttpDateHeader {
      * The {@code Date} header value for the given instant.
      *
      * @param epochMillis The instant, in milliseconds since the epoch
-     * @return The RFC 1123 text
+     * @return The IMF-fixdate text
      */
     public static String get(long epochMillis) {
         return CACHE.get(epochMillis);
     }
 
     private static String format(long epochSecond) {
-        return DateTimeFormatter.RFC_1123_DATE_TIME.format(Instant.ofEpochSecond(epochSecond).atZone(MutableHttpHeaders.GMT));
+        return HttpDates.format(Instant.ofEpochSecond(epochSecond));
     }
 }
