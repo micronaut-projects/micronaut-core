@@ -99,6 +99,10 @@ final class DevEventLoopGroups implements RetainedEventLoopGroups {
         }
         if (retained != null) {
             // made from other settings, which the application's code set rather than its configuration, or shut down
+            if (retained.claimed == generation && !retained.group.isShuttingDown() && LOG.isWarnEnabled()) {
+                // asked for during this generation already, by a registry that may still hold it
+                LOG.warn("Event loop group [{}] was asked for twice in one generation with different settings: the group made first is shut down", name);
+            }
             groups.remove(name);
             retained.shutdown();
         }
@@ -190,7 +194,9 @@ final class DevEventLoopGroups implements RetainedEventLoopGroups {
         final Duration quietPeriod;
         final Duration timeout;
         /**
-         * The generation, counted as {@link #generation} is, that last asked for the group.
+         * The generation, counted as {@link #generation} is, that last asked for the group. A group a registry creates
+         * lazily, such as a client's, after the watch ended the generation is stamped with the next generation's count:
+         * should that generation not ask for it, it is shut down one generation late, which is harmless.
          */
         long claimed;
 
