@@ -60,6 +60,28 @@ class StaticCompilationReportTest {
     }
 
     @Test
+    void theDelegationOfACompiledBodyIsReported(@TempDir Path directory) throws IOException {
+        StaticCompilationDecision retried = new StaticCompilationDecision("shop.Pricing.total", new SourceSpan("src/shop/pricing.py", 14, 5, 14, 9),
+            Outcome.COMPILED, Scope.MODE, List.of(), new Stats(3, 1, 0, 0), "retry");
+        StaticCompilationDecision kept = new StaticCompilationDecision("shop.Pricing.tax", new SourceSpan("src/shop/pricing.py", 20, 5, 20, 9),
+            Outcome.COMPILED, Scope.MODE, List.of(), new Stats(1, 0, 0, 0), "none(parameter [rates] is a [java.util.Map], which a Python argument does not reach unchanged)");
+
+        Properties properties = new Properties();
+        kept.writeTo(properties, "decision.0.");
+        assertEquals(kept, StaticCompilationDecision.fromProperties(properties, "decision.0."));
+        assertTrue(retried.toJson().endsWith("\"helperCalls\":0},\"delegation\":\"retry\"}"), retried.toJson());
+        assertNull(decision("shop.Pricing.total", "src/shop/pricing.py", 14, Outcome.SKIPPED).delegation());
+
+        StaticCompilationReport.write(directory, StaticCompilationMode.ALL, List.of(retried, kept), null);
+        String summary = Files.readString(directory.resolve(StaticCompilationReport.SUMMARY_FILE));
+        assertTrue(summary.contains("COMPILED      shop.Pricing.total  src/shop/pricing.py:14:5\n"
+            + "              statements 3 · java calls 1 · bridge calls 0 · helpers 0\n"
+            + "              python callers: retry\n"), summary);
+        assertTrue(summary.contains("              python callers: none(parameter [rates] is a [java.util.Map], which a Python argument does not reach unchanged)\n"), summary);
+        assertTrue(summary.contains("delegation none         1\ndelegation retry        1\n"), summary);
+    }
+
+    @Test
     void everyReasonOfTheSummaryCarriesItsFix(@TempDir Path directory) throws IOException {
         StaticCompilationReport.write(directory, StaticCompilationMode.ALL, List.of(
             decision("shop.Orders.place", "src/shop/orders.py", 8, Outcome.SKIPPED,
