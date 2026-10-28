@@ -65,6 +65,8 @@ final class NettyStreamingFileUploadBinder implements TypedRequestArgumentBinder
                 .map(raw -> formFactory.get().streamFileUpload(raw))
                 .toFuture();
         BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(completableFuture));
+        // the upload is only read once the route consumes it
+        BasicHttpAttributes.addUnconsumedBodyDiscard(request, () -> completableFuture.thenAccept(StreamingFileUpload::close));
 
         return new PendingRequestBindingResult<>() {
 

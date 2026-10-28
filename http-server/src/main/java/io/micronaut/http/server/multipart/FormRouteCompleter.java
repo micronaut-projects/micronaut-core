@@ -22,6 +22,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.body.AvailableByteBody;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
@@ -32,6 +33,7 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Operators;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -54,6 +56,9 @@ import java.util.concurrent.atomic.AtomicReference;
 @Internal
 public final class FormRouteCompleter {
     private static final Logger LOG = LoggerFactory.getLogger(FormRouteCompleter.class);
+    private static final int UNCLAIMED = 0;
+    private static final int SUBSCRIBED = 1;
+    private static final int DISCARDED = 2;
 
     private final FormCapableHttpRequest<?> request;
 
@@ -119,6 +124,21 @@ public final class FormRouteCompleter {
         }
         started = true;
         request.getRawFormFields().subscribe(new SubscriberImpl());
+    }
+
+    /**
+     * Discard the fields of every parameter that has not subscribed to its field. This is called
+     * when the route fails before it returns. A parameter that was never subscribed to would
+     * otherwise keep its field buffered and stop the form from being read any further.
+     */
+    public void discardUnsubscribed() {
+        if (!started) {
+            // the body was never claimed, the request releases it
+            return;
+        }
+        for (Unicast unicast : fieldUnicasts.values()) {
+            unicast.discardIfUnsubscribed();
+        }
     }
 
     /**
@@ -257,6 +277,10 @@ public final class FormRouteCompleter {
     private final class Unicast implements Publisher<RawFormField>, Subscription {
         final SubscriptionMetadata metadata;
 
+        /**
+         * {@link #UNCLAIMED}, {@link #SUBSCRIBED} or {@link #DISCARDED}.
+         */
+        private final AtomicInteger claim = new AtomicInteger(UNCLAIMED);
         @Nullable
         private Subscriber<? super RawFormField> subscriber;
         @Nullable
@@ -274,7 +298,11 @@ public final class FormRouteCompleter {
 
         @Override
         public void subscribe(Subscriber<? super RawFormField> s) {
-            if (subscriber != null) {
+            int previous = claim.compareAndExchange(UNCLAIMED, SUBSCRIBED);
+            if (previous == DISCARDED) {
+                Operators.error(s, ByteBody.BodyDiscardedException.create());
+                return;
+            } else if (previous != UNCLAIMED) {
                 throw new IllegalStateException("Only one subscriber allowed");
             }
             // onSubscribe first to make sure that no other onX method is called before we're done
@@ -407,6 +435,12 @@ public final class FormRouteCompleter {
                 } else {
                     s.onComplete();
                 }
+            }
+        }
+
+        void discardIfUnsubscribed() {
+            if (claim.compareAndSet(UNCLAIMED, DISCARDED)) {
+                cancel();
             }
         }
 
