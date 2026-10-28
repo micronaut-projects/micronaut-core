@@ -822,7 +822,8 @@ public final class FormBinding {
     /**
      * @param argument The type a text field is converted to
      * @return Whether the type gets every value of the field: a collection or an array, or an
-     * {@code Optional} of one
+     * {@code Optional} of one. A {@code byte[]} is the content of a single field, not a value
+     * per field.
      */
     static boolean isMany(Argument<?> argument) {
         Class<?> type = argument.getType();
@@ -833,7 +834,7 @@ public final class FormBinding {
             }
             type = value.getType();
         }
-        return Iterable.class.isAssignableFrom(type) || type.isArray();
+        return Iterable.class.isAssignableFrom(type) || (type.isArray() && type != byte[].class);
     }
 
     static String name(Argument<?> argument) {
