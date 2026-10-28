@@ -22,6 +22,7 @@ import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayDeque;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -42,6 +43,15 @@ import java.util.concurrent.atomic.AtomicLong;
  * reported change is rare, and a single epoch keeps the read a field comparison. An object whose class serves its attributes itself (a {@code __getattribute__},
  * a {@code __setattr__} of its own, a class attribute of the name) is read every time, as the stub
  * reads any other attribute.
+ * <p>
+ * A stub primes its slots when it takes its Python object ({@link #prime}): when it is created, wraps
+ * an object, or creates its object again, so a compiled body does not read an attribute through the
+ * Python object the first time it runs (a route kept on the event loop, see {@code EventLoopSafety},
+ * then never waits for the context). Only an attribute the object has is primed; a slot of one it
+ * lacks (yet) reads it as before. A slot reads its attribute again after a reported change, on
+ * whichever thread runs the next body: by the planner's rules only code outside the compilation
+ * writes a fixed attribute. A cycle of objects holding each other in fixed attributes leaves the slots
+ * of the wrapper that closes the cycle to their first read.
  *
  * @author Graeme Rocher
  * @since 5.3.0
@@ -52,7 +62,10 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class PythonFixedAttributes {
 
     private static final String FIXED_MEMBER = "__micronaut_fixed_member";
+    private static final String FIXED_MEMBERS = "__micronaut_fixed_members";
     private static final AtomicLong IDS = new AtomicLong();
+    /** The Python objects whose stubs this thread primes, innermost last: a wrapper of one of them closes a cycle. */
+    private static final ThreadLocal<ArrayDeque<Value>> PRIMING = ThreadLocal.withInitial(ArrayDeque::new);
 
     private final AtomicLong epoch = new AtomicLong();
     private final long id = IDS.incrementAndGet();
@@ -79,6 +92,55 @@ public final class PythonFixedAttributes {
      */
     public void changed() {
         epoch.incrementAndGet();
+    }
+
+    /**
+     * Fills the slots of a stub for its Python object, in one call into Python, when the stub takes
+     * the object: each slot keeps the value of its attribute as its first read would, so the compiled
+     * bodies read none of them through the object. A slot of an attribute the object does not have
+     * (yet) is left empty, and a value that does not convert is left to the read, which fails as
+     * before. A wrapper the conversion creates primes its own slots; one of an object being primed on
+     * this thread does not, which ends a cycle of objects holding each other.
+     *
+     * @param self       The Python object of the stub
+     * @param names      The attributes, one per slot
+     * @param slots      The slots of the stub
+     * @param converters The conversion of each attribute to the Java type the bodies read
+     * @param wrappers   Whether each type is the generated class of a plain class of the compilation
+     */
+    public void prime(@Nullable Value self, String[] names, Slot[] slots, PolyglotValueConverter<?>[] converters, boolean[] wrappers) {
+        if (self == null || names.length == 0) {
+            return;
+        }
+        ArrayDeque<Value> priming = PRIMING.get();
+        for (Value outer : priming) {
+            if (outer == self || outer.equals(self)) {
+                return;
+            }
+        }
+        // the epoch is read before the attributes: a change after it moves the epoch past the kept values
+        long current = epoch();
+        Value found;
+        try {
+            found = PythonContextRuntime.helper(self.getContext(), FIXED_MEMBERS).execute(self, names, this, id);
+        } catch (PolyglotException e) {
+            if (fatal(e)) {
+                throw e;
+            }
+            return;
+        }
+        priming.addLast(self);
+        try {
+            for (int i = 0; i < slots.length; i++) {
+                slots[i].prime(self, current, found.getArrayElement(i), converters[i], wrappers[i]);
+            }
+        } finally {
+            priming.removeLast();
+        }
+    }
+
+    private static boolean fatal(PolyglotException e) {
+        return e.isCancelled() || e.isExit() || e.isInterrupted() || e.isResourceExhausted() || e.isInternalError();
     }
 
     /**
@@ -113,7 +175,7 @@ public final class PythonFixedAttributes {
             try {
                 found = PythonContextRuntime.helper(self.getContext(), FIXED_MEMBER).execute(self, name, attributes, attributes.id());
             } catch (PolyglotException e) {
-                if (e.isCancelled() || e.isExit() || e.isInterrupted() || e.isResourceExhausted() || e.isInternalError()) {
+                if (fatal(e)) {
                     throw e;
                 }
                 return converter.convert(self.getMember(name));
@@ -133,6 +195,35 @@ public final class PythonFixedAttributes {
             // state (a target type mapping), which a change in place does not reach: read every time
             current = new Fixed(self, epoch, value, wrapper || unchanging(member));
             return value;
+        }
+
+        /**
+         * Keeps the value of the attribute for the Python object at the epoch, as {@link #read} keeps it,
+         * from what {@code __micronaut_fixed_member} found: nothing when the object has no such attribute
+         * or the value does not convert.
+         */
+        void prime(Value self, long epoch, Value found, PolyglotValueConverter<?> converter, boolean wrapper) {
+            if (found.isNull()) {
+                return;
+            }
+            if (found.isBoolean()) {
+                current = new Fixed(self, epoch, null, false);
+                return;
+            }
+            Value member = found.getArrayElement(0);
+            Object value;
+            try {
+                value = converter.convert(member);
+            } catch (PolyglotException e) {
+                if (fatal(e)) {
+                    throw e;
+                }
+                return;
+            } catch (RuntimeException e) {
+                // the read converts it again and fails as it does without priming
+                return;
+            }
+            current = new Fixed(self, epoch, value, wrapper || unchanging(member));
         }
 
         /**

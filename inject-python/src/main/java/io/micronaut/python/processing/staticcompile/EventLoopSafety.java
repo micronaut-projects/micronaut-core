@@ -46,8 +46,12 @@ import java.util.function.Predicate;
  *     {@code toString}, {@code equals} or {@code hashCode} may be the Python object's.</li>
  * </ul>
  *
- * A read of an attribute fixed at construction reaches the Python object only the first time,
- * once per object, and is allowed.
+ * A read of an attribute fixed at construction is allowed: the stub primes its slot when it takes its
+ * Python object, off the request (see {@code PythonFixedAttributes#prime}), and the runtime keeps a
+ * route on the event loop only when its bean is a singleton created at startup
+ * ({@code PythonEventLoopBeans}). The slot reads the Python object again only after code outside the
+ * compilation assigns the attribute, which the compilation never does. An injected attribute of a
+ * module is a Java field of the module's generated class, set when the module is injected.
  *
  * @author Graeme Rocher
  * @since 5.3.0

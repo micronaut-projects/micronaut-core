@@ -331,6 +331,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private final Map<String, StubEntry> classBuilders = new LinkedHashMap<>();
     // per stub builder, the readers of attributes fixed at construction its compiled bodies read, by attribute and type
     private final Map<ClassDef.ClassDefBuilder, Map<String, MethodDef>> fixedReaders = new IdentityHashMap<>();
+    // per stub builder, what its priming method fills each slot with (see fixedPrime)
+    private final Map<ClassDef.ClassDefBuilder, List<FixedPrime>> fixedPrimes = new IdentityHashMap<>();
     private final Map<String, StateEntry> stateDefs = new LinkedHashMap<>();
     private final Map<String, EnumEntry> enumDefs = new LinkedHashMap<>();
     private final Map<String, InterfaceEntry> interfaceDefs = new LinkedHashMap<>();
@@ -421,6 +423,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         } finally {
             classBuilders.clear();
             fixedReaders.clear();
+            fixedPrimes.clear();
             stateDefs.clear();
             enumDefs.clear();
             interfaceDefs.clear();
@@ -748,6 +751,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     addInjectionMethods(model, methodsToBridge);
                     boolean hasToString = addToStringBridge(model, addedMethodNames);
                     addCreatorsAndPropertyAccessors(model, hasAsyncBridgeMethod, hasToString);
+                    if (readsFixedAttributes(model)) {
+                        // every compiled body is generated: the slots its readers created are known
+                        builder.addMethod(fixedPrime(model));
+                    }
                 } catch (ProcessingException e) {
                     throw e;
                 } catch (Exception e) {
@@ -1334,7 +1341,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     return StatementDef.multi(
                                         aThis.field(pythonValueField(model)).assign(methodParameters.get(0)),
                                         aThis.field(ownedClassReferenceField(model)).assign(ExpressionDef.nullValue()),
-                                        bindWrapper(model, methodParameters.get(0))
+                                        bindWrapper(model, methodParameters.get(0)),
+                                        primeFixedAttributes(model, aThis, methodParameters.get(0))
                                     );
                                 }
                             })
@@ -1358,7 +1366,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 return StatementDef.multi(
                                     aThis.field(pythonValueField(model)).assign(newInstanceUnlessProxy(aThis, methodParameters.get(0))),
                                     aThis.field(ownedClassReferenceField(model)).assign(methodParameters.get(0)),
-                                    bindWrapper(model, aThis.field(pythonValueField(model)))
+                                    bindWrapper(model, aThis.field(pythonValueField(model))),
+                                    primeFixedAttributes(model, aThis, aThis.field(pythonValueField(model)))
                                 );
                             })
                         ));
@@ -1999,7 +2008,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             value.assign(newInstance),
                                             aThis.field(pythonValueFinal).assign(value),
                                             bindWrapper(model, value),
-                                            resetFixedAttributes(model, aThis)
+                                            resetFixedAttributes(model, aThis),
+                                            primeFixedAttributes(model, aThis, value)
                                         ))
                                 ))),
                             value.returning()
@@ -2019,7 +2029,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             value.notEqualsReferentially(aThis.field(bound)).doIf(StatementDef.multi(
                                 bindWrapper(model, value),
                                 aThis.field(bound).assign(value),
-                                resetFixedAttributes(model, aThis)
+                                resetFixedAttributes(model, aThis),
+                                primeFixedAttributes(model, aThis, value)
                             )),
                             value.returning()
                         ));
@@ -5327,6 +5338,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         String erasedName = typeName.indexOf('<') < 0 ? typeName : typeName.substring(0, typeName.indexOf('<'));
         boolean wrapper = erasedName.indexOf('.') >= 0 && model.context().getClassElement(erasedName.replace('$', '.'))
             .map(attributeType -> isGeneratedWrapperType(allClasses, attributeType)).orElse(false);
+        fixedPrimes.computeIfAbsent(builder, b -> new ArrayList<>()).add(new FixedPrime(slot, property, converter, wrapper));
         MethodDef reader = MethodDef.builder(name)
             .addModifiers(Modifier.PRIVATE)
             .addJavadoc("The attribute [" + property + "] of the Python object, fixed at construction.")
@@ -5791,7 +5803,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             aThis.field(pythonValueField(model)).assign(value),
             bindWrapper(model, aThis.field(pythonValueField(model)))
         );
-        return StatementDef.multi(assigned, resetFixedAttributes(model, aThis));
+        // the slots forget the previous object, then keep the values of the new one
+        return StatementDef.multi(assigned, resetFixedAttributes(model, aThis), primeFixedAttributes(model, aThis, aThis.field(pythonValueField(model))));
     }
 
     /**
@@ -5804,7 +5817,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     /**
      * Whether the compiled bodies of the stub's class may read attributes fixed at construction from
-     * slots of the stub (see {@link #fixedReader}), which a new Python object of the stub resets.
+     * slots of the stub (see {@link #fixedReader}), which a new Python object of the stub resets and primes.
      */
     private static boolean readsFixedAttributes(ClassStubModel model) {
         StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
@@ -5842,6 +5855,64 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Set<String> taken = new HashSet<>();
         element.getEnclosedElements(ElementQuery.ALL_METHODS).forEach(method -> taken.add(method.getName()));
         StringBuilder name = new StringBuilder(FIXED_SLOT_PREFIX).append("Reset");
+        while (taken.contains(name.toString())) {
+            name.insert(0, '_');
+        }
+        return name.toString();
+    }
+
+    /**
+     * Primes the slots of the stub for the Python object it takes (see {@link #fixedPrime}), when
+     * its compiled bodies read attributes fixed at construction.
+     */
+    private static StatementDef primeFixedAttributes(ClassStubModel model, VariableDef.This aThis, ExpressionDef value) {
+        return readsFixedAttributes(model) ? aThis.invoke(fixedPrimeName(model.element()), TypeDef.VOID, value) : StatementDef.multi();
+    }
+
+    /**
+     * The private method of the stub priming its slots for the Python object it takes, when it is
+     * created, wraps an object or creates its object again: each slot keeps the value of its
+     * attribute, read in one call into Python, so a compiled body never reads it through the object
+     * the first time it runs. A route that never enters Python otherwise runs on the event loop (see
+     * {@code EventLoopSafety}), where that first read would wait for the context. See
+     * {@code PythonFixedAttributes#prime}.
+     */
+    private MethodDef fixedPrime(ClassStubModel model) {
+        List<FixedPrime> primes = fixedPrimes.computeIfAbsent(model.builder(), b -> new ArrayList<>());
+        return MethodDef.builder(fixedPrimeName(model.element()))
+            .addModifiers(Modifier.PRIVATE)
+            .addParameter(ParameterDef.of("pythonObject", POLYGLOT_VALUE))
+            .returns(TypeDef.VOID)
+            .build((aThis, methodParameters) -> {
+                if (primes.isEmpty()) {
+                    return StatementDef.multi();
+                }
+                List<StatementDef> statements = new ArrayList<>();
+                List<ExpressionDef> names = new ArrayList<>();
+                List<ExpressionDef> slots = new ArrayList<>();
+                List<ExpressionDef> converters = new ArrayList<>();
+                List<ExpressionDef> wrappers = new ArrayList<>();
+                for (FixedPrime prime : primes) {
+                    statements.add(aThis.field(prime.slot()).isNull().doIf(aThis.field(prime.slot()).assign(PYTHON_FIXED_SLOT.instantiate())));
+                    names.add(ExpressionDef.constant(prime.property()));
+                    slots.add(aThis.field(prime.slot()));
+                    converters.add(prime.converter());
+                    wrappers.add(ExpressionDef.constant(prime.wrapper()));
+                }
+                statements.add(javaClassType(model.element()).getStaticField(FIXED_ATTRIBUTES_FIELD, PYTHON_FIXED_ATTRIBUTES).invoke("prime", TypeDef.VOID,
+                    methodParameters.get(0),
+                    TypeDef.STRING.array().instantiate(names),
+                    PYTHON_FIXED_SLOT.array().instantiate(slots),
+                    POLYGLOT_VALUE_CONVERTER.array().instantiate(converters),
+                    TypeDef.Primitive.BOOLEAN.array().instantiate(wrappers)));
+                return methodParameters.get(0).isNonNull().doIf(StatementDef.multi(statements));
+            });
+    }
+
+    private static String fixedPrimeName(ClassElement element) {
+        Set<String> taken = new HashSet<>();
+        element.getEnclosedElements(ElementQuery.ALL_METHODS).forEach(method -> taken.add(method.getName()));
+        StringBuilder name = new StringBuilder(FIXED_SLOT_PREFIX).append("Prime");
         while (taken.contains(name.toString())) {
             name.insert(0, '_');
         }
@@ -8200,6 +8271,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         List<String> nestedMemberNames,
         String displayName,
         String cacheKey) {
+    }
+
+    /**
+     * What the priming method of a stub fills one slot with.
+     *
+     * @param slot      The slot
+     * @param property  The attribute
+     * @param converter The conversion of the attribute, as its reader converts it
+     * @param wrapper   Whether the type is the generated class of a plain class of the compilation
+     */
+    private record FixedPrime(FieldDef slot, String property, ExpressionDef converter, boolean wrapper) {
     }
 
     /**
