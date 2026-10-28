@@ -1214,6 +1214,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         dontGenerateExecutableMethodsDefinitionWriter();
     }
 
+    /**
+     * Adds a field to the definition, with the method accessing it.
+     *
+     * @param field  The field
+     * @param method The method
+     */
+    public void addMember(FieldDef field, MethodDef method) {
+        classDefBuilder.addField(field);
+        classDefBuilder.addMethod(method);
+    }
+
     public void dontGenerateExecutableMethodsDefinitionWriter() {
         // NOTE: proxied bean will reuse existing executable methods definition, the building is postponed
         generateExecutableMethodsDefinitionWriter = false;

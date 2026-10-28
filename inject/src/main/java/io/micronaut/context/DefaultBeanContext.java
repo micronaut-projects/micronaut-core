@@ -213,6 +213,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     protected final AtomicBoolean configured = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
     protected final AtomicBoolean terminating = new AtomicBoolean(false);
+    // whether the start failed, which leaves the context initializing, though it never runs
+    private volatile boolean startFailed;
     /**
      * The thread running {@link #stop()} until the singletons are destroyed. Lookups made on it are made on behalf
      * of a shutdown event listener or a destruction callback, and may resolve through existing dependency groups.
@@ -227,6 +229,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     final BeanResolutionTraceMode traceMode;
     final Set<String> tracePatterns;
+    /** The tracer of the trace mode, which only traces the beans matching the trace patterns, or null for none. */
+    final @Nullable BeanResolutionTracer modeTracer;
+    /** The registered and the active discovered tracers, which trace every bean, or null for none. */
+    @SuppressWarnings("java:S3077") // only the reference is published, replaced when the context is configured
+    volatile @Nullable BeanResolutionTracer customTracer;
+    /** The tracer of the trace mode combined with the custom tracer, or null when there is no tracer of the mode. */
+    @SuppressWarnings("java:S3077") // only the reference is published, replaced when the context is configured
+    volatile @Nullable BeanResolutionTracer combinedTracer;
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
     private final BeanWatchRegistry watches = new BeanWatchRegistry(this);
 
@@ -441,6 +451,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             .getTraceConfiguration();
         this.traceMode = traceConfiguration.mode();
         this.tracePatterns = traceConfiguration.classPatterns();
+        this.modeTracer = traceMode.getTracer().orElse(null);
+        this.combinedTracer = modeTracer;
         this.eventsEnabled = contextConfiguration.eventsEnabled();
         this.eagerBeansEnabled = contextConfiguration.eagerBeansEnabled();
         this.dependencyGraph = contextConfiguration.beanDependencyTrackingEnabled() ? new DefaultBeanDependencyGraph() : null;
@@ -487,6 +499,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     /**
+     * Whether the context is stopping or stopped: neither running nor starting, or its start failed. Unlike
+     * {@code !isRunning()}, false while the context starts, such as while a {@link StartupEvent} listener runs.
+     *
+     * @return Whether the context is stopping or stopped
+     * @since 5.3.0
+     */
+    @Internal
+    public boolean isStoppingOrStopped() {
+        // initializing is read before running: a start sets running before it clears initializing, so a start that
+        // completes between the two reads is never seen as neither
+        boolean starting = initializing.get();
+        return startFailed || terminating.get() || !starting && !running.get();
+    }
+
+    /**
      * The start method will read all bean definition classes found on the classpath and initialize any pre-required
      * state.
      */
@@ -495,36 +522,47 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (!isRunning()) {
 
             if (initializing.compareAndSet(false, true)) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Starting BeanContext");
+                try {
+                    startContext();
+                } catch (RuntimeException | Error e) {
+                    // the context never runs: a request still in flight is answered as by a stopped one
+                    startFailed = true;
+                    throw e;
                 }
-                if (dependencyGraph == null && isBeanDependencyTrackingEnabledOnStart()) {
-                    // development mode was switched on by configuration rather than by system property: the
-                    // environment is started and no bean has been created yet, so the graph sees every bean
-                    dependencyGraph = new DefaultBeanDependencyGraph();
-                }
-                adaptsProcessors = dependencyGraph != null || isDevelopmentMode();
-                configureAndStartContext();
-                if (LOG.isDebugEnabled()) {
-                    String activeConfigurations = beanConfigurations
-                        .values()
-                        .stream()
-                        .filter(config -> config.isEnabled(this))
-                        .map(BeanConfiguration::getName)
-                        .collect(Collectors.joining(","));
-                    if (StringUtils.isNotEmpty(activeConfigurations)) {
-                        LOG.debug("Loaded active configurations: {}", activeConfigurations);
-                    }
-                }
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("BeanContext Started.");
-                }
-                publishEvent(new StartupEvent(this));
             }
+            startFailed = false;
             running.set(true);
             initializing.set(false);
         }
         return this;
+    }
+
+    private void startContext() {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Starting BeanContext");
+        }
+        if (dependencyGraph == null && isBeanDependencyTrackingEnabledOnStart()) {
+            // development mode was switched on by configuration rather than by system property: the
+            // environment is started and no bean has been created yet, so the graph sees every bean
+            dependencyGraph = new DefaultBeanDependencyGraph();
+        }
+        adaptsProcessors = dependencyGraph != null || isDevelopmentMode();
+        configureAndStartContext();
+        if (LOG.isDebugEnabled()) {
+            String activeConfigurations = beanConfigurations
+                .values()
+                .stream()
+                .filter(config -> config.isEnabled(this))
+                .map(BeanConfiguration::getName)
+                .collect(Collectors.joining(","));
+            if (StringUtils.isNotEmpty(activeConfigurations)) {
+                LOG.debug("Loaded active configurations: {}", activeConfigurations);
+            }
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("BeanContext Started.");
+        }
+        publishEvent(new StartupEvent(this));
     }
 
     /**
@@ -646,10 +684,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             terminating.set(false);
             running.set(false);
             configured.set(false);
-            if (traceMode != BeanResolutionTraceMode.NONE) {
-                traceMode.getTracer().ifPresent(tracer -> {
-                    tracer.traceContextShutdown(this);
-                });
+            BeanResolutionTracer tracer = combinedTracer != null ? combinedTracer : customTracer;
+            if (tracer != null) {
+                tracer.traceContextShutdown(this);
             }
             beanDefinitionProvider.reset();
             // a restarted context reads its configurations and validator again, as it does its definitions
@@ -1561,20 +1598,35 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
     }
 
+    @SuppressWarnings("java:S1181") // A failed creation is traced whatever failed it, then rethrown
     private <T> T doCreateBeanWithArguments(BeanResolutionContext resolutionContext,
                                             BeanDefinition<T> definition,
                                             Argument<T> beanType,
                                             @Nullable Qualifier<T> qualifier,
                                             @Nullable Object... args) {
-        Map<String, Object> argumentValues = resolveArgumentValues(resolutionContext, definition, args);
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("Computed bean argument values: {}", argumentValues);
+        // the creation encloses the resolution of the arguments, which pushes the injection points of the constructor
+        AbstractBeanResolutionContext traced = traceCreation(resolutionContext, definition, beanType, qualifier);
+        T bean;
+        try {
+            Map<String, Object> argumentValues = resolveArgumentValues(resolutionContext, definition, args);
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Computed bean argument values: {}", argumentValues);
+            }
+            if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
+                bean = createBeanInCreation(resolutionContext, instantiatableBeanDefinition, beanType, qualifier, argumentValues);
+            } else {
+                throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
+            }
+        } catch (RuntimeException | Error e) {
+            if (traced != null) {
+                traced.traceCreationFailed(definition, e);
+            }
+            throw e;
         }
-        if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-            return createBeanWithArgumentValues(resolutionContext, instantiatableBeanDefinition, beanType, qualifier, argumentValues);
-        } else {
-            throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
+        if (traced != null) {
+            traced.traceCreationEnd(definition);
         }
+        return bean;
     }
 
     /**
@@ -1586,12 +1638,40 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * {@link InterceptionTarget}, and a {@link BeanDependencyResolver} it injects is owned by it. The context
      * holds no registration for the bean, so what the creation owns is not released with it; see
      * {@link #destroyBean(Object)} for what is.</p>
+     *
+     * <p>The creation is traced if the context is.</p>
      */
+    @SuppressWarnings("java:S1181") // A failed creation is traced whatever failed it, then rethrown
     private <T> T createBeanWithArgumentValues(BeanResolutionContext resolutionContext,
                                                InstantiatableBeanDefinition<T> definition,
                                                Argument<T> beanType,
                                                @Nullable Qualifier<T> qualifier,
                                                @Nullable Map<String, Object> argumentValues) {
+        AbstractBeanResolutionContext traced = traceCreation(resolutionContext, definition, beanType, qualifier);
+        T bean;
+        try {
+            bean = createBeanInCreation(resolutionContext, definition, beanType, qualifier, argumentValues);
+        } catch (RuntimeException | Error e) {
+            if (traced != null) {
+                traced.traceCreationFailed(definition, e);
+            }
+            throw e;
+        }
+        if (traced != null) {
+            traced.traceCreationEnd(definition);
+        }
+        return bean;
+    }
+
+    /**
+     * Creates a bean the caller supplies the arguments of within a creation begun on the resolution context, see
+     * {@link #createBeanWithArgumentValues}. The caller traces the creation.
+     */
+    private <T> T createBeanInCreation(BeanResolutionContext resolutionContext,
+                                       InstantiatableBeanDefinition<T> definition,
+                                       Argument<T> beanType,
+                                       @Nullable Qualifier<T> qualifier,
+                                       @Nullable Map<String, Object> argumentValues) {
         AbstractBeanResolutionContext creatingContext = resolutionContext instanceof AbstractBeanResolutionContext creating ? creating : null;
         BeanCreationState previousCreation = creatingContext == null ? null : creatingContext.creationState;
         if (creatingContext != null) {
@@ -4405,7 +4485,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return name != null && segment != null && segment.getDeclaringType().isIterable() ? Qualifiers.byName(name.toString()) : null;
     }
 
-    @SuppressWarnings({"unchecked", "NullAway"}) // Nullable factory definitions may produce a registration without an instance.
+    @SuppressWarnings("java:S1181") // A failed creation is traced whatever failed it, then rethrown
     private <T> BeanRegistration<T> createRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                       Argument<T> beanType,
                                                       @Nullable Qualifier<T> qualifier,
@@ -4420,100 +4500,144 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             resolutionContext = resolutionContext.copy();
         }
         try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
-            final BeanResolutionContext.Path path = context.getPath();
-            final boolean isNewPath = path.isEmpty();
-            if (isNewPath) {
-                Argument<T> resolvedBeanType;
-                if (qualifier instanceof TypeArgumentQualifier<T> taq) {
-                    Class<?>[] typeArguments = taq.getTypeArguments();
-                    resolvedBeanType = Argument.of(
-                        beanType.getType(),
-                        beanType.getAnnotationMetadata(),
-                        typeArguments
-                    );
-                } else {
-                    resolvedBeanType = beanType;
-                }
-                path.pushBeanCreate(definition, resolvedBeanType);
+            AbstractBeanResolutionContext traced = traceCreation(context, definition, beanType, qualifier);
+            if (traced == null) {
+                return createRegistrationInContext(context, beanType, qualifier, definition, dependent, customizeNull, ownLifecycle);
             }
+            BeanRegistration<T> registration;
             try {
-                AbstractBeanResolutionContext creatingContext = context instanceof AbstractBeanResolutionContext creating ? creating : null;
-                BeanCreationState previousCreation = creatingContext == null ? null : creatingContext.creationState;
-                BeanCreationState creation = creatingContext == null
-                    ? new BeanCreationState(definition, List.of()) : creatingContext.beginCreation(definition);
-                try {
-                    List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
-                    BeanRegistration<T> beanRegistration;
-                    try {
-                        T bean;
-                        if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
-                            bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
-                        } else {
-                            throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
-                        }
-                        InterceptorCandidates interceptorCandidates;
-                        try {
-                            interceptorCandidates = creation.lifecycleInterceptorCandidates();
-                            if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
-                                Object value = registrations.remove(definition);
-                                if (value instanceof List<?> list) {
-                                    interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
-                                }
-                            }
-                        } catch (RuntimeException | Error e) {
-                            // the creation the instance began ends here, failed, as postBeanCreated would have ended it
-                            watches.endCreation(definition, null);
-                            throw e;
-                        }
-                        T created = bean;
-                        bean = postBeanCreated(context, definition, beanType, qualifier, bean);
-                        if (customizeNull && bean == null) {
-                            bean = (T) beanResolutionCustomizer.resolveNullBean(beanType, beanType, definition).orElse(null);
-                        }
+                registration = createRegistrationInContext(context, beanType, qualifier, definition, dependent, customizeNull, ownLifecycle);
+            } catch (RuntimeException | Error e) {
+                traced.traceCreationFailed(definition, e);
+                throw e;
+            }
+            traced.traceCreationEnd(definition);
+            return registration;
+        }
+    }
 
-                        BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
-                        if (dependentFactoryBean != null) {
-                            destroyBean(dependentFactoryBean);
+    /**
+     * Starts tracing the creation of a bean, if the context is traced.
+     *
+     * @param context The resolution context of the creation
+     * @param definition The definition of the bean
+     * @param beanType The type the bean is created for
+     * @param qualifier The qualifier the bean is created for
+     * @return The traced context, which the caller ends the creation with, or null when it is not traced
+     */
+    private static <T> @Nullable AbstractBeanResolutionContext traceCreation(BeanResolutionContext context,
+                                                                            BeanDefinition<T> definition,
+                                                                            Argument<T> beanType,
+                                                                            @Nullable Qualifier<T> qualifier) {
+        if (context instanceof AbstractBeanResolutionContext traced && traced.isTraced()) {
+            traced.traceCreationStart(definition, resolveCreatedBeanType(beanType, qualifier));
+            return traced;
+        }
+        return null;
+    }
+
+    private static <T> Argument<T> resolveCreatedBeanType(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        if (qualifier instanceof TypeArgumentQualifier<T> taq) {
+            Class<?>[] typeArguments = taq.getTypeArguments();
+            return Argument.of(
+                beanType.getType(),
+                beanType.getAnnotationMetadata(),
+                typeArguments
+            );
+        }
+        return beanType;
+    }
+
+    @SuppressWarnings({"unchecked", "NullAway"}) // Nullable factory definitions may produce a registration without an instance.
+    private <T> BeanRegistration<T> createRegistrationInContext(BeanResolutionContext context,
+                                                               Argument<T> beanType,
+                                                               @Nullable Qualifier<T> qualifier,
+                                                               BeanDefinition<T> definition,
+                                                               boolean dependent,
+                                                               boolean customizeNull,
+                                                               boolean ownLifecycle) {
+        final BeanResolutionContext.Path path = context.getPath();
+        final boolean isNewPath = path.isEmpty();
+        if (isNewPath) {
+            path.pushBeanCreate(definition, resolveCreatedBeanType(beanType, qualifier));
+        }
+        try {
+            AbstractBeanResolutionContext creatingContext = context instanceof AbstractBeanResolutionContext creating ? creating : null;
+            BeanCreationState previousCreation = creatingContext == null ? null : creatingContext.creationState;
+            BeanCreationState creation = creatingContext == null
+                ? new BeanCreationState(definition, List.of()) : creatingContext.beginCreation(definition);
+            try {
+                List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
+                BeanRegistration<T> beanRegistration;
+                try {
+                    T bean;
+                    if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
+                        bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
+                    } else {
+                        throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
+                    }
+                    InterceptorCandidates interceptorCandidates;
+                    try {
+                        interceptorCandidates = creation.lifecycleInterceptorCandidates();
+                        if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
+                            Object value = registrations.remove(definition);
+                            if (value instanceof List<?> list) {
+                                interceptorCandidates = new InterceptorCandidates.Resolved((List) list);
+                            }
                         }
-                        Qualifier<T> registrationQualifier = qualifier;
-                        if (registrationQualifier == null) {
-                            registrationQualifier = definition.getDeclaredQualifier();
-                        }
-                        BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
-                        List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
-                        BeanDisposingRegistration<T> disposing = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
-                            dependentBeans, interceptorCandidates, creation.dependencies, ownLifecycle);
-                        if (dependencyGraph != null && created != bean) {
-                            // a listener replaced the instance: a development context retains the one it received
-                            disposing.setBeforeListeners(created);
-                        }
-                        beanRegistration = disposing;
                     } catch (RuntimeException | Error e) {
-                        destroyDependentsOfFailedBean(context, e);
-                        destroyCreatedBeans(creation.dependencies.takeDependents(), e);
-                        context.pushDependentBeans(parentDependentBeans);
+                        // the creation the instance began ends here, failed, as postBeanCreated would have ended it
+                        watches.endCreation(definition, null);
                         throw e;
                     }
-                    if (definition instanceof ProxyBeanDefinition<?> proxyDefinition
-                        && context instanceof AbstractBeanResolutionContext creating
-                        && beanRegistration instanceof BeanDisposingRegistration<T> disposingRegistration) {
-                        // the context a lazy proxy retains holds what is created with the target it caches
-                        disposingRegistration.setProxyTargetContext(creating.takeLazyProxyTargetCopy(proxyDefinition.getTargetDefinitionType()));
+                    T created = bean;
+                    bean = postBeanCreated(context, definition, beanType, qualifier, bean);
+                    if (customizeNull && bean == null) {
+                        bean = (T) beanResolutionCustomizer.resolveNullBean(beanType, beanType, definition).orElse(null);
                     }
+
+                    BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
+                    if (dependentFactoryBean != null) {
+                        destroyBean(dependentFactoryBean);
+                    }
+                    Qualifier<T> registrationQualifier = qualifier;
+                    if (registrationQualifier == null) {
+                        registrationQualifier = definition.getDeclaredQualifier();
+                    }
+                    BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
+                    List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
+                    BeanDisposingRegistration<T> disposing = new BeanDisposingRegistration<>(this, beanKey, definition, bean,
+                        dependentBeans, interceptorCandidates, creation.dependencies, ownLifecycle);
+                    if (dependencyGraph != null && created != bean) {
+                        // a listener replaced the instance: a development context retains the one it received
+                        disposing.setBeforeListeners(created);
+                    }
+                    beanRegistration = disposing;
+                } catch (RuntimeException | Error e) {
+                    destroyDependentsOfFailedBean(context, e);
+                    destroyCreatedBeans(creation.dependencies.takeDependents(), e);
                     context.pushDependentBeans(parentDependentBeans);
-                    if (dependent) {
-                        context.addDependentBean(beanRegistration);
-                    }
-                    return beanRegistration;
-                } finally {
-                    if (creatingContext != null) {
-                        creatingContext.creationState = previousCreation;
-                    }
+                    throw e;
                 }
+                if (definition instanceof ProxyBeanDefinition<?> proxyDefinition
+                    && context instanceof AbstractBeanResolutionContext creating
+                    && beanRegistration instanceof BeanDisposingRegistration<T> disposingRegistration) {
+                    // the context a lazy proxy retains holds what is created with the target it caches
+                    disposingRegistration.setProxyTargetContext(creating.takeLazyProxyTargetCopy(proxyDefinition.getTargetDefinitionType()));
+                }
+                context.pushDependentBeans(parentDependentBeans);
+                if (dependent) {
+                    context.addDependentBean(beanRegistration);
+                }
+                return beanRegistration;
             } finally {
-                if (isNewPath) {
-                    path.close();
+                if (creatingContext != null) {
+                    creatingContext.creationState = previousCreation;
                 }
+            }
+        } finally {
+            if (isNewPath) {
+                path.close();
             }
         }
     }
@@ -6489,6 +6613,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Internal
     void configureContextInternal() {
         if (configured.compareAndSet(false, true)) {
+            initializeTracers();
             readAllBeanConfigurations();
             beanDefinitionProvider.initialize(this);
             // an index exhaustiveness computed before the bean definitions were read does not hold for them
@@ -6497,6 +6622,35 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             // an application context: a configurer touching a retained type must find the retained instance
             adoptRetainedRegistrations();
         }
+    }
+
+    /**
+     * Combines the registered tracers with the discovered tracers that activate for this context.
+     */
+    private void initializeTracers() {
+        List<BeanResolutionTracer> tracers = new ArrayList<>(beanContextConfiguration.getBeanResolutionTracers());
+        BeanResolutionTracerProvider.Activation activation = new CompositeBeanResolutionTracer.DefaultActivation(
+            getTracerEnvironmentNames(),
+            beanContextConfiguration.isBeanResolutionTracerDiscoveryEnabled()
+        );
+        CompositeBeanResolutionTracer.discover(classLoader, activation, tracers);
+        BeanResolutionTracer custom = CompositeBeanResolutionTracer.of(tracers);
+        if (modeTracer != null && custom != null) {
+            tracers.add(0, modeTracer);
+            combinedTracer = CompositeBeanResolutionTracer.of(tracers);
+        } else {
+            combinedTracer = modeTracer;
+        }
+        customTracer = custom;
+    }
+
+    /**
+     * The environment names discovered tracers activate for.
+     *
+     * @return The active environment names
+     */
+    Set<String> getTracerEnvironmentNames() {
+        return Set.of();
     }
 
     /**
