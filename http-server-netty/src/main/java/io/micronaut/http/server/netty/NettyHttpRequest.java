@@ -229,6 +229,17 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return routeWaitsFor;
     }
 
+    /**
+     * Remove the conditions the route waits for and return them.
+     *
+     * @return The conditions to wait for
+     */
+    public ExecutionFlow<?> takeRouteWaitsFor() {
+        ExecutionFlow<?> flow = routeWaitsFor;
+        routeWaitsFor = ExecutionFlow.just(null);
+        return flow;
+    }
+
     public FormRouteCompleter formRouteCompleter() {
         assert isFormOrMultipartData();
         if (formRouteCompleter == null) {

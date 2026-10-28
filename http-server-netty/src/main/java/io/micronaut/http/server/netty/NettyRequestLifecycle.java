@@ -162,7 +162,9 @@ final class NettyRequestLifecycle extends RequestLifecycle {
                 return ExecutionFlow.error(e);
             }
         }
-        return nettyRequest.getRouteWaitsFor().map(v -> routeMatch);
+        // the conditions are taken off the request: a status route executed for the same request
+        // must not continue the flow it runs in
+        return nettyRequest.takeRouteWaitsFor().map(v -> routeMatch);
     }
 
     void handleException(NettyHttpRequest<?> nettyRequest, Throwable cause) {

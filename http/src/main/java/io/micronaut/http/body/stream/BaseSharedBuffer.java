@@ -478,7 +478,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     public void error(Throwable e) {
         if (error != null) {
-            error.addSuppressed(e);
+            // keep the first failure as is: it is not owned by this buffer and may be shared
             return;
         }
 
