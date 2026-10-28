@@ -152,34 +152,45 @@ def __micronaut_bind_compiled(instance, owner, delegate):
 
 
 # The epochs of the Java fields holding attributes fixed at construction (PythonFixedAttributes), by
-# the class of the objects they hold attributes of, each by its id: a change of an attribute of such
-# an object moves them on, and the Java side reads the attribute again. Held weakly by the class: a
-# class created at run time goes with its objects.
+# the class of the objects they hold attributes of, then by the name of the attribute a slot of the
+# stub keeps, each by its id: a change of that attribute of such an object moves them on, and the Java
+# side reads the attribute again. A write of any other attribute reports nothing. Held weakly by the
+# class: a class created at run time goes with its objects.
 _MICRONAUT_FIXED_EPOCHS = weakref.WeakKeyDictionary()
 
 
-def _micronaut_fixed_changed(cls):
-    epochs = _MICRONAUT_FIXED_EPOCHS.get(cls)
-    if epochs:
-        for epoch in list(epochs.values()):
-            epoch.changed()
+def _micronaut_fixed_changed(cls, name):
+    watched = _MICRONAUT_FIXED_EPOCHS.get(cls)
+    if watched:
+        epochs = watched.get(name)
+        if epochs:
+            for epoch in list(epochs.values()):
+                epoch.changed()
+
+
+def _micronaut_fixed_watched(cls, name):
+    watched = _MICRONAUT_FIXED_EPOCHS.get(cls)
+    return watched is not None and name in watched
 
 
 def _micronaut_fixed_setattr(self, name, value):
-    """The __setattr__ of a class whose attributes a stub holds in Java fields: object's, reporting a change of an attribute the object has."""
+    """The __setattr__ of a class whose attributes a stub holds in Java fields: object's, reporting a change of an attribute a stub holds that the object has."""
+    if not _micronaut_fixed_watched(type(self), name):
+        object.__setattr__(self, name, value)
+        return
     try:
         present = name in object.__getattribute__(self, "__dict__")
     except AttributeError:
         present = False
     object.__setattr__(self, name, value)
     if present:
-        _micronaut_fixed_changed(type(self))
+        _micronaut_fixed_changed(type(self), name)
 
 
 def _micronaut_fixed_delattr(self, name):
-    """The __delattr__ of a class whose attributes a stub holds in Java fields: object's, reporting the change."""
+    """The __delattr__ of a class whose attributes a stub holds in Java fields: object's, reporting a change of an attribute a stub holds."""
     object.__delattr__(self, name)
-    _micronaut_fixed_changed(type(self))
+    _micronaut_fixed_changed(type(self), name)
 
 
 def __micronaut_fixed_member(instance, name, epoch, epoch_id):
@@ -187,9 +198,10 @@ def __micronaut_fixed_member(instance, name, epoch, epoch_id):
     The attribute of an object a stub keeps in a Java field (PythonFixedAttributes.Slot), as a
     1-tuple: the entry of the object's __dict__, which is what reading the attribute gives while the
     class leaves the attribute protocol to object and declares nothing of the name, nor does any
-    class of its MRO. The class's __setattr__ and __delattr__ are made to report every change of an
-    attribute the object has from then on (a first assignment cannot change a value read before), so
-    the epoch moves on and the stub reads the attribute again. None when the object has no such
+    class of its MRO. The class's __setattr__ and __delattr__ are made to report every change of the
+    attributes slots hold, by name, that an object has from then on (a first assignment cannot change
+    a value read before; a write of any other attribute is object's, reporting nothing), so the epoch
+    moves on and the stub reads the attribute again. None when the object has no such
     attribute (yet); False when its class serves its attributes itself, so the stub reads the
     attribute every time.
     """
@@ -215,12 +227,15 @@ def __micronaut_fixed_member(instance, name, epoch, epoch_id):
         return False
     if name not in attributes:
         return None
-    epochs = _MICRONAUT_FIXED_EPOCHS.get(cls)
-    if epochs is None:
+    watched = _MICRONAUT_FIXED_EPOCHS.get(cls)
+    if watched is None:
         try:
-            epochs = _MICRONAUT_FIXED_EPOCHS[cls] = {}
+            watched = _MICRONAUT_FIXED_EPOCHS[cls] = {}
         except TypeError:
             return False  # a class that cannot be referenced weakly: read every time
+    epochs = watched.get(name)
+    if epochs is None:
+        epochs = watched[name] = {}
     if epoch_id not in epochs:
         epochs[epoch_id] = epoch
     return (attributes[name],)
