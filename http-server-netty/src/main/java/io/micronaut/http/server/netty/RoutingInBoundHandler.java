@@ -358,7 +358,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             List<UriRouteMatch<Object, Object>> anyUriRoutes = router.findAny(request.getUri().toString(), request)
                     .collect(Collectors.toList());
             if (!anyUriRoutes.isEmpty()) {
-                setRouteAttributes(request, anyUriRoutes.get(0));
+                // a CORS preflight is decided by the route that serves the requested method
+                String preflightMethod = request.getHeaders().get(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD);
+                UriRouteMatch<Object, Object> preflightRoute = anyUriRoutes.stream()
+                        .filter(anyRoute -> anyRoute.getRoute().getHttpMethodName().equals(preflightMethod))
+                        .findFirst()
+                        .orElse(anyUriRoutes.get(0));
+                setRouteAttributes(request, preflightRoute);
                 request.setAttribute(AVAILABLE_HTTP_METHODS, anyUriRoutes.stream().map(UriRouteMatch::getHttpMethod).collect(Collectors.toList()));
             }
         }
