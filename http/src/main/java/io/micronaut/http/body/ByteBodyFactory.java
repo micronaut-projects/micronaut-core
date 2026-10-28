@@ -33,12 +33,14 @@ import io.micronaut.http.body.stream.BufferConsumer;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.OptionalLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Factory methods for {@link ByteBody}s.
@@ -305,11 +307,35 @@ public class ByteBodyFactory {
         if (body instanceof BaseStreamingByteBody<?> bsbb) {
             return bsbb;
         }
-        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        OptionalLong expectedLength = body.expectedLength();
+        AbstractBodyAdapter adapter = createClaimingBodyAdapter(body);
         StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);
-        body.expectedLength().ifPresent(sb.sharedBuffer::setExpectedLength);
+        expectedLength.ifPresent(sb.sharedBuffer::setExpectedLength);
         return sb.rootBody;
+    }
+
+    /**
+     * Claim the given body and create a {@link #createBodyAdapter body adapter} that streams its
+     * data. If the adapter is discarded before it is started, the data of the body is released.
+     *
+     * @param body The body to claim
+     * @return The adapter
+     */
+    @Internal
+    protected final AbstractBodyAdapter createClaimingBodyAdapter(ByteBody body) {
+        // keep the claimed body reachable, so that it can be closed if the adapter is discarded
+        // before it is started
+        AtomicReference<@Nullable CloseableByteBody> pending = new AtomicReference<>(body.move());
+        return createBodyAdapter(Flux.defer(() -> {
+            CloseableByteBody claimed = pending.getAndSet(null);
+            return claimed == null ? Flux.error(new IllegalStateException("Already started")) : claimed.toReadBufferPublisher();
+        }), () -> {
+            CloseableByteBody claimed = pending.getAndSet(null);
+            if (claimed != null) {
+                claimed.close();
+            }
+        });
     }
 
     /**
