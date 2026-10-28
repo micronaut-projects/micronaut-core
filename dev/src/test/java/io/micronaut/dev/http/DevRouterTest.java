@@ -22,6 +22,7 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.LocatedHttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
+import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
@@ -252,6 +253,48 @@ class DevRouterTest {
         }
     }
 
+    @Test
+    void routesThatTheBodyTellsApartAreChosenByTheBody() throws IOException {
+        try (ApplicationContext context = ApplicationContext.run(Map.of(
+            "spec.name", "DevRouterTest",
+            "dev-router.orders", true,
+            "micronaut.server.port", -1,
+            DevelopmentMode.PROPERTY, true))) {
+            EmbeddedServer server = context.getBean(EmbeddedServer.class).start();
+            DevRouter devRouter = context.getBean(DevRouter.class);
+            assertTrue(devRouter.current().hasBodyConditions());
+            assertEquals("200 express", post(server.getPort(), "/dev-router/orders", "express order"));
+            assertEquals("200 standard", post(server.getPort(), "/dev-router/orders", "standard order"));
+            assertEquals("200 static", get(server, "/dev-router/static"));
+        }
+    }
+
+    @Test
+    void routesThatTheBodyTellsApartAreChosenByTheBodyWhenARebuildAddsTheFirstOnes() throws IOException {
+        try (ApplicationContext context = ApplicationContext.run(Map.of(
+            "spec.name", "DevRouterTest",
+            "micronaut.server.port", -1,
+            DevelopmentMode.PROPERTY, true))) {
+            EmbeddedServer server = context.getBean(EmbeddedServer.class).start();
+            DevRouter devRouter = context.getBean(DevRouter.class);
+            // no route had a body condition when the server was created
+            assertFalse(devRouter.current().hasBodyConditions());
+            assertEquals("200 static", get(server, "/dev-router/static"));
+
+            context.registerSingleton(HttpRoutes.class, routes -> {
+                routes.POST("/dev-router/later").where(RequestCondition.bodyText(text -> text.startsWith("a")))
+                    .consumesAll().handle((request, variables) -> text("a"));
+                routes.POST("/dev-router/later").where(RequestCondition.bodyText(text -> text.startsWith("b")))
+                    .consumesAll().handle((request, variables) -> text("b"));
+            });
+            assertEquals(1, devRouter.rebuilds());
+            assertTrue(devRouter.current().hasBodyConditions());
+            assertEquals("200 a", post(server.getPort(), "/dev-router/later", "apple"));
+            assertEquals("200 b", post(server.getPort(), "/dev-router/later", "banana"));
+            assertEquals("200 static", get(server, "/dev-router/static"));
+        }
+    }
+
     private static List<String> routes(Router router) {
         return router.uriRoutes().map(route -> route.getHttpMethodName() + " " + route.getUriMatchTemplate().toPathString()).sorted().toList();
     }
@@ -284,6 +327,19 @@ class DevRouterTest {
         }
     }
 
+    private static String post(int port, String path, String body) throws IOException {
+        try (Socket socket = new Socket("localhost", port)) {
+            socket.setSoTimeout(30_000);
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            socket.getOutputStream().write(("POST " + path + " HTTP/1.1\r\nHost: localhost\r\nContent-Type: text/plain\r\nContent-Length: "
+                + bytes.length + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            socket.getOutputStream().write(bytes);
+            String response = new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            String status = response.substring("HTTP/1.1 ".length(), response.indexOf('\r'));
+            return status.substring(0, 3) + " " + response.substring(response.indexOf("\r\n\r\n") + 4);
+        }
+    }
+
     private static String get(int port, String path) throws IOException {
         try (Socket socket = new Socket("localhost", port)) {
             socket.setSoTimeout(30_000);
@@ -300,6 +356,20 @@ class DevRouterTest {
         @Get(value = "/static", produces = "text/plain")
         String hello() {
             return "static";
+        }
+    }
+
+    @Requires(property = "spec.name", value = "DevRouterTest")
+    @Requires(property = "dev-router.orders")
+    @Singleton
+    static class OrderRoutes implements HttpRoutes {
+        @Override
+        public void routes(io.micronaut.web.router.builder.HttpRouteBuilder routes) {
+            // two routes of one path that only the body tells apart
+            routes.POST("/dev-router/orders").where(RequestCondition.bodyText(text -> text.contains("express")))
+                .consumesAll().handle((request, variables) -> text("express"));
+            routes.POST("/dev-router/orders").where(RequestCondition.bodyText(text -> !text.contains("express")))
+                .consumesAll().handle((request, variables) -> text("standard"));
         }
     }
 

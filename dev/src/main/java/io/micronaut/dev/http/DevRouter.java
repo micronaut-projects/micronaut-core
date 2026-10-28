@@ -46,6 +46,7 @@ import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanType;
 import io.micronaut.web.router.RouteBuilder;
 import io.micronaut.web.router.RouteMatch;
+import io.micronaut.web.router.RouteResolution;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.UriRouteMatch;
@@ -395,6 +396,30 @@ public final class DevRouter implements Router {
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
         return current().findAny(request);
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        // the application's router filters the routes of a located target too
+        return current().findAny(request, filter);
+    }
+
+    /**
+     * Always true: a rebuild in place may add a route with a body condition, and the server decides once, when it is
+     * created, whether it can choose a route by the body of a request. Where no route has a body condition, the server
+     * answers as it would otherwise, as {@link #resolve(HttpRequest, Predicate)} asks the application's router, which
+     * knows whether one does.
+     *
+     * @return true
+     */
+    @Override
+    public boolean hasBodyConditions() {
+        return true;
+    }
+
+    @Override
+    public <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        return current().resolve(request, filter);
     }
 
     @Override
