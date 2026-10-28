@@ -27,6 +27,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -40,6 +41,11 @@ import java.util.regex.Pattern;
  */
 public final class HttpHeadersUtil {
     private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
+    /**
+     * The longest Accept-Language tag that is resolved to a {@link Locale}. Longer tags are
+     * ignored, since the JDK caches per-locale data for every distinct tag it resolves.
+     */
+    private static final int MAX_LANGUAGE_TAG_LENGTH = 64;
     private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
         Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
     );
@@ -140,6 +146,26 @@ public final class HttpHeadersUtil {
             text = text.split(",")[0];
         }
         return text;
+    }
+
+    /**
+     * Resolve the locale of an {@code Accept-Language} header. The default locale is returned if
+     * the header is {@code *} or its first language tag is longer than the supported maximum.
+     *
+     * @param text The Accept-Language header value
+     * @return The locale
+     * @since 4.10.34
+     */
+    @Internal
+    public static Locale parseAcceptLanguage(@NonNull String text) {
+        String part = splitAcceptHeader(text);
+        if (part == null) {
+            return Locale.getDefault();
+        }
+        if (part.length() > MAX_LANGUAGE_TAG_LENGTH) {
+            return Locale.getDefault();
+        }
+        return Locale.forLanguageTag(part);
     }
 
     /**

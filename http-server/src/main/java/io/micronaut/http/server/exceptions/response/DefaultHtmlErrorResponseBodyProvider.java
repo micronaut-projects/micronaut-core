@@ -128,13 +128,17 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
                                   }
             """;
 
-    private static final int MAX_CACHE_SIZE = 100;
+    /**
+     * The maximum number of characters of HTML kept in the cache.
+     */
+    private static final int MAX_CACHE_WEIGHT = 512 * 1024;
 
     private final HtmlSanitizer htmlSanitizer;
     private final MessageSource messageSource;
     private final LocaleResolver<HttpRequest<?>> localeResolver;
     private final Map<HtmlErrorPage, String> cache = new ConcurrentLinkedHashMap.Builder<HtmlErrorPage, String>()
-        .maximumWeightedCapacity(MAX_CACHE_SIZE)
+        .maximumWeightedCapacity(MAX_CACHE_WEIGHT)
+        .weigher((String html) -> html.length())
         .build();
 
     DefaultHtmlErrorResponseBodyProvider(HtmlSanitizer htmlSanitizer,

@@ -765,10 +765,7 @@ public interface HttpHeaders extends Headers {
      */
     default Optional<Locale> findAcceptLanguage() {
         return findFirst(HttpHeaders.ACCEPT_LANGUAGE)
-            .map(text -> {
-                String part = HttpHeadersUtil.splitAcceptHeader(text);
-                return part == null ? Locale.getDefault() : Locale.forLanguageTag(part);
-            });
+            .map(HttpHeadersUtil::parseAcceptLanguage);
     }
 
     /**
