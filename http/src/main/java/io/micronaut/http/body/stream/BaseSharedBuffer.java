@@ -530,9 +530,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     @Override
     public void error(Throwable e) {
         if (error != null) {
-            if (error != e) {
-                error.addSuppressed(e);
-            }
+            // keep the first failure as is: it is not owned by this buffer and may be shared
             return;
         }
 

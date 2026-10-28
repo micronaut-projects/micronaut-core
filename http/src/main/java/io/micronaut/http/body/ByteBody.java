@@ -208,19 +208,16 @@ public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, I
      * {@link #allowDiscard()} calls.
      */
     final class BodyDiscardedException extends IOException {
-        static final BodyDiscardedException INSTANCE = new BodyDiscardedException();
-
         BodyDiscardedException() {
         }
 
         /**
-         * Get an instance of this exception. At the moment this is a singleton without stack trace,
-         * but this may change in the future.
+         * Get an instance of this exception. The instance has no stack trace.
          *
          * @return The instance
          */
         public static BodyDiscardedException create() {
-            return INSTANCE;
+            return new BodyDiscardedException();
         }
 
         @Override
