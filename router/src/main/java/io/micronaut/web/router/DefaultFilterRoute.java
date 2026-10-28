@@ -221,7 +221,8 @@ final class DefaultFilterRoute implements FilterRoute {
     /**
      * Makes the patterns added so far relative to the server context path. A pattern that already starts
      * with the context path segment is kept as is. A relative pattern matches the part of a request path
-     * after the context path; a request outside the context path is not matched by it.
+     * after the context path, and the whole path of a request outside the context path (routes such as
+     * WebSocket or function routes that are not mounted under the context path).
      * Must be called after the patterns and the pattern style are set.
      *
      * @param contextPath The server context path
@@ -273,9 +274,11 @@ final class DefaultFilterRoute implements FilterRoute {
         }
         String contextPath = this.contextPath;
         FilterPatternMatcher contextPathPatternMatcher = this.contextPathPatternMatcher;
-        // on 5.3 every route is under the context path, so a relative pattern matches only below it
-        if (contextPath != null && contextPathPatternMatcher != null && isUnderContextPath(contextPath, path)) {
-            String relativePath = path.length() == contextPath.length() ? "/" : path.substring(contextPath.length());
+        if (contextPath != null && contextPathPatternMatcher != null) {
+            String relativePath = path;
+            if (isUnderContextPath(contextPath, path)) {
+                relativePath = path.length() == contextPath.length() ? "/" : path.substring(contextPath.length());
+            }
             if (matches(contextPathPatternMatcher, relativePath)) {
                 return enabledFilter();
             }
