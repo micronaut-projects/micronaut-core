@@ -355,10 +355,11 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                         return null;
                     }
                     if (uri.indexOf('%', pos) != -1
-                        && (decodesToDotSegment(uri, pos, length) || !matchesDecoded(segment, uri.substring(pos), matcher))) {
-                        // the handler receives the decoded values: an encoded slash may be part of them
-                        // (see the raw values of a route), but never to climb out of the segment, and an
-                        // encoded backslash must still satisfy the template
+                        && (!matchesDecoded(segment, uri.substring(pos), matcher)
+                            || decodesToDotSegment(uri, pos, length) && !segment.pattern.matcher(decodeSeparators(uri.substring(pos))).matches())) {
+                        // the handler receives the decoded values: an encoded backslash must still satisfy
+                        // the template, and an encoded slash may be part of them (see the raw values of a
+                        // route), but never to climb out of a template that does not take a slash itself
                         return null;
                     }
                     return matcher;
@@ -398,8 +399,10 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         if (percent == -1 || percent >= to) {
             return false;
         }
-        String decoded = decodeSeparators(uri.substring(from, to));
-        if (decoded.indexOf('/') == -1 && decoded.indexOf('\\') == -1) {
+        String raw = uri.substring(from, to);
+        String decoded = decodeSeparators(raw);
+        if (decoded.length() == raw.length()) {
+            // no encoded separator: a literal one is matched by the template as it is
             return false;
         }
         for (String part : decoded.split("[/\\\\]", -1)) {
