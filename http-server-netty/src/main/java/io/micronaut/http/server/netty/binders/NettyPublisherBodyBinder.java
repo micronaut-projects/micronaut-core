@@ -77,7 +77,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
                 return BindingResult.empty();
             }
             @SuppressWarnings("unchecked")
-            Argument<Object> targetType = (Argument<Object>) context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            Argument<Object> targetType = (Argument<Object>) valueType(context);
             MediaType mediaType = nhr.getContentType().orElse(null);
             if (!Publishers.isSingle(context.getArgument().getType()) && !context.getArgument().isSpecifiedSingle() && mediaType != null) {
                 Optional<MessageBodyReader<Object>> reader = nettyBodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType));
@@ -108,6 +108,22 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
             return () -> Optional.of(future);
         }
         return BindingResult.empty();
+    }
+
+    /**
+     * The type of the value a reactive or future body parameter wraps. The annotations of the
+     * parameter (for example a JSON view) apply to the value, as they do for a parameter that is
+     * not wrapped.
+     *
+     * @param context The conversion context of the parameter
+     * @return The value type
+     */
+    static Argument<?> valueType(ArgumentConversionContext<?> context) {
+        Argument<?> valueType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        if (valueType.getAnnotationMetadata().isEmpty()) {
+            return valueType.withAnnotationMetadata(context.getAnnotationMetadata());
+        }
+        return valueType;
     }
 
     static RuntimeException extractError(Object message, ArgumentConversionContext<?> conversionContext) {
