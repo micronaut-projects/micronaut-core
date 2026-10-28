@@ -71,7 +71,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     private static final Map<Http2Error, Exception> HTTP2_ERRORS = new EnumMap<>(Http2Error.class);
 
     @Nullable
-    private Http2ConnectionHandler connectionHandler;
+    private ConnectionHandler connectionHandler;
     private Http2Connection. @Nullable PropertyKey streamKey;
     private boolean reading = false;
     private boolean upgradedFromHttp1 = false;
@@ -103,7 +103,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         super(requestHandler);
     }
 
-    private void init(Http2ConnectionHandler connectionHandler) {
+    private void init(ConnectionHandler connectionHandler) {
         this.connectionHandler = connectionHandler;
         Http2Connection.PropertyKey key = connectionHandler.connection().newKey();
         streamKey = key;
@@ -272,8 +272,12 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
     @Override
     public void onWindowUpdateRead(ChannelHandlerContext ctx, int streamId, int windowSizeIncrement) {
-        // handled by netty
-        lastStreamActivity = System.nanoTime();
+        // handled by netty. This is not activity by itself: a peer could send a connection
+        // WINDOW_UPDATE every idle period while all stream windows stay at zero. Response data
+        // that the update lets through is seen by the idle check as a smaller send window.
+        if (streamId == Http2CodecUtil.CONNECTION_STREAM_ID && connectionHandler != null) {
+            connectionHandler.expectedSendWindow += windowSizeIncrement;
+        }
     }
 
     @Override
@@ -294,6 +298,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         private int lastMessageHashCode;
         private long lastPendingWriteBytes;
         private long lastProgress;
+        /**
+         * The connection send window as of the last idle check, plus the connection
+         * WINDOW_UPDATEs read since. If the actual window is smaller, response data was sent.
+         */
+        private long expectedSendWindow;
 
         private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, ConnectionHandlerBuilder builder) {
             super(decoder, encoder, initialSettings, decoupleCloseAndGoAway, flushPreface);
@@ -356,16 +365,32 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
          * {@link IdleStateHandler} does with {@code observeOutput}.
          */
         private boolean outputChanged(ChannelHandlerContext ctx) {
+            boolean changed = false;
+            // data frames sent since the last check use up the connection send window
+            int sendWindow = encoder().flowController().windowSize(connection().connectionStream());
+            if (sendWindow < expectedSendWindow) {
+                changed = true;
+            }
+            expectedSendWindow = sendWindow;
             ChannelOutboundBuffer buf = ctx.channel().unsafe().outboundBuffer();
             if (buf == null) {
-                return false;
+                return changed;
             }
-            int messageHashCode = System.identityHashCode(buf.current());
+            // only count draining. Frames added to a buffer the peer does not read (e.g. a PING
+            // ACK each idle period) make it grow, and must not count as progress.
+            Object current = buf.current();
+            int messageHashCode = current == null ? 0 : System.identityHashCode(current);
             long pendingWriteBytes = buf.totalPendingWriteBytes();
             long progress = buf.currentProgress();
-            boolean changed = messageHashCode != lastMessageHashCode
-                || pendingWriteBytes != lastPendingWriteBytes
-                || progress != lastProgress;
+            if (lastMessageHashCode != 0 && messageHashCode != lastMessageHashCode) {
+                // the message that was at the head of the buffer has been written
+                changed = true;
+            } else if (messageHashCode != 0 && messageHashCode == lastMessageHashCode && progress != lastProgress) {
+                // the same message was partially written
+                changed = true;
+            } else if (pendingWriteBytes < lastPendingWriteBytes) {
+                changed = true;
+            }
             lastMessageHashCode = messageHashCode;
             lastPendingWriteBytes = pendingWriteBytes;
             lastProgress = progress;
