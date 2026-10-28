@@ -55,7 +55,7 @@ PyronautCompiler.builder()
 
 == Switching Compilation On or Off for a Scope
 
-The `CompileStatic` annotation switches compilation for a class, a function or, applied as a bare statement, a module, with the scope rules of `TypeChecked`: the nearest declaration wins.
+The `CompileStatic` annotation switches compilation for a class, a function or, applied as a bare statement, a module, with the scope rules of `TypeChecked`: the nearest declaration wins: a function over its class, a nested class over the class around it, a class over its module, a module over the compilation's mode.
 
 [source,python]
 .shop/PricingService.py

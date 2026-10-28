@@ -45,7 +45,7 @@ The callback receives every diagnostic before the compiler reports it, with its 
 
 == Switching Checking On or Off for a Scope
 
-The `TypeChecked` annotation switches checking for a class, a function or, applied as a bare statement, a module. The nearest declaration wins: a function over its class, a class over its module, a module over the compilation's mode. A scope switched on under mode `off` is checked at `error` severity.
+The `TypeChecked` annotation switches checking for a class, a function or, applied as a bare statement, a module. The nearest declaration wins: a function over its class, a nested class over the class around it, a class over its module, a module over the compilation's mode. A scope switched on under mode `off` is checked at `error` severity.
 
 [source,python]
 ----
