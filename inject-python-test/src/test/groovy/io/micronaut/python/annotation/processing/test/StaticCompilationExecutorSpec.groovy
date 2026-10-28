@@ -27,7 +27,9 @@ class StaticCompilationExecutorSpec extends AbstractPythonTypeElementSpec {
     static final String SOURCE = '''
 from dataclasses import dataclass
 from java.lang import Thread
-from jakarta.inject import Singleton
+from typing import Annotated
+from jakarta.inject import Inject, Singleton
+from micronaut.context.annotation import Prototype
 from micronaut.core.annotation import Introspected
 from micronaut.http.annotation import Controller, Get
 from micronaut.scheduling import TaskExecutors
@@ -65,6 +67,7 @@ class Clock:
 class ThreadController:
     def __init__(self, clock: Clock):
         self.clock = clock
+        self.created = Thread.currentThread()
 
     @Get(value="/plain", produces="text/plain")
     def plain(self) -> str:
@@ -87,6 +90,10 @@ class ThreadController:
     @Get(value="/service", produces="text/plain")
     def service(self) -> str:
         return self.clock.thread()
+
+    @Get(value="/created", produces="text/plain")
+    def created_on(self) -> str:
+        return self.created.getName() + "|" + Thread.currentThread().getName()
 
     @Get("/introspected")
     def introspected(self) -> Stamp:
@@ -129,6 +136,18 @@ class ThreadController:
         return Thread.currentThread().getName()
 
 
+@Prototype
+@Controller("/prototype")
+class PrototypeController:
+    @Get(value="/plain", produces="text/plain")
+    def plain(self) -> str:
+        return Thread.currentThread().getName()
+
+
+# a singleton module: its bean, created when the application starts, injects [module_clock]
+Singleton()
+
+
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Get(value="/module/blocking", produces="text/plain")
 def module_blocking() -> str:
@@ -138,6 +157,14 @@ def module_blocking() -> str:
 @Get(value="/module/plain", produces="text/plain")
 def module_plain() -> str:
     return Thread.currentThread().getName()
+
+
+module_clock: Annotated[Clock, Inject]
+
+
+@Get(value="/module/service", produces="text/plain")
+def module_service() -> str:
+    return module_clock.thread()
 '''
 
     static final Map PROPERTIES = [
@@ -181,12 +208,14 @@ def module_plain() -> str:
                 threads[m] = ['plain', 'sibling', 'python-sibling', 'service', 'plain-object', 'lazy-raise', 'eager-raise', 'blocking'].collectEntries { String route ->
                     [(route): client.retrieve("/threads/$route".toString())]
                 } + ['module/plain': client.retrieve('/module/plain'), 'module/blocking': client.retrieve('/module/blocking'),
+                     'module/service': client.retrieve('/module/service'), 'prototype': client.retrieve('/prototype/plain'),
                      'introspected': client.retrieve('/threads/introspected', Map).thread as String,
                      'introspected-read': client.retrieve('/threads/introspected-read')]
                 if (m == StaticCompilationMode.ALL) {
                     ['ThreadController.plain', 'ThreadController.sibling', 'ThreadController.named', 'ThreadController.python_sibling',
                      'ThreadController.service', 'Clock.thread', 'module_plain', 'ThreadController.introspected',
-                     'ThreadController.plain_object', 'ThreadController.lazy_raise', 'ThreadController.eager_raise', 'ThreadController.introspected_read'].each { compiled(it) }
+                     'ThreadController.plain_object', 'ThreadController.lazy_raise', 'ThreadController.eager_raise', 'ThreadController.introspected_read',
+                     'module_service', 'ThreadController.created_on', 'PrototypeController.plain'].each { compiled(it) }
                 }
             } finally {
                 context.close()
@@ -200,9 +229,10 @@ def module_plain() -> str:
         off['blocking'].startsWith('blocking-') && off['module/blocking'].startsWith('blocking-')
 
         and: "compiled, a route calling Java, a compiled sibling or a compiled service, or building an introspected object, or raising and catching an exception class created lazily, stays on the event loop"
-        ['plain', 'sibling', 'service', 'module/plain', 'introspected', 'introspected-read', 'lazy-raise'].every { onEventLoop(all[it]) }
+        ['plain', 'sibling', 'service', 'module/plain', 'module/service', 'introspected', 'introspected-read', 'lazy-raise'].every { onEventLoop(all[it]) }
 
-        and: "a route calling a sibling through the Python object, or creating a Python object, an exception included, runs on io, and @ExecuteOn is honoured"
+        and: "a route calling a sibling through the Python object, or creating a Python object, an exception included, or of a bean created per use, runs on io, and @ExecuteOn is honoured"
+        all['prototype'].startsWith('io-')
         all['python-sibling'].startsWith('io-')
         all['eager-raise'].startsWith('io-')
         all['plain-object'].startsWith('io-')
@@ -228,6 +258,91 @@ def module_plain() -> str:
 
         cleanup:
         context?.close()
+    }
+
+    void "a compiled route reading attributes fixed at construction finds its bean created and its slots primed on its first request"() {
+        given: "the application started, no request made"
+        mode = StaticCompilationMode.ALL
+        decisions.clear()
+        ApplicationContext context = buildContext(SOURCE, true, PROPERTIES)
+        def server = context.getBean(EmbeddedServer)
+        server.start()
+        def client = context.createBean(HttpClient, server.URL).toBlocking()
+        def controller = getBean(context, 'python.ThreadController')
+        Map<String, Object> primed = slots(controller)
+
+        expect: "the controller was created at startup, and the bodies read [clock] and [created] from slots it filled for its Python object then"
+        compiled('ThreadController.service') && compiled('ThreadController.created_on')
+        primed.size() == 2
+        primed.values().every { it != null && component(it, 'owner').is(controller.asPolyglotValue()) && component(it, 'held') }
+
+        when: "the first requests of the routes reading them"
+        String service = client.retrieve('/threads/service')
+        List<String> created = client.retrieve('/threads/created').split('\\|') as List
+
+        then: "they run on the event loop, the controller was not created there, and they read the slots as primed: no read reached the Python object"
+        onEventLoop(service)
+        !created[0].toLowerCase(Locale.ROOT).contains('eventloop')
+        onEventLoop(created[1])
+        slots(controller).every { name, fixed -> fixed.is(primed[name]) }
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a module route reading an injected attribute of the module reads a Java field and stays on the event loop"() {
+        given:
+        mode = StaticCompilationMode.ALL
+        decisions.clear()
+        ApplicationContext context = buildContext(SOURCE, true, PROPERTIES)
+        def server = context.getBean(EmbeddedServer)
+        server.start()
+        def client = context.createBean(HttpClient, server.URL).toBlocking()
+
+        expect: "the module was injected at startup: the field the compiled body reads holds the bean before the first request"
+        compiled('module_service')
+        injected(context, 'injected_module_clock').is(getBean(context, 'python.Clock'))
+
+        and: "the route runs on the event loop, reading the field"
+        onEventLoop(client.retrieve('/module/service'))
+
+        cleanup:
+        context?.close()
+    }
+
+    /**
+     * What the slots of the attributes fixed at construction of a stub keep, by slot.
+     */
+    private static Map<String, Object> slots(Object stub) {
+        Map<String, Object> found = [:]
+        for (Class<?> type = stub.getClass(); type != null; type = type.superclass) {
+            type.declaredFields.findAll { it.type.name == 'io.micronaut.context.python.PythonFixedAttributes$Slot' }.each { slot ->
+                slot.accessible = true
+                def value = slot.get(stub)
+                def current = value == null ? null : value.getClass().getDeclaredField('current')
+                current?.accessible = true
+                found[slot.name] = current?.get(value)
+            }
+        }
+        return found
+    }
+
+    /**
+     * The value of a field of the generated class of a module holding an injected attribute, read
+     * from the instance of the class without creating its bean.
+     */
+    private static Object injected(ApplicationContext context, String name) {
+        def definition = context.allBeanDefinitions.find { candidate -> candidate.beanType.declaredFields.any { it.name == name } }
+        def module = definition.beanType.getMethod('getInstance').invoke(null)
+        def field = module.getClass().getDeclaredField(name)
+        field.accessible = true
+        return field.get(module)
+    }
+
+    private static Object component(Object record, String name) {
+        def field = record.getClass().getDeclaredField(name)
+        field.accessible = true
+        return field.get(record)
     }
 
     private static boolean onEventLoop(String thread) {
