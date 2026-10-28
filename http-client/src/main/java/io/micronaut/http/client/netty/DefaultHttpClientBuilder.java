@@ -158,7 +158,15 @@ public final class DefaultHttpClientBuilder {
         return this;
     }
 
-    DefaultHttpClientBuilder handlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
+    /**
+     * Set the registry of message body readers and writers used to read and write request
+     * and response bodies.
+     *
+     * @param handlerRegistry The handler registry
+     * @return This builder
+     * @since 5.3.0
+     */
+    public DefaultHttpClientBuilder handlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
         delegate.handlerRegistry(handlerRegistry);
         return this;
     }

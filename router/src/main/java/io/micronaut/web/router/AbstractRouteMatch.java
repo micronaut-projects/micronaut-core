@@ -336,6 +336,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             throw new IllegalStateException("Argument before filters already processed!");
         }
         RequestArgumentBinder<Object>[] argumentBinders = routeInfo.resolveArgumentBinders(requestBinderRegistry);
+        RequestConversionContexts conversionContexts = null;
         for (int i = 0; i < arguments.length; i++) {
             if (fulfilledArguments[i]) {
                 continue;
@@ -360,11 +361,15 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 }
             }
             if (argumentBinder != null) {
+                if (conversionContexts == null) {
+                    conversionContexts = new RequestConversionContexts(request);
+                }
                 fulfillValue(
                     i,
                     argumentBinder,
                     argument,
-                    request
+                    request,
+                    conversionContexts
                 );
             }
         }
@@ -380,6 +385,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (afterBindersApplied) {
             throw new IllegalStateException("Argument binders after filters already processed!");
         }
+        RequestConversionContexts conversionContexts = null;
         for (int i = 0; i < arguments.length; i++) {
             if (fulfilledArguments[i]) {
                 continue;
@@ -387,11 +393,16 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             Argument<Object> argument = (Argument<Object>) arguments[i];
             PostponedRequestArgumentBinder<Object> argumentBinder = postponedArgumentBinders[i];
             if (argumentBinder != null) {
+                if (conversionContexts == null) {
+                    // the filters may have changed the request
+                    conversionContexts = new RequestConversionContexts(request);
+                }
                 fulfillValuePostponed(
                     i,
                     argumentBinder,
                     argument,
-                    request
+                    request,
+                    conversionContexts
                 );
             }
         }
@@ -402,27 +413,29 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     private <E> void fulfillValue(int index,
                                   RequestArgumentBinder<E> argumentBinder,
                                   Argument<E> argument,
-                                  HttpRequest<?> request) {
-        ArgumentConversionContext<E> conversionContext = newContext(argument, request);
+                                  HttpRequest<?> request,
+                                  RequestConversionContexts conversionContexts) {
+        ArgumentConversionContext<E> conversionContext = conversionContexts.newContext(argument);
         ArgumentBinder.BindingResult<E> bindingResult = argumentBinder.bind(conversionContext, request);
+        if (bindingResult instanceof PendingRequestBindingResult<?>) {
+            // a pending result converts later, with the locale and the character encoding of the request as it is now
+            conversionContexts.resolve();
+        }
         fulfillValue(index, argument, bindingResult);
     }
 
     private <E> void fulfillValuePostponed(int index,
                                            PostponedRequestArgumentBinder<E> argumentBinder,
                                            Argument<E> argument,
-                                           HttpRequest<?> request) {
-        ArgumentConversionContext<E> conversionContext = newContext(argument, request);
+                                           HttpRequest<?> request,
+                                           RequestConversionContexts conversionContexts) {
+        ArgumentConversionContext<E> conversionContext = conversionContexts.newContext(argument);
         ArgumentBinder.BindingResult<E> bindingResult = argumentBinder.bindPostponed(conversionContext, request);
+        if (bindingResult instanceof PendingRequestBindingResult<?>) {
+            // a pending result converts later, with the locale and the character encoding of the request as it is now
+            conversionContexts.resolve();
+        }
         fulfillValue(index, argument, bindingResult);
-    }
-
-    private <E> ArgumentConversionContext<E> newContext(Argument<E> argument, HttpRequest<?> request) {
-        return ConversionContext.of(
-            argument,
-            request.getLocale().orElse(null),
-            request.getCharacterEncoding()
-        );
     }
 
     private <E> void fulfillValue(int index, Argument<E> argument, ArgumentBinder.BindingResult<E> bindingResult) {
@@ -479,7 +492,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         } else {
             return false;
         }
-        if (value != null && bindingResult.isConvertedToArgumentType() && argument.getType().isInstance(value)) {
+        if (value != null && bindingResult.isConvertedToArgumentType() && isInstance(argument, value)) {
             // The binder already produced the value for the complete argument, including its type arguments
             argumentValues[index] = value;
             fulfilledArguments[index] = true;
@@ -529,6 +542,19 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         }
     }
 
+    /**
+     * Whether the value is an instance of the type of the argument, or of its wrapper type if the type is primitive:
+     * the conversion service returns such a value unchanged.
+     *
+     * @param argument The argument
+     * @param value    The value
+     * @return Whether the value is an instance
+     */
+    private static boolean isInstance(Argument<?> argument, Object value) {
+        Class<?> argumentType = argument.getType();
+        return argumentType.isInstance(value) || argumentType.isPrimitive() && argument.getWrapperType().isInstance(value);
+    }
+
     private @Nullable Object resolveValueOrError(Argument<?> argument, ConversionContext conversionContext, Optional<?> result) {
         if (result.isEmpty()) {
             Optional<ConversionError> lastError = conversionContext.getLastError();
@@ -541,5 +567,4 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         }
         return result.get();
     }
-
 }
