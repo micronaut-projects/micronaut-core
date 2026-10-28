@@ -36,6 +36,7 @@ import jakarta.inject.Singleton;
 public final class WebSocketUpgradeHandlerFactory {
     private final ConversionService conversionService;
     private final NettyHttpServerConfiguration serverConfiguration;
+    private volatile int maxPayloadLength;
 
     public WebSocketUpgradeHandlerFactory(ConversionService conversionService, NettyHttpServerConfiguration serverConfiguration) {
         this.conversionService = conversionService;
@@ -50,6 +51,11 @@ public final class WebSocketUpgradeHandlerFactory {
      * @return The handler
      */
     public NettyServerWebSocketUpgradeHandler create(NettyEmbeddedServer embeddedServer, NettyEmbeddedServices nettyEmbeddedServices) {
-        return new NettyServerWebSocketUpgradeHandler(nettyEmbeddedServices, embeddedServer, conversionService, serverConfiguration);
+        int maxPayloadLength = this.maxPayloadLength;
+        if (maxPayloadLength == 0) {
+            maxPayloadLength = NettyServerWebSocketUpgradeHandler.maxPayloadLength(nettyEmbeddedServices.getApplicationContext());
+            this.maxPayloadLength = maxPayloadLength;
+        }
+        return new NettyServerWebSocketUpgradeHandler(nettyEmbeddedServices, embeddedServer, conversionService, serverConfiguration, maxPayloadLength);
     }
 }
