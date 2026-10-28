@@ -72,8 +72,7 @@ final class NettyCompletableFutureBodyBinder
                 return BindingResult.empty();
             }
 
-            Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
-            Argument<?> targetType = firstTypeParameter.orElse(Argument.OBJECT_ARGUMENT);
+            Argument<?> targetType = NettyPublisherBodyBinder.valueType(context);
             CompletableFuture<Object> future = InternalByteBody.bufferFlow(rootBody)
                 .map(bytes -> {
                     Optional<Object> value;
