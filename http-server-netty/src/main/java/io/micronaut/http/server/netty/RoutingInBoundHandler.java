@@ -149,7 +149,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
             try {
                 if (!terminateEventPublisher.isEmpty()) {
                     terminatedFlow = ExecutionFlow.async(getRequestEventExecutor(), () -> {
-                        PropagatedContext.getOrEmpty()
+                        // the response may be written while another request of the same connection
+                        // is current (pipelining), so do not inherit the current context
+                        PropagatedContext.empty()
                             .plus(new ServerHttpRequestContext(request))
                             .propagate(() -> publishRequestEvent(request, terminateEventPublisher, new HttpRequestTerminatedEvent(request)));
                         return ExecutionFlow.empty();
