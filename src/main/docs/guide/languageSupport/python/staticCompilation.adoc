@@ -170,7 +170,7 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 |`throw` and `try` with typed catches. A checked exception a Java call declares reaches the caller wrapped in `IllegalStateException`, as it does through the bridge.
 
 |`raise OwnError(...)`, `raise OwnError`, `except OwnError as e`, `raise e`, for an exception class of the compilation (extending a builtin exception such as `Exception` or `ValueError`, or a Java `RuntimeException`)
-|The representation of <<pythonExceptions, Python exception classes>>: a raise calls the Python class with the arguments, as Python does, and throws the Python exception wrapped in the generated Java class through its `Value` constructor, the Java exception the runtime creates when an exception raised in Python reaches Java; a clause catches the generated class. A Java caller of the compiled method gets what it gets from the Python body, and a Python caller the Python exception: the rewritten Python method raises the Python exception the Java one carries, when the compiled body calls no Java code outside the compilation. The arguments of a raise are positional `str`, `int`, `float`, `bool` or `None` values, which reach the Python class as themselves. A value of an exception class has no Java layout otherwise: it is constructed by the raise itself, an exception variable is only raised again by its own clause, and a parameter, a return or a construction elsewhere is refused. Refused too, as Python would behave otherwise: a raise inside an `except` or `finally` block (Python chains the exception being handled as its `+__context__+`), a nested exception class (the runtime does not find its generated class), a clause for a Python subclass reached through a base other than the one its generated class extends, clauses in an order Java refuses, a clause for a Java type the generated classes extend (`RuntimeException`, `Exception`, `Throwable`) while an exception class of the compilation could reach it, and a clause for an exception class around a try block calling Java code outside the compilation: an exception that crossed Java code (a Java method calling back into Python) is the Java class in Python too, which the Python clause does not catch. A class that takes its arguments as `BaseException` does is raised without entering Python: it extends `Exception` or another builtin exception whose `str()` is `BaseException`'s (`ValueError`, `TypeError`, `RuntimeError`, `LookupError`, `IndexError`, `ArithmeticError`, `OverflowError`, `ZeroDivisionError`, `AssertionError`, `NotImplementedError`) directly or through Python bases that do too, and neither the class nor a Python base defines `+__new__+`, `+__init__+`, `+__str__+`, `+__repr__+`, `+__del__+`, `args`, `+__cause__+`, `+__context__+`, `+__suppress_context__+`, `+__traceback__+`, `+__notes__+` or `+__bases__+` (as a method, an attribute or an assignment to `self.args` in its body, or through an assignment such as `E.__str__ = ...` or a `setattr(E, ...)`, `delattr`, `builtins.setattr` or `type.__setattr__(E, ...)` anywhere in the compilation, also through a name bound to the class; a special method written on a parameter (whatever class shares its name) or a local such as `cls.__str__ = ...`, a `setattr` with a computed name on anything but `self`, or a `setattr` or `__setattr__` named without being called or imported under another name, or a string naming one (`patch = setattr`, `from builtins import setattr as patch`, `getattr(builtins, "setattr")`), or an `exec`, `eval` or `compile`, may be any class's and keeps every raise eager; code outside the compilation replacing them is not seen), nor carries a decorator or a metaclass. The raise creates the generated Java exception alone, with the Java message `BaseException.__str__` gives the arguments (none for no argument, the `str()` of a single one, the `repr()` of the tuple of several), and the Python exception is created from the class and the arguments the first time it is needed: when it reaches a Python caller, or Python code converts the Java exception. It is then the exception the raise would have created, with the same `args`; like the exception a compiled raise of any other class creates, it has no `+__traceback__+` until Python raises it, and no `+__cause__+` or `+__context__+` (a raise inside an `except` or `finally` block is refused). A class defining one of those members is created through its Python class when it is raised, which enters Python.
+|The representation of <<pythonExceptions, Python exception classes>>: a raise calls the Python class with the arguments, as Python does, and throws the Python exception wrapped in the generated Java class through its `Value` constructor, the Java exception the runtime creates when an exception raised in Python reaches Java; a clause catches the generated class. A Java caller of the compiled method gets what it gets from the Python body, and a Python caller the Python exception: the rewritten Python method raises the Python exception the Java one carries, when the compiled body calls no Java code outside the compilation. The arguments of a raise are positional `str`, `int`, `float`, `bool` or `None` values, which reach the Python class as themselves. A value of an exception class has no Java layout otherwise: it is constructed by the raise itself, an exception variable is only raised again by its own clause, and a parameter, a return or a construction elsewhere is refused. Refused too, as Python would behave otherwise: a raise inside an `except` or `finally` block (Python chains the exception being handled as its `+__context__+`), a nested exception class (the runtime does not find its generated class), a clause for a Python subclass reached through a base other than the one its generated class extends, clauses in an order Java refuses, a clause for a Java type the generated classes extend (`RuntimeException`, `Exception`, `Throwable`) while an exception class of the compilation could reach it, and a clause for an exception class around a try block calling Java code outside the compilation: an exception that crossed Java code (a Java method calling back into Python) is the Java class in Python too, which the Python clause does not catch. A class that takes its arguments as `BaseException` does is raised without entering Python: it extends `Exception` or another builtin exception whose `str()` is `BaseException`'s (`ValueError`, `TypeError`, `RuntimeError`, `LookupError`, `IndexError`, `ArithmeticError`, `OverflowError`, `ZeroDivisionError`, `AssertionError`, `NotImplementedError`) directly or through Python bases that do too, and neither the class nor a Python base defines `+__new__+`, `+__init__+`, `+__str__+`, `+__repr__+`, `+__del__+`, `args`, `+__cause__+`, `+__context__+`, `+__suppress_context__+`, `+__traceback__+`, `+__notes__+` or `+__bases__+` (as a method, an attribute or an assignment to `self.args` in its body, or through an assignment such as `E.__str__ = ...` or a `setattr(E, ...)`, `delattr`, `builtins.setattr` or `type.__setattr__(E, ...)` anywhere in the compilation, also through a name bound to the class; a special method written on a parameter (whatever class shares its name) or a local such as `cls.__str__ = ...`, a `setattr` with a computed name on anything but `self`, or a `setattr` or `__setattr__` named without being called or imported under another name, or a string naming one (`patch = setattr`, `from builtins import setattr as patch`, `getattr(builtins, "setattr")`), or an `exec`, `eval` or `compile`, may be any class's and keeps every raise eager; code outside the compilation replacing them is not seen), nor carries a decorator or a metaclass. The raise creates the generated Java exception alone, with the Java message `BaseException.__str__` gives the arguments (none for no argument, the `str()` of a single one, the `repr()` of the tuple of several), and the Python exception is created from the class and the arguments the first time it is needed: when it reaches a Python caller, or Python code converts the Java exception. It is then the exception the raise would have created, with the same `args`; like the exception a compiled raise of any other class creates, it has no `+__traceback__+` until Python raises it, and no `+__cause__+` or `+__context__+` (a raise inside an `except` or `finally` block is refused). Creating a Python exception enters Python and takes the context's lock, so on a hot path a class raised lazily, or a Java exception class, costs least. A class defining one of those members is created through its Python class when it is raised, which enters Python.
 
 |`+`, `-`, `*` on integers, `**` with a non-negative integer literal exponent
 |`Math.addExact` and friends: an overflow raises `ArithmeticException` where Python would promote to a big integer. This is the one accepted difference.
@@ -412,74 +412,11 @@ The modes alternate within each round, so the load of the machine favours neithe
     -Pcorpus.budget.jvm-args="-XX:+UnlockExperimentalVMOptions -XX:-UseJVMCICompiler -Dtruffle.TruffleRuntime=com.oracle.truffle.api.impl.DefaultTruffleRuntime"
 ----
 
-Indicative numbers, from an Apple M2 Max on Oracle GraalVM 25, five rounds on a machine other builds were loading (load average 4 to 12, the spread between cold rounds up to 20%): what mode `all` adds to mode `off`.
+Nearly all of what mode `all` adds is the planner (`plan`); rewriting the runtime trees for delegation, generating the larger stubs and compiling them with `javac` add little. Most of the planner is the lowering of the bodies and the walks of the trees of the compilation, spread over hundreds of interpreted Python functions, and its cost grows with the number of functions, so the share mode `all` adds grows with the size of the application. It depends on the JVM rather than on the GraalPy engine:
 
-[cols="2,1,1,1"]
-|===
-|Compilation |`petclinic` |`fullstack` |four copies of both
+* A build compiles in a cold JVM. With the arguments the build's Python compile tasks run with (the host code compiled by C2, GraalPy interpreted without Truffle's compiler, which a single compilation does not pay off) both modes compile markedly faster than with the JDK's defaults, and the planner gains the most.
+* In a JVM that compiles again and again, the other stages get faster than in a cold JVM, while the planner does not, with or without Truffle's compiler, so its share of the compilation grows. A processing session, which keeps its context, does not change that.
+* A JVM-wide GraalPy engine shared by the contexts of the compilations, so that Truffle keeps the code it compiles for the processor's modules, was measured and not adopted: the compilations of a corpus run each function of the planner too few times for Truffle to compile it, so neither cold nor warm compilations got faster. The latency mode of the engine (`engine.Mode=latency`, as an incremental compilation uses) changes nothing measurable, and switching Truffle's compiler off per context (`engine.Compilation=false`) makes every stage slower.
 
-|Cold, the JVM arguments of the build's Python compile tasks (above)
-|4% (6.0 s)
-|5% (6.9 s)
-|7% (16.1 s)
+Run the test on your own hardware, with the JVM arguments your build uses, for figures that apply to it.
 
-|Cold, the JDK's defaults
-|17% (10.0 s)
-|18% (12.4 s)
-|15% (23.0 s)
-
-|Warm
-|13 to 16% (1.5 s)
-|15 to 26% (2.3 s)
-|27% (10.4 s)
-
-|Session
-|16 to 18% (1.2 s)
-|27% (1.9 s)
-|26% (10.0 s)
-|===
-
-Nearly all of it is the planner (`plan`); rewriting the runtime trees for delegation adds 1 to 3%, generating the larger stubs and compiling them with `javac` under 1%. Most of the planner is the lowering of the bodies (three fifths of its samples) and the walks of the trees of the compilation, spread over hundreds of interpreted Python functions. Its cost depends on the JVM rather than on the GraalPy engine:
-
-* A build compiles in a cold JVM. With the arguments the build's Python compile tasks run with (the host code compiled by C2, GraalPy interpreted without Truffle's compiler, which a single compilation does not pay off) a compilation takes about 40% less time than with the JDK's defaults in either mode, and the planner a quarter or less of its time with the defaults, so mode `all` stays well within the budget.
-* In a JVM that compiles again and again, the other stages run about twice as fast as in a cold JVM, while the planner does not get faster, with or without Truffle's compiler: its share grows to the 15 to 27% above. A processing session, which keeps its context, does not change that over the rounds measured.
-* A JVM-wide GraalPy engine shared by the contexts of the compilations, so that Truffle keeps the code it compiles for the processor's modules, was measured and not adopted: the warm and cold numbers do not change (within 5% for the planner), since the compilations of a corpus run each function of the planner too few times for Truffle to compile it; only a JVM compiling the same application twenty times over halves the planner, by then a few percent of the compilation. The latency mode of the engine (`engine.Mode=latency`, as an incremental compilation uses) changes nothing measurable, and switching Truffle's compiler off per context (`engine.Compilation=false`) makes every stage slower.
-
-== Runtime Performance
-
-A compiled body is Java, so its speed does not depend on the Truffle runtime GraalPy gets. A benchmark of one HTTP service written three ways (a controller and three `@Singleton` services in Java, the same logic in Python with compilation `off`, and that Python compiled in mode `all`, every function but the constructors compiled) gave these indicative numbers on an Apple M2 Max, with `wrk` on the same host at 64 connections:
-
-[cols="3,1,1,1,1"]
-|===
-|Route |GraalVM JDK, mode `off` |GraalVM JDK, mode `all` |OpenJDK, mode `off` |OpenJDK, mode `all`
-
-|A constant
-|0.26×
-|0.97×
-|0.27×
-|0.97×
-
-|A numeric loop
-|0.05×
-|0.61×
-|0.001×
-|0.61×
-
-|String building over lists and dicts
-|0.001×
-|0.57×
-|0.001×
-|0.51×
-
-|Order pricing: validation, a mapped DTO, calls between services, a Java exception raised
-|0.002×
-|0.91×
-|0.002×
-|0.92×
-|===
-
-Each figure is the throughput of the Python service as a fraction of the Java one on the same JDK. On a stock OpenJDK, GraalPy interprets Python without compiling it to machine code, which is where compiling the bodies matters most: the numeric loop served 127 requests a second interpreted and 65,000 compiled. Mode `off` routes are also serialized on the context's lock, so they scale little with concurrent requests; a compiled body takes the lock only where it still calls into Python. Startup time and memory do not change with the mode, since the GraalPy context is created either way.
-
-The table was measured with every compiled route on the `io` executor. A compiled route that never enters Python now runs on the event loop (see <<staticCompilationEventLoop>>), which removes most of what kept the loop routes from Java: on OpenJDK the numeric loop went from 66,700 to 84,600 requests a second (0.79× Java) and its 99th percentile latency from 128 ms to 5.2 ms (Java: 4.7 ms), the constant route from 151,000 to 156,000 (Java's). The tail came from the `io` executor, an unbounded cached pool: 64 concurrent CPU-bound requests ran on 64 threads over 12 cores. A route that stays on `io` keeps it; a fixed `io` pool of about the number of cores (`micronaut.executors.io.type: fixed`, `n-threads: 8`) took the same route's 99th percentile to 1.3 ms.
-
-A compiled `raise` of an exception class of the compilation that defines `+__init__+`, `+__str__+` or another of the members listed under `raise OwnError(...)` constructs the Python exception in Python and takes the context's lock: the same pricing route raising such a class for 2 of its 12 order lines reached 3% of the Java throughput. A class taking its arguments as `BaseException` does, such as `class InvalidLine(Exception): pass`, is raised as a Java exception alone and creates its Python exception only when Python code needs it: the route then served 90% of the Java throughput, as many requests as raising a Java exception class.
