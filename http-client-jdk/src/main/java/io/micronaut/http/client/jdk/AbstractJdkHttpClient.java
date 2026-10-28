@@ -170,6 +170,7 @@ abstract class AbstractJdkHttpClient {
         this.client = prototype.client;
         this.sizeLimits = prototype.sizeLimits;
         this.micronautRedirects = prototype.micronautRedirects;
+        this.jdkRedirects = prototype.jdkRedirects;
         this.jdkConfiguration = prototype.jdkConfiguration;
         this.rawClient = prototype.rawClient;
         this.rawNoRedirectClient = prototype.rawNoRedirectClient;

@@ -190,7 +190,16 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     private final int maxPendingFrames;
     /**
-     * Whether the open handler of a WebSocket route runs: the messages wait. Event loop only.
+     * The frames a {@code @ServerWebSocket} bean received while its open handler runs, handled once it completed.
+     * Event loop only.
+     */
+    private final Queue<WebSocketFrame> framesWhileOpening = new ArrayDeque<>();
+    /**
+     * The payload bytes held in {@link #framesWhileOpening}. Event loop only.
+     */
+    private long bytesWhileOpening;
+    /**
+     * Whether the open handler runs: the messages wait. Event loop only.
      */
     private boolean opening;
     /**
@@ -246,7 +255,86 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     @Nullable
     private ChannelHandlerContext handlerContext;
-=======
+
+    /**
+     * Default constructor.
+     *
+     * @param nettyEmbeddedServices      The netty embedded services
+     * @param webSocketSessionRepository The web socket sessions repository
+     * @param handshaker                 The handshaker
+     * @param webSocketBean              The web socket bean
+     * @param request                    The request used to create the websocket
+     * @param routeMatch                 The route match
+     * @param ctx                        The channel handler context
+     * @param executorSelector           The executor selector
+     * @param coroutineHelper            Helper for kotlin coroutines
+     * @param routeEndpoint              The endpoint of a WebSocket route of handler functions, or {@code null} for a bean
+     * @param routeExecutor              The executor of the WebSocket route of handler functions, or {@code null} for a bean
+     * @param propagatedContext          The context of the upgrade request after the filters
+     * @param releaseRequest             Releases the request used to create the websocket once
+     *                                   the session ended
+     */
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    NettyServerWebSocketHandler(
+        NettyEmbeddedServices nettyEmbeddedServices,
+        WebSocketSessionRepository webSocketSessionRepository,
+        WebSocketServerHandshaker handshaker,
+        WebSocketBean<?> webSocketBean,
+        HttpRequest<?> request,
+        UriRouteMatch<Object, Object> routeMatch,
+        ChannelHandlerContext ctx,
+        ThreadSelectionConfiguration threadSelection,
+        ExecutorSelector executorSelector,
+        @Nullable CoroutineHelper coroutineHelper,
+        @Nullable WebSocketRouteEndpoint routeEndpoint,
+        @Nullable Executor routeExecutor,
+        PropagatedContext propagatedContext,
+        Runnable releaseRequest) {
+        super(
+                nettyEmbeddedServices.getRequestArgumentSatisfier().getBinderRegistry(),
+                nettyEmbeddedServices.getMediaTypeCodecRegistry(),
+                nettyEmbeddedServices.getMessageBodyHandlerRegistry(),
+                webSocketBean,
+                request,
+                routeMatch.getVariableValues(),
+                handshaker.version(),
+                handshaker.selectedSubprotocol(),
+                webSocketSessionRepository,
+                nettyEmbeddedServices.getApplicationContext().getConversionService());
+
+        this.threadSelection = threadSelection;
+        this.executorSelector = executorSelector;
+        this.releaseRequest = releaseRequest;
+        this.eventLoop = ctx.channel().eventLoop();
+        this.routeExecutor = routeExecutor;
+        // the handlers run in the context of the upgrade request, e.g. with the elements that a
+        // filter added to it, and with the upgrade request as the current request
+        this.propagatedContext = propagatedContext.plus(new ServerHttpRequestContext(request));
+        this.routeEndpoint = routeEndpoint;
+        this.maxConcurrentMessages = routeEndpoint == null ? 0 : routeEndpoint.maxConcurrentMessages();
+        this.streamsMessages = routeEndpoint != null && routeEndpoint.streamsMessages();
+        this.maxPendingFrames = routeEndpoint == null ? 0 : routeEndpoint.maxPendingMessages();
+        this.pingHandler = routeEndpoint == null ? null : routeEndpoint.pingMethod();
+        this.pingArgument = routeEndpoint == null ? null : routeEndpoint.pingArgument();
+
+        this.channel = ctx.channel();
+        this.serverSession = createWebSocketSession(ctx);
+
+        if (routeEndpoint != null) {
+            // the handler functions declare the type of their message: it is never bound from the
+            // upgrade request, e.g. from a query parameter of the same name
+            this.bodyArgument = routeEndpoint.messageArgument();
+            this.pongArgument = routeEndpoint.pongArgument();
+        } else {
+            ExecutableBinder<WebSocketState> binder = new DefaultExecutableBinder<>();
+            this.bodyArgument = messageHandler == null ? null : bodyArgument(binder, webSocketBean, messageHandler);
+            this.pongArgument = pongHandler == null ? null : pongArgument(binder, webSocketBean, pongHandler);
+        }
+
+        this.nettyEmbeddedServices = nettyEmbeddedServices;
+        this.coroutineHelper = coroutineHelper;
+        RouteAttributes.setRouteMatch(request, routeMatch);
+
         if (routeEndpoint != null) {
             // the first message is handled once the open handler is done
             opening = true;
