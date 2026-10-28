@@ -16,7 +16,7 @@ import os
 
 import java
 
-from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, UNKNOWN, PythonClassModel, Typed
+from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, UNKNOWN, PythonClassModel, Typed, _native_exception
 
 # names Java cannot declare: its keywords and literals, and the methods of Object
 JAVA_RESERVED_NAMES = frozenset((
@@ -30,6 +30,7 @@ JAVA_RESERVED_NAMES = frozenset((
 Ir = java.type("io.micronaut.python.processing.staticcompile.Ir")
 CompiledBody = java.type("io.micronaut.python.processing.staticcompile.Ir$CompiledBody")
 Stats = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Stats")
+Delegation = java.type("io.micronaut.python.processing.staticcompile.StaticDelegation")
 
 
 def _ir(name):
@@ -96,6 +97,16 @@ DEFAULTS = {LONG: 0, DOUBLE: 0.0, BOOLEAN: False}
 # the Java types of the arguments a compiled raise hands the Python exception class as Python would: the
 # boundary converts them to the str, int, float, bool or None the Python code passes
 EXCEPTION_ARGUMENT_TYPES = {LONG, DOUBLE, BOOLEAN, STRING, NONE, "java.lang.Long", "java.lang.Integer", "java.lang.Double", "java.lang.Boolean"}
+# the builtin exceptions that take their arguments as BaseException does: args holds them, and str() is
+# the str() of a single argument or the repr of the tuple of several (KeyError, OSError, UnicodeError,
+# ImportError... differ). A raise of a class extending only these creates its Python exception lazily
+LAZY_EXCEPTION_BASES = {"Exception", "ValueError", "TypeError", "RuntimeError", "LookupError", "IndexError", "ArithmeticError",
+                        "OverflowError", "ZeroDivisionError", "AssertionError", "NotImplementedError"}
+# the members that make the Python exception of a class differ from the arguments it is created with, or
+# make its creation (or its collection) observable, or give it a state the Java exception does not take
+# (a cause, a context, notes): a raise of a class defining one creates it eagerly
+EAGER_EXCEPTION_MEMBERS = ("__new__", "__init__", "__str__", "__repr__", "args", "__del__", "__cause__", "__context__",
+                           "__suppress_context__", "__traceback__", "__notes__", "__bases__")
 SYNTHESIZED_EXCEPTIONS = ("java.lang.ArithmeticException", "java.lang.ClassCastException", "java.lang.IllegalArgumentException",
                           "java.lang.IllegalStateException", "java.lang.IndexOutOfBoundsException", "java.lang.NullPointerException",
                           "java.lang.UnsupportedOperationException", "java.util.NoSuchElementException",
@@ -339,26 +350,86 @@ def _parameter_names(arguments):
     return {argument.arg for argument in every}
 
 
-def _function_bindings(function_node):
+def _function_names(function_node):
     """
-    The names a function binds in its body (assignments, loop and with targets, imports, nested
-    definitions, except clauses) and its parameters: each hides a module-level name or a builtin
-    of the same name for the whole body. Nested scopes are included, which only hides more.
+    What the lowering of a function needs to know of the names in its tree, in one walk of it:
+
+    * the identifiers, every name and parameter name anywhere in the function, which a local the
+      lowering introduces must not be;
+    * the bindings, the names the function binds in its body (assignments, loop and with targets,
+      imports, nested definitions, except clauses) and its parameters: each hides a module-level
+      name or a builtin of the same name for the whole body. Nested scopes are included, which only
+      hides more;
+    * the names stored anywhere in the function (``x = ...``), among them the parameters the body
+      reassigns.
     """
-    names = _parameter_names(function_node.args)
-    for statement in function_node.body:
-        for child in ast.walk(statement):
-            if isinstance(child, ast.Name) and isinstance(child.ctx, (ast.Store, ast.Del)):
-                names.add(child.id)
-            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                names.add(child.name)
+    identifiers = set()
+    bindings = _parameter_names(function_node.args)
+    stored = set()
+    stack = [(statement, True) for statement in function_node.body]
+    stack.extend((child, False) for child in _child_nodes(function_node) if not _in_body(function_node, child))
+    while stack:
+        child, in_body = stack.pop()
+        if isinstance(child, ast.Name):
+            identifiers.add(child.id)
+            if isinstance(child.ctx, ast.Store):
+                stored.add(child.id)
+                if in_body:
+                    bindings.add(child.id)
+            elif in_body and isinstance(child.ctx, ast.Del):
+                bindings.add(child.id)
+            continue
+        if isinstance(child, ast.arg):
+            identifiers.add(child.arg)
+            if in_body:
+                bindings.add(child.arg)
+        elif in_body:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                bindings.add(child.name)
             elif isinstance(child, ast.alias):
-                names.add(child.asname or child.name.split(".")[0])
+                bindings.add(child.asname or child.name.split(".")[0])
             elif isinstance(child, ast.ExceptHandler) and child.name:
-                names.add(child.name)
-            elif isinstance(child, ast.arg):
-                names.add(child.arg)
-    return names
+                bindings.add(child.name)
+        for grandchild in _child_nodes(child):
+            stack.append((grandchild, in_body))
+    return identifiers, bindings, stored
+
+
+def _in_body(function_node, child):
+    """Whether a child node of the function is one of the statements of its body."""
+    return any(child is statement for statement in function_node.body)
+
+
+# (snippet, index) -> the names the statement of a generated snippet declares global, see ModuleScope
+_SNIPPET_GLOBALS = {}
+# the leaves of a tree no walk of the planner asks about: the load, store and delete markers and the operators
+_LEAVES = (ast.expr_context, ast.operator, ast.boolop, ast.cmpop, ast.unaryop)
+
+
+def _child_nodes(node):
+    """
+    The child nodes of a node in the order of ast.iter_child_nodes, as a list, without the leaves:
+    the planner walks the body of every function several times, and this is the cheaper step.
+    """
+    children = []
+    for field in node._fields:
+        value = getattr(node, field, None)
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, ast.AST) and not isinstance(item, _LEAVES):
+                    children.append(item)
+        elif isinstance(value, ast.AST) and not isinstance(value, _LEAVES):
+            children.append(value)
+    return children
+
+
+def _statement_nodes(tree):
+    """The statements of a tree, at any depth: an expression holds no statement, so none is entered."""
+    stack = [tree]
+    while stack:
+        node = stack.pop()
+        yield node
+        stack.extend(child for child in ast.iter_child_nodes(node) if not isinstance(child, ast.expr))
 
 
 class ModuleScope:
@@ -378,9 +449,15 @@ class ModuleScope:
         self.known = tree is not None
         if tree is None:
             return
-        for child in ast.walk(tree):
-            if isinstance(child, ast.Global):
-                self.declared_global.update(child.names)
+        for statement in getattr(tree, "body", None) if isinstance(tree, ast.Module) else [tree]:
+            # a statement the transformer generated from a snippet declares the globals every copy does
+            snippet = getattr(statement, "_mn_snippet", None)
+            names = _SNIPPET_GLOBALS.get(snippet) if snippet is not None else None
+            if names is None:
+                names = tuple(name for child in _statement_nodes(statement) if isinstance(child, ast.Global) for name in child.names)
+                if snippet is not None:
+                    _SNIPPET_GLOBALS[snippet] = names
+            self.declared_global.update(names)
         for index, statement in enumerate(tree.body):
             self._scan(statement, index, statement)
 
@@ -673,6 +750,27 @@ class Refused(Exception):
     """A construct without a lowering; the reason is recorded before it is raised."""
 
 
+class _Lowered(list):
+    """The lowered statements of a block, with the Python line each one is lowered from in ``lines``."""
+
+    def __init__(self):
+        super().__init__()
+        self.lines = []
+
+    def add(self, statements, line):
+        self.extend(statements)
+        self.lines.extend([line] * len(statements))
+
+
+def _body(statements, prefix=()):
+    """
+    A Body of lowered statements, after the given ones lowered from no statement of their own: the
+    lines of the statements the generated Java maps its lines to (see StaticLineMap).
+    """
+    lines = list(getattr(statements, "lines", [0] * len(statements)))
+    return Body(list(prefix) + list(statements), [0] * len(prefix) + lines)
+
+
 class _ComprehensionBody(ast.stmt):
     """The statement at the heart of the loop a comprehension lowers to: the element appended to the result."""
     _fields = ()
@@ -683,6 +781,33 @@ class _ComprehensionBody(ast.stmt):
         self.kind = kind
         self.result = result
         self.container_type = None
+
+
+# the Java types a Python int converts to, which an int beyond their range fails
+INTEGER_RESULTS = {"long", "int", "short", "byte", "java.lang.Long", "java.lang.Integer", "java.lang.Short", "java.lang.Byte"}
+
+
+def _plain_attributes(model, write=False):
+    """
+    Whether reading (or writing) a hinted attribute of an object of the class runs no Python code: the
+    class and every base leave the attribute protocol to object, and every base is of the compilation.
+    """
+    seen = set()
+    pending = [model]
+    while pending:
+        current = pending.pop()
+        if current.qualified in seen:
+            continue
+        seen.add(current.qualified)
+        if current.dynamic or current.lookup_dynamic or current.metaclass:
+            return False
+        if write and ("__setattr__" in current.methods or "__delattr__" in current.methods):
+            return False
+        for base in current.bases:
+            if not isinstance(base, type(model)):
+                return False  # a Java base or one outside the compilation may serve attributes itself
+            pending.append(base)
+    return True
 
 
 class Lowering:
@@ -714,13 +839,16 @@ class Lowering:
         self.loops = []           # (id, node, following depth, branch depth) of the loops enclosing the statement being lowered
         self.reassigned = set()   # the parameters the body assigns, kept in a local of their own
         self.copied = set()       # the collection parameters the body works on a copy of
-        self.identifiers = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)} | {a.arg for a in ast.walk(node) if isinstance(a, ast.arg)}
+        # the identifiers of the function, the names it binds and the names it stores, see _function_names
+        self.identifiers, self.bound, self._stored = _function_names(node)
         self.loop_exits = {}      # loop id -> {"break", "continue"} used in its body
         self.following = []       # the statements following the one being lowered, innermost block last
         self.next_loop = 0
         self.parameters = {}      # name -> (type used at, stub type)
+        self.python_parameters = []  # per parameter, the Python name of the plain class of the compilation it takes, or ""
         self.java_calls = 0
         self.bridge_calls = 0
+        self.fixed_reads = 0      # the reads of attributes of self fixed at construction, from Java fields of the stub
         self.helper_calls = 0
         self.checked = False      # a call declares a checked exception
         self.prelude = []         # per statement being lowered, the statements a comprehension hoists before it
@@ -728,11 +856,18 @@ class Lowering:
         self.evaluated = 0        # the evaluations the statement being lowered has completed that may run code or raise
         self.synthetic = 0        # inside the loop a comprehension lowers to, whose refused statement refuses the comprehension
         self.comprehensions = {}  # id(comprehension) -> the local it is hoisted into, when an operand is lowered twice
-        self.bound = _function_bindings(node)  # the names the function binds: a module-level name or builtin of the same name is hidden
         self.thrown = []          # per enclosing try block, the checked exceptions its Java calls declare
         self.java_code = []       # per enclosing try block, the Java methods and constructors outside the compilation it calls
         self.calls_java = False   # the body calls a Java method or constructor outside the compilation
         self.compilation_calls = 0  # the calls of code of the compilation through Java: compiled functions, generated constructors and methods
+        self.python_code = 0      # the crossings that may run Python code of the compilation: accessors, methods, attributes of a class serving them itself
+        self.computing_calls = 0  # the calls of compiled functions and methods of the compilation, which compute a result of their own
+        # whether the body enters Python (Ir.PythonEntries, StaticPlanner._record_python_entries): what about the
+        # calls of the compilation it makes through Java does, the functions those calls run (None for one
+        # the planner cannot follow) and the generated constructors it calls; EventLoopSafety finds the rest
+        self.python_entry = None
+        self.callees = []
+        self.constructions = []
         self.handling = []        # the except ("except", variable) and finally ("finally", None) blocks enclosing the statement
         self.exception_variables = set()  # the variables of the enclosing except clauses for an exception class of the compilation
 
@@ -754,11 +889,11 @@ class Lowering:
         try:
             self._shadow_reassigned_parameters()
             statements = self._block(self.node.body)
+            body = _body(statements, self.hoisted)
         except Refused:
             return None
         if self.reasons:
             return None
-        body = Body(self.hoisted + statements)
         stats = Stats(len(self.node.body), self.java_calls, self.bridge_calls, self.helper_calls)
         if self.class_def is not None:
             owner = self.class_def.qualifiedName()
@@ -768,7 +903,7 @@ class Lowering:
             owner = self.module.script.qualifiedName()
         return CompiledBody(owner, self.function_def.name(), parameter_names, parameter_types,
                             return_type, body, self.function_def.span(), stats, self.checked, self.advised_method,
-                            self.static, self.class_def is None, self._exception_crossing())
+                            self.static, self.class_def is None, self._exception_crossing(), self.python_parameters, self.computing_calls > 0, None)
 
     def _exception_crossing(self):
         """
@@ -778,12 +913,15 @@ class Lowering:
         crossed Java code is the Java exception. A body calling no Java code outside the compilation
         throws only the former, one calling only Java code the latter; a body calling both, in a
         compilation with exception classes, may throw either, and its Python callers keep the Python body.
+        Only a crossing that may run Python code of the compilation counts: a read or a write of a plain
+        attribute (of a class that leaves the attribute protocol to object), or of one fixed at
+        construction, runs none and cannot raise an exception class of the compilation.
         """
         if not self.calls_java:
             return ExceptionCrossing.TRANSLATED
         classes = getattr(self.checker, "python_classes", None)
         exception_classes = classes is not None and any(model.is_throwable() for model in classes.all())
-        if exception_classes and (self.compilation_calls or self.bridge_calls):
+        if exception_classes and (self.compilation_calls or self.python_code):
             return ExceptionCrossing.PYTHON_BODY
         return ExceptionCrossing.UNTRANSLATED
 
@@ -792,9 +930,7 @@ class Lowering:
         A parameter the body assigns lives in a local of its own from the start: a Java parameter
         keeps the type the stub declares, the local the type the body uses.
         """
-        for node in ast.walk(self.node):
-            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store) and node.id in self.parameters:
-                self.reassigned.add(node.id)
+        self.reassigned.update(name for name in self._stored if name in self.parameters)
         self.reassigned |= self.copied
         for name in sorted(self.reassigned):
             used, stub = self.parameters[name]
@@ -851,6 +987,9 @@ class Lowering:
                 self.copied.add(name)
             names.append(name)
             types.append(stub_type)
+            plain = typed is not None and typed.kind == PY and self.java_layout is None and self.planner is not None \
+                and getattr(self.planner, "plain_class", None) is not None and self.planner.plain_class(stub_type)
+            self.python_parameters.append(plain.name if plain else "")
         return names, types
 
     def _return_type(self):
@@ -1067,11 +1206,11 @@ class Lowering:
 
     def _block(self, statements):
         self.depth += 1
-        lowered = []
+        lowered = _Lowered()
         for index, statement in enumerate(statements):
             self.following.append(statements[index + 1:])
             try:
-                lowered.extend(self._statement(statement))
+                lowered.add(self._statement(statement), getattr(statement, "lineno", 0))
             except Refused:
                 if self.synthetic:
                     raise  # a statement of a comprehension's loop: the comprehension has no lowering
@@ -1135,14 +1274,14 @@ class Lowering:
             self.branches.append(node)
             self.branch_depths.append(self.depth)
             try:
-                then = Body(self._branch_block(node.body))
-                or_else = Body(self._branch_block(node.orelse)) if node.orelse else None
+                then = _body(self._branch_block(node.body))
+                or_else = _body(self._branch_block(node.orelse)) if node.orelse else None
             finally:
                 self.branch_depths.pop()
                 self.branches.pop()
             return [If(test, then, or_else)]
         if isinstance(node, ast.While):
-            return self._loop(node, lambda loop: While(loop, self._unhoisted(lambda: self._truthy(node.test)), Body(self._block(node.body)), *self._exits(loop)))
+            return self._loop(node, lambda loop: While(loop, self._unhoisted(lambda: self._truthy(node.test)), _body(self._block(node.body)), *self._exits(loop)))
         if isinstance(node, ast.For):
             return [self._for(node)]
         if isinstance(node, ast.Break):
@@ -1234,7 +1373,7 @@ class Lowering:
 
             def build(loop):
                 self.locals[variable] = LONG
-                return ForRange(loop, variable, start, stop, step, Body(self._block(node.body)), *self._exits(loop))
+                return ForRange(loop, variable, start, stop, step, _body(self._block(node.body)), *self._exits(loop))
             return self._loop(node, build)[0]
         if ((isinstance(iterable, ast.Name) or (isinstance(iterable, ast.Attribute) and isinstance(iterable.value, ast.Name) and iterable.value.id == "self"))
                 and _may_change_iterated(iterable, node.body)):
@@ -1262,7 +1401,7 @@ class Lowering:
 
         def build(loop):
             self.locals[variable] = used
-            return ForEach(loop, variable, used, declared, collection, Body(self._block(node.body)), *self._exits(loop))
+            return ForEach(loop, variable, used, declared, collection, _body(self._block(node.body)), *self._exits(loop))
         return self._loop(node, build)[0]
 
     def _loop_variable(self, variable, node):
@@ -1306,7 +1445,7 @@ class Lowering:
             for name, getter, java_type in ((key_name, "getKey", used[0]), (value_name, "getValue", used[1])):
                 self.locals[name] = java_type
                 bindings.append(Local(name, java_type, Cast(InvokeJava(LocalRef(entry, MAP_ENTRY), MAP_ENTRY, getter, [], [], OBJECT), java_type)))
-            return ForEach(loop, entry, MAP_ENTRY, MAP_ENTRY, entries, Body(bindings + self._block(node.body)), *self._exits(loop))
+            return ForEach(loop, entry, MAP_ENTRY, MAP_ENTRY, entries, _body(self._block(node.body), bindings), *self._exits(loop))
         return self._loop(node, build)[0]
 
     # ---------------------------------------------------------------- exceptions
@@ -1367,10 +1506,179 @@ class Lowering:
             if _erased(value.type()) not in EXCEPTION_ARGUMENT_TYPES:
                 self._refuse("python-exception", f"constructing [{model.name}] with a [{_erased(value.type())}] has no static lowering: only a str, an int, a float, a bool or None reaches the Python class as the value Python passes", argument)
             lowered.append(self._boxed(value, argument))
-        # the Python class creates the exception as a generated constructor creates its Python object
+        # the Python class creates the exception as a generated constructor creates its Python object: when
+        # the raise runs, or, lazily, when the generated class first needs it
         self.java_calls += 1
         self.compilation_calls += 1
-        return NewPythonException(generated, lowered)
+        return NewPythonException(generated, lowered, self._creates_lazily(model))
+
+    def _patched_classes(self):
+        """
+        The classes that code of the compilation may give one of the EAGER_EXCEPTION_MEMBERS after their
+        definition, by name: an assignment or a deletion (E.__str__ = ..., app.errors.E.__init__ = ...),
+        or a setattr or delattr with such a member or a computed name (builtins.setattr, type.__setattr__(E, ...),
+        object.__setattr__(E, ...) and E.__setattr__(...) included), on a name, on a name bound to it
+        (Alias = E; Alias.__str__ = ...) or on the last attribute of a qualified name; a write on self is
+        one on an instance. A setter referenced but not called (patch = setattr, type.__setattr__ passed on)
+        may write anything anywhere: the set then holds "*". A special method written on anything else (cls.__str__ = ...,
+        type(e).__init__ = ..., self.__class__.__str__ = ...) may reach any class: the set then holds "*".
+        Collected once per compilation over the ASTs of its modules.
+        """
+        trees = [getattr(getattr(module, "visitor", None), "module_node", None) for module in self.checker._modules.values()]
+        trees = [tree for tree in trees if tree is not None]
+        cached = getattr(self.checker, "_mn_patched_classes", None)
+        if cached is not None and len(cached[0]) == len(trees) and all(a is b for a, b in zip(cached[0], trees)):
+            return cached[1]
+        classes = {model.class_def.name() for model in self.checker.python_classes.all()}
+        receivers = set()
+        specials = set()  # the names a special method is written on
+        aliases = {}  # a name -> the names assigned to it
+        unresolved = False
+
+        def written(receiver, member):
+            # member is None for a computed name; a special method or args written on an instance changes
+            # neither how its class creates its exceptions nor the message of one created before
+            nonlocal unresolved
+            special = member != "args"  # a computed name may be a special method too
+            if isinstance(receiver, ast.Name):
+                if receiver.id == "self":
+                    return
+                receivers.add(receiver.id)
+                if special:
+                    specials.add(receiver.id)
+            elif isinstance(receiver, ast.Attribute):
+                if receiver.attr == "__class__":
+                    unresolved = unresolved or special  # self.__class__.__str__ = ...: the class of an object
+                else:
+                    receivers.add(receiver.attr)
+            elif special:
+                unresolved = True  # type(e).__init__ = ...
+
+        setters = ("setattr", "delattr")
+        dunder_setters = ("__setattr__", "__delattr__")
+
+        def setter_call(call):
+            """The (receiver, member) a call of setattr or delattr writes, in any of its spellings, or None."""
+            func = call.func
+            if (isinstance(func, ast.Name) and func.id in setters) or (isinstance(func, ast.Attribute) and func.attr in setters):
+                return (call.args[0], call.args[1]) if len(call.args) >= 2 else (None, None)
+            if isinstance(func, ast.Attribute) and func.attr in dunder_setters:
+                owner = func.value
+                if isinstance(owner, ast.Call) and isinstance(owner.func, ast.Name) and owner.func.id == "super":
+                    return None  # super().__setattr__(name, value): the object's own attribute protocol
+                if (isinstance(owner, ast.Name) and owner.id in ("type", "object")) or (isinstance(owner, ast.Attribute) and owner.attr in ("type", "object")):
+                    # type.__setattr__(E, name, value): the unbound slot, the object first
+                    return (call.args[0], call.args[1]) if len(call.args) >= 2 else (None, None)
+                return (owner, call.args[0]) if call.args else (None, None)
+            return None
+
+        for tree in trees:
+            called = {id(node.func) for node in ast.walk(tree) if isinstance(node, ast.Call)}
+            for node in ast.walk(tree):
+                if id(node) not in called and ((isinstance(node, ast.Name) and node.id in setters and isinstance(node.ctx, ast.Load))
+                                               or (isinstance(node, ast.Attribute) and node.attr in setters + dunder_setters)):
+                    unresolved = True  # a setter referenced, not called: it may be called on any class
+                if isinstance(node, ast.Constant) and node.value in setters + dunder_setters:
+                    unresolved = True  # getattr(builtins, "setattr"): a setter looked up by its name
+                if isinstance(node, ast.Name) and node.id in ("exec", "eval", "compile") and isinstance(node.ctx, ast.Load):
+                    unresolved = True  # code run from a string may write anything on any class
+                if isinstance(node, ast.ImportFrom) and any(alias.name in setters + dunder_setters and alias.asname not in (None, alias.name)
+                                                            for alias in node.names):
+                    unresolved = True  # from builtins import setattr as patch: called by a name of its own
+                targets = ()
+                if isinstance(node, ast.Assign):
+                    targets = node.targets
+                    if isinstance(node.value, (ast.Name, ast.Attribute)):
+                        source = node.value.id if isinstance(node.value, ast.Name) else node.value.attr
+                        for target in node.targets:
+                            if isinstance(target, ast.Name):
+                                aliases.setdefault(target.id, set()).add(source)
+                elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
+                    targets = (node.target,)
+                elif isinstance(node, ast.Delete):
+                    targets = node.targets
+                for target in targets:
+                    for element in (target.elts if isinstance(target, (ast.Tuple, ast.List)) else (target,)):
+                        if isinstance(element, ast.Attribute) and element.attr in EAGER_EXCEPTION_MEMBERS:
+                            written(element.value, element.attr)
+                setter = setter_call(node) if isinstance(node, ast.Call) else None
+                if setter is not None:
+                    receiver, member = setter
+                    if receiver is None:
+                        unresolved = True  # setattr(*arguments): any class, any member
+                    elif not isinstance(member, ast.Constant):
+                        written(receiver, None)
+                    elif member.value in EAGER_EXCEPTION_MEMBERS:
+                        written(receiver, member.value)
+        def reached(start):
+            """The name and the names bound to it, transitively."""
+            found = set()
+            pending = [start]
+            while pending:
+                name = pending.pop()
+                if name not in found:
+                    found.add(name)
+                    pending.extend(aliases.get(name, ()))
+            return found
+
+        names = set()
+        for receiver in receivers:
+            names |= reached(receiver)
+        # a special method written on a name bound to no class of the compilation (cls.__str__ = ..., a
+        # local) or on a parameter, whatever class shares its spelling, may be written on any class
+        parameters = set()
+        for tree in trees:
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                    arguments = node.args
+                    parameters.update(argument.arg for argument in arguments.posonlyargs + arguments.args + arguments.kwonlyargs)
+                    parameters.update(argument.arg for argument in (arguments.vararg, arguments.kwarg) if argument is not None)
+        if unresolved or any(name in parameters or not reached(name) & classes for name in specials):
+            names.add("*")
+        self.checker._mn_patched_classes = (trees, names)
+        return names
+
+    def _creates_lazily(self, model, seen=None):
+        """
+        Whether a raise of the exception class creates the Java exception alone, its generated class
+        creating the Python exception from the arguments when it is first needed (it reaches Python, or an
+        exception handler converts it). Only when nothing tells the two apart: the Java message is what
+        BaseException.__str__ gives the arguments, the Python exception holds them as its args, and
+        creating it runs no code of the compilation. So neither the class nor a Python base defines
+        __new__, __init__, __str__, __repr__, args or __del__ (in its body, or by an assignment or a
+        setattr on its name anywhere in the compilation), nor is decorated, nor has a metaclass or a
+        dynamic lookup, and every builtin base takes its arguments as BaseException does.
+        """
+        seen = seen if seen is not None else set()
+        if model.qualified in seen:
+            return True
+        seen.add(model.qualified)
+        node = model.node
+        if getattr(node, "decorator_list", None) or getattr(node, "keywords", None):
+            return False
+        if model.dynamic or model.lookup_dynamic or model.metaclass or model.constructor is not None:
+            return False
+        for member in EAGER_EXCEPTION_MEMBERS:
+            if (member in model.methods or member in model.properties or member in model.attributes
+                    or member in model.instance_attributes or member in model.nested):
+                return False
+        patched = self._patched_classes()
+        if "*" in patched or model.class_def.name() in patched:
+            return False  # E.__str__ = ... or setattr(E, ...) somewhere in the compilation
+        classes = self.checker.python_classes
+        for base in model.class_def.bases():
+            name = base.name()
+            python = classes.by_qualified.get(name)
+            if python is not None:
+                if not self._creates_lazily(python, seen):
+                    return False
+                continue
+            if name in ("object", "builtins.object"):
+                continue
+            builtin = name[len("builtins."):] if name.startswith("builtins.") else name
+            if "." in builtin or builtin not in LAZY_EXCEPTION_BASES or not _native_exception(base):
+                return False
+        return True
 
     def _names_class(self, function, model):
         """Whether the callee of a call is the class reference of the model."""
@@ -1462,7 +1770,7 @@ class Lowering:
         classes = getattr(self.checker, "python_classes", None)
         if classes is not None and _erased(owner) in classes.by_qualified:
             return True
-        return self.planner is not None and any(body.className() == _erased(owner) for body in self.planner.bodies)
+        return self.planner is not None and _erased(owner) in self.planner.body_classes
 
     def _python_exceptions_reaching(self, java_type, earlier):
         """
@@ -1510,7 +1818,7 @@ class Lowering:
         self.thrown.append(set())
         self.java_code.append([])
         try:
-            body = Body(self._block(node.body))
+            body = _body(self._block(node.body))
         finally:
             thrown = self.thrown.pop()
             java_code = self.java_code.pop()
@@ -1552,7 +1860,7 @@ class Lowering:
             declared_before = set(self.locals)
             self.handling.append(("except", handler.name))
             try:
-                catches.append(Catch(caught[0], handler.name, Body(self._block(handler.body))))
+                catches.append(Catch(caught[0], handler.name, _body(self._block(handler.body))))
             finally:
                 self.handling.pop()
                 if handler.name is not None:
@@ -1564,7 +1872,7 @@ class Lowering:
             declared_before = set(self.locals)
             self.handling.append(("finally", None))
             try:
-                finally_body = Body(self._block(node.finalbody))
+                finally_body = _body(self._block(node.finalbody))
             finally:
                 self.handling.pop()
             self._end_scope(node, declared_before, [], "the finally block")
@@ -1645,6 +1953,7 @@ class Lowering:
         if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
             property_type = self._self_property_type(target.attr, target)
             self.bridge_calls += 1
+            self._crossing(self.class_model, self._is_accessor(target.attr), write=True)
             return PutSelf(target.attr, property_type, self._coerce(value, property_type, node), self._is_accessor(target.attr))
         if isinstance(target, ast.Subscript):
             return self._subscript_store(target, value, node)
@@ -1669,6 +1978,7 @@ class Lowering:
         setter = "set" + target.attr[:1].upper() + target.attr[1:]
         self.java_calls += 1
         self.compilation_calls += 1
+        self._accessor_entry(model, target.attr, f"assigns [{target.attr}] of [{model.name}]")
         return Eval(InvokeJava(self._expression(target.value), owner, setter, [stub_type], [self._coerce(value, stub_type, node)], VOID))
 
     def _subscript_store(self, target, value, node):
@@ -1703,11 +2013,12 @@ class Lowering:
             current = self._name(node.target)
         elif isinstance(node.target, ast.Attribute) and isinstance(node.target.value, ast.Name) and node.target.value.id == "self":
             property_type = self._self_property_type(node.target.attr, node.target)
-            current = SelfProperty(node.target.attr, property_type, self._is_accessor(node.target.attr))
+            current = SelfProperty(node.target.attr, property_type, self._is_accessor(node.target.attr), False)
             # an int attribute is a long in the body, as a read of it is
             used = JAVA_PRIMITIVE_NUMBERS.get(property_type, property_type)
             current = Cast(current, used) if used != property_type else current
             self.bridge_calls += 1
+            self._crossing(self.class_model, self._is_accessor(node.target.attr))
             if not self._pure_read(node.target):
                 self.evaluated += 1  # Python reads the property before the value
         else:
@@ -2253,9 +2564,16 @@ class Lowering:
 
     def _attribute(self, node):
         if isinstance(node.value, ast.Name) and node.value.id == "self":
-            self.bridge_calls += 1
             property_type = self._self_property_type(node.attr, node)
-            read = SelfProperty(node.attr, property_type, self._is_accessor(node.attr))
+            accessor = self._is_accessor(node.attr)
+            fixed = not accessor and self._fixed(node.attr, property_type)
+            if fixed:
+                # read from a Java field of the stub: the Python object is reached once per object
+                self.fixed_reads += 1
+            else:
+                self.bridge_calls += 1
+                self._crossing(self.class_model, accessor)
+            read = SelfProperty(node.attr, property_type, accessor, fixed)
             # an int attribute (an instance attribute hinted through __init__) is a long in the body; one
             # that may be None stays boxed
             used = JAVA_PRIMITIVE_NUMBERS.get(property_type, property_type)
@@ -2285,6 +2603,20 @@ class Lowering:
                 return self._python_attribute(model, value, node)
         self._outside_module(node.value)
         self._refuse("dynamic-call", f"the attribute [{node.attr}] resolves to no Java field or property of self", node)
+
+    def _fixed(self, name, property_type):
+        """Whether self.<name> is fixed at construction, so the stub reads it from a Java field (StaticPlanner.fixed_attribute)."""
+        fixed_attribute = getattr(self.planner, "fixed_attribute", None)
+        return fixed_attribute is not None and not self.static and self.class_model is not None and fixed_attribute(self.class_model, name, property_type)
+
+    def _crossing(self, model, accessor, write=False):
+        """
+        Counts a read or a write of an attribute of an object of the compilation that may run Python
+        code of the compilation (see _exception_crossing): an accessor, or an attribute of a class that
+        serves its attributes itself (a __getattr__, a __setattr__, a base outside the compilation).
+        """
+        if accessor or model is None or not _plain_attributes(model, write):
+            self.python_code += 1
 
     def _is_accessor(self, name):
         """Whether the attribute of self is a @property: its getter and setter run on the Python object."""
@@ -2390,6 +2722,10 @@ class Lowering:
             self.calls_java = True
             if self.java_code:
                 self.java_code[-1].append(owner if kind == "constructor" else f"{owner}.{name}")
+        elif self.python_entry is None:
+            # a member of a generated class the lowering does not resolve to a function of the compilation
+            self.python_entry = f"calls [{owner}.{name}], which may run Python"
+
         if node.keywords:
             self._refuse("kwargs-to-java", "keyword arguments to a Java method or constructor have no static lowering", node)
         lowered_arguments = [self._expression(argument) for argument in node.args]
@@ -2475,6 +2811,10 @@ class Lowering:
                      for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
         self.java_calls += 1
         self.compilation_calls += 1
+        if Delegation.promotes(body):
+            # the compiled function may overflow where Python promotes, and so may the call
+            self.computing_calls += 1
+        self.callees.append(function_node)
         return_type = body.returnType()
         call = InvokeJava(None, body.className(), name, parameter_types, arguments, return_type)
         used = JAVA_NUMBERS.get(return_type, return_type)
@@ -2510,6 +2850,8 @@ class Lowering:
     def _module_of_source(self, source):
         """The module of the compilation of a source file, or None."""
         wanted = os.path.normcase(os.path.normpath(os.path.abspath(source)))
+        if self.planner is not None:
+            return self.planner.module_of_path(wanted)
         for path, module in self.checker._modules.items():
             if os.path.normcase(os.path.normpath(os.path.abspath(path))) == wanted:
                 return module
@@ -2577,6 +2919,15 @@ class Lowering:
                          for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
             self.java_calls += 1
             self.compilation_calls += 1
+            if self._computes(function_def, function_node, self.class_model, name, return_type):
+                self.computing_calls += 1
+            # a "shared" call counts as a "java" one: a call of the compiled body for Java callers, and for the
+            # compiled delegate a Python caller runs, which has no stub and no shared entry, a call through
+            # the Python object (SelfAccess.invokeShared), as a "java" one is there; compilation_calls
+            # counts it as Python code of the compilation (see _exception_crossing)
+            # the stub's Java method of a method no subclass overrides (or the shared entry of its compiled
+            # body, a Java call too): its compiled body, or the bridge to Python
+            self.callees.append(function_node)
             declared = OBJECT if hint is None and return_type != VOID else return_type
             call = InvokeSibling(name, parameter_types, arguments, declared, "shared" if shares else "java")
             call = Cast(call, return_type) if declared != return_type else call
@@ -2585,6 +2936,9 @@ class Lowering:
                 self._refuse("sibling-call", f"calling [{name}] with keyword arguments has no static lowering: the stub declares no Java method the call fills", node)
             lowered_arguments = [self._expression(argument) for argument in node.args]
             self.bridge_calls += 1
+            self.python_code += 1
+            if self._computes(function_def, function_node, self.class_model, name, return_type):
+                self.computing_calls += 1
             # a private method is invoked by the name Python mangled it to
             call = InvokeSibling(python_name, [], [self._boxed(argument, node) for argument in lowered_arguments], return_type, "python")
         # a boxed result may be null, which Python sees as None: it stays boxed, a primitive is widened
@@ -2693,10 +3047,13 @@ class Lowering:
                 getter = ("is" if stub_type == BOOLEAN else "get") + node.attr[:1].upper() + node.attr[1:]
                 self.java_calls += 1
                 self.compilation_calls += 1
+                self._accessor_entry(model, node.attr, f"reads [{node.attr}] of [{model.name}]")
                 read = InvokeJava(receiver, owner, getter, [], [], stub_type)
             else:
                 self.bridge_calls += 1
-                read = PythonMember(receiver, node.attr, stub_type)
+                self._crossing(model, False)
+                # an attribute of a class serving its attributes itself runs code: a side effect
+                read = PythonMember(receiver, node.attr, stub_type, not _plain_attributes(model))
         elif kind == "property":
             getter = found[1].getter()
             return_def = getter.returnType() if getter is not None else None
@@ -2705,19 +3062,79 @@ class Lowering:
                 self._refuse("unknown-type", f"the property [{node.attr}] of [{model.name}] has no return hint", node)
             stub_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
             self.bridge_calls += 1
-            read = PythonMember(receiver, node.attr, stub_type)
+            self.python_code += 1
+            read = PythonMember(receiver, node.attr, stub_type, True)
         elif kind == "instance":
             typed = model.instance_attribute_type(node.attr, self.bindings)
             if typed is None:
                 self._refuse("unknown-type", f"the attribute [{node.attr}] of [{model.name}] has no hinted type", node)
             stub_type = self._stub_type(typed, None, node)
             self.bridge_calls += 1
-            read = PythonMember(receiver, node.attr, stub_type)
+            self._crossing(model, False)
+            read = PythonMember(receiver, node.attr, stub_type, not _plain_attributes(model))
         else:
             self._refuse("unsupported-expression", f"reading [{node.attr}] of [{model.name}], which is not an attribute, has no static lowering", node)
         # an attribute that may be None stays boxed, a primitive is widened
         used = JAVA_PRIMITIVE_NUMBERS.get(stub_type, stub_type)
         return Cast(read, used) if used != stub_type else read
+
+    def _computes(self, function_def, function_node, model, name, return_type):
+        """
+        Whether a method of the compilation a body calls through its generated class may raise where
+        Python promotes: its compiled body when that may, or its Python code when it returns an int,
+        which the generated class converts to a Java integer (Python code promotes in Python). An
+        abstract method is implemented in Java (a repository); a subclass's override may be either.
+        """
+        if model.subclass_overrides(name):
+            return True
+        if function_def.isAbstract() or function_def.hasPlaceholderBody():
+            return False
+        decide = getattr(self.planner, "decide_method", None)
+        decision = decide(model, function_def, function_node) if decide is not None else None
+        body = self.planner.body_of(function_node) if decision is not None and decision.outcome().name() == "COMPILED" else None
+        if body is not None:
+            return Delegation.promotes(body)
+        # in a cycle of calls the decision is under way: whatever the body becomes, it may overflow
+        return decision is None or _erased(return_type) in INTEGER_RESULTS
+
+    def _accessor_entry(self, model, attribute, what):
+        """
+        Records that a call of an accessor of a generated class enters Python, unless the class and
+        every subclass of the compilation is introspected: an introspected stub keeps a hinted attribute
+        in a Java field its accessors read and write, any other stub reaches the Python object. Even
+        then a bean-style getter or setter the class defines makes the accessor call Python: the stub
+        generator tells which accessors only touch their field (<class>.<property>, see
+        EventLoopSafety.safeBodies), for the class and each subclass, whose override Java dispatch may pick.
+        """
+        planner = self.planner
+        candidates = [model] + list(model.subclasses)
+        introspected = planner is not None and all(planner._introspected(candidate.qualified) for candidate in candidates)
+        if introspected:
+            self.constructions.extend(f"{candidate.qualified}.{attribute}" for candidate in candidates)
+        elif self.python_entry is None:
+            self.python_entry = f"{what} through the Python object"
+
+    def _dispatched(self, model, name, function_node, static):
+        """
+        The functions a Java call of a method of a generated class may run: the method the class
+        resolves, and every override of a subclass of the compilation, which Java dispatch picks for
+        an object of it; None when the hierarchy is hidden from the checker.
+        """
+        if static:
+            return [function_node]
+        found = [function_node]
+        for candidate in [model] + list(model.subclasses):
+            if candidate.is_open() or candidate.is_lookup_dynamic():
+                return [None]
+        for subclass in model.subclasses:
+            member = subclass.find(name)
+            if member is None:
+                continue
+            if member[0] != "method" or member[2] is None:
+                return [None]
+            if all(member[2] is not other for other in found):
+                found.append(member[2])
+        return found
 
     def _python_receiver_call(self, model, receiver_node, name, node):
         """
@@ -2756,6 +3173,9 @@ class Lowering:
                          for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
             self.java_calls += 1
             self.compilation_calls += 1
+            if self._computes(function_def, function_node, model, name, return_type):
+                self.computing_calls += 1
+            self.callees.extend(self._dispatched(model, name, function_node, static))
             if static and not _plain_receiver(receiver_node):
                 # Python evaluates the receiver (Cart(n).factory() constructs the Cart); a static Java call would not
                 self._refuse("unsupported-expression", f"calling the static method [{name}] of [{model.name}] on an expression has no static lowering: the expression would not be evaluated", node)
@@ -2770,6 +3190,7 @@ class Lowering:
                 self._refuse("unsupported-expression", f"calling [{name}] of [{model.name}] with keyword arguments has no static lowering: the generated class declares no Java method the call fills", node)
             lowered_arguments = [self._expression(argument) for argument in node.args]
             self.bridge_calls += 1
+            self.python_code += 1
             call = InvokePython(self._expression(receiver_node), name, [self._boxed(argument, node) for argument in lowered_arguments], return_type)
         # a boxed result may be null, which Python sees as None: it stays boxed, a primitive is widened
         used = JAVA_PRIMITIVE_NUMBERS.get(return_type, return_type)
@@ -2796,6 +3217,7 @@ class Lowering:
                 self._refuse("unsupported-expression", f"[{model.name}] takes no constructor arguments", node)
             self.java_calls += 1
             self.compilation_calls += 1
+            self._construction(model, owner, 0)
             return NewJava(owner, [], [])
         function_def, function_node = constructor
         parameters = [argument for argument in function_def.arguments().arguments() if argument.name() != "self"]
@@ -2810,7 +3232,19 @@ class Lowering:
                      for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
         self.java_calls += 1
         self.compilation_calls += 1
+        self._construction(model, owner, len(parameter_types))
         return NewJava(owner, parameter_types, arguments)
+
+    def _construction(self, model, owner, arity):
+        """
+        Records a call of a generated constructor: the constructor of an introspected class may only
+        assign the Java fields, which the stub generator tells (EventLoopSafety.safeBodies); any other
+        creates the Python object.
+        """
+        if self.planner is not None and self.planner._introspected(model.qualified):
+            self.constructions.append(f"{owner}#{arity}")
+        elif self.python_entry is None:
+            self.python_entry = f"constructs [{model.name}], which creates its Python object"
 
     def _bind_arguments(self, model, parameters, function_node, node, label):
         """
