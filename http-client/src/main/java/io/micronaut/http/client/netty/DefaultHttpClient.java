@@ -119,6 +119,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -1616,6 +1617,10 @@ public class DefaultHttpClient implements
             } else if (!(nettyRequest instanceof StreamedHttpRequest)) {
                 headers.set(HttpHeaderNames.CONTENT_LENGTH, 0);
             }
+        } else if (nettyRequest instanceof FullHttpRequest && !((FullHttpRequest) nettyRequest).content().isReadable()) {
+            // no body is sent, so a length among the request headers is stale, e.g. that of
+            // a relayed body that is not sent again after a redirect
+            headers.remove(HttpHeaderNames.CONTENT_LENGTH);
         }
     }
 
@@ -2204,6 +2209,13 @@ public class DefaultHttpClient implements
 
         @Override
         protected void channelReadInstrumented(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) throws Exception {
+            DecoderResult decoderResult = fullResponse.decoderResult();
+            if (decoderResult.isFailure()) {
+                // the body could not be decoded, e.g. an invalid chunk: the rest of the response
+                // cannot be read, so the exchange fails and the connection cannot be reused
+                exceptionCaught(channelHandlerContext, decoderResult.cause());
+                return;
+            }
             try {
                 // corresponding release is the SimpleChannelInboundHandler autoRelease
                 // this should probably be dropped at some point
