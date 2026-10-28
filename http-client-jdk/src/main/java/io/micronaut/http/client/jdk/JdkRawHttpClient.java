@@ -91,7 +91,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 }
                 BodySizeLimits bodySizeLimits = new BodySizeLimits(Long.MAX_VALUE, configuration.getMaxContentLength());
                 // a raw client relays exchanges of different users, so it must not keep the cookies an upstream sets
-                return sendAsync(rawClient.get(), httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits));
+                return sendAsync(rawClient.get(), httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits, configuration.getReadTimeout().orElse(null)));
             })
             .flatMap(Mono::fromCompletionStage)
             .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))

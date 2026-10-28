@@ -16,6 +16,7 @@
 package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.DelayedSubscriber;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -23,15 +24,20 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ReactiveByteBufferByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import org.reactivestreams.Subscription;
+import reactor.core.Disposable;
+import reactor.core.scheduler.Schedulers;
 
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
 
 /**
  * {@link HttpResponse.BodySubscriber} implementation that pushes data into a
@@ -46,9 +52,24 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
 
     private final DelayedSubscriber<ReadBuffer> defer = new DelayedSubscriber<>();
     private final CloseableByteBody mapped;
+    /**
+     * The longest wait for the next piece of the body while the consumer has demand, or
+     * {@code null} for no limit. The request timeout of the JDK client ends when the headers
+     * arrive, so a stalled body is only caught here.
+     */
+    private final @Nullable Duration readTimeout;
+    private Flow.@Nullable Subscription upstream;
+    private long outstanding;
+    private boolean done;
+    private @Nullable Disposable timeoutTask;
 
     public ByteBodySubscriber(BodySizeLimits limits) {
+        this(limits, null);
+    }
+
+    ByteBodySubscriber(BodySizeLimits limits, @Nullable Duration readTimeout) {
         this.mapped = BODY_FACTORY.adapt(defer, limits, null, null);
+        this.readTimeout = readTimeout == null || readTimeout.isNegative() || readTimeout.isZero() ? null : readTimeout;
     }
 
     @Override
@@ -58,21 +79,97 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
+        synchronized (this) {
+            upstream = subscription;
+        }
         defer.onSubscribe(new Subscription() {
             @Override
             public void request(long n) {
+                demand(n);
                 subscription.request(n);
             }
 
             @Override
             public void cancel() {
+                finish();
                 subscription.cancel();
             }
         });
     }
 
+    private synchronized void demand(long n) {
+        if (readTimeout == null || done || n <= 0) {
+            return;
+        }
+        boolean idle = outstanding == 0;
+        outstanding = outstanding + n < 0 ? Long.MAX_VALUE : outstanding + n;
+        if (idle) {
+            restartTimeout();
+        }
+    }
+
+    private synchronized void received() {
+        if (readTimeout == null || done) {
+            return;
+        }
+        if (outstanding != Long.MAX_VALUE) {
+            outstanding--;
+        }
+        if (outstanding > 0) {
+            restartTimeout();
+        } else {
+            cancelTimeout();
+        }
+    }
+
+    private void restartTimeout() {
+        cancelTimeout();
+        Duration timeout = readTimeout;
+        if (timeout != null) {
+            timeoutTask = Schedulers.parallel().schedule(this::timedOut, timeout.toNanos(), TimeUnit.NANOSECONDS);
+        }
+    }
+
+    private void cancelTimeout() {
+        Disposable task = timeoutTask;
+        if (task != null) {
+            task.dispose();
+            timeoutTask = null;
+        }
+    }
+
+    private synchronized boolean finish() {
+        if (done) {
+            return false;
+        }
+        done = true;
+        cancelTimeout();
+        return true;
+    }
+
+    private void timedOut() {
+        Flow.Subscription s;
+        synchronized (this) {
+            if (done || outstanding == 0) {
+                return;
+            }
+            finish();
+            s = upstream;
+        }
+        if (s != null) {
+            s.cancel();
+        }
+        defer.onError(ReadTimeoutException.TIMEOUT_EXCEPTION);
+    }
+
     @Override
     public void onNext(List<ByteBuffer> item) {
+        synchronized (this) {
+            if (done) {
+                return;
+            }
+        }
+        received();
         if (item.isEmpty()) {
             defer.onNext(BODY_FACTORY.readBufferFactory().createEmpty());
         } else if (item.size() == 1) {
@@ -88,11 +185,15 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
 
     @Override
     public void onError(Throwable throwable) {
-        defer.onError(throwable);
+        if (finish()) {
+            defer.onError(throwable);
+        }
     }
 
     @Override
     public void onComplete() {
-        defer.onComplete();
+        if (finish()) {
+            defer.onComplete();
+        }
     }
 }

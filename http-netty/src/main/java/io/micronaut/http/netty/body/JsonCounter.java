@@ -30,6 +30,11 @@ import io.netty.buffer.ByteBuf;
 @Internal
 public final class JsonCounter {
     /**
+     * A 0x00 byte, never part of UTF-8 JSON.
+     */
+    private static final byte NUL = 0;
+
+    /**
      * Total number of bytes consumed.
      */
     private long position;
@@ -332,6 +337,10 @@ public final class JsonCounter {
                 startNode();
             }
             default -> {
+                // the charset check of the node starts after this byte, so check it here
+                if (b == NUL) {
+                    throw new JsonSyntaxException("Input must be legal UTF-8 JSON");
+                }
                 state = State.TOP_LEVEL_SCALAR;
                 startNode();
             }
