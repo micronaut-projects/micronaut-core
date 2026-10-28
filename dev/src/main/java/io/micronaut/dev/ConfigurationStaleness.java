@@ -143,18 +143,30 @@ final class ConfigurationStaleness {
                 }
             }
         }
-        // paired by the component and the condition, which name an outcome whatever the order they are evaluated in
+        // paired by the component, the condition and which of its uses by the component it is, which name an outcome
+        // whatever the order the components are evaluated in
         Map<List<String>, Object> answered = new HashMap<>();
+        Map<List<String>, Integer> uses = new HashMap<>();
         for (Outcome outcome : before.outcomes()) {
-            answered.put(outcome.key(), outcome.result());
+            answered.put(key(outcome, uses), outcome.result());
         }
+        uses.clear();
         for (Outcome outcome : customOutcomes(current, before.components())) {
-            List<String> key = outcome.key();
+            List<String> key = key(outcome, uses);
             if (answered.containsKey(key) && !Objects.equals(outcome.result(), answered.get(key))) {
                 return outcome.component() + " has a custom condition " + outcome.condition() + " that the change flipped";
             }
         }
         return null;
+    }
+
+    /**
+     * @return The component, the condition and which use of the condition by the component the outcome is, as a
+     * component may repeat a condition in several {@code @Requires}
+     */
+    private static List<String> key(Outcome outcome, Map<List<String>, Integer> uses) {
+        int use = uses.merge(List.of(outcome.component(), outcome.condition()), 1, Integer::sum);
+        return List.of(outcome.component(), outcome.condition(), Integer.toString(use));
     }
 
     /**
@@ -481,13 +493,6 @@ final class ConfigurationStaleness {
      * @param result    True or false, or the type of what it threw
      */
     record Outcome(String component, String condition, Object result) {
-
-        /**
-         * @return What names the outcome: the component and the condition
-         */
-        List<String> key() {
-            return List.of(component, condition);
-        }
     }
 
 }
