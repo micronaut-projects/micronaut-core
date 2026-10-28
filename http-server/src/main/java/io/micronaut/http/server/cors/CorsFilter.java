@@ -394,7 +394,13 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (requestOrigin == null) {
             return Optional.empty();
         }
+        HttpMethod methodToMatch = methodToMatch(request);
+        boolean anyRouteServesMethod = routeMatches.stream().anyMatch(routeMatch -> methodToMatch.equals(routeMatch.getHttpMethod()));
         for (UriRouteMatch<Object, Object> routeMatch : routeMatches) {
+            if (anyRouteServesMethod && !methodToMatch.equals(routeMatch.getHttpMethod())) {
+                // Only the routes that serve the requested method decide the preflight
+                continue;
+            }
             Optional<CorsOriginConfiguration> corsOriginConfiguration = getCorsOriginConfiguration(routeMatch);
             if (corsOriginConfiguration.isPresent() && matchesOrigin(corsOriginConfiguration.get(), requestOrigin)) {
                 return corsOriginConfiguration;
