@@ -354,8 +354,11 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                     if (!matcher.matches()) {
                         return null;
                     }
-                    if (uri.indexOf('%', pos) != -1 && !matchesDecoded(segment, uri.substring(pos), matcher)) {
-                        // the handler receives the decoded values, which must still satisfy the template
+                    if (uri.indexOf('%', pos) != -1
+                        && (decodesToDotSegment(uri, pos, length) || !matchesDecoded(segment, uri.substring(pos), matcher))) {
+                        // the handler receives the decoded values: an encoded slash may be part of them
+                        // (see the raw values of a route), but never to climb out of the segment, and an
+                        // encoded backslash must still satisfy the template
                         return null;
                     }
                     return matcher;
@@ -409,7 +412,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     }
 
     private static boolean matchesDecoded(Segment segment, String uri, Matcher rawMatcher) {
-        String decodedUri = decodeSeparators(uri);
+        String decodedUri = decodeBackslashes(uri);
         Matcher decodedMatcher = segment.pattern.matcher(decodedUri);
         if (!decodedMatcher.matches()) {
             return false;
@@ -418,7 +421,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         for (int i = 0; i < segment.regexpVariables.length; i++) {
             String rawGroup = rawMatcher.group(groupInx);
             String decodedGroup = decodedMatcher.group(groupInx);
-            if (rawGroup == null ? decodedGroup != null : !Objects.equals(decodeSeparators(rawGroup), decodedGroup)) {
+            if (rawGroup == null ? decodedGroup != null : !Objects.equals(decodeBackslashes(rawGroup), decodedGroup)) {
                 return false;
             }
             groupInx += 2;
@@ -435,6 +438,14 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
      */
     private static String decodeSeparators(String value) {
         return value.replace("%2F", "/").replace("%2f", "/").replace("%5C", "\\").replace("%5c", "\\");
+    }
+
+    /**
+     * @param value The raw value
+     * @return The value with {@code %5C} decoded
+     */
+    private static String decodeBackslashes(String value) {
+        return value.replace("%5C", "\\").replace("%5c", "\\");
     }
 
     private static int readText(String input, int from, boolean requiresSlash) {
