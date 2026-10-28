@@ -149,7 +149,7 @@ abstract class MultiplexedServerHandler {
         private boolean requestAccepted;
         /**
          * Whether the headers of the response were handed to the connection, even if writing them
-         * failed: no other headers may follow them.
+         * failed: no other headers, including an interim 100 Continue, may follow them.
          */
         private boolean headersWritten;
         private boolean finished;
@@ -586,8 +586,9 @@ abstract class MultiplexedServerHandler {
             if (finished) {
                 content.release();
                 return;
-            } else if (reset) {
-                // stream closed
+            } else if (reset || closed) {
+                // stream reset by either side, or connection closed. Writing to a stream that
+                // netty has already closed would fail the whole connection.
                 content.release();
                 finish();
                 return;
@@ -846,7 +847,12 @@ abstract class MultiplexedServerHandler {
 
                 if (sendContinue) {
                     sendContinue = false;
-                    writeContinue();
+                    // an interim response is only allowed before the final response headers, and
+                    // only on a stream that is still open. Writing it later fails in the encoder,
+                    // which would take down the whole connection.
+                    if (!headersWritten && !finished && !reset && !closed) {
+                        writeContinue();
+                    }
                 }
             }
 
@@ -913,6 +919,8 @@ abstract class MultiplexedServerHandler {
                     return;
                 }
 
+                // the body will not be read, so do not ask the client to send it
+                sendContinue = false;
                 closeInput();
                 dest.discard(); // signal discard
             }
@@ -998,15 +1006,17 @@ abstract class MultiplexedServerHandler {
              * pieces that arrived before this, so the HEADERS of the stream go out first.
              */
             void open(BufferConsumer.Upstream upstream) {
-                if (finished || reset || headersWritten) {
+                if (finished || reset || closed || headersWritten) {
                     // the stream is gone (e.g. the connection closed) before the response could
                     // start. Disposing the writer reports responseWritten, which finishes the
                     // stream if that has not happened yet
                     upstream.allowDiscard();
                     upstream.disregardBackpressure();
-                    if (headersWritten && !finished) {
+                    if (headersWritten && !finished && !reset && !closed) {
                         // a response whose write failed after its headers: a second HEADERS
-                        // frame would be read as trailers
+                        // frame would be read as trailers. A stream that is reset or closed is
+                        // not reset again: writing to a stream that netty has already closed
+                        // would fail the whole connection
                         abortWrittenResponse();
                     }
                     writer.dispose();
@@ -1027,9 +1037,10 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public void write(ByteBuf data, boolean last) {
-                if (finished || reset) {
+                if (finished || reset || closed) {
                     // the stream is gone: the upstream is told to discard when the stream is
-                    // finished
+                    // finished. The end of stream frame may use a void promise, so it must not be
+                    // written to a stream that netty has already closed
                     data.release();
                     return;
                 }
@@ -1073,7 +1084,7 @@ abstract class MultiplexedServerHandler {
                 // while the window has room, written bytes count as consumed right away;
                 // otherwise consumption is reported once the batch is written, see endBatch, or
                 // when the stream becomes writable again, see onOutboundWritable
-                return !finished && !reset && isOutboundWritable();
+                return !finished && !reset && !closed && isOutboundWritable();
             }
 
             /**
@@ -1087,7 +1098,7 @@ abstract class MultiplexedServerHandler {
                 if (data == null) {
                     return;
                 }
-                if (finished || reset) {
+                if (finished || reset || closed) {
                     data.release();
                     return;
                 }
