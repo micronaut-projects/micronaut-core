@@ -49,5 +49,7 @@ spotless {
 tasks {
     test {
         forkEvery = 1
+        // the loom carrier tests need access to the virtual thread scheduler internals
+        jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
     }
 }
