@@ -618,8 +618,10 @@ public class RequestLifecycle {
                 frc.start();
             }
 
-            // check if any argument binders are still waiting for data
-            ExecutionFlow<?> routeWaitsFor = BasicHttpAttributes.getRouteWaitsFor(request);
+            // check if any argument binders are still waiting for data. The conditions are taken
+            // off the request: a status route executed for the same request must not continue
+            // the flow it runs in
+            ExecutionFlow<?> routeWaitsFor = BasicHttpAttributes.takeRouteWaitsFor(request);
             return routeWaitsFor.then(() -> {
                 if (frc != null) {
                     frc.stopDeadlockDetection();

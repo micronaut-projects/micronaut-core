@@ -96,6 +96,21 @@ public final class BasicHttpAttributes {
     }
 
     /**
+     * Remove the conditions that must be awaited before executing controllers for the given
+     * request and return them.
+     *
+     * @param request The request
+     * @return The condition to wait for
+     * @since 5.2.18
+     */
+    @Internal
+    public static ExecutionFlow<?> takeRouteWaitsFor(HttpRequest<?> request) {
+        @SuppressWarnings("rawtypes")
+        Optional<ExecutionFlow> attr = request.removeAttribute(ROUTE_WAITS_FOR, ExecutionFlow.class);
+        return attr.orElseGet(ExecutionFlow::empty);
+    }
+
+    /**
      * Add a condition that must be awaited before executing controllers for the given request.
      * This is used to delay execution for argument binding.
      *

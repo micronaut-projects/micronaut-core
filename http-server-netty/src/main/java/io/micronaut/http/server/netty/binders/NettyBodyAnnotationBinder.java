@@ -44,6 +44,7 @@ import io.micronaut.http.exceptions.HttpException;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
+import io.micronaut.http.server.binding.UnconsumedArgumentRelease;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -137,6 +138,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                     ServerRequestContext.with(nhr, (Supplier<ExecutionFlow<Object>>) () -> {
                         try {
                             result = transform(nhr, context, imm);
+                            releaseIfRouteNotInvoked(nhr, result.orElse(null));
                             return ExecutionFlow.just(null);
                         } catch (Throwable e) {
                             return ExecutionFlow.error(e);
@@ -160,6 +162,23 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                 return context.getLastError().map(List::of).orElseGet(List::of);
             }
         };
+    }
+
+    /**
+     * A refcounted argument value is owned by the route. Release it with the request if the route
+     * is never invoked.
+     *
+     * @param nhr The request
+     * @param value The bound value
+     */
+    static void releaseIfRouteNotInvoked(NettyHttpRequest<?> nhr, @Nullable Object value) {
+        if (value instanceof io.netty.util.ReferenceCounted rc) {
+            UnconsumedArgumentRelease.add(nhr, () -> {
+                if (rc.refCnt() > 0) {
+                    rc.release();
+                }
+            });
+        }
     }
 
     Optional<T> transform(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context, AvailableByteBody imm) throws Throwable {
