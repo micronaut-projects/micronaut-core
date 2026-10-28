@@ -96,6 +96,7 @@ import io.netty.handler.codec.http3.Http3SettingsFrame;
 import io.netty.handler.codec.quic.QuicChannel;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.codec.quic.QuicStreamChannel;
+import io.netty.handler.codec.quic.QuicStreamType;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.pcap.PcapWriteHandler;
@@ -656,6 +657,9 @@ public class ConnectionManager {
 
     private Http2FrameCodec makeFrameCodec() {
         Http2Settings defaultSettings = Http2Settings.defaultSettings();
+        // we don't handle pushed streams. Http2MultiplexHandler does not create a channel for them
+        // and never releases their frames
+        defaultSettings.pushEnabled(false);
 
         defaultSettings.maxHeaderListSize(configuration.getHttp2Configuration().getMaxHeaderListSize());
 
@@ -671,7 +675,10 @@ public class ConnectionManager {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
             }
         });
-        return builder.build();
+        Http2FrameCodec frameCodec = builder.build();
+        // netty only enforces the setting once the server acknowledges it, don't rely on that
+        frameCodec.connection().local().allowPushTo(false);
+        return frameCodec;
     }
 
     private SslHandler configureSslHandler(SslHandler sslHandler) {
@@ -1121,8 +1128,15 @@ public class ConnectionManager {
                 .localAddress(ch.localAddress())
                 .connect()
                 .addListener((GenericFutureListener<Future<QuicChannel>>) future -> {
-                    if (!future.isSuccess()) {
-                        pool.pool.onNewConnectionFailure(ch.eventLoop(), future.cause());
+                    // the datagram channel only serves this QUIC connection. Before the settings
+                    // frame arrives there is no Http3ConnectionHolder to close it, so tie it to
+                    // the QUIC channel here. While HANDLER_INITIAL_ERROR is still in the
+                    // pipeline, closing the datagram channel also reports the failure to the pool
+                    if (future.isSuccess()) {
+                        future.getNow().closeFuture().addListener(f -> ch.close());
+                    } else {
+                        InitialConnectionErrorHandler.setFailureCause(ch, future.cause());
+                        ch.close();
                     }
                 });
         }
@@ -1492,11 +1506,18 @@ public class ConnectionManager {
                         ChannelPipelineCustomizer.HANDLER_SSL :
                         ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC
                 );
+                // behind the SslHandler, so that only application data counts, including bytes the
+                // codec would skip without producing a message, e.g. line breaks
+                channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, "unsolicited-bytes", new UnsolicitedDataHandler());
 
                 if (fireInitialPipelineBuilt) {
                     connectionCustomizer.onInitialPipelineBuilt();
                 }
                 connectionCustomizer.onStreamPipelineBuilt();
+                // messages decoded while no request is running, e.g. from bytes that arrived
+                // together with the end of the previous response. The response handler of a
+                // request is added after this handler
+                channel.pipeline().addLast("unsolicited-messages", new UnsolicitedDataHandler());
 
                 poolEntry.onConnectionEstablished();
             }
@@ -1582,6 +1603,27 @@ public class ConnectionManager {
                 super.onInactive();
                 poolEntry.onConnectionInactive();
             }
+
+            /**
+             * Closes the connection when the server sends something while no request is running.
+             * Nobody asked for that data, so no timeout or size limit of a request covers it, and
+             * it can leave the codec in a state where the next response cannot be read: the
+             * connection must neither be read further nor be given to another request.
+             */
+            private final class UnsolicitedDataHandler extends ChannelInboundHandlerAdapter {
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) {
+                    if (hasLiveRequest) {
+                        ctx.fireChannelRead(msg);
+                        return;
+                    }
+                    ReferenceCountUtil.release(msg);
+                    if (!windDownConnection && log.isDebugEnabled()) {
+                        log.debug("Server sent data on HTTP/1 connection {} while no request was running, closing it", ctx.channel());
+                    }
+                    windDownConnection();
+                }
+            }
         }
 
         sealed class Http2ConnectionHolder extends ConnectionHolder {
@@ -1598,7 +1640,14 @@ public class ConnectionManager {
 
                 connectionCustomizer.onStreamPipelineBuilt();
 
-                poolEntry.onConnectionEstablished(configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection());
+                poolEntry.onConnectionEstablished(maxStreamCount());
+            }
+
+            /**
+             * @return The number of requests the pool may run on this connection concurrently
+             */
+            int maxStreamCount() {
+                return configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection();
             }
 
             void addTimeoutHandlers() {
@@ -1700,6 +1749,10 @@ public class ConnectionManager {
                     } else {
                         log.debug("Failed to open http2 stream", future.cause());
                         liveRequests.decrementAndGet();
+                        // the connection refused a stream, e.g. because the QUIC stream limit of
+                        // the peer is used up. Make sure the request isn't dispatched to this
+                        // connection again, it would fail the same way in a busy loop
+                        windDownConnection();
                         returnPendingRequest(sink);
                     }
                 });
@@ -1776,6 +1829,15 @@ public class ConnectionManager {
             @Override
             void addTimeoutHandlers() {
                 addTimeoutHandlers(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION);
+            }
+
+            @Override
+            int maxStreamCount() {
+                // opening a stream beyond the QUIC stream limit of the peer fails, so do not
+                // offer the pool more streams than the peer allows. At least one, so that a
+                // connection without any stream is retired by the failure of the first one
+                long peerAllowed = Math.max(1, quicChannel.peerAllowedStreams(QuicStreamType.BIDIRECTIONAL));
+                return (int) Math.min(super.maxStreamCount(), peerAllowed);
             }
 
             @Override

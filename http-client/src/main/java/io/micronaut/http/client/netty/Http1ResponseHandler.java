@@ -22,6 +22,7 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
@@ -53,10 +54,8 @@ import java.util.concurrent.TimeUnit;
 @Internal
 final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented<HttpObject> {
     private static final Logger LOG = LoggerFactory.getLogger(Http1ResponseHandler.class);
-
     /**
-     * A response body that is abandoned before it ended is drained so that the connection can be
-     * reused. Beyond this many bytes, the rest of the body is not drained.
+     * A response body that is abandoned before it ended is drained for at most this many bytes.
      */
     private static final long DISCARD_BYTE_LIMIT = 64L * 1024;
     /**
@@ -81,6 +80,16 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         if (msg.decoderResult().isFailure()) {
             ReferenceCountUtil.release(msg);
             exceptionCaught(ctx, msg.decoderResult().cause());
+            return;
+        }
+        // the state takes ownership of the message, but only of the kind it expects. Anything else
+        // is out of order, e.g. an HTTP/2 DATA frame before the HEADERS frame, and is released here
+        boolean expectResponse = state instanceof BeforeResponse;
+        if (expectResponse ? !(msg instanceof HttpResponse) : !(msg instanceof HttpContent)) {
+            ReferenceCountUtil.release(msg);
+            exceptionCaught(ctx, new HttpClientException(expectResponse ?
+                "Received response content before the response headers" :
+                "Received response headers before the end of the response content"));
             return;
         }
 

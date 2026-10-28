@@ -89,6 +89,7 @@ import io.micronaut.http.client.multipart.MultipartDataFactory;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.http.client.sse.SseClient;
+import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
@@ -814,10 +815,13 @@ public class DefaultHttpClient implements
         return new MicronautFlux<>(toMono(resolveRequestURI(request), propagatedContext)
             .flatMapMany(requestURI -> dataStreamImpl(toMutableRequest(request), errorType, propagatedContext, requestURI))
             .map(bb -> {
-                if (bb.asNativeBuffer() instanceof ByteBuf byteBuf && byteBuf.refCnt() > 1) {
-                    // if we aren't the exclusive owner of this buffer, we need to detect whether
-                    // the downstream consumer releases it or not. For that, we need our own
-                    // refCnt. A composite buffer provides that.
+                if (bb.asNativeBuffer() instanceof ByteBuf byteBuf) {
+                    // we need to detect whether the downstream consumer releases the buffer or
+                    // not. For that, we need our own refCnt: the refCnt of the received buffer
+                    // may be shared with other owners, and even when we are the exclusive owner
+                    // it is that of a pooled buffer, which can be recycled and handed out again
+                    // with a refCnt of 1 between the release by the consumer and our check. A
+                    // composite buffer is not pooled, so it provides that.
                     CompositeByteBuf composite = byteBuf.alloc().compositeBuffer(1);
                     composite.addComponent(true, byteBuf);
                     return byteBufferFactory.wrap(composite);
@@ -893,6 +897,8 @@ public class DefaultHttpClient implements
         // if a connection is available immediately, we can use its executor for the timeout
         // instead of a random executor for the whole group
         AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>(connectionManager.getGroup());
+        // the flow that buffers the body of the current response, cancelled on a request timeout
+        AtomicReference<ExecutionFlow<?>> bodyFlow = new AtomicReference<>();
         ExecutionFlow<HttpResponse<O>> mono = resolveRequestURI(request).flatMap(uri -> {
             MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(uri);
             //noinspection unchecked
@@ -901,9 +907,13 @@ public class DefaultHttpClient implements
                 scheduler,
                 blockHint,
                 mutableRequest,
-                (req, resp) -> InternalByteBody.bufferFlow(resp.byteBody())
-                    .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, t)))
-                    .flatMap(av -> handleExchangeResponse(bodyType, errorType, resp, av))
+                (req, resp) -> {
+                    ExecutionFlow<? extends CloseableAvailableByteBody> buffered = InternalByteBody.bufferFlow(resp.byteBody());
+                    bodyFlow.set(buffered);
+                    return buffered
+                        .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, t)))
+                        .flatMap(av -> handleExchangeResponse(bodyType, errorType, resp, av));
+                }
             ).map(r -> (HttpResponse<O>) r);
         });
 
@@ -919,6 +929,12 @@ public class DefaultHttpClient implements
                 mono = mono.timeout(requestTimeout, scheduler.get(), null)
                     .onErrorResume(throwable -> {
                         if (throwable instanceof TimeoutException) {
+                            // after the response head, nobody takes the body anymore: stop
+                            // buffering it, which also lets the connection discard the rest
+                            ExecutionFlow<?> buffered = bodyFlow.get();
+                            if (buffered != null) {
+                                buffered.cancel();
+                            }
                             return ExecutionFlow.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
                         }
                         return ExecutionFlow.error(throwable);
@@ -1119,12 +1135,33 @@ public class DefaultHttpClient implements
 
             // could also be application/json, in which case we will stream an array
             MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_STREAM_TYPE);
-            ChunkedMessageBodyReader<O> reader = (ChunkedMessageBodyReader<O>) handlerRegistry.getReader(type, List.of(mediaType));
+            MessageBodyReader<O> found;
+            try {
+                found = handlerRegistry.getReader(type, List.of(mediaType));
+            } catch (RuntimeException e) {
+                discardBody(streamResponse);
+                throw e;
+            }
+            if (!(found instanceof ChunkedMessageBodyReader<O> reader)) {
+                discardBody(streamResponse);
+                throw new CodecException("No reader of the elements of a [" + mediaType + "] body");
+            }
             // every element is buffered in memory before it is decoded
             return JsonStreamElementLimit.limit(
                 reader.readChunked(type, mediaType, response.getHeaders(), Flux.from(streamResponse).map(c -> NettyByteBufferFactory.DEFAULT.wrap(c.content()))),
                 configuration.getMaxContentLength());
         });
+    }
+
+    /**
+     * Discard the body of a streamed response that nobody is going to read, e.g. because there is
+     * no reader for its content type: what has arrived already is released, and the rest is
+     * cancelled, so the buffers do not leak and the connection is not held until the read timeout.
+     *
+     * @param body The body of the streamed response
+     */
+    private static void discardBody(Publisher<HttpContent> body) {
+        Flux.from(body).subscribe(HttpContent::release, t -> { }).dispose();
     }
 
     private <I> Flux<ByteBuffer<?>> dataStreamImpl(MutableHttpRequest<I> request, Argument<?> errorType, PropagatedContext propagatedContext, URI requestURI) {
@@ -1172,7 +1209,10 @@ public class DefaultHttpClient implements
                             ByteBuf single = NettyByteBodyFactory.toByteBuf(anbb);
                             List<ByteBuf> parts = SseSplitter.split(single);
                             parts.get(parts.size() - 1).release();
-                            body = Flux.fromIterable(parts.subList(0, parts.size() - 1)).map(DefaultHttpContent::new);
+                            // lines that are not delivered because the subscriber cancels are discarded
+                            body = Flux.fromIterable(parts.subList(0, parts.size() - 1))
+                                .doOnDiscard(ByteBuf.class, ByteBuf::release)
+                                .map(DefaultHttpContent::new);
                         } else {
                             body = SseSplitter.split(NettyByteBodyFactory.toByteBufs(bb), sizeLimits()).map(DefaultHttpContent::new);
                         }

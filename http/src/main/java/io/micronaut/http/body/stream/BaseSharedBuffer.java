@@ -261,7 +261,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * body. The returned flow will complete when the input is buffered.
      *
      * @param targetFlow The delayed flow to use, or {@code null} if an already-complete
-     *                   result may be returned immediately
+     *                   result may be returned immediately. The subclass registers
+     *                   {@link #cancelFull0} to run when the returned delayed flow is cancelled
      * @param specificUpstream The upstream for the subscriber. This is used to call allowDiscard if there was an error
      * @return A flow that will complete when all data has arrived, with a buffer containing that data
      */
@@ -295,6 +296,10 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             afterSubscribe(last);
             working = false;
 
+            if (targetFlow.isCancelled()) {
+                // cancelFull0 can have run before a subscribe that was delayed
+                cancelFull0(targetFlow, specificUpstream);
+            }
             return targetFlow;
         } else if (targetFlow != null) {
             ReadBuffer buf = error == null ? getBufferedData(last) : null;
@@ -321,6 +326,32 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 return ExecutionFlow.error(error);
             }
         }
+    }
+
+    /**
+     * Remove a subscriber of {@link #subscribeFull0} whose flow was cancelled before the input
+     * completed, e.g. by a request timeout while the body is still read. Like a cancelled
+     * {@link AsFlux} reader, it takes nothing anymore: the bytes buffered for it are dropped
+     * unless another reader still needs them, and its upstream does not have to send the rest.
+     * The flow never completes.
+     * <br>Not thread safe, caller must handle concurrency.
+     *
+     * @param targetFlow       The flow returned by {@link #subscribeFull0}
+     * @param specificUpstream The upstream for the subscriber
+     */
+    protected final void cancelFull0(DelayedExecutionFlow<ReadBuffer> targetFlow, BufferConsumer.Upstream specificUpstream) {
+        if (fullSubscribers == null || !fullSubscribers.remove(targetFlow)) {
+            // not subscribed yet, or already completed
+            return;
+        }
+        if (fullSubscribers.isEmpty()) {
+            fullSubscribers = null;
+            if (reserved == 0) {
+                discardBuffer();
+            }
+        }
+        specificUpstream.allowDiscard();
+        specificUpstream.disregardBackpressure();
     }
 
     /**

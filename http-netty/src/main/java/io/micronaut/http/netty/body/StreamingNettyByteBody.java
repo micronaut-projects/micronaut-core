@@ -228,9 +228,16 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
          */
         ExecutionFlow<ReadBuffer> subscribeFull(Upstream specificUpstream, boolean forceDelay) {
             if (!forceDelay && eventLoop.inEventLoop() && !adding) {
-                return subscribeFull0(null, specificUpstream);
+                ExecutionFlow<ReadBuffer> res = subscribeFull0(null, specificUpstream);
+                if (res instanceof DelayedExecutionFlow<ReadBuffer> waiting) {
+                    // the flow can be cancelled from any thread
+                    waiting.onCancel(() -> eventLoop.execute(() -> cancelFull0(waiting, specificUpstream)));
+                }
+                return res;
             } else {
                 DelayedExecutionFlow<ReadBuffer> asyncFlow = DelayedExecutionFlow.create();
+                // the flow can be cancelled from any thread
+                asyncFlow.onCancel(() -> eventLoop.execute(() -> cancelFull0(asyncFlow, specificUpstream)));
                 eventLoop.execute(() -> {
                     ExecutionFlow<ReadBuffer> res = subscribeFull0(asyncFlow, specificUpstream);
                     assert res == asyncFlow;
