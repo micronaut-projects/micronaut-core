@@ -38,9 +38,11 @@ import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 
@@ -53,6 +55,17 @@ import java.util.stream.Collectors;
 @Internal
 @Experimental
 public final class HttpRequestFactory {
+
+    /**
+     * The headers of the request that are not sent. Like the Netty client, the JDK client frames
+     * the body itself and manages the connection, so the framing headers and the
+     * {@code Connection} header of the request would contradict what it sends.
+     */
+    private static final Set<String> SKIPPED_HEADERS = Set.of(
+        "transfer-encoding",
+        "content-length",
+        "connection"
+    );
 
     private HttpRequestFactory() {
     }
@@ -74,7 +87,11 @@ public final class HttpRequestFactory {
             // the name of a custom method, e.g. PROPFIND, not CUSTOM
             builder.method(mutableHttpRequest.getMethodName(), bodyPublisher);
         }
-        mutableHttpRequest.getHeaders().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
+        mutableHttpRequest.getHeaders().forEach((name, values) -> {
+            if (!SKIPPED_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
+                values.forEach(value -> builder.header(name, value));
+            }
+        });
         if (mutableHttpRequest.getContentType().isEmpty()) {
             builder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
         }
