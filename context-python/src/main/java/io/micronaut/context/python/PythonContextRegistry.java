@@ -29,8 +29,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -753,26 +753,22 @@ final class PythonContextRegistry {
             }
         };
         synchronized (LOCK) {
-            HashSet<Context> seen = new HashSet<>();
-            for (Context context : contexts) {
-                if (!seen.add(context)) {
-                    continue;
-                }
+            // each context once, in the order given
+            for (Context context : new LinkedHashSet<>(contexts)) {
                 ContextState state = closing
                     ? CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState())
                     : CONTEXT_STATES.get(context);
-                if (state == null) {
-                    continue;
-                }
-                remaining.incrementAndGet();
-                state.noActiveExecutionsListeners.add(gate);
-                if (state.await(closing)) {
-                    // idle: no exit will run the gate
-                    state.noActiveExecutionsListeners.remove(state.noActiveExecutionsListeners.size() - 1);
-                    if (state.noActiveExecutionsListeners.isEmpty()) {
-                        state.stopAwaiting();
+                if (state != null) {
+                    remaining.incrementAndGet();
+                    state.noActiveExecutionsListeners.add(gate);
+                    if (state.await(closing)) {
+                        // idle: no exit will run the gate
+                        state.noActiveExecutionsListeners.remove(state.noActiveExecutionsListeners.size() - 1);
+                        if (state.noActiveExecutionsListeners.isEmpty()) {
+                            state.stopAwaiting();
+                        }
+                        remaining.decrementAndGet();
                     }
-                    remaining.decrementAndGet();
                 }
             }
         }
