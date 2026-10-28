@@ -213,6 +213,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     protected final AtomicBoolean configured = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
     protected final AtomicBoolean terminating = new AtomicBoolean(false);
+    // whether the start failed, which leaves the context initializing, though it never runs
+    private volatile boolean startFailed;
     /**
      * The thread running {@link #stop()} until the singletons are destroyed. Lookups made on it are made on behalf
      * of a shutdown event listener or a destruction callback, and may resolve through existing dependency groups.
@@ -487,15 +489,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     /**
-     * Whether the context is stopping or stopped: neither running nor starting. Unlike {@code !isRunning()}, false
-     * while the context starts, such as while a {@link StartupEvent} listener runs.
+     * Whether the context is stopping or stopped: neither running nor starting, or its start failed. Unlike
+     * {@code !isRunning()}, false while the context starts, such as while a {@link StartupEvent} listener runs.
      *
      * @return Whether the context is stopping or stopped
      * @since 5.3.0
      */
     @Internal
     public boolean isStoppingOrStopped() {
-        return isShuttingDown();
+        return startFailed || isShuttingDown();
     }
 
     /**
@@ -507,36 +509,47 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (!isRunning()) {
 
             if (initializing.compareAndSet(false, true)) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Starting BeanContext");
+                try {
+                    startContext();
+                } catch (RuntimeException | Error e) {
+                    // the context never runs: a request still in flight is answered as by a stopped one
+                    startFailed = true;
+                    throw e;
                 }
-                if (dependencyGraph == null && isBeanDependencyTrackingEnabledOnStart()) {
-                    // development mode was switched on by configuration rather than by system property: the
-                    // environment is started and no bean has been created yet, so the graph sees every bean
-                    dependencyGraph = new DefaultBeanDependencyGraph();
-                }
-                adaptsProcessors = dependencyGraph != null || isDevelopmentMode();
-                configureAndStartContext();
-                if (LOG.isDebugEnabled()) {
-                    String activeConfigurations = beanConfigurations
-                        .values()
-                        .stream()
-                        .filter(config -> config.isEnabled(this))
-                        .map(BeanConfiguration::getName)
-                        .collect(Collectors.joining(","));
-                    if (StringUtils.isNotEmpty(activeConfigurations)) {
-                        LOG.debug("Loaded active configurations: {}", activeConfigurations);
-                    }
-                }
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("BeanContext Started.");
-                }
-                publishEvent(new StartupEvent(this));
             }
+            startFailed = false;
             running.set(true);
             initializing.set(false);
         }
         return this;
+    }
+
+    private void startContext() {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Starting BeanContext");
+        }
+        if (dependencyGraph == null && isBeanDependencyTrackingEnabledOnStart()) {
+            // development mode was switched on by configuration rather than by system property: the
+            // environment is started and no bean has been created yet, so the graph sees every bean
+            dependencyGraph = new DefaultBeanDependencyGraph();
+        }
+        adaptsProcessors = dependencyGraph != null || isDevelopmentMode();
+        configureAndStartContext();
+        if (LOG.isDebugEnabled()) {
+            String activeConfigurations = beanConfigurations
+                .values()
+                .stream()
+                .filter(config -> config.isEnabled(this))
+                .map(BeanConfiguration::getName)
+                .collect(Collectors.joining(","));
+            if (StringUtils.isNotEmpty(activeConfigurations)) {
+                LOG.debug("Loaded active configurations: {}", activeConfigurations);
+            }
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("BeanContext Started.");
+        }
+        publishEvent(new StartupEvent(this));
     }
 
     /**

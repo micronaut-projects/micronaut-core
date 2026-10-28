@@ -180,6 +180,25 @@ class DefaultBeanContextSpec extends Specification {
             context.isStoppingOrStopped()
     }
 
+    def "a context whose start failed counts as stopped, though it never stopped"() {
+        given:
+            DefaultBeanContext context = new DefaultBeanContext()
+            context.registerSingleton(new ApplicationEventListener<StartupEvent>() {
+                @Override
+                void onApplicationEvent(StartupEvent event) {
+                    throw new IllegalStateException("bad start")
+                }
+            })
+
+        when:
+            context.start()
+
+        then:
+            thrown(IllegalStateException)
+            !context.isRunning()
+            context.isStoppingOrStopped()
+    }
+
     def "container conversion only expands arrays and containers convertible to Iterable"() {
         given:
             DefaultBeanContext beanContext = new DefaultBeanContext()
