@@ -45,6 +45,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -142,14 +143,30 @@ final class ConfigurationStaleness {
                 }
             }
         }
-        List<Outcome> after = customOutcomes(current, before.components());
-        for (int i = 0; i < after.size() && i < before.outcomes().size(); i++) {
-            Outcome outcome = after.get(i);
-            if (!Objects.equals(outcome.result(), before.outcomes().get(i).result())) {
+        // paired by the component, the condition and which of its uses by the component it is, which name an outcome
+        // whatever the order the components are evaluated in
+        Map<List<String>, Object> answered = new HashMap<>();
+        Map<List<String>, Integer> uses = new HashMap<>();
+        for (Outcome outcome : before.outcomes()) {
+            answered.put(key(outcome, uses), outcome.result());
+        }
+        uses.clear();
+        for (Outcome outcome : customOutcomes(current, before.components())) {
+            List<String> key = key(outcome, uses);
+            if (answered.containsKey(key) && !Objects.equals(outcome.result(), answered.get(key))) {
                 return outcome.component() + " has a custom condition " + outcome.condition() + " that the change flipped";
             }
         }
         return null;
+    }
+
+    /**
+     * @return The component, the condition and which use of the condition by the component the outcome is, as a
+     * component may repeat a condition in several {@code @Requires}
+     */
+    private static List<String> key(Outcome outcome, Map<List<String>, Integer> uses) {
+        int use = uses.merge(List.of(outcome.component(), outcome.condition()), 1, Integer::sum);
+        return List.of(outcome.component(), outcome.condition(), Integer.toString(use));
     }
 
     /**
@@ -451,7 +468,7 @@ final class ConfigurationStaleness {
      *
      * @param references Every bean reference, the disabled ones too
      * @param components Each bean reference and bean configuration with a requirement
-     * @param outcomes   What each custom condition among them answered, in order
+     * @param outcomes   What each custom condition among them answered
      */
     record Requirements(List<BeanDefinitionReference<?>> references, List<Conditional> components, List<Outcome> outcomes) {
         static final Requirements NONE = new Requirements(List.of(), List.of(), List.of());

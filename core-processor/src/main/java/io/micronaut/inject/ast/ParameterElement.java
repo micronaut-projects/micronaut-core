@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -122,7 +123,9 @@ public interface ParameterElement extends TypedElement {
     }
 
     /**
-     * Creates a parameter element for the given arguments.
+     * Creates a parameter element for the given arguments. When the provider supplies the annotation metadata of
+     * another element, such as a bean property the parameter writes, the parameter is annotated through that
+     * element, so the mutation reaches the members it is made of.
      *
      * @param type                       The element type
      * @param name                       The name
@@ -162,8 +165,7 @@ public interface ParameterElement extends TypedElement {
                 if (consumer != null) {
 
                     consumer.accept(builder);
-                    AnnotationValue<T> av = builder.build();
-                    this.annotationMetadata = metadataBuilder.annotate(getAnnotationMetadata(), av);
+                    annotate(builder.build());
                 }
                 return this;
             }
@@ -179,21 +181,33 @@ public interface ParameterElement extends TypedElement {
             @Override
             public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
                 ArgumentUtils.requireNonNull("annotationValue", annotationValue);
-                annotationMetadata = metadataBuilder.annotate(getAnnotationMetadata(), annotationValue);
+                if (getAnnotationMetadata() instanceof ElementAnnotationMetadata element) {
+                    element.annotate(annotationValue);
+                } else {
+                    annotationMetadata = metadataBuilder.annotate(getAnnotationMetadata(), annotationValue);
+                }
                 return this;
             }
 
             @Override
             public Element removeAnnotation(String annotationType) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
-                annotationMetadata = metadataBuilder.removeAnnotation(getAnnotationMetadata(), annotationType);
+                if (getAnnotationMetadata() instanceof ElementAnnotationMetadata element) {
+                    element.removeAnnotation(annotationType);
+                } else {
+                    annotationMetadata = metadataBuilder.removeAnnotation(getAnnotationMetadata(), annotationType);
+                }
                 return this;
             }
 
             @Override
             public <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
                 ArgumentUtils.requireNonNull("predicate", predicate);
-                annotationMetadata = metadataBuilder.removeAnnotationIf(getAnnotationMetadata(), predicate);
+                if (getAnnotationMetadata() instanceof ElementAnnotationMetadata element) {
+                    element.removeAnnotationIf(predicate);
+                } else {
+                    annotationMetadata = metadataBuilder.removeAnnotationIf(getAnnotationMetadata(), predicate);
+                }
                 return this;
 
             }
@@ -201,7 +215,11 @@ public interface ParameterElement extends TypedElement {
             @Override
             public Element removeStereotype(String annotationType) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
-                annotationMetadata = metadataBuilder.removeStereotype(getAnnotationMetadata(), annotationType);
+                if (getAnnotationMetadata() instanceof ElementAnnotationMetadata element) {
+                    element.removeStereotype(annotationType);
+                } else {
+                    annotationMetadata = metadataBuilder.removeStereotype(getAnnotationMetadata(), annotationType);
+                }
                 return this;
             }
 

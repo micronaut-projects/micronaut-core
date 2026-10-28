@@ -32,3 +32,4 @@ io.micronaut.kotlin.processing.visitor.rounds.RoundOverriddenMethodsSpec$Overrid
 io.micronaut.kotlin.processing.annotations.RemapperStereotypesSpec$ExtraStereotypeVisitor
 io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
 io.micronaut.kotlin.processing.qualifiers.NonBindingMarkingVisitor
+io.micronaut.inject.test.hierarchy.IntrospectEveryClassVisitor
