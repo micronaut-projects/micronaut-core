@@ -460,7 +460,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         MessageBodyReader<?> reader = data == null ? messageBodyHandlerRegistry.findReader(bodyArgument, mediaType).orElse(null) : null;
                         if (reader != null) {
                             // consumes the read buffer, the reader owns the bytes from here on
-                            ByteBuffer<?> byteBuffer = payload.toByteBuffer();
+                            ByteBuf bytes = NettyReadBufferFactory.toByteBuf(payload);
+                            ByteBuffer<ByteBuf> byteBuffer = NettyByteBufferFactory.DEFAULT.wrap(bytes);
                             try {
                                 data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
                                 // a reader can hand over the payload itself (e.g. a ByteBuf body), release it
@@ -468,8 +469,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                                 readerOwned = data instanceof ReferenceCounted rc ? rc : null;
                             } catch (Throwable t) {
                                 // readers only release the buffer when they succeed
-                                if (byteBuffer instanceof ReferenceCounted rc && rc.refCnt() > 0) {
-                                    rc.release();
+                                if (bytes.refCnt() > 0) {
+                                    bytes.release();
                                 }
                                 throw t;
                             }
