@@ -19,11 +19,13 @@ import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.sse.Event
@@ -48,6 +50,10 @@ import java.util.function.Consumer
 class ServerSentEventSpec extends Specification {
 
     @Inject SseClient client
+
+    @Inject
+    @Client('/')
+    HttpClient httpClient
 
     void "test consume event stream object"() {
         given:
@@ -86,6 +92,16 @@ class ServerSentEventSpec extends Specification {
         def ex = thrown(HttpClientResponseException)
         ex.status == HttpStatus.INTERNAL_SERVER_ERROR
         ex.message == "Client '/sse': Internal Server Error"
+    }
+
+    void "test line breaks in event fields are not written as separate fields"() {
+        when:
+        String body = httpClient.toBlocking().retrieve(HttpRequest
+                .GET("/sse/line-breaks")
+                .accept(MediaType.TEXT_EVENT_STREAM))
+
+        then:
+        body == ": c1\n: id: c2\nid: 1event: x\nevent: foodata: x\ndata: a\ndata: id: 2\ndata: \ndata: data: b\n\n"
     }
 
     @Client('/sse')
@@ -144,6 +160,15 @@ class ServerSentEventSpec extends Specification {
                         emitter.complete()
                     }
             })
+        }
+
+        @Get('/line-breaks')
+        @Produces(MediaType.TEXT_EVENT_STREAM)
+        Publisher<Event> lineBreaks() {
+            Flux.just(Event.of("a\rid: 2\r\rdata: b")
+                    .id("1\r\nevent: x")
+                    .name("foo\rdata: x")
+                    .comment("c1\nid: c2"))
         }
 
         @Get('/string')
