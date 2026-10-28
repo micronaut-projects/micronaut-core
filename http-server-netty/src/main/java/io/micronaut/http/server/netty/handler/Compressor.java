@@ -138,15 +138,6 @@ final class Compressor {
     }
 
     /**
-     * Pick the response encoding from the {@code Accept-Encoding} header values. Each value is
-     * a comma-separated list of {@code encoding[;q=weight]} entries; the entries are examined in
-     * place, without splitting the header into strings.
-     *
-     * @param acceptEncodingValues The raw header values
-     * @param available            The algorithms that may be chosen
-     * @return The algorithm to use, or {@code null} for no compression
-     */
-    /**
      * Parse a weight without throwing for malformed input: an exception per malformed entry makes
      * a long header expensive to examine.
      *
@@ -180,6 +171,15 @@ final class Compressor {
         return Float.parseFloat(header.substring(start, end));
     }
 
+    /**
+     * Pick the response encoding from the {@code Accept-Encoding} header values. Each value is
+     * a comma-separated list of {@code encoding[;q=weight]} entries; the entries are examined in
+     * place, without splitting the header into strings.
+     *
+     * @param acceptEncodingValues The raw header values
+     * @param available            The algorithms that may be chosen
+     * @return The algorithm to use, or {@code null} for no compression
+     */
     @SuppressWarnings("FloatingPointEquality")
     @Nullable
     static Algorithm determineEncoding(Iterator<String> acceptEncodingValues, Set<Algorithm> available) {
