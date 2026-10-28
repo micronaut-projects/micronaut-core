@@ -74,7 +74,8 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
                 variables = CollectionUtils.newLinkedHashMap(matchVariables.size());
                 matchVariables.forEach((k, v) -> {
                     if (v instanceof CharSequence) {
-                        v = URLDecoder.decode(v.toString(), defaultCharset);
+                        // percent-decode only: a '+' in a path is not a space
+                        v = URLDecoder.decode(v.toString().replace("+", "%2B"), defaultCharset);
                     }
                     variables.put(k, v);
                 });
