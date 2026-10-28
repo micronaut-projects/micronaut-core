@@ -636,8 +636,11 @@ abstract class AbstractJdkHttpClient {
         try {
             sent = sendAsync(httpClient, httpRequest, followRedirects, responseInfo -> {
                 headersReceived.set(true);
-                // the body is not buffered beyond the maximum content length
-                return new LimitedBodySubscriber<>(java.net.http.HttpResponse.BodySubscribers.ofByteArray(), configuration.getMaxContentLength());
+                // the body is not buffered beyond the maximum content length. The request timeout
+                // of the JDK client ends when the headers arrive, so the read timeout applies to
+                // the body
+                return new LimitedBodySubscriber<>(java.net.http.HttpResponse.BodySubscribers.ofByteArray(), configuration.getMaxContentLength(),
+                    configuration.getReadTimeout().orElse(null));
             });
         } catch (RuntimeException e) {
             releaseUnclaimed(selection);

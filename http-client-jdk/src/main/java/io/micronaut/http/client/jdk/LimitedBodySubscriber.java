@@ -18,15 +18,22 @@ package io.micronaut.http.client.jdk;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import org.jspecify.annotations.Nullable;
+import reactor.core.Disposable;
+import reactor.core.scheduler.Schedulers;
 
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Body subscriber that fails and cancels the body once it exceeds the maximum content length.
+ * Body subscriber that fails and cancels the body once it exceeds the maximum content length,
+ * or once no piece of the body arrives within the read timeout.
  *
  * @param <T> The body type
  * @since 4.10.0
@@ -35,13 +42,23 @@ import java.util.concurrent.Flow;
 final class LimitedBodySubscriber<T> implements HttpResponse.BodySubscriber<T> {
     private final HttpResponse.BodySubscriber<T> delegate;
     private final long maxContentLength;
+    private final @Nullable Duration readTimeout;
+    private final AtomicBoolean failed = new AtomicBoolean();
     private long received;
-    private boolean failed;
-    private Flow.@Nullable Subscription subscription;
+    private volatile Flow.@Nullable Subscription subscription;
+    private volatile @Nullable Disposable timeoutTask;
 
-    LimitedBodySubscriber(HttpResponse.BodySubscriber<T> delegate, long maxContentLength) {
+    /**
+     * @param delegate         The subscriber that reads the body
+     * @param maxContentLength The maximum number of bytes of the body
+     * @param readTimeout      The longest wait for the next piece of the body, or {@code null}
+     *                         for none. The request timeout of the JDK client ends when the
+     *                         headers arrive, so without it a stalled body is waited for forever
+     */
+    LimitedBodySubscriber(HttpResponse.BodySubscriber<T> delegate, long maxContentLength, @Nullable Duration readTimeout) {
         this.delegate = delegate;
         this.maxContentLength = maxContentLength;
+        this.readTimeout = readTimeout == null || readTimeout.isNegative() || readTimeout.isZero() ? null : readTimeout;
     }
 
     @Override
@@ -52,40 +69,72 @@ final class LimitedBodySubscriber<T> implements HttpResponse.BodySubscriber<T> {
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
         this.subscription = subscription;
+        restartTimeout();
         delegate.onSubscribe(subscription);
     }
 
     @Override
     public void onNext(List<ByteBuffer> item) {
-        if (failed) {
+        if (failed.get()) {
             return;
         }
         for (ByteBuffer buffer : item) {
             received += buffer.remaining();
         }
         if (received > maxContentLength) {
-            failed = true;
-            if (subscription != null) {
-                subscription.cancel();
-            }
-            delegate.onError(new ContentLengthExceededException(maxContentLength, received));
+            fail(new ContentLengthExceededException(maxContentLength, received));
             return;
         }
+        restartTimeout();
         delegate.onNext(item);
     }
 
     @Override
     public void onError(Throwable throwable) {
-        if (!failed) {
-            failed = true;
+        if (failed.compareAndSet(false, true)) {
+            cancelTimeout();
             delegate.onError(throwable);
         }
     }
 
     @Override
     public void onComplete() {
-        if (!failed) {
+        if (!failed.get()) {
+            cancelTimeout();
             delegate.onComplete();
         }
+    }
+
+    private void fail(Throwable failure) {
+        if (failed.compareAndSet(false, true)) {
+            cancelTimeout();
+            Flow.Subscription s = subscription;
+            if (s != null) {
+                s.cancel();
+            }
+            delegate.onError(failure);
+        }
+    }
+
+    private void restartTimeout() {
+        Duration timeout = readTimeout;
+        if (timeout == null) {
+            return;
+        }
+        cancelTimeout();
+        timeoutTask = Schedulers.parallel().schedule(this::timedOut, timeout.toNanos(), TimeUnit.NANOSECONDS);
+    }
+
+    private void cancelTimeout() {
+        Disposable task = timeoutTask;
+        if (task != null) {
+            task.dispose();
+            timeoutTask = null;
+        }
+    }
+
+    private void timedOut() {
+        // mapped to a read timeout of the body, and reported to the load balancer as a timeout
+        fail(new HttpTimeoutException("Read Timeout while reading the response body"));
     }
 }
