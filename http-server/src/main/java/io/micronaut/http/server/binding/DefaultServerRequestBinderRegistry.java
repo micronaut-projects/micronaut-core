@@ -93,4 +93,10 @@ public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRe
         return internalRequestBinderRegistry.findArgumentBinder(argument);
     }
 
+    @Internal
+    @Override
+    public boolean bindsRequestAsIs(Argument<?> argument) {
+        // a subclass may find another binder than the internal registry
+        return getClass() == DefaultServerRequestBinderRegistry.class && internalRequestBinderRegistry.bindsRequestAsIs(argument);
+    }
 }

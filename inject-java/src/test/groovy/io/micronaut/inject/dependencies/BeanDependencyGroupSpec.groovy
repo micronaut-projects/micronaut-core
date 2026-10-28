@@ -189,6 +189,76 @@ interface Service {}
         thrown(IllegalStateException)
     }
 
+    void "closing a child group detaches it from its parent"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@Singleton class Owner {
+    final BeanDependencyResolver resolver;
+    Owner(BeanDependencyResolver resolver) { this.resolver = resolver; }
+    @PreDestroy void stop() { Log.events.add("owner"); }
+}
+''')
+        def resource = ctx.classLoader.loadClass('test.Resource')
+        def log = ctx.classLoader.loadClass('test.Log')
+        def parent = ctx.createDependencyGroup()
+        def child = parent.createGroup()
+        child.getBean(resource)
+        def owner = ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+        def owned = owner.resolver.createGroup()
+        owned.getBean(resource)
+
+        expect:
+        parent.findRegistration(child).isPresent()
+        owner.resolver.dependencies.dependentBeans().any { it.bean().is(owned) }
+
+        when:
+        child.close()
+        owned.close()
+
+        then: 'the closed groups are no longer retained by their owners'
+        log.events == ['resource', 'resource']
+        !parent.findRegistration(child).isPresent()
+        !owner.resolver.dependencies.dependentBeans().any { it.bean().is(owned) }
+
+        when:
+        parent.close()
+        ctx.close()
+
+        then:
+        log.events == ['resource', 'resource', 'owner']
+    }
+
+    void "a group finds the registration it owns for an instance"() {
+        given:
+        def ctx = buildContext(HEADER)
+        def resource = ctx.classLoader.loadClass('test.Resource')
+        def log = ctx.classLoader.loadClass('test.Log')
+        def group = ctx.createDependencyGroup()
+        def first = group.getBeanRegistration(resource)
+        def second = group.getBean(resource)
+        def created = group.createBeanRegistration(ctx.getBeanDefinition(resource))
+        def shared = group.getBean(ctx.classLoader.loadClass('test.Shared'))
+
+        expect:
+        group.findRegistration(first.bean()).get().is(first)
+        group.findRegistration(second).get().bean().is(second)
+        group.findRegistration(created.bean()).get().is(created)
+        !group.findRegistration(shared).isPresent()
+        !group.findRegistration(ctx.getBean(resource)).isPresent()
+
+        when:
+        group.destroy(group.findRegistration(second).get())
+
+        then:
+        log.events == ['resource']
+        !group.findRegistration(second).isPresent()
+        group.findRegistration(first.bean()).isPresent()
+
+        cleanup:
+        group.close()
+        ctx.close()
+    }
+
     void "temporary destruction dependencies are resolved through the pre-destroy event"() {
         given:
         def ctx = buildContext(HEADER + '''
@@ -211,12 +281,8 @@ interface Service {}
                 Log.events.add("nested");
                 return null;
             });
-            try {
-                context.withDependencies(ordinary -> null);
-                throw new AssertionError("ordinary context allowed resolution during shutdown");
-            } catch (IllegalStateException expected) {
-                Log.events.add("ordinary rejected");
-            }
+            context.withDependencies(ordinary -> null);
+            Log.events.add("ordinary allowed");
             Log.events.add("callback");
             return null;
         });
@@ -232,7 +298,7 @@ interface Service {}
         ctx.close()
 
         then:
-        log.events == ['nested', 'resource', 'ordinary rejected', 'callback', 'resource', 'resource', 'finished']
+        log.events == ['nested', 'resource', 'ordinary allowed', 'callback', 'resource', 'resource', 'finished']
 
         when:
         type.escaped.getBean(String)
