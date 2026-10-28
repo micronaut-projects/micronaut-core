@@ -189,6 +189,65 @@ class Front:
         results[StaticCompilationMode.ALL].hooked == false
     }
 
+    void "the slots are primed when the stub takes its Python object, and read it again only after a change"() {
+        given:
+        mode = StaticCompilationMode.ALL
+        decisions.clear()
+        def context = buildContext(SOURCE)
+
+        when: "the bean is created, before any compiled body runs"
+        def pricing = getBean(context, 'python.Pricing')
+        Value self = pricing.asPolyglotValue()
+        Map<String, Object> primed = slots(pricing)
+
+        then: "every slot holds the value of its attribute for the object"
+        primed.size() == 3
+        primed.values().every { it != null && component(it, 'owner').is(self) && component(it, 'held') }
+
+        when: "the compiled bodies run"
+        def total = pricing.total(3)
+        def label = pricing.label(4)
+
+        then: "they read the slots as primed"
+        total == 4.5d
+        label == 'std:4'
+        slots(pricing).every { name, fixed -> fixed.is(primed[name]) }
+
+        when: "code outside the compilation assigns a fixed attribute"
+        self.getContext().getBindings('python').putMember('pricing', self)
+        self.getContext().eval('python', 'pricing.name = "vip"')
+
+        then: "the next body reads the attributes again"
+        pricing.label(4) == 'vip:4'
+        slots(pricing).any { name, fixed -> !fixed.is(primed[name]) }
+
+        cleanup:
+        context?.close()
+    }
+
+    /**
+     * What the slots of the attributes fixed at construction of a stub keep, by slot.
+     */
+    private static Map<String, Object> slots(Object stub) {
+        Map<String, Object> found = [:]
+        for (Class<?> type = stub.getClass(); type != null; type = type.superclass) {
+            type.declaredFields.findAll { it.type.name == 'io.micronaut.context.python.PythonFixedAttributes$Slot' }.each { slot ->
+                slot.accessible = true
+                def value = slot.get(stub)
+                def current = value == null ? null : value.getClass().getDeclaredField('current')
+                current?.accessible = true
+                found[slot.name] = current?.get(value)
+            }
+        }
+        return found
+    }
+
+    private static Object component(Object record, String name) {
+        def field = record.getClass().getDeclaredField(name)
+        field.accessible = true
+        return field.get(record)
+    }
+
     /**
      * The epoch of the fixed attributes of the stub class of a bean, or null when it has none.
      */

@@ -241,6 +241,14 @@ def __micronaut_fixed_member(instance, name, epoch, epoch_id):
     return (attributes[name],)
 
 
+def __micronaut_fixed_members(instance, names, epoch, epoch_id):
+    """
+    What __micronaut_fixed_member finds of each of the attributes, as a list: the slots of a stub
+    primed in one call when the stub takes its object (PythonFixedAttributes.prime).
+    """
+    return [__micronaut_fixed_member(instance, str(name), epoch, epoch_id) for name in names]
+
+
 _MICRONAUT_PYTHON_ERRORS = {"ZeroDivisionError": ZeroDivisionError, "TypeError": TypeError, "AssertionError": AssertionError}
 
 
