@@ -30,6 +30,11 @@ import io.micronaut.json.JsonSyntaxException;
 @Internal
 public final class JsonCounter {
     /**
+     * A 0x00 byte, never part of UTF-8 JSON.
+     */
+    private static final byte NUL = 0;
+
+    /**
      * Total number of bytes consumed.
      */
     private long position;
@@ -46,6 +51,12 @@ public final class JsonCounter {
      * {@link #position} of the first byte of the current top-level JSON node.
      */
     private long bufferStart = -1;
+    /**
+     * {@link #position} up to which input bytes must not be 0x00.
+     *
+     * @see #checkCharset(byte[], int, int)
+     */
+    private long charsetCheckEnd = 4;
 
     /**
      * Whether we are currently unwrapping a top-level array.
@@ -80,32 +91,38 @@ public final class JsonCounter {
      *                             errors are detected by this class.
      */
     public int feed(byte[] buf, int start, int end) throws JsonSyntaxException {
-        if (position < 4) {
-            // RFC 4627 allows JSON to be encoded as UTF-8, UTF-16 or UTF-32. It also specifies a
-            // charset detection algorithm using 0x00 bytes.
-            // Later standards (RFC 8259) only permit UTF-8, but Jackson still allows other
-            // charsets. To avoid potential parser differential vulnerabilities, we forbid any 0x00
-            // bytes in the input. They never appear in valid UTF-8 JSON.
-
-            // If the input is utf-16 or utf-32, one of the first four bytes will be 0. Checking
-            // this separately and only for four bytes allows us to avoid the work in the hot loops
-            // below.
-            // only look at the bytes of this range that are among the first four bytes of the input
-            int checkEnd = start + Math.min(end - start, 4 - (int) position);
-            for (int i = start; i < checkEnd; i++) {
-                if (buf[i] == 0) {
-                    throw new JsonSyntaxException("Input must be legal UTF-8 JSON");
-                }
-            }
-        }
+        checkCharset(buf, start, end);
         int i = start;
         if (!isBuffering()) {
             i = proceedUntilBuffering(buf, i, end);
+            // a node may have started, its first bytes are checked too
+            checkCharset(buf, i, end);
         }
         if (isBuffering()) {
             i = proceedUntilNonBuffering(buf, i, end);
         }
         return i;
+    }
+
+    /**
+     * RFC 4627 allows JSON to be encoded as UTF-8, UTF-16 or UTF-32. It also specifies a charset
+     * detection algorithm using 0x00 bytes. Later standards (RFC 8259) only permit UTF-8, but
+     * Jackson still allows other charsets, and it detects the charset of every node it is given
+     * separately. To avoid potential parser differential vulnerabilities, we forbid 0x00 bytes
+     * among the first four bytes of the input and of every top-level node. They never appear in
+     * valid UTF-8 JSON, and if the input is UTF-16 or UTF-32, one of them is 0. Checking only
+     * these bytes allows us to avoid the work in the hot loops below.
+     */
+    private void checkCharset(byte[] buf, int start, int end) throws JsonSyntaxException {
+        if (position < charsetCheckEnd) {
+            // only look at the bytes of this range that are among the checked bytes
+            int checkEnd = start + (int) Math.min(end - start, charsetCheckEnd - position);
+            for (int i = start; i < checkEnd; i++) {
+                if (buf[i] == NUL) {
+                    throw new JsonSyntaxException("Input must be legal UTF-8 JSON");
+                }
+            }
+        }
     }
 
     /**
@@ -280,6 +297,14 @@ public final class JsonCounter {
     }
 
     /**
+     * Start buffering a top-level node at the current position.
+     */
+    private void startNode() {
+        bufferStart = position;
+        charsetCheckEnd = position + 4;
+    }
+
+    /**
      * Handle a special byte (anything but whitespace) in the base state, while not buffering.
      */
     private void handleNonBufferingBase(byte b) throws JsonSyntaxException {
@@ -295,7 +320,7 @@ public final class JsonCounter {
             }
             case '{' -> {
                 depth = 1;
-                bufferStart = position;
+                startNode();
                 state = State.BASE; // we might be in BEFORE_UNWRAP_ARRAY
             }
             case '[' -> {
@@ -304,16 +329,20 @@ public final class JsonCounter {
                     unwrappingArray = true;
                 } else {
                     depth = 1;
-                    bufferStart = position;
+                    startNode();
                 }
             }
             case '"' -> {
                 state = State.STRING;
-                bufferStart = position;
+                startNode();
             }
             default -> {
+                // the charset check of the node starts after this byte, so check it here
+                if (b == NUL) {
+                    throw new JsonSyntaxException("Input must be legal UTF-8 JSON");
+                }
                 state = State.TOP_LEVEL_SCALAR;
-                bufferStart = position;
+                startNode();
             }
         }
     }
