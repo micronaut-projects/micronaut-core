@@ -34,6 +34,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
 
 import java.io.File;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -88,6 +89,9 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             long ifModifiedSinceDateSeconds = ifModifiedSince.toEpochSecond();
             long fileLastModifiedSeconds = lastModified / 1000;
             if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
+                if (type instanceof StreamedFile) {
+                    closeQuietly((StreamedFile) type);
+                }
                 FullHttpResponse nettyResponse = notModified(response);
                 if (request instanceof NettyHttpRequest) {
                     ((NettyHttpRequest<?>) request).prepareHttp2ResponseIfNecessary(nettyResponse);
@@ -157,6 +161,14 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
                 to.getHeaders().add(header, value);
             }
         });
+    }
+
+    private static void closeQuietly(StreamedFile file) {
+        try {
+            file.getInputStream().close();
+        } catch (IOException ignored) {
+            // the body is not sent, nothing else to do
+        }
     }
 
     private FullHttpResponse notModified(MutableHttpResponse<?> originalResponse) {
