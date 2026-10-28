@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.OptionalLong;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * {@link io.micronaut.http.body.ByteBody} implementation that reads from an InputStream.
@@ -158,8 +159,17 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
                 }
             })
             .doOnTerminate(s::close)
-            .doOnCancel(s::close)
+            // cancellation may come from the event loop, and close() may block
+            .doOnCancel(() -> closeOnIoExecutor(s))
             .subscribeOn(Schedulers.fromExecutor(context.ioExecutor()));
+    }
+
+    private void closeOnIoExecutor(ExtendedInputStream s) {
+        try {
+            context.ioExecutor().execute(s::close);
+        } catch (RejectedExecutionException e) {
+            s.close();
+        }
     }
 
     @Override
