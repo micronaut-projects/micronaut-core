@@ -88,6 +88,11 @@ public class FilteredRouter implements Router {
         router.applyDefaultPorts(ports);
     }
 
+    @Override
+    public boolean exposesDefaultRoutes(HttpRequest<?> request) {
+        return router.exposesDefaultRoutes(request);
+    }
+
     @NonNull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {

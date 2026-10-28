@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.annotation.Get;
@@ -62,6 +63,13 @@ import java.util.stream.Stream;
  */
 @Singleton
 public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatch<?>> {
+
+    /**
+     * The request attribute that tells whether the listener of a request exposes the default
+     * routes, set for the listeners that have no port, e.g. UNIX domain sockets.
+     */
+    @Internal
+    public static final String LISTENER_EXPOSES_DEFAULT_ROUTES = "micronaut.router.listener-exposes-default-routes";
 
     private static final UriRouteInfo<Object, Object>[] EMPTY = new UriRouteInfo[0];
 
@@ -218,6 +226,20 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @Override
     public void applyDefaultPorts(List<Integer> ports) {
         this.ports = new HashSet<>(ports);
+    }
+
+    @Override
+    public boolean exposesDefaultRoutes(HttpRequest<?> request) {
+        Set<Integer> defaultPorts = ports;
+        if (defaultPorts == null) {
+            return true;
+        }
+        // a listener that has no port, e.g. a UNIX domain socket, tells whether it exposes them
+        Optional<Boolean> listenerExposes = request.getAttribute(LISTENER_EXPOSES_DEFAULT_ROUTES, Boolean.class);
+        if (listenerExposes.isPresent()) {
+            return listenerExposes.get();
+        }
+        return defaultPorts.contains(request.getServerAddress().getPort());
     }
 
     @NonNull
@@ -757,10 +779,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     private boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route) {
-        if (ports == null || route.getPort() != null) {
+        if (route.getPort() != null) {
             return false;
         }
-        return !ports.contains(request.getServerAddress().getPort());
+        return !exposesDefaultRoutes(request);
     }
 
     private UriRouteInfo<Object, Object>[] finalizeRoutes(List<UriRouteInfo<Object, Object>> routes) {
