@@ -651,12 +651,13 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     /**
      * Match the filter route. An implicit {@code HEAD} route runs the {@code GET} handler, so the
-     * filters scoped to {@code GET} apply to it as well.
+     * filters scoped to {@code GET} apply to it as well. Without a route (for example a static
+     * resource) a {@code HEAD} request is answered like a {@code GET}, so the same applies.
      */
     private static Optional<GenericHttpFilter> matchFilter(FilterRoute filterRoute, HttpMethod method, String path, @Nullable RouteMatch<?> routeMatch) {
         Optional<GenericHttpFilter> filter = filterRoute.match(method, path);
-        if (filter.isEmpty() && method == HttpMethod.HEAD && routeMatch != null
-            && routeMatch.getRouteInfo() instanceof UriRouteInfo<?, ?> uriRouteInfo && uriRouteInfo.isImplicitHead()) {
+        if (filter.isEmpty() && method == HttpMethod.HEAD
+            && (routeMatch == null || routeMatch.getRouteInfo() instanceof UriRouteInfo<?, ?> uriRouteInfo && uriRouteInfo.isImplicitHead())) {
             return filterRoute.match(HttpMethod.GET, path);
         }
         return filter;
@@ -675,7 +676,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         HttpMethod method = request.getMethod();
         String path = request.getPath();
         for (FilterRoute filterRoute : preMatchingPreconditionFilterRoutes) {
-            filterRoute.match(method, path).ifPresent(httpFilters::add);
+            // the route is not matched yet, so a HEAD request may reach a GET handler: treat it as
+            // a GET for the filters scoped to GET
+            matchFilter(filterRoute, method, path, null).ifPresent(httpFilters::add);
         }
         FilterRunner.sort(httpFilters);
         return Collections.unmodifiableList(httpFilters);
