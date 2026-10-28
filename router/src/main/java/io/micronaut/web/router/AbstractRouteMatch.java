@@ -29,6 +29,11 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.CookieValue;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.Part;
+import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
@@ -155,6 +160,9 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public boolean isExecutable() {
+        if (hasUnboundExplicitArgument()) {
+            return false;
+        }
         Map<String, Object> variables = getVariableValues();
         for (Map.Entry<String, Argument> entry : abstractRoute.requiredInputs.entrySet()) {
             Object value = variables.get(entry.getKey());
@@ -253,7 +261,10 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 Argument argument = entry.getValue();
                 String name = entry.getKey();
                 Object value = DefaultRouteBuilder.NO_VALUE;
-                if (uriVariables.containsKey(name)) {
+                if (isUnboundExplicitArgument(argument)) {
+                    // never fall back to a URI variable of the same name
+                    value = DefaultRouteBuilder.NO_VALUE;
+                } else if (uriVariables.containsKey(name)) {
                     value = uriVariables.get(name);
                 } else if (argumentValues.containsKey(name)) {
                     value = argumentValues.get(name);
@@ -302,6 +313,35 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
             return executableMethod.invoke(argumentList.toArray());
         }
+    }
+
+    /**
+     * Whether the argument is explicitly bound to a request source other than the URI
+     * (a header, a cookie, a request attribute, the body or a part).
+     *
+     * @param argument The argument
+     * @return true if it is
+     */
+    static boolean isExplicitlyBound(Argument<?> argument) {
+        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        return annotationMetadata.hasAnnotation(Header.class)
+            || annotationMetadata.hasAnnotation(CookieValue.class)
+            || annotationMetadata.hasAnnotation(RequestAttribute.class)
+            || annotationMetadata.hasAnnotation(Body.class)
+            || annotationMetadata.hasAnnotation(Part.class);
+    }
+
+    private boolean hasUnboundExplicitArgument() {
+        for (Argument<?> argument : getRequiredArguments()) {
+            if (isExplicitlyBound(argument)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isUnboundExplicitArgument(Argument<?> argument) {
+        return isExplicitlyBound(argument) && getRequiredArguments().contains(argument);
     }
 
     private void convertValueAndAddToList(ConversionService conversionService, List argumentList, Argument argument, Object value, Class argumentType) {

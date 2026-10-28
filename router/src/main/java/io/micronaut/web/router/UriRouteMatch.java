@@ -53,7 +53,8 @@ public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch
             Map<String, Object> matchVariables = getVariableValues();
             List<Argument> actualArguments = new ArrayList<>(arguments.length);
             for (Argument argument : arguments) {
-                if (!matchVariables.containsKey(argument.getName())) {
+                // An argument explicitly bound to another request source never takes a URI variable of the same name
+                if (!matchVariables.containsKey(argument.getName()) || AbstractRouteMatch.isExplicitlyBound(argument)) {
                     actualArguments.add(argument);
                 }
             }
