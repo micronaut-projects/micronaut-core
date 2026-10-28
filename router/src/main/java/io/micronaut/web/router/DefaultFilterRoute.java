@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.util.*;
@@ -27,6 +28,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -42,6 +44,9 @@ import java.util.function.Supplier;
 class DefaultFilterRoute implements FilterRoute {
 
     private final List<String> patterns = new ArrayList<>(1);
+    private final List<String> contextPathPatterns = new ArrayList<>(0);
+    @Nullable
+    private String contextPath;
     private final Supplier<HttpFilter> filterSupplier;
     private final AnnotationMetadataResolver annotationMetadataResolver;
     private Set<HttpMethod> httpMethods;
@@ -110,7 +115,51 @@ class DefaultFilterRoute implements FilterRoute {
     @NonNull
     @Override
     public String[] getPatterns() {
-        return patterns.toArray(StringUtils.EMPTY_STRING_ARRAY);
+        String contextPath = this.contextPath;
+        if (contextPath == null || contextPathPatterns.isEmpty()) {
+            return patterns.toArray(StringUtils.EMPTY_STRING_ARRAY);
+        }
+        List<String> all = new ArrayList<>(patterns.size() + contextPathPatterns.size());
+        all.addAll(patterns);
+        for (String pattern : contextPathPatterns) {
+            all.add(StringUtils.prependUri(contextPath, pattern));
+        }
+        return all.toArray(StringUtils.EMPTY_STRING_ARRAY);
+    }
+
+    /**
+     * Makes the patterns added so far relative to the server context path. A pattern that already starts
+     * with the context path segment is kept as is. A relative pattern matches the part of a request path
+     * after the context path, and the whole path of a request outside the context path (routes such as
+     * WebSocket or function routes that are not mounted under the context path).
+     * Must be called after the patterns and the pattern style are set.
+     *
+     * @param contextPath The server context path
+     */
+    void contextPath(@Nullable String contextPath) {
+        if (contextPath == null) {
+            return;
+        }
+        String normalized = contextPath.startsWith("/") ? contextPath : "/" + contextPath;
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        if (normalized.isEmpty()) {
+            return;
+        }
+        this.contextPath = normalized;
+        boolean ant = getPatternStyle() == FilterPatternStyle.ANT;
+        for (Iterator<String> i = patterns.iterator(); i.hasNext(); ) {
+            String pattern = i.next();
+            if (!isUnderContextPath(normalized, pattern)) {
+                i.remove();
+                contextPathPatterns.add(ant && !pattern.startsWith("/") ? "/" + pattern : pattern);
+            }
+        }
+    }
+
+    private static boolean isUnderContextPath(String contextPath, String path) {
+        return path.startsWith(contextPath) && (path.length() == contextPath.length() || path.charAt(contextPath.length()) == '/');
     }
 
     @Override
@@ -127,14 +176,30 @@ class DefaultFilterRoute implements FilterRoute {
         PathMatcher matcher = getPatternStyle().getPathMatcher();
         for (String pattern : patterns) {
             if (matcher.matches(pattern, uriStr)) {
-                HttpFilter filter = getFilter();
-                if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
-                    return Optional.empty();
+                return enabledFilter();
+            }
+        }
+        String contextPath = this.contextPath;
+        if (contextPath != null && !contextPathPatterns.isEmpty()) {
+            String relativePath = uriStr;
+            if (isUnderContextPath(contextPath, uriStr)) {
+                relativePath = uriStr.length() == contextPath.length() ? "/" : uriStr.substring(contextPath.length());
+            }
+            for (String pattern : contextPathPatterns) {
+                if (matcher.matches(pattern, relativePath)) {
+                    return enabledFilter();
                 }
-                return Optional.of(filter);
             }
         }
         return Optional.empty();
+    }
+
+    private Optional<HttpFilter> enabledFilter() {
+        HttpFilter filter = getFilter();
+        if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
+            return Optional.empty();
+        }
+        return Optional.of(filter);
     }
 
     @Override

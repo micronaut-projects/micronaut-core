@@ -563,6 +563,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             if (entry.hasMethods() && !entry.getFilterMethods().contains(request.getMethod())) {
                 continue;
             }
+            if (entry instanceof DefaultFilterRoute) {
+                // context path relative patterns are only matched by the route itself
+                ((DefaultFilterRoute) entry).match(request.getMethod(), request.getUri()).ifPresent(httpFilters::add);
+                continue;
+            }
             if (entry.hasPatterns()) {
                 String path = request.getPath();
                 String[] patterns = entry.getPatterns();
