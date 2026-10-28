@@ -225,7 +225,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     @Nullable
     private static Boolean listenerExposesDefaultRoutes(Channel channel) {
-        if (channel.localAddress() instanceof InetSocketAddress) {
+        if (channel == null || channel.localAddress() instanceof InetSocketAddress) {
             return null;
         }
         Boolean exposes = channel.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
