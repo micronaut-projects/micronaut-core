@@ -49,15 +49,21 @@ import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakeException;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
 import io.netty.handler.ssl.SslHandler;
@@ -125,7 +131,9 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
 
     @Override
     public boolean acceptInboundMessage(Object msg) {
-        return msg instanceof NettyHttpRequest && isWebSocketUpgrade((NettyHttpRequest<?>) msg);
+        // a request whose head failed to decode is answered like any other request: 400 and close
+        return msg instanceof NettyHttpRequest && isWebSocketUpgrade((NettyHttpRequest<?>) msg)
+            && !((NettyHttpRequest<?>) msg).getNativeRequest().decoderResult().isFailure();
     }
 
     /**
@@ -199,7 +207,19 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                         //Adding new handler to the existing pipeline to handle WebSocket Messages
                         WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
 
-                        handleHandshake(ctx, msg, webSocketBean, actualResponse);
+                        try {
+                            handleHandshake(ctx, msg, webSocketBean, actualResponse);
+                        } catch (WebSocketServerHandshakeException e) {
+                            // rejected before anything was written: answered like a malformed request
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Rejecting websocket upgrade: {}", e.getMessage());
+                            }
+                            FullHttpResponse badRequest = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
+                            badRequest.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
+                            badRequest.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+                            ctx.writeAndFlush(badRequest).addListener(ChannelFutureListener.CLOSE);
+                            return;
+                        }
 
                         ChannelPipeline pipeline = ctx.pipeline();
 
