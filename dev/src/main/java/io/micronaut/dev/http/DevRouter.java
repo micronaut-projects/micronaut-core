@@ -46,6 +46,7 @@ import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanType;
 import io.micronaut.web.router.RouteBuilder;
 import io.micronaut.web.router.RouteMatch;
+import io.micronaut.web.router.RouteResolution;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.UriRouteMatch;
@@ -125,6 +126,8 @@ public final class DevRouter implements Router {
 
     private final BeanContext context;
     private final Object lock = new Object();
+    // whether the HTTP server is present, whose limit of the bytes a body condition reads a rebuilt table is checked against
+    private final boolean checksBodyLimits;
     private volatile @Nullable Router router; // NOSONAR java:S3077 replaced whole by a rebuild; a built router is never changed through it
     private volatile @Nullable List<Integer> defaultPorts; // NOSONAR java:S3077 an unmodifiable list, replaced whole
     private volatile int rebuilds;
@@ -139,6 +142,7 @@ public final class DevRouter implements Router {
      */
     DevRouter(BeanContext context) {
         this.context = context;
+        this.checksBodyLimits = ClassUtils.isPresent("io.micronaut.http.server.HttpServerConfiguration", context.getClassLoader());
         if (context instanceof WatchableBeanContext watchable) {
             // registered while this bean is created: the watches belong to it and close when it is destroyed
             watchable.definitions(RouteBuilder.class).watch(this::onChange);
@@ -245,8 +249,14 @@ public final class DevRouter implements Router {
      * without them a router serves those routes on every listener, such as the management one.
      *
      * @param fresh The router
+     * @throws io.micronaut.context.exceptions.ConfigurationException if a body condition of a route reads more than the
+     * server may buffer, as the server would fail to start with it: the previous routes stay
      */
     private void install(Router fresh) {
+        if (checksBodyLimits) {
+            // as the server checks the table it was created with: a route added since may read more than it buffers
+            DevRouteLimits.check(context, fresh);
+        }
         List<Integer> ports = defaultPorts;
         if (ports != null) {
             fresh.applyDefaultPorts(ports);
@@ -398,6 +408,30 @@ public final class DevRouter implements Router {
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
         return current().findAny(request);
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        // the application's router filters the routes of a located target too
+        return current().findAny(request, filter);
+    }
+
+    /**
+     * Always true: a rebuild in place may add a route with a body condition, and the server decides once, when it is
+     * created, whether it can choose a route by the body of a request. Where no route has a body condition, the server
+     * answers as it would otherwise, as {@link #resolve(HttpRequest, Predicate)} asks the application's router, which
+     * knows whether one does.
+     *
+     * @return true
+     */
+    @Override
+    public boolean hasBodyConditions() {
+        return true;
+    }
+
+    @Override
+    public <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        return current().resolve(request, filter);
     }
 
     @Override

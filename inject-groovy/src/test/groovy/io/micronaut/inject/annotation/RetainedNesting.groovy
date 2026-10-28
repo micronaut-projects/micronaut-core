@@ -52,3 +52,18 @@ import java.lang.annotation.RetentionPolicy
 
     RetainedRangeList list()
 }
+
+@Limit(min = 1)
+@Retention(RetentionPolicy.RUNTIME)
+@interface RetainedBundle {
+    @AliasFor(annotation = Limit, member = "min", applyDefault = true)
+    int min() default 1
+
+    /**
+     * A container the bundled annotation does not declare as repeatable.
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @interface List {
+        RetainedBundle[] value()
+    }
+}

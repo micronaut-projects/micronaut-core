@@ -193,6 +193,14 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
     }
 
     @Override
+    public io.micronaut.inject.ast.Element removeStereotype(String annotationType) {
+        for (MutableAnnotationMetadataDelegate<?> am : writeElements) {
+            am.removeStereotype(annotationType);
+        }
+        return thisElement;
+    }
+
+    @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return propertyReadAnnotationMetadata;
     }
