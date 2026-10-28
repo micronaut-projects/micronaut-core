@@ -81,7 +81,7 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
             if (nativeRequest instanceof StreamedHttpRequest) {
 
                 CompletableFuture future = new CompletableFuture();
-                Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                Argument<?> targetType = PublisherBodyBinder.valueType(context);
 
                 HttpContentProcessor<?> processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
 
@@ -111,9 +111,8 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
 
                     @Override
                     protected void doOnComplete() {
-                        Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
-                        if (firstTypeParameter.isPresent()) {
-                            Argument<?> arg = firstTypeParameter.get();
+                        if (context.getFirstTypeVariable().isPresent()) {
+                            Argument<?> arg = PublisherBodyBinder.valueType(context);
                             Optional converted = nettyHttpRequest.getBody(arg);
                             if (converted.isPresent()) {
                                 future.complete(converted.get());

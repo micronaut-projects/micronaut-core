@@ -76,7 +76,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
             if (nativeRequest instanceof StreamedHttpRequest) {
-                Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                Argument<?> targetType = valueType(context);
 
                 HttpContentProcessor<?> processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
 
@@ -157,5 +157,21 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
             }
         }
         return BindingResult.EMPTY;
+    }
+
+    /**
+     * The type of the value a reactive or future body parameter wraps. The annotations of the
+     * parameter (for example a JSON view) apply to the value, as they do for a parameter that is
+     * not wrapped.
+     *
+     * @param context The conversion context of the parameter
+     * @return The value type
+     */
+    static Argument<?> valueType(ArgumentConversionContext<?> context) {
+        Argument<?> valueType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        if (valueType.getAnnotationMetadata().isEmpty()) {
+            return Argument.of(valueType.getType(), valueType.getName(), context.getAnnotationMetadata(), valueType.getTypeParameters());
+        }
+        return valueType;
     }
 }
