@@ -30,6 +30,7 @@ JAVA_RESERVED_NAMES = frozenset((
 Ir = java.type("io.micronaut.python.processing.staticcompile.Ir")
 CompiledBody = java.type("io.micronaut.python.processing.staticcompile.Ir$CompiledBody")
 Stats = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Stats")
+Delegation = java.type("io.micronaut.python.processing.staticcompile.StaticDelegation")
 
 
 def _ir(name):
@@ -782,6 +783,33 @@ class _ComprehensionBody(ast.stmt):
         self.container_type = None
 
 
+# the Java types a Python int converts to, which an int beyond their range fails
+INTEGER_RESULTS = {"long", "int", "short", "byte", "java.lang.Long", "java.lang.Integer", "java.lang.Short", "java.lang.Byte"}
+
+
+def _plain_attributes(model, write=False):
+    """
+    Whether reading (or writing) a hinted attribute of an object of the class runs no Python code: the
+    class and every base leave the attribute protocol to object, and every base is of the compilation.
+    """
+    seen = set()
+    pending = [model]
+    while pending:
+        current = pending.pop()
+        if current.qualified in seen:
+            continue
+        seen.add(current.qualified)
+        if current.dynamic or current.lookup_dynamic or current.metaclass:
+            return False
+        if write and ("__setattr__" in current.methods or "__delattr__" in current.methods):
+            return False
+        for base in current.bases:
+            if not isinstance(base, type(model)):
+                return False  # a Java base or one outside the compilation may serve attributes itself
+            pending.append(base)
+    return True
+
+
 class Lowering:
     """Lowers one function body; see the module documentation."""
 
@@ -817,6 +845,7 @@ class Lowering:
         self.following = []       # the statements following the one being lowered, innermost block last
         self.next_loop = 0
         self.parameters = {}      # name -> (type used at, stub type)
+        self.python_parameters = []  # per parameter, the Python name of the plain class of the compilation it takes, or ""
         self.java_calls = 0
         self.bridge_calls = 0
         self.fixed_reads = 0      # the reads of attributes of self fixed at construction, from Java fields of the stub
@@ -831,6 +860,8 @@ class Lowering:
         self.java_code = []       # per enclosing try block, the Java methods and constructors outside the compilation it calls
         self.calls_java = False   # the body calls a Java method or constructor outside the compilation
         self.compilation_calls = 0  # the calls of code of the compilation through Java: compiled functions, generated constructors and methods
+        self.python_code = 0      # the crossings that may run Python code of the compilation: accessors, methods, attributes of a class serving them itself
+        self.computing_calls = 0  # the calls of compiled functions and methods of the compilation, which compute a result of their own
         # whether the body enters Python (Ir.PythonEntries, StaticPlanner._record_python_entries): what about the
         # calls of the compilation it makes through Java does, the functions those calls run (None for one
         # the planner cannot follow) and the generated constructors it calls; EventLoopSafety finds the rest
@@ -872,7 +903,7 @@ class Lowering:
             owner = self.module.script.qualifiedName()
         return CompiledBody(owner, self.function_def.name(), parameter_names, parameter_types,
                             return_type, body, self.function_def.span(), stats, self.checked, self.advised_method,
-                            self.static, self.class_def is None, self._exception_crossing())
+                            self.static, self.class_def is None, self._exception_crossing(), self.python_parameters, self.computing_calls > 0, None)
 
     def _exception_crossing(self):
         """
@@ -882,12 +913,15 @@ class Lowering:
         crossed Java code is the Java exception. A body calling no Java code outside the compilation
         throws only the former, one calling only Java code the latter; a body calling both, in a
         compilation with exception classes, may throw either, and its Python callers keep the Python body.
+        Only a crossing that may run Python code of the compilation counts: a read or a write of a plain
+        attribute (of a class that leaves the attribute protocol to object), or of one fixed at
+        construction, runs none and cannot raise an exception class of the compilation.
         """
         if not self.calls_java:
             return ExceptionCrossing.TRANSLATED
         classes = getattr(self.checker, "python_classes", None)
         exception_classes = classes is not None and any(model.is_throwable() for model in classes.all())
-        if exception_classes and (self.compilation_calls or self.bridge_calls or self.fixed_reads):
+        if exception_classes and (self.compilation_calls or self.python_code):
             return ExceptionCrossing.PYTHON_BODY
         return ExceptionCrossing.UNTRANSLATED
 
@@ -953,6 +987,9 @@ class Lowering:
                 self.copied.add(name)
             names.append(name)
             types.append(stub_type)
+            plain = typed is not None and typed.kind == PY and self.java_layout is None and self.planner is not None \
+                and getattr(self.planner, "plain_class", None) is not None and self.planner.plain_class(stub_type)
+            self.python_parameters.append(plain.name if plain else "")
         return names, types
 
     def _return_type(self):
@@ -1916,6 +1953,7 @@ class Lowering:
         if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
             property_type = self._self_property_type(target.attr, target)
             self.bridge_calls += 1
+            self._crossing(self.class_model, self._is_accessor(target.attr), write=True)
             return PutSelf(target.attr, property_type, self._coerce(value, property_type, node), self._is_accessor(target.attr))
         if isinstance(target, ast.Subscript):
             return self._subscript_store(target, value, node)
@@ -1980,6 +2018,7 @@ class Lowering:
             used = JAVA_PRIMITIVE_NUMBERS.get(property_type, property_type)
             current = Cast(current, used) if used != property_type else current
             self.bridge_calls += 1
+            self._crossing(self.class_model, self._is_accessor(node.target.attr))
             if not self._pure_read(node.target):
                 self.evaluated += 1  # Python reads the property before the value
         else:
@@ -2533,6 +2572,7 @@ class Lowering:
                 self.fixed_reads += 1
             else:
                 self.bridge_calls += 1
+                self._crossing(self.class_model, accessor)
             read = SelfProperty(node.attr, property_type, accessor, fixed)
             # an int attribute (an instance attribute hinted through __init__) is a long in the body; one
             # that may be None stays boxed
@@ -2568,6 +2608,15 @@ class Lowering:
         """Whether self.<name> is fixed at construction, so the stub reads it from a Java field (StaticPlanner.fixed_attribute)."""
         fixed_attribute = getattr(self.planner, "fixed_attribute", None)
         return fixed_attribute is not None and not self.static and self.class_model is not None and fixed_attribute(self.class_model, name, property_type)
+
+    def _crossing(self, model, accessor, write=False):
+        """
+        Counts a read or a write of an attribute of an object of the compilation that may run Python
+        code of the compilation (see _exception_crossing): an accessor, or an attribute of a class that
+        serves its attributes itself (a __getattr__, a __setattr__, a base outside the compilation).
+        """
+        if accessor or model is None or not _plain_attributes(model, write):
+            self.python_code += 1
 
     def _is_accessor(self, name):
         """Whether the attribute of self is a @property: its getter and setter run on the Python object."""
@@ -2762,6 +2811,9 @@ class Lowering:
                      for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
         self.java_calls += 1
         self.compilation_calls += 1
+        if Delegation.promotes(body):
+            # the compiled function may overflow where Python promotes, and so may the call
+            self.computing_calls += 1
         self.callees.append(function_node)
         return_type = body.returnType()
         call = InvokeJava(None, body.className(), name, parameter_types, arguments, return_type)
@@ -2867,6 +2919,12 @@ class Lowering:
                          for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
             self.java_calls += 1
             self.compilation_calls += 1
+            if self._computes(function_def, function_node, self.class_model, name, return_type):
+                self.computing_calls += 1
+            # a "shared" call counts as a "java" one: a call of the compiled body for Java callers, and for the
+            # compiled delegate a Python caller runs, which has no stub and no shared entry, a call through
+            # the Python object (SelfAccess.invokeShared), as a "java" one is there; compilation_calls
+            # counts it as Python code of the compilation (see _exception_crossing)
             # the stub's Java method of a method no subclass overrides (or the shared entry of its compiled
             # body, a Java call too): its compiled body, or the bridge to Python
             self.callees.append(function_node)
@@ -2878,6 +2936,9 @@ class Lowering:
                 self._refuse("sibling-call", f"calling [{name}] with keyword arguments has no static lowering: the stub declares no Java method the call fills", node)
             lowered_arguments = [self._expression(argument) for argument in node.args]
             self.bridge_calls += 1
+            self.python_code += 1
+            if self._computes(function_def, function_node, self.class_model, name, return_type):
+                self.computing_calls += 1
             # a private method is invoked by the name Python mangled it to
             call = InvokeSibling(python_name, [], [self._boxed(argument, node) for argument in lowered_arguments], return_type, "python")
         # a boxed result may be null, which Python sees as None: it stays boxed, a primitive is widened
@@ -2990,7 +3051,9 @@ class Lowering:
                 read = InvokeJava(receiver, owner, getter, [], [], stub_type)
             else:
                 self.bridge_calls += 1
-                read = PythonMember(receiver, node.attr, stub_type)
+                self._crossing(model, False)
+                # an attribute of a class serving its attributes itself runs code: a side effect
+                read = PythonMember(receiver, node.attr, stub_type, not _plain_attributes(model))
         elif kind == "property":
             getter = found[1].getter()
             return_def = getter.returnType() if getter is not None else None
@@ -2999,19 +3062,40 @@ class Lowering:
                 self._refuse("unknown-type", f"the property [{node.attr}] of [{model.name}] has no return hint", node)
             stub_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
             self.bridge_calls += 1
-            read = PythonMember(receiver, node.attr, stub_type)
+            self.python_code += 1
+            read = PythonMember(receiver, node.attr, stub_type, True)
         elif kind == "instance":
             typed = model.instance_attribute_type(node.attr, self.bindings)
             if typed is None:
                 self._refuse("unknown-type", f"the attribute [{node.attr}] of [{model.name}] has no hinted type", node)
             stub_type = self._stub_type(typed, None, node)
             self.bridge_calls += 1
-            read = PythonMember(receiver, node.attr, stub_type)
+            self._crossing(model, False)
+            read = PythonMember(receiver, node.attr, stub_type, not _plain_attributes(model))
         else:
             self._refuse("unsupported-expression", f"reading [{node.attr}] of [{model.name}], which is not an attribute, has no static lowering", node)
         # an attribute that may be None stays boxed, a primitive is widened
         used = JAVA_PRIMITIVE_NUMBERS.get(stub_type, stub_type)
         return Cast(read, used) if used != stub_type else read
+
+    def _computes(self, function_def, function_node, model, name, return_type):
+        """
+        Whether a method of the compilation a body calls through its generated class may raise where
+        Python promotes: its compiled body when that may, or its Python code when it returns an int,
+        which the generated class converts to a Java integer (Python code promotes in Python). An
+        abstract method is implemented in Java (a repository); a subclass's override may be either.
+        """
+        if model.subclass_overrides(name):
+            return True
+        if function_def.isAbstract() or function_def.hasPlaceholderBody():
+            return False
+        decide = getattr(self.planner, "decide_method", None)
+        decision = decide(model, function_def, function_node) if decide is not None else None
+        body = self.planner.body_of(function_node) if decision is not None and decision.outcome().name() == "COMPILED" else None
+        if body is not None:
+            return Delegation.promotes(body)
+        # in a cycle of calls the decision is under way: whatever the body becomes, it may overflow
+        return decision is None or _erased(return_type) in INTEGER_RESULTS
 
     def _accessor_entry(self, model, attribute, what):
         """
@@ -3089,6 +3173,8 @@ class Lowering:
                          for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
             self.java_calls += 1
             self.compilation_calls += 1
+            if self._computes(function_def, function_node, model, name, return_type):
+                self.computing_calls += 1
             self.callees.extend(self._dispatched(model, name, function_node, static))
             if static and not _plain_receiver(receiver_node):
                 # Python evaluates the receiver (Cart(n).factory() constructs the Cart); a static Java call would not
@@ -3104,6 +3190,7 @@ class Lowering:
                 self._refuse("unsupported-expression", f"calling [{name}] of [{model.name}] with keyword arguments has no static lowering: the generated class declares no Java method the call fills", node)
             lowered_arguments = [self._expression(argument) for argument in node.args]
             self.bridge_calls += 1
+            self.python_code += 1
             call = InvokePython(self._expression(receiver_node), name, [self._boxed(argument, node) for argument in lowered_arguments], return_type)
         # a boxed result may be null, which Python sees as None: it stays boxed, a primitive is widened
         used = JAVA_PRIMITIVE_NUMBERS.get(return_type, return_type)

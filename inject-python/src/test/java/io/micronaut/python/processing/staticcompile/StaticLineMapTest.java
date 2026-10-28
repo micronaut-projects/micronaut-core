@@ -129,7 +129,7 @@ class StaticLineMapTest {
             new Ir.Return(new Ir.Cast(n, "int"))
         ), List.of(4, 6));
         Ir.CompiledBody compiled = new Ir.CompiledBody("example.Sample", "check", List.of("n"), List.of("int"), "int", body,
-            SourceSpan.at("app/sample.py", 3, 5), new StaticCompilationDecision.Stats(2, 0, 0, 0), false, false, true, true, Ir.ExceptionCrossing.UNTRANSLATED);
+            SourceSpan.at("app/sample.py", 3, 5), new StaticCompilationDecision.Stats(2, 0, 0, 0), false, false, true, true, Ir.ExceptionCrossing.UNTRANSLATED, List.of(), false, null);
         ClassDef classDef = ClassDef.builder("example.Sample")
             .addModifiers(Modifier.PUBLIC)
             .addMethod(MethodDef.builder("check")

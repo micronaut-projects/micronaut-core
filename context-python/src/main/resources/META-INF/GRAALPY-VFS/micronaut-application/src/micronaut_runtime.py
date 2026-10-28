@@ -103,6 +103,11 @@ _MICRONAUT_INT_BOUNDS = {"int": 2 ** 31, "long": 2 ** 63, "short": 2 ** 15, "byt
 
 def _micronaut_fits(value, kind):
     """Whether a value reaches a Java parameter of the kind unchanged, as the Python body would see it."""
+    if type(kind) is tuple:
+        # ("python", cls): an object of exactly the plain class of the compilation, which its generated class wraps
+        return type(value) is kind[1]
+    if kind is None:
+        return False
     if kind.startswith("?"):
         if value is None:
             return True

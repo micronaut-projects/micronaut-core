@@ -380,8 +380,9 @@ public sealed interface Ir {
      * @param receiver The receiver, a value of a generated class
      * @param name     The attribute
      * @param type     The Java type of the value
+     * @param accessor Whether the attribute is a Python {@code @property}, whose getter runs on the Python object
      */
-    record PythonMember(Expression receiver, String name, String type) implements Expression {
+    record PythonMember(Expression receiver, String name, String type, boolean accessor) implements Expression {
     }
 
     /**
@@ -608,6 +609,12 @@ public sealed interface Ir {
      *                       module's class
      * @param exceptions     How the Java exception of a Python exception class the body throws reaches a
      *                       Python caller of the rewritten function
+     * @param pythonParameters Per parameter, the Python name ({@code Outer.Inner}) of the plain class of the
+     *                       compilation whose generated class the parameter is, which wraps the Python object a
+     *                       Python caller passes, or an empty string
+     * @param callsCompiledCode Whether the body calls code of the compilation that computes a result of its
+     *                       own (a compiled function, a method of a Python class through its generated class),
+     *                       which may overflow where Python promotes
      * @param pythonEntries  What may make the body enter Python, which decides whether a route whose body
      *                       it is runs on the event loop (see {@link EventLoopSafety}); {@code null} when the
      *                       planner did not find it out
@@ -625,6 +632,8 @@ public sealed interface Ir {
                         boolean staticMethod,
                         boolean moduleLevel,
                         ExceptionCrossing exceptions,
+                        List<String> pythonParameters,
+                        boolean callsCompiledCode,
                         @Nullable PythonEntries pythonEntries) {
         public CompiledBody {
             Objects.requireNonNull(className, "className");
@@ -632,32 +641,15 @@ public sealed interface Ir {
             Objects.requireNonNull(methodName, "methodName");
             parameterNames = List.copyOf(parameterNames);
             parameterTypes = List.copyOf(parameterTypes);
+            pythonParameters = pythonParameters == null ? List.of() : List.copyOf(pythonParameters);
         }
 
         /**
-         * A body whose entries into Python the planner has not found out yet.
-         *
-         * @param className      The generated class the method belongs to
-         * @param methodName     The method
-         * @param parameterNames The parameter names, the receiver excluded
-         * @param parameterTypes The Java types of the parameters as the stub declares them
-         * @param returnType     The Java return type as the stub declares it
-         * @param body           The body
-         * @param span           Where the Python function is declared
-         * @param stats          What the body contains
-         * @param wrapsCheckedExceptions Whether a call of the body declares a checked exception
-         * @param advised        Whether the method is advised
-         * @param staticMethod   Whether the body is generated as a static Java method
-         * @param moduleLevel    Whether the function is a module-level function
-         * @param exceptions     How the Java exception of a Python exception class the body throws reaches a Python caller
+         * @param index The position of a parameter
+         * @return The Python name of the plain class of the compilation the parameter takes, or an empty string
          */
-        @SuppressWarnings("checkstyle:ParameterNumber")
-        public CompiledBody(String className, String methodName, List<String> parameterNames, List<String> parameterTypes,
-                            String returnType, Body body, @Nullable SourceSpan span, StaticCompilationDecision.Stats stats,
-                            boolean wrapsCheckedExceptions, boolean advised, boolean staticMethod, boolean moduleLevel,
-                            ExceptionCrossing exceptions) {
-            this(className, methodName, parameterNames, parameterTypes, returnType, body, span, stats, wrapsCheckedExceptions,
-                advised, staticMethod, moduleLevel, exceptions, null);
+        public String pythonParameter(int index) {
+            return index < pythonParameters.size() ? pythonParameters.get(index) : "";
         }
 
         /**
@@ -666,7 +658,8 @@ public sealed interface Ir {
          */
         public CompiledBody withPythonEntries(PythonEntries entries) {
             return new CompiledBody(className, methodName, parameterNames, parameterTypes, returnType,
-                body, span, stats, wrapsCheckedExceptions, advised, staticMethod, moduleLevel, exceptions, entries);
+                body, span, stats, wrapsCheckedExceptions, advised, staticMethod, moduleLevel, exceptions, pythonParameters, callsCompiledCode,
+                entries);
         }
 
         /**

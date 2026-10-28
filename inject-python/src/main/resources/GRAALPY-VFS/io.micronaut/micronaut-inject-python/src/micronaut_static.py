@@ -41,6 +41,7 @@ Outcome = java.type("io.micronaut.python.processing.staticcompile.StaticCompilat
 Scope = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Scope")
 Reason = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Reason")
 Stats = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Stats")
+Delegation = java.type("io.micronaut.python.processing.staticcompile.StaticDelegation")
 ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
 EventLoopSafety = java.type("io.micronaut.python.processing.staticcompile.EventLoopSafety")
 PythonEntries = java.type("io.micronaut.python.processing.staticcompile.Ir$PythonEntries")
@@ -230,15 +231,16 @@ class StaticPlanner:
             return self._decided[id(node)]
         return self._decide(module, None, None, function_def, node)
 
-    def decide_method(self, module, class_def, function_def, node):
+    def decide_method(self, model, function_def, node):
         """
-        The decision of a method of the class a compiled body calls, made now when the planner has
-        not reached it yet; None while the method's own decision is under way (a cycle of calls).
+        The decision of a method of a class of the compilation (its PythonClassModel) a compiled body
+        calls, made now when the planner has not reached it yet: the lowering asks whether a sibling is
+        compiled (its shared entry, see _compiled_method) and whether a callee may overflow where Python
+        promotes (Lowering._computes). None while the method's own decision is under way (a cycle of calls).
         """
         if id(node) in self._decided:
             return self._decided[id(node)]
-        class_node = next((candidate for defined, candidate in module.classes if defined is class_def), None)
-        return self._decide(module, class_def, class_node, function_def, node)
+        return self._decide(model.module, model.class_def, model.node, function_def, node)
 
     def body_of(self, node):
         """The compiled body of a decided function, or None."""
@@ -352,6 +354,19 @@ class StaticPlanner:
             return not model.is_throwable() and not any(self._introspected(other.qualified) for other in [model] + list(model.subclasses))
         return True
 
+    def plain_class(self, type_name):
+        """
+        The model of the plain class of the compilation a Java type is the generated class of: one whose
+        generated class wraps the Python object (no introspected class among it and its subclasses, no
+        exception class), so a Python caller's object of exactly that class reaches the Java body as
+        itself; else None.
+        """
+        classes = getattr(self.checker, "python_classes", None)
+        model = classes.by_qualified.get(type_name) if classes is not None else None
+        if model is None or model.is_throwable() or any(self._introspected(other.qualified) for other in [model] + list(model.subclasses)):
+            return None
+        return model
+
     def _introspected(self, qualified_name):
         """Whether the generated class of the class is introspected; unknown facts count as introspected."""
         facts = getattr(self.checker, "facts", None)
@@ -430,7 +445,7 @@ class StaticPlanner:
         self.body_classes.add(body.className())
         if node is not None:
             self._bodies[id(node)] = body
-        return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats())
+        return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats(), delegation=_delegation_status(body, node))
 
     def _class_scope(self, module, class_def, class_node):
         """The resolution of a class of the module, the classes around it included: resolved once per module and plan."""
@@ -466,7 +481,7 @@ class StaticPlanner:
                             advised=lambda sibling: self._advice(class_def, sibling) is not None,
                             advised_method=class_def is not None and self._advice(class_def, function_def) is not None,
                             java_layout=java_layout, planner=self, static=static,
-                            compiled=lambda sibling, sibling_node: self._compiled_method(module, class_def, sibling, sibling_node))
+                            compiled=lambda sibling, sibling_node: self._compiled_method(class_model, sibling, sibling_node))
         body = lowering.lower()
         if body is not None:
             classes = getattr(self.checker, "python_classes", None)
@@ -475,13 +490,13 @@ class StaticPlanner:
             self._python_entries[id(node)] = (entry, list(lowering.callees), list(lowering.constructions))
         return body, lowering.reasons
 
-    def _compiled_method(self, module, class_def, function_def, node):
+    def _compiled_method(self, model, function_def, node):
         """
         Whether a method of the class is compiled, decided now when the planner has not reached it
         yet; a method whose decision is under way (a cycle of calls) counts as not compiled, which
         only costs the call its Java dispatch.
         """
-        decision = self.decide_method(module, class_def, function_def, node) if node is not None else None
+        decision = self.decide_method(model, function_def, node) if node is not None and model is not None else None
         return decision is not None and decision.outcome().name() == "COMPILED" and self.body_of(node) is not None
 
     def _switched_accessors(self, class_def):
@@ -508,9 +523,9 @@ class StaticPlanner:
         self._reported_classes.add(name)
         return True
 
-    def _record(self, qualified, span, outcome, scope, reasons, statements, explicit=False, stats=None):
+    def _record(self, qualified, span, outcome, scope, reasons, statements, explicit=False, stats=None, delegation=None):
         java_reasons = [Reason(rule, message, reason_span) for rule, message, reason_span in reasons]
-        decision = Decision(qualified, span, Outcome.valueOf(outcome), Scope.valueOf(scope), java_reasons, stats or Stats(statements, 0, 0, 0))
+        decision = Decision(qualified, span, Outcome.valueOf(outcome), Scope.valueOf(scope), java_reasons, stats or Stats(statements, 0, 0, 0), delegation)
         self.decisions.append(decision)
         if explicit and reasons and (self.scope.mode != MODE_ALL or scope == SCOPE_FUNCTION):
             rule, message, reason_span = reasons[0]
@@ -1210,8 +1225,6 @@ def apply_delegation(tree, targets):
         kinds = tuple(kind for kind in options["kinds"].split(",") if kind)
         conversion = next((name for name in ("list", "set", "dict") if name in options), None)
         static_class = options.get("static")
-        if static_class is not None and "retry" not in options:
-            continue  # a static body that cannot be run again keeps the Python body, see above
         wanted.setdefault(class_name, {})[method] = (options.get("owner", class_name), kinds, "retry" in options, conversion, static_class, "python-exceptions" in options)
     count = 0
     for class_node, path in _classes(tree):
@@ -1225,7 +1238,7 @@ def apply_delegation(tree, targets):
                 if static_class is not None:
                     if not _takes_exactly(statement, kinds):
                         continue
-                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion)
+                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion, retry, translated)
                     ast.fix_missing_locations(statement)
                     count += 1
                     continue
@@ -1243,9 +1256,9 @@ def apply_delegation(tree, targets):
     if functions:
         for statement in tree.body:
             if isinstance(statement, ast.FunctionDef) and statement.name in functions and not _delegates(statement):
-                _, kinds, _, conversion, static_class, _ = functions[statement.name]
+                _, kinds, retry, conversion, static_class, translated = functions[statement.name]
                 if static_class is not None and _takes_exactly(statement, kinds):
-                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion)
+                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion, retry, translated)
                     ast.fix_missing_locations(statement)
                     count += 1
     if count and not any(isinstance(statement, ast.FunctionDef) and statement.name == STATIC_LOOKUP for statement in tree.body):
@@ -1270,6 +1283,7 @@ def apply_delegation(tree, targets):
 STATIC_LOOKUP = "_mn_static_class"
 STATIC_CALL = "_mn_static_call"
 PYTHON_EXCEPTION = "_mn_python_exception"
+PYTHON_CLASS = "_mn_python_class"
 HELPERS_SOURCE = """
 _mn_static_classes = {}
 
@@ -1286,7 +1300,7 @@ def _mn_static_class(name):
     return found
 
 
-def _mn_static_call(name, method, arguments, kinds):
+def _mn_static_call(name, method, arguments, kinds, retry=True, translated=False):
     found = _mn_static_class(name)
     if found is None:
         return None
@@ -1297,10 +1311,35 @@ def _mn_static_call(name, method, arguments, kinds):
     for argument, kind in zip(arguments, kinds):
         if not fits(argument, kind):
             return None
+    if retry:
+        try:
+            return (getattr(found, method)(*arguments),)
+        except Exception:
+            return None
+    failure = None
     try:
         return (getattr(found, method)(*arguments),)
-    except Exception:
+    except BaseException as error:
+        failure = error
+    # outside the handler, so the exception raised keeps its own context: the Python exception the
+    # failure carries, or Python's exception for it (PythonStatic.forPython), or the failure itself
+    found = _mn_python_exception(failure) if translated else None
+    if found is not None:
+        raise found
+    import java as __mn_java_module
+    if __mn_java_module.is_object(failure):
+        # raises the Python exception of a failure Python raises one for, or the checked exception of a Java call
+        __mn_java_module.type("io.micronaut.context.python.PythonStatic").forPython(failure)
+    raise failure
+
+
+def _mn_python_class(path, qualname):
+    found = globals().get(path.split(".")[0])
+    for part in path.split(".")[1:]:
+        found = getattr(found, part, None)
+    if not isinstance(found, type) or found.__qualname__ != qualname:
         return None
+    return ("python", found)
 
 
 def _mn_python_exception(error):
@@ -1361,6 +1400,65 @@ def _delegates(function):
             and isinstance(value.value, ast.Name) and value.value.id == "__class__")
 
 
+def _delegation_status(body, node):
+    """
+    Whether the Python callers of a compiled body run its Java body, as the report says it
+    (StaticDelegation.status): apply_delegation rewrites only a function that takes exactly the
+    parameters of the Java body, positionally, and only a body that has a location to tie it to its source.
+    """
+    if body.span() is None:
+        return Delegation.none("the body has no location in a source")
+    status = Delegation.status(body)
+    if status.startswith("none(") or node is None:
+        return status
+    kinds = [None] * len(list(body.parameterTypes()))
+    takes = _takes_exactly(node, kinds) if body.staticMethod() or body.moduleLevel() else _receives_self(node, kinds)
+    if not takes:
+        return Delegation.none("the function takes keyword-only, variadic or more parameters than the Java body")
+    positional = list(node.args.posonlyargs) + list(node.args.args)
+    parameters = positional if body.staticMethod() or body.moduleLevel() else positional[1:]
+    for index, argument in enumerate(parameters):
+        if body.pythonParameter(index) and _annotation_path(argument) is None:
+            return Delegation.none(f"the hint of [{argument.arg}] names its class by no name of the module, which the check of the argument looks up")
+    return status
+
+
+def _annotation_path(argument):
+    """The dotted name (Cls, mod.Cls) the hint of a parameter names its class by, a quoted hint included, or None."""
+    annotation = argument.annotation
+    if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
+        try:
+            annotation = ast.parse(annotation.value, mode="eval").body
+        except SyntaxError:
+            return None
+    parts = []
+    while isinstance(annotation, ast.Attribute):
+        parts.append(annotation.attr)
+        annotation = annotation.value
+    if not isinstance(annotation, ast.Name):
+        return None
+    parts.append(annotation.id)
+    return ".".join(reversed(parts))
+
+
+def _kind_nodes(function, kinds, receives_self):
+    """
+    The kinds of the parameters as the prologue passes them: a string, or for a plain class of the
+    compilation ("python:<name>") the class the hint names, looked up in the module on each call
+    (None when the module does not hold it, so the argument does not fit).
+    """
+    positional = list(function.args.posonlyargs) + list(function.args.args)
+    parameters = positional[1:] if receives_self else positional
+    nodes = []
+    for index, kind in enumerate(kinds):
+        if kind.startswith("python:") and index < len(parameters) and _annotation_path(parameters[index]) is not None:
+            nodes.append(ast.Call(func=ast.Name(id=PYTHON_CLASS, ctx=ast.Load()),
+                                  args=[ast.Constant(value=_annotation_path(parameters[index])), ast.Constant(value=kind[len("python:"):])], keywords=[]))
+        else:
+            nodes.append(ast.Constant(value=kind))
+    return nodes
+
+
 def _takes_exactly(function, kinds):
     """Whether a static method or a module-level function takes exactly the parameters the Java body does, positionally."""
     args = function.args
@@ -1368,8 +1466,12 @@ def _takes_exactly(function, kinds):
     return len(positional) == len(kinds) and args.vararg is None and args.kwarg is None and not args.kwonlyargs
 
 
-def _static_delegation(function, static_class, kinds, conversion=None):
-    """The prologue of a static method or a module-level function: the static Java method of the generated class, when it is loadable and the arguments fit it."""
+def _static_delegation(function, static_class, kinds, conversion=None, retry=True, translated=False):
+    """
+    The prologue of a static method or a module-level function: the static Java method of the
+    generated class, when it is loadable and the arguments fit it. A body with side effects (not
+    retry) is not run again: its failures reach the caller as Python's exceptions.
+    """
     args = function.args
     names = [argument.arg for argument in list(args.posonlyargs) + list(args.args)]
     temporary = _temporary(function)
@@ -1381,8 +1483,8 @@ def _static_delegation(function, static_class, kinds, conversion=None):
                 ast.Constant(value=static_class),
                 ast.Constant(value=function.name),
                 ast.Tuple(elts=[ast.Name(id=name, ctx=ast.Load()) for name in names], ctx=ast.Load()),
-                ast.Tuple(elts=[ast.Constant(value=kind) for kind in kinds], ctx=ast.Load()),
-            ],
+                ast.Tuple(elts=_kind_nodes(function, kinds, False), ctx=ast.Load()),
+            ] + ([] if retry else [ast.Constant(value=False), ast.Constant(value=translated)]),
             keywords=[],
         ),
     )
@@ -1502,7 +1604,7 @@ def _delegation(function, owner, kinds, retry, conversion=None, translated=False
                 ast.Constant(value=owner),
                 ast.Constant(value=function.name),
                 ast.Tuple(elts=[load(name) for name in names], ctx=ast.Load()),
-                ast.Tuple(elts=[ast.Constant(value=kind) for kind in kinds], ctx=ast.Load()),
+                ast.Tuple(elts=_kind_nodes(function, kinds, True), ctx=ast.Load()),
                 ast.Constant(value=retry),
             ],
             keywords=[],

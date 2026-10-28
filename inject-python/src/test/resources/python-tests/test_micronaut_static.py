@@ -2930,7 +2930,7 @@ class Calc:
         self.assertIn("__mn_java_p = _mn_python_exception(__mn_java_e)", source)
         self.assertNotRegex(source, r"raise .* from ")  # the Python exception keeps its own cause and context
         self.assertIn("def _mn_python_exception(error):", source)
-        self.assertEqual("_mn_python_exception", tree.body[3].name)  # the helpers precede the class
+        self.assertEqual(["_mn_python_class", "_mn_python_exception"], [tree.body[3].name, tree.body[4].name])  # the helpers precede the class
         calc = next(node for node in tree.body if isinstance(node, ast.ClassDef))
         self.assertIsInstance(calc.body[0], ast.Expr)  # the class docstring stays first
         self.assertEqual("__micronaut_compiled__", calc.body[1].targets[0].id)
@@ -2974,11 +2974,11 @@ class Calc:
 ''')
         targets = ["#helper#static=pkg.Module#kinds=long#retry#list", "Calc#twice#static=pkg.Calc#kinds=long#retry",
                    "#counted#static=pkg.Module#kinds=long#once"]
-        self.assertEqual(2, apply_delegation(tree, targets))
+        self.assertEqual(3, apply_delegation(tree, targets))
         self.assertEqual(0, apply_delegation(tree, targets))  # already rewritten
         source = ast.unparse(tree)
         self.assertIn("def _mn_static_class(name):", source)
-        self.assertIn("def _mn_static_call(name, method, arguments, kinds):", source)
+        self.assertIn("def _mn_static_call(name, method, arguments, kinds, retry=True, translated=False):", source)
         self.assertIn("__mn_java = _mn_static_call('pkg.Module', 'helper', (n,), ('long',))", source)
         self.assertIn("return list(__mn_java[0])", source)
         self.assertIn("__mn_java = _mn_static_call('pkg.Calc', 'twice', (n,), ('long',))", source)
@@ -2989,9 +2989,8 @@ class Calc:
         self.assertIsInstance(tree.body[3], ast.FunctionDef)
         self.assertEqual("_mn_static_class", tree.body[3].name)
         self.assertEqual("_mn_static_call", tree.body[4].name)
-        # a static body that cannot be run again in Python keeps the Python body for Python callers
-        counted = next(statement for statement in tree.body if isinstance(statement, ast.FunctionDef) and statement.name == "counted")
-        self.assertIsInstance(counted.body[0], ast.Return)
+        # a static body that cannot be run again in Python runs once, its failures raised as Python's
+        self.assertIn("__mn_java = _mn_static_call('pkg.Module', 'counted', (n,), ('long',), False, False)", source)
         compile(tree, "delegated.py", "exec")
 
     def test_a_static_delegation_runs_the_python_body_when_the_generated_class_is_missing(self):
@@ -3027,6 +3026,65 @@ class Calc:
             self.assertEqual([2 ** 64 + 1], namespace["helper"](2 ** 64))
             self.assertEqual([True + 1], namespace["helper"](True))
             self.assertEqual([0], namespace["helper"](-1))
+        finally:
+            if previous is None:
+                del sys.modules["micronaut_runtime"]
+            else:
+                sys.modules["micronaut_runtime"] = previous
+
+    def test_a_plain_class_of_the_compilation_is_checked_by_the_class_the_hint_names(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class User:
+    pass
+
+
+class Greeter:
+    def greet(self, user: "User", label: str) -> str:
+        return label
+''')
+        self.assertEqual(1, apply_delegation(tree, ["Greeter#greet#owner=pkg.Greeter#kinds=python:User,str#retry"]))
+        source = ast.unparse(tree)
+        self.assertIn("(_mn_python_class('User', 'User'), 'str')", source)
+        namespace = {}
+        exec(compile(tree, "plain.py", "exec"), namespace)
+        # the class itself, by the name the hint gives it in the module; another class of that name is not it
+        self.assertEqual(("python", namespace["User"]), namespace["_mn_python_class"]("User", "User"))
+        self.assertIsNone(namespace["_mn_python_class"]("User", "Other"))
+        self.assertIsNone(namespace["_mn_python_class"]("Missing.User", "User"))
+
+    def test_a_static_body_with_side_effects_runs_once_and_raises_its_failure(self):
+        import sys
+        import types
+        from micronaut_static import apply_delegation
+        tree = ast.parse("def counted(n: int) -> int:\n    return n + 1\n")
+        self.assertEqual(1, apply_delegation(tree, ["#counted#static=pkg.Counted#kinds=long#once"]))
+        namespace = {}
+        exec(compile(tree, "once.py", "exec"), namespace)
+        calls = []
+
+        class Generated:
+            @staticmethod
+            def counted(n):
+                calls.append(n)
+                if n < 0:
+                    raise ValueError("the Java body failed")
+                return n * 100
+
+        runtime = types.ModuleType("micronaut_runtime")
+        runtime._micronaut_fits = lambda value, kind: kind == "long" and type(value) is int and -2 ** 63 <= value < 2 ** 63
+        previous = sys.modules.get("micronaut_runtime")
+        sys.modules["micronaut_runtime"] = runtime
+        try:
+            namespace["_mn_static_classes"]["pkg.Counted"] = Generated
+            self.assertEqual(300, namespace["counted"](3))
+            # the failure reaches the caller, raised outside the handler: no context of its own, and the Python body does not run
+            with self.assertRaises(ValueError) as raised:
+                namespace["counted"](-1)
+            self.assertIsNone(raised.exception.__context__)
+            self.assertEqual([3, -1], calls)
+            # an argument the Java parameter does not take still runs the Python body
+            self.assertEqual(2 ** 64 + 1, namespace["counted"](2 ** 64))
         finally:
             if previous is None:
                 del sys.modules["micronaut_runtime"]
