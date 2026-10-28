@@ -29,6 +29,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -208,6 +209,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         private final HttpResponse response;
         @Nullable
         private List<ByteBuf> buffered;
+        private long bufferedBytes;
 
         BufferedContent(ResponseListener listener, HttpResponse response) {
             this.listener = listener;
@@ -221,10 +223,19 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
                     buffered = new ArrayList<>();
                 }
                 buffered.add(msg.content());
+                bufferedBytes += msg.content().readableBytes();
             } else {
                 msg.release();
             }
-            if (msg instanceof LastHttpContent) {
+            if (!(msg instanceof LastHttpContent)) {
+                if (bufferedBytes > listener.sizeLimits().maxBufferSize() && !response.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
+                    // too much data in one read (e.g. a decompressed body, which has no
+                    // Content-Length anymore): stream instead, so that the size limits of the
+                    // streaming buffer apply. With a Content-Length, the decoder bounds the body
+                    // and the length is checked when the body completes
+                    devolveToStreaming(ctx);
+                }
+            } else {
                 List<ByteBuf> buffered = this.buffered;
                 this.buffered = null;
                 transitionToState(ctx, this, AfterContent.INSTANCE);
@@ -315,6 +326,12 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         void read(ChannelHandlerContext ctx, HttpContent msg) {
             add(NettyReadBufferFactory.of(ctx.alloc()).adapt(msg.content()));
             if (msg instanceof LastHttpContent) {
+                if (state != this) {
+                    // the body was discarded while adding the content, e.g. over the size limit
+                    //noinspection unchecked,rawtypes
+                    ((ReaderState) state).read(ctx, LastHttpContent.EMPTY_LAST_CONTENT);
+                    return;
+                }
                 transitionToState(ctx, this, AfterContent.INSTANCE);
                 streaming.complete();
                 listener.finish(ctx);
