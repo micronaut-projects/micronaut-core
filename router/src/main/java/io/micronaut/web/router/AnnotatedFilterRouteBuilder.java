@@ -21,7 +21,6 @@ import io.micronaut.context.processor.BeanDefinitionProcessor;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.context.ServerContextPathProvider;
@@ -67,7 +66,7 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
             // ignore http client filters
             return;
         }
-        String[] patterns = getPatterns(beanDefinition);
+        String[] patterns = beanDefinition.stringValues(Filter.class);
         if (ArrayUtils.isNotEmpty(patterns)) {
             HttpMethod[] methods = beanDefinition.enumValues(Filter.class, "methods", HttpMethod.class);
             FilterPatternStyle patternStyle = beanDefinition.enumValue(Filter.class, "patternStyle",
@@ -85,28 +84,9 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
                 filterRoute.methods(methods);
             }
             filterRoute.patternStyle(patternStyle);
-        }
-    }
-
-    /**
-     * @param beanDefinition The bean definition
-     * @return The array of patterns that should match request URLs for the bean to
-     * be invoked.
-     */
-    private String[] getPatterns(BeanDefinition<?> beanDefinition) {
-        String[] values = beanDefinition.stringValues(Filter.class);
-        String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
-        if (contextPath != null) {
-            for (int i = 0; i < values.length; i++) {
-                if (!values[i].startsWith(contextPath)) {
-                    String newValue = StringUtils.prependUri(contextPath, values[i]);
-                    if (newValue.charAt(0) != '/') {
-                        newValue = "/" + newValue;
-                    }
-                    values[i] = newValue;
-                }
+            if (contextPathProvider != null && filterRoute instanceof DefaultFilterRoute defaultFilterRoute) {
+                defaultFilterRoute.contextPath(contextPathProvider.getContextPath());
             }
         }
-        return values;
     }
 }
