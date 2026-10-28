@@ -818,9 +818,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         T theType = getTypeForAnnotation(annotationType);
         // A nested annotation carries no native type, the retention of what it composes resolves it by name
         processedAnnotationTypes.putIfAbsent(annotationTypeName, theType);
+        // a nested annotation records its non-binding members as an annotation of the element does, so that a
+        // binding member holding it is compared without them
+        Set<String> nonBindingMembers = getNonBindingMembers(annotationTypeName, theType, annotationValues);
         if (annotationValues.isEmpty()) {
             Map<CharSequence, Object> annotationDefaults = resolveAnnotationDefaults(theType, annotationTypeName, resolvedDefaults);
-            return new AnnotationValue<>(annotationTypeName, Collections.emptyMap(), annotationDefaults);
+            Map<CharSequence, Object> values = nonBindingMembers.isEmpty()
+                ? Collections.emptyMap()
+                : Map.of(AnnotationUtil.NON_BINDING_ATTRIBUTE, nonBindingMembers.toArray(String[]::new));
+            return new AnnotationValue<>(annotationTypeName, values, annotationDefaults);
         }
 
         Map<CharSequence, Object> resolvedValues = CollectionUtils.newLinkedHashMap(annotationValues.size());
@@ -851,6 +857,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     annotationValue,
                     resolvedValues);
 
+        }
+        if (!nonBindingMembers.isEmpty()) {
+            resolvedValues.put(AnnotationUtil.NON_BINDING_ATTRIBUTE, nonBindingMembers.toArray(String[]::new));
         }
         Map<CharSequence, Object> annotationDefaults = resolveAnnotationDefaults(theType, annotationTypeName, resolvedDefaults);
         return new AnnotationValue<>(annotationTypeName, resolvedValues, annotationDefaults);
