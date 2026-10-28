@@ -831,6 +831,12 @@ class Lowering:
         self.java_code = []       # per enclosing try block, the Java methods and constructors outside the compilation it calls
         self.calls_java = False   # the body calls a Java method or constructor outside the compilation
         self.compilation_calls = 0  # the calls of code of the compilation through Java: compiled functions, generated constructors and methods
+        # whether the body enters Python (Ir.PythonEntries, StaticPlanner._record_python_entries): what about the
+        # calls of the compilation it makes through Java does, the functions those calls run (None for one
+        # the planner cannot follow) and the generated constructors it calls; EventLoopSafety finds the rest
+        self.python_entry = None
+        self.callees = []
+        self.constructions = []
         self.handling = []        # the except ("except", variable) and finally ("finally", None) blocks enclosing the statement
         self.exception_variables = set()  # the variables of the enclosing except clauses for an exception class of the compilation
 
@@ -1934,6 +1940,7 @@ class Lowering:
         setter = "set" + target.attr[:1].upper() + target.attr[1:]
         self.java_calls += 1
         self.compilation_calls += 1
+        self._accessor_entry(model, target.attr, f"assigns [{target.attr}] of [{model.name}]")
         return Eval(InvokeJava(self._expression(target.value), owner, setter, [stub_type], [self._coerce(value, stub_type, node)], VOID))
 
     def _subscript_store(self, target, value, node):
@@ -2666,6 +2673,10 @@ class Lowering:
             self.calls_java = True
             if self.java_code:
                 self.java_code[-1].append(owner if kind == "constructor" else f"{owner}.{name}")
+        elif self.python_entry is None:
+            # a member of a generated class the lowering does not resolve to a function of the compilation
+            self.python_entry = f"calls [{owner}.{name}], which may run Python"
+
         if node.keywords:
             self._refuse("kwargs-to-java", "keyword arguments to a Java method or constructor have no static lowering", node)
         lowered_arguments = [self._expression(argument) for argument in node.args]
@@ -2751,6 +2762,7 @@ class Lowering:
                      for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
         self.java_calls += 1
         self.compilation_calls += 1
+        self.callees.append(function_node)
         return_type = body.returnType()
         call = InvokeJava(None, body.className(), name, parameter_types, arguments, return_type)
         used = JAVA_NUMBERS.get(return_type, return_type)
@@ -2855,6 +2867,9 @@ class Lowering:
                          for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
             self.java_calls += 1
             self.compilation_calls += 1
+            # the stub's Java method of a method no subclass overrides (or the shared entry of its compiled
+            # body, a Java call too): its compiled body, or the bridge to Python
+            self.callees.append(function_node)
             declared = OBJECT if hint is None and return_type != VOID else return_type
             call = InvokeSibling(name, parameter_types, arguments, declared, "shared" if shares else "java")
             call = Cast(call, return_type) if declared != return_type else call
@@ -2971,6 +2986,7 @@ class Lowering:
                 getter = ("is" if stub_type == BOOLEAN else "get") + node.attr[:1].upper() + node.attr[1:]
                 self.java_calls += 1
                 self.compilation_calls += 1
+                self._accessor_entry(model, node.attr, f"reads [{node.attr}] of [{model.name}]")
                 read = InvokeJava(receiver, owner, getter, [], [], stub_type)
             else:
                 self.bridge_calls += 1
@@ -2996,6 +3012,45 @@ class Lowering:
         # an attribute that may be None stays boxed, a primitive is widened
         used = JAVA_PRIMITIVE_NUMBERS.get(stub_type, stub_type)
         return Cast(read, used) if used != stub_type else read
+
+    def _accessor_entry(self, model, attribute, what):
+        """
+        Records that a call of an accessor of a generated class enters Python, unless the class and
+        every subclass of the compilation is introspected: an introspected stub keeps a hinted attribute
+        in a Java field its accessors read and write, any other stub reaches the Python object. Even
+        then a bean-style getter or setter the class defines makes the accessor call Python: the stub
+        generator tells which accessors only touch their field (<class>.<property>, see
+        EventLoopSafety.safeBodies), for the class and each subclass, whose override Java dispatch may pick.
+        """
+        planner = self.planner
+        candidates = [model] + list(model.subclasses)
+        introspected = planner is not None and all(planner._introspected(candidate.qualified) for candidate in candidates)
+        if introspected:
+            self.constructions.extend(f"{candidate.qualified}.{attribute}" for candidate in candidates)
+        elif self.python_entry is None:
+            self.python_entry = f"{what} through the Python object"
+
+    def _dispatched(self, model, name, function_node, static):
+        """
+        The functions a Java call of a method of a generated class may run: the method the class
+        resolves, and every override of a subclass of the compilation, which Java dispatch picks for
+        an object of it; None when the hierarchy is hidden from the checker.
+        """
+        if static:
+            return [function_node]
+        found = [function_node]
+        for candidate in [model] + list(model.subclasses):
+            if candidate.is_open() or candidate.is_lookup_dynamic():
+                return [None]
+        for subclass in model.subclasses:
+            member = subclass.find(name)
+            if member is None:
+                continue
+            if member[0] != "method" or member[2] is None:
+                return [None]
+            if all(member[2] is not other for other in found):
+                found.append(member[2])
+        return found
 
     def _python_receiver_call(self, model, receiver_node, name, node):
         """
@@ -3034,6 +3089,7 @@ class Lowering:
                          for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
             self.java_calls += 1
             self.compilation_calls += 1
+            self.callees.extend(self._dispatched(model, name, function_node, static))
             if static and not _plain_receiver(receiver_node):
                 # Python evaluates the receiver (Cart(n).factory() constructs the Cart); a static Java call would not
                 self._refuse("unsupported-expression", f"calling the static method [{name}] of [{model.name}] on an expression has no static lowering: the expression would not be evaluated", node)
@@ -3074,6 +3130,7 @@ class Lowering:
                 self._refuse("unsupported-expression", f"[{model.name}] takes no constructor arguments", node)
             self.java_calls += 1
             self.compilation_calls += 1
+            self._construction(model, owner, 0)
             return NewJava(owner, [], [])
         function_def, function_node = constructor
         parameters = [argument for argument in function_def.arguments().arguments() if argument.name() != "self"]
@@ -3088,7 +3145,19 @@ class Lowering:
                      for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
         self.java_calls += 1
         self.compilation_calls += 1
+        self._construction(model, owner, len(parameter_types))
         return NewJava(owner, parameter_types, arguments)
+
+    def _construction(self, model, owner, arity):
+        """
+        Records a call of a generated constructor: the constructor of an introspected class may only
+        assign the Java fields, which the stub generator tells (EventLoopSafety.safeBodies); any other
+        creates the Python object.
+        """
+        if self.planner is not None and self.planner._introspected(model.qualified):
+            self.constructions.append(f"{owner}#{arity}")
+        elif self.python_entry is None:
+            self.python_entry = f"constructs [{model.name}], which creates its Python object"
 
     def _bind_arguments(self, model, parameters, function_node, node, label):
         """

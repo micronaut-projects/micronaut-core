@@ -22,7 +22,7 @@ micronaut:
       virtual: false
 ----
 
-Micronaut routes synchronous generated Python methods and `asyncio.run_in_executor(None, ...)` to the `io` executor. The `blocking` executor is used when an operation is explicitly annotated with `@ExecuteOn(TaskExecutors.BLOCKING)`. Configure both when Python code can use either path. The `io` executor is a caching, platform-thread executor by default; specifying it explicitly makes the configuration safe if executor defaults change.
+Micronaut routes synchronous generated Python methods and `asyncio.run_in_executor(None, ...)` to the `io` executor. A route annotated with `@ExecuteOn` runs on the executor it names, as a Java route does: the `blocking` executor is used when an operation is explicitly annotated with `@ExecuteOn(TaskExecutors.BLOCKING)`. Configure both when Python code can use either path. A statically compiled route that never enters Python is the exception: it runs on the event loop as a Java route does (see <<staticCompilationEventLoop>>). The `io` executor is a caching, platform-thread executor by default; specifying it explicitly makes the configuration safe if executor defaults change.
 
 === Configuring the Python context pool
 

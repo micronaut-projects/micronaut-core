@@ -3867,5 +3867,247 @@ class ObjectsOfTheCompilationTest(unittest.TestCase):
             self.assertEqual(("SKIPPED", ["unsupported-expression"]), self._decided(name), name)
 
 
+
+EVENT_LOOP = '''
+from dataclasses import dataclass
+
+
+@dataclass
+class Pair:
+    left: int
+    right: int
+
+
+class Rejected(Exception):
+    pass
+
+
+class Refused(Exception):
+    def __str__(self) -> str:
+        return "refused"
+
+
+class Item:
+    def __init__(self, n: int):
+        self.n = n
+
+
+class Point:
+    def __init__(self, x: int, y: int):
+        self.x = x
+        self.y = y
+
+
+class Origin:
+    def __init__(self, x: int, y: int):
+        self.x = x
+        self.y = y
+
+
+class Leaf:
+    def __init__(self, n: int, item: Item):
+        self.n = n
+        self.item = item
+
+    def plain(self, a: int) -> int:
+        return a + 1
+
+    def fixed(self) -> int:
+        return self.n
+
+    def calls_plain(self, a: int) -> int:
+        return self.plain(a) + self.fixed()
+
+    def calls_private(self, a: int) -> int:
+        return self._private(a)
+
+    def _private(self, a: int) -> int:
+        return a
+
+    def raising(self, a: int) -> int:
+        if a < 0:
+            raise Refused("negative")
+        return a
+
+    def calls_raising(self, a: int) -> int:
+        return self.raising(a)
+
+    def raising_lazily(self, a: int) -> int:
+        if a < 0:
+            raise Rejected("negative")
+        return a
+
+    def catches_lazily(self, a: int) -> int:
+        try:
+            if a < 0:
+                raise Rejected("negative")
+            return a
+        except Rejected:
+            return 0
+
+    def ping(self, a: int) -> int:
+        if a <= 0:
+            return 0
+        return self.pong(a - 1)
+
+    def pong(self, a: int) -> int:
+        return self.ping(a)
+
+    def builds(self, a: int) -> Item:
+        return Item(a)
+
+    def builds_point(self, a: int) -> Point:
+        return Point(a, a)
+
+    def builds_origin(self) -> Origin:
+        return Origin(0, 0)
+
+    def reads_left(self, pair: Pair) -> int:
+        return pair.left
+
+    def reads_right(self, pair: Pair) -> int:
+        return pair.right
+
+    def reads_item(self) -> int:
+        return self.item.n
+
+    def counts_items(self, items: set[Item]) -> int:
+        return len(items)
+
+    def counts_names(self, names: set[str]) -> int:
+        return len(names)
+
+    def fill(self, xs: list[str]) -> None:
+        xs.append("filled")
+
+    def fills(self) -> int:
+        xs: list[str] = []
+        self.fill(xs)
+        return len(xs)
+
+    def renders(self) -> str:
+        values = [self.item, "label"]
+        return "value " + str(values[0])
+
+    def renders_name(self, name: str) -> str:
+        return "name " + str(name)
+
+
+class Caller:
+    def __init__(self, leaf: Leaf):
+        self.leaf = leaf
+
+    def through_leaf(self, a: int) -> int:
+        return self.leaf.calls_plain(a)
+
+    def through_private(self, a: int) -> int:
+        return self.leaf.calls_private(a)
+
+
+def twice(n: int) -> int:
+    return n * 2
+
+
+def twice_twice(n: int) -> int:
+    return twice(twice(n))
+'''
+
+
+class EventLoopSafetyTest(unittest.TestCase):
+    """Which compiled bodies never enter Python: the planner's Ir.PythonEntries, decided over the plan by EventLoopSafety."""
+
+    def setUp(self):
+        import java
+        self.decisions, self.planner = plan(EVENT_LOOP, MODE_ALL, facts=FixedFacts(introspected=["pkg.Point", "pkg.Pair"]))
+        self.bodies = {(body.methodName() if body.moduleLevel() else body.className().rsplit(".", 1)[-1] + "." + body.methodName()): body
+                       for body in self.planner.bodies}
+        safety = java.type("io.micronaut.python.processing.staticcompile.EventLoopSafety")
+        # the stub generator tells which generated constructors only assign Java fields: here Point's
+        self.safe = set(safety.safeBodies(list(self.planner.bodies), lambda member: member in ("pkg.Point#2", "pkg.Pair.left")))
+
+    def _safe(self, name):
+        decision = self.decisions[name]
+        self.assertEqual("COMPILED", decision.outcome().name(), rules(decision))
+        return self.bodies[name].key() in self.safe
+
+    def test_a_body_calling_java_and_compiled_safe_siblings_is_safe(self):
+        self.assertTrue(self._safe("Leaf.plain"))
+        # the first read of an attribute fixed at construction reaches the Python object once per object
+        self.assertTrue(self._safe("Leaf.fixed"))
+        self.assertTrue(self._safe("Leaf.calls_plain"))
+        # through a compiled method of another object of the compilation
+        self.assertTrue(self._safe("Caller.through_leaf"))
+
+    def test_module_functions_calling_compiled_functions_are_safe(self):
+        self.assertTrue(self._safe("twice"))
+        self.assertTrue(self._safe("twice_twice"))
+
+    def test_a_call_through_the_python_object_is_unsafe_and_so_are_its_callers(self):
+        self.assertFalse(self._safe("Leaf.calls_private"))
+        self.assertFalse(self._safe("Caller.through_private"))
+
+    def test_a_raise_of_a_python_exception_class_is_unsafe_and_so_are_its_callers(self):
+        self.assertFalse(self._safe("Leaf.raising"))
+        self.assertFalse(self._safe("Leaf.calls_raising"))
+
+    def test_rendering_an_object_value_is_unsafe(self):
+        # an element of a mixed list is an Object, which may be a Python object of the compilation, whose
+        # toString runs its __str__
+        self.assertFalse(self._safe("Leaf.renders"))
+        self.assertTrue(self._safe("Leaf.renders_name"))
+
+    def test_a_call_of_the_shared_entry_of_a_compiled_sibling_is_a_java_call(self):
+        # fill takes the caller's list: its compiled body is called through its shared entry, in Java
+        call = _uncast(list(self.bodies["Leaf.fills"].body().statements())[1].expression())
+        self.assertEqual(("fill", "shared"), (call.name(), call.dispatch()))
+        self.assertEqual(["pkg.Leaf#fill"], list(self.bodies["Leaf.fills"].pythonEntries().callees()))
+        self.assertTrue(self._safe("Leaf.fills"))
+
+    def test_a_lazy_raise_creates_no_python_exception_and_is_safe(self):
+        # Refused defines __str__: its raise creates the exception through its Python class. Rejected takes
+        # its arguments as BaseException does: the raise creates the Java exception alone, and a clause
+        # of the body catches it without its Python exception being created
+        self.assertFalse(self._thrown_lazily("Leaf.raising"))
+        self.assertTrue(self._thrown_lazily("Leaf.raising_lazily"))
+        self.assertTrue(self._safe("Leaf.raising_lazily"))
+        self.assertTrue(self._safe("Leaf.catches_lazily"))
+
+    def _thrown_lazily(self, name):
+        thrown = list(list(self.bodies[name].body().statements())[0].then().statements())[0].exception()
+        self.assertEqual("NewPythonException", thrown.getClass().getSimpleName(), name)
+        return thrown.lazy()
+
+    def test_a_cycle_of_calls_is_unsafe(self):
+        self.assertFalse(self._safe("Leaf.ping"))
+        self.assertFalse(self._safe("Leaf.pong"))
+
+    def test_constructing_a_python_class_or_reading_an_object_through_its_accessor_is_unsafe(self):
+        self.assertFalse(self._safe("Leaf.builds"))
+        self.assertFalse(self._safe("Leaf.reads_item"))
+
+    def test_constructing_an_introspected_class_is_safe_where_its_constructor_only_assigns_java_fields(self):
+        self.assertEqual(["pkg.Point#2"], list(self.bodies["Leaf.builds_point"].pythonEntries().constructions()))
+        self.assertTrue(self._safe("Leaf.builds_point"))
+        # Origin is no introspected class: its generated constructor creates the Python object
+        self.assertFalse(self._safe("Leaf.builds_origin"))
+
+    def test_an_accessor_of_an_introspected_class_is_safe_where_it_only_touches_its_field(self):
+        # the stub generator tells which accessors read their Java field: here left's, not right's (a
+        # bean-style getter of the class would make it call Python)
+        self.assertEqual(["pkg.Pair.left"], list(self.bodies["Leaf.reads_left"].pythonEntries().constructions()))
+        self.assertTrue(self._safe("Leaf.reads_left"))
+        self.assertFalse(self._safe("Leaf.reads_right"))
+
+    def test_copying_a_set_of_python_objects_hashes_them(self):
+        # the body works on a copy of a set parameter: a hashed collection of Python objects runs their __hash__
+        self.assertFalse(self._safe("Leaf.counts_items"))
+        self.assertTrue(self._safe("Leaf.counts_names"))
+
+    def test_the_planner_records_what_enters_python(self):
+        entries = self.bodies["Leaf.calls_private"].pythonEntries()
+        self.assertEqual("calls [_private] through the Python object", entries.entry())
+        self.assertEqual(["pkg.Leaf#plain", "pkg.Leaf#fixed"], list(self.bodies["Leaf.calls_plain"].pythonEntries().callees()))
+
+
 if __name__ == "__main__":
     unittest.main()
