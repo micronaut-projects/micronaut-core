@@ -69,6 +69,14 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
         // the body is taken now, but only read once the route subscribes
         Publisher<RawFormField> fields = nhr == null ? fchr.getRawFormFields() : UnconsumedBodyGuard.openWhenSubscribed(nhr, nhr.byteBody().move(), nhr::getRawFormFields);
         Flux<? extends CompletedPart> parts = Flux.from(fields)
+            .filter(raw -> {
+                if (raw.metadata().name() == null) {
+                    // a part without a name cannot be a CompletedPart, skip it like the FormData binder
+                    raw.close();
+                    return false;
+                }
+                return true;
+            })
             .flatMap(raw -> ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(fchr, raw)))
             .doOnDiscard(CompletedPart.class, p -> p.closeAsync(formFactory.get().getDiskWriteExecutor()));
         return () -> Optional.of(parts::subscribe);

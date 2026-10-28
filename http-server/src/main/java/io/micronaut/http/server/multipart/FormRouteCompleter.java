@@ -42,6 +42,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -258,6 +260,9 @@ public final class FormRouteCompleter {
                 Objects.requireNonNull(upstream).request(1);
             } else {
                 unicast.emit(rawFormField);
+                // the field is queued by its unicast until its subscriber wants it, the next
+                // field may be for another parameter
+                Objects.requireNonNull(upstream).request(1);
             }
         }
 
@@ -283,8 +288,7 @@ public final class FormRouteCompleter {
         private final AtomicInteger claim = new AtomicInteger(UNCLAIMED);
         @Nullable
         private Subscriber<? super RawFormField> subscriber;
-        @Nullable
-        private volatile RawFormField queued = null;
+        private final Queue<RawFormField> queued = new ConcurrentLinkedQueue<>();
         private final AtomicLong demand = new AtomicLong(0);
         private final AtomicReference<State> state = new AtomicReference<>(State.CLEAN);
         private boolean endForwarded;
@@ -349,8 +353,7 @@ public final class FormRouteCompleter {
         }
 
         void emit(RawFormField field) {
-            assert queued == null;
-            queued = field;
+            queued.add(field);
             markDirty();
         }
 
@@ -398,8 +401,9 @@ public final class FormRouteCompleter {
 
         private void work() {
             Subscriber<? super RawFormField> s = subscriber;
-            while (queued != null) {
-                Exception deadlock = predictDeadlock(Objects.requireNonNull(queued));
+            RawFormField next;
+            while ((next = queued.peek()) != null) {
+                Exception deadlock = predictDeadlock(next);
                 if (deadlock != null) {
                     // we detected a deadlock. cancel this subscription and forward the error
                     cancelled = true;
@@ -411,10 +415,9 @@ public final class FormRouteCompleter {
                     break;
                 }
                 if (cancelled) {
-                    Objects.requireNonNull(queued).close();
-                    queued = null;
-                    Objects.requireNonNull(upstream).request(1);
-                    break;
+                    queued.poll();
+                    next.close();
+                    continue;
                 }
                 if (s == null) {
                     // we're still in onSubscribe, wait
@@ -422,11 +425,10 @@ public final class FormRouteCompleter {
                 }
 
                 demand.decrementAndGet();
-                s.onNext(queued);
-                queued = null;
-                Objects.requireNonNull(upstream).request(1);
+                queued.poll();
+                s.onNext(next);
             }
-            if (!endForwarded && queued == null && (globalComplete || globalError != null || ownError != null) && s != null) {
+            if (!endForwarded && queued.isEmpty() && (globalComplete || globalError != null || ownError != null) && s != null) {
                 endForwarded = true;
                 if (globalError != null) {
                     s.onError(globalError);
