@@ -39,6 +39,7 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.model.ArgumentDef;
 import io.micronaut.python.processing.model.ArgumentsDef;
 import io.micronaut.python.processing.model.ClassDef;
@@ -598,6 +599,42 @@ public class PythonAstParserTest {
         assertTrue(interfaceResult.runtimeCode().contains("def _micronaut_java_interface_defaults(*interface_names):"));
         assertTrue(interfaceResult.runtimeCode().contains("@_micronaut_java_interface_defaults('java.lang.Runnable')\nclass Worker:"));
         assertTrue(parser.requiresRuntimeBytecode(interfaceResult));
+        assertTrue(result.validationErrors().isEmpty(), result.validationErrors().toString());
+        assertTrue(interfaceResult.validationErrors().isEmpty(), interfaceResult.validationErrors().toString());
+
+        // a class defined inside a function has no generated Java class: GraalPy adapts it, which
+        // only a JVM supports, so the compilation warns (micronaut-projects/pyronaut#125)
+        PythonAstParser.TransformResult localResult = parser.transform(visitorContext, """
+            from java.lang import Runnable, Thread
+
+            def start():
+                class LocalWorker(Thread):
+                    pass
+
+                class LocalTask(Runnable):
+                    def run(self):
+                        pass
+
+                class StrippedTask(Runnable):
+                    def __init__(self, name):
+                        self.name = name
+
+                    def run(self):
+                        pass
+
+                return LocalWorker(), LocalTask(), StrippedTask("x")
+            """);
+
+        List<PythonDiagnostic> localWarnings = localResult.validationErrors();
+        assertEquals(2, localWarnings.size(), localWarnings.toString());
+        assertTrue(localWarnings.stream().noneMatch(PythonDiagnostic::isError), localWarnings.toString());
+        assertTrue(localWarnings.stream().allMatch(diagnostic -> diagnostic.rule().equals("function-local-java-base")));
+        assertTrue(localWarnings.get(0).message().startsWith(
+            "Python class [LocalWorker] (line 4) is defined inside a function and extends the Java class [java.lang.Thread]"));
+        assertTrue(localWarnings.get(0).message().contains("Java Class can be extended only in JVM mode"));
+        // an interface adapter is a host adapter too; the class with constructor parameters is stripped of the interface
+        assertTrue(localWarnings.get(1).message().startsWith(
+            "Python class [LocalTask] (line 7) is defined inside a function and implements the Java interface [java.lang.Runnable]"));
     }
 
     @Test
