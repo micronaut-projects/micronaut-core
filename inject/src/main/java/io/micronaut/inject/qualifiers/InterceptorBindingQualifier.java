@@ -245,6 +245,36 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
     public static List<AnnotationValue<?>> resolveBoundOccurrences(AnnotationValue<?> binding,
                                                                    @Nullable AnnotationMetadata annotationMetadata,
                                                                    boolean declaredOverrides) {
+        return resolveOccurrences(binding, annotationMetadata, declaredOverrides, false);
+    }
+
+    /**
+     * The occurrences of the binding annotation a binding compares members with, in the given metadata, as
+     * {@link #resolveBoundOccurrences(AnnotationValue, AnnotationMetadata, boolean)} resolves them but with the
+     * members marked {@code io.micronaut.context.annotation.NonBinding} kept, together with their
+     * {@link AnnotationUtil#NON_BINDING_ATTRIBUTE} list. {@link AnnotationValue#matches(AnnotationValue)} leaves
+     * them out, and also out of an occurrence on the other side which does not list them, such as one built at
+     * runtime.
+     *
+     * @param binding            The interceptor binding
+     * @param annotationMetadata The metadata of the element the binding was declared on
+     * @param declaredOverrides  Whether an occurrence declared on the most specific element replaces the ones above it
+     * @return The occurrences to compare, or {@code null} to compare by name
+     * @since 5.3.0
+     */
+    @Internal
+    @Nullable
+    public static List<AnnotationValue<?>> resolveDeclaredOccurrences(AnnotationValue<?> binding,
+                                                                      @Nullable AnnotationMetadata annotationMetadata,
+                                                                      boolean declaredOverrides) {
+        return resolveOccurrences(binding, annotationMetadata, declaredOverrides, true);
+    }
+
+    @Nullable
+    private static List<AnnotationValue<?>> resolveOccurrences(AnnotationValue<?> binding,
+                                                               @Nullable AnnotationMetadata annotationMetadata,
+                                                               boolean declaredOverrides,
+                                                               boolean keepNonBinding) {
         final AnnotationValue<?> copy = binding.getAnnotation(META_BINDING_VALUES).orElse(null);
         if (copy != null) {
             return List.of(copy);
@@ -264,33 +294,51 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
         if (declaredOverrides
             && metadata instanceof AnnotationMetadataHierarchy hierarchy
             && (matchAllOccurrences || !metadata.isRepeatableAnnotation(annotationName))) {
-            collectOccurrences(hierarchy.getDeclaredMetadata(), annotationName, occurrences);
+            collectOccurrences(hierarchy.getDeclaredMetadata(), annotationName, keepNonBinding, occurrences);
             if (occurrences.isEmpty()) {
-                collectOccurrences(hierarchy.getRootMetadata(), annotationName, occurrences);
+                collectOccurrences(hierarchy.getRootMetadata(), annotationName, keepNonBinding, occurrences);
             }
         } else {
-            collectOccurrences(metadata, annotationName, occurrences);
+            collectOccurrences(metadata, annotationName, keepNonBinding, occurrences);
         }
         return occurrences.isEmpty() ? null : new ArrayList<>(occurrences);
     }
 
     private static void collectOccurrences(AnnotationMetadata annotationMetadata,
                                            String annotationName,
+                                           boolean keepNonBinding,
                                            Set<AnnotationValue<?>> occurrences) {
         if (annotationMetadata.isRepeatableAnnotation(annotationName)) {
             for (AnnotationValue<?> declared : annotationMetadata.getAnnotationValuesByName(annotationName)) {
-                occurrences.add(boundMembers(declared));
+                occurrences.add(boundMembers(declared, keepNonBinding));
             }
-        } else {
-            annotationMetadata.findAnnotation(annotationName).ifPresent(declared -> occurrences.add(boundMembers(declared)));
+            collectRetained(annotationMetadata, annotationName, keepNonBinding, occurrences);
+            return;
         }
+        if (annotationMetadata.hasAnnotation(annotationName)) {
+            annotationMetadata.findAnnotation(annotationName).ifPresent(declared -> occurrences.add(boundMembers(declared, keepNonBinding)));
+        }
+        int declared = occurrences.size();
+        collectRetained(annotationMetadata, annotationName, keepNonBinding, occurrences);
+        if (occurrences.size() == declared && !annotationMetadata.hasAnnotation(annotationName)) {
+            // only composed, by annotations retaining nothing as compiled before the retained tree: the stereotype
+            // the metadata flattens them into, which merges the members of every composing annotation, is all there is
+            annotationMetadata.findAnnotation(annotationName).ifPresent(flattened -> occurrences.add(boundMembers(flattened, keepNonBinding)));
+        }
+    }
+
+    private static void collectRetained(AnnotationMetadata annotationMetadata,
+                                        String annotationName,
+                                        boolean keepNonBinding,
+                                        Set<AnnotationValue<?>> occurrences) {
         for (AnnotationValue<?> composing : annotationMetadata.getAnnotationValuesByStereotype(annotationName)) {
-            collectRetained(composing, annotationName, occurrences);
+            collectRetained(composing, annotationName, keepNonBinding, occurrences);
         }
     }
 
     private static void collectRetained(AnnotationValue<?> composing,
                                         String annotationName,
+                                        boolean keepNonBinding,
                                         Set<AnnotationValue<?>> occurrences) {
         final List<AnnotationValue<?>> stereotypes = composing.getStereotypes();
         if (stereotypes == null) {
@@ -298,14 +346,17 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
         }
         for (AnnotationValue<?> stereotype : stereotypes) {
             if (annotationName.equals(stereotype.getAnnotationName())) {
-                occurrences.add(boundMembers(stereotype));
+                occurrences.add(boundMembers(stereotype, keepNonBinding));
             } else {
-                collectRetained(stereotype, annotationName, occurrences);
+                collectRetained(stereotype, annotationName, keepNonBinding, occurrences);
             }
         }
     }
 
-    private static AnnotationValue<?> boundMembers(AnnotationValue<?> occurrence) {
+    private static AnnotationValue<?> boundMembers(AnnotationValue<?> occurrence, boolean keepNonBinding) {
+        if (keepNonBinding) {
+            return occurrence;
+        }
         final String[] nonBinding = occurrence.stringValues(AnnotationUtil.NON_BINDING_ATTRIBUTE);
         if (nonBinding.length == 0) {
             return occurrence;
