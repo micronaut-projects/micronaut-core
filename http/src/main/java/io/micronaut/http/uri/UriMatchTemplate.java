@@ -184,6 +184,10 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         }
         Matcher matcher = matchPattern.matcher(uri);
         if (matcher.matches()) {
+            if (!variables.isEmpty() && uri.indexOf('%') != -1 && !matchesDecoded(uri, matcher)) {
+                // the handler receives the decoded values, which must still satisfy the template
+                return Optional.empty();
+            }
             if (variables.isEmpty()) {
                 return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
             } else {
@@ -202,6 +206,38 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             }
         }
         return Optional.empty();
+    }
+
+    private boolean matchesDecoded(String uri, Matcher rawMatcher) {
+        String decodedUri = decodeSeparators(uri);
+        Matcher decodedMatcher = matchPattern.matcher(decodedUri);
+        if (!decodedMatcher.matches()) {
+            return false;
+        }
+        int count = rawMatcher.groupCount();
+        for (int j = 0; j < variables.size(); j++) {
+            int index = (j * 2) + 2;
+            if (index > count) {
+                break;
+            }
+            String rawGroup = rawMatcher.group(index);
+            String decodedGroup = decodedMatcher.group(index);
+            if (rawGroup == null ? decodedGroup != null : !Objects.equals(decodeSeparators(rawGroup), decodedGroup)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Decode the percent-encoded path separators of a value, which a template must not see
+     * encoded when the handler receives them decoded.
+     *
+     * @param value The raw value
+     * @return The value with {@code %2F} and {@code %5C} decoded
+     */
+    private static String decodeSeparators(String value) {
+        return value.replace("%2F", "/").replace("%2f", "/").replace("%5C", "\\").replace("%5c", "\\");
     }
 
     @Override

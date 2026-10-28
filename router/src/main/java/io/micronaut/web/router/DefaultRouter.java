@@ -586,7 +586,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                     if (!matches) {
                         break;
                     }
-                    matches = Filter.MATCH_ALL_PATTERN.equals(pattern) || patternStyle.getPathMatcher().matches(pattern, path);
+                    matches = Filter.MATCH_ALL_PATTERN.equals(pattern) || DefaultFilterRoute.matches(patternStyle.getPathMatcher(), pattern, path);
                 }
                 if (!matches) {
                     continue;

@@ -73,7 +73,13 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     public AbstractNettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest, ConversionService conversionService) {
         this.nettyRequest = nettyRequest;
         this.conversionService = conversionService;
-        URI fullUri = URI.create(nettyRequest.uri());
+        String target = nettyRequest.uri();
+        URI fullUri = URI.create(target);
+        String scheme = fullUri.getScheme();
+        if (!target.startsWith("/") && !"*".equals(target) && (scheme == null || !target.startsWith("://", scheme.length()))) {
+            // neither origin-form, absolute-form nor asterisk-form (RFC 9112 section 3.2)
+            throw new IllegalArgumentException(new URISyntaxException(target, "Invalid request target"));
+        }
         if (fullUri.getAuthority() != null || fullUri.getScheme() != null) {
             // https://example.com/foo -> /foo
             try {

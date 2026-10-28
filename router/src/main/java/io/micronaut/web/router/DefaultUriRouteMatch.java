@@ -122,7 +122,8 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
             variables.forEach((k, v) -> {
                 if (v instanceof CharSequence) {
                     try {
-                        v = URLDecoder.decode(v.toString(), charset);
+                        // percent-decode only: a '+' in a path is not a space
+                        v = URLDecoder.decode(v.toString().replace("+", "%2B"), charset);
                     } catch (UnsupportedEncodingException e) {
                         // ignore
                     }

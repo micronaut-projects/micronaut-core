@@ -175,7 +175,7 @@ class DefaultFilterRoute implements FilterRoute {
         String uriStr = uri.getPath();
         PathMatcher matcher = getPatternStyle().getPathMatcher();
         for (String pattern : patterns) {
-            if (matcher.matches(pattern, uriStr)) {
+            if (matches(matcher, pattern, uriStr)) {
                 return enabledFilter();
             }
         }
@@ -186,7 +186,7 @@ class DefaultFilterRoute implements FilterRoute {
                 relativePath = uriStr.length() == contextPath.length() ? "/" : uriStr.substring(contextPath.length());
             }
             for (String pattern : contextPathPatterns) {
-                if (matcher.matches(pattern, relativePath)) {
+                if (matches(matcher, pattern, relativePath)) {
                     return enabledFilter();
                 }
             }
@@ -200,6 +200,26 @@ class DefaultFilterRoute implements FilterRoute {
             return Optional.empty();
         }
         return Optional.of(filter);
+    }
+
+    /**
+     * Match a filter pattern against the request path and against the forms of the path the
+     * router uses: the path without its trailing slash, and the root path for an empty path.
+     *
+     * @param matcher The path matcher
+     * @param pattern The filter pattern
+     * @param path    The request path
+     * @return Whether any form of the path matches the pattern
+     */
+    static boolean matches(PathMatcher matcher, String pattern, String path) {
+        if (matcher.matches(pattern, path)) {
+            return true;
+        }
+        if (path.isEmpty()) {
+            return matcher.matches(pattern, "/");
+        }
+        int length = path.length();
+        return length > 1 && path.charAt(length - 1) == '/' && matcher.matches(pattern, path.substring(0, length - 1));
     }
 
     @Override
