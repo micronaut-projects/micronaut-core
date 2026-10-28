@@ -527,7 +527,7 @@ public final class RouteExecutor {
                         // the arguments could not be bound, the route was not invoked
                         throw e;
                     } catch (Throwable e) {
-                        UnconsumedArgumentRelease.routeInvoked(httpRequest);
+                        UnconsumedArgumentRelease.routeInvoked(httpRequest, routeMatch.getRouteInfo());
                         throw e;
                     }
                 } catch (Throwable e) {
@@ -538,7 +538,7 @@ public final class RouteExecutor {
                     throw e;
                 }
                 // the route was invoked and owns its argument values
-                UnconsumedArgumentRelease.routeInvoked(httpRequest);
+                UnconsumedArgumentRelease.routeInvoked(httpRequest, routeMatch.getRouteInfo());
                 if (body instanceof Optional optional) {
                     body = optional.orElse(null);
                 }
