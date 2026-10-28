@@ -185,8 +185,8 @@ class StaticPlanner:
         and what the lowering knows of the calls of the compilation it makes through Java: an accessor
         of a stub that is not introspected, a member it cannot follow), the compiled functions it calls
         through Java (a call of a function that is not compiled runs its Python body through the bridge),
-        and the generated constructors it calls. The first read of an attribute fixed at construction
-        reaches the Python object, once per object, and is allowed.
+        and the generated constructors it calls. A read of an attribute fixed at construction is allowed:
+        the stub primes its slot when it takes its Python object (PythonFixedAttributes.prime).
         """
         marked = {}
         for node_key, body in list(self._bodies.items()):
@@ -258,7 +258,7 @@ class StaticPlanner:
         the entry of the object's ``__dict__``; and the value converts to the same Java value every
         time (a number, a string, a Java object, a plain object of the compilation, which its
         generated class wraps). The stub reads the attribute through the Python object once per
-        object; ``micronaut_runtime`` then makes the class's ``__setattr__`` and ``__delattr__``
+        object, when it takes the object; ``micronaut_runtime`` then makes the class's ``__setattr__`` and ``__delattr__``
         report every later change of an attribute a stub keeps that an object has (a write of any
         other attribute reports nothing), so a write the compilation does not see (a test's ``monkeypatch.setattr``, code outside the compilation, a method of another
         class called with the object) makes the stub read it again. See ``PythonFixedAttributes``.
