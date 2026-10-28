@@ -128,6 +128,12 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * the monitor of {@link #propertySources}.
      */
     private @Nullable RefreshChanges changedWhileRefreshing;
+    /**
+     * How many snapshots of the registered property sources starts and refreshes have taken. Guarded by the
+     * monitor of {@link #propertySources}, which an add holds to register a property source and a read holds to
+     * take its snapshot, so one always comes before the other.
+     */
+    private long registrySnapshots;
 
     // For configuration maps, sets with low access - it's enough to use Collections.synchronized
 
@@ -214,14 +220,15 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
+        long snapshotsWhenRegistered;
         synchronized (propertySources) {
             internalAddPropertySource(propertySource);
             noteChangeWhileRefreshing(propertySource.getName(), propertySource);
+            snapshotsWhenRegistered = registrySnapshots;
         }
         if (isRunning() && !reading.get()) {
             propertyPlaceholderResolver.resetCachesAndRememberedValues();
-            // into a copy of the published catalogs, which lookups on other threads keep reading until it is published
-            propertyPlaceholderResolver.addToCopy(() -> internalProcessPropertySource(propertySource));
+            propertyPlaceholderResolver.processAddedPropertySource(propertySource, propertySource.getConvention(), snapshotsWhenRegistered);
         }
         return this;
     }
@@ -442,7 +449,14 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         // what the read takes from the registry rather than loading itself, such as a property source added meanwhile
         Set<PropertySource> registered = Collections.newSetFromMap(new IdentityHashMap<>());
         Set<String> registeredNames = new HashSet<>();
-        for (PropertySource propertySource : getPropertySources()) {
+        long snapshotNumber;
+        List<PropertySource> snapshot;
+        synchronized (this.propertySources) {
+            // numbered with the copy: an add that registered a property source before it leaves it to this read
+            snapshotNumber = ++registrySnapshots;
+            snapshot = List.copyOf(this.propertySources.values());
+        }
+        for (PropertySource propertySource : snapshot) {
             if (!propertySources.contains(propertySource)) {
                 propertySources.add(propertySource);
                 registered.add(propertySource);
@@ -483,9 +497,14 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         }
 
         OrderUtil.sortOrdered(propertySources);
+        // what this read processes from the registry, which an add that waited for it does not process again
+        PropertySourcePropertyResolver.RegistrySnapshot registrySnapshot = new PropertySourcePropertyResolver.RegistrySnapshot(snapshotNumber, registered);
+        propertyPlaceholderResolver.startProcessing(registrySnapshot);
         for (PropertySource propertySource : propertySources) {
             internalProcessPropertySource(propertySource);
         }
+        // not in a finally: a read that fails leaves no processed snapshot, so an add that waited for it processes its property source
+        propertyPlaceholderResolver.finishProcessing(registrySnapshot);
     }
 
     private void internalAddPropertySource(PropertySource propertySource) {

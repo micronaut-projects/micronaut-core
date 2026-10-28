@@ -358,6 +358,57 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
+     * Notes that a start or a refresh is about to process the property sources of the given
+     * snapshot into the catalogs that writes go into now. Until it has processed them all, the
+     * catalogs hold no processed snapshot.
+     *
+     * @param snapshot The snapshot
+     */
+    void startProcessing(RegistrySnapshot snapshot) {
+        synchronized (catalogLock) {
+            writeState.pendingSnapshot = snapshot;
+            writeState.processedSnapshot = null;
+        }
+    }
+
+    /**
+     * Keeps the given snapshot with the catalogs once all of its property sources are processed,
+     * if they were all processed into the catalogs that writes go into now.
+     *
+     * @param snapshot The snapshot
+     */
+    void finishProcessing(RegistrySnapshot snapshot) {
+        synchronized (catalogLock) {
+            if (writeState.pendingSnapshot == snapshot) {
+                writeState.processedSnapshot = snapshot;
+            }
+        }
+    }
+
+    /**
+     * Processes a property source added to a running environment, see {@link #addToCopy(Runnable)},
+     * unless the catalogs that writes go into hold it already: a start or a refresh that took its
+     * snapshot after the add registered the property source processed it there, in its order, and
+     * the add does not process it a second time, on top of the others.
+     *
+     * @param propertySource          The property source
+     * @param convention              The property convention
+     * @param snapshotsWhenRegistered How many snapshots had been taken when the add registered it
+     */
+    void processAddedPropertySource(PropertySource propertySource, PropertySource.PropertyConvention convention, long snapshotsWhenRegistered) {
+        synchronized (catalogLock) {
+            RegistrySnapshot snapshot = writeState.processedSnapshot;
+            if (snapshot == null || snapshot.number() <= snapshotsWhenRegistered || !snapshot.propertySources().contains(propertySource)) {
+                log.debug("Processing property source: {} convention: {}", propertySource.getName(), convention);
+                // into a copy of the published catalogs, which lookups on other threads keep reading until it is published
+                addToCopy(() -> processPropertySource(propertySource, convention));
+            } else {
+                log.debug("Property source {} was already processed, in its order, by the read of snapshot {}", propertySource.getName(), snapshot.number());
+            }
+        }
+    }
+
+    /**
      * Runs a change of the catalogs, such as a refresh, and returns what it has changed.
      *
      * @param change The change to run
@@ -1721,6 +1772,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          * Cache for values <i>after</i> conversion.
          */
         private final Map<ConversionCacheKey, CachedValue> resolvedValueCache = new ConcurrentHashMap<>(20);
+        /**
+         * The snapshot of the start or the refresh that last started to process its property sources into these
+         * catalogs. Guarded by the monitor of {@code catalogLock}, the lock object of the resolver.
+         */
+        private @Nullable RegistrySnapshot pendingSnapshot;
+        /**
+         * The snapshot of the start or the refresh that processed all of its property sources into these
+         * catalogs, in their order, and was the last to start to. Catalogs that are new or reset have none, and a
+         * start or a refresh clears it when it starts to process into them. It keeps the property sources it
+         * holds reachable while these catalogs, or copies of them, are published: one removed since stays
+         * referenced until the next refresh or stop. Guarded by the monitor of {@code catalogLock}, the lock
+         * object of the resolver.
+         */
+        private @Nullable RegistrySnapshot processedSnapshot;
 
         ResolverState() {
             rememberedValues = new ConcurrentHashMap<>(4);
@@ -1730,7 +1795,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         /**
          * A copy of a published state, which shares its first-letter maps until it writes into them,
          * and the values remembered for its expressions. The caches start empty, as a property source
-         * processed into the published state leaves them.
+         * processed into the published state leaves them. It keeps the snapshots of the published
+         * state: the catalogs it holds are the same ones, written on.
          *
          * @param published The published state
          */
@@ -1744,6 +1810,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             addMaps(sharedMaps, rawCatalog);
             addMaps(sharedMaps, nonGenerated);
             rawOwnedBases.addAll(published.rawOwnedBases);
+            // a start that is processing into the published state goes on into the copy once it is published
+            pendingSnapshot = published.pendingSnapshot;
+            processedSnapshot = published.processedSnapshot;
         }
 
         private static void addMaps(Set<Map<String, DefaultPropertyEntry>> maps, @Nullable Map<String, DefaultPropertyEntry>[] catalog) {
@@ -1753,6 +1822,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 }
             }
         }
+    }
+
+    /**
+     * The registered property sources that a start or a refresh of an environment took and processes, by
+     * identity.
+     *
+     * @param number          Which snapshot it is
+     * @param propertySources The property sources
+     */
+    record RegistrySnapshot(long number, Set<PropertySource> propertySources) {
     }
 
     /**
