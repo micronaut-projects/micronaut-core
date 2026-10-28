@@ -25,6 +25,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -172,6 +173,14 @@ public class RequestLifecycle {
                                                         PropagatedContext propagatedContext,
                                                         RouteMatch<?> routeMatch) {
         ExecutionFlow<RouteMatch<?>> routeMatchFlow = fulfillArguments(routeMatch, request);
+        if (routeMatchFlow.tryCompleteValue() == null) {
+            routeMatchFlow = routeMatchFlow.onErrorResume(e -> {
+                // the route will not run, so a streaming body argument that was already bound
+                // would never be consumed
+                BasicHttpAttributes.discardUnconsumedBodies(request);
+                return ExecutionFlow.error(e);
+            });
+        }
         ExecutionFlow<HttpResponse<?>> responseFlow = callRoute(routeMatchFlow, request, propagatedContext);
         responseFlow = handleStatusException(responseFlow, request, routeMatch, propagatedContext);
         return onErrorNoFilter(responseFlow, request, propagatedContext);

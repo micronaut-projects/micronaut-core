@@ -30,6 +30,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -391,6 +392,9 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Internal
     public void release() {
         body.close();
+        // the response has been written, a streaming body argument the route never subscribed to
+        // would otherwise stay buffered and stall the connection
+        BasicHttpAttributes.discardUnsubscribedBodies(this);
         if (formRouteCompleter != null) {
             formRouteCompleter.release();
         }

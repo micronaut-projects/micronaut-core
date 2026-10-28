@@ -60,6 +60,8 @@ public final class HttpContentProcessorAsReactiveProcessor {
                     e.addSuppressed(ex);
                 }
             })
+            // e.g. the route failed before it consumed the form, and the form is discarded
+            .doOnCancel(processor::cancel)
             .concatMap(c -> {
                 try {
                     List<T> out = new ArrayList<>(1);

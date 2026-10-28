@@ -20,6 +20,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.server.exceptions.InternalServerException;
@@ -28,6 +29,7 @@ import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.multipart.FileUpload;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -68,6 +70,7 @@ public final class FormRouteCompleter implements Subscriber<Object> {
     private final Set<MicronautHttpData<?>> allData = new LinkedHashSet<>();
     private final Map<String, Claimant> claimants = new HashMap<>();
     private boolean upstreamDemanded = false;
+    private boolean discarded = false;
 
     FormRouteCompleter(RouteMatch<?> routeMatch, EventLoop eventLoop) {
         this.flow = new EventLoopFlow(eventLoop);
@@ -87,6 +90,10 @@ public final class FormRouteCompleter implements Subscriber<Object> {
     }
 
     private void onSubscribe0(Subscription s) {
+        if (discarded) {
+            s.cancel();
+            return;
+        }
         upstreamSubscription = s;
         upstreamDemanded = true;
         s.request(1);
@@ -159,7 +166,8 @@ public final class FormRouteCompleter implements Subscriber<Object> {
         upstreamDemanded = false;
 
         String name = data.getName();
-        Claimant claimant = claimants.get(name);
+        // once discarded, nobody consumes the claimed fields any more
+        Claimant claimant = discarded ? null : claimants.get(name);
         data.touch(claimant != null);
         if (claimant == null) {
             upstreamSubscription.request(1);
@@ -217,7 +225,9 @@ public final class FormRouteCompleter implements Subscriber<Object> {
      */
     public <R> Flux<R> claimFields(String name, BiFunction<? super MicronautHttpData<?>, ? super Flux<PartData>, R> fieldFactory) {
         FieldSplitter<R> proc = new FieldSplitter<>(fieldFactory);
-        claimFieldsRaw(name).subscribe(proc);
+        Claimant claimant = createClaimant(name);
+        claimant.splitter = proc;
+        claimant.flux().subscribe(proc);
         return proc.outer.asFlux();
     }
 
@@ -236,6 +246,53 @@ public final class FormRouteCompleter implements Subscriber<Object> {
 
     public boolean isClaimed(String name) {
         return claimants.containsKey(name);
+    }
+
+    /**
+     * Discard the claimed fields. This is called when the route fails before it returns, so the
+     * fields it claimed will not be consumed. The rest of the body is discarded, so that the
+     * connection does not stall on it.
+     */
+    public void discard() {
+        // can't use serializer here
+        if (!eventLoop.inEventLoop()) {
+            eventLoop.execute(this::discard);
+            return;
+        }
+        if (discarded) {
+            return;
+        }
+        discarded = true;
+        // upstreamSubscription can be null if onSubscribe is delayed, it is cancelled then
+        if (upstreamSubscription != null) {
+            upstreamSubscription.cancel();
+        }
+        for (Claimant claimant : claimants.values()) {
+            claimant.discard();
+        }
+    }
+
+    /**
+     * Discard the claimed fields if none of them has a subscriber. This is called once the
+     * response has been written: a route that returned without subscribing to the fields it
+     * claimed would otherwise leave them buffered and the connection stalled. If the route
+     * subscribed to one of the fields, the form is left alone.
+     */
+    public void discardIfUnsubscribed() {
+        // can't use serializer here
+        if (!eventLoop.inEventLoop()) {
+            eventLoop.execute(this::discardIfUnsubscribed);
+            return;
+        }
+        if (discarded) {
+            return;
+        }
+        for (Claimant claimant : claimants.values()) {
+            if (claimant.isSubscribed()) {
+                return;
+            }
+        }
+        discard();
     }
 
     public void release() {
@@ -282,6 +339,7 @@ public final class FormRouteCompleter implements Subscriber<Object> {
         private MicronautHttpData<?> last;
         private MicronautHttpData<?> unsentIncomplete;
         private boolean skipUnfinished = false;
+        private FieldSplitter<?> splitter;
 
         public Flux<MicronautHttpData<?>> flux() {
             return sink.asFlux()
@@ -339,6 +397,69 @@ public final class FormRouteCompleter implements Subscriber<Object> {
                 unsentIncomplete = null;
             }
         }
+
+        boolean isSubscribed() {
+            if (splitter != null) {
+                // the FieldSplitter itself is always subscribed, look at the field it emitted
+                return splitter.isSubscribed();
+            }
+            return sink.currentSubscriberCount() > 0;
+        }
+
+        void discard() {
+            if (splitter != null) {
+                // the FieldSplitter is subscribed, it releases the data of its fields
+                splitter.discard();
+            } else {
+                // if nobody subscribed, release the data that was already sent. If there is a
+                // subscriber, this subscription is rejected and the subscriber gets the error
+                sink.asFlux().subscribe(new RawDiscardingSubscriber(skipUnfinished));
+            }
+            sink.tryEmitError(ByteBody.BodyDiscardedException.create());
+            releaseNotForwarded();
+        }
+    }
+
+    /**
+     * Releases the data of a raw claimant that the route did not subscribe to.
+     */
+    private static final class RawDiscardingSubscriber implements Subscriber<MicronautHttpData<?>> {
+        private final boolean complete;
+        private MicronautHttpData<?> last;
+
+        RawDiscardingSubscriber(boolean complete) {
+            this.complete = complete;
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            s.request(Long.MAX_VALUE);
+        }
+
+        @Override
+        public void onNext(MicronautHttpData<?> data) {
+            if (!complete) {
+                // each emission of incomplete data corresponds to one chunk
+                MicronautHttpData<?>.Chunk chunk = data.pollChunk();
+                if (chunk != null) {
+                    chunk.claim().release();
+                }
+            }
+            if (data != last) {
+                // the ownership the claimant took
+                data.release();
+                last = data;
+            }
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            // expected, the field was discarded
+        }
+
+        @Override
+        public void onComplete() {
+        }
     }
 
     private static class FieldSplitter<R> implements Subscriber<MicronautHttpData<?>> {
@@ -349,7 +470,9 @@ public final class FormRouteCompleter implements Subscriber<Object> {
         MicronautHttpData<?> currentData = null;
 
         Sinks.Many<PartData> innerSink;
+        R currentField;
         boolean firstInner = true;
+        boolean discarded = false;
 
         FieldSplitter(BiFunction<? super MicronautHttpData<?>, ? super Flux<PartData>, R> fieldFactory) {
             this.fieldFactory = fieldFactory;
@@ -361,8 +484,44 @@ public final class FormRouteCompleter implements Subscriber<Object> {
             s.request(1);
         }
 
+        boolean isSubscribed() {
+            Sinks.Many<PartData> inner = innerSink;
+            return inner != null ? inner.currentSubscriberCount() > 0 : outer.currentSubscriberCount() > 0;
+        }
+
+        /**
+         * Release the data of the fields that the route did not consume.
+         */
+        void discard() {
+            discarded = true;
+            if (currentField instanceof Publisher<?> field) {
+                // release the data that is already buffered. If the field was subscribed to, this
+                // subscription is rejected and the existing subscriber gets the error instead
+                field.subscribe(new DiscardingSubscriber());
+            }
+            if (upstream != null) {
+                upstream.request(Long.MAX_VALUE);
+            }
+        }
+
         @Override
         public void onNext(MicronautHttpData<?> data) {
+            if (discarded) {
+                if (data != currentData) {
+                    if (innerSink != null) {
+                        innerSink.tryEmitComplete();
+                        innerSink = null;
+                    }
+                    currentData = data;
+                    // nobody consumes this field, give up the ownership the claimant took
+                    data.release();
+                }
+                MicronautHttpData<?>.Chunk chunk = data.pollChunk();
+                if (chunk != null) {
+                    chunk.claim().release();
+                }
+                return;
+            }
             if (data != currentData) {
                 if (innerSink != null) {
                     innerSink.tryEmitComplete();
@@ -371,7 +530,7 @@ public final class FormRouteCompleter implements Subscriber<Object> {
                 currentData = data;
                 innerSink = Sinks.many().unicast().onBackpressureBuffer();
                 firstInner = true;
-                outer.tryEmitNext(fieldFactory.apply(data, innerSink.asFlux().doOnRequest(n -> {
+                currentField = fieldFactory.apply(data, innerSink.asFlux().doOnRequest(n -> {
                     if (firstInner) {
                         firstInner = false;
                         if (n != Long.MAX_VALUE) {
@@ -381,7 +540,8 @@ public final class FormRouteCompleter implements Subscriber<Object> {
                     if (n != 0) {
                         upstream.request(n);
                     }
-                })));
+                }));
+                outer.tryEmitNext(currentField);
             }
             MicronautHttpData<?>.Chunk chunk = data.pollChunk();
             if (chunk == null) {
@@ -412,6 +572,32 @@ public final class FormRouteCompleter implements Subscriber<Object> {
             if (innerSink != null) {
                 innerSink.tryEmitComplete();
             }
+        }
+    }
+
+    /**
+     * Reads a field that the route did not consume, and releases its data.
+     */
+    private static final class DiscardingSubscriber implements Subscriber<Object> {
+        @Override
+        public void onSubscribe(Subscription s) {
+            s.request(Long.MAX_VALUE);
+        }
+
+        @Override
+        public void onNext(Object o) {
+            if (o instanceof NettyPartData part) {
+                part.getByteBuf().release();
+            }
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            // expected, the field was discarded
+        }
+
+        @Override
+        public void onComplete() {
         }
     }
 }

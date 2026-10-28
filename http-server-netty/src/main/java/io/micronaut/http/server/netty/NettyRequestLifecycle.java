@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -151,6 +152,9 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nettyRequest, rib.serverConfiguration);
             ByteBody rootBody = nettyRequest.byteBody();
             FormRouteCompleter formRouteCompleter = nettyRequest.formRouteCompleter();
+            // if the route fails before it returns, or returns without subscribing to any of the
+            // fields it claimed, they are not consumed
+            BasicHttpAttributes.addUnconsumedBodyDiscard(nettyRequest, formRouteCompleter::discard, formRouteCompleter::discardIfUnsubscribed);
             try {
                 HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBodyFactory.toByteBufs(rootBody).map(DefaultHttpContent::new)).subscribe(formRouteCompleter);
                 nettyRequest.addRouteWaitsFor(formRouteCompleter.getExecute());

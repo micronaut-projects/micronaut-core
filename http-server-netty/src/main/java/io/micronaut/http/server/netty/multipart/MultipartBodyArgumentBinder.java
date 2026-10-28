@@ -28,6 +28,7 @@ import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.binders.UnconsumedBodyGuard;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.multipart.Attribute;
@@ -68,12 +69,9 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
     public BindingResult<MultipartBody> bind(ArgumentConversionContext<MultipartBody> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
             FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration.get());
-            @NonNull Flux<HttpData> multiObjectBody;
-            try {
-                multiObjectBody = HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBodyFactory.toByteBufs(nhr.byteBody()).map(DefaultHttpContent::new));
-            } catch (Throwable e) {
-                return () -> Optional.of(Flux.<CompletedPart>error(e)::subscribe);
-            }
+            // the body is taken now, but only read once the route subscribes
+            @NonNull Flux<HttpData> multiObjectBody = Flux.from(UnconsumedBodyGuard.openWhenSubscribed(nhr, nhr.byteBody().move(),
+                body -> HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBodyFactory.toByteBufs(body).map(DefaultHttpContent::new))));
             Set<ReferenceCounted> partial = new HashSet<>();
             Flux<CompletedPart> completed = multiObjectBody.mapNotNull(message -> {
                 if (message.isCompleted() && message.length() != 0) {

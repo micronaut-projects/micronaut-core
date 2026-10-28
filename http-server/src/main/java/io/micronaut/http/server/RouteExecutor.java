@@ -84,6 +84,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -443,21 +444,41 @@ public final class RouteExecutor {
 
     ExecutionFlow<HttpResponse<?>> callRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {
         RouteInfo<?> routeInfo = routeMatch.getRouteInfo();
-        ExecutorService executorService = routeInfo.getExecutor(serverConfiguration.getThreadSelection());
+        ExecutorService executorService;
+        try {
+            executorService = routeInfo.getExecutor(serverConfiguration.getThreadSelection());
+        } catch (RuntimeException e) {
+            // e.g. the executor the route names is not configured, so the route never runs
+            BasicHttpAttributes.discardUnconsumedBodies(request);
+            throw e;
+        }
         ExecutionFlow<HttpResponse<?>> executeMethodResponseFlow;
         if (executorService != null) {
-            if (routeInfo.isSuspended()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
-                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView, propagatedContext));
-                        return Mono.from(
-                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
-                        );
-                    }));
-            } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request));
-            } else {
-                executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request));
+            try {
+                if (routeInfo.isSuspended()) {
+                    executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
+                            coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView, propagatedContext));
+                            return Mono.from(
+                                ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
+                            );
+                        }));
+                } else if (routeInfo.isReactive()) {
+                    executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request));
+                } else {
+                    executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request));
+                }
+            } catch (RejectedExecutionException e) {
+                // the route never runs, so it can't consume a streaming body argument
+                BasicHttpAttributes.discardUnconsumedBodies(request);
+                throw e;
             }
+            executeMethodResponseFlow = executeMethodResponseFlow.onErrorResume(e -> {
+                if (e instanceof RejectedExecutionException) {
+                    // the route never runs, so it can't consume a streaming body argument
+                    BasicHttpAttributes.discardUnconsumedBodies(request);
+                }
+                return ExecutionFlow.error(e);
+            });
         } else {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
@@ -478,8 +499,17 @@ public final class RouteExecutor {
     private ExecutionFlow<HttpResponse<?>> executeRouteAndConvertBody(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {
         try (PropagatedContext.Scope ignore = propagatedContext.plus(new ServerHttpRequestContext(httpRequest)).propagate()) {
             try {
-                requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
-                Object body = routeMatch.execute();
+                Object body;
+                try {
+                    requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
+                    body = routeMatch.execute();
+                } catch (Throwable e) {
+                    // either the route was never invoked (e.g. an argument failed to bind), or the
+                    // invocation threw (e.g. a @Valid violation). In both cases the request has
+                    // failed, so a streaming body argument is not consumed any more
+                    BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+                    throw e;
+                }
                 if (body instanceof Optional optional) {
                     body = optional.orElse(null);
                 }

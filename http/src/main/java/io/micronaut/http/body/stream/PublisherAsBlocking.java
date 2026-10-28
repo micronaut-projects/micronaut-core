@@ -18,6 +18,7 @@ package io.micronaut.http.body.stream;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.body.ByteBody;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.scheduler.NonBlocking;
@@ -188,6 +189,12 @@ public final class PublisherAsBlocking implements Subscriber<ReadBuffer>, Closea
             if (swap != null) {
                 swap.close();
                 swap = null;
+            }
+            if (!done) {
+                // the cancelled upstream will not signal again, so wake any blocked reader
+                failure = ByteBody.BodyDiscardedException.create();
+                done = true;
+                newDataCondition.signalAll();
             }
         } finally {
             lock.unlock();
