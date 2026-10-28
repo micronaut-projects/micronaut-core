@@ -41,6 +41,7 @@ import io.micronaut.http.body.ConcatenatingSubscriber;
 import io.micronaut.http.body.MediaTypeProvider;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
@@ -64,6 +65,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 
@@ -169,6 +171,14 @@ public abstract class ResponseLifecycle {
         }
     }
 
+    private void closeOnIoExecutor(ByteBodyHttpResponse<?> response) {
+        try {
+            ioExecutor().execute(response::close);
+        } catch (RejectedExecutionException e) {
+            response.close();
+        }
+    }
+
     /**
      * Discard the content of the given response to a HEAD request, keeping the headers and the
      * length of the content that a GET request would get.
@@ -179,8 +189,13 @@ public abstract class ResponseLifecycle {
     private ByteBodyHttpResponse<?> discardContent(ByteBodyHttpResponse<?> response) {
         HttpResponse<?> delegate = response instanceof HttpResponseWrapper<?> wrapper ? wrapper.getDelegate() : response;
         OptionalLong length = response.byteBody().expectedLength();
-        // closes the file or stream of the body
-        response.close();
+        // closes the file or stream of the body. Closing a stream may block, and this can run on
+        // the event loop for an async route, so a stream body is closed on the io executor
+        if (response.byteBody() instanceof InputStreamByteBody) {
+            closeOnIoExecutor(response);
+        } else {
+            response.close();
+        }
         if (delegate instanceof MutableHttpResponse<?> mutable) {
             mutable.body(null);
             if (length.isPresent() && !mutable.getHeaders().contains(HttpHeaders.CONTENT_LENGTH)) {
