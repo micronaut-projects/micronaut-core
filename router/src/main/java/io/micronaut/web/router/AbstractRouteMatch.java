@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -26,6 +27,11 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.CookieValue;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.Part;
+import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.PostponedRequestArgumentBinder;
@@ -254,7 +260,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 setBindingResultOfFail(i, argument, pendingRequestBindingResult);
                 continue;
             }
-            Object value = getVariableValues().get(argumentNames[i]);
+            Object value = resolveVariableValue(i);
             if (value != null) {
                 setValue(i, argument, value);
                 continue;
@@ -272,6 +278,31 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             return unsafeExecutionHandle.invokeUnsafe(argumentValues);
         }
         return methodExecutionHandle.invoke(argumentValues);
+    }
+
+    /**
+     * Resolves a URI variable value for the argument at the given index.
+     * An argument explicitly bound to another request source (a header, a cookie, a request attribute, the body or a part)
+     * never takes a URI variable of the same name.
+     *
+     * @param index The argument index
+     * @return The variable value or null
+     */
+    @Nullable
+    private Object resolveVariableValue(int index) {
+        Object value = getVariableValues().get(argumentNames[index]);
+        if (value == null) {
+            return null;
+        }
+        AnnotationMetadata annotationMetadata = arguments[index].getAnnotationMetadata();
+        if (annotationMetadata.hasAnnotation(Header.class)
+            || annotationMetadata.hasAnnotation(CookieValue.class)
+            || annotationMetadata.hasAnnotation(RequestAttribute.class)
+            || annotationMetadata.hasAnnotation(Body.class)
+            || annotationMetadata.hasAnnotation(Part.class)) {
+            return null;
+        }
+        return value;
     }
 
     @Override
@@ -306,7 +337,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 continue;
             }
             Argument<Object> argument = (Argument<Object>) arguments[i];
-            Object value = getVariableValues().get(argumentNames[i]);
+            Object value = resolveVariableValue(i);
             if (value != null) {
                 setValue(i, argument, value);
                 continue;
