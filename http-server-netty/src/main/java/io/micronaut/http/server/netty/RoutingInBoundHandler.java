@@ -126,7 +126,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
             request.release();
         } finally {
             if (!terminateEventPublisher.isEmpty()) {
-                try {
+                // the response may be written while another request of the same connection
+                // is current (pipelining), so do not inherit the current context
+                try (PropagatedContext.Scope ignore = PropagatedContext.empty().plus(new ServerHttpRequestContext(request)).propagate()) {
                     terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));
                 } catch (Exception e) {
                     if (LOG.isErrorEnabled()) {
