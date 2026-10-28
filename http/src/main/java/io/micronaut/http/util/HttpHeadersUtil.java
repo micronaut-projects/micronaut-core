@@ -167,6 +167,8 @@ public final class HttpHeadersUtil {
     /**
      * Resolve the locale of an {@code Accept-Language} header. The default locale is returned if
      * the header is {@code *} or its first language tag is longer than the supported maximum.
+     * The number of distinct locales is bounded: once many locales the JDK does not provide have
+     * been seen, a new one resolves to the closest available locale.
      *
      * @param text The Accept-Language header value
      * @return The locale
@@ -181,7 +183,7 @@ public final class HttpHeadersUtil {
         if (part.length() > MAX_LANGUAGE_TAG_LENGTH) {
             return Locale.getDefault();
         }
-        return Locale.forLanguageTag(part);
+        return BoundedLocales.INSTANCE.resolve(Locale.forLanguageTag(part));
     }
 
     /**
