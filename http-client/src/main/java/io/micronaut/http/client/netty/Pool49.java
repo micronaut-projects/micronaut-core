@@ -20,6 +20,7 @@ import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.netty.channel.loom.EventLoopVirtualThreadScheduler;
@@ -926,6 +927,11 @@ final class Pool49 implements Pool {
          */
         private final DelayedExecutionFlow<ConnectionManager.PoolHandle> sink = DelayedExecutionFlow.create();
         /**
+         * Context of the caller, the flow continuations must run in it rather than in the context
+         * of whoever hands over the connection.
+         */
+        private final transient PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        /**
          * Pool that we prefer based on the caller.
          */
         private final LocalPoolPair preferredPool;
@@ -1162,7 +1168,7 @@ final class Pool49 implements Pool {
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
                 releasePermit();
-                sink.completeExceptionally(t);
+                propagatedContext.wrap(() -> sink.completeExceptionally(t)).run();
                 return true;
             } else {
                 return false;
@@ -1176,7 +1182,7 @@ final class Pool49 implements Pool {
                 if (sink.isCancelled()) {
                     return false;
                 }
-                sink.complete(value);
+                propagatedContext.wrap(() -> sink.complete(value)).run();
                 return true;
             } else {
                 return false;
