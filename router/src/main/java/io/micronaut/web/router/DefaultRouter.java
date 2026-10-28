@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.annotation.Get;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -602,7 +603,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                     continue;
                 }
             }
-            filterRoute.match(method, path).ifPresent(httpFilters::add);
+            matchFilter(filterRoute, method, path, routeMatch).ifPresent(httpFilters::add);
         }
         FilterRunner.sort(httpFilters);
         return Collections.unmodifiableList(httpFilters);
@@ -625,10 +626,23 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             if (routeMatch != null && !matchesFilterMatcher(filterRoute, routeMatch)) {
                 continue;
             }
-            filterRoute.match(method, path).ifPresent(httpFilters::add);
+            matchFilter(filterRoute, method, path, routeMatch).ifPresent(httpFilters::add);
         }
         FilterRunner.sort(httpFilters);
         return Collections.unmodifiableList(httpFilters);
+    }
+
+    /**
+     * Match the filter route. A {@code HEAD} route derived from a {@code @Get} method runs the {@code GET} handler, so the
+     * filters scoped to {@code GET} apply to it as well.
+     */
+    private static Optional<GenericHttpFilter> matchFilter(FilterRoute filterRoute, HttpMethod method, String path, @Nullable RouteMatch<?> routeMatch) {
+        Optional<GenericHttpFilter> filter = filterRoute.match(method, path);
+        if (filter.isEmpty() && method == HttpMethod.HEAD && routeMatch != null
+            && routeMatch.getAnnotationMetadata().hasDeclaredAnnotation(Get.class)) {
+            return filterRoute.match(HttpMethod.GET, path);
+        }
+        return filter;
     }
 
     @NonNull
