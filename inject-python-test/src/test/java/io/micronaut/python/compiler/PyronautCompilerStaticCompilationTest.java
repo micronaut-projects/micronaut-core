@@ -168,8 +168,17 @@ class PyronautCompilerStaticCompilationTest {
         }
         String total = generated.substring(generated.indexOf("Compiled from"), generated.indexOf("public String names("));
         assertTrue(total.contains("public double total(int quantity, double unit_price)"), total);
-        assertTrue(total.contains("this.asPolyglotValue().getMember(\"rate\").asDouble()"), total);
+        // rate is fixed at construction: read from the slot of the stub, through the Python object once per object
+        assertTrue(total.contains("this.graalpyInternalFixed0()"), total);
         assertTrue(!total.contains("invokePythonMethod"), total);
+        String reader = generated.substring(generated.indexOf("private double graalpyInternalFixed0()"));
+        reader = reader.substring(0, reader.indexOf("\n  }\n"));
+        assertTrue(reader.contains("\"rate\""), reader);
+        assertTrue(reader.contains("graalpyInternalFixedAttributes"), reader);
+        assertTrue(reader.contains("asDouble()"), reader);
+        assertTrue(generated.contains("private transient PythonFixedAttributes.Slot graalpyInternalFixed0;"), generated);
+        // the delegate Python callers run reads the Python object, as the Python body does
+        assertTrue(generated.contains("__mnSelf.getMember(\"rate\").asDouble()"), generated);
         // the method that is not compiled keeps its bridge
         assertTrue(generated.substring(generated.indexOf("public String names(")).contains("invokePythonMethod"), generated);
     }

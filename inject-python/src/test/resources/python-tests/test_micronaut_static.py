@@ -3224,6 +3224,253 @@ class PythonSemanticsTest(unittest.TestCase):
         self.assertIsNotNone(self._helper(self._returned("frozen"), "copyOfTuple"), self._returned("frozen"))
 
 
+class FixedFacts(FakeFacts):
+    """The facts of a compilation whose classes are introspected only when named so."""
+
+    def __init__(self, introspected=()):
+        self.introspected = set(introspected)
+
+    def isIntrospected(self, name):
+        return name in self.introspected
+
+
+FIXED = '''
+class Repo:
+    def __init__(self, base: int):
+        self.base = base
+
+    def find(self, n: int) -> int:
+        return n + self.base
+
+
+class Service:
+    def __init__(self, rate: float, name: str, repo: Repo, count: int, items: list[str]):
+        """Every attribute is assigned here and only read afterwards."""
+        self.rate = rate
+        self.name = name
+        self.repo = repo
+        self.count = count
+        self.items = items
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+
+    def label(self) -> str:
+        return self.name + str(self.count)
+
+    def found(self, n: int) -> int:
+        return self.repo.find(n)
+
+    def listed(self) -> int:
+        return len(self.items)
+
+
+class Counter:
+    def __init__(self, start: int):
+        self.start = start
+        self.calls = 0
+
+    def bump(self) -> None:
+        self.calls += 1
+
+    def read(self) -> int:
+        return self.start
+
+
+class Patched:
+    def __init__(self, factor: float, limit: int):
+        self.factor = factor
+        self.limit = limit
+
+    def total(self, n: int) -> float:
+        return n * self.factor
+
+    def capped(self, n: int) -> int:
+        return min(n, self.limit)
+
+
+def reset(patched: Patched) -> None:
+    patched.factor = 2.0
+
+
+class Named:
+    def __init__(self, bound: int, size: int):
+        self.bound = bound
+        self.size = size
+
+    def capped(self, n: int) -> int:
+        return min(n, self.bound) + self.size
+
+
+def tweak(named: Named) -> None:
+    setattr(named, "bound", 3)
+
+
+class Base:
+    def __init__(self, rate: float):
+        self.rate = rate
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+
+
+class Derived(Base):
+    pass
+
+
+class Guarded:
+    def __init__(self, rate: float):
+        self.rate = rate
+
+    def __setattr__(self, name, value):
+        object.__setattr__(self, name, value)
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+
+
+class Later:
+    def __init__(self, rate: float):
+        self.rate = rate
+
+        def change():
+            self.rate = 2.0
+        self.change = change
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+
+
+class Updating:
+    def __init__(self, rate: float):
+        self.rate = rate
+
+    def update(self, name: str, value: float) -> None:
+        super().__setattr__(name, value)
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+
+
+class Declared:
+    rate: float = 1.0
+
+    def __init__(self, rate: float):
+        self.rate = rate
+
+    def total(self, n: int) -> float:
+        return n * self.rate
+'''
+
+
+def _self_reads(body):
+    """The reads of attributes of self in a compiled body, by attribute: whether each is fixed."""
+    reads = {}
+    children = ("body", "statements", "value", "left", "right", "operand", "receiver", "arguments", "test", "then", "orElse", "parts", "expression")
+
+    def visit(node):
+        if node is None or isinstance(node, (str, bool, int, float)):
+            return
+        if hasattr(node, "size") and hasattr(node, "iterator"):
+            for element in node:
+                visit(element)
+            return
+        if not hasattr(node, "getClass"):
+            return
+        if node.getClass().getSimpleName() == "SelfProperty":
+            reads[node.property()] = node.fixed()
+            return
+        for accessor in children:
+            if hasattr(node, accessor):
+                visit(getattr(node, accessor)())
+
+    visit(body.body())
+    return reads
+
+
+class FixedAttributeTest(unittest.TestCase):
+    """Attributes fixed at construction: __init__ assigns them and nothing writes them later, so a stub reads them from Java fields."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.decisions, cls.planner = plan(FIXED, MODE_ALL, facts=FixedFacts())
+        cls.bodies = {(body.className().split(".")[-1], body.methodName()): body for body in cls.planner.bodies}
+
+    def _body(self, owner, name):
+        decision = self.decisions[f"{owner}.{name}"]
+        self.assertEqual("COMPILED", decision.outcome().name(), [(r.rule(), r.message()) for r in decision.reasons()])
+        return self.bodies[(owner, name)]
+
+    def test_attributes_only_init_assigns_are_read_from_java_fields(self):
+        self.assertEqual({"rate": True}, _self_reads(self._body("Service", "total")))
+        self.assertEqual({"name": True, "count": True}, _self_reads(self._body("Service", "label")))
+        self.assertEqual({"repo": True}, _self_reads(self._body("Service", "found")))  # a plain object of the compilation
+        for name in ("total", "label", "found"):
+            self.assertEqual(0, self._body("Service", name).stats().bridgeCalls(), name)
+
+    def test_a_collection_is_read_through_the_python_object(self):
+        # the boundary copies a Python list: a change in place would not reach a kept copy
+        self.assertEqual({"items": False}, _self_reads(self._body("Service", "listed")))
+        self.assertEqual(1, self._body("Service", "listed").stats().bridgeCalls())
+
+    def test_a_class_writing_its_attributes_after_construction_keeps_them_in_python(self):
+        # each write would report a change: the class keeps every attribute in Python
+        self.assertEqual({"start": False}, _self_reads(self._body("Counter", "read")))
+        self.assertEqual(1, self._body("Counter", "read").stats().bridgeCalls())
+
+    def test_an_attribute_written_elsewhere_in_the_compilation_is_not_fixed(self):
+        # by its name: an assignment on another object may assign the attribute of a class, which no change reports
+        self.assertEqual({"factor": False}, _self_reads(self._body("Patched", "total")))
+        self.assertEqual({"limit": True}, _self_reads(self._body("Patched", "capped")))
+
+    def test_an_attribute_a_call_names_is_not_fixed(self):
+        self.assertEqual({"bound": False, "size": True}, _self_reads(self._body("Named", "capped")))
+
+    def test_a_class_with_a_subclass_a_setattr_a_closure_or_a_declaration_is_not_fixed(self):
+        for owner in ("Base", "Guarded", "Later", "Declared", "Updating"):
+            self.assertEqual({"rate": False}, _self_reads(self._body(owner, "total")), owner)
+
+    def test_an_introspected_class_or_value_is_not_fixed(self):
+        decisions, planner = plan(FIXED, MODE_ALL, facts=FixedFacts(introspected={"pkg.Service", "Service"}))
+        bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
+        self.assertEqual({"rate": False}, _self_reads(bodies[("Service", "total")]))
+        decisions, planner = plan(FIXED, MODE_ALL, facts=FixedFacts(introspected={"pkg.Repo", "Repo"}))
+        bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
+        self.assertEqual({"repo": False}, _self_reads(bodies[("Service", "found")]))
+        self.assertEqual({"rate": True}, _self_reads(bodies[("Service", "total")]))
+
+    def test_without_introspection_facts_nothing_is_fixed(self):
+        decisions, planner = plan(FIXED, MODE_ALL, facts=FakeFacts())
+        bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
+        self.assertEqual({"rate": False}, _self_reads(bodies[("Service", "total")]))
+
+    def test_dict_access_anywhere_in_the_compilation_fixes_nothing(self):
+        for escape in ("vars(service)", "service.__dict__", "object.__setattr__(service, attribute, 1)", "setattr(service, attribute, 1)",
+                       "Service.__getattribute__ = None", "del Service.__setattr__", "setattr(Service, \"__delattr__\", None)", "Service.__bases__ = ()", "getattr(service, \"__dict__\")[attribute] = 1",
+                       "object.__setattr__(service, attribute, \"new\")", "setattr(service, attribute, \"new\")",
+                       "mock.patch.object(Service, attribute, \"new\")", "mock.patch(attribute, \"new\")", "__setattr__(service, attribute)"):
+            source = FIXED + f"\n\ndef escape(service: Service, attribute: str) -> None:\n    {escape}\n"
+            decisions, planner = plan(source, MODE_ALL, facts=FixedFacts())
+            bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
+            self.assertEqual({"rate": False}, _self_reads(bodies[("Service", "total")]), escape)
+
+    def test_writes_bypassing_the_reported_setattr_in_the_compilation_unfix_the_attribute(self):
+        # the three spellings no __setattr__ of the class sees: the planner keeps the attribute in Python
+        for write in ("service.__dict__.update(rate=2.0)", "vars(service)[\"rate\"] = 2.0", "object.__setattr__(service, \"rate\", 2.0)"):
+            source = FIXED + f"\n\ndef bypass(service: Service) -> None:\n    {write}\n"
+            decisions, planner = plan(source, MODE_ALL, facts=FixedFacts())
+            bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
+            self.assertEqual({"rate": False}, _self_reads(bodies[("Service", "total")]), write)
+
+    def test_a_patch_naming_the_attribute_unfixes_it(self):
+        for patch in ('mock.patch.object(Service, "rate", 2.0)', 'mock.patch("pkg.Service.rate", 2.0)', 'monkeypatch.setattr(service, "rate", 2.0)', "mock.patch.multiple(service, rate=2.0)"):
+            source = FIXED + f"\n\ndef patched(service, mock, monkeypatch) -> None:\n    {patch}\n"
+            decisions, planner = plan(source, MODE_ALL, facts=FixedFacts())
+            bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
+            self.assertEqual({"rate": False}, _self_reads(bodies[("Service", "total")]), patch)
+            self.assertEqual({"name": True, "count": True}, _self_reads(bodies[("Service", "label")]), patch)
+
+
 OBJECTS = '''
 from dataclasses import dataclass
 

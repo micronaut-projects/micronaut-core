@@ -580,7 +580,9 @@ public final class StaticBodyGenerator {
             case Ir.Const constant -> constant(constant);
             case Ir.Param param -> parameter(param);
             case Ir.LocalRef ref -> local(ref.name());
-            case Ir.SelfProperty property -> self.read(property.property(), property.type(), type(property.type()), property.accessor());
+            case Ir.SelfProperty property -> property.fixed()
+                ? self.readFixed(property.property(), property.type(), type(property.type()))
+                : self.read(property.property(), property.type(), type(property.type()), property.accessor());
             case Ir.InvokeJava call -> invoke(call);
             case Ir.InvokeSibling call when SHARED_DISPATCH.equals(call.dispatch()) ->
                 self.invokeShared(call.name(), types(call.parameterTypes()), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
@@ -961,6 +963,20 @@ public final class StaticBodyGenerator {
          * @return The expression reading it
          */
         ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor);
+
+        /**
+         * An attribute fixed at construction (see {@link Ir.SelfProperty#fixed()}): a stub reads it
+         * from the Python object once per object and keeps the converted value in a Java field; a
+         * body run on a Python object without a stub reads it as any other attribute.
+         *
+         * @param property The attribute
+         * @param typeName The Java type of the attribute, as the IR spells it
+         * @param type     The Java type of the attribute
+         * @return The expression reading it
+         */
+        default ExpressionDef readFixed(String property, String typeName, TypeDef type) {
+            return read(property, typeName, type, false);
+        }
 
         /**
          * @param name           The method of the class to call on {@code self}
