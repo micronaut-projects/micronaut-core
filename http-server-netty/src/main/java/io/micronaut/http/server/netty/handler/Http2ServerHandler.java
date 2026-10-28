@@ -109,6 +109,20 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                     stream.discardBufferedContent();
                 }
             }
+
+            @Override
+            public void onStreamHalfClosed(io.netty.handler.codec.http2.Http2Stream s) {
+                // The request body can be discarded after the last write of the response was
+                // issued, and before it completed: neither closeInput(), which found the stream
+                // open, nor that write, which did not know of the discard, reset the stream. The
+                // peer would keep sending the body, which nothing consumes, until the window of
+                // the connection is exhausted, and the other streams of the connection stall.
+                Http2Stream stream = s.getProperty(key);
+                if (stream != null && stream.closeInput && s.state() == io.netty.handler.codec.http2.Http2Stream.State.HALF_CLOSED_LOCAL) {
+                    // outside of the write that half-closed the stream
+                    ctx.channel().eventLoop().execute(stream::closeInput);
+                }
+            }
         });
     }
 
