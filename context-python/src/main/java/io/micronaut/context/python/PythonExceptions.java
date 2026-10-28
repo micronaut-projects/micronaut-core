@@ -175,6 +175,28 @@ public final class PythonExceptions {
     }
 
     /**
+     * The message {@link #message(Value)} reads from a Python exception created with the given
+     * arguments by a class whose {@code str()} is {@code BaseException.__str__}, computed without
+     * creating it: {@code null} without arguments, the {@code str()} of a single argument, the
+     * {@code repr()} of the tuple of several. A compiled raise of such a class creates the generated
+     * Java exception alone, with this message; its Python exception is created when it is first needed.
+     *
+     * @param arguments The arguments of the exception: strings, integers, floats, booleans or {@code null} (None)
+     * @return The message, or {@code null}
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    public static @Nullable String argumentsMessage(@Nullable Object[] arguments) {
+        if (arguments.length == 0) {
+            return null;
+        }
+        if (arguments.length == 1) {
+            return PythonStatic.str(arguments[0]);
+        }
+        return PythonStatic.repr(PythonStatic.tuple(arguments));
+    }
+
+    /**
      * The exception a generated bridge method declaring checked exceptions rethrows for the
      * exception of its Python call: a host exception of one of the declared types (raised in Python,
      * or thrown by a Java method the Python code called), or the generated Java exception of a

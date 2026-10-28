@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.CollectionUtils;
@@ -67,7 +68,6 @@ import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.RouteRejections;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
-import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.websocket.WebSocketUpgradeCondition;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -646,16 +646,8 @@ public class RequestLifecycle {
         if (!router.hasBodyConditions()) {
             return routeExecutor.findRouteMatch(request);
         }
-        try {
-            // the closest match as if every body condition were met: when it has none, the body
-            // does not decide, e.g. for the routes of a route locator without body conditions
-            UriRouteMatch<Object, Object> match = routeExecutor.findRouteMatch(request);
-            if (match == null || match.getRouteInfo().getBodyConditions().isEmpty()) {
-                return match;
-            }
-        } catch (DuplicateRouteException e) {
-            // routes of the same rank, which the body may tell apart
-        }
+        // one pass: the closest match when the body does not decide, e.g. for the routes of a
+        // route locator without body conditions, otherwise the matches the body chooses among
         RouteResolution<Object, Object> resolution = router.resolve(request);
         if (resolution instanceof RouteResolution.Pending<Object, Object> pending) {
             // chosen once the body is read, see doRouteMatchAsync
@@ -1016,8 +1008,13 @@ public class RequestLifecycle {
      */
     protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch, HttpRequest<?> request) {
         try {
-            // try to fulfill the argument requirements of the route
-            routeExecutor.requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(routeMatch, request);
+            if (routeMatch instanceof DefaultUriRouteMatch<?, ?> match && routeExecutor.execution(routeMatch.getRouteInfo()).fulfillsDirectly) {
+                // a handler function of the request and the path variables: nothing to bind
+                match.fulfillDirectly(request);
+            } else {
+                // try to fulfill the argument requirements of the route
+                routeExecutor.requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(routeMatch, request);
+            }
 
             FormRouteCompleter frc = FormFactory.getCompleterOrNull(request);
             if (frc != null) {
@@ -1027,6 +1024,13 @@ public class RequestLifecycle {
 
             // check if any argument binders are still waiting for data
             ExecutionFlow<?> routeWaitsFor = BasicHttpAttributes.getRouteWaitsFor(request);
+            if (frc == null) {
+                ImperativeExecutionFlow<?> done = routeWaitsFor.tryComplete();
+                if (done != null && done.getError() == null) {
+                    // nothing waits, the case of nearly every request: no continuation to create
+                    return ExecutionFlow.just(routeMatch);
+                }
+            }
             return routeWaitsFor.then(() -> {
                 if (frc != null) {
                     frc.stopDeadlockDetection();
