@@ -36,8 +36,15 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.DecoderResult;
+import io.netty.handler.codec.compression.DecompressionException;
+import io.netty.handler.codec.compression.ZlibWrapper;
+import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContentDecompressor;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
@@ -525,17 +532,61 @@ final class HttpPipelineBuilder {
      * malformed chunk), so that the request body is failed instead of completed.
      * {@link HttpContentDecompressor} would replace it with a successful last content. The
      * connection is closed after such a failure, the decompression state is cleaned up then.
+     * A gzip or deflate body that ends before its compressed stream does is failed the same way.
      */
     private static final class FailurePreservingHttpContentDecompressor extends HttpContentDecompressor {
+        private final int maxAllocation;
+        private ZlibBodyDecoder zlibDecoder;
+
         FailurePreservingHttpContentDecompressor(int maxAllocation) {
             super(maxAllocation);
+            this.maxAllocation = maxAllocation;
+        }
+
+        @Override
+        protected EmbeddedChannel newContentDecoder(String contentEncoding) throws Exception {
+            ZlibWrapper wrapper;
+            if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) ||
+                HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
+                wrapper = ZlibWrapper.GZIP;
+            } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) ||
+                HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
+                wrapper = ZlibWrapper.ZLIB_OR_NONE;
+            } else {
+                zlibDecoder = null;
+                return super.newContentDecoder(contentEncoding);
+            }
+            zlibDecoder = new ZlibBodyDecoder(wrapper, maxAllocation);
+            return new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
+                ctx.channel().config(), zlibDecoder);
         }
 
         @Override
         protected void decode(ChannelHandlerContext ctx, HttpObject msg, List<Object> out) throws Exception {
+            if (msg instanceof HttpMessage) {
+                zlibDecoder = null;
+            }
             if (msg instanceof LastHttpContent && !(msg instanceof HttpMessage) && msg.decoderResult().isFailure()) {
                 // msg is released by the superclass after decode
                 out.add(ReferenceCountUtil.retain(msg));
+                return;
+            }
+            if (msg instanceof LastHttpContent && zlibDecoder != null) {
+                // inflate the content first, to tell whether the body ended inside the
+                // compressed stream before the decoder is finished
+                LastHttpContent last = (LastHttpContent) msg;
+                super.decode(ctx, new DefaultHttpContent(last.content()), out);
+                boolean truncated = zlibDecoder.isTruncated();
+                zlibDecoder = null;
+                LastHttpContent end = new DefaultLastHttpContent();
+                end.trailingHeaders().set(last.trailingHeaders());
+                if (truncated) {
+                    end.setDecoderResult(DecoderResult.failure(
+                        new DecompressionException("Request body ended before the end of the compressed stream")));
+                    out.add(end);
+                } else {
+                    super.decode(ctx, end, out);
+                }
                 return;
             }
             super.decode(ctx, msg, out);
