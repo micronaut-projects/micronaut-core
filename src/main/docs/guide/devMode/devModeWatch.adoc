@@ -108,7 +108,7 @@ NOTE: Existing api:context.processor.ExecutableMethodProcessor[] and api:context
 
 A module that watches a file outside the roots the build tools give, such as a bundle in `build/`, injects the api:scheduling.io.watch.FileWatcher[]. In development mode the context's file watcher is backed by the runtime's single watcher: a directory within the roots adds a listener rather than a second watch, a directory outside them is watched for the life of the process, and stopping a generation closes what its beans registered.
 
-In continuous testing the tests start their own contexts, as they would in the build. The runtime's watcher backs none of them: each context has its own file watcher, unless `micronaut.io.watch.enabled` is `false`, in which case it has none. A module that must start without one injects it as optional, or requires the bean with `@Requires(beans = FileWatcher.class)`.
+In continuous testing the tests start their own contexts, as they would in the build. The runtime's watcher backs none of them: each context has its own file watcher, as it would in the build, and may have none, such as when `micronaut.io.watch.enabled` is `false` or in the `function` and `android` environments. A module that must start without one injects it as optional, or requires the bean with `@Requires(beans = FileWatcher.class)`.
 
 == Testing a module against a reload
 
