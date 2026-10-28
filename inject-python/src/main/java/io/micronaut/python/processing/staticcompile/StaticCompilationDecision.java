@@ -35,6 +35,9 @@ import java.util.Properties;
  * @param scope         The declaration that decided whether compilation was attempted
  * @param reasons       Why the body is not compiled; empty when it is
  * @param stats         What the body contains
+ * @param delegation    Whether the Python callers of a compiled body run its Java body, see
+ *                      {@link io.micronaut.python.processing.staticcompile.StaticDelegation#status(Ir.CompiledBody)}:
+ *                      {@code retry}, {@code once}, {@code static}, {@code static-once} or {@code none(<why>)}; {@code null} when it is not compiled
  * @author Graeme Rocher
  * @since 5.3.0
  */
@@ -44,7 +47,8 @@ public record StaticCompilationDecision(String qualifiedName,
                                         Outcome outcome,
                                         Scope scope,
                                         List<Reason> reasons,
-                                        Stats stats) {
+                                        Stats stats,
+                                        @Nullable String delegation) {
 
     // the field names of the JSON and properties forms
     private static final String NAME_KEY = "name";
@@ -60,6 +64,7 @@ public record StaticCompilationDecision(String qualifiedName,
     private static final String JAVA_CALLS_KEY = "javaCalls";
     private static final String BRIDGE_CALLS_KEY = "bridgeCalls";
     private static final String HELPER_CALLS_KEY = "helperCalls";
+    private static final String DELEGATION_KEY = "delegation";
 
     public StaticCompilationDecision {
         Objects.requireNonNull(qualifiedName, "qualifiedName");
@@ -67,6 +72,20 @@ public record StaticCompilationDecision(String qualifiedName,
         Objects.requireNonNull(scope, SCOPE_KEY);
         reasons = reasons == null ? List.of() : List.copyOf(reasons);
         stats = stats == null ? Stats.NONE : stats;
+    }
+
+    /**
+     * A decision without a delegation status.
+     *
+     * @param qualifiedName The function
+     * @param span          Where the function is declared, when known
+     * @param outcome       The outcome
+     * @param scope         The declaration that decided whether compilation was attempted
+     * @param reasons       Why the body is not compiled
+     * @param stats         What the body contains
+     */
+    public StaticCompilationDecision(String qualifiedName, @Nullable SourceSpan span, Outcome outcome, Scope scope, List<Reason> reasons, Stats stats) {
+        this(qualifiedName, span, outcome, scope, reasons, stats, null);
     }
 
     /**
@@ -100,15 +119,17 @@ public record StaticCompilationDecision(String qualifiedName,
             }
             json.endObject();
         }
-        return json.endArray()
+        json.endArray()
             .name("stats").beginObject()
             .name(STATEMENTS_KEY).value(stats.statements())
             .name(JAVA_CALLS_KEY).value(stats.javaCalls())
             .name(BRIDGE_CALLS_KEY).value(stats.bridgeCalls())
             .name(HELPER_CALLS_KEY).value(stats.helperCalls())
-            .endObject()
-            .endObject()
-            .toString();
+            .endObject();
+        if (delegation != null) {
+            json.name(DELEGATION_KEY).value(delegation);
+        }
+        return json.endObject().toString();
     }
 
     /**
@@ -126,6 +147,9 @@ public record StaticCompilationDecision(String qualifiedName,
         properties.setProperty(prefix + JAVA_CALLS_KEY, Integer.toString(stats.javaCalls()));
         properties.setProperty(prefix + BRIDGE_CALLS_KEY, Integer.toString(stats.bridgeCalls()));
         properties.setProperty(prefix + HELPER_CALLS_KEY, Integer.toString(stats.helperCalls()));
+        if (delegation != null) {
+            properties.setProperty(prefix + DELEGATION_KEY, delegation);
+        }
         properties.setProperty(prefix + REASONS_KEY, Integer.toString(reasons.size()));
         for (int i = 0; i < reasons.size(); i++) {
             Reason reason = reasons.get(i);
@@ -186,7 +210,7 @@ public record StaticCompilationDecision(String qualifiedName,
         return new StaticCompilationDecision(name, span,
             Outcome.of(Objects.requireNonNull(properties.getProperty(prefix + OUTCOME_KEY), prefix + OUTCOME_KEY)),
             Scope.of(Objects.requireNonNull(properties.getProperty(prefix + SCOPE_KEY), prefix + SCOPE_KEY)),
-            reasons, stats);
+            reasons, stats, properties.getProperty(prefix + DELEGATION_KEY));
     }
 
     private static int intOf(@Nullable String value) {
