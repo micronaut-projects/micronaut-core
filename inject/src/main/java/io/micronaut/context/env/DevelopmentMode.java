@@ -74,8 +74,12 @@ public final class DevelopmentMode {
     /**
      * Whether development mode is active for the given property resolver.
      *
+     * <p>Given the environment, {@link Environment#isDevelopmentMode()} answers the same and is the entry point to
+     * use; this method serves a property resolver that is not an environment.</p>
+     *
      * @param propertyResolver The property resolver, typically the environment
      * @return True if development mode is active
+     * @see Environment#isDevelopmentMode()
      */
     public static boolean isEnabled(PropertyResolver propertyResolver) {
         // the same test as the @Requires of DevelopmentActive and DevelopmentInactive

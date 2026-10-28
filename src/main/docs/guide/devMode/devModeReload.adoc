@@ -98,7 +98,7 @@ An `@EachProperty` entry counts under its own prefix, so a change of one entry r
 
 `invalidatedBy` then only names what the bean reads outside configuration beans, such as a raw `@Property` or `@Value`. With an empty `invalidatedBy`, the bean is released by the configuration of its closure alone. The prefixes a policy's `observedConfigurationPrefixes` declares add to it in the same way.
 
-A configuration bean in the closure does not keep the bean from being retained, and is not retained with it. Each generation binds it again, so the retained bean must copy the values it needs rather than keep the configuration bean.
+A configuration bean in the closure does not keep the bean from being retained, and is not retained with it. Each generation binds it again, so the retained bean must copy the values it needs rather than keep the configuration bean. Since nothing checks that it does, a bean made from a configuration bean of the application's own class, which a restart replaces, is not retained: it could keep that class of the previous generation.
 
 === HTTP client connections
 
