@@ -196,6 +196,44 @@ class Http3StreamLifecycleSpec extends Specification {
         answered == 8
     }
 
+    def 'HTTP/3 streams answered before the request FIN do not retain their stream slot with the default config'() {
+        given:
+        startServer([
+                'micronaut.server.netty.http3.initial-max-streams-bidirectional': 4,
+        ])
+        def qc = connect()
+        int answered = 0
+
+        when: 'more unfinished uploads than the stream limit are answered by routes that do not read the body'
+        for (int i = 0; i < 8; i++) {
+            def state = new StreamState()
+            def future = Http3.newRequestStream(qc, state)
+            future.await(5, TimeUnit.SECONDS)
+            if (!future.isSuccess()) {
+                break
+            }
+            QuicStreamChannel stream = future.getNow()
+            stream.write(new DefaultHttp3HeadersFrame(new DefaultHttp3Headers()
+                    .path(path).method('POST').authority('localhost').scheme('https')
+                    .add('content-length', '100000')))
+            stream.writeAndFlush(new DefaultHttp3DataFrame(Unpooled.wrappedBuffer(new byte[1000])))
+            def deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (state.status == null && System.nanoTime() < deadline) {
+                TimeUnit.MILLISECONDS.sleep(20)
+            }
+            if (state.status == null) {
+                break
+            }
+            answered++
+        }
+
+        then:
+        answered == 8
+
+        where:
+        path << ['/h3-lifecycle/fail', '/h3-lifecycle/ignore-body', '/h3-lifecycle/missing']
+    }
+
     static class ListAppender extends AppenderBase<ILoggingEvent> {
         final List<String> messages = new CopyOnWriteArrayList<>()
 
@@ -216,6 +254,11 @@ class Http3StreamLifecycleSpec extends Specification {
         @Post('/fail')
         HttpResponse<?> fail() {
             return HttpResponse.serverError()
+        }
+
+        @Post('/ignore-body')
+        String ignoreBody() {
+            return 'ignored'
         }
     }
 }
