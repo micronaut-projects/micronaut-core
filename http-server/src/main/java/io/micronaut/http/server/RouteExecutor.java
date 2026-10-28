@@ -93,6 +93,14 @@ import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunct
 @Singleton
 public final class RouteExecutor {
 
+    /**
+     * Request attribute holding a {@link Runnable} that discards a streaming request body bound to
+     * route arguments. It is run when the route fails before it returns, because the route then
+     * cannot consume the body any more.
+     */
+    @Internal
+    public static final String UNCONSUMED_BODY_DISCARD = RouteExecutor.class.getName() + ".UNCONSUMED_BODY_DISCARD";
+
     private static final Logger LOG = LoggerFactory.getLogger(RouteExecutor.class);
     /**
      * Also present in netty RoutingInBoundHandler.
@@ -664,17 +672,25 @@ public final class RouteExecutor {
 
                 // ensure the route requirements are completely satisfied
                 final HttpRequest<?> httpRequest = requestReference.get();
-                if (!routeMatch.isExecutable()) {
-                    finalRoute = requestArgumentSatisfier
-                            .fulfillArgumentRequirements(routeMatch, httpRequest, true);
-                } else {
-                    finalRoute = routeMatch;
-                }
-                if (finalRoute.isSuspended() && coroutineHelper.isPresent()) {
-                    coroutineHelper.get().setupCoroutineContext(httpRequest, contextView);
-                }
+                Object body;
+                try {
+                    if (!routeMatch.isExecutable()) {
+                        finalRoute = requestArgumentSatisfier
+                                .fulfillArgumentRequirements(routeMatch, httpRequest, true);
+                    } else {
+                        finalRoute = routeMatch;
+                    }
+                    if (finalRoute.isSuspended() && coroutineHelper.isPresent()) {
+                        coroutineHelper.get().setupCoroutineContext(httpRequest, contextView);
+                    }
 
-                Object body = ServerRequestContext.with(httpRequest, (Supplier<Object>) finalRoute::execute);
+                    body = ServerRequestContext.with(httpRequest, (Supplier<Object>) finalRoute::execute);
+                } catch (Throwable e) {
+                    // the route was not invoked, or its invocation threw. The request has failed,
+                    // so a streaming body argument is not consumed any more
+                    httpRequest.getAttribute(UNCONSUMED_BODY_DISCARD, Runnable.class).ifPresent(Runnable::run);
+                    throw e;
+                }
                 if (body instanceof Optional) {
                     body = ((Optional<?>) body).orElse(null);
                 }

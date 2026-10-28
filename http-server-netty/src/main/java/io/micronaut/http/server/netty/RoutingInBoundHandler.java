@@ -79,6 +79,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.EventLoop;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
@@ -150,6 +151,12 @@ import static io.micronaut.http.HttpAttributes.AVAILABLE_HTTP_METHODS;
 class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
+    /**
+     * Request attribute holding a {@link Runnable} that discards the streaming form fields bound
+     * to route arguments if the route never subscribed to them. It is run once the response has
+     * been written.
+     */
+    private static final String UNSUBSCRIBED_BODY_DISCARD = RoutingInBoundHandler.class.getName() + ".UNSUBSCRIBED_BODY_DISCARD";
     /*
      * Also present in {@link RouteExecutor}.
      */
@@ -221,6 +228,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private void cleanupRequest(ChannelHandlerContext ctx, NettyHttpRequest request) {
         try {
+            // the response has been written, a streaming field the route never subscribed to
+            // would otherwise stay buffered and stall the connection
+            request.getAttribute(UNSUBSCRIBED_BODY_DISCARD, Runnable.class).ifPresent(discard -> ((Runnable) discard).run());
             request.release();
         } finally {
             if (terminateEventPublisher != ApplicationEventPublisher.NO_OP) {
@@ -655,6 +665,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 final boolean alwaysAddContent = request.isFormData();
                 RouteMatch<?> routeMatch = finalRoute;
                 final AtomicBoolean executed = new AtomicBoolean(false);
+                final AtomicBoolean discarded = new AtomicBoolean(false);
                 final AtomicLong pressureRequested = new AtomicLong(0);
                 final ConcurrentHashMap<String, Sinks.Many<Object>> subjectsByDataName = new ConcurrentHashMap<>();
                 final Collection<Sinks.Many<Object>> downstreamSubscribers = Collections.synchronizedList(new ArrayList<>());
@@ -687,7 +698,61 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 @Override
                 protected void doOnSubscribe(Subscription subscription) {
                     this.s = subscription;
+                    // if the route fails before it returns, it won't consume the fields bound to it
+                    request.setAttribute(RouteExecutor.UNCONSUMED_BODY_DISCARD, (Runnable) this::discard);
+                    // if the route returns without subscribing to the fields bound to it, they
+                    // are not consumed either
+                    request.setAttribute(UNSUBSCRIBED_BODY_DISCARD, (Runnable) this::discardIfUnsubscribed);
                     subscription.request(1);
+                }
+
+                /**
+                 * Discard the form if the route did not subscribe to any of the fields bound to
+                 * it. If it subscribed to one of them, the form is left alone.
+                 */
+                private void discardIfUnsubscribed() {
+                    EventLoop eventLoop = request.getChannelHandlerContext().channel().eventLoop();
+                    if (!eventLoop.inEventLoop()) {
+                        eventLoop.execute(this::discardIfUnsubscribed);
+                        return;
+                    }
+                    if (discarded.get()) {
+                        return;
+                    }
+                    synchronized (downstreamSubscribers) {
+                        if (downstreamSubscribers.isEmpty()) {
+                            // no streaming field was bound
+                            return;
+                        }
+                        for (Sinks.Many<Object> subject : downstreamSubscribers) {
+                            if (subject.currentSubscriberCount() > 0) {
+                                return;
+                            }
+                        }
+                    }
+                    discard();
+                }
+
+                /**
+                 * Release the fields bound to the route, and read and drop the rest of the
+                 * form, so that the connection does not stall on it.
+                 */
+                private void discard() {
+                    EventLoop eventLoop = request.getChannelHandlerContext().channel().eventLoop();
+                    if (!eventLoop.inEventLoop()) {
+                        eventLoop.execute(this::discard);
+                        return;
+                    }
+                    if (!discarded.compareAndSet(false, true)) {
+                        return;
+                    }
+                    for (Sinks.Many<Object> subject : downstreamSubscribers) {
+                        subject.tryEmitError(new IllegalStateException("The request failed, the request body was discarded"));
+                    }
+                    for (HttpDataReference dataReference : dataReferences.values()) {
+                        dataReference.destroy();
+                    }
+                    s.request(Long.MAX_VALUE);
                 }
 
                 @Override
@@ -710,7 +775,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
 
                 private void doOnNext0(Object message) {
-                    if (request.destroyed) {
+                    if (request.destroyed || discarded.get()) {
                         // we don't want this message anymore
                         return;
                     }

@@ -33,6 +33,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiPredicate;
@@ -55,6 +56,7 @@ public class HttpDataReference {
     private final AtomicReference<RandomAccessFile> fileAccess = new AtomicReference<>();
     private final AtomicLong position = new AtomicLong(0);
     private final List<Component> components = new ArrayList<>();
+    private final AtomicBoolean destroyed = new AtomicBoolean(false);
 
     /**
      * @param data The data this class is in control of
@@ -163,6 +165,10 @@ public class HttpDataReference {
      * disk and releases the buffer for the file.
      */
     void destroy() {
+        if (!destroyed.compareAndSet(false, true)) {
+            // already destroyed, e.g. by the discard of a failed route and by its subscriber
+            return;
+        }
         fileAccess.getAndUpdate(channel -> {
             if (channel != null) {
                 try {
