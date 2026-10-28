@@ -89,6 +89,7 @@ public final class PythonTypeElementVisitorProcessor {
     private static final String ANN_CONFIGURATION_READER = "io.micronaut.context.annotation.ConfigurationReader";
     private static final String ANN_EVENT_LOOP_SAFE = "io.micronaut.context.python.annotation.EventLoopSafe";
     private static final String ANN_EVENT_LOOP_SAFE_OWNER = "io.micronaut.context.python.annotation.EventLoopSafeOwner";
+    private static final String ANN_HTTP_METHOD_MAPPING = "io.micronaut.http.annotation.HttpMethodMapping";
 
     private final ClassLoader classLoader;
     private final TypeElementVisitor.VisitorKind visitorKind;
@@ -384,8 +385,8 @@ public final class PythonTypeElementVisitorProcessor {
      * Annotates the methods whose compiled body never enters Python ({@link EventLoopSafety}) with
      * {@code EventLoopSafe}, which the executor selection of the runtime reads from the metadata of the
      * method: such a route runs where a Java route runs, on the event loop unless it names an executor.
-     * The class declaring one is annotated with {@code EventLoopSafeOwner}: the runtime creates its
-     * singleton bean at startup, since creating it runs Python.
+     * The class declaring a route among them is annotated with {@code EventLoopSafeOwner}: the runtime
+     * creates its singleton bean at startup, since creating it runs Python.
      *
      * @param environment   The processing environment, holding the static compilation plan
      * @param classes       The classes being processed
@@ -410,7 +411,7 @@ public final class PythonTypeElementVisitorProcessor {
                     // only the bridge of the compiled signature runs the body: another overload of the name calls Python
                     if (compiledSignature(method, body) && !method.hasDeclaredAnnotation(ANN_EVENT_LOOP_SAFE)) {
                         method.annotate(ANN_EVENT_LOOP_SAFE);
-                        owner = true;
+                        owner |= method.hasStereotype(ANN_HTTP_METHOD_MAPPING);
                     }
                 }
             }

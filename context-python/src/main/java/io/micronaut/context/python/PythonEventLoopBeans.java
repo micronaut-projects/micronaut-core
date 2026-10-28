@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Creates, when the application starts, the singleton beans of the generated classes declaring a
- * method whose compiled body never enters Python ({@link EventLoopSafe}): creating the bean runs
+ * route whose compiled body never enters Python ({@link EventLoopSafe}): creating the bean runs
  * Python (the constructor of the Python class, the injection of a module's attributes), which the
  * first request of a route kept on the event loop would otherwise do there, holding the event loop
  * until the Python context is free. Creating the bean also primes the slots of its attributes fixed
@@ -54,6 +54,7 @@ import java.util.concurrent.ConcurrentHashMap;
 final class PythonEventLoopBeans implements ApplicationEventListener<StartupEvent> {
 
     private static final Logger LOG = LoggerFactory.getLogger(PythonEventLoopBeans.class);
+    private static final String HTTP_METHOD_MAPPING = "io.micronaut.http.annotation.HttpMethodMapping";
 
     private final BeanContext beanContext;
     private final boolean eventLoop;
@@ -80,7 +81,8 @@ final class PythonEventLoopBeans implements ApplicationEventListener<StartupEven
         for (BeanDefinition<?> definition : beanContext.getBeanDefinitions(Qualifiers.byStereotype(EventLoopSafeOwner.class))) {
             Set<Class<?>> declaring = new HashSet<>();
             for (ExecutableMethod<?, ?> method : definition.getExecutableMethods()) {
-                if (method.hasAnnotation(EventLoopSafe.class)) {
+                // a route: no executor is selected for any other method
+                if (method.hasAnnotation(EventLoopSafe.class) && method.hasStereotype(HTTP_METHOD_MAPPING)) {
                     declaring.add(method.getDeclaringType());
                 }
             }
