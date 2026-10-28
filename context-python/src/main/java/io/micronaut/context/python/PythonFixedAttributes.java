@@ -32,11 +32,14 @@ import java.util.concurrent.atomic.AtomicLong;
  * attribute.
  * <p>
  * A slot reads the attribute through the Python object the first time and keeps the converted
- * value, for that Python object, until the epoch moves on: the class's {@code __setattr__} and
- * {@code __delattr__} report every change of an attribute an object of the class has once a slot
- * has read one ({@code micronaut_runtime.__micronaut_fixed_member}), so a write the compilation does
- * not see (a test's {@code monkeypatch.setattr}, code outside the compilation) makes the slots read
- * the attribute again. An object whose class serves its attributes itself (a {@code __getattribute__},
+ * value, for that Python object, until the epoch moves on: once a slot has read an attribute of an
+ * object ({@code micronaut_runtime.__micronaut_fixed_member}), the class's {@code __setattr__} and
+ * {@code __delattr__} report every change of that attribute, by name, of an object of the class, so a
+ * write the compilation does not see (a test's {@code monkeypatch.setattr}, code outside the
+ * compilation) makes the slots read the attribute again. A write of an attribute no slot holds (a
+ * counter the compilation mutates) reports nothing and keeps the slots' values. The epoch is one per
+ * stub class rather than one per attribute: the compilation never writes a fixed attribute, so a
+ * reported change is rare, and a single epoch keeps the read a field comparison. An object whose class serves its attributes itself (a {@code __getattribute__},
  * a {@code __setattr__} of its own, a class attribute of the name) is read every time, as the stub
  * reads any other attribute.
  *
@@ -70,7 +73,8 @@ public final class PythonFixedAttributes {
     }
 
     /**
-     * Reports a change of an attribute of an object of the class: every slot reads its attribute again.
+     * Reports a change of an attribute a slot holds of an object of the class: every slot reads its
+     * attribute again.
      * Called by the {@code __setattr__} and {@code __delattr__} the Python side gives the class.
      */
     public void changed() {

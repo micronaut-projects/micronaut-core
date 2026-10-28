@@ -40,6 +40,7 @@ class Pricing:
         self.rates = rates
         self.name = name
         self.limit = limit
+        self.hits = 0
 
     def total(self, n: int) -> float:
         return self.rates.rate(min(n, self.limit))
@@ -70,6 +71,9 @@ class Front:
 
     def label(self, n: int) -> str:
         return self.pricing.label(n)
+
+    def bump(self) -> None:
+        self.pricing.hits += 1
 '''
 
     void "fixed attributes give the results of the python bodies, before and after a change"() {
@@ -139,6 +143,64 @@ class Front:
         and: "the java bodies ran, and the class reports changes of the attributes of its objects"
         results[StaticCompilationMode.ALL].java_runs >= 6
         results[StaticCompilationMode.ALL].hooked == '_micronaut_fixed_setattr'
+    }
+
+    void "a write of an attribute no stub keeps reports no change, a write of a fixed attribute does"() {
+        given:
+        Map results = [:]
+        [StaticCompilationMode.OFF, StaticCompilationMode.ALL].each { StaticCompilationMode m ->
+            mode = m
+            decisions.clear()
+            PythonStatic.resetEntries()
+            def context = buildContext(SOURCE)
+            try {
+                def pricing = getBean(context, 'python.Pricing')
+                def front = getBean(context, 'python.Front')
+                Value self = pricing.asPolyglotValue()
+                self.getContext().getBindings('python').putMember('pricing', self)
+                Map row = [:]
+                row.label = invoke { pricing.label(4) }
+                Long before = epoch(pricing)
+                10.times { front.bump() }
+                self.getContext().eval('python', 'for _ in range(10):\n    pricing.hits += 1')
+                row.hits = self.getMember('hits').asInt()
+                row.counted = invoke { pricing.label(4) }
+                Long counted = epoch(pricing)
+                self.getContext().eval('python', 'pricing.name = "vip"')
+                row.renamed = invoke { pricing.label(4) }
+                if (m == StaticCompilationMode.ALL) {
+                    row.counter_moved_epoch = counted != before
+                    row.name_moved_epoch = epoch(pricing) != counted
+                    row.hooked = self.getContext().eval('python', 'type(pricing).__setattr__ is object.__setattr__').asBoolean()
+                }
+                results[m] = row
+            } finally {
+                context.close()
+            }
+        }
+
+        expect: "the same results either way"
+        results[StaticCompilationMode.ALL].subMap(['label', 'hits', 'counted', 'renamed']) == results[StaticCompilationMode.OFF]
+        results[StaticCompilationMode.OFF] == [label: 'std:4', hits: 20, counted: 'std:4', renamed: 'vip:4']
+
+        and: "the counter leaves the epoch of the fixed slots alone; the fixed attribute moves it"
+        results[StaticCompilationMode.ALL].counter_moved_epoch == false
+        results[StaticCompilationMode.ALL].name_moved_epoch == true
+        results[StaticCompilationMode.ALL].hooked == false
+    }
+
+    /**
+     * The epoch of the fixed attributes of the stub class of a bean, or null when it has none.
+     */
+    private static Long epoch(Object bean) {
+        for (Class<?> type = bean.getClass(); type != null; type = type.superclass) {
+            def field = type.declaredFields.find { it.name == 'graalpyInternalFixedAttributes' }
+            if (field != null) {
+                field.accessible = true
+                return field.get(null).epoch()
+            }
+        }
+        return null
     }
 
     private static Object invoke(Closure<?> call) {
