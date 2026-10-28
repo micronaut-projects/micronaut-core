@@ -673,6 +673,27 @@ class Refused(Exception):
     """A construct without a lowering; the reason is recorded before it is raised."""
 
 
+class _Lowered(list):
+    """The lowered statements of a block, with the Python line each one is lowered from in ``lines``."""
+
+    def __init__(self):
+        super().__init__()
+        self.lines = []
+
+    def add(self, statements, line):
+        self.extend(statements)
+        self.lines.extend([line] * len(statements))
+
+
+def _body(statements, prefix=()):
+    """
+    A Body of lowered statements, after the given ones lowered from no statement of their own: the
+    lines of the statements the generated Java maps its lines to (see StaticLineMap).
+    """
+    lines = list(getattr(statements, "lines", [0] * len(statements)))
+    return Body(list(prefix) + list(statements), [0] * len(prefix) + lines)
+
+
 class _ComprehensionBody(ast.stmt):
     """The statement at the heart of the loop a comprehension lowers to: the element appended to the result."""
     _fields = ()
@@ -754,11 +775,11 @@ class Lowering:
         try:
             self._shadow_reassigned_parameters()
             statements = self._block(self.node.body)
+            body = _body(statements, self.hoisted)
         except Refused:
             return None
         if self.reasons:
             return None
-        body = Body(self.hoisted + statements)
         stats = Stats(len(self.node.body), self.java_calls, self.bridge_calls, self.helper_calls)
         if self.class_def is not None:
             owner = self.class_def.qualifiedName()
@@ -1067,11 +1088,11 @@ class Lowering:
 
     def _block(self, statements):
         self.depth += 1
-        lowered = []
+        lowered = _Lowered()
         for index, statement in enumerate(statements):
             self.following.append(statements[index + 1:])
             try:
-                lowered.extend(self._statement(statement))
+                lowered.add(self._statement(statement), getattr(statement, "lineno", 0))
             except Refused:
                 if self.synthetic:
                     raise  # a statement of a comprehension's loop: the comprehension has no lowering
@@ -1135,14 +1156,14 @@ class Lowering:
             self.branches.append(node)
             self.branch_depths.append(self.depth)
             try:
-                then = Body(self._branch_block(node.body))
-                or_else = Body(self._branch_block(node.orelse)) if node.orelse else None
+                then = _body(self._branch_block(node.body))
+                or_else = _body(self._branch_block(node.orelse)) if node.orelse else None
             finally:
                 self.branch_depths.pop()
                 self.branches.pop()
             return [If(test, then, or_else)]
         if isinstance(node, ast.While):
-            return self._loop(node, lambda loop: While(loop, self._unhoisted(lambda: self._truthy(node.test)), Body(self._block(node.body)), *self._exits(loop)))
+            return self._loop(node, lambda loop: While(loop, self._unhoisted(lambda: self._truthy(node.test)), _body(self._block(node.body)), *self._exits(loop)))
         if isinstance(node, ast.For):
             return [self._for(node)]
         if isinstance(node, ast.Break):
@@ -1234,7 +1255,7 @@ class Lowering:
 
             def build(loop):
                 self.locals[variable] = LONG
-                return ForRange(loop, variable, start, stop, step, Body(self._block(node.body)), *self._exits(loop))
+                return ForRange(loop, variable, start, stop, step, _body(self._block(node.body)), *self._exits(loop))
             return self._loop(node, build)[0]
         if ((isinstance(iterable, ast.Name) or (isinstance(iterable, ast.Attribute) and isinstance(iterable.value, ast.Name) and iterable.value.id == "self"))
                 and _may_change_iterated(iterable, node.body)):
@@ -1262,7 +1283,7 @@ class Lowering:
 
         def build(loop):
             self.locals[variable] = used
-            return ForEach(loop, variable, used, declared, collection, Body(self._block(node.body)), *self._exits(loop))
+            return ForEach(loop, variable, used, declared, collection, _body(self._block(node.body)), *self._exits(loop))
         return self._loop(node, build)[0]
 
     def _loop_variable(self, variable, node):
@@ -1306,7 +1327,7 @@ class Lowering:
             for name, getter, java_type in ((key_name, "getKey", used[0]), (value_name, "getValue", used[1])):
                 self.locals[name] = java_type
                 bindings.append(Local(name, java_type, Cast(InvokeJava(LocalRef(entry, MAP_ENTRY), MAP_ENTRY, getter, [], [], OBJECT), java_type)))
-            return ForEach(loop, entry, MAP_ENTRY, MAP_ENTRY, entries, Body(bindings + self._block(node.body)), *self._exits(loop))
+            return ForEach(loop, entry, MAP_ENTRY, MAP_ENTRY, entries, _body(self._block(node.body), bindings), *self._exits(loop))
         return self._loop(node, build)[0]
 
     # ---------------------------------------------------------------- exceptions
@@ -1510,7 +1531,7 @@ class Lowering:
         self.thrown.append(set())
         self.java_code.append([])
         try:
-            body = Body(self._block(node.body))
+            body = _body(self._block(node.body))
         finally:
             thrown = self.thrown.pop()
             java_code = self.java_code.pop()
@@ -1552,7 +1573,7 @@ class Lowering:
             declared_before = set(self.locals)
             self.handling.append(("except", handler.name))
             try:
-                catches.append(Catch(caught[0], handler.name, Body(self._block(handler.body))))
+                catches.append(Catch(caught[0], handler.name, _body(self._block(handler.body))))
             finally:
                 self.handling.pop()
                 if handler.name is not None:
@@ -1564,7 +1585,7 @@ class Lowering:
             declared_before = set(self.locals)
             self.handling.append(("finally", None))
             try:
-                finally_body = Body(self._block(node.finalbody))
+                finally_body = _body(self._block(node.finalbody))
             finally:
                 self.handling.pop()
             self._end_scope(node, declared_before, [], "the finally block")

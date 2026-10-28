@@ -240,6 +240,13 @@ A division by zero, a failed `assert` or `+` on `None` in a Java body reaches a 
 
 Introspected classes keep their ownership model: their state lives in Java fields, and a compiled body reads and writes those fields, which is what a Java caller of the accessors sees. Other classes keep their state in the Python object, and a compiled body reaches it through the same member access the generated accessors use; each such access crosses into the Python runtime, which the report counts as a bridge call, so a compiled body that touches many attributes of a plain class may not be faster than the bridge it replaces.
 
+[[staticCompilationStackTraces]]
+== Stack Traces and Debugging
+
+The generated Java of a compiled method notes where each statement comes from: a `Compiled from` javadoc gives the Python file and the line of the `def`, and a `// Python line N` comment precedes the Java of each Python statement. When `PyronautCompiler` compiles the application (the `pyronaut` CLI and the build tasks that run it, to a directory or in memory), it rewrites the class files of such a generated class to these positions: the class names the Python file as its source, and each line of a compiled method is the line of the Python statement it runs, or the line of the `def` for the code the generated class adds around the statements. A stack trace of an exception raised in a compiled body therefore shows the Python position (`at shop.PricingService.total(pricing.py:12)`), and so does a debugger, which reads the same attributes. The other methods of the class, which call into Python, have no Python statement of their own: their frames show the Python file without a line, followed by the frames of the Python code they run.
+
+A class compiled by `javac` without `PyronautCompiler` (the annotation processor on the processor path of a plain Java compilation) keeps the positions of the generated Java, with the comments as the map to the Python source.
+
 [[staticCompilationAssumptions]]
 == Assumptions and Limitations
 

@@ -82,10 +82,40 @@ public sealed interface Ir {
      * A sequence of statements.
      *
      * @param statements The statements
+     * @param lines      The Python line each statement is lowered from, 0 for one lowered from none;
+     *                   empty when no line is known. The generated Java maps its lines to them
+     *                   (see {@link StaticLineMap})
      */
-    record Body(List<Statement> statements) implements Statement {
+    record Body(List<Statement> statements, List<Integer> lines) implements Statement {
         public Body {
             statements = List.copyOf(statements);
+            // the lowering passes Python ints, which a polyglot list may give as any Number
+            List<?> given = lines;
+            List<Integer> copied = new java.util.ArrayList<>(given.size());
+            for (Object line : given) {
+                copied.add(line instanceof Number number ? number.intValue() : 0);
+            }
+            if (!copied.isEmpty() && copied.size() != statements.size()) {
+                throw new IllegalArgumentException("A body of " + statements.size() + " statements has " + copied.size() + " lines");
+            }
+            lines = List.copyOf(copied);
+        }
+
+        /**
+         * A body whose statements have no known line.
+         *
+         * @param statements The statements
+         */
+        public Body(List<Statement> statements) {
+            this(statements, List.of());
+        }
+
+        /**
+         * @param index The index of a statement
+         * @return The Python line of the statement, 0 when it is not known
+         */
+        public int line(int index) {
+            return lines.isEmpty() ? 0 : lines.get(index);
         }
     }
 

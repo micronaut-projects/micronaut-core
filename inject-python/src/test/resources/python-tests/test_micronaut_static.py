@@ -434,6 +434,18 @@ class ModuleFunctionTest(unittest.TestCase):
         self.assertEqual("append", append.name())
         self.assertEqual("LocalRef", _uncast(statements[-1].value()).getClass().getSimpleName())
 
+    def test_each_statement_carries_the_python_line_it_is_lowered_from(self):
+        # the generated Java maps its lines to them, so stack traces show the Python line
+        line = MODULE.splitlines().index("    return [v * 2 for v in values if v % 2 == 0]") + 1
+        body = self._compiled("evens").body()
+        statements = list(body.statements())
+        self.assertEqual(len(statements), len(list(body.lines())))
+        # the loop the comprehension is hoisted into belongs to the statement it is part of
+        self.assertEqual([line] * 3, list(body.lines())[-3:])
+        self.assertEqual([line], list(statements[-2].body().lines()))
+        twice_of = MODULE.splitlines().index("    return n * RATE") + 1
+        self.assertEqual([twice_of], list(self._compiled("twice_of").body().lines()))
+
     def test_dict_comprehensions_and_any_and_all_lower_alike(self):
         statements = list(self._compiled("lengths").body().statements())
         self.assertEqual("java.util.Map<java.lang.String,long>", statements[-3].type())
