@@ -43,6 +43,29 @@ class PropertySourceImporterRegistryTest {
     }
 
     @Test
+    void closesDisabledImportersAfterConfigurationLoad() {
+        TestImporter importer = new TestImporter("disabled", false);
+        DefaultApplicationContextBuilder builder = (DefaultApplicationContextBuilder) ApplicationContext.builder();
+        builder.propertySourcesLocator(new ConfigImportPropertySourcesLocator(() -> List.of(importer)));
+
+        try (DefaultEnvironment environment = new DefaultEnvironment(builder)) {
+            environment.start();
+
+            assertEquals(1, importer.closedCount);
+        }
+    }
+
+    @Test
+    void closesAllImportersWhenProvidersAreDuplicated() {
+        assertImportersClosedWhenProviderRejected("FAILING", "Duplicate property source importer for provider [failing]");
+    }
+
+    @Test
+    void closesAllImportersWhenProviderIsBlank() {
+        assertImportersClosedWhenProviderRejected(" ", "returned an empty provider");
+    }
+
+    @Test
     void closesImportersAfterEachConfigurationLoadCycle() {
         DefaultApplicationContextBuilder builder = (DefaultApplicationContextBuilder) ApplicationContext.builder();
         builder.propertySourcesLocator(new ConfigImportPropertySourcesLocator(() -> List.of(new TrackingImporter())));
@@ -94,6 +117,24 @@ class PropertySourceImporterRegistryTest {
         assertEquals("close failed", e.getSuppressed()[0].getCause().getMessage());
     }
 
+    private static void assertImportersClosedWhenProviderRejected(String provider, String expectedMessage) {
+        TestImporter rejected = new TestImporter(provider);
+        TestImporter remaining = new TestImporter("remaining");
+        DefaultApplicationContextBuilder builder = (DefaultApplicationContextBuilder) ApplicationContext.builder();
+        builder.propertySourcesLocator(new ConfigImportPropertySourcesLocator(() -> List.of(new FailingImporter(), rejected, remaining)));
+
+        try (DefaultEnvironment environment = new DefaultEnvironment(builder)) {
+            ConfigurationException e = assertThrows(ConfigurationException.class, environment::start);
+
+            assertTrue(e.getMessage().contains(expectedMessage));
+            assertEquals(1, FailingImporter.closedCount.get());
+            assertEquals(1, rejected.closedCount);
+            assertEquals(1, remaining.closedCount);
+            assertEquals(1, e.getSuppressed().length);
+            assertEquals("close failed", e.getSuppressed()[0].getCause().getMessage());
+        }
+    }
+
     private static void createDuplicateImportersByProvider() {
         ConfigImportPropertySourcesLocator.toImporterByProvider(List.of(
             new TestImporter("file"),
@@ -103,9 +144,21 @@ class PropertySourceImporterRegistryTest {
 
     private static final class TestImporter implements PropertySourceImporter<ConnectionString> {
         private final String protocol;
+        private final boolean enabled;
+        private int closedCount;
 
         private TestImporter(String protocol) {
+            this(protocol, true);
+        }
+
+        private TestImporter(String protocol, boolean enabled) {
             this.protocol = protocol;
+            this.enabled = enabled;
+        }
+
+        @Override
+        public boolean isEnabled() {
+            return enabled;
         }
 
         @Override
@@ -126,6 +179,11 @@ class PropertySourceImporterRegistryTest {
         @Override
         public Optional<PropertySource> importPropertySource(ImportContext<ConnectionString> context) {
             return Optional.of(PropertySource.of(protocol + ":test", Map.of("connection", context.importDeclaration().getCanonicalForm())));
+        }
+
+        @Override
+        public void close() {
+            closedCount++;
         }
     }
 
