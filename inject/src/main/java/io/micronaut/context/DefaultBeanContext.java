@@ -497,7 +497,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     @Internal
     public boolean isStoppingOrStopped() {
-        return startFailed || isShuttingDown();
+        // initializing is read before running: a start sets running before it clears initializing, so a start that
+        // completes between the two reads is never seen as neither
+        boolean starting = initializing.get();
+        return startFailed || terminating.get() || !starting && !running.get();
     }
 
     /**
