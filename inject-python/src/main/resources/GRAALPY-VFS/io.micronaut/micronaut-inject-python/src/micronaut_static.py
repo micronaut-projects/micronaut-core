@@ -27,11 +27,13 @@ module-level one for each method of its scope that is ``SKIPPED``, except in mod
 skipping is the expected common case.
 """
 import ast
+import os
 
 import java
 
-from micronaut_typecheck import Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, function_node, switch_value
-from micronaut_lowering import JAVA_RESERVED_NAMES, Lowering, stub_type_name, _decorated_with
+from micronaut_typecheck import (Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, ScopeModes,
+                                ScopeResolver, SCOPE_CLASS, SCOPE_FUNCTION, SCOPE_MODE, class_key, function_node, TRANSPARENT_BASES)
+from micronaut_lowering import JAVA_RESERVED_NAMES, Lowering, stub_type_name, _child_nodes, _decorated_with, _LEAVES
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
 Decision = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision")
@@ -39,7 +41,10 @@ Outcome = java.type("io.micronaut.python.processing.staticcompile.StaticCompilat
 Scope = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Scope")
 Reason = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Reason")
 Stats = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Stats")
+Delegation = java.type("io.micronaut.python.processing.staticcompile.StaticDelegation")
 ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
+EventLoopSafety = java.type("io.micronaut.python.processing.staticcompile.EventLoopSafety")
+PythonEntries = java.type("io.micronaut.python.processing.staticcompile.Ir$PythonEntries")
 MICRONAUT_TEST = "io.micronaut.test.extensions.junit5.annotation.MicronautTest"
 
 MODE_OFF = "off"
@@ -62,35 +67,47 @@ SUPPORTED_EXPRESSIONS = (ast.Constant, ast.Name, ast.Attribute, ast.Call, ast.Bi
 POOLED_DECORATOR = "ContextPooled"
 PROTOCOL_BASES = {"Protocol", "typing.Protocol"}
 
+# attributes fixed at construction (StaticPlanner.fixed_attribute): the members through which a class
+# takes over the access to the attributes of its objects
+ATTRIBUTE_PROTOCOL = {"__setattr__", "__delattr__", "__getattr__", "__getattribute__", "__new__", "__slots__",
+                      "__dict__", "__class__", "__init_subclass__", "__class_getitem__", "__set_name__"}
+# the Java types whose value a Python value converts to anew every time, equal each time: numbers,
+# booleans, characters and strings
+FIXED_SCALARS = {"long", "int", "short", "byte", "double", "float", "boolean", "char",
+                 "java.lang.Long", "java.lang.Integer", "java.lang.Short", "java.lang.Byte", "java.lang.Double",
+                 "java.lang.Float", "java.lang.Boolean", "java.lang.Character", "java.lang.String"}
+# the types any Python value converts to, a container among them
+LOOSE_TYPES = {"java.lang.Object", "java.lang.Number", "java.io.Serializable", "java.lang.Comparable", "java.lang.CharSequence"}
+# the types of java.util whose values are immutable
+IMMUTABLE_UTIL_TYPES = {"java.util.UUID", "java.util.Locale", "java.util.Currency"}
+# the types a Python container converts to, by a copy of its elements
+CONTAINER_TYPES = ("java.lang.Iterable", "java.util.Map", "java.util.Iterator", "java.util.Optional", "java.util.stream.BaseStream")
+# the calls writing the attribute their string argument names: setattr(o, "x", v), delattr(o, "x"),
+# object.__setattr__(o, "x", v), monkeypatch.setattr(o, "x", v), patch.object(o, "x"), patch("m.C.x"), patch.multiple(o, x=v)
+NAMED_WRITERS = {"setattr", "delattr", "__setattr__", "__delattr__", "object", "multiple", "patch"}
+# the attributes whose assignment changes what reading any attribute of an object gives: its class,
+# the bases of a class, the members of the attribute protocol
+PROTOCOL_CHANGES = ATTRIBUTE_PROTOCOL | {"__bases__", "__mro__"}
+# the calls among them that write the attribute a computed name says when no string names it
+COMPUTED_WRITERS = {"setattr", "delattr", "__setattr__", "__delattr__"}
 
-class CompileScope:
+
+# static compilation: a function is compiled under mode all or when switched on; mode annotated
+# decides as mode off does
+COMPILE_MODES = ScopeModes(
+    "static compilation", MODES,
+    default=lambda mode: mode == MODE_ALL,
+    on=lambda mode: True,
+    off=False)
+
+
+def CompileScope(mode, annotation_names):
     """
-    Resolves whether a definition is compiled from its decorators and its enclosing scopes, and
-    which declaration decided: the nearest ``CompileStatic`` switch, else the compilation's mode.
+    The :class:`micronaut_typecheck.ScopeResolver` of static compilation: resolves whether a
+    definition is compiled and which declaration decided, the nearest ``CompileStatic`` switch, else
+    the compilation's mode.
     """
-
-    def __init__(self, mode, annotation_names):
-        if mode not in MODES:
-            raise ValueError(f"Unknown static compilation mode [{mode}]; expected one of {', '.join(MODES)}")
-        self.mode = mode
-        self.annotation_names = frozenset(annotation_names or ())
-
-    def switch(self, decorators):
-        """True or False when one of the decorators is an accepted switch, None otherwise; a bare decorator switches on."""
-        for decorator in decorators or ():
-            if decorator.annotationName() in self.annotation_names:
-                members = decorator.members()
-                value = members.get("value") if members is not None else None
-                return True if value is None else switch_value(value)
-        return None
-
-    def resolve(self, module_decorators, class_decorators, function_decorators):
-        """(compiled, scope name) for a function under the given declarations."""
-        for decorators, scope in ((function_decorators, "FUNCTION"), (class_decorators, "CLASS"), (module_decorators, "MODULE")):
-            switch = self.switch(decorators)
-            if switch is not None:
-                return switch, scope
-        return self.mode == MODE_ALL, "MODE"
+    return ScopeResolver(mode, annotation_names, COMPILE_MODES)
 
 
 class StaticPlanner:
@@ -103,26 +120,43 @@ class StaticPlanner:
         self.strict = strict
         self.decisions = []
         self.bodies = []
+        self.body_classes = set()  # the generated classes the bodies belong to, see Lowering._of_compilation
         self.scripts = []         # the ScriptDefs of the modules that generate a class for their compiled functions only
         self.diagnostics = []
         self._ineligibility = {}  # id(class_def) -> why the class generates no stub, or None: asked once per class
         self._decided = {}        # id(node) -> the decision, or None while it is being made
         self._bodies = {}         # id(node) -> the compiled body
+        # id(node) -> (what in the compiled body enters Python or None, the functions it calls through Java)
+        self._python_entries = {}
+        self._class_scopes = {}   # id(module) -> the resolution of each of its classes
         # the classes already reported for a class-level switch they can never honour
         self._reported_classes = set()
+        self._fixed = {}          # id(class model) -> the names of its attributes fixed at construction
+        self._writes = None       # the attribute writes of the compilation, see AttributeWrites
+        self._modules_by_path = None  # the normalized source path -> the module of the compilation, see module_of_path
 
     def plan(self, checker, visitor_context=None):
         """
         Decide every function recorded by the type checker; returns the decisions. The checker's
         facts are created from the visitor context when its own check did not run. Every plan starts
         afresh: the decisions and diagnostics of an earlier plan are dropped, so a planner that
-        outlives one compilation element never reports a decision twice.
+        outlives one compilation element never reports a decision twice, nor hands over the bodies
+        and scripts of an earlier plan or takes its classes for classes of this one.
         """
         self.decisions = []
+        self.bodies = []
+        self.body_classes = set()
+        self.scripts = []
         self.diagnostics = []
+        self._ineligibility = {}
         self._decided = {}
         self._bodies = {}
+        self._python_entries = {}
+        self._class_scopes = {}
         self._reported_classes = set()
+        self._fixed = {}
+        self._writes = None
+        self._modules_by_path = None
         if getattr(checker, "facts", None) is None and visitor_context is not None:
             checker.facts = TypeFacts(visitor_context)
             checker.python_classes = PythonClasses(checker)
@@ -141,7 +175,45 @@ class StaticPlanner:
                         self._decide(module, class_def, class_node, function_def, function_node(class_node, function_def.name()))
                     else:
                         self._decide_accessor(class_def, function_def, accessor)
+        self._record_python_entries()
         return list(self.decisions)
+
+    def _record_python_entries(self):
+        """
+        Gives every compiled body what may make it enter Python (``Ir.PythonEntries``), from which
+        ``EventLoopSafety.safeBodies`` keeps a compiled route that never enters Python on the event loop,
+        as a Java route is: what in the body enters Python by itself (``EventLoopSafety.pythonEntry``,
+        and what the lowering knows of the calls of the compilation it makes through Java: an accessor
+        of a stub that is not introspected, a member it cannot follow), the compiled functions it calls
+        through Java (a call of a function that is not compiled runs its Python body through the bridge),
+        and the generated constructors it calls. A read of an attribute fixed at construction is allowed:
+        the stub primes its slot when it takes its Python object (PythonFixedAttributes.prime).
+        """
+        marked = {}
+        for node_key, body in list(self._bodies.items()):
+            facts = self._python_entries.get(node_key)
+            if facts is None:
+                continue
+            entry, callees, constructions = facts
+            keys = []
+            for callee in callees:
+                compiled = self._bodies.get(id(callee)) if callee is not None else None
+                if compiled is None:
+                    entry = entry or "calls a function of the compilation that is not compiled, through the bridge"
+                    break
+                keys.append(compiled.key())
+            replaced = body.withPythonEntries(PythonEntries(entry, keys, constructions))
+            marked[body.key()] = replaced
+            self._bodies[node_key] = replaced
+        self.bodies = [marked.get(body.key(), body) for body in self.bodies]
+
+    def module_of_path(self, path):
+        """The module of the compilation whose source has the path, normalized (normcase, normpath, abspath), or None."""
+        if self._modules_by_path is None:
+            self._modules_by_path = {}
+            for source, module in self.checker._modules.items():
+                self._modules_by_path.setdefault(os.path.normcase(os.path.normpath(os.path.abspath(source))), module)
+        return self._modules_by_path.get(path)
 
     def module_function(self, module, name):
         """The (function_def, node) of a top-level function of the module, or None."""
@@ -159,19 +231,156 @@ class StaticPlanner:
             return self._decided[id(node)]
         return self._decide(module, None, None, function_def, node)
 
-    def decide_method(self, module, class_def, function_def, node):
+    def decide_method(self, model, function_def, node):
         """
-        The decision of a method of the class a compiled body calls, made now when the planner has
-        not reached it yet; None while the method's own decision is under way (a cycle of calls).
+        The decision of a method of a class of the compilation (its PythonClassModel) a compiled body
+        calls, made now when the planner has not reached it yet: the lowering asks whether a sibling is
+        compiled (its shared entry, see _compiled_method) and whether a callee may overflow where Python
+        promotes (Lowering._computes). None while the method's own decision is under way (a cycle of calls).
         """
         if id(node) in self._decided:
             return self._decided[id(node)]
-        class_node = next((candidate for defined, candidate in module.classes if defined is class_def), None)
-        return self._decide(module, class_def, class_node, function_def, node)
+        return self._decide(model.module, model.class_def, model.node, function_def, node)
 
     def body_of(self, node):
         """The compiled body of a decided function, or None."""
         return self._bodies.get(id(node))
+
+    # ---------------------------------------------------------------- attributes fixed at construction
+
+    def fixed_attribute(self, class_model, name, type_name):
+        """
+        Whether a compiled body of the class reads ``self.<name>`` from a Java field of its stub
+        instead of the Python object (``Ir.SelfProperty#fixed``): the attribute is fixed at
+        construction. ``__init__`` assigns it; no method of the class writes an attribute of
+        ``self`` after construction; no code of the compilation assigns the name on another object
+        (which may be the class itself) or names it in a call writing attributes by name, nor reaches
+        attributes behind the attribute protocol (``__dict__``, ``vars()``, a computed
+        ``object.__setattr__``); the class takes over no part of the protocol, so ``self.<name>`` is
+        the entry of the object's ``__dict__``; and the value converts to the same Java value every
+        time (a number, a string, a Java object, a plain object of the compilation, which its
+        generated class wraps). The stub reads the attribute through the Python object once per
+        object, when it takes the object; ``micronaut_runtime`` then makes the class's ``__setattr__`` and ``__delattr__``
+        report every later change of an attribute a stub keeps that an object has (a write of any
+        other attribute reports nothing), so a write the compilation does not see (a test's ``monkeypatch.setattr``, code outside the compilation, a method of another
+        class called with the object) makes the stub read it again. See ``PythonFixedAttributes``.
+        """
+        if class_model is None or not self._fixable_type(type_name):
+            return False
+        key = id(class_model)
+        if key not in self._fixed:
+            self._fixed[key] = self._fixed_attributes(class_model)
+        return name in self._fixed[key]
+
+    def _fixed_attributes(self, model):
+        """The names of the attributes of the class fixed at construction, see fixed_attribute."""
+        if not self._fixable_class(model):
+            return frozenset()
+        writes = self._attribute_writes()
+        if writes.everything or id(model.node) in writes.classes_written:
+            return frozenset()
+        names = set()
+        for name in model.instance_attributes:
+            if name.startswith("__") or name in writes.named or name in writes.stores:
+                # a dunder or a name-mangled private attribute; one a call writes by its name, or one
+                # assigned on an object other than the receiver of a method (an object of the class,
+                # or the class itself)
+                continue
+            if model.find(name) != ("instance", None):
+                continue  # the class or a base declares the name: a descriptor may serve it
+            names.add(name)
+        return frozenset(names)
+
+    def _fixable_class(self, model):
+        """
+        Whether the objects of the class keep their attributes in their ``__dict__`` and write them
+        through ``object.__setattr__`` only while ``__init__`` runs: no base but ``object`` (or ``ABC``,
+        ``Generic``), no subclass of the compilation, no metaclass or decorator of its own, no part
+        of the attribute protocol, a constructor of its own, and no method other than ``__init__``
+        (nor a function ``__init__`` defines) writing an attribute of ``self``.
+        """
+        if model.constructor is None or model.constructor[1] is None or not model.constructor[1].args.args:
+            return False
+        if any(base.name() not in TRANSPARENT_BASES for base in model.class_def.bases()) or model.bases:
+            return False
+        if model.is_open() or model.is_lookup_dynamic() or model.subclasses:
+            return False
+        if any(decorator.annotationName().rsplit(".", 1)[-1] == "dataclass" for decorator in model.class_def.decorators()):
+            return False
+        if self._introspected(model.qualified) or model.is_throwable():
+            return False
+        node = model.node
+        for statement in getattr(node, "body", ()):
+            for target in _declared_names(statement):
+                if target in ATTRIBUTE_PROTOCOL:
+                    return False
+        for statement in getattr(node, "body", ()):
+            if not isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) or not statement.args.args:
+                continue
+            receiver = statement.args.args[0].arg
+            if statement.name == "__init__":
+                # a function __init__ defines runs later: its writes of self are no construction
+                nested = [child for child in ast.walk(statement) if child is not statement and isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda))]
+                if any(_receiver_store(grandchild, receiver) for child in nested for grandchild in ast.walk(child)):
+                    return False
+                continue
+            if any(_receiver_store(child, receiver) for child in ast.walk(statement)):
+                return False
+        return True
+
+    def _fixable_type(self, type_name):
+        """
+        Whether a value of the Java type a compiled body reads converts to the same Java value every
+        time the Python value is the same object: a number, a boolean, a string, a Java object (the
+        boundary hands it over as itself), a plain object of the compilation (its generated class
+        wraps the Python object). A collection is copied, and an introspected object of the
+        compilation is a copy of its state, which changes in place.
+        """
+        if type_name in FIXED_SCALARS:
+            return True
+        erased = type_name.split("<", 1)[0]
+        if erased.endswith("[]") or erased in LOOSE_TYPES or "." not in erased:
+            return False
+        if erased.startswith("java.util.") and erased not in IMMUTABLE_UTIL_TYPES:
+            return False
+        facts = getattr(self.checker, "facts", None)
+        if facts is None:
+            return False
+        if any(facts.isAssignable(erased, container) for container in CONTAINER_TYPES):
+            return False
+        classes = getattr(self.checker, "python_classes", None)
+        model = classes.by_qualified.get(erased) if classes is not None else None
+        if model is not None:
+            return not model.is_throwable() and not any(self._introspected(other.qualified) for other in [model] + list(model.subclasses))
+        return True
+
+    def plain_class(self, type_name):
+        """
+        The model of the plain class of the compilation a Java type is the generated class of: one whose
+        generated class wraps the Python object (no introspected class among it and its subclasses, no
+        exception class), so a Python caller's object of exactly that class reaches the Java body as
+        itself; else None.
+        """
+        classes = getattr(self.checker, "python_classes", None)
+        model = classes.by_qualified.get(type_name) if classes is not None else None
+        if model is None or model.is_throwable() or any(self._introspected(other.qualified) for other in [model] + list(model.subclasses)):
+            return None
+        return model
+
+    def _introspected(self, qualified_name):
+        """Whether the generated class of the class is introspected; unknown facts count as introspected."""
+        facts = getattr(self.checker, "facts", None)
+        introspected = getattr(facts, "isIntrospected", None) if facts is not None else None
+        return True if introspected is None else bool(introspected(qualified_name))
+
+    def _attribute_writes(self):
+        if self._writes is None:
+            trees = []
+            for module in self.checker._modules.values():
+                tree = getattr(getattr(module, "visitor", None), "module_node", None)
+                trees.append(tree)
+            self._writes = AttributeWrites(trees)
+        return self._writes
 
     def script_class_name(self, module):
         """The name of the module's generated class: the script's when it has one, else the class its compiled functions get."""
@@ -197,7 +406,9 @@ class StaticPlanner:
 
     def _decision(self, module, class_def, class_node, function_def, node):
         qualified = f"{class_def.name()}.{function_def.name()}" if class_def is not None else function_def.name()
-        compiled, scope = self.scope.resolve(module.decorators, class_def.decorators() if class_def is not None else None, function_def.decorators())
+        # a method is declared within its class, which is declared within the class around it or the module
+        enclosing = self._class_scope(module, class_def, class_node) if class_def is not None else self.scope.module(module)
+        compiled, scope = self.scope.within(function_def.decorators(), SCOPE_FUNCTION, enclosing)
         span = function_def.span()
         if not compiled:
             return self._record(qualified, span, "EXCLUDED", scope, [], 0)
@@ -209,8 +420,8 @@ class StaticPlanner:
         reasons = self._candidate_reasons(module, class_def, class_node, function_def, node, span, java_layout)
         if reasons:
             # a class-level switch on a class that can never be compiled is flagged once for the class
-            ineligible_class = scope == "CLASS" and reasons[0][0] == "class-not-eligible" and self._first_report(class_def)
-            return self._record(qualified, span, "NOT_CANDIDATE", scope, reasons, 0, explicit=scope == "FUNCTION" or ineligible_class)
+            ineligible_class = scope == SCOPE_CLASS and reasons[0][0] == "class-not-eligible" and self._first_report(class_def)
+            return self._record(qualified, span, "NOT_CANDIDATE", scope, reasons, 0, explicit=scope == SCOPE_FUNCTION or ineligible_class)
         reasons = self._signature_reasons(module, class_def, function_def, node, span, java_layout, bindings)
         statements = 0
         if node is not None:
@@ -218,22 +429,32 @@ class StaticPlanner:
             reasons.extend(self._body_reasons(module, node))
         if reasons or node is None or getattr(self.checker, "facts", None) is None:
             outcome = "SKIPPED" if reasons else "CANDIDATE"
-            return self._record(qualified, span, outcome, scope, reasons, statements, explicit=scope != "MODE")
+            return self._record(qualified, span, outcome, scope, reasons, statements, explicit=scope != SCOPE_MODE)
         body, reasons = self._lower(module, class_def, function_def, node, java_layout)
         if body is None:
-            return self._record(qualified, span, "SKIPPED", scope, reasons, statements, explicit=scope != "MODE")
+            return self._record(qualified, span, "SKIPPED", scope, reasons, statements, explicit=scope != SCOPE_MODE)
         if class_def is None and body.stats().bridgeCalls() > 0 and self._pooled_module(module):
             # a module served by a context pool: a body of its generated class runs outside any
             # Python context, so it cannot reach a Python object
             reason = ("pooled-module", "the module is served by a context pool; a body reaching a Python object has no context to reach it in", span)
-            return self._record(qualified, span, "SKIPPED", scope, [reason], statements, explicit=scope != "MODE")
+            return self._record(qualified, span, "SKIPPED", scope, [reason], statements, explicit=scope != SCOPE_MODE)
         if class_def is None and body.staticMethod() and not _generates_class(getattr(module, "script", None)):
             # a module without a generated class gets one for its compiled functions
             self._add_script(module)
         self.bodies.append(body)
+        self.body_classes.add(body.className())
         if node is not None:
             self._bodies[id(node)] = body
-        return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats())
+        return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats(), delegation=_delegation_status(body, node))
+
+    def _class_scope(self, module, class_def, class_node):
+        """The resolution of a class of the module, the classes around it included: resolved once per module and plan."""
+        resolutions = self._class_scopes.get(id(module))
+        if resolutions is None:
+            resolutions = self._class_scopes[id(module)] = self.scope.classes(module)
+        resolved = resolutions.get(class_key(class_def, class_node))
+        # a class the module does not record is declared within the module only
+        return resolved if resolved is not None else self.scope.within(class_def.decorators(), SCOPE_CLASS, self.scope.module(module))
 
     def _add_script(self, module):
         visitor = module.visitor
@@ -260,17 +481,22 @@ class StaticPlanner:
                             advised=lambda sibling: self._advice(class_def, sibling) is not None,
                             advised_method=class_def is not None and self._advice(class_def, function_def) is not None,
                             java_layout=java_layout, planner=self, static=static,
-                            compiled=lambda sibling, sibling_node: self._compiled_method(module, class_def, sibling, sibling_node))
+                            compiled=lambda sibling, sibling_node: self._compiled_method(class_model, sibling, sibling_node))
         body = lowering.lower()
+        if body is not None:
+            classes = getattr(self.checker, "python_classes", None)
+            by_qualified = classes.by_qualified if classes is not None else {}
+            entry = lowering.python_entry or EventLoopSafety.pythonEntry(body, lambda name: name in by_qualified)
+            self._python_entries[id(node)] = (entry, list(lowering.callees), list(lowering.constructions))
         return body, lowering.reasons
 
-    def _compiled_method(self, module, class_def, function_def, node):
+    def _compiled_method(self, model, function_def, node):
         """
         Whether a method of the class is compiled, decided now when the planner has not reached it
         yet; a method whose decision is under way (a cycle of calls) counts as not compiled, which
         only costs the call its Java dispatch.
         """
-        decision = self.decide_method(module, class_def, function_def, node) if node is not None else None
+        decision = self.decide_method(model, function_def, node) if node is not None and model is not None else None
         return decision is not None and decision.outcome().name() == "COMPILED" and self.body_of(node) is not None
 
     def _switched_accessors(self, class_def):
@@ -297,11 +523,11 @@ class StaticPlanner:
         self._reported_classes.add(name)
         return True
 
-    def _record(self, qualified, span, outcome, scope, reasons, statements, explicit=False, stats=None):
+    def _record(self, qualified, span, outcome, scope, reasons, statements, explicit=False, stats=None, delegation=None):
         java_reasons = [Reason(rule, message, reason_span) for rule, message, reason_span in reasons]
-        decision = Decision(qualified, span, Outcome.valueOf(outcome), Scope.valueOf(scope), java_reasons, stats or Stats(statements, 0, 0, 0))
+        decision = Decision(qualified, span, Outcome.valueOf(outcome), Scope.valueOf(scope), java_reasons, stats or Stats(statements, 0, 0, 0), delegation)
         self.decisions.append(decision)
-        if explicit and reasons and (self.scope.mode != MODE_ALL or scope == "FUNCTION"):
+        if explicit and reasons and (self.scope.mode != MODE_ALL or scope == SCOPE_FUNCTION):
             rule, message, reason_span = reasons[0]
             rest = f" (and {len(reasons) - 1} more, see the report)" if len(reasons) > 1 else ""
             text = f"[{qualified}] cannot be compiled statically: [{rule}] {message}{rest}"
@@ -661,7 +887,7 @@ class StaticPlanner:
             if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Slice):
                 reasons.append(("unsupported-expression", "a slice has no static lowering", module.span_of(node)))
                 return
-        for child in ast.iter_child_nodes(node):
+        for child in _child_nodes(node):
             if isinstance(child, (ast.stmt, ast.expr, ast.excepthandler, ast.keyword)):
                 self._walk(module, child, reasons)
 
@@ -707,12 +933,215 @@ def _yields(function_node):
             return True
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
             continue
-        stack.extend(ast.iter_child_nodes(node))
+        stack.extend(_child_nodes(node))
     return False
 
 
 def _describe(node):
     return _NAMES.get(type(node), f"a {type(node).__name__} node")
+
+
+class AttributeWrites:
+    """
+    The writes of attributes of objects in the sources of a compilation, by the name of the attribute
+    (StaticPlanner.fixed_attribute): the nodes assigning or deleting ``<anything>.<name>`` but an
+    attribute of the receiver of the method they are in (``self.<name>``: an object of that class,
+    whose own writes the class answers for, and which the reported changes cover anyway); the names
+    a call writes by a string (``setattr(o, "x", v)``, ``monkeypatch.setattr(o, "x", v)``,
+    ``patch.object(C, "x")``, ``patch("app.m.C.x")``, ``patch.multiple(o, x=v)``); the classes whose
+    methods write attributes of ``self`` by a computed name (``setattr(self, name, value)``); and
+    ``everything`` when a write may reach any attribute: ``__dict__`` (or the string), ``vars()``, a computed
+    ``setattr`` on another object, an assignment of ``__class__``, ``__bases__`` or a member of the
+    attribute protocol (``Cls.__getattribute__ = f``, ``setattr(Cls, "__setattr__", f)``), a reference
+    to ``__setattr__`` that is not called, or a source whose tree is not known.
+
+    The statements the transformer generates from a snippet (the decorator of each annotation a
+    module imports, ``_mn_snippet``) are most of the nodes of a module, and the same in every module
+    importing the annotation: each is scanned once, its writes reused for its copies.
+    """
+
+    def __init__(self, trees):
+        self.stores = set()           # the attribute names stored or deleted on another object than self
+        self.named = set()            # the names calls write by a string
+        self.classes_written = set()  # id(class node) of the classes whose methods setattr(self, name, ...)
+        self.everything = False
+        snippets = {}                 # (snippet, index) -> the writes of that statement of a generated snippet
+        for tree in trees:
+            if tree is None:
+                self.everything = True
+                continue
+            if not isinstance(tree, ast.Module):
+                self._scan(tree)
+                continue
+            for statement in tree.body:
+                snippet = getattr(statement, "_mn_snippet", None)
+                if snippet is None:
+                    self._scan(statement)
+                    continue
+                writes = snippets.get(snippet)
+                if writes is None:
+                    # a module-level statement belongs to no method, wherever it is
+                    writes = AttributeWrites(())
+                    writes._scan(statement)
+                    if not writes.classes_written:
+                        snippets[snippet] = writes  # the classes are those of this copy: scanned again
+                self.stores |= writes.stores
+                self.named |= writes.named
+                self.classes_written |= writes.classes_written
+                self.everything = self.everything or writes.everything
+
+    def _scan(self, tree):
+        """
+        One walk of the tree, parents before children, each node carrying the method whose own scope
+        it belongs to: ``(class node, receiver)`` for the body of a method of a class (a function of the
+        class body with a first parameter) and what it holds but the functions, lambdas and classes
+        defined in it (a statement of the body itself counts, whatever it is), None elsewhere. The
+        contexts, the leaves (operators, load and store markers) and the walk being one pass are what
+        make it cheaper than walking the tree once per question: the planner scans every module.
+        """
+        stack = [(tree, None)]
+        callees = set()  # id(node) of the o.__setattr__ / o.__delattr__ attributes called, which keep no reference
+        while stack:
+            node, owner = stack.pop()
+            if isinstance(node, ast.Attribute):
+                if node.attr == "__dict__" or (node.attr in PROTOCOL_CHANGES and isinstance(node.ctx, (ast.Store, ast.Del))):
+                    # the class or the attribute protocol of objects changed: what an attribute reads may change with it
+                    self.everything = True
+                elif node.attr in ("__setattr__", "__delattr__") and id(node) not in callees:
+                    self.everything = True  # a reference kept to write with later
+                if isinstance(node.ctx, (ast.Store, ast.Del)):
+                    if owner is None or not isinstance(node.value, ast.Name) or node.value.id != owner[1]:
+                        self.stores.add(node.attr)
+            elif isinstance(node, ast.Call):
+                self._call(node, owner)
+                function = node.func
+                if isinstance(function, ast.Attribute) and function.attr in ("__setattr__", "__delattr__"):
+                    callees.add(id(function))
+            elif isinstance(node, ast.Constant):
+                if node.value == "__dict__":
+                    # getattr(o, "__dict__"), object.__getattribute__(o, "__dict__"): the dictionary itself
+                    self.everything = True
+                continue
+            if isinstance(node, ast.ClassDef):
+                for child in _children(node):
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.args.args:
+                        # a method: its body is a scope of its own, whatever its statements are; its
+                        # signature and decorators belong to no method
+                        method = (node, child.args.args[0].arg)
+                        stack.extend((statement, method) for statement in child.body)
+                        stack.extend((other, None) for other in _children(child, "body"))
+                    else:
+                        stack.append((child, None if isinstance(child, _SCOPES) else owner))
+                continue
+            # the children, as ast.iter_child_nodes gives them but the leaves, inlined: the walk is the cost
+            for field in node._fields:
+                value = getattr(node, field, None)
+                if isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, ast.AST) and not isinstance(item, _LEAVES):
+                            stack.append((item, None if isinstance(item, _SCOPES) else owner))
+                elif isinstance(value, ast.AST) and not isinstance(value, _LEAVES):
+                    stack.append((value, None if isinstance(value, _SCOPES) else owner))
+
+    def _call(self, call, owner):
+        function = call.func
+        name = function.id if isinstance(function, ast.Name) else function.attr if isinstance(function, ast.Attribute) else None
+        if name == "vars" and isinstance(function, ast.Name) and (call.args or call.keywords):
+            self.everything = True
+            return
+        if name not in NAMED_WRITERS:
+            return
+        strings = [argument.value for argument in list(call.args) + [keyword.value for keyword in call.keywords]
+                   if isinstance(argument, ast.Constant) and isinstance(argument.value, str)]
+        for string in strings:
+            self.named.add(string.rsplit(".", 1)[-1])
+            if string.rsplit(".", 1)[-1] in PROTOCOL_CHANGES:
+                self.everything = True  # setattr(Cls, "__getattribute__", f), patch.object(Cls, "__setattr__")
+        if name == "multiple":
+            self.named.update(keyword.arg for keyword in call.keywords if keyword.arg is not None)
+            if any(keyword.arg in PROTOCOL_CHANGES for keyword in call.keywords):
+                self.everything = True
+        if _is_patch(function, name):
+            # mock.patch(target, ...), patch.object(target, attribute, ...): a computed name may be any attribute
+            named = call.args[1 if name == "object" else 0] if len(call.args) > (1 if name == "object" else 0) else None
+            if named is not None and not (isinstance(named, ast.Constant) and isinstance(named.value, str)):
+                self.everything = True
+            return
+        if name not in COMPUTED_WRITERS:
+            return
+        # the object written and the name it is written by: setattr(o, name, v), monkeypatch.setattr(o, name, v),
+        # object.__setattr__(o, name, v), or o.__setattr__(name, v) bound; a string anywhere else is a value
+        if name in ("__setattr__", "__delattr__") and isinstance(function, ast.Attribute) and not (isinstance(function.value, ast.Name) and function.value.id in ("object", "type")):
+            target, named = function.value, call.args[0] if call.args else None
+        else:
+            target, named = (call.args[0] if call.args else None), (call.args[1] if len(call.args) > 1 else None)
+            if isinstance(target, ast.Constant) and isinstance(target.value, str) and isinstance(function, ast.Attribute):
+                return  # monkeypatch.setattr("app.m.Cls.attribute", v): the name is the string's last part
+        if isinstance(named, ast.Constant) and isinstance(named.value, str):
+            return
+        if isinstance(target, ast.Call) and isinstance(target.func, ast.Name) and target.func.id == "super":
+            # super().__setattr__(name, value) in a method: object's write of an attribute of self, past
+            # the __setattr__ that reports changes
+            if owner is not None:
+                self.classes_written.add(id(owner[0]))
+                return
+        if owner is not None and isinstance(target, ast.Name) and owner[1] == target.id:
+            # setattr(self, name, value) in a method: an attribute of an object of that class
+            self.classes_written.add(id(owner[0]))
+            return
+        self.everything = True
+
+
+# the nodes that open a scope of their own: what they hold belongs to no enclosing method's scope
+_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+
+
+def _children(node, skip=None):
+    """The child nodes of a node, as ast.iter_child_nodes gives them, but the leaves and the field to skip."""
+    for field in node._fields:
+        if field == skip:
+            continue
+        value = getattr(node, field, None)
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, ast.AST) and not isinstance(item, _LEAVES):
+                    yield item
+        elif isinstance(value, ast.AST) and not isinstance(value, _LEAVES):
+            yield value
+
+
+def _is_patch(function, name):
+    """Whether a call is mock.patch(...) or patch.object(...): patch, mock.patch, unittest.mock.patch, and their object."""
+    if name == "patch":
+        return isinstance(function, ast.Name) or (isinstance(function, ast.Attribute) and _names(function.value, "mock"))
+    return name == "object" and isinstance(function, ast.Attribute) and _names(function.value, "patch")
+
+
+def _names(node, name):
+    """Whether the expression is the name, or an attribute of that name (mock, unittest.mock)."""
+    return (isinstance(node, ast.Name) and node.id == name) or (isinstance(node, ast.Attribute) and node.attr == name)
+
+
+def _receiver_store(node, receiver):
+    """Whether the node assigns or deletes an attribute of the receiver, or setattr()s or delattr()s one."""
+    if isinstance(node, ast.Attribute) and isinstance(node.ctx, (ast.Store, ast.Del)):
+        return isinstance(node.value, ast.Name) and node.value.id == receiver
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("setattr", "delattr"):
+        return bool(node.args) and isinstance(node.args[0], ast.Name) and node.args[0].id == receiver
+    return False
+
+
+def _declared_names(statement):
+    """The names a statement of a class body binds: a function, a class, an assignment or an import."""
+    if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return [statement.name]
+    if isinstance(statement, ast.Assign):
+        return [name.id for target in statement.targets for name in ast.walk(target) if isinstance(name, ast.Name)]
+    if isinstance(statement, (ast.AnnAssign, ast.AugAssign)):
+        return [name.id for name in ast.walk(statement.target) if isinstance(name, ast.Name)]
+    if isinstance(statement, (ast.Import, ast.ImportFrom)):
+        return [(alias.asname or alias.name).split(".")[0] for alias in statement.names]
+    return []
 
 
 def _generates_class(script):
@@ -796,8 +1225,6 @@ def apply_delegation(tree, targets):
         kinds = tuple(kind for kind in options["kinds"].split(",") if kind)
         conversion = next((name for name in ("list", "set", "dict") if name in options), None)
         static_class = options.get("static")
-        if static_class is not None and "retry" not in options:
-            continue  # a static body that cannot be run again keeps the Python body, see above
         wanted.setdefault(class_name, {})[method] = (options.get("owner", class_name), kinds, "retry" in options, conversion, static_class, "python-exceptions" in options)
     count = 0
     for class_node, path in _classes(tree):
@@ -811,7 +1238,7 @@ def apply_delegation(tree, targets):
                 if static_class is not None:
                     if not _takes_exactly(statement, kinds):
                         continue
-                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion)
+                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion, retry, translated)
                     ast.fix_missing_locations(statement)
                     count += 1
                     continue
@@ -829,9 +1256,9 @@ def apply_delegation(tree, targets):
     if functions:
         for statement in tree.body:
             if isinstance(statement, ast.FunctionDef) and statement.name in functions and not _delegates(statement):
-                _, kinds, _, conversion, static_class, _ = functions[statement.name]
+                _, kinds, retry, conversion, static_class, translated = functions[statement.name]
                 if static_class is not None and _takes_exactly(statement, kinds):
-                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion)
+                    statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, kinds, conversion, retry, translated)
                     ast.fix_missing_locations(statement)
                     count += 1
     if count and not any(isinstance(statement, ast.FunctionDef) and statement.name == STATIC_LOOKUP for statement in tree.body):
@@ -856,6 +1283,7 @@ def apply_delegation(tree, targets):
 STATIC_LOOKUP = "_mn_static_class"
 STATIC_CALL = "_mn_static_call"
 PYTHON_EXCEPTION = "_mn_python_exception"
+PYTHON_CLASS = "_mn_python_class"
 HELPERS_SOURCE = """
 _mn_static_classes = {}
 
@@ -872,7 +1300,7 @@ def _mn_static_class(name):
     return found
 
 
-def _mn_static_call(name, method, arguments, kinds):
+def _mn_static_call(name, method, arguments, kinds, retry=True, translated=False):
     found = _mn_static_class(name)
     if found is None:
         return None
@@ -883,10 +1311,35 @@ def _mn_static_call(name, method, arguments, kinds):
     for argument, kind in zip(arguments, kinds):
         if not fits(argument, kind):
             return None
+    if retry:
+        try:
+            return (getattr(found, method)(*arguments),)
+        except Exception:
+            return None
+    failure = None
     try:
         return (getattr(found, method)(*arguments),)
-    except Exception:
+    except BaseException as error:
+        failure = error
+    # outside the handler, so the exception raised keeps its own context: the Python exception the
+    # failure carries, or Python's exception for it (PythonStatic.forPython), or the failure itself
+    found = _mn_python_exception(failure) if translated else None
+    if found is not None:
+        raise found
+    import java as __mn_java_module
+    if __mn_java_module.is_object(failure):
+        # raises the Python exception of a failure Python raises one for, or the checked exception of a Java call
+        __mn_java_module.type("io.micronaut.context.python.PythonStatic").forPython(failure)
+    raise failure
+
+
+def _mn_python_class(path, qualname):
+    found = globals().get(path.split(".")[0])
+    for part in path.split(".")[1:]:
+        found = getattr(found, part, None)
+    if not isinstance(found, type) or found.__qualname__ != qualname:
         return None
+    return ("python", found)
 
 
 def _mn_python_exception(error):
@@ -947,6 +1400,65 @@ def _delegates(function):
             and isinstance(value.value, ast.Name) and value.value.id == "__class__")
 
 
+def _delegation_status(body, node):
+    """
+    Whether the Python callers of a compiled body run its Java body, as the report says it
+    (StaticDelegation.status): apply_delegation rewrites only a function that takes exactly the
+    parameters of the Java body, positionally, and only a body that has a location to tie it to its source.
+    """
+    if body.span() is None:
+        return Delegation.none("the body has no location in a source")
+    status = Delegation.status(body)
+    if status.startswith("none(") or node is None:
+        return status
+    kinds = [None] * len(list(body.parameterTypes()))
+    takes = _takes_exactly(node, kinds) if body.staticMethod() or body.moduleLevel() else _receives_self(node, kinds)
+    if not takes:
+        return Delegation.none("the function takes keyword-only, variadic or more parameters than the Java body")
+    positional = list(node.args.posonlyargs) + list(node.args.args)
+    parameters = positional if body.staticMethod() or body.moduleLevel() else positional[1:]
+    for index, argument in enumerate(parameters):
+        if body.pythonParameter(index) and _annotation_path(argument) is None:
+            return Delegation.none(f"the hint of [{argument.arg}] names its class by no name of the module, which the check of the argument looks up")
+    return status
+
+
+def _annotation_path(argument):
+    """The dotted name (Cls, mod.Cls) the hint of a parameter names its class by, a quoted hint included, or None."""
+    annotation = argument.annotation
+    if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
+        try:
+            annotation = ast.parse(annotation.value, mode="eval").body
+        except SyntaxError:
+            return None
+    parts = []
+    while isinstance(annotation, ast.Attribute):
+        parts.append(annotation.attr)
+        annotation = annotation.value
+    if not isinstance(annotation, ast.Name):
+        return None
+    parts.append(annotation.id)
+    return ".".join(reversed(parts))
+
+
+def _kind_nodes(function, kinds, receives_self):
+    """
+    The kinds of the parameters as the prologue passes them: a string, or for a plain class of the
+    compilation ("python:<name>") the class the hint names, looked up in the module on each call
+    (None when the module does not hold it, so the argument does not fit).
+    """
+    positional = list(function.args.posonlyargs) + list(function.args.args)
+    parameters = positional[1:] if receives_self else positional
+    nodes = []
+    for index, kind in enumerate(kinds):
+        if kind.startswith("python:") and index < len(parameters) and _annotation_path(parameters[index]) is not None:
+            nodes.append(ast.Call(func=ast.Name(id=PYTHON_CLASS, ctx=ast.Load()),
+                                  args=[ast.Constant(value=_annotation_path(parameters[index])), ast.Constant(value=kind[len("python:"):])], keywords=[]))
+        else:
+            nodes.append(ast.Constant(value=kind))
+    return nodes
+
+
 def _takes_exactly(function, kinds):
     """Whether a static method or a module-level function takes exactly the parameters the Java body does, positionally."""
     args = function.args
@@ -954,8 +1466,12 @@ def _takes_exactly(function, kinds):
     return len(positional) == len(kinds) and args.vararg is None and args.kwarg is None and not args.kwonlyargs
 
 
-def _static_delegation(function, static_class, kinds, conversion=None):
-    """The prologue of a static method or a module-level function: the static Java method of the generated class, when it is loadable and the arguments fit it."""
+def _static_delegation(function, static_class, kinds, conversion=None, retry=True, translated=False):
+    """
+    The prologue of a static method or a module-level function: the static Java method of the
+    generated class, when it is loadable and the arguments fit it. A body with side effects (not
+    retry) is not run again: its failures reach the caller as Python's exceptions.
+    """
     args = function.args
     names = [argument.arg for argument in list(args.posonlyargs) + list(args.args)]
     temporary = _temporary(function)
@@ -967,8 +1483,8 @@ def _static_delegation(function, static_class, kinds, conversion=None):
                 ast.Constant(value=static_class),
                 ast.Constant(value=function.name),
                 ast.Tuple(elts=[ast.Name(id=name, ctx=ast.Load()) for name in names], ctx=ast.Load()),
-                ast.Tuple(elts=[ast.Constant(value=kind) for kind in kinds], ctx=ast.Load()),
-            ],
+                ast.Tuple(elts=_kind_nodes(function, kinds, False), ctx=ast.Load()),
+            ] + ([] if retry else [ast.Constant(value=False), ast.Constant(value=translated)]),
             keywords=[],
         ),
     )
@@ -1088,7 +1604,7 @@ def _delegation(function, owner, kinds, retry, conversion=None, translated=False
                 ast.Constant(value=owner),
                 ast.Constant(value=function.name),
                 ast.Tuple(elts=[load(name) for name in names], ctx=ast.Load()),
-                ast.Tuple(elts=[ast.Constant(value=kind) for kind in kinds], ctx=ast.Load()),
+                ast.Tuple(elts=_kind_nodes(function, kinds, True), ctx=ast.Load()),
                 ast.Constant(value=retry),
             ],
             keywords=[],
