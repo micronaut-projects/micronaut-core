@@ -159,6 +159,41 @@ class ObservedConfigurationSpec extends Specification {
         start(retained, PROPERTIES).close()
     }
 
+    void "a bean made from configuration of a class the restart replaces is not retained, as it may keep the instance"() {
+        given:
+        ApplicationContext first = start(List.of(), PROPERTIES)
+        Map<String, Object> beans = beansOf(first)
+
+        when: "the restart replaces the class of the client's configuration, as it would an application's class"
+        Collection<BeanRegistration<?>> retained = ((DefaultBeanContext) first).stopRetaining(new PolicyRetentionCriteria(
+            List.of(AnnotatedBeanRetentionPolicy.INSTANCE), { String prefix -> false }, { Class<?> type -> type == ClientSettings }))
+
+        then: "the clients made from it are released, the beans made from other configuration kept"
+        !retained*.bean.any { it.is(beans.unnamed) || it.is(beans.other) }
+        retained*.bean.any { it.is(beans.a) }
+        retained*.bean.any { it.is(beans.b) }
+
+        cleanup:
+        start(retained, PROPERTIES).close()
+    }
+
+    void "a bean made from configuration that a listener replaced with an instance of a class the restart replaces is not retained"() {
+        given:
+        ApplicationContext first = start(List.of(), PROPERTIES + ['observed.replace-settings': 'true'])
+        Map<String, Object> beans = beansOf(first)
+
+        when: "the restart replaces the class of the instance the listener returned, not the class of the definition"
+        Collection<BeanRegistration<?>> retained = ((DefaultBeanContext) first).stopRetaining(new PolicyRetentionCriteria(
+            List.of(AnnotatedBeanRetentionPolicy.INSTANCE), { String prefix -> false }, { Class<?> type -> type == SettingsReplacer.ReplacedSettings }))
+
+        then:
+        !retained*.bean.any { it.is(beans.unnamed) || it.is(beans.other) }
+        retained*.bean.any { it.is(beans.a) }
+
+        cleanup:
+        start(retained, PROPERTIES).close()
+    }
+
     private static Map<String, Object> beansOf(ApplicationContext context) {
         return [
             unnamed: context.getBean(Client, Qualifiers.byName('unnamed')),
