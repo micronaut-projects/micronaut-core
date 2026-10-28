@@ -315,6 +315,9 @@ abstract class MultiplexedServerHandler {
                 // the body is streaming and will not receive any more data: fail it, so that its
                 // consumer stops waiting and releases what it holds
                 onRstStreamRead(new ClosedChannelException());
+            } else if (!finished) {
+                // the response will never be written: let its body release what it holds
+                disposeWriteSide();
             }
             if (bufferedContent != null) {
                 for (ByteBuf buf : bufferedContent) {
@@ -362,6 +365,9 @@ abstract class MultiplexedServerHandler {
                 OptionalLong length = body.expectedLength();
                 if (length.isPresent()) {
                     response.headers().set(HttpHeaderNames.CONTENT_LENGTH, length.getAsLong());
+                } else {
+                    // the length is unknown, a header set by the application may not match the data
+                    response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
             } else {
                 response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);

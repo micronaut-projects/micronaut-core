@@ -25,6 +25,7 @@ import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListe
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelOutboundBuffer;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
@@ -49,10 +50,12 @@ import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * HTTP/2-specific server handler.
@@ -68,6 +71,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     private Http2Connection.PropertyKey streamKey;
     private boolean reading = false;
     private boolean upgradedFromHttp1 = false;
+    /**
+     * {@link System#nanoTime()} of the last frame that makes progress on a stream: a request
+     * frame read or a response frame written. PING and SETTINGS frames do not count.
+     */
+    private long lastStreamActivity = System.nanoTime();
 
     static {
         for (Http2Error value : Http2Error.values()) {
@@ -115,6 +123,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
     @Override
     public int onDataRead(ChannelHandlerContext ctx, int streamId, ByteBuf data, int padding, boolean endOfStream) throws Http2Exception {
+        lastStreamActivity = System.nanoTime();
         MultiplexedStream stream = connectionHandler.connection().stream(streamId).getProperty(streamKey);
         if (stream == null) {
             return padding; // data not consumed
@@ -129,6 +138,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
     @Override
     public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int streamDependency, short weight, boolean exclusive, int padding, boolean endOfStream) throws Http2Exception {
+        lastStreamActivity = System.nanoTime();
         io.netty.handler.codec.http2.Http2Stream str = connectionHandler.connection().stream(streamId);
         Http2Stream existing = str.getProperty(streamKey);
         if (existing != null) {
@@ -215,6 +225,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     @Override
     public void onWindowUpdateRead(ChannelHandlerContext ctx, int streamId, int windowSizeIncrement) {
         // handled by netty
+        lastStreamActivity = System.nanoTime();
     }
 
     @Override
@@ -229,6 +240,10 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         private final Http2ServerHandler handler;
         @Nullable
         private final Http2AccessLogManager accessLogManager;
+        private long idleTimeoutNanos = -1;
+        private int lastMessageHashCode;
+        private long lastPendingWriteBytes;
+        private long lastProgress;
 
         private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, Http2ServerHandler handler, Http2AccessLogManager accessLogManager) {
             super(decoder, encoder, initialSettings, decoupleCloseAndGoAway, flushPreface);
@@ -239,6 +254,10 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
             handler.ctx = ctx;
+            IdleStateHandler idleStateHandler = ctx.pipeline().get(IdleStateHandler.class);
+            if (idleStateHandler != null && idleStateHandler.getAllIdleTimeInMillis() > 0) {
+                idleTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(idleStateHandler.getAllIdleTimeInMillis());
+            }
             super.handlerAdded(ctx);
         }
 
@@ -259,6 +278,38 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             });
             handler.reading = false;
             super.channelReadComplete(ctx);
+            if (idleTimeoutNanos > 0) {
+                long now = System.nanoTime();
+                if (outputChanged(ctx)) {
+                    // a response is still being drained to the peer
+                    handler.lastStreamActivity = now;
+                } else if (now - handler.lastStreamActivity >= idleTimeoutNanos) {
+                    // only PING, SETTINGS and the like for the whole idle timeout. These reset the
+                    // idle state handler, but must not keep a stalled connection open.
+                    ctx.close();
+                }
+            }
+        }
+
+        /**
+         * Whether the channel's outbound buffer made progress since the last call, like
+         * {@link IdleStateHandler} does with {@code observeOutput}.
+         */
+        private boolean outputChanged(ChannelHandlerContext ctx) {
+            ChannelOutboundBuffer buf = ctx.channel().unsafe().outboundBuffer();
+            if (buf == null) {
+                return false;
+            }
+            int messageHashCode = System.identityHashCode(buf.current());
+            long pendingWriteBytes = buf.totalPendingWriteBytes();
+            long progress = buf.currentProgress();
+            boolean changed = messageHashCode != lastMessageHashCode
+                || pendingWriteBytes != lastPendingWriteBytes
+                || progress != lastProgress;
+            lastMessageHashCode = messageHashCode;
+            lastPendingWriteBytes = pendingWriteBytes;
+            lastProgress = progress;
+            return changed;
         }
 
         @Override
@@ -434,6 +485,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
         @Override
         void writeHeaders(HttpResponse headers, boolean endStream, ChannelPromise promise) {
+            lastStreamActivity = System.nanoTime();
             if (endStream && closeInput) {
                 promise = promise.unvoid();
                 promise.addListener(future -> closeInput());
@@ -443,6 +495,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
         @Override
         void writeData0(ByteBuf data, boolean endStream, ChannelPromise promise) {
+            lastStreamActivity = System.nanoTime();
             if (endStream && closeInput) {
                 promise = promise.unvoid();
                 promise.addListener(future -> closeInput());
