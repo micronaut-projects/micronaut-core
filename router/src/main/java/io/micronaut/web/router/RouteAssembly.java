@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.SupplierUtil;
@@ -41,13 +40,12 @@ import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriRouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
-import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.builder.FilterRegistration;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.http.PathVariables;
@@ -67,10 +65,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -99,7 +95,7 @@ public final class RouteAssembly {
      */
     public static final String PATH_VARIABLE_PLUS_AS_SPACE = "micronaut.router.path-variable-plus-as-space";
 
-    private static final String NO_EXECUTOR = "No executor configured for name: ";
+    static final String NO_EXECUTOR = "No executor configured for name: ";
 
     final ConversionService conversionService;
     final Charset defaultCharset;
@@ -449,6 +445,8 @@ public final class RouteAssembly {
             // routes of its method, or of any method
             String methodName = method == HttpMethod.CUSTOM ? AnyMethodRoutes.CUSTOM_METHODS : method.name();
             DefaultUriRoute route = new DefaultUriRoute(method, composed, mediaTypes, executableHandle, methodName, conversionService);
+            // the locator has its own HEAD route
+            route.settings().declaresHead();
             if (currentParentRoute != null) {
                 currentParentRoute.nestedRoutes.add(route);
             }
@@ -530,30 +528,27 @@ public final class RouteAssembly {
     }
 
     /**
-     * Add an implicit {@code HEAD} route for every {@code GET} route that has no {@code HEAD} route
-     * for the same URI, like {@link AnnotatedMethodRouteBuilder} does for {@code @Get} methods.
-     * Each {@code HEAD} route is a copy of the finished {@code GET} route.
+     * Add an implicit {@code HEAD} route for every {@code GET} route, like
+     * {@link AnnotatedMethodRouteBuilder} does for {@code @Get} methods. Each {@code HEAD} route is
+     * a copy of the finished {@code GET} route, marked as implicit. An explicit {@code HEAD} route
+     * of the same URI does not suppress it: the two can differ by port, media types, conditions or
+     * version, and only when they tie at match time does the explicit one win
+     * ({@code ImplicitHeadRoutes.preferExplicit}).
      */
     public void addImplicitHeadRoutes() {
-        // keyed by the template, never by the text alone: the same text can be a different
-        // template of another language
         List<DefaultUriRoute> getRoutes = new ArrayList<>();
-        Set<Object> headTemplates = new HashSet<>();
         for (UriRoute route : uriRoutes) {
-            // a route of any method has its own HEAD route, and does not hide the implicit HEAD route of a GET route
-            if (route instanceof DefaultUriRoute defaultUriRoute && !defaultUriRoute.settings.isAnyMethod()) {
-                if (defaultUriRoute.httpMethod == HttpMethod.GET) {
-                    getRoutes.add(defaultUriRoute);
-                } else if (defaultUriRoute.httpMethod == HttpMethod.HEAD) {
-                    headTemplates.add(defaultUriRoute.headKey());
-                }
+            // a route of any method, or declared with a HEAD route, has its own HEAD route
+            if (route instanceof DefaultUriRoute defaultUriRoute
+                && !defaultUriRoute.settings.isAnyMethod()
+                && !defaultUriRoute.settings.isDeclaresHead()
+                && defaultUriRoute.httpMethod == HttpMethod.GET
+                && defaultUriRoute.targetMethod.booleanValue(Get.class, "headRoute").orElse(true)) {
+                getRoutes.add(defaultUriRoute);
             }
         }
         for (DefaultUriRoute getRoute : getRoutes) {
-            if (!headTemplates.contains(getRoute.headKey())
-                && getRoute.targetMethod.booleanValue(Get.class, "headRoute").orElse(true)) {
-                uriRoutes.add(getRoute.implicitHeadCopy());
-            }
+            uriRoutes.add(getRoute.implicitHeadCopy());
         }
     }
 
@@ -1041,7 +1036,7 @@ public final class RouteAssembly {
 
         private DefaultFilterRoute filterRoute(GenericHttpFilter filter, List<String> patterns, boolean isPreMatching) {
             GenericHttpFilter ordered = GenericHttpFilter.withOrder(filter, order);
-            DefaultFilterRoute route = new DefaultFilterRoute(() -> ordered, AnnotationMetadata.EMPTY_METADATA, isPreMatching);
+            DefaultFilterRoute route = new DefaultFilterRoute(() -> ordered, AnnotationMetadata.EMPTY_METADATA, isPreMatching).fixedOrder(order);
             route.patternStyle(patternStyle);
             for (String pattern : patterns) {
                 route.pattern(pattern);
@@ -1145,14 +1140,16 @@ public final class RouteAssembly {
         }
 
         /**
-         * The named executor, looked up when a filter first runs on it.
+         * The named executor, looked up when a filter first runs on it. The filter holds it, so
+         * it holds the executor selector and the error, not the filters, nor the assembly.
          *
          * @param executorName The name of the executor
          * @return The executor
          */
         private Supplier<Executor> executor(String executorName) {
+            ExecutorSelector selector = RouteAssembly.this.executorSelector;
+            Function<String, RuntimeException> noExecutor = this.noExecutor;
             return SupplierUtil.memoized(() -> {
-                ExecutorSelector selector = RouteAssembly.this.executorSelector;
                 if (selector == null) {
                     throw new IllegalStateException("No executor selector to find executor: " + executorName);
                 }
@@ -1621,7 +1618,7 @@ public final class RouteAssembly {
                 effectivePort,
                 conversionService,
                 // the executor choice as it is now: a later change to the route does not change the route info
-                new RouteExecutorSelector(settings.getExecutorName(), settings.isNonBlocking()),
+                new RouteExecutorSelector(executorSelector, targetMethod.getExecutableMethod(), settings.getExecutorName(), settings.isNonBlocking()),
                 messageBodyHandlerRegistry,
                 implicitHead,
                 routeFilters(),
@@ -1763,7 +1760,7 @@ public final class RouteAssembly {
             for (Argument<?> argument : targetMethod.getArguments()) {
                 if (argument.getAnnotationMetadata().hasAnnotation(Body.class)
                     && InputStream.class.isAssignableFrom(argument.getType())
-                    && new RouteExecutorSelector(null, settings.isNonBlocking()).select(targetMethod.getExecutableMethod(), threadSelection).isEmpty()) {
+                    && new RouteExecutorSelector(executorSelector, targetMethod.getExecutableMethod(), null, settings.isNonBlocking()).select(targetMethod.getExecutableMethod(), threadSelection).isEmpty()) {
                     throw new RoutingException("The route " + this + " reads the body as an InputStream, which blocks, on the event loop"
                         + ": run it on an executor, e.g. with executeOn(TaskExecutors.BLOCKING)");
                 }
@@ -1825,8 +1822,10 @@ public final class RouteAssembly {
          * the outer group, then of the inner groups, then of the route, see {@link RouteFilters#chain()}
          */
         List<GenericHttpFilter> routeFilters() {
+            // the error is held by the filters of the route info, so it holds the method, not the route
+            ExecutableMethod<Object, Object> method = targetMethod.getExecutableMethod();
             RouteFilters filters = new RouteFilters(settings.getGroupFilters(), executorName -> new SchedulerConfigurationException(
-                targetMethod.getExecutableMethod(), NO_EXECUTOR + executorName));
+                method, NO_EXECUTOR + executorName));
             for (FilterRegistration filter : settings.getFilters()) {
                 filters.add(filter);
             }
@@ -1906,16 +1905,6 @@ public final class RouteAssembly {
             return template;
         }
 
-        /**
-         * @return The key of the template of the route for implicit {@code HEAD} routes: the
-         * {@link UriMatchTemplate} of a URI template, otherwise the template. A subclass of
-         * {@link UriMatchTemplate}, e.g. {@link io.micronaut.http.uri.UriTypeMatchTemplate}, has
-         * rules its equality does not compare: its template, equal to itself only
-         */
-        Object headKey() {
-            return uriMatchTemplate != null && uriMatchTemplate.getClass() == UriMatchTemplate.class ? uriMatchTemplate : template;
-        }
-
         @Override
         public int compareTo(UriRoute o) {
             if (uriMatchTemplate != null && (!(o instanceof DefaultUriRoute other) || other.uriMatchTemplate != null)) {
@@ -1927,62 +1916,6 @@ public final class RouteAssembly {
                 return rawCompare != 0 ? rawCompare : Integer.compare(template.pathVariableCount(), other.template.pathVariableCount());
             }
             return 0;
-        }
-
-        /**
-         * Selects the executor of a route info, with the choice of the route when the route info
-         * was built.
-         */
-        private final class RouteExecutorSelector implements ExecutorSelector {
-            private final @Nullable String executorName;
-            private final boolean eventLoop;
-
-            RouteExecutorSelector(@Nullable String executorName, boolean eventLoop) {
-                this.executorName = executorName;
-                this.eventLoop = eventLoop;
-            }
-
-            @Override
-            public Optional<ExecutorService> select(@Nullable MethodReference<?, ?> method, ThreadSelection threadSelection) {
-                // like @ExecuteOn and @NonBlocking on the method
-                String name = executorName;
-                if (name != null) {
-                    return Optional.of(select(name).orElseThrow(() -> new SchedulerConfigurationException(
-                        targetMethod.getExecutableMethod(), NO_EXECUTOR + name)));
-                }
-                if (eventLoop && threadSelection == ThreadSelection.AUTO) {
-                    return Optional.empty();
-                }
-                if (RouteAssembly.this.executorSelector != null) {
-                    // the handler of a located route has the annotations it inherits, e.g. an @ExecuteOn of a group of its locator route
-                    MethodReference<?, ?> annotated = method instanceof HandlerMethod<?> handler ? handler : targetMethod.getExecutableMethod();
-                    return RouteAssembly.this.executorSelector.select(annotated, threadSelection);
-                } else {
-                    return Optional.empty();
-                }
-            }
-
-            @Override
-            public Optional<ExecutorService> select(String name) {
-                if (RouteAssembly.this.executorSelector != null) {
-                    return RouteAssembly.this.executorSelector.select(name);
-                } else {
-                    return Optional.empty();
-                }
-            }
-
-            @Override
-            public Executor selectExecutor(@Nullable MethodReference<?, ?> method, ThreadSelectionConfiguration configuration) {
-                if (executorName != null || eventLoop) {
-                    // selects with the route's choice, see select(MethodReference, ThreadSelection)
-                    return ExecutorSelector.super.selectExecutor(method, configuration);
-                }
-                if (RouteAssembly.this.executorSelector != null) {
-                    return RouteAssembly.this.executorSelector.selectExecutor(method, configuration);
-                } else {
-                    return ImmediateExecutor.INSTANCE;
-                }
-            }
         }
     }
 
