@@ -6125,7 +6125,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         private final Set<String> invalidatedBy;
         private final boolean observing;
         private Set<String> observed = Set.of();
-        private Set<Class<?>> leftOut = Set.of();
+        private Set<Class<?>> leftOutTypes = Set.of();
 
         ClosureConfiguration(Set<String> invalidatedBy, boolean observing) {
             this.invalidatedBy = invalidatedBy;
@@ -6165,7 +6165,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
 
         private boolean leaveOut(BeanDefinition<?> definition) {
-            leftOut(definition.getBeanType());
+            addLeftOutType(definition.getBeanType());
             return true;
         }
 
@@ -6177,15 +6177,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
          */
         void leftOutInstance(@Nullable Object bean) {
             if (bean != null) {
-                leftOut(bean.getClass());
+                addLeftOutType(bean.getClass());
             }
         }
 
-        private void leftOut(Class<?> type) {
-            if (leftOut.isEmpty()) {
-                leftOut = new LinkedHashSet<>();
+        private void addLeftOutType(Class<?> type) {
+            if (leftOutTypes.isEmpty()) {
+                leftOutTypes = new LinkedHashSet<>();
             }
-            leftOut.add(type);
+            leftOutTypes.add(type);
         }
 
         /**
@@ -6198,7 +6198,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
          */
         @Nullable
         Class<?> replacedBy(RetentionCriteria criteria) {
-            for (Class<?> type : leftOut) {
+            for (Class<?> type : leftOutTypes) {
                 if (criteria.isReplaced(type)) {
                     return type;
                 }
