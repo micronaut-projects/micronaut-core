@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.websocket;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.ArgumentBinderRegistry;
@@ -26,6 +27,7 @@ import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpRequest;
@@ -35,6 +37,7 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.simple.SimpleHttpHeaders;
@@ -70,6 +73,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.List;
@@ -424,45 +428,44 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 }
 
                 if (data == null && content != null) {
-                    // the complete payload: a single frame or the assembled fragments
-                    ByteBuf payload = content;
-                    MediaType mediaType;
-                    try {
-                        mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
-                    } catch (IllegalArgumentException e) {
-                        payload.release();
-                        exceptionCaught(ctx, e);
-                        return;
-                    }
-                    try {
-                        data = mediaTypeCodecRegistry.findCodec(mediaType)
-                            .map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(payload)))
-                            .orElse(null);
-                    } catch (CodecException e) {
-                        payload.release();
-                        messageProcessingException(ctx, e);
-                        return;
-                    } catch (Throwable e) {
-                        // codecs don't release the buffer, and not every decode error is a CodecException
-                        payload.release();
-                        throw e;
-                    }
-                    MessageBodyReader<?> reader = data == null ? messageBodyHandlerRegistry.findReader(bodyArgument, mediaType).orElse(null) : null;
-                    if (reader == null) {
-                        payload.release();
-                    } else {
-                        ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(payload);
+                    // the complete payload: a single frame or the assembled fragments. The read
+                    // buffer releases it on every path, unless a reader takes it over
+                    try (ReadBuffer payload = NettyReadBufferFactory.of(ctx.alloc()).adapt(content)) {
+                        MediaType mediaType;
                         try {
-                            data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
-                            // a reader can hand over the payload itself (e.g. a ByteBuf body), release it
-                            // once the handler completes
-                            readerOwned = data instanceof ReferenceCounted rc ? rc : null;
-                        } catch (Throwable t) {
-                            // readers only release the buffer when they succeed
-                            if (payload.refCnt() > 0) {
-                                payload.release();
+                            mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
+                        } catch (IllegalArgumentException e) {
+                            exceptionCaught(ctx, e);
+                            return;
+                        }
+                        MediaTypeCodec codec = mediaTypeCodecRegistry.findCodec(mediaType).orElse(null);
+                        if (codec != null) {
+                            try (InputStream in = payload.duplicate().toInputStream()) {
+                                data = codec.decode(bodyArgument, in);
+                            } catch (CodecException e) {
+                                messageProcessingException(ctx, e);
+                                return;
+                            } catch (IOException e) {
+                                // closing a buffer stream does not fail
+                                throw new CodecException("Failed to close the message stream", e);
                             }
-                            throw t;
+                        }
+                        MessageBodyReader<?> reader = data == null ? messageBodyHandlerRegistry.findReader(bodyArgument, mediaType).orElse(null) : null;
+                        if (reader != null) {
+                            // consumes the read buffer, the reader owns the bytes from here on
+                            ByteBuffer<?> byteBuffer = payload.toByteBuffer();
+                            try {
+                                data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+                                // a reader can hand over the payload itself (e.g. a ByteBuf body), release it
+                                // once the handler completes
+                                readerOwned = data instanceof ReferenceCounted rc ? rc : null;
+                            } catch (Throwable t) {
+                                // readers only release the buffer when they succeed
+                                if (byteBuffer instanceof ReferenceCounted rc && rc.refCnt() > 0) {
+                                    rc.release();
+                                }
+                                throw t;
+                            }
                         }
                     }
                 }
