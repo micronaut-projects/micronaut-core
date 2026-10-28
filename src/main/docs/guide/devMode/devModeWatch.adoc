@@ -104,6 +104,12 @@ The build tools give `src/main/resources` as the configuration root, so a file k
 
 NOTE: Existing api:context.processor.ExecutableMethodProcessor[] and api:context.processor.BeanDefinitionProcessor[] beans keep working. The context feeds them what is added after startup, through an adapter that sees additions only, which is also how the launcher tells that such a processor cannot follow a reload.
 
+== Watching other files
+
+A module that watches a file outside the roots the build tools give, such as a bundle in `build/`, injects the api:scheduling.io.watch.FileWatcher[]. In development mode the context's file watcher is backed by the runtime's single watcher: a directory within the roots adds a listener rather than a second watch, a directory outside them is watched for the life of the process, and stopping a generation closes what its beans registered.
+
+In continuous testing the tests start their own contexts, as they would in the build. The runtime's watcher backs none of them: each context has its own file watcher, unless `micronaut.io.watch.enabled` is `false`, in which case it has none. A module that must start without one injects it as optional, or requires the bean with `@Requires(beans = FileWatcher.class)`.
+
 == Testing a module against a reload
 
 `micronaut-dev-tck` is a small TCK a module runs in its own build. Add `micronaut-dev-tck` and `micronaut-inject-java` to the test classpath to use it. A harness:
