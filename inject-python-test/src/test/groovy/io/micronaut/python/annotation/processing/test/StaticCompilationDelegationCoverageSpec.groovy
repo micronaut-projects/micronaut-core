@@ -512,12 +512,12 @@ class Labels:
             .beanDefinitionsProvider(new InMemoryBeanDefinitionsProvider(false))
             .environments('test')
             .build().start()
-        labels.asPolyglotValue()
+        def recreated = labels.asPolyglotValue()
 
-        then: "the slot no longer holds the object of the closed context"
-        slot.get(labels) == null
+        then: "the slot no longer holds the object of the closed context: it was primed for the new object"
+        slotOwner(slot.get(labels)).is(recreated)
         labels.label(2) == 'p2'
-        slot.get(labels) != null
+        slotOwner(slot.get(labels)).is(recreated)
 
         cleanup:
         second?.close()
@@ -614,5 +614,20 @@ class Caller:
         results.all == results.off
         results['entries.Lists.filled'] == 0
         results['entries.Lists.tagged'] == 1
+    }
+
+    /**
+     * The Python object a slot keeps a value for, or null when it keeps none.
+     */
+    private static Object slotOwner(Object slot) {
+        def current = slot.getClass().getDeclaredField('current')
+        current.accessible = true
+        def fixed = current.get(slot)
+        if (fixed == null) {
+            return null
+        }
+        def owner = fixed.getClass().getDeclaredField('owner')
+        owner.accessible = true
+        return owner.get(fixed)
     }
 }
