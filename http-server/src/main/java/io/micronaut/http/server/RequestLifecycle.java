@@ -179,6 +179,14 @@ public class RequestLifecycle {
                                                         PropagatedContext propagatedContext,
                                                         RouteMatch<?> routeMatch) {
         ExecutionFlow<RouteMatch<?>> routeMatchFlow = fulfillArguments(routeMatch, request);
+        if (routeMatchFlow.tryCompleteValue() == null) {
+            routeMatchFlow = routeMatchFlow.onErrorResume(e -> {
+                // the route will not run, so a streaming body argument that was already bound
+                // would never be consumed
+                BasicHttpAttributes.discardUnconsumedBodies(request);
+                return ExecutionFlow.error(e);
+            });
+        }
         ExecutionFlow<HttpResponse<?>> responseFlow = callRoute(routeMatchFlow, request, propagatedContext);
         responseFlow = handleStatusException(responseFlow, request, routeMatch, propagatedContext);
         return onErrorNoFilter(responseFlow, request, propagatedContext);

@@ -23,10 +23,13 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.CompletedPart;
+import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.binders.UnconsumedBodyGuard;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import java.util.Optional;
@@ -62,7 +65,10 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
         if (fchr == null || !fchr.hasFormBody()) {
             return BindingResult.empty();
         }
-        Flux<? extends CompletedPart> parts = Flux.from(fchr.getRawFormFields())
+        NettyHttpRequest<?> nhr = NettyHttpRequest.findBodyRequest(source);
+        // the body is taken now, but only read once the route subscribes
+        Publisher<RawFormField> fields = nhr == null ? fchr.getRawFormFields() : UnconsumedBodyGuard.openWhenSubscribed(nhr, nhr.byteBody().move(), nhr::getRawFormFields);
+        Flux<? extends CompletedPart> parts = Flux.from(fields)
             .flatMap(raw -> ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(fchr, raw)))
             .doOnDiscard(CompletedPart.class, p -> p.closeAsync(formFactory.get().getDiskWriteExecutor()));
         return () -> Optional.of(parts::subscribe);

@@ -22,6 +22,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -83,7 +84,9 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
             if (!Publishers.isSingle(context.getArgument().getType()) && !context.getArgument().isSpecifiedSingle() && mediaType != null) {
                 Optional<MessageBodyReader<Object>> reader = nettyBodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType));
                 if (reader.isPresent() && reader.get() instanceof ChunkedMessageBodyReader<Object> piecewise) {
-                    Publisher<?> pub = piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), rootBody.toByteBufferPublisher());
+                    // the body is taken now, but only read once the route subscribes
+                    Publisher<ByteBuffer<?>> input = UnconsumedBodyGuard.openWhenSubscribed(nhr, rootBody.move(), ByteBody::toByteBufferPublisher);
+                    Publisher<?> pub = piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), input);
                     return () -> Optional.of(pub);
                 }
             }

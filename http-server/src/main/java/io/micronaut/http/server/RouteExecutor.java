@@ -84,6 +84,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -446,29 +447,49 @@ public final class RouteExecutor {
 
     ExecutionFlow<HttpResponse<?>> callRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {
         RouteInfo<?> routeInfo = routeMatch.getRouteInfo();
-        ExecutorService executorService = routeInfo.getExecutor(serverConfiguration.getThreadSelection());
+        ExecutorService executorService;
+        try {
+            executorService = routeInfo.getExecutor(serverConfiguration.getThreadSelection());
+        } catch (RuntimeException e) {
+            // e.g. the executor the route names is not configured, so the route never runs
+            BasicHttpAttributes.discardUnconsumedBodies(request);
+            throw e;
+        }
         ExecutionFlow<HttpResponse<?>> executeMethodResponseFlow;
         if (executorService != null) {
-            if (routeInfo.isSuspended()) {
-                // a suspend function runs synchronously on the caller until its first suspension point, and its
-                // coroutine context decides where it resumes, so honouring the executor needs both: applying it to
-                // the publisher moves the body off the event loop, and passing it on to the coroutine context keeps
-                // the continuation there. publishOn is deliberate - it holds the same "the response is assembled off
-                // the event loop" invariant the blocking branch below gets from ExecutionFlow.async
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(
-                    applyExecutorToPublisher(
-                        Mono.deferContextual(contextView -> Mono.from(
-                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView, executorService)).toPublisher()
-                        )),
-                        executorService,
-                        propagatedContext
-                    )
-                );
-            } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
-            } else {
-                executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
+            try {
+                if (routeInfo.isSuspended()) {
+                    // a suspend function runs synchronously on the caller until its first suspension point, and its
+                    // coroutine context decides where it resumes, so honouring the executor needs both: applying it to
+                    // the publisher moves the body off the event loop, and passing it on to the coroutine context keeps
+                    // the continuation there. publishOn is deliberate - it holds the same "the response is assembled off
+                    // the event loop" invariant the blocking branch below gets from ExecutionFlow.async
+                    executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(
+                        applyExecutorToPublisher(
+                            Mono.deferContextual(contextView -> Mono.from(
+                                ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView, executorService)).toPublisher()
+                            )),
+                            executorService,
+                            propagatedContext
+                        )
+                    );
+                } else if (routeInfo.isReactive()) {
+                    executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
+                } else {
+                    executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
+                }
+            } catch (RejectedExecutionException e) {
+                // the route never runs, so it can't consume a streaming body argument
+                BasicHttpAttributes.discardUnconsumedBodies(request);
+                throw e;
             }
+            executeMethodResponseFlow = executeMethodResponseFlow.onErrorResume(e -> {
+                if (e instanceof RejectedExecutionException) {
+                    // the route never runs, so it can't consume a streaming body argument
+                    BasicHttpAttributes.discardUnconsumedBodies(request);
+                }
+                return ExecutionFlow.error(e);
+            });
         } else {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> Mono.from(
@@ -492,11 +513,20 @@ public final class RouteExecutor {
         PropagatedContext routePropagatedContext = withRequest(propagatedContext, httpRequest);
         return routePropagatedContext.propagate(() -> {
             try {
-                if (isKotlinCoroutine && contextView != null) {
-                    coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext, executorService));
+                Object body;
+                try {
+                    if (isKotlinCoroutine && contextView != null) {
+                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext, executorService));
+                    }
+                    requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
+                    body = routeMatch.execute();
+                } catch (Throwable e) {
+                    // either the route was never invoked (e.g. an argument failed to bind), or the
+                    // invocation threw (e.g. a @Valid violation). In both cases the request has
+                    // failed, so a streaming body argument is not consumed any more
+                    BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+                    throw e;
                 }
-                requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
-                Object body = routeMatch.execute();
                 if (body instanceof Optional optional) {
                     body = optional.orElse(null);
                 }
