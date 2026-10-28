@@ -45,6 +45,167 @@ class DefaultEnvironmentSpec extends Specification {
     private static final String HEROKU_DYNO = "DYNO"
     private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST"
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13895")
+    void "test a refresh after a failed refresh still reads the property sources"() {
+        given:
+        def fail = new AtomicBoolean(false)
+        Throwable readFailure = failure
+        def properties = ['testPropKey': 'testPropValue']
+        def failing = new PropertySource() {
+            @Override
+            String getName() { 'failing' }
+
+            @Override
+            Object get(String key) { null }
+
+            @Override
+            Iterator<String> iterator() {
+                if (fail.get()) {
+                    throw readFailure
+                }
+                return Collections.emptyIterator()
+            }
+        }
+        def env = new DefaultEnvironment({['test']})
+        env.addPropertySource(failing)
+        env.addPropertySource(new MapPropertySource('CustomPS', properties))
+        env.start()
+
+        expect:
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValue'
+
+        when: "a refresh fails while it reads the property sources"
+        properties.put('testPropKey', 'newValue')
+        fail.set(true)
+        env.refresh()
+
+        then: "the properties stay as they were"
+        def e = thrown(failure.class)
+        e.is(failure)
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValue'
+
+        when: "another refresh fails"
+        env.refresh()
+
+        then: "the old snapshot is still available and the failure is propagated again"
+        def repeated = thrown(failure.class)
+        repeated.is(failure)
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValue'
+
+        when: "the next refresh succeeds"
+        fail.set(false)
+        def changes = env.refreshAndDiff()
+
+        then: "the new value is published and compared with the old snapshot"
+        env.getRequiredProperty("testPropKey", String.class) == 'newValue'
+        changes['test-prop-key'] == 'testPropValue'
+
+        when: "the environment is refreshed once more"
+        changes = env.refreshAndDiff()
+
+        then:
+        env.getRequiredProperty("testPropKey", String.class) == 'newValue'
+        changes.isEmpty()
+
+        cleanup:
+        env.stop()
+
+        where:
+        failure << [new IllegalStateException('failed to read the property source'),
+                    new AssertionError((Object) 'failed to read the property source')]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13895")
+    void "test a refresh after a refresh that failed in a property sources locator reads the property sources again"() {
+        given:
+        File main = File.createTempFile("config-import-failed-refresh", ".properties")
+        main.write("app.main=one")
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+        def previousSources = env.propertySources.toList()
+
+        expect:
+        env.getRequiredProperty("app.main", String) == "one"
+
+        when: "a required import is missing, so the config import locator fails the refresh"
+        main.write("micronaut.config.import=file://missing.properties\napp.main=one")
+        env.refresh()
+
+        then: "the properties stay as they were"
+        def e = thrown(ConfigurationException)
+        e.message.contains("Required config import not found")
+        env.getRequiredProperty("app.main", String) == "one"
+        env.propertySources.toList() == previousSources
+        !env.containsProperty("micronaut.config.import")
+
+        when: "the file is corrected and changed"
+        main.write("app.main=two")
+        env.refresh()
+
+        then: "the refresh succeeds and reads the new value"
+        env.getRequiredProperty("app.main", String) == "two"
+
+        when: "the corrected source changes again"
+        main.write("app.main=three")
+        env.refresh()
+
+        then: "the source is still refreshable"
+        env.getRequiredProperty("app.main", String) == "three"
+
+        cleanup:
+        env?.close()
+        System.clearProperty("micronaut.config.files")
+        main?.delete()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13895")
+    void "test a refresh after a locator failed with a checked exception reads the property sources again"() {
+        given:
+        def fail = new AtomicBoolean(false)
+        PropertySourcesLocator locator = new PropertySourcesLocator() {
+            @Override
+            Collection<PropertySource> load(Environment environment) {
+                if (fail.get()) {
+                    throw new IOException('remote configuration unavailable')
+                }
+                return []
+            }
+        }
+        def config = new ApplicationContextConfiguration() {
+            @Override
+            List<String> getEnvironments() { ['test'] }
+
+            @Override
+            Collection<PropertySourcesLocator> getPropertySourcesLocators() { [locator] }
+        }
+        File main = File.createTempFile("locator-checked-failure", ".properties")
+        main.write("app.main=one")
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        def env = new DefaultEnvironment(config).start()
+
+        when:
+        main.write("app.main=two")
+        fail.set(true)
+        env.refresh()
+
+        then:
+        thrown(IOException)
+        env.getRequiredProperty("app.main", String) == "one"
+
+        when:
+        fail.set(false)
+        main.write("app.main=three")
+        env.refresh()
+
+        then:
+        env.getRequiredProperty("app.main", String) == "three"
+
+        cleanup:
+        env?.stop()
+        System.clearProperty("micronaut.config.files")
+        main?.delete()
+    }
+
     void "mapper not reset on refresh"() {
         given:
         Environment environment = new DefaultEnvironment({ ["test"] })

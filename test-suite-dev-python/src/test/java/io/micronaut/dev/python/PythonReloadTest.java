@@ -31,6 +31,7 @@ class PythonReloadTest {
         Files.writeString(manifestFile, """
             micronaut.dev.main-class=pyronaut_application.PyronautMain
             micronaut.dev.strategy=restart
+            micronaut.dev.patch-in-place=false
             micronaut.dev.reloadable=build/classes
             micronaut.dev.compile-classpath=@cp.argfile
             micronaut.dev.sources.python=src/main/python
@@ -46,7 +47,7 @@ class PythonReloadTest {
             assertEquals(1, runtime.generation());
             assertEquals("Hello one", greet(first));
 
-            // a Python edit: the module is read again by the GraalPy context of the next generation
+            // a Python edit, with patching in place off: the module is read again by the GraalPy context of the next generation
             fixture.writeGreeter("two");
             runtime.reload();
             ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));

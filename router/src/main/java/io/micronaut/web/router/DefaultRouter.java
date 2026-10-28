@@ -45,6 +45,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -69,6 +70,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private final UriRouteSet routes;
     private final StatusRouteInfo<Object, Object>[] statusRoutes;
     private final ErrorRouteInfo<Object, Object>[] errorRoutes;
+    /**
+     * The types that have local error routes, or {@code null} if unknown: no local error route
+     * is looked up for another type, e.g. the class of a handler function.
+     */
+    private final @Nullable Set<Class<?>> localErrorRouteTypes;
     private final Set<Integer> exposedPorts;
     /**
      * The default ports: an unmodifiable snapshot, replaced as a whole.
@@ -76,6 +82,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private final AtomicReference<@Nullable Set<Integer>> ports = new AtomicReference<>();
     private final List<FilterRoute> alwaysMatchesFilterRoutes;
     private final List<FilterRoute> preconditionFilterRoutes;
+    private final Map<HttpMethod, List<FilterRoute>> applicationFiltersByMethod;
+    private final boolean applicationFilterOrderFixed;
     private final List<FilterRoute> preMatchingAlwaysMatchesFilterRoutes;
     private final List<FilterRoute> preMatchingPreconditionFilterRoutes;
     // ArrayList to avoid interface checkcast
@@ -175,6 +183,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         this.routes = uriRoutes.build();
         this.statusRoutes = statusRoutes.toArray(StatusRouteInfo[]::new);
         this.errorRoutes = errorRoutes.toArray(ErrorRouteInfo[]::new);
+        this.localErrorRouteTypes = localErrorRouteTypes(this.errorRoutes);
+        List<FilterRoute> fixed = fixedOrderFilters(alwaysMatchesFilterRoutes, preconditionFilterRoutes);
+        this.applicationFilterOrderFixed = fixed != null;
+        this.applicationFiltersByMethod = filtersByMethod(fixed != null ? fixed : preconditionFilterRoutes);
         this.alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
             if (alwaysMatchesFilterRoutes.isEmpty()) {
                 return new ArrayList<>(0);
@@ -197,6 +209,56 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             FilterRunner.sort(httpFilters);
             return httpFilters;
         });
+    }
+
+    private static @Nullable List<FilterRoute> fixedOrderFilters(List<FilterRoute> always, List<FilterRoute> conditional) {
+        if (conditional.isEmpty() || always.size() + conditional.size() < 2) {
+            return null;
+        }
+        var filters = new ArrayList<FilterRoute>(always.size() + conditional.size());
+        filters.addAll(always);
+        filters.addAll(conditional);
+        for (FilterRoute route : filters) {
+            if (!(route instanceof DefaultFilterRoute candidate) || candidate.fixedOrder() == null) {
+                return null;
+            }
+        }
+        for (FilterRoute route : always) {
+            ((DefaultFilterRoute) route).matchAlways();
+        }
+        // Stable sorting before matching preserves the original category order for equal orders.
+        filters.sort(Comparator.comparingInt(route -> Objects.requireNonNull(((DefaultFilterRoute) route).fixedOrder())));
+        return filters;
+    }
+
+    private static Map<HttpMethod, List<FilterRoute>> filtersByMethod(List<FilterRoute> filters) {
+        if (filters.size() < 2) {
+            return Map.of();
+        }
+        boolean prepared = false;
+        for (FilterRoute route : filters) {
+            if (route instanceof DefaultFilterRoute candidate && candidate.fixedOrder() != null) {
+                prepared = true;
+                break;
+            }
+        }
+        if (!prepared) {
+            return Map.of();
+        }
+        Map<HttpMethod, List<FilterRoute>> byMethod = CollectionUtils.newEnumMap(HttpMethod.values());
+        List<FilterRoute> all = List.copyOf(filters);
+        for (HttpMethod method : HttpMethod.values()) {
+            var candidates = new ArrayList<FilterRoute>();
+            for (FilterRoute route : filters) {
+                // Only assembly-owned functional routes have a fixed publication snapshot.
+                if (!(route instanceof DefaultFilterRoute candidate) || candidate.fixedOrder() == null
+                    || route.getFilterMethods().isEmpty() || route.getFilterMethods().contains(method)) {
+                    candidates.add(route);
+                }
+            }
+            byMethod.put(method, candidates.size() == filters.size() ? all : List.copyOf(candidates));
+        }
+        return byMethod;
     }
 
     private boolean isMatchesAll(FilterRoute filterRoute) {
@@ -339,17 +401,22 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             long variableCount = 0;
             long rawLength = 0;
 
-            var closestMatches = new ArrayList<UriRouteMatch<T, R>>(routeCount);
-
+            int closestCount = 0;
             for (int i = 0; i < routeCount; i++) {
                 UriRouteMatch<T, R> match = uriRoutes.get(i);
                 UriRouteInfo<T, R> routeInfo = match.getRouteInfo();
                 long variable;
                 long raw;
-                if (routeInfo instanceof DefaultUrlRouteInfo<?, ?> info && !info.isMicronautTemplate()) {
-                    // the facts the template describes for this policy
-                    variable = info.getPathVariableCount();
-                    raw = info.getRawLength();
+                if (routeInfo instanceof DefaultUrlRouteInfo<?, ?> info) {
+                    if (info.isMicronautTemplate()) {
+                        // read once, when the route was built
+                        variable = info.getAmbiguityVariableSegments();
+                        raw = info.getAmbiguityRawSegmentLength();
+                    } else {
+                        // the facts the template describes for this policy
+                        variable = info.getPathVariableCount();
+                        raw = info.getRawLength();
+                    }
                 } else {
                     UriMatchTemplate template = routeInfo.getUriMatchTemplate();
                     variable = template.getPathVariableSegmentCount();
@@ -362,9 +429,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 if (variable > variableCount || raw < rawLength) {
                     break;
                 }
-                closestMatches.add(match);
+                closestCount++;
             }
-            uriRoutes = closestMatches;
+            if (closestCount != routeCount) {
+                uriRoutes = copyPrefix(uriRoutes, closestCount, closestCount);
+            }
         }
         return uriRoutes;
     }
@@ -385,36 +454,52 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             // take the highest priority accepted type, a type of the quality 0 is not acceptable
             final MediaType mediaType = preferredAcceptedType(acceptedProducedTypes);
             if (mediaType != null) {
-                var mostSpecific = new ArrayList<UriRouteMatch<T, R>>(uriRoutes.size());
-                for (UriRouteMatch<T, R> routeMatch : uriRoutes) {
-                    if (routeMatch.getRouteInfo().explicitlyProduces(mediaType)) {
-                        mostSpecific.add(routeMatch);
-                    }
-                }
-                if (!mostSpecific.isEmpty()) {
-                    uriRoutes = mostSpecific;
-                }
+                uriRoutes = preferExplicitMediaType(uriRoutes, mediaType, true);
             }
         }
         boolean permitsBody = request.getMethod().permitsRequestBody();
         int routeCount = uriRoutes.size();
         if (routeCount > 1 && permitsBody) {
             final MediaType contentType = request.getContentType().orElse(MediaType.ALL_TYPE);
-            var explicitlyConsumedRoutes = new ArrayList<UriRouteMatch<T, R>>(routeCount);
-            var consumesRoutes = new ArrayList<UriRouteMatch<T, R>>(routeCount);
-
-            for (UriRouteMatch<T, R> match : uriRoutes) {
-                if (match.getRouteInfo().explicitlyConsumes(contentType)) {
-                    explicitlyConsumedRoutes.add(match);
-                }
-                if (explicitlyConsumedRoutes.isEmpty()) {
-                    consumesRoutes.add(match);
-                }
-            }
-
-            uriRoutes = explicitlyConsumedRoutes.isEmpty() ? consumesRoutes : explicitlyConsumedRoutes;
+            uriRoutes = preferExplicitMediaType(uriRoutes, contentType, false);
         }
         return uriRoutes;
+    }
+
+    /**
+     * Prefer explicit media types, retaining the candidates when all or none are explicit.
+     */
+    private static <T, R> List<UriRouteMatch<T, R>> preferExplicitMediaType(List<UriRouteMatch<T, R>> matches,
+                                                                          MediaType type, boolean produces) {
+        int count = matches.size();
+        int prefix = 0;
+        ArrayList<UriRouteMatch<T, R>> explicit = null;
+        for (int i = 0; i < count; i++) {
+            UriRouteMatch<T, R> match = matches.get(i);
+            boolean accepts = produces ? match.getRouteInfo().explicitlyProduces(type) : match.getRouteInfo().explicitlyConsumes(type);
+            if (accepts) {
+                if (explicit != null) {
+                    explicit.add(match);
+                } else if (prefix == i) {
+                    prefix++;
+                } else {
+                    explicit = copyPrefix(matches, prefix, count);
+                    explicit.add(match);
+                }
+            }
+        }
+        if (explicit != null) {
+            return explicit;
+        }
+        return prefix == 0 || prefix == count ? matches : copyPrefix(matches, prefix, prefix);
+    }
+
+    private static <T> ArrayList<T> copyPrefix(List<T> input, int size, int capacity) {
+        var copy = new ArrayList<T>(capacity);
+        for (int i = 0; i < size; i++) {
+            copy.add(input.get(i));
+        }
+        return copy;
     }
 
     private static @Nullable MediaType preferredAcceptedType(Collection<MediaType> acceptedTypes) {
@@ -510,6 +595,15 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     /**
      * @param route A route
+     * @return Whether the route selector of the route selects by the media types itself, see
+     * {@link RouteMatchSelector#selectsMediaTypes()}
+     */
+    static boolean selectsMediaTypes(UriRouteInfo<?, ?> route) {
+        return route instanceof DefaultUrlRouteInfo<?, ?> info && info.routeMatchSelectorSelectsMediaTypes();
+    }
+
+    /**
+     * @param route A route
      * @return The order of the route selector of the route, read once when it was built, or {@code null}
      */
     static @Nullable Comparator<UriRouteInfo<?, ?>> selectorOrder(UriRouteInfo<?, ?> route) {
@@ -571,7 +665,37 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         Class<?> originatingClass,
         Throwable error,
         HttpRequest<?> request) {
+        if (!mayHaveLocalErrorRoutes(originatingClass)) {
+            // a local error route only matches the type it is local to
+            return Optional.empty();
+        }
         return findErrorRouteInternal(originatingClass, error, request);
+    }
+
+    /**
+     * @param originatingClass The class the error originates from, {@code null} for the global error routes
+     * @return Whether to look up the error routes: always for {@code null}, and when an error route may be local to the class
+     */
+    private boolean mayHaveLocalErrorRoutes(@Nullable Class<?> originatingClass) {
+        return originatingClass == null || localErrorRouteTypes == null || localErrorRouteTypes.contains(originatingClass);
+    }
+
+    /**
+     * @param errorRoutes The error routes
+     * @return The types the error routes are local to, or {@code null} if one of them is not a {@link DefaultErrorRouteInfo}
+     */
+    private static @Nullable Set<Class<?>> localErrorRouteTypes(ErrorRouteInfo<Object, Object>[] errorRoutes) {
+        Set<Class<?>> types = new HashSet<>();
+        for (ErrorRouteInfo<Object, Object> errorRoute : errorRoutes) {
+            if (!(errorRoute instanceof DefaultErrorRouteInfo)) {
+                return null;
+            }
+            Class<?> originatingType = errorRoute.originatingType();
+            if (originatingType != null) {
+                types.add(originatingType);
+            }
+        }
+        return types;
     }
 
     private <R> Optional<RouteMatch<R>> findErrorRouteInternal(
@@ -745,21 +869,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             ArrayList<GenericHttpFilter> always = alwaysMatchesHttpFilters.get();
             return always;
         }
-        var httpFilters = new ArrayList<GenericHttpFilter>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
-        httpFilters.addAll(alwaysMatchesHttpFilters.get());
         var routeMatch = RouteAttributes.getRouteMatch(request).orElse(null);
-        HttpMethod method = request.getMethod();
-        String path = request.getPath();
-        for (FilterRoute filterRoute : preconditionFilterRoutes) {
-            if (routeMatch != null) {
-                if (!matchesFilterMatcher(filterRoute, routeMatch)) {
-                    continue;
-                }
-            }
-            filterRoute.match(method, path).ifPresent(httpFilters::add);
-        }
-        FilterRunner.sort(httpFilters);
-        return Collections.unmodifiableList(httpFilters);
+        return findApplicationFilters(request, routeMatch);
     }
 
     @Override
@@ -802,17 +913,27 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             ArrayList<GenericHttpFilter> always = alwaysMatchesHttpFilters.get();
             return always;
         }
-        var httpFilters = new ArrayList<GenericHttpFilter>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
-        httpFilters.addAll(alwaysMatchesHttpFilters.get());
         HttpMethod method = request.getMethod();
+        List<FilterRoute> candidates = applicationFiltersByMethod.getOrDefault(method, preconditionFilterRoutes);
+        int capacity = candidates.size() + (applicationFilterOrderFixed ? 0 : alwaysMatchesFilterRoutes.size());
+        var httpFilters = new ArrayList<GenericHttpFilter>(capacity);
+        if (!applicationFilterOrderFixed) {
+            httpFilters.addAll(alwaysMatchesHttpFilters.get());
+        }
         String path = request.getPath();
-        for (FilterRoute filterRoute : preconditionFilterRoutes) {
+        for (FilterRoute filterRoute : candidates) {
+            if (applicationFilterOrderFixed && ((DefaultFilterRoute) filterRoute).isAlwaysMatch()) {
+                httpFilters.add(filterRoute.getFilter());
+                continue;
+            }
             if (routeMatch != null && !matchesFilterMatcher(filterRoute, routeMatch)) {
                 continue;
             }
             filterRoute.match(method, path).ifPresent(httpFilters::add);
         }
-        FilterRunner.sort(httpFilters);
+        if (!applicationFilterOrderFixed) {
+            FilterRunner.sort(httpFilters);
+        }
         return Collections.unmodifiableList(httpFilters);
     }
 

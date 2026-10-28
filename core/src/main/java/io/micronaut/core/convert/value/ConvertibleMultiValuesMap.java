@@ -84,7 +84,7 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V>, 
         if (!values.isEmpty()) {
             boolean hasSingleEntry = values.size() == 1;
             if (hasSingleEntry) {
-                final V v = values.iterator().next();
+                final V v = values.get(0);
                 if (conversionContext.getArgument().getType().isInstance(v)) {
                     return Optional.of((T) v);
                 } else {

@@ -256,7 +256,7 @@ class HttpRoutesResponseReplacementTest {
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { }, null);
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, null);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         return new DefaultRouter(List.of(), List.of(() -> assembly));
     }

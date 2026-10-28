@@ -9,7 +9,9 @@ Java packages, types and annotations every module imports in a manifest
 installed here serves them from the manifests of every compilation on the path. A package is a module
 object without a file whose attributes resolve to host classes on first access; an annotation is a
 callable that carries the annotation type and returns its target, as the compiler-generated decorators
-did; a class the run time class path lacks is a facade resolving it on first use.
+did; a class the run time class path lacks is a facade resolving it on first use. The Java wrappers
+generated for Python dataclasses get the dataclass attributes of their Python class, registered with
+GraalPy as interop types of the wrappers.
 
 Loaded by PythonContextRuntime before the application modules import, and imported by the package
 initialisers of the application packages that share their name with a Java package. Kept apart from
@@ -222,6 +224,8 @@ class _MicronautJavaImports:
         self.types = {}
         # Python module name -> simple name -> (binary name, kind)
         self.members = {}
+        # binary name of the Java wrapper of a Python dataclass -> (Python package, dotted class name)
+        self.dataclasses = {}
         self.manifests = []
 
     def merge(self, manifest):
@@ -236,6 +240,8 @@ class _MicronautJavaImports:
                 existing = merged.get(simple_name)
                 if existing is None or (existing[1] != 'annotation' and _micronaut_host_class(existing[0]) is None):
                     merged[simple_name] = tuple(member)
+        for java_name, python_class in manifest.get('DATACLASSES', {}).items():
+            self.dataclasses.setdefault(java_name, tuple(python_class))
 
     def java_name(self, python_name):
         return self.types.get(python_name) or self.packages.get(python_name)
@@ -287,24 +293,105 @@ def _micronaut_java_imports():
         with _micronaut_java_imports_lock:
             imports = _micronaut_java_imports_cache
             if imports is None:
-                imports = _MicronautJavaImports()
-                for entry in list(sys.path):
-                    try:
-                        files = _micronaut_os.listdir(entry) if entry else []
-                    except OSError:
-                        continue
-                    for file in sorted(files):
-                        if file.startswith(_MICRONAUT_JAVA_IMPORTS_MANIFEST_PREFIX) and file.endswith(_MICRONAUT_JAVA_IMPORTS_MANIFEST_SUFFIX):
-                            # a module of dict literals, run in a namespace of its own like a members module: the
-                            # loader uses the bytecode cache the compiler may have written next to it
-                            path = _micronaut_os.path.join(entry, file)
-                            name = file[:-3]
-                            namespace = {'__name__': name, '__file__': path}
-                            exec(_micronaut_importlib_machinery.SourceFileLoader(name, path).get_code(name), namespace)
-                            imports.merge(namespace)
-                            imports.manifests.append(path)
+                imports = _micronaut_read_java_imports()
+                _micronaut_register_interop_types(imports)
                 _micronaut_java_imports_cache = imports
     return imports
+
+
+def _micronaut_read_java_imports():
+    """The manifests of the path entries, merged."""
+    imports = _MicronautJavaImports()
+    for entry in list(sys.path):
+        try:
+            files = _micronaut_os.listdir(entry) if entry else []
+        except OSError:
+            continue
+        for file in sorted(files):
+            if file.startswith(_MICRONAUT_JAVA_IMPORTS_MANIFEST_PREFIX) and file.endswith(_MICRONAUT_JAVA_IMPORTS_MANIFEST_SUFFIX):
+                # a module of dict literals, run in a namespace of its own like a members module: the
+                # loader uses the bytecode cache the compiler may have written next to it
+                path = _micronaut_os.path.join(entry, file)
+                name = file[:-3]
+                namespace = {'__name__': name, '__file__': path}
+                exec(_micronaut_importlib_machinery.SourceFileLoader(name, path).get_code(name), namespace)
+                imports.merge(namespace)
+                imports.manifests.append(path)
+    return imports
+
+
+def __micronaut_register_interop_types():
+    """
+    Registers the interop types the manifests record once the application modules have loaded, for a context
+    whose bootstrap did not read the manifests through a Java import: a dataclass needs no Java import. The
+    manifests are read without being kept, so the first Java import still reads the path it then has.
+    """
+    with _micronaut_java_imports_lock:
+        if _micronaut_java_imports_cache is None:
+            _micronaut_register_interop_types(_micronaut_read_java_imports())
+
+
+# binary name -> the interop type registered for it in this context; kept across reloads of this module, as a
+# type registered again would join the Java type's classes a second time
+_micronaut_interop_types = globals().get('_micronaut_interop_types', {})
+_MICRONAUT_DATACLASS_ATTRIBUTES = ('__dataclass_fields__', '__dataclass_params__')
+_micronaut_caller_classes = None
+
+
+class _MicronautDataclassAttribute:
+    """
+    A dataclass attribute of the type of the Java wrapper of a Python dataclass, which is the type ``dataclasses``
+    looks it up on (``type(value)``): read from the Python class in the context reading it, so the fields and
+    parameters are that context's, and a reloaded class is seen.
+    """
+
+    __slots__ = ('_python_class', '_name')
+
+    def __init__(self, python_class, name):
+        self._python_class = python_class
+        self._name = name
+
+    def __get__(self, instance, owner=None):
+        global _micronaut_caller_classes
+        if _micronaut_caller_classes is None:
+            import java
+            _micronaut_caller_classes = java.type('io.micronaut.context.python.PythonCallerClasses')
+        return getattr(_micronaut_caller_classes.callerClass(*self._python_class), self._name)
+
+
+def _micronaut_register_interop_types(imports):
+    """
+    Registers the dataclass attributes of the Java wrapper of each Python dataclass the manifests record as an
+    interop type of the wrapper, which GraalPy adds to the type of its instances. A wrapper registered before
+    keeps its interop type, with the attributes the manifests now record; a wrapper the run time class path
+    lacks is skipped. Only the compilation's own dataclass wrappers are registered, so a context loads few
+    host classes for them.
+    """
+    attributes = {
+        java_name: {name: _MicronautDataclassAttribute(python_class, name) for name in _MICRONAUT_DATACLASS_ATTRIBUTES}
+        for java_name, python_class in imports.dataclasses.items()
+    }
+    for java_name, registered in _micronaut_interop_types.items():
+        recorded = attributes.get(java_name, {})
+        for name in _MICRONAUT_DATACLASS_ATTRIBUTES:
+            if name in registered.__dict__ and name not in recorded:
+                delattr(registered, name)
+    from polyglot import register_interop_type
+    for java_name, namespace in attributes.items():
+        registered = _micronaut_interop_types.get(java_name)
+        if registered is not None:
+            for name, value in namespace.items():
+                setattr(registered, name, value)
+            continue
+        host_class = _micronaut_host_class(java_name)
+        if host_class is None:
+            continue
+        registered = type(java_name.rsplit('.', 1)[-1].replace('$', '_') + 'Interop', (), {'__slots__': (), **namespace})
+        try:
+            register_interop_type(host_class, registered)
+        except (KeyError, ImportError, TypeError):
+            continue  # not a class GraalPy gives an interop type to
+        _micronaut_interop_types[java_name] = registered
 
 
 def __micronaut_reset_java_imports():

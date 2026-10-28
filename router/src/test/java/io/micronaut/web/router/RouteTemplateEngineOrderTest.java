@@ -136,7 +136,7 @@ class RouteTemplateEngineOrderTest {
     }
 
     static Router router(@Nullable String contextPath, Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, contextPath, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, contextPath);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         return new DefaultRouter(List.of(), List.of(() -> assembly));

@@ -41,6 +41,7 @@ import io.micronaut.http.netty.body.RawDuplexHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.RouteExecutor;
+import io.micronaut.http.server.binding.AsyncRequestBodyFactory;
 import io.micronaut.http.server.ServerResponseAttributes;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -128,6 +129,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
      */
     boolean supportLoggingHandler = false;
     private final ApplicationContext applicationContext;
+    private final AsyncRequestBodyFactory asyncBodies;
     /**
      * Decides whether a {@link HttpRequestTerminatedEvent} has to be published for a request.
      * Resolved on first use, see {@link #resolveTerminatedEventFilter()}.
@@ -162,6 +164,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         Optional<Boolean> isMultiPartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
         this.routeExecutor = embeddedServerContext.getRouteExecutor();
+        this.asyncBodies = embeddedServerContext.getApplicationContext().getBean(AsyncRequestBodyFactory.class);
         this.conversionService = conversionService;
         this.applicationContext = embeddedServerContext.getApplicationContext();
     }
@@ -342,7 +345,22 @@ public final class RoutingInBoundHandler implements RequestHandler {
             .propagate(() -> new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest));
     }
 
+    /**
+     * Give a request created outside this handler, e.g. a WebSocket upgrade, the
+     * {@link io.micronaut.http.body.AsyncRequestBody} of its filters, see
+     * {@link io.micronaut.http.body.AsyncRequestBody#of(io.micronaut.http.HttpRequest)}.
+     *
+     * @param request The request
+     * @since 5.3.0
+     */
+    @Internal
+    public void prepareAsyncRequestBody(NettyHttpRequest<?> request) {
+        request.setAsyncRequestBodySource(asyncBodies);
+    }
+
     private void prepareRequest(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> mnRequest) {
+        // every request that runs the filters, the requests of early errors too
+        mnRequest.setAsyncRequestBodySource(asyncBodies);
         if (supportLoggingHandler && hasAccessLogHandler(ctx)) {
             // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
             ctx.channel().attr(ACCESS_LOG_REQUEST_ATTRIBUTE).set(mnRequest);

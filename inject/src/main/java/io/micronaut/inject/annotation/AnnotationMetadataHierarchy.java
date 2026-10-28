@@ -33,13 +33,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.RandomAccess;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -278,11 +278,18 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public <T extends Annotation> @Nullable AnnotationValue<T> getAnnotation(String annotation) {
+        // Each layer checks the repeatable registry only when it misses, so checking it up front costs more than it saves
         AnnotationValue<T> existing = null;
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             existing = mergeValue(annotation, existing, annotationMetadata.getAnnotation(annotation));
         }
         return existing;
+    }
+
+    @Override
+    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(Class<T> annotationClass) {
+        // The default checks repeatability before findAnnotation(String), which would check it again
+        return Optional.ofNullable(getAnnotation(annotationClass));
     }
 
     @Override
@@ -472,20 +479,20 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
-        Set<String> list = new LinkedHashSet<>();
+        UniqueValues<String> merged = new UniqueValues<>();
         for (AnnotationMetadata am : hierarchy) {
-            list.addAll(am.getAnnotationNamesByStereotype(stereotype));
+            merged.addAll(am.getAnnotationNamesByStereotype(stereotype));
         }
-        return new ArrayList<>(list);
+        return merged.list();
     }
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
-        Set<AnnotationValue<T>> list = new LinkedHashSet<>();
+        UniqueValues<AnnotationValue<T>> merged = new UniqueValues<>();
         for (AnnotationMetadata am : hierarchy) {
-            list.addAll(am.getAnnotationValuesByStereotype(stereotype));
+            merged.addAll(am.getAnnotationValuesByStereotype(stereotype));
         }
-        return new ArrayList<>(list);
+        return merged.list();
     }
 
     @Override
@@ -554,25 +561,11 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
-        List<AnnotationValue<T>> list = new ArrayList<>();
-        Set<AnnotationValue<T>> uniqueValues = null;
+        UniqueValues<AnnotationValue<T>> merged = new UniqueValues<>();
         for (AnnotationMetadata am : hierarchy) {
-            for (AnnotationValue<T> value : am.getAnnotationValuesByType(annotationType)) {
-                if (list.isEmpty()) {
-                    list.add(value);
-                    continue;
-                }
-                if (uniqueValues == null) {
-                    // Only created once there is a second value to compare: the list holds the first value only
-                    uniqueValues = new HashSet<>();
-                    uniqueValues.add(list.get(0));
-                }
-                if (uniqueValues.add(value)) {
-                    list.add(value);
-                }
-            }
+            merged.addAll(am.getAnnotationValuesByType(annotationType));
         }
-        return list;
+        return merged.list();
     }
 
     @Override
@@ -585,25 +578,11 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     private <T extends Annotation, V> List<AnnotationValue<T>> mergeAnnotationValues(V annotationType,
                                                                                      BiFunction<AnnotationMetadata, V, List<AnnotationValue<T>>> fn) {
-        List<AnnotationValue<T>> list = new ArrayList<>();
-        Set<AnnotationValue<T>> uniqueValues = null;
+        UniqueValues<AnnotationValue<T>> merged = new UniqueValues<>();
         for (AnnotationMetadata am : hierarchy) {
-            for (AnnotationValue<T> value : fn.apply(am, annotationType)) {
-                if (list.isEmpty()) {
-                    list.add(value);
-                    continue;
-                }
-                if (uniqueValues == null) {
-                    // Only created once there is a second value to compare: the list holds the first value only
-                    uniqueValues = new HashSet<>();
-                    uniqueValues.add(list.get(0));
-                }
-                if (uniqueValues.add(value)) {
-                    list.add(value);
-                }
-            }
+            merged.addAll(fn.apply(am, annotationType));
         }
-        return list.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(list);
+        return merged.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(merged.list());
     }
 
 
@@ -1069,6 +1048,66 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     /**
+     * {@link #findRepeatableAnnotation(Class)} without an {@link java.util.Optional} per layer, asking the shared
+     * registry once for all the layers that are exactly {@link DefaultAnnotationMetadata}.
+     *
+     * @param annotationClass The annotation
+     * @return The container of the first layer that considers the annotation repeatable, or {@code null}
+     */
+    /**
+     * The name the layers store the annotation under: its container when a layer considers it repeatable.
+     *
+     * @param annotationClass The annotation
+     * @return The name to look up
+     */
+    private String lookupName(Class<? extends Annotation> annotationClass) {
+        String container = repeatableContainer(annotationClass);
+        return container != null ? container : annotationClass.getName();
+    }
+
+    @Nullable
+    private String repeatableContainer(Class<? extends Annotation> annotationClass) {
+        boolean registryChecked = false;
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.getClass() == DefaultAnnotationMetadata.class) {
+                if (!registryChecked) {
+                    String container = AnnotationMetadataSupport.getRepeatableAnnotation(annotationClass.getName());
+                    if (container != null) {
+                        return container;
+                    }
+                    registryChecked = true;
+                }
+            } else {
+                String container = metadata.findRepeatableAnnotation(annotationClass).orElse(null);
+                if (container != null) {
+                    return container;
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
+        return annotation != null && hasAnnotation(lookupName(annotation));
+    }
+
+    @Override
+    public boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
+        return annotation != null && hasStereotype(lookupName(annotation));
+    }
+
+    @Override
+    public boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
+        return annotation != null && hasDeclaredAnnotation(lookupName(annotation));
+    }
+
+    @Override
+    public boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
+        return stereotype != null && hasDeclaredStereotype(lookupName(stereotype));
+    }
+
+    /**
      * {@link #isRepeatableAnnotation(Class)}, asking the shared registry once for all the layers that are exactly
      * {@link DefaultAnnotationMetadata}, since that is all such a layer asks.
      *
@@ -1199,5 +1238,55 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     public int size() {
         return hierarchy.length;
+    }
+
+    /**
+     * The values of the layers in order, without duplicates. The list is created with the first value, sized for the
+     * first layer with values, and the set to find duplicates only once there is a second value to compare.
+     *
+     * @param <E> The value type
+     */
+    private static final class UniqueValues<E> {
+        private @Nullable List<E> list;
+        private @Nullable Set<E> unique;
+
+        void addAll(List<E> values) {
+            int n = values.size();
+            if (values instanceof RandomAccess) {
+                // An index loop: the lists of the generated metadata are random access, and their iterators were
+                // allocated on every call
+                for (int i = 0; i < n; i++) {
+                    add(values.get(i), n);
+                }
+            } else {
+                for (E value : values) {
+                    add(value, n);
+                }
+            }
+        }
+
+        private void add(E value, int layerSize) {
+            if (list == null) {
+                list = new ArrayList<>(layerSize);
+                list.add(value);
+                return;
+            }
+            if (unique == null) {
+                // Few values are expected, so a small table
+                unique = new HashSet<>(4);
+                unique.add(list.get(0));
+            }
+            if (unique.add(value)) {
+                list.add(value);
+            }
+        }
+
+        boolean isEmpty() {
+            return list == null;
+        }
+
+        List<E> list() {
+            return list != null ? list : new ArrayList<>();
+        }
     }
 }

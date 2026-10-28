@@ -16,6 +16,7 @@
 package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Adapter;
+import io.micronaut.aop.ExactInterceptorBindingQualifier;
 import io.micronaut.aop.ConstructorInterceptor;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
@@ -85,9 +86,8 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
         final Interceptor<T, ?>[] resolvedInterceptors = findInterceptors(
             method.getDeclaringType(),
             interceptors,
-            interceptorKind,
             applicableBindings,
-            annotationMetadata,
+            ExactInterceptorBindingQualifier.of(annotationMetadata, interceptorKind),
             true,
             false
         );
@@ -119,14 +119,13 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
 
     private <T> Interceptor<T, ?>[] findInterceptors(Class<?> declaringType,
                                                      Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
-                                                     InterceptorKind interceptorKind,
                                                      Collection<AnnotationValue<?>> interceptPointBindings,
-                                                     AnnotationMetadata interceptPointMetadata,
+                                                     ExactInterceptorBindingQualifier<?> interceptPoint,
                                                      boolean selectMethodInterceptor,
                                                      boolean selectConstructorInterceptor) {
         List<BeanRegistration<Interceptor<T, ?>>> selectedInterceptorRegistrations = new ArrayList<>(interceptors.size());
         for (BeanRegistration<Interceptor<T, ?>> beanRegistration : interceptors) {
-            if (selectInterceptor(declaringType, interceptorKind, interceptPointBindings, interceptPointMetadata, beanRegistration)) {
+            if (selectInterceptor(declaringType, interceptPointBindings, interceptPoint, beanRegistration)) {
                 selectedInterceptorRegistrations.add(beanRegistration);
             }
         }
@@ -144,9 +143,8 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
     }
 
     private <T> boolean selectInterceptor(Class<?> declaringType,
-                                          InterceptorKind interceptorKind,
                                           Collection<AnnotationValue<?>> interceptPointBindings,
-                                          AnnotationMetadata interceptPointMetadata,
+                                          ExactInterceptorBindingQualifier<?> interceptPoint,
                                           BeanRegistration<Interceptor<T, ?>> beanRegistration) {
         final List<Argument<?>> typeArgs = beanRegistration.getBeanDefinition().getTypeArguments(ConstructorInterceptor.class);
         if (!typeArgs.isEmpty()) {
@@ -164,73 +162,8 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
                 return true;
             }
         }
-        // these are the binding declared on the interceptor itself
-        // an interceptor can declare one or more bindings
-        final AnnotationMetadata interceptorMetadata = beanRegistration.getBeanDefinition().getAnnotationMetadata();
-        final Collection<AnnotationValue<?>> interceptorValues = AbstractInterceptorChain
-            .resolveInterceptorValues(interceptorMetadata, interceptorKind);
-        if (interceptorValues.isEmpty()) {
-            // Bean is an interceptor but no bindings???
-            return false;
-        }
-        // loop through the bindings on the interceptor and make sure that
-        // the intercept point has the same once
-        boolean hasInterceptorBinding = false;
-        for (AnnotationValue<?> interceptorAnnotationValue : interceptorValues) {
-            if (interceptorAnnotationValue.stringValue().isEmpty()) {
-                continue;
-            }
-            hasInterceptorBinding = true;
-            if (!matches(interceptorAnnotationValue, interceptorMetadata, interceptPointBindings, interceptPointMetadata)) {
-                return false;
-            }
-        }
-        return hasInterceptorBinding;
-    }
-
-    /**
-     * Whether a binding declared on an interceptor applies to one of the bindings of an interception point: the
-     * binding annotation is the same and, when the interceptor binds members, one of the occurrences it was declared
-     * through is the same annotation as one of the occurrences at the interception point, with the occurrence
-     * declared on the method replacing the one on its class.
-     */
-    private boolean matches(AnnotationValue<?> interceptorAnnotationValue,
-                            AnnotationMetadata interceptorMetadata,
-                            Collection<AnnotationValue<?>> interceptPointBindings,
-                            AnnotationMetadata interceptPointMetadata) {
-        final String annotationName = interceptorAnnotationValue.stringValue().orElse(null);
-        if (annotationName == null) {
-            // This shouldn't happen
-            return false;
-        }
-        final List<AnnotationValue<?>> interceptorOccurrences =
-            InterceptorBindingQualifier.resolveBoundOccurrences(interceptorAnnotationValue, interceptorMetadata);
-        boolean boundByOccurrences = false;
-        boolean boundByNoOccurrences = false;
-        for (AnnotationValue<?> applicableValue : interceptPointBindings) {
-            String interceptPointAnnotation = applicableValue.stringValue().orElse(null);
-            if (!annotationName.equals(interceptPointAnnotation)) {
-                continue;
-            }
-            if (interceptorOccurrences == null) {
-                return true;
-            }
-            final List<AnnotationValue<?>> interceptPointOccurrences =
-                InterceptorBindingQualifier.resolveBoundOccurrences(applicableValue, interceptPointMetadata, true);
-            if (interceptPointOccurrences == null) {
-                // an annotation carrying both @Around and @InterceptorBinding(bindMembers = true) records a
-                // second binding which binds no members, and it must not decide the match while a binding
-                // carrying the occurrences the intercept point binds by is present
-                boundByNoOccurrences = true;
-                continue;
-            }
-            boundByOccurrences = true;
-            if (InterceptorBindingQualifier.anyMatch(interceptorOccurrences, interceptPointOccurrences)) {
-                return true;
-            }
-        }
-        // an intercept point binding no members at all is one compiled before the interceptor bound by them
-        return boundByNoOccurrences && !boundByOccurrences;
+        // every binding declared on the interceptor must apply at the intercept point
+        return interceptPoint.matches(beanRegistration.getBeanDefinition().getAnnotationMetadata());
     }
 
     private <T> boolean isApplicableByType(BeanRegistration<Interceptor<T, ?>> beanRegistration,
@@ -259,9 +192,8 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
         final Interceptor<T, T>[] resolvedInterceptors = findInterceptors(
             constructor.getDeclaringBeanType(),
             (Collection) interceptors,
-            InterceptorKind.AROUND_CONSTRUCT,
             applicableBindings,
-            constructor.getAnnotationMetadata(),
+            ExactInterceptorBindingQualifier.of(constructor.getAnnotationMetadata(), InterceptorKind.AROUND_CONSTRUCT),
             false,
             true
         );

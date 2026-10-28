@@ -309,6 +309,13 @@ public class ConnectionManager {
     }
 
     /**
+     * @return The event loop group the connections of this manager run on
+     */
+    EventLoopGroup eventLoopGroup() {
+        return group;
+    }
+
+    /**
      * Allocator for this connection manager. Used by micronaut-oracle-cloud.
      *
      * @return The configured allocator

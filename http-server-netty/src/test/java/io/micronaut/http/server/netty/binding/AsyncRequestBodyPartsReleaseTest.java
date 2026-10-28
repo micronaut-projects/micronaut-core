@@ -228,6 +228,7 @@ class AsyncRequestBodyPartsReleaseTest {
             writeChunk(out, first.substring(withheld) + file("d2.txt", DOC2) + end());
             out.write(lastChunk());
             out.flush();
+            awaitBodyDiscarded(socket, out);
             assertEquals("0", probe.files(probe.destinations()));
         }
     }
@@ -545,6 +546,7 @@ class AsyncRequestBodyPartsReleaseTest {
             writeChunk(out, first.substring(withheld) + file("d2.txt", DOC2) + end());
             out.write(lastChunk());
             out.flush();
+            awaitBodyDiscarded(socket, out);
             assertEquals("0", probe.files(probe.destinations()));
         }
     }
@@ -651,6 +653,20 @@ class AsyncRequestBodyPartsReleaseTest {
         return Map.of(
             "micronaut.executors.blocking.type", "fixed",
             "micronaut.executors.blocking.number-of-threads", 1);
+    }
+
+    /**
+     * Wait until the server is done with the body of the request that was answered before its end
+     * arrived: the next request on the connection is served once the rest of that body was
+     * discarded, so the test does not end, and close the server, while buffers are in flight.
+     */
+    private static void awaitBodyDiscarded(Socket socket, OutputStream out) throws IOException {
+        out.write(chunkedHead("/parts-release/skip"));
+        writeChunk(out, field("name", "Next") + end());
+        out.write(lastChunk());
+        out.flush();
+        Response next = Response.read(socket.getInputStream());
+        assertEquals(200, next.status(), next.head());
     }
 
     private static ByteBodyHttpResponse<?> exchange(ApplicationContext ctx, String path, Publisher<ReadBuffer> body) throws Exception {

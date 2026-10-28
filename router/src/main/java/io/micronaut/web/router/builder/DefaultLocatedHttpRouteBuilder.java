@@ -126,6 +126,12 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
     }
 
     @Override
+    public <U> void locateOn(String executorName, String prefixUri, LocatedLocatorHandler<T, ? extends U> locator,
+                             Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
+        locateOn(executorName, prefixUri, target.<U>locator(locator), routesOf);
+    }
+
+    @Override
     public <U> void locateAsync(String prefixUri, LocatedAsyncLocatorHandler<T, ? extends U> locator,
                                 Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
         locateAsync(prefixUri, target.<U>asyncLocator(locator), routesOf);

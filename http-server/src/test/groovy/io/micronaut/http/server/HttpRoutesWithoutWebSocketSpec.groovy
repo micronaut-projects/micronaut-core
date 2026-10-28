@@ -12,7 +12,6 @@ import io.micronaut.web.router.builder.DefaultHttpRouteBuilder
 import io.micronaut.web.router.builder.HttpRouteBuilder
 import spock.lang.Specification
 
-import java.util.function.Consumer
 import java.util.function.UnaryOperator
 
 /**
@@ -77,7 +76,7 @@ class HttpRoutesWithoutWebSocketSpec extends Specification {
     }
 
     private static RouteAssembly assembly() {
-        new RouteAssembly(null, ConversionService.SHARED, { String uri -> uri } as UnaryOperator<String>, { route -> } as Consumer)
+        new RouteAssembly(null, ConversionService.SHARED, { String uri -> uri } as UnaryOperator<String>)
     }
 
     private static Router router(RouteAssembly assembly) {

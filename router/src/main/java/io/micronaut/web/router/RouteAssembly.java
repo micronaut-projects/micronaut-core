@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.SupplierUtil;
@@ -41,13 +40,12 @@ import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriRouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
-import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.builder.FilterRegistration;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.http.PathVariables;
@@ -67,11 +65,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -90,10 +85,24 @@ import java.util.function.UnaryOperator;
 @Internal
 public final class RouteAssembly {
 
-    private static final String NO_EXECUTOR = "No executor configured for name: ";
+    /**
+     * The property that, when {@code true}, decodes a {@code +} in a path variable as a space, like
+     * the router did before 5.3.0, which decoded path variables like form values. It is
+     * {@code false} by default: a {@code +} in a path variable is a plus sign (RFC 3986, Section
+     * 3.3), and a space is sent as {@code %20}.
+     *
+     * @since 5.3.0
+     */
+    public static final String PATH_VARIABLE_PLUS_AS_SPACE = "micronaut.router.path-variable-plus-as-space";
+
+    static final String NO_EXECUTOR = "No executor configured for name: ";
 
     final ConversionService conversionService;
     final Charset defaultCharset;
+    /**
+     * Whether a {@code +} in a path variable is decoded as a space, see {@link #PATH_VARIABLE_PLUS_AS_SPACE}.
+     */
+    final boolean pathVariablePlusAsSpace;
     final List<UriRoute> uriRoutes = new ArrayList<>();
     final List<StatusRoute> statusRoutes = new ArrayList<>();
     final List<ErrorRoute> errorRoutes = new ArrayList<>();
@@ -103,11 +112,10 @@ public final class RouteAssembly {
      * The tables of the located targets of the routes, shared with the located tables.
      */
     @Nullable RouteTableFactory locatedTables;
-    private final @Nullable ExecutorSelector executorSelector;
+    final @Nullable ExecutorSelector executorSelector;
     private final ThreadSelection threadSelection;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private final UnaryOperator<String> routeUri;
-    private final Consumer<DefaultUriRoute> routeCreated;
     /**
      * Whether the literal path the routes that are not nested are mounted under is known, see
      * {@link #mountPrefix}: only then can templates other than URI templates be
@@ -128,28 +136,24 @@ public final class RouteAssembly {
      * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
      * @param conversionService The conversion service
      * @param routeUri          The URI template of a route that is not nested in another route, e.g. under the context path
-     * @param routeCreated      Called for every URI route when it is created, before any further configuration of it
      */
     public RouteAssembly(@Nullable Object beanLocator,
                          ConversionService conversionService,
-                         UnaryOperator<String> routeUri,
-                         Consumer<DefaultUriRoute> routeCreated) {
-        this(beanLocator, conversionService, routeUri, routeCreated, null);
+                         UnaryOperator<String> routeUri) {
+        this(beanLocator, conversionService, routeUri, null);
     }
 
     /**
      * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
      * @param conversionService The conversion service
      * @param routeUri          The URI template of a route that is not nested in another route, e.g. under the context path
-     * @param routeCreated      Called for every URI route when it is created, before any further configuration of it
      * @param contextPath       The context path the patterns of the server filters are under, or {@code null}
      */
     public RouteAssembly(@Nullable Object beanLocator,
                          ConversionService conversionService,
                          UnaryOperator<String> routeUri,
-                         Consumer<DefaultUriRoute> routeCreated,
                          @Nullable String contextPath) {
-        this(beanLocator, conversionService, routeUri, routeCreated, false, null, contextPath);
+        this(beanLocator, conversionService, routeUri, false, null, contextPath);
     }
 
     /**
@@ -160,20 +164,17 @@ public final class RouteAssembly {
      * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
      * @param conversionService The conversion service
      * @param contextPath       The context path, e.g. the {@code micronaut.server.context-path} property, or {@code null}
-     * @param routeCreated      Called for every URI route when it is created, before any further configuration of it
      */
     public RouteAssembly(@Nullable Object beanLocator,
                          ConversionService conversionService,
-                         @Nullable String contextPath,
-                         Consumer<DefaultUriRoute> routeCreated) {
-        this(beanLocator, conversionService, uri -> underContextPath(contextPath, uri), routeCreated, true, RouteTemplates.mountPrefix(contextPath), contextPath);
+                         @Nullable String contextPath) {
+        this(beanLocator, conversionService, uri -> underContextPath(contextPath, uri), true, RouteTemplates.mountPrefix(contextPath), contextPath);
     }
 
     @SuppressWarnings("ParameterNumber")
     private RouteAssembly(@Nullable Object beanLocator,
                           ConversionService conversionService,
                           UnaryOperator<String> routeUri,
-                          Consumer<DefaultUriRoute> routeCreated,
                           boolean mountKnown,
                           @Nullable String mountPrefix,
                           @Nullable String contextPath) {
@@ -181,12 +182,12 @@ public final class RouteAssembly {
         this.beanLocator = beanLocator;
         this.conversionService = conversionService;
         this.routeUri = routeUri;
-        this.routeCreated = routeCreated;
         this.mountKnown = mountKnown;
         this.mountPrefix = mountPrefix;
         if (beanLocator instanceof ApplicationContext applicationContext) {
             Environment environment = applicationContext.getEnvironment();
             defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
+            pathVariablePlusAsSpace = environment.get(PATH_VARIABLE_PLUS_AS_SPACE, Boolean.class, false);
             this.executorSelector = applicationContext.findBean(ExecutorSelector.class).orElse(null);
             // like HttpServerConfiguration, which the router does not depend on
             this.threadSelection = environment.get("micronaut.server.thread-selection", ThreadSelection.class).orElse(ThreadSelection.MANUAL);
@@ -197,6 +198,7 @@ public final class RouteAssembly {
         } else {
             this.conditionContext = RouteConditionContext.fallback();
             defaultCharset = StandardCharsets.UTF_8;
+            pathVariablePlusAsSpace = false;
             this.executorSelector = null;
             this.threadSelection = ThreadSelection.MANUAL;
             this.messageBodyHandlerRegistry = MessageBodyHandlerRegistry.EMPTY;
@@ -216,11 +218,11 @@ public final class RouteAssembly {
         this.conversionService = resolved.conversionService;
         // the URIs of located routes are relative to the prefix of their locator
         this.routeUri = uri -> uri;
-        this.routeCreated = route -> { };
         // relative to the prefix of the locator: no context path, so templates of every language are supported
         this.mountKnown = true;
         this.mountPrefix = null;
         this.defaultCharset = resolved.defaultCharset;
+        this.pathVariablePlusAsSpace = resolved.pathVariablePlusAsSpace;
         this.executorSelector = resolved.executorSelector;
         this.threadSelection = resolved.threadSelection;
         this.messageBodyHandlerRegistry = resolved.messageBodyHandlerRegistry;
@@ -239,6 +241,13 @@ public final class RouteAssembly {
             locatedTables = tables;
         }
         return tables;
+    }
+
+    /**
+     * @return What the router asks the server for a request, e.g. the body for a route locator
+     */
+    public RouteConditionContext routeConditionContext() {
+        return conditionContext;
     }
 
     /**
@@ -329,7 +338,6 @@ public final class RouteAssembly {
             route = new DefaultUriRoute(httpMethod, routeUri.apply(uri), mediaTypes, executableHandle, httpMethodName, conversionService);
         }
         uriRoutes.add(route);
-        routeCreated.accept(route);
         return route;
     }
 
@@ -357,7 +365,6 @@ public final class RouteAssembly {
             route = new DefaultUriRoute(httpMethod, mount(checked), mediaTypes, executableHandle, httpMethodName, conversionService);
         }
         uriRoutes.add(route);
-        routeCreated.accept(route);
         return route;
     }
 
@@ -412,7 +419,6 @@ public final class RouteAssembly {
         }
         DefaultUriRoute route = new DefaultUriRoute(httpMethod, template, mediaTypes, executableHandle, httpMethodName, conversionService);
         uriRoutes.add(route);
-        routeCreated.accept(route);
         return route;
     }
 
@@ -443,7 +449,6 @@ public final class RouteAssembly {
                 currentParentRoute.nestedRoutes.add(route);
             }
             uriRoutes.add(route);
-            routeCreated.accept(route);
             routes.add(route);
         }
         return routes;
@@ -486,20 +491,6 @@ public final class RouteAssembly {
             return settings.getSelector();
         }
         return group == null ? null : group.selector();
-    }
-
-    /**
-     * A URI route that is not added: the caller builds its route info.
-     *
-     * @param httpMethod       The HTTP method
-     * @param uri              The URI template
-     * @param mediaTypes       The media types the route consumes
-     * @param executableHandle The target of the route
-     * @param httpMethodName   The name of the HTTP method
-     * @return The route
-     */
-    public DefaultUriRoute newRoute(HttpMethod httpMethod, String uri, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle, String httpMethodName) {
-        return new DefaultUriRoute(httpMethod, uri, mediaTypes, executableHandle, httpMethodName, conversionService);
     }
 
     /**
@@ -1046,7 +1037,7 @@ public final class RouteAssembly {
 
         private DefaultFilterRoute filterRoute(GenericHttpFilter filter, List<String> patterns, boolean isPreMatching) {
             GenericHttpFilter ordered = GenericHttpFilter.withOrder(filter, order);
-            DefaultFilterRoute route = new DefaultFilterRoute(() -> ordered, AnnotationMetadata.EMPTY_METADATA, isPreMatching);
+            DefaultFilterRoute route = new DefaultFilterRoute(() -> ordered, AnnotationMetadata.EMPTY_METADATA, isPreMatching).fixedOrder(order);
             route.patternStyle(patternStyle);
             for (String pattern : patterns) {
                 route.pattern(pattern);
@@ -1150,14 +1141,16 @@ public final class RouteAssembly {
         }
 
         /**
-         * The named executor, looked up when a filter first runs on it.
+         * The named executor, looked up when a filter first runs on it. The filter holds it, so
+         * it holds the executor selector and the error, not the filters, nor the assembly.
          *
          * @param executorName The name of the executor
          * @return The executor
          */
         private Supplier<Executor> executor(String executorName) {
+            ExecutorSelector selector = RouteAssembly.this.executorSelector;
+            Function<String, RuntimeException> noExecutor = this.noExecutor;
             return SupplierUtil.memoized(() -> {
-                ExecutorSelector selector = RouteAssembly.this.executorSelector;
                 if (selector == null) {
                     throw new IllegalStateException("No executor selector to find executor: " + executorName);
                 }
@@ -1626,7 +1619,7 @@ public final class RouteAssembly {
                 effectivePort,
                 conversionService,
                 // the executor choice as it is now: a later change to the route does not change the route info
-                new RouteExecutorSelector(settings.getExecutorName(), settings.isNonBlocking()),
+                new RouteExecutorSelector(executorSelector, targetMethod.getExecutableMethod(), settings.getExecutorName(), settings.isNonBlocking()),
                 messageBodyHandlerRegistry,
                 implicitHead,
                 routeFilters(),
@@ -1637,7 +1630,8 @@ public final class RouteAssembly {
                 constraints(group),
                 declaredSettings(),
                 null,
-                effectiveSelector(settings, group)
+                effectiveSelector(settings, group),
+                pathVariablePlusAsSpace
             );
             if (errorScope != null) {
                 // built now: a duplicate fails when the router is built
@@ -1767,7 +1761,7 @@ public final class RouteAssembly {
             for (Argument<?> argument : targetMethod.getArguments()) {
                 if (argument.getAnnotationMetadata().hasAnnotation(Body.class)
                     && InputStream.class.isAssignableFrom(argument.getType())
-                    && new RouteExecutorSelector(null, settings.isNonBlocking()).select(targetMethod.getExecutableMethod(), threadSelection).isEmpty()) {
+                    && new RouteExecutorSelector(executorSelector, targetMethod.getExecutableMethod(), null, settings.isNonBlocking()).select(targetMethod.getExecutableMethod(), threadSelection).isEmpty()) {
                     throw new RoutingException("The route " + this + " reads the body as an InputStream, which blocks, on the event loop"
                         + ": run it on an executor, e.g. with executeOn(TaskExecutors.BLOCKING)");
                 }
@@ -1829,8 +1823,10 @@ public final class RouteAssembly {
          * the outer group, then of the inner groups, then of the route, see {@link RouteFilters#chain()}
          */
         List<GenericHttpFilter> routeFilters() {
+            // the error is held by the filters of the route info, so it holds the method, not the route
+            ExecutableMethod<Object, Object> method = targetMethod.getExecutableMethod();
             RouteFilters filters = new RouteFilters(settings.getGroupFilters(), executorName -> new SchedulerConfigurationException(
-                targetMethod.getExecutableMethod(), NO_EXECUTOR + executorName));
+                method, NO_EXECUTOR + executorName));
             for (FilterRegistration filter : settings.getFilters()) {
                 filters.add(filter);
             }
@@ -1931,62 +1927,6 @@ public final class RouteAssembly {
                 return rawCompare != 0 ? rawCompare : Integer.compare(template.pathVariableCount(), other.template.pathVariableCount());
             }
             return 0;
-        }
-
-        /**
-         * Selects the executor of a route info, with the choice of the route when the route info
-         * was built.
-         */
-        private final class RouteExecutorSelector implements ExecutorSelector {
-            private final @Nullable String executorName;
-            private final boolean eventLoop;
-
-            RouteExecutorSelector(@Nullable String executorName, boolean eventLoop) {
-                this.executorName = executorName;
-                this.eventLoop = eventLoop;
-            }
-
-            @Override
-            public Optional<ExecutorService> select(@Nullable MethodReference<?, ?> method, ThreadSelection threadSelection) {
-                // like @ExecuteOn and @NonBlocking on the method
-                String name = executorName;
-                if (name != null) {
-                    return Optional.of(select(name).orElseThrow(() -> new SchedulerConfigurationException(
-                        targetMethod.getExecutableMethod(), NO_EXECUTOR + name)));
-                }
-                if (eventLoop && threadSelection == ThreadSelection.AUTO) {
-                    return Optional.empty();
-                }
-                if (RouteAssembly.this.executorSelector != null) {
-                    // the handler of a located route has the annotations it inherits, e.g. an @ExecuteOn of a group of its locator route
-                    MethodReference<?, ?> annotated = method instanceof HandlerMethod<?> handler ? handler : targetMethod.getExecutableMethod();
-                    return RouteAssembly.this.executorSelector.select(annotated, threadSelection);
-                } else {
-                    return Optional.empty();
-                }
-            }
-
-            @Override
-            public Optional<ExecutorService> select(String name) {
-                if (RouteAssembly.this.executorSelector != null) {
-                    return RouteAssembly.this.executorSelector.select(name);
-                } else {
-                    return Optional.empty();
-                }
-            }
-
-            @Override
-            public Executor selectExecutor(@Nullable MethodReference<?, ?> method, ThreadSelectionConfiguration configuration) {
-                if (executorName != null || eventLoop) {
-                    // selects with the route's choice, see select(MethodReference, ThreadSelection)
-                    return ExecutorSelector.super.selectExecutor(method, configuration);
-                }
-                if (RouteAssembly.this.executorSelector != null) {
-                    return RouteAssembly.this.executorSelector.selectExecutor(method, configuration);
-                } else {
-                    return ImmediateExecutor.INSTANCE;
-                }
-            }
         }
     }
 

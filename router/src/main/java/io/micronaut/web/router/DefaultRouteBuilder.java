@@ -99,7 +99,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         this.executionHandleLocator = executionHandleLocator;
         this.uriNamingStrategy = uriNamingStrategy;
         this.conversionService = conversionService;
-        this.assembly = new RouteAssembly(executionHandleLocator, conversionService, this::routeUri, this::routeCreated);
+        this.assembly = new RouteAssembly(executionHandleLocator, conversionService, this::routeUri);
         this.defaultCharset = assembly.defaultCharset;
     }
 
@@ -427,14 +427,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     @Internal
     protected String routeUri(String uri) {
         return uri;
-    }
-
-    /**
-     * Called for every URI route when it is created, before any further configuration of it.
-     *
-     * @param route The route
-     */
-    void routeCreated(DefaultUriRoute route) {
     }
 
     /**
