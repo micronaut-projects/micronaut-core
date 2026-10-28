@@ -5820,16 +5820,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 }
                 continue;
             }
-            // a configuration bean it received is left out of the closure, but one of a class the restart replaces may still
-            // be held, as nothing makes the bean copy its values rather than keep it
-            Class<?> replacedConfiguration = configuration.replacedBy(criteria);
-            if (replacedConfiguration != null) {
-                if (LOG_LIFECYCLE.isWarnEnabled()) {
-                    LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: it was made from configuration of the class [{}], which the restart replaces",
-                        registration.bean, replacedConfiguration.getName());
-                }
-                continue;
-            }
             // as does one refusing a singleton it holds, which would be retained with the closure otherwise
             if (refusals.isRefused(registration, closure.subList(1, closure.size()))) {
                 continue;
@@ -5850,6 +5840,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 if (LOG_LIFECYCLE.isWarnEnabled()) {
                     LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {} bound to the class [{}], which the restart replaces",
                         registration.bean, replacing == registration ? "it is" : theBean(replacing) + " it holds is", replaced.getName());
+                }
+                continue;
+            }
+            // a configuration bean it received is left out of the closure, but one of a class the restart replaces may still
+            // be held, as nothing makes the bean copy its values rather than keep it
+            Class<?> replacedConfiguration = configuration.replacedBy(criteria);
+            if (replacedConfiguration != null) {
+                if (LOG_LIFECYCLE.isWarnEnabled()) {
+                    LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: it was made from configuration of the class [{}], which the restart replaces",
+                        registration.bean, replacedConfiguration.getName());
                 }
                 continue;
             }
@@ -5957,6 +5957,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
         if (!closure.isEmpty() && configuration.leavesOut(registration.beanDefinition, true)) {
             // the next context binds it again; the retained bean holds only what it copied, valid until a change releases it
+            configuration.leftOutInstance(registration.bean);
             return null;
         }
         if (holdsContextBoundState(registration, configuration)) {
@@ -6023,6 +6024,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (registration instanceof BeanDisposingRegistration<?> disposing) {
             for (BeanRegistration<?> dependent : disposing.dependentBeans()) {
                 if (configuration.leavesOut(dependent.beanDefinition, false)) {
+                    configuration.leftOutInstance(dependent.bean);
                     continue;
                 }
                 replaced = replacedClassOf(dependent, criteria, configuration, examined);
@@ -6163,11 +6165,27 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
 
         private boolean leaveOut(BeanDefinition<?> definition) {
+            leftOut(definition.getBeanType());
+            return true;
+        }
+
+        /**
+         * Records the class of a configuration bean left out of the closure, which may be a subclass or a wrapper of the
+         * type of its definition, such as one a {@link BeanCreatedEventListener} returned.
+         *
+         * @param bean The configuration bean
+         */
+        void leftOutInstance(@Nullable Object bean) {
+            if (bean != null) {
+                leftOut(bean.getClass());
+            }
+        }
+
+        private void leftOut(Class<?> type) {
             if (leftOut.isEmpty()) {
                 leftOut = new LinkedHashSet<>();
             }
-            leftOut.add(definition.getBeanType());
-            return true;
+            leftOut.add(type);
         }
 
         /**
