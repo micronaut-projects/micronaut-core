@@ -80,17 +80,17 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
         } else {
             importers = evaluatePropertySourceImporters(environment);
         }
-        // The enabled importers belong to this load and are closed when it finishes, whether it
+        // All created importers belong to this load and are closed when it finishes, whether it
         // succeeds or fails: the property sources it returns are copies of what the importers have
         // read, see ImportedPropertySourceFactory. A load of another environment that shares this
         // locator has importers of its own, so it cannot close these.
-        Map<String, PropertySourceImporter<?>> importerByProvider = toImporterByProvider(importers);
         List<PropertySource> result = new ArrayList<>();
         // As a resource, the importers are closed whatever the load ends in, an error or a checked
         // exception that an importer written in Groovy or Kotlin can throw included. The failure of
         // the load is what the caller sees, with that of closing the importers suppressed.
-        try (LoadImporters loadImporters = () -> closeImporters(importerByProvider.values());
+        try (LoadImporters loadImporters = () -> closeImporters(importers);
              ImportPropertyResolver properties = new ImportPropertyResolver(environment)) {
+            Map<String, PropertySourceImporter<?>> importerByProvider = toImporterByProvider(importers);
             for (PropertySource propertySource : environment.getPropertySources()) {
                 result.addAll(resolveConfigImports(environment, propertySource, properties, importerByProvider));
             }
