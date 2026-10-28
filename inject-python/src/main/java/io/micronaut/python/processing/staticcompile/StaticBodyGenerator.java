@@ -77,6 +77,8 @@ public final class StaticBodyGenerator {
     // whether the body is generated as its shared entry, which makes no copy of a collection parameter
     private boolean shared;
     private int temporaries;
+    // the Python line of the statement being generated, 0 when it is not known
+    private int line;
 
     private StaticBodyGenerator(SelfAccess self, List<VariableDef.MethodParameter> methodParameters) {
         this.self = self;
@@ -369,24 +371,37 @@ public final class StaticBodyGenerator {
     // ---------------------------------------------------------------- statements
 
     private StatementDef statements(Ir.Body body) {
-        return statements(body.statements());
+        return statements(body.statements(), body.lines());
     }
 
     /**
      * The statements of a block. Inside a loop, the statements following one that may break or
      * continue the loop run only when it did not: SourceGen has no break or continue node, so both
-     * are flags the loop condition and the rest of the body consult.
+     * are flags the loop condition and the rest of the body consult. The first statement of each
+     * Python line is preceded by the marker of the line (see {@link StaticLineMap}).
      */
-    private StatementDef statements(List<Ir.Statement> body) {
+    private StatementDef statements(List<Ir.Statement> body, List<Integer> lines) {
         Loop loop = loops.peekLast();
         List<StatementDef> statements = new ArrayList<>(body.size());
-        for (int i = 0; i < body.size(); i++) {
-            Ir.Statement statement = body.get(i);
-            statements.add(statement(statement));
-            if (loop != null && i < body.size() - 1 && exits(statement, loop.id())) {
-                statements.add(loop.notExited().doIf(statements(body.subList(i + 1, body.size()))));
-                break;
+        int enclosing = line;
+        int marked = 0;
+        try {
+            for (int i = 0; i < body.size(); i++) {
+                Ir.Statement statement = body.get(i);
+                int statementLine = lines.isEmpty() ? 0 : lines.get(i);
+                if (statementLine > 0 && statementLine != marked) {
+                    statements.add(StaticLineMap.marker(statementLine));
+                    marked = statementLine;
+                }
+                line = statementLine > 0 ? statementLine : enclosing;
+                statements.add(statement(statement));
+                if (loop != null && i < body.size() - 1 && exits(statement, loop.id())) {
+                    statements.add(loop.notExited().doIf(statements(body.subList(i + 1, body.size()), lines.isEmpty() ? lines : lines.subList(i + 1, body.size()))));
+                    break;
+                }
             }
+        } finally {
+            line = enclosing;
         }
         return StatementDef.multi(statements);
     }
@@ -430,6 +445,10 @@ public final class StaticBodyGenerator {
             statements.add(new StatementDef.DefineAndAssign(continued, ExpressionDef.falseValue()));
         }
         statements.add(statements(body));
+        if (!perIteration.isEmpty() && line > 0) {
+            // the step of a range belongs to the line of the loop
+            statements.add(StaticLineMap.marker(line));
+        }
         statements.addAll(perIteration);
         loops.removeLast();
         return StatementDef.multi(statements);
@@ -561,7 +580,9 @@ public final class StaticBodyGenerator {
             case Ir.Const constant -> constant(constant);
             case Ir.Param param -> parameter(param);
             case Ir.LocalRef ref -> local(ref.name());
-            case Ir.SelfProperty property -> self.read(property.property(), property.type(), type(property.type()), property.accessor());
+            case Ir.SelfProperty property -> property.fixed()
+                ? self.readFixed(property.property(), property.type(), type(property.type()))
+                : self.read(property.property(), property.type(), type(property.type()), property.accessor());
             case Ir.InvokeJava call -> invoke(call);
             case Ir.InvokeSibling call when SHARED_DISPATCH.equals(call.dispatch()) ->
                 self.invokeShared(call.name(), types(call.parameterTypes()), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
@@ -587,17 +608,24 @@ public final class StaticBodyGenerator {
     }
 
     /**
-     * {@code PythonStatic.raised(E.class, PythonContextRuntime.newInstance(<the class reference of E>, new Object[] {args}))}:
+     * {@code PythonStatic.raised(E.class, PythonContextRuntime.newInstance(E.__PYTHON_CLASS_REFERENCE, new Object[] {args}))}:
      * the Python exception created by its Python class, wrapped in its generated class as the runtime
-     * wraps a Python exception that reaches Java code (through the {@code Value} constructor).
+     * wraps a Python exception that reaches Java code (through the {@code Value} constructor). A lazy
+     * exception is {@code new E(E.__PYTHON_CLASS_REFERENCE, new Object[] {args})}: the Java exception
+     * alone, which creates the Python exception from the arguments when it is first needed.
      */
     private ExpressionDef newPythonException(Ir.NewPythonException construction) {
+        ExpressionDef classReference = self.pythonClassReference(construction.type());
+        ExpressionDef arguments = TypeDef.OBJECT.array().instantiate(expressions(construction.arguments()));
+        if (construction.lazy()) {
+            return classType(construction.type()).instantiate(List.of(PYTHON_CLASS_REFERENCE, TypeDef.OBJECT.array()), List.of(classReference, arguments));
+        }
         ExpressionDef value = PYTHON_CONTEXT_RUNTIME.invokeStatic(
             "newInstance",
             List.of(PYTHON_CLASS_REFERENCE, TypeDef.OBJECT.array()),
             POLYGLOT_VALUE_TYPE,
-            self.pythonClassReference(construction.type()),
-            TypeDef.OBJECT.array().instantiate(expressions(construction.arguments()))
+            classReference,
+            arguments
         );
         return PYTHON_STATIC.invokeStatic("raised", List.of(TypeDef.CLASS, POLYGLOT_VALUE_TYPE), ClassTypeDef.of(RuntimeException.class),
             classType(construction.type()).getStaticField("class", TypeDef.CLASS), value);
@@ -942,6 +970,20 @@ public final class StaticBodyGenerator {
          * @return The expression reading it
          */
         ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor);
+
+        /**
+         * An attribute fixed at construction (see {@link Ir.SelfProperty#fixed()}): a stub reads it
+         * from the Python object once per object and keeps the converted value in a Java field; a
+         * body run on a Python object without a stub reads it as any other attribute.
+         *
+         * @param property The attribute
+         * @param typeName The Java type of the attribute, as the IR spells it
+         * @param type     The Java type of the attribute
+         * @return The expression reading it
+         */
+        default ExpressionDef readFixed(String property, String typeName, TypeDef type) {
+            return read(property, typeName, type, false);
+        }
 
         /**
          * @param name           The method of the class to call on {@code self}

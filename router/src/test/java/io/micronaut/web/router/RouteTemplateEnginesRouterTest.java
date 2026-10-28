@@ -143,9 +143,13 @@ class RouteTemplateEnginesRouterTest {
             routes.route(HttpMethod.GET, ColonRouteTemplateEngine.template("/books/:id")).handle((request, variables) -> HttpResponse.ok());
         });
         List<UriRouteInfo<?, ?>> heads = router.uriRoutes().filter(r -> r.getHttpMethod() == HttpMethod.HEAD).toList();
-        assertEquals(3, heads.size());
+        assertEquals(4, heads.size());
         assertTrue(heads.stream().anyMatch(r -> r.isImplicitHead() && r.getRouteTemplate().equals(COLON_ITEM)));
-        assertFalse(heads.stream().anyMatch(r -> r.isImplicitHead() && r.getRouteTemplate().expression().equals("/books/:id")));
+        // the implicit HEAD route of the same engine and template is kept, the explicit one wins at match time
+        assertTrue(heads.stream().anyMatch(r -> r.isImplicitHead() && r.getRouteTemplate().expression().equals("/books/:id")));
+        UriRouteMatch<Object, Object> head = router.findClosest(HttpRequest.HEAD("/books/5"));
+        assertNotNull(head);
+        assertFalse(head.getRouteInfo().isImplicitHead());
     }
 
     @Test

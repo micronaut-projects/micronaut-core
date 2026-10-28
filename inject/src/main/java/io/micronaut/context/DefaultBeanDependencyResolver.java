@@ -33,6 +33,10 @@ import java.util.function.Function;
 final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDependencies {
     private final DefaultBeanContext context;
     final DefaultBeanDependencies dependencies;
+    /** The owner of a child group, which forgets it once the group is closed. */
+    private @Nullable DefaultBeanDependencies parent;
+    /** The registration of a child group in its parent. */
+    private @Nullable BeanRegistration<?> registrationInParent;
     /** The bean the resolver was injected into, which the dependency graph records what it receives under; unset when not recorded. */
     private final AtomicReference<@Nullable Ownership> ownership = new AtomicReference<>();
 
@@ -43,6 +47,17 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     DefaultBeanDependencyResolver(DefaultBeanContext context, DefaultBeanDependencies dependencies) {
         this.context = context;
         this.dependencies = dependencies;
+    }
+
+    /**
+     * Makes this group a child, so that closing it detaches it from its parent.
+     *
+     * @param parent The owner of the group
+     * @param registration The registration of the group in its parent
+     */
+    void ownedBy(DefaultBeanDependencies parent, BeanRegistration<?> registration) {
+        this.parent = parent;
+        this.registrationInParent = registration;
     }
 
     @Override
@@ -85,7 +100,7 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     @Override
     public BeanDependencyGroup createGroup() {
         return dependencies.resolve(context, null, resolution -> {
-            BeanRegistration<BeanDependencyResolver> child = context.newDependencyGroupRegistration(dependencies.destructionContext);
+            BeanRegistration<BeanDependencyResolver> child = context.newDependencyGroupRegistration(dependencies, dependencies.destructionContext);
             ((DefaultBeanDependencyResolver) child.bean()).owner(owner(), false);
             resolution.addDependentBean(child);
             return (BeanDependencyGroup) child.bean();
@@ -148,7 +163,13 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
 
     @Override
     public void close() {
-        dependencies.close(context);
+        try {
+            dependencies.close(context);
+        } finally {
+            if (parent != null && registrationInParent != null) {
+                parent.remove(registrationInParent);
+            }
+        }
     }
 
     @Override
