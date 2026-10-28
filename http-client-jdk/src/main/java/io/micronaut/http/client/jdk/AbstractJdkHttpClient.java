@@ -40,6 +40,7 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -72,6 +73,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -461,6 +463,29 @@ abstract class AbstractJdkHttpClient {
         return (Publisher<R>) Mono.from(ReactiveExecutionFlow.fromFlow(runner.run(request)).toPublisher());
     }
 
+    /**
+     * The request timeout of {@link java.net.http.HttpRequest.Builder#timeout} ends when the
+     * response headers arrive. Apply the request timeout to the whole exchange, including the
+     * body, like the Netty client.
+     */
+    private <T> Mono<T> withRequestTimeout(CompletableFuture<T> future) {
+        Mono<T> mono = Mono.fromCompletionStage(future);
+        Duration requestTimeout = configuration.getRequestTimeout();
+        if (requestTimeout == null) {
+            // for compatibility, like the Netty client
+            requestTimeout = configuration.getReadTimeout()
+                .filter(d -> !d.isNegative())
+                .map(d -> d.plusSeconds(1)).orElse(null);
+        }
+        if (requestTimeout == null || requestTimeout.isNegative()) {
+            return mono;
+        }
+        return mono.timeout(requestTimeout, Mono.defer(() -> {
+            future.cancel(true);
+            return Mono.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
+        }));
+    }
+
     protected <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(
         @NonNull io.micronaut.http.HttpRequest<?> request,
         @Nullable Argument<O> bodyType
@@ -477,9 +502,10 @@ abstract class AbstractJdkHttpClient {
                 HttpHeadersUtil.trace(log,
                     () -> httpRequest.headers().map().keySet(),
                     headerName -> httpRequest.headers().allValues(headerName));
-                return sendAsync(client, httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+                int maxContentLength = configuration.getMaxContentLength();
+                return sendAsync(client, httpRequest, responseInfo -> new LimitedBodySubscriber<>(java.net.http.HttpResponse.BodySubscribers.ofByteArray(), maxContentLength));
             })
-            .flatMap(Mono::fromCompletionStage)
+            .flatMap(this::withRequestTimeout)
             .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .handle((netResponse, sink) -> {

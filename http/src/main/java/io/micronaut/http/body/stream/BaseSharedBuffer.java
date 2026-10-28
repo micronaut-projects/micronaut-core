@@ -393,6 +393,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                         bufferLimitsExceeded = new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar);
                     }
                     fullSubscribersToFail = detachFullSubscribers();
+                    if (subscribers == null && reserved <= 0) {
+                        // nobody can use the body anymore, let the upstream drop the rest
+                        // instead of reading it
+                        rootUpstream.allowDiscard();
+                    }
                 } else {
                     if (buffer == null) {
                         buffer = new ArrayList<>();

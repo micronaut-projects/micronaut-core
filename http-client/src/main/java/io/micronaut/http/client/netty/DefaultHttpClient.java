@@ -1778,6 +1778,14 @@ public class DefaultHttpClient implements
             }
 
             @Override
+            public void discardLimitReached() {
+                // the rest of an abandoned body is too long to drain: close the connection
+                // (HTTP/1) or reset the stream (HTTP/2) instead of reading it
+                poolHandle.taint();
+                poolHandle.channel().close();
+            }
+
+            @Override
             public BodySizeLimits sizeLimits() {
                 return DefaultHttpClient.this.sizeLimits();
             }

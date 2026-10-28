@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.CompositeByteBuf;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
@@ -86,7 +85,7 @@ final class SseSplitter {
                     bb.release();
                     return List.of();
                 }
-                CompositeByteBuf joined = (CompositeByteBuf) previous;
+                ByteBuf joined = (ByteBuf) previous;
                 ByteBuf here;
                 if (joined == null) {
                     here = bb;
@@ -97,18 +96,31 @@ final class SseSplitter {
                         joined.release();
                         throw new ContentLengthExceededException(limits.maxBufferSize(), combinedLength);
                     }
-                    joined.addComponent(true, bb);
+                    // copy into the growing partial line instead of composing the pieces, so
+                    // that many small pieces stay linear
+                    boolean hasNewline = bb.indexOf(bb.readerIndex(), bb.writerIndex(), (byte) '\n') >= 0;
+                    joined.writeBytes(bb);
+                    bb.release();
+                    if (!hasNewline) {
+                        // no line ends in this piece, no need to search the partial line again
+                        if (!last.compareAndSet(null, joined)) {
+                            // closed concurrently
+                            joined.release();
+                        }
+                        return List.of();
+                    }
                     here = joined;
                 }
                 List<ByteBuf> split = split(here);
                 ByteBuf l = split.get(split.size() - 1);
                 if (l.isReadable()) {
-                    l.discardSomeReadBytes();
                     if (joined != null) {
                         assert l == joined;
+                        l.discardSomeReadBytes();
                     } else {
-                        joined = l.alloc().compositeBuffer();
-                        joined.addComponent(true, l);
+                        joined = l.alloc().buffer(l.readableBytes());
+                        joined.writeBytes(l);
+                        l.release();
                     }
                     if (!last.compareAndSet(null, joined)) {
                         // closed concurrently
