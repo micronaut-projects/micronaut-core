@@ -268,6 +268,144 @@ class Caller:
         context?.close()
     }
 
+    static final String LAZY_EXCEPTIONS = '''
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
+
+
+class Rejected(Exception):
+    pass
+
+
+class Narrow(Rejected):
+    pass
+
+
+class Coded(Exception):
+    def __init__(self, code: int):
+        super().__init__(f"code {code}")
+        self.code = code
+
+
+def raise_many(key: str) -> str:
+    if key != "":
+        raise Rejected(key, 'say "hi"', -0.0, 1e16, None, 7, False)
+    return key
+
+
+def raise_bare(key: str) -> str:
+    if key == "":
+        raise Rejected
+    return key
+
+
+def raise_narrow(key: str) -> str:
+    if key == "":
+        raise Narrow(f"narrow {key}!")
+    return key
+
+
+def raise_coded(key: str) -> str:
+    if key == "":
+        raise Coded(len(key))
+    return key
+
+
+@Singleton
+class Calc:
+    # a body calling only the compilation: a Python caller runs it, its exception reaching it as the Python one
+    def many(self, key: str) -> str:
+        return raise_many(key)
+
+    def bare(self, key: str) -> str:
+        return raise_bare(key)
+
+    def narrow(self, key: str) -> str:
+        return raise_narrow(key)
+
+    def coded(self, key: str) -> str:
+        return raise_coded(key)
+
+
+@Singleton
+@CompileStatic(False)
+class Caller:
+    def __init__(self, calc: Calc):
+        self.calc = calc
+
+    def view(self, error) -> str:
+        return (f"{type(error).__name__} [{error}] {error.args!r} {error!r} {error.__cause__} {error.__context__} "
+                f"{error.__suppress_context__} {isinstance(error, Rejected)} {error.__traceback__ is None}")
+
+    def run(self) -> list[str]:
+        out = []
+        try:
+            self.calc.many("it's")
+        except Rejected as error:
+            out.append(self.view(error))
+        try:
+            self.calc.bare("")
+        except Rejected as error:
+            out.append(self.view(error))
+        try:
+            self.calc.narrow("")
+        except Rejected as error:
+            out.append(self.view(error))
+        try:
+            self.calc.coded("")
+        except Coded as error:
+            out.append(f"{error} {error.code} {error.args}")
+        return out
+'''
+
+    void "a python caller sees the python exception of a lazily created exception as python creates it"() {
+        given:
+        Map<StaticCompilationMode, Object> results = [:]
+        Map<StaticCompilationMode, List<String>> messages = [:]
+        [StaticCompilationMode.OFF, StaticCompilationMode.ALL].each { StaticCompilationMode m ->
+            mode = m
+            decisions.clear()
+            PythonStatic.resetEntries()
+            def context = buildContext(LAZY_EXCEPTIONS)
+            try {
+                results[m] = getBean(context, 'python.Caller').run().collect { it.toString() }
+                def fromPython = ['many', 'bare', 'narrow', 'coded'].collectEntries { [(it): PythonStatic.entries("python.Calc#$it")] }
+                def calc = getBean(context, 'python.Calc')
+                messages[m] = [{ calc.many("it's") }, { calc.bare("") }, { calc.narrow("") }, { calc.coded("") }].collect { Closure call ->
+                    try {
+                        call()
+                        return 'nothing'
+                    } catch (RuntimeException e) {
+                        return e.class.name + ': ' + e.message
+                    }
+                }
+                if (m == StaticCompilationMode.ALL) {
+                    assert ['Calc.many', 'Calc.bare', 'Calc.narrow', 'Calc.coded'].every { name -> decisions.find { it.qualifiedName() == name }.outcome() == StaticCompilationDecision.Outcome.COMPILED }
+                    // the Python caller ran the Java bodies, whose exceptions reached it as their Python exceptions
+                    assert fromPython == [many: 1, bare: 1, narrow: 1, coded: 1]
+                }
+            } finally {
+                context.close()
+            }
+        }
+
+        expect:
+        results[StaticCompilationMode.ALL] == results[StaticCompilationMode.OFF]
+        messages[StaticCompilationMode.ALL] == messages[StaticCompilationMode.OFF]
+        results[StaticCompilationMode.OFF] == [
+            '''Rejected [("it's", 'say "hi"', -0.0, 1e+16, None, 7, False)] ("it's", 'say "hi"', -0.0, 1e+16, None, 7, False) Rejected("it's", 'say "hi"', -0.0, 1e+16, None, 7, False) None None False True False''',
+            'Rejected [] () Rejected() None None False True False',
+            "Narrow [narrow !] ('narrow !',) Narrow('narrow !') None None False True False",
+            "code 0 0 ('code 0',)"
+        ]
+        messages[StaticCompilationMode.OFF] == [
+            '''python.Rejected: ("it's", 'say "hi"', -0.0, 1e+16, None, 7, False)''',
+            'python.Rejected: null',
+            'python.Narrow: narrow !',
+            'python.Coded: code 0'
+        ]
+    }
+
     void "a subclass object delegates its inherited compiled methods too"() {
         given:
         PythonStatic.resetEntries()

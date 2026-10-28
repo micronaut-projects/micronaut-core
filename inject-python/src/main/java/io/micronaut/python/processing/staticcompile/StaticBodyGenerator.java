@@ -608,17 +608,24 @@ public final class StaticBodyGenerator {
     }
 
     /**
-     * {@code PythonStatic.raised(E.class, PythonContextRuntime.newInstance(<the class reference of E>, new Object[] {args}))}:
+     * {@code PythonStatic.raised(E.class, PythonContextRuntime.newInstance(E.__PYTHON_CLASS_REFERENCE, new Object[] {args}))}:
      * the Python exception created by its Python class, wrapped in its generated class as the runtime
-     * wraps a Python exception that reaches Java code (through the {@code Value} constructor).
+     * wraps a Python exception that reaches Java code (through the {@code Value} constructor). A lazy
+     * exception is {@code new E(E.__PYTHON_CLASS_REFERENCE, new Object[] {args})}: the Java exception
+     * alone, which creates the Python exception from the arguments when it is first needed.
      */
     private ExpressionDef newPythonException(Ir.NewPythonException construction) {
+        ExpressionDef classReference = self.pythonClassReference(construction.type());
+        ExpressionDef arguments = TypeDef.OBJECT.array().instantiate(expressions(construction.arguments()));
+        if (construction.lazy()) {
+            return classType(construction.type()).instantiate(List.of(PYTHON_CLASS_REFERENCE, TypeDef.OBJECT.array()), List.of(classReference, arguments));
+        }
         ExpressionDef value = PYTHON_CONTEXT_RUNTIME.invokeStatic(
             "newInstance",
             List.of(PYTHON_CLASS_REFERENCE, TypeDef.OBJECT.array()),
             POLYGLOT_VALUE_TYPE,
-            self.pythonClassReference(construction.type()),
-            TypeDef.OBJECT.array().instantiate(expressions(construction.arguments()))
+            classReference,
+            arguments
         );
         return PYTHON_STATIC.invokeStatic("raised", List.of(TypeDef.CLASS, POLYGLOT_VALUE_TYPE), ClassTypeDef.of(RuntimeException.class),
             classType(construction.type()).getStaticField("class", TypeDef.CLASS), value);

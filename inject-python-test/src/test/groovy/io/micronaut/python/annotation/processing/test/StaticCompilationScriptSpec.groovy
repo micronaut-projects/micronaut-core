@@ -98,7 +98,7 @@ class Missing(Exception):
 @Produces("text/plain")
 class MissingHandler(ExceptionHandler[Missing, HttpResponse]):
     def handle(self, request: HttpRequest, exception: Missing) -> HttpResponse:
-        return HttpResponse.ok("missing")
+        return HttpResponse.ok(f"missing {exception}")
 
 
 @Get("/routes/find/{name}")
@@ -120,7 +120,8 @@ def find(name: str) -> str:
 
         then: "the compiled route ran as Java and threw the generated class, which the handler declared for the Python class matched"
         found == "a"
-        missing == "missing"
+        // the exception is created lazily, with the message of the Python exception
+        missing == "missing x"
         PythonStatic.entries('python.Script#find') == 2
 
         cleanup:

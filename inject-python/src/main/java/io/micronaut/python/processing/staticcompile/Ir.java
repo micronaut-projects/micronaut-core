@@ -414,13 +414,32 @@ public sealed interface Ir {
      * the Python class called with the arguments, the Python exception wrapped in the generated Java
      * class through its {@code Value} constructor, as the runtime wraps a Python exception that
      * reaches Java code. Its Java value is the {@code RuntimeException} a {@code raise} throws.
+     * <p>
+     * A lazy exception is created as the Java exception alone, with the message
+     * {@code BaseException.__str__} gives the arguments: its generated class creates the Python
+     * exception from the class reference and the arguments the first time the Python object is
+     * needed (it reaches Python, or an exception handler converts it). The planner makes an
+     * exception lazy only when nothing of its class can tell the difference: neither the class
+     * nor a Python base defines {@code __new__}, {@code __init__}, {@code __str__}, {@code __repr__}
+     * or {@code args}, and its builtin base takes its arguments as {@code BaseException} does.
      *
      * @param type      The generated class, a RuntimeException
      * @param arguments The arguments of the Python class, boxed
+     * @param lazy      Whether the Python exception is created when it is first needed
      */
-    record NewPythonException(String type, List<Expression> arguments) implements Expression {
+    record NewPythonException(String type, List<Expression> arguments, boolean lazy) implements Expression {
         public NewPythonException {
             arguments = List.copyOf(arguments);
+        }
+
+        /**
+         * An exception created through its Python class when it is raised.
+         *
+         * @param type      The generated class, a RuntimeException
+         * @param arguments The arguments of the Python class, boxed
+         */
+        public NewPythonException(String type, List<Expression> arguments) {
+            this(type, arguments, false);
         }
     }
 

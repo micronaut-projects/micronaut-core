@@ -16,7 +16,7 @@ import os
 
 import java
 
-from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, UNKNOWN, PythonClassModel, Typed
+from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, UNKNOWN, PythonClassModel, Typed, _native_exception
 
 # names Java cannot declare: its keywords and literals, and the methods of Object
 JAVA_RESERVED_NAMES = frozenset((
@@ -96,6 +96,16 @@ DEFAULTS = {LONG: 0, DOUBLE: 0.0, BOOLEAN: False}
 # the Java types of the arguments a compiled raise hands the Python exception class as Python would: the
 # boundary converts them to the str, int, float, bool or None the Python code passes
 EXCEPTION_ARGUMENT_TYPES = {LONG, DOUBLE, BOOLEAN, STRING, NONE, "java.lang.Long", "java.lang.Integer", "java.lang.Double", "java.lang.Boolean"}
+# the builtin exceptions that take their arguments as BaseException does: args holds them, and str() is
+# the str() of a single argument or the repr of the tuple of several (KeyError, OSError, UnicodeError,
+# ImportError... differ). A raise of a class extending only these creates its Python exception lazily
+LAZY_EXCEPTION_BASES = {"Exception", "ValueError", "TypeError", "RuntimeError", "LookupError", "IndexError", "ArithmeticError",
+                        "OverflowError", "ZeroDivisionError", "AssertionError", "NotImplementedError"}
+# the members that make the Python exception of a class differ from the arguments it is created with, or
+# make its creation (or its collection) observable, or give it a state the Java exception does not take
+# (a cause, a context, notes): a raise of a class defining one creates it eagerly
+EAGER_EXCEPTION_MEMBERS = ("__new__", "__init__", "__str__", "__repr__", "args", "__del__", "__cause__", "__context__",
+                           "__suppress_context__", "__traceback__", "__notes__", "__bases__")
 SYNTHESIZED_EXCEPTIONS = ("java.lang.ArithmeticException", "java.lang.ClassCastException", "java.lang.IllegalArgumentException",
                           "java.lang.IllegalStateException", "java.lang.IndexOutOfBoundsException", "java.lang.NullPointerException",
                           "java.lang.UnsupportedOperationException", "java.util.NoSuchElementException",
@@ -1453,10 +1463,179 @@ class Lowering:
             if _erased(value.type()) not in EXCEPTION_ARGUMENT_TYPES:
                 self._refuse("python-exception", f"constructing [{model.name}] with a [{_erased(value.type())}] has no static lowering: only a str, an int, a float, a bool or None reaches the Python class as the value Python passes", argument)
             lowered.append(self._boxed(value, argument))
-        # the Python class creates the exception as a generated constructor creates its Python object
+        # the Python class creates the exception as a generated constructor creates its Python object: when
+        # the raise runs, or, lazily, when the generated class first needs it
         self.java_calls += 1
         self.compilation_calls += 1
-        return NewPythonException(generated, lowered)
+        return NewPythonException(generated, lowered, self._creates_lazily(model))
+
+    def _patched_classes(self):
+        """
+        The classes that code of the compilation may give one of the EAGER_EXCEPTION_MEMBERS after their
+        definition, by name: an assignment or a deletion (E.__str__ = ..., app.errors.E.__init__ = ...),
+        or a setattr or delattr with such a member or a computed name (builtins.setattr, type.__setattr__(E, ...),
+        object.__setattr__(E, ...) and E.__setattr__(...) included), on a name, on a name bound to it
+        (Alias = E; Alias.__str__ = ...) or on the last attribute of a qualified name; a write on self is
+        one on an instance. A setter referenced but not called (patch = setattr, type.__setattr__ passed on)
+        may write anything anywhere: the set then holds "*". A special method written on anything else (cls.__str__ = ...,
+        type(e).__init__ = ..., self.__class__.__str__ = ...) may reach any class: the set then holds "*".
+        Collected once per compilation over the ASTs of its modules.
+        """
+        trees = [getattr(getattr(module, "visitor", None), "module_node", None) for module in self.checker._modules.values()]
+        trees = [tree for tree in trees if tree is not None]
+        cached = getattr(self.checker, "_mn_patched_classes", None)
+        if cached is not None and len(cached[0]) == len(trees) and all(a is b for a, b in zip(cached[0], trees)):
+            return cached[1]
+        classes = {model.class_def.name() for model in self.checker.python_classes.all()}
+        receivers = set()
+        specials = set()  # the names a special method is written on
+        aliases = {}  # a name -> the names assigned to it
+        unresolved = False
+
+        def written(receiver, member):
+            # member is None for a computed name; a special method or args written on an instance changes
+            # neither how its class creates its exceptions nor the message of one created before
+            nonlocal unresolved
+            special = member != "args"  # a computed name may be a special method too
+            if isinstance(receiver, ast.Name):
+                if receiver.id == "self":
+                    return
+                receivers.add(receiver.id)
+                if special:
+                    specials.add(receiver.id)
+            elif isinstance(receiver, ast.Attribute):
+                if receiver.attr == "__class__":
+                    unresolved = unresolved or special  # self.__class__.__str__ = ...: the class of an object
+                else:
+                    receivers.add(receiver.attr)
+            elif special:
+                unresolved = True  # type(e).__init__ = ...
+
+        setters = ("setattr", "delattr")
+        dunder_setters = ("__setattr__", "__delattr__")
+
+        def setter_call(call):
+            """The (receiver, member) a call of setattr or delattr writes, in any of its spellings, or None."""
+            func = call.func
+            if (isinstance(func, ast.Name) and func.id in setters) or (isinstance(func, ast.Attribute) and func.attr in setters):
+                return (call.args[0], call.args[1]) if len(call.args) >= 2 else (None, None)
+            if isinstance(func, ast.Attribute) and func.attr in dunder_setters:
+                owner = func.value
+                if isinstance(owner, ast.Call) and isinstance(owner.func, ast.Name) and owner.func.id == "super":
+                    return None  # super().__setattr__(name, value): the object's own attribute protocol
+                if (isinstance(owner, ast.Name) and owner.id in ("type", "object")) or (isinstance(owner, ast.Attribute) and owner.attr in ("type", "object")):
+                    # type.__setattr__(E, name, value): the unbound slot, the object first
+                    return (call.args[0], call.args[1]) if len(call.args) >= 2 else (None, None)
+                return (owner, call.args[0]) if call.args else (None, None)
+            return None
+
+        for tree in trees:
+            called = {id(node.func) for node in ast.walk(tree) if isinstance(node, ast.Call)}
+            for node in ast.walk(tree):
+                if id(node) not in called and ((isinstance(node, ast.Name) and node.id in setters and isinstance(node.ctx, ast.Load))
+                                               or (isinstance(node, ast.Attribute) and node.attr in setters + dunder_setters)):
+                    unresolved = True  # a setter referenced, not called: it may be called on any class
+                if isinstance(node, ast.Constant) and node.value in setters + dunder_setters:
+                    unresolved = True  # getattr(builtins, "setattr"): a setter looked up by its name
+                if isinstance(node, ast.Name) and node.id in ("exec", "eval", "compile") and isinstance(node.ctx, ast.Load):
+                    unresolved = True  # code run from a string may write anything on any class
+                if isinstance(node, ast.ImportFrom) and any(alias.name in setters + dunder_setters and alias.asname not in (None, alias.name)
+                                                            for alias in node.names):
+                    unresolved = True  # from builtins import setattr as patch: called by a name of its own
+                targets = ()
+                if isinstance(node, ast.Assign):
+                    targets = node.targets
+                    if isinstance(node.value, (ast.Name, ast.Attribute)):
+                        source = node.value.id if isinstance(node.value, ast.Name) else node.value.attr
+                        for target in node.targets:
+                            if isinstance(target, ast.Name):
+                                aliases.setdefault(target.id, set()).add(source)
+                elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
+                    targets = (node.target,)
+                elif isinstance(node, ast.Delete):
+                    targets = node.targets
+                for target in targets:
+                    for element in (target.elts if isinstance(target, (ast.Tuple, ast.List)) else (target,)):
+                        if isinstance(element, ast.Attribute) and element.attr in EAGER_EXCEPTION_MEMBERS:
+                            written(element.value, element.attr)
+                setter = setter_call(node) if isinstance(node, ast.Call) else None
+                if setter is not None:
+                    receiver, member = setter
+                    if receiver is None:
+                        unresolved = True  # setattr(*arguments): any class, any member
+                    elif not isinstance(member, ast.Constant):
+                        written(receiver, None)
+                    elif member.value in EAGER_EXCEPTION_MEMBERS:
+                        written(receiver, member.value)
+        def reached(start):
+            """The name and the names bound to it, transitively."""
+            found = set()
+            pending = [start]
+            while pending:
+                name = pending.pop()
+                if name not in found:
+                    found.add(name)
+                    pending.extend(aliases.get(name, ()))
+            return found
+
+        names = set()
+        for receiver in receivers:
+            names |= reached(receiver)
+        # a special method written on a name bound to no class of the compilation (cls.__str__ = ..., a
+        # local) or on a parameter, whatever class shares its spelling, may be written on any class
+        parameters = set()
+        for tree in trees:
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                    arguments = node.args
+                    parameters.update(argument.arg for argument in arguments.posonlyargs + arguments.args + arguments.kwonlyargs)
+                    parameters.update(argument.arg for argument in (arguments.vararg, arguments.kwarg) if argument is not None)
+        if unresolved or any(name in parameters or not reached(name) & classes for name in specials):
+            names.add("*")
+        self.checker._mn_patched_classes = (trees, names)
+        return names
+
+    def _creates_lazily(self, model, seen=None):
+        """
+        Whether a raise of the exception class creates the Java exception alone, its generated class
+        creating the Python exception from the arguments when it is first needed (it reaches Python, or an
+        exception handler converts it). Only when nothing tells the two apart: the Java message is what
+        BaseException.__str__ gives the arguments, the Python exception holds them as its args, and
+        creating it runs no code of the compilation. So neither the class nor a Python base defines
+        __new__, __init__, __str__, __repr__, args or __del__ (in its body, or by an assignment or a
+        setattr on its name anywhere in the compilation), nor is decorated, nor has a metaclass or a
+        dynamic lookup, and every builtin base takes its arguments as BaseException does.
+        """
+        seen = seen if seen is not None else set()
+        if model.qualified in seen:
+            return True
+        seen.add(model.qualified)
+        node = model.node
+        if getattr(node, "decorator_list", None) or getattr(node, "keywords", None):
+            return False
+        if model.dynamic or model.lookup_dynamic or model.metaclass or model.constructor is not None:
+            return False
+        for member in EAGER_EXCEPTION_MEMBERS:
+            if (member in model.methods or member in model.properties or member in model.attributes
+                    or member in model.instance_attributes or member in model.nested):
+                return False
+        patched = self._patched_classes()
+        if "*" in patched or model.class_def.name() in patched:
+            return False  # E.__str__ = ... or setattr(E, ...) somewhere in the compilation
+        classes = self.checker.python_classes
+        for base in model.class_def.bases():
+            name = base.name()
+            python = classes.by_qualified.get(name)
+            if python is not None:
+                if not self._creates_lazily(python, seen):
+                    return False
+                continue
+            if name in ("object", "builtins.object"):
+                continue
+            builtin = name[len("builtins."):] if name.startswith("builtins.") else name
+            if "." in builtin or builtin not in LAZY_EXCEPTION_BASES or not _native_exception(base):
+                return False
+        return True
 
     def _names_class(self, function, model):
         """Whether the callee of a call is the class reference of the model."""
