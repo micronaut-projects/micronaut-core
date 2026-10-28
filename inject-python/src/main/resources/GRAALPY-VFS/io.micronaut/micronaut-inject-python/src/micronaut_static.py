@@ -135,10 +135,15 @@ class StaticPlanner:
         Decide every function recorded by the type checker; returns the decisions. The checker's
         facts are created from the visitor context when its own check did not run. Every plan starts
         afresh: the decisions and diagnostics of an earlier plan are dropped, so a planner that
-        outlives one compilation element never reports a decision twice.
+        outlives one compilation element never reports a decision twice, nor hands over the bodies
+        and scripts of an earlier plan or takes its classes for classes of this one.
         """
         self.decisions = []
+        self.bodies = []
+        self.body_classes = set()
+        self.scripts = []
         self.diagnostics = []
+        self._ineligibility = {}
         self._decided = {}
         self._bodies = {}
         self._class_scopes = {}
