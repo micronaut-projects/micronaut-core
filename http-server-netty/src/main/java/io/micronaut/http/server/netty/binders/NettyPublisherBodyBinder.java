@@ -32,6 +32,7 @@ import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.netty.body.JsonStreamElementLimit;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
@@ -86,7 +87,10 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
                 if (reader.isPresent() && reader.get() instanceof ChunkedMessageBodyReader<Object> piecewise) {
                     // the body is taken now, but only read once the route subscribes
                     Publisher<ByteBuffer<?>> input = UnconsumedBodyGuard.openWhenSubscribed(nhr, rootBody.move(), ByteBody::toByteBufferPublisher);
-                    Publisher<?> pub = piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), input);
+                    // every element is buffered in memory before it is decoded
+                    Publisher<?> pub = JsonStreamElementLimit.limit(
+                        piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), input),
+                        nettyBodyAnnotationBinder.httpServerConfiguration.getMaxRequestBufferSize());
                     return () -> Optional.of(pub);
                 }
             }
