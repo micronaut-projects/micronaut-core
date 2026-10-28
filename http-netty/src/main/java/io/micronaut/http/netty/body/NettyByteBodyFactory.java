@@ -47,7 +47,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 
-import java.util.OptionalLong;
 
 /**
  * {@link ByteBodyFactory} implementation with netty-optimized bodies.
