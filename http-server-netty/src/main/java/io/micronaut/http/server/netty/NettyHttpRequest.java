@@ -48,6 +48,7 @@ import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.DefaultByteBufHolder;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -103,6 +104,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * not supposed to.
      */
     private static final io.netty.handler.codec.http.HttpHeaders SERVER_PUSH_EXCLUDE_HEADERS;
+    /**
+     * Pieces of the body smaller than this are copied together until the copy reaches this size.
+     */
+    private static final int SMALL_CONTENT = 1024;
 
     static {
         SERVER_PUSH_EXCLUDE_HEADERS = new DefaultHttpHeaders();
@@ -428,10 +433,37 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 httpContent.retain();
                 return (HttpData) httpContent;
             });
-        } else {
+        } else if (!coalesceSmallContent(httpContent.content())) {
             // released in release()
             receivedContent.add(httpContent.retain());
         }
+    }
+
+    /**
+     * A body can arrive in very small pieces, e.g. one byte per HTTP chunk, and every piece kept
+     * has a fixed overhead far beyond its size. Small pieces are copied together, so the number
+     * of pieces kept is bounded by the number of bytes, not by the number of chunks.
+     *
+     * @param content The content of the new piece
+     * @return {@code true} iff the content was copied into the previous piece
+     */
+    private boolean coalesceSmallContent(ByteBuf content) {
+        if (content == null || content.readableBytes() >= SMALL_CONTENT || receivedContent.isEmpty()) {
+            return false;
+        }
+        int last = receivedContent.size() - 1;
+        ByteBufHolder tailHolder = receivedContent.get(last);
+        ByteBuf tail = tailHolder.content();
+        if (tail == null || tail.readableBytes() >= SMALL_CONTENT) {
+            return false;
+        }
+        ByteBuf combined = channelHandlerContext.alloc().buffer(tail.readableBytes() + content.readableBytes());
+        combined.writeBytes(tail, tail.readerIndex(), tail.readableBytes());
+        combined.writeBytes(content, content.readerIndex(), content.readableBytes());
+        // released in release()
+        receivedContent.set(last, new DefaultByteBufHolder(combined));
+        releaseIfNecessary(tailHolder);
+        return true;
     }
 
     /**
