@@ -62,6 +62,23 @@ public interface ConnectionMetadata {
     }
 
     /**
+     * Get the host string of the given {@link SocketAddress} instance without a reverse DNS
+     * lookup. This is the host name if the address was created from one, otherwise the numeric
+     * IP. For unix domain sockets it is the file path.
+     *
+     * @param a The address
+     * @return The string representation, or {@link Optional#empty()} if this type of address is
+     * not supported
+     */
+    static Optional<String> getHostString(SocketAddress a) {
+        if (a instanceof InetSocketAddress addr) {
+            return Optional.of(addr.getHostString());
+        } else {
+            return getHostName(a);
+        }
+    }
+
+    /**
      * Get the host name of the given {@link SocketAddress} instance. This is usually the DNS name
      * or IP, but for unix domain socket it is the file path.
      *

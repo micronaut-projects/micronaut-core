@@ -61,7 +61,7 @@ import java.util.function.Consumer;
 @Internal
 @Experimental
 public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
-    private List<Runner> runners;
+    List<Runner> runners;
 
     private LoomCarrierGroup(Factory factory, int nThreads, Executor executor, IoHandlerFactory ioHandlerFactory) {
         super(nThreads, executor, ioHandlerFactory, factory);
@@ -403,7 +403,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                         continuationsFifo = false;
                     } else {
                         ScheduledTask last = localLoomQueue.peekLast();
-                        continuationsFifo = last != null && last.scheduleTime > now + factory.configuration.taskFifoThreshold().toNanos();
+                        continuationsFifo = last != null && now - last.scheduleTime > factory.configuration.taskFifoThreshold().toNanos();
                     }
                     continuationTime = 0;
                 }
