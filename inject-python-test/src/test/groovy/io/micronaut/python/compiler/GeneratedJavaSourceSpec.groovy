@@ -34,6 +34,14 @@ abstract class GeneratedJavaSourceSpec extends Specification {
                 sources.collect { it.toUri().toString() + "\n-----------\n" + it.getCharContent(true).toString() + '----------' }.join('\n'))
     }
 
+    protected void assertGeneratedSourceDoesNotContain(String pythonCode, String unexpectedSnippet) {
+        def outputs = compile(pythonCode)
+        def sources = outputs.findAll { it.toUri().toString().contains("/SOURCE_OUTPUT/") && it.getKind() == JavaFileObject.Kind.SOURCE }
+        assert !sources.isEmpty()
+        def offending = sources.find { it.getCharContent(true).toString().contains(unexpectedSnippet.stripIndent().trim()) }
+        assert offending == null : ("A generated source contained the unexpected snippet:\n" + offending?.getCharContent(true))
+    }
+
     protected void assertGeneratedSourceEquals(String pythonCode, String expectedFull, String fqcn = null, List<String> compilerOptions = null) {
         def outputs = compile(pythonCode, compilerOptions)
         def sources = outputs.findAll { it.toUri().toString().contains("/SOURCE_OUTPUT/") && it.getKind() == JavaFileObject.Kind.SOURCE }

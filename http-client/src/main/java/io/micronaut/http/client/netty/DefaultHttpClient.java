@@ -381,7 +381,7 @@ public class DefaultHttpClient implements
      * Set the handler registry for this client.
      *
      * @param handlerRegistry The handler registry
-     * @deprecated Use builder instead
+     * @deprecated Use {@link DefaultHttpClientBuilder#handlerRegistry(MessageBodyHandlerRegistry)} instead
      */
     @Deprecated(forRemoval = true)
     public final void setHandlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
