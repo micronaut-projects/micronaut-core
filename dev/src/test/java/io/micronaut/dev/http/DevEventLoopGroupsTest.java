@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DevEventLoopGroupsTest {
 
     @Test
-    void aGroupAskedForAgainInOneGenerationWithOtherSettingsReplacesTheFirstWithAWarning() {
+    void aGroupAskedForAgainWithOtherSettingsWhileClaimedReplacesTheFirstWithAWarning() {
         ListAppender<ILoggingEvent> logged = new ListAppender<>();
         logged.start();
         Logger logger = (Logger) LoggerFactory.getLogger(DevEventLoopGroups.class);

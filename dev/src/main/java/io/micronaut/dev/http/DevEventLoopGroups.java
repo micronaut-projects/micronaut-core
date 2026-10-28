@@ -100,8 +100,9 @@ final class DevEventLoopGroups implements RetainedEventLoopGroups {
         if (retained != null) {
             // made from other settings, which the application's code set rather than its configuration, or shut down
             if (retained.claimed == generation && !retained.group.isShuttingDown() && LOG.isWarnEnabled()) {
-                // asked for during this generation already, by a registry that may still hold it
-                LOG.warn("Event loop group [{}] was asked for twice in one generation with different settings: the group made first is shut down", name);
+                // claimed at this count already, by a registry that may still hold it: one of this generation, or one of the
+                // previous generation that asked after it ended, see Retained#claimed
+                LOG.warn("Event loop group [{}] was asked for again with different settings while a registry may still hold it: the group made first is shut down", name);
             }
             groups.remove(name);
             retained.shutdown();
