@@ -79,29 +79,33 @@ final class PythonEventLoopBeans implements ApplicationEventListener<StartupEven
             return;
         }
         for (BeanDefinition<?> definition : beanContext.getBeanDefinitions(Qualifiers.byStereotype(EventLoopSafeOwner.class))) {
-            Set<Class<?>> declaring = new HashSet<>();
-            for (ExecutableMethod<?, ?> method : definition.getExecutableMethods()) {
-                // a route: no executor is selected for any other method
-                if (method.hasAnnotation(EventLoopSafe.class) && method.hasStereotype(HTTP_METHOD_MAPPING)) {
-                    declaring.add(method.getDeclaringType());
-                }
+            create(definition);
+        }
+    }
+
+    private void create(BeanDefinition<?> definition) {
+        Set<Class<?>> declaring = new HashSet<>();
+        for (ExecutableMethod<?, ?> method : definition.getExecutableMethods()) {
+            // a route: no executor is selected for any other method
+            if (method.hasAnnotation(EventLoopSafe.class) && method.hasStereotype(HTTP_METHOD_MAPPING)) {
+                declaring.add(method.getDeclaringType());
             }
-            if (declaring.isEmpty()) {
-                continue;
-            }
-            if (!definition.isSingleton()) {
-                excluded.addAll(declaring);
-                continue;
-            }
-            try {
-                beanContext.getBean(definition);
-                created.addAll(declaring);
-            } catch (RuntimeException e) {
-                // created when first needed, as any bean is: its routes run on the IO executor
-                excluded.addAll(declaring);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("The bean [{}] was not created at startup; its compiled routes run on the IO executor", definition.getBeanType().getName(), e);
-                }
+        }
+        if (declaring.isEmpty()) {
+            return;
+        }
+        if (!definition.isSingleton()) {
+            excluded.addAll(declaring);
+            return;
+        }
+        try {
+            beanContext.getBean(definition);
+            created.addAll(declaring);
+        } catch (RuntimeException e) {
+            // created when first needed, as any bean is: its routes run on the IO executor
+            excluded.addAll(declaring);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("The bean [{}] was not created at startup; its compiled routes run on the IO executor", definition.getBeanType().getName(), e);
             }
         }
     }

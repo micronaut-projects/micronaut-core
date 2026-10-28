@@ -136,6 +136,10 @@ public final class PythonFixedAttributes {
             }
         } finally {
             priming.removeLast();
+            if (priming.isEmpty()) {
+                // the outermost priming of this thread is done: no deque is kept per thread
+                PRIMING.remove();
+            }
         }
     }
 
