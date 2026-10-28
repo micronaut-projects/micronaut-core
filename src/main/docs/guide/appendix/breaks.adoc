@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== `max-file-size` applies to streamed uploads (5.3)
+
+`micronaut.server.multipart.max-file-size` (1MB by default) now limits the content of every part an upload binding reads, not only a buffered `CompletedFileUpload`. A `StreamingFileUpload`, `Publisher<StreamingFileUpload>`, `Publisher<PartData>` or `Publisher<Publisher<...>>` argument whose part is larger now fails with a `ContentLengthExceededException`, which the server answers with `413 Request Entity Too Large`. An application that streams larger files should raise `micronaut.server.multipart.max-file-size`, together with `micronaut.server.max-request-size`.
+
 === Buffered JSON stream responses require a list type (5.3)
 
 The JDK HTTP client now uses the shared JSON stream message body reader. For an `application/x-json-stream` response, `retrieve(request, Book.class)` no longer returns only the first JSON value. Retrieve `Argument.listOf(Book.class)` to read the complete stream, or use `jsonStream(request, Book.class)` to consume individual values as they arrive.

@@ -180,6 +180,19 @@ public final class FormFactory {
     }
 
     /**
+     * Limit the content of a part to the {@code max-file-size} of the server: reading more fails
+     * with a {@link ContentLengthExceededException}, like a buffered upload.
+     *
+     * @param request   The request
+     * @param formField The field
+     * @return The field with the limited content
+     * @since 5.3.0
+     */
+    public RawFormField limitFileSize(FormCapableHttpRequest<?> request, RawFormField formField) {
+        return new RawFormField(formField.metadata(), request.byteBodyFactory().limit(formField.byteBody(), configuration.getMultipart().getMaxFileSize()));
+    }
+
+    /**
      * Create a new {@link StreamingFileUpload} from the given raw data.
      *
      * @param formField The field
