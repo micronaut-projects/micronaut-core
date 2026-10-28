@@ -18,7 +18,7 @@ class JdkProxyCredentialsSpec extends Specification {
     def 'proxy credentials are not given to an origin server challenge'() {
         given:
         def client = ctx.createBean(HttpClient, new URL('http://127.0.0.1:9999'))
-        Authenticator authenticator = ((AbstractJdkHttpClient) client).client.authenticator().get()
+        Authenticator authenticator = ((DefaultJdkHttpClient) client).transport().client.authenticator().get()
 
         when:
         def server = authenticator.requestPasswordAuthenticationInstance('127.0.0.1', InetAddress.loopbackAddress, 9999,
