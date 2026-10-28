@@ -101,6 +101,7 @@ import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
+import io.micronaut.http.netty.body.JsonStreamElementLimit;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
 import io.micronaut.http.netty.body.NettyJsonHandler;
@@ -1119,7 +1120,10 @@ public class DefaultHttpClient implements
             // could also be application/json, in which case we will stream an array
             MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_STREAM_TYPE);
             ChunkedMessageBodyReader<O> reader = (ChunkedMessageBodyReader<O>) handlerRegistry.getReader(type, List.of(mediaType));
-            return reader.readChunked(type, mediaType, response.getHeaders(), Flux.from(streamResponse).map(c -> NettyByteBufferFactory.DEFAULT.wrap(c.content())));
+            // every element is buffered in memory before it is decoded
+            return JsonStreamElementLimit.limit(
+                reader.readChunked(type, mediaType, response.getHeaders(), Flux.from(streamResponse).map(c -> NettyByteBufferFactory.DEFAULT.wrap(c.content()))),
+                configuration.getMaxContentLength());
         });
     }
 

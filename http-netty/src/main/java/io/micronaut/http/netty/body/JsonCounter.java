@@ -46,6 +46,12 @@ public final class JsonCounter {
      * {@link #position} of the first byte of the current top-level JSON node.
      */
     private long bufferStart = -1;
+    /**
+     * {@link #position} up to which input bytes must not be 0x00.
+     *
+     * @see #checkCharset(ByteBuf)
+     */
+    private long charsetCheckEnd = 4;
 
     /**
      * Whether we are currently unwrapping a top-level array.
@@ -76,30 +82,36 @@ public final class JsonCounter {
      *                             errors are detected by this class.
      */
     public void feed(ByteBuf buf) throws JsonSyntaxException {
-        if (position < 4) {
-            // RFC 4627 allows JSON to be encoded as UTF-8, UTF-16 or UTF-32. It also specifies a
-            // charset detection algorithm using 0x00 bytes.
-            // Later standards (RFC 8259) only permit UTF-8, but Jackson still allows other
-            // charsets. To avoid potential parser differential vulnerabilities, we forbid any 0x00
-            // bytes in the input. They never appear in valid UTF-8 JSON.
-
-            // If the input is utf-16 or utf-32, one of the first four bytes will be 0. Checking
-            // this separately and only for four bytes allows us to avoid the work in the hot loops
-            // below.
-            int r = buf.readableBytes();
-            if ((r >= 1 && buf.getByte(0) == 0)
-                || (r >= 2 && buf.getByte(1) == 0)
-                || (r >= 3 && buf.getByte(2) == 0)
-                || (r >= 4 && buf.getByte(3) == 0)) {
-
-                throw new JsonSyntaxException("Input must be legal UTF-8 JSON");
-            }
-        }
+        checkCharset(buf);
         if (!isBuffering()) {
             proceedUntilBuffering(buf);
+            // a node may have started, its first bytes are checked too
+            checkCharset(buf);
         }
         if (isBuffering()) {
             proceedUntilNonBuffering(buf);
+        }
+    }
+
+    /**
+     * RFC 4627 allows JSON to be encoded as UTF-8, UTF-16 or UTF-32. It also specifies a charset
+     * detection algorithm using 0x00 bytes. Later standards (RFC 8259) only permit UTF-8, but
+     * Jackson still allows other charsets, and it detects the charset of every node it is given
+     * separately. To avoid potential parser differential vulnerabilities, we forbid 0x00 bytes
+     * among the first four bytes of the input and of every top-level node. They never appear in
+     * valid UTF-8 JSON, and if the input is UTF-16 or UTF-32, one of them is 0. Checking only
+     * these bytes allows us to avoid the work in the hot loops below.
+     */
+    private void checkCharset(ByteBuf buf) throws JsonSyntaxException {
+        if (position < charsetCheckEnd) {
+            int i = buf.readerIndex();
+            // only look at the bytes of this buffer that are among the checked bytes
+            int end = i + (int) Math.min(buf.readableBytes(), charsetCheckEnd - position);
+            for (; i < end; i++) {
+                if (buf.getByte(i) == 0) {
+                    throw new JsonSyntaxException("Input must be legal UTF-8 JSON");
+                }
+            }
         }
     }
 
@@ -258,6 +270,14 @@ public final class JsonCounter {
     }
 
     /**
+     * Start buffering a top-level node at the current position.
+     */
+    private void startNode() {
+        bufferStart = position;
+        charsetCheckEnd = position + 4;
+    }
+
+    /**
      * Handle a special byte (anything but whitespace) in the base state, while not buffering.
      */
     private void handleNonBufferingBase(byte b) throws JsonSyntaxException {
@@ -272,7 +292,7 @@ public final class JsonCounter {
             }
             case '{' -> {
                 depth = 1;
-                bufferStart = position;
+                startNode();
                 state = State.BASE; // we might be in BEFORE_UNWRAP_ARRAY
             }
             case '[' -> {
@@ -281,16 +301,16 @@ public final class JsonCounter {
                     unwrappingArray = true;
                 } else {
                     depth = 1;
-                    bufferStart = position;
+                    startNode();
                 }
             }
             case '"' -> {
                 state = State.STRING;
-                bufferStart = position;
+                startNode();
             }
             default -> {
                 state = State.TOP_LEVEL_SCALAR;
-                bufferStart = position;
+                startNode();
             }
         }
     }

@@ -20,9 +20,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
+import io.micronaut.http.exceptions.BufferLengthExceededException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.SynchronousSink;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -59,6 +61,10 @@ final class JsonChunkedProcessor {
      * nodes of earlier chunks have all been claimed.
      */
     private List<Node> emitting = List.of();
+    /**
+     * The maximum size of a single node.
+     */
+    private long maxElementSize = Long.MAX_VALUE;
 
     /**
      * Split the input into one buffer per JSON node. The input buffers are released by this
@@ -69,24 +75,23 @@ final class JsonChunkedProcessor {
      * @return The split buffers
      */
     public Flux<ByteBuffer<?>> process(Flux<ByteBuf> input) {
+        return Flux.deferContextual(ctx -> {
+            maxElementSize = JsonStreamElementLimit.get(ctx);
+            return processWithLimit(input);
+        });
+    }
+
+    private Flux<ByteBuffer<?>> processWithLimit(Flux<ByteBuf> input) {
         return Flux.concat(
                 input.map(Node::new).concatMap(node -> {
                     ByteBuf b = node.claim();
                     if (b == null) {
                         return Flux.empty();
                     }
-                    if (!enter()) {
-                        b.release();
-                        return Flux.empty();
-                    }
-                    try {
-                        return Flux.fromIterable(track(split(b)));
-                    } catch (Throwable e) {
-                        return Flux.error(e);
-                    } finally {
-                        exit();
-                    }
-                }),
+                    // split one node per request, so that the nodes of a chunk are not all
+                    // retained ahead of demand
+                    return Flux.generate(() -> new Chunk(b), this::splitNext, Chunk::release);
+                }, 1),
                 Flux.defer(() -> {
                     if (!enter()) {
                         return Flux.empty();
@@ -173,16 +178,40 @@ final class JsonChunkedProcessor {
         return buf;
     }
 
+    private Chunk splitNext(Chunk chunk, SynchronousSink<Node> sink) {
+        if (!enter()) {
+            sink.complete();
+            return chunk;
+        }
+        try {
+            ByteBuf next = chunk.next();
+            if (next == null) {
+                sink.complete();
+            } else {
+                sink.next(track(next));
+            }
+        } catch (Throwable e) {
+            sink.error(e);
+        } finally {
+            exit();
+        }
+        return chunk;
+    }
+
     private List<ByteBuf> split(ByteBuf content) throws IOException {
         List<ByteBuf> out = new ArrayList<>();
+        Chunk chunk = new Chunk(content);
         try {
-            countLoop(out, content);
+            ByteBuf next;
+            while ((next = chunk.next()) != null) {
+                out.add(next);
+            }
             return out;
         } catch (Throwable t) {
             releaseAll(out);
             throw t;
         } finally {
-            content.release();
+            chunk.release();
         }
     }
 
@@ -236,8 +265,14 @@ final class JsonChunkedProcessor {
         }
     }
 
+    private Node track(ByteBuf buf) {
+        // if the stream is released during the split, exit() releases this node
+        Node node = new Node(buf);
+        emitting = List.of(node);
+        return node;
+    }
+
     private List<Node> track(List<ByteBuf> bufs) {
-        // if the stream is released during the split, exit() releases these nodes
         emitting = Node.wrapAll(bufs);
         return emitting;
     }
@@ -248,24 +283,9 @@ final class JsonChunkedProcessor {
         }
     }
 
-    private void countLoop(List<ByteBuf> out, ByteBuf content) throws IOException {
-        long initialPosition = counter.position();
-        long bias = initialPosition - content.readerIndex();
-        while (content.isReadable()) {
-            counter.feed(content);
-            JsonCounter.BufferRegion bufferRegion = counter.pollFlushedRegion();
-            if (bufferRegion != null) {
-                long start = Math.max(initialPosition, bufferRegion.start());
-                buffer(content.retainedSlice(
-                    Math.toIntExact(start - bias),
-                    Math.toIntExact(bufferRegion.end() - start)
-                ));
-                out.add(Objects.requireNonNull(takeBuffered()));
-            }
-        }
-        if (counter.isBuffering()) {
-            int currentBufferStart = Math.toIntExact(Math.max(initialPosition, counter.bufferStart()) - bias);
-            buffer(content.retainedSlice(currentBufferStart, content.writerIndex() - currentBufferStart));
+    private void checkElementSize(long size) throws BufferLengthExceededException {
+        if (size > maxElementSize) {
+            throw new BufferLengthExceededException(maxElementSize, size);
         }
     }
 
@@ -274,7 +294,8 @@ final class JsonChunkedProcessor {
             this.singleBuffer = buffer;
         } else {
             if (this.compositeBuffer == null) {
-                this.compositeBuffer = buffer.alloc().compositeBuffer();
+                // no component limit: a consolidating composite recopies the whole node every few pieces
+                this.compositeBuffer = buffer.alloc().compositeBuffer(Integer.MAX_VALUE);
                 this.compositeBuffer.addComponent(true, this.singleBuffer);
                 this.singleBuffer = null;
             }
@@ -288,6 +309,60 @@ final class JsonChunkedProcessor {
         compositeBuffer = null;
         singleBuffer = null;
         return buffered;
+    }
+
+    /**
+     * An input chunk that is split one node at a time.
+     */
+    private final class Chunk {
+        private final ByteBuf content;
+        private final long initialPosition;
+        private final long bias;
+        private boolean done;
+        private boolean released;
+
+        Chunk(ByteBuf content) {
+            this.content = content;
+            this.initialPosition = counter.position();
+            this.bias = initialPosition - content.readerIndex();
+        }
+
+        /**
+         * @return The next complete node of this chunk, or {@code null} once the chunk is
+         * consumed. The incomplete node at the end of the chunk is buffered.
+         */
+        @Nullable
+        ByteBuf next() throws IOException {
+            while (content.isReadable()) {
+                counter.feed(content);
+                JsonCounter.BufferRegion bufferRegion = counter.pollFlushedRegion();
+                if (bufferRegion != null) {
+                    checkElementSize(bufferRegion.end() - bufferRegion.start());
+                    long start = Math.max(initialPosition, bufferRegion.start());
+                    buffer(content.retainedSlice(
+                        Math.toIntExact(start - bias),
+                        Math.toIntExact(bufferRegion.end() - start)
+                    ));
+                    return Objects.requireNonNull(takeBuffered());
+                }
+            }
+            if (!done) {
+                done = true;
+                if (counter.isBuffering()) {
+                    checkElementSize(counter.position() - counter.bufferStart());
+                    int currentBufferStart = Math.toIntExact(Math.max(initialPosition, counter.bufferStart()) - bias);
+                    buffer(content.retainedSlice(currentBufferStart, content.writerIndex() - currentBufferStart));
+                }
+            }
+            return null;
+        }
+
+        void release() {
+            if (!released) {
+                released = true;
+                content.release();
+            }
+        }
     }
 
     /**
