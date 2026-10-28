@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server;
 
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -34,6 +36,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
@@ -70,6 +73,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -217,6 +221,10 @@ public class RequestLifecycle {
         return flux.flatMap(rm -> routeExecutor.callRoute(propagatedContext, rm, filteredRequest));
     }
 
+    private static boolean isStoppingOrStopped(BeanContext beanContext) {
+        return beanContext instanceof DefaultBeanContext defaultBeanContext ? defaultBeanContext.isStoppingOrStopped() : !beanContext.isRunning();
+    }
+
     private ExecutionFlow<HttpResponse<?>> handleStatusException(ExecutionFlow<HttpResponse<?>> flux,
                                                                  HttpRequest<?> request,
                                                                  RouteMatch<?> routeMatch,
@@ -298,11 +306,17 @@ public class RequestLifecycle {
             // with delayed parsing, json syntax errors show up as conversion errors
             t = jse;
         }
+        if (t instanceof IOException && (t.getCause() instanceof HttpStatusException || t.getCause() instanceof ContentLengthExceededException)) {
+            // a body read as an InputStream reports a failure of the body (e.g. a body over the
+            // size limit, or a malformed multipart body) as an IOException
+            t = t.getCause();
+        }
         final Throwable cause = t;
 
-        if (!routeExecutor.beanContext.isRunning()) {
+        if (isStoppingOrStopped(routeExecutor.beanContext)) {
             // the context stopped while the request was in flight, as in a shutdown or a development restart: the error
-            // routes and exception handlers stopped with it, and resolving them from a stopped context would fail in turn
+            // routes and exception handlers stopped with it, and resolving them from a stopped context would fail in turn.
+            // A context that is still starting, such as for a request a StartupEvent listener makes, has them
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Request {} {} failed after the context stopped: {}", request.getMethodName(), request.getUri(), cause.toString(), cause);
             }
