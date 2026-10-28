@@ -304,6 +304,11 @@ public final class FormDemuxer implements BufferConsumer {
     @Override
     public void error(Throwable e) {
         assert eventLoop == null || eventLoop.inEventLoop();
+        if (decodeFailure) {
+            // the decoder failure is forwarded to the consumers. Forwarding it allows the upstream
+            // to discard the rest of the body, which must not replace the failure
+            return;
+        }
         if (state instanceof StreamingContent sc) {
             sc.baseSharedBuffer.error(e);
         }

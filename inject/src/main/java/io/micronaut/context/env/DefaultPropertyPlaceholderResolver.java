@@ -132,6 +132,25 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     @Override
     public Object resolveRequiredPlaceholdersObject(String str) throws ConfigurationException {
         List<Segment> segments = buildSegments(str);
+        return resolveRequiredPlaceholdersObject(segments);
+    }
+
+    /**
+     * Resolves the placeholders of a property's text as {@link #resolveRequiredPlaceholdersObject(String)}
+     * does. The expression resolvers that remember what an expression resolves to keep it in the
+     * given memory.
+     *
+     * @param str    The text
+     * @param memory The memory of the expressions of the text
+     * @return The resolved value
+     * @throws ConfigurationException If the placeholders cannot be resolved
+     */
+    Object resolveRequiredPlaceholdersObject(String str, PlaceholderMemory memory) throws ConfigurationException {
+        List<Segment> segments = buildSegments(str, true, memory);
+        return resolveRequiredPlaceholdersObject(segments);
+    }
+
+    private static Object resolveRequiredPlaceholdersObject(List<Segment> segments) {
         if (segments.size() == 1) {
             return segments.getFirst().getValue(Object.class);
         }
@@ -185,6 +204,18 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      * @since 4.2.0
      */
     private List<Segment> buildSegments(String str, boolean failOnIncomplete) {
+        return buildSegments(str, failOnIncomplete, null);
+    }
+
+    /**
+     * Split a placeholder value into logic segments.
+     *
+     * @param str The placeholder
+     * @param failOnIncomplete True if should fail on incomplete placeholder, empty list will be returned otherwise
+     * @param memory The memory of the expressions of the text, {@code null} if nothing is remembered
+     * @return The list of segments
+     */
+    private List<Segment> buildSegments(String str, boolean failOnIncomplete, @Nullable PlaceholderMemory memory) {
         List<Segment> segments = new ArrayList<>();
         String value = str;
         int i = value.indexOf(PREFIX);
@@ -199,7 +230,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             int suffixIdx = value.indexOf(SUFFIX);
             if (suffixIdx > -1) {
                 String expr = value.substring(0, suffixIdx).trim();
-                segments.add(new PlaceholderSegment(expr));
+                segments.add(new PlaceholderSegment(expr, memory, segments.size()));
                 value = value.substring(suffixIdx + SUFFIX.length());
             } else if (failOnIncomplete) {
                 throw new ConfigurationException("Incomplete placeholder definitions detected: " + str);
@@ -225,8 +256,26 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      */
     @Nullable
     protected <T> T resolveExpression(String context, String expression, Class<T> type) {
+        return resolveExpression(context, expression, type, null);
+    }
+
+    /**
+     * Resolves a single expression, which the expression resolvers that remember what an
+     * expression resolves to keep in the given memory.
+     *
+     * @param context The context of the expression
+     * @param expression The expression
+     * @param type The class
+     * @param memory The memory of the expression, {@code null} if nothing is remembered
+     * @param <T> The type the expression should be converted to
+     * @return The resolved and converted expression
+     */
+    @Nullable
+    private <T> T resolveExpression(String context, String expression, Class<T> type, RememberingPropertyExpressionResolver.@Nullable Memory memory) {
         for (PropertyExpressionResolver expressionResolver : getExpressionResolvers()) {
-            Optional<T> value = expressionResolver.resolve(environment, conversionService, expression, type);
+            Optional<T> value = memory != null && expressionResolver instanceof RememberingPropertyExpressionResolver remembering
+                ? remembering.resolve(environment, conversionService, expression, type, memory)
+                : expressionResolver.resolve(environment, conversionService, expression, type);
             if (value.isPresent()) {
                 return value.get();
             }
@@ -284,6 +333,23 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
                 }
             }
         }
+    }
+
+    /**
+     * Where the expressions of the placeholders of a property's text keep what they resolve to,
+     * for the {@link RememberingPropertyExpressionResolver}s.
+     */
+    @FunctionalInterface
+    interface PlaceholderMemory {
+
+        /**
+         * The memory of an expression of the text.
+         *
+         * @param placeholder The index of the placeholder among the segments of the text
+         * @param expression  The index of the expression among those of the placeholder
+         * @return The memory of the expression
+         */
+        RememberingPropertyExpressionResolver.Memory forExpression(int placeholder, int expression);
     }
 
     /**
@@ -376,6 +442,9 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
         private final List<String> expressions = new ArrayList<>();
         @Nullable
         private String defaultValue;
+        @Nullable
+        private final PlaceholderMemory memory;
+        private final int index;
 
         /**
          * Default constructor.
@@ -384,7 +453,18 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
          *                    any prefix or suffix
          */
         PlaceholderSegment(String placeholder) {
+            this(placeholder, null, 0);
+        }
+
+        /**
+         * @param placeholder The placeholder value without any prefix or suffix
+         * @param memory      The memory of the expressions of the text, {@code null} if nothing is remembered
+         * @param index       The index of the placeholder among the segments of the text
+         */
+        PlaceholderSegment(String placeholder, @Nullable PlaceholderMemory memory, int index) {
             this.placeholder = placeholder;
+            this.memory = memory;
+            this.index = index;
             findExpressions(placeholder);
         }
 
@@ -398,8 +478,12 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
         @Override
         public <T> T getValue(Class<T> type) throws ConfigurationException {
-            for (String expression: expressions) {
-                T value = resolveExpression(placeholder, expression, type);
+            for (int i = 0; i < expressions.size(); i++) {
+                String expression = expressions.get(i);
+                // the expressions are resolved in order, so one is only resolved if those before it are not set
+                T value = memory == null
+                    ? resolveExpression(placeholder, expression, type)
+                    : resolveExpression(placeholder, expression, type, memory.forExpression(index, i));
                 if (value != null) {
                     return value;
                 }

@@ -779,9 +779,10 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
             if (bootstrapContext != null) {
                 // A refresh reuses the bootstrap context and its beans, which run until the
                 // application context stops. Its environment reads the bootstrap configuration
-                // again, and its locator reads the distributed configuration again. Beans built
-                // from the bootstrap configuration keep the values they were built with.
-                bootstrapContext.getEnvironment().refresh();
+                // again, with new property source loaders, and its locator reads the distributed
+                // configuration again. Beans built from the bootstrap configuration keep the values
+                // they were built with.
+                BootstrapLocatorMarker.refreshBootstrapEnvironment(bootstrapContext.getEnvironment());
                 return readPropertySources(bootstrapContext);
             }
 
