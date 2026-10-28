@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -42,6 +43,9 @@ import io.micronaut.http.server.netty.RoutingInBoundHandler;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
+import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
@@ -89,6 +93,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     public static final String COMPRESSION_HANDLER = "WebSocketServerCompressionHandler";
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyServerWebSocketUpgradeHandler.class);
+    private static final int DEFAULT_MAX_PAYLOAD_LENGTH = 65536;
     private static final AsciiString WEB_SOCKET_HEADER_VALUE = AsciiString.cached("websocket");
 
     private final Router router;
@@ -98,6 +103,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     private final NettyEmbeddedServices nettyEmbeddedServices;
     private final ConversionService conversionService;
     private final NettyHttpServerConfiguration serverConfiguration;
+    private final int maxPayloadLength;
     private WebSocketServerHandshaker handshaker;
     private boolean cancelUpgrade = false;
 
@@ -115,6 +121,16 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                                               WebSocketSessionRepository webSocketSessionRepository,
                                               ConversionService conversionService,
                                               NettyHttpServerConfiguration serverConfiguration) {
+        this(embeddedServices, webSocketSessionRepository, conversionService, serverConfiguration,
+            maxPayloadLength(embeddedServices.getApplicationContext()));
+    }
+
+    NettyServerWebSocketUpgradeHandler(NettyEmbeddedServices embeddedServices,
+                                       WebSocketSessionRepository webSocketSessionRepository,
+                                       ConversionService conversionService,
+                                       NettyHttpServerConfiguration serverConfiguration,
+                                       int maxPayloadLength) {
+        this.maxPayloadLength = maxPayloadLength;
         this.router = embeddedServices.getRouter();
         this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(embeddedServices.getApplicationContext());
         this.webSocketSessionRepository = webSocketSessionRepository;
@@ -122,6 +138,35 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         this.nettyEmbeddedServices = embeddedServices;
         this.conversionService = conversionService;
         this.serverConfiguration = serverConfiguration;
+    }
+
+    /**
+     * The largest {@link OnMessage#maxPayloadLength()} of the server WebSocket endpoints. A
+     * compressed frame must not inflate past it.
+     *
+     * @return The largest payload length
+     */
+    @Internal
+    public int getMaxPayloadLength() {
+        return maxPayloadLength;
+    }
+
+    /**
+     * Compute the largest {@link OnMessage#maxPayloadLength()} of the server WebSocket endpoints.
+     *
+     * @param beanContext The bean context
+     * @return The largest payload length
+     */
+    static int maxPayloadLength(BeanContext beanContext) {
+        int max = 0;
+        for (BeanDefinition<?> definition : beanContext.getBeanDefinitions(Qualifiers.byStereotype(ServerWebSocket.class))) {
+            for (ExecutableMethod<?, ?> method : definition.getExecutableMethods()) {
+                if (method.isAnnotationPresent(OnMessage.class)) {
+                    max = Math.max(max, method.intValue(OnMessage.class, "maxPayloadLength").orElse(DEFAULT_MAX_PAYLOAD_LENGTH));
+                }
+            }
+        }
+        return max == 0 ? DEFAULT_MAX_PAYLOAD_LENGTH : max;
     }
 
     static boolean isWebSocketUpgrade(@NonNull io.netty.handler.codec.http.HttpRequest request) {
