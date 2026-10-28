@@ -23,12 +23,13 @@ import spock.lang.Specification
  */
 class H2IdleTimeoutKeepAliveFramesSpec extends Specification {
 
-    void "connection WINDOW_UPDATEs do not keep a zero stream window connection open"() {
+    void "connection WINDOW_UPDATEs do not keep a zero stream window connection open"(boolean legacy) {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 'spec.name'                    : 'H2IdleTimeoutKeepAliveFramesSpec',
                 'micronaut.server.http-version': '2.0',
                 'micronaut.server.idle-timeout': '2s',
+                'micronaut.server.netty.legacy-multiplex-handlers': legacy,
         ])
         EmbeddedChannel encoder = new EmbeddedChannel(
                 Http2FrameCodecBuilder.forClient().initialSettings(Http2Settings.defaultSettings().initialWindowSize(0)).build())
@@ -71,14 +72,18 @@ class H2IdleTimeoutKeepAliveFramesSpec extends Specification {
         socket?.close()
         encoder?.finishAndReleaseAll()
         server?.close()
+
+        where:
+        legacy << [false, true]
     }
 
-    void "PINGs from a peer that stopped reading do not keep the connection open"() {
+    void "PINGs from a peer that stopped reading do not keep the connection open"(boolean legacy) {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 'spec.name'                    : 'H2IdleTimeoutKeepAliveFramesSpec',
                 'micronaut.server.http-version': '2.0',
                 'micronaut.server.idle-timeout': '2s',
+                'micronaut.server.netty.legacy-multiplex-handlers': legacy,
         ])
         EmbeddedChannel encoder = new EmbeddedChannel(
                 Http2FrameCodecBuilder.forClient().initialSettings(Http2Settings.defaultSettings().initialWindowSize(Integer.MAX_VALUE)).build())
@@ -128,14 +133,18 @@ class H2IdleTimeoutKeepAliveFramesSpec extends Specification {
         socket?.close()
         encoder?.finishAndReleaseAll()
         server?.close()
+
+        where:
+        legacy << [false, true]
     }
 
-    void "a response paced by WINDOW_UPDATEs alone stays open past the idle timeout"() {
+    void "a response paced by WINDOW_UPDATEs alone stays open past the idle timeout"(boolean legacy) {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 'spec.name'                    : 'H2IdleTimeoutKeepAliveFramesSpec',
                 'micronaut.server.http-version': '2.0',
                 'micronaut.server.idle-timeout': '1s',
+                'micronaut.server.netty.legacy-multiplex-handlers': legacy,
         ])
         EmbeddedChannel encoder = new EmbeddedChannel(
                 Http2FrameCodecBuilder.forClient().initialSettings(Http2Settings.defaultSettings().initialWindowSize(16 * 1024)).build())
@@ -183,6 +192,9 @@ class H2IdleTimeoutKeepAliveFramesSpec extends Specification {
         socket?.close()
         encoder?.finishAndReleaseAll()
         server?.close()
+
+        where:
+        legacy << [false, true]
     }
 
     private static void flush(EmbeddedChannel encoder, OutputStream out) {

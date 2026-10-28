@@ -23,6 +23,7 @@ import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ConnectionWindow;
+import io.micronaut.http.server.netty.handler.Http2LegacyIdleHandler;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
@@ -500,6 +501,7 @@ final class HttpPipelineBuilder {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, http2FrameCodec);
                 specificGracefulShutdown = new Http2GracefulShutdown(pipeline.lastContext(), http2FrameCodec);
                 pipeline.addLast(createHttp2ConnectionWindow(http2FrameCodec));
+                pipeline.addLast(new Http2LegacyIdleHandler(http2FrameCodec));
                 pipeline.addLast(makeHttp2Handler());
                 pipeline.addLast(IdleCloseHandler.INSTANCE);
             } else {
@@ -642,7 +644,7 @@ final class HttpPipelineBuilder {
                     if (frameCodec == null || multiplexHandler == null) {
                         return new Http2ServerUpgradeCodecImpl(connectionHandler);
                     } else {
-                        return new Http2ServerUpgradeCodecImpl(frameCodec, createHttp2ConnectionWindow(frameCodec), multiplexHandler, IdleCloseHandler.INSTANCE);
+                        return new Http2ServerUpgradeCodecImpl(frameCodec, createHttp2ConnectionWindow(frameCodec), new Http2LegacyIdleHandler(frameCodec), multiplexHandler, IdleCloseHandler.INSTANCE);
                     }
                 } else {
                     return null;
@@ -664,7 +666,7 @@ final class HttpPipelineBuilder {
             ChannelHandler priorKnowledgeHandler = frameCodec == null ? connectionHandler : new ChannelInitializer<>() {
                 @Override
                 protected void initChannel(Channel ch) {
-                    ch.pipeline().addLast(connectionHandler, createHttp2ConnectionWindow(frameCodec), multiplexHandler, IdleCloseHandler.INSTANCE);
+                    ch.pipeline().addLast(connectionHandler, createHttp2ConnectionWindow(frameCodec), new Http2LegacyIdleHandler(frameCodec), multiplexHandler, IdleCloseHandler.INSTANCE);
                 }
             };
             final CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =

@@ -24,7 +24,6 @@ import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListe
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOutboundBuffer;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
@@ -276,7 +275,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         // WINDOW_UPDATE every idle period while all stream windows stay at zero. Response data
         // that the update lets through is seen by the idle check as a smaller send window.
         if (streamId == Http2CodecUtil.CONNECTION_STREAM_ID && connectionHandler != null) {
-            connectionHandler.expectedSendWindow += windowSizeIncrement;
+            connectionHandler.outputProgress.onConnectionWindowUpdate(windowSizeIncrement);
         }
     }
 
@@ -295,14 +294,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         private final int connectionWindowSize;
         private boolean connectionWindowRaised;
         private long idleTimeoutNanos = -1;
-        private int lastMessageHashCode;
-        private long lastPendingWriteBytes;
-        private long lastProgress;
-        /**
-         * The connection send window as of the last idle check, plus the connection
-         * WINDOW_UPDATEs read since. If the actual window is smaller, response data was sent.
-         */
-        private long expectedSendWindow;
+        private final Http2OutputProgress outputProgress = new Http2OutputProgress();
 
         private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, ConnectionHandlerBuilder builder) {
             super(decoder, encoder, initialSettings, decoupleCloseAndGoAway, flushPreface);
@@ -349,7 +341,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             super.channelReadComplete(ctx);
             if (idleTimeoutNanos > 0) {
                 long now = System.nanoTime();
-                if (outputChanged(ctx)) {
+                if (outputProgress.progressed(ctx.channel(), this)) {
                     // a response is still being drained to the peer
                     handler.lastStreamActivity = now;
                 } else if (now - handler.lastStreamActivity >= idleTimeoutNanos) {
@@ -358,43 +350,6 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                     ctx.close();
                 }
             }
-        }
-
-        /**
-         * Whether the channel's outbound buffer made progress since the last call, like
-         * {@link IdleStateHandler} does with {@code observeOutput}.
-         */
-        private boolean outputChanged(ChannelHandlerContext ctx) {
-            boolean changed = false;
-            // data frames sent since the last check use up the connection send window
-            int sendWindow = encoder().flowController().windowSize(connection().connectionStream());
-            if (sendWindow < expectedSendWindow) {
-                changed = true;
-            }
-            expectedSendWindow = sendWindow;
-            ChannelOutboundBuffer buf = ctx.channel().unsafe().outboundBuffer();
-            if (buf == null) {
-                return changed;
-            }
-            // only count draining. Frames added to a buffer the peer does not read (e.g. a PING
-            // ACK each idle period) make it grow, and must not count as progress.
-            Object current = buf.current();
-            int messageHashCode = current == null ? 0 : System.identityHashCode(current);
-            long pendingWriteBytes = buf.totalPendingWriteBytes();
-            long progress = buf.currentProgress();
-            if (lastMessageHashCode != 0 && messageHashCode != lastMessageHashCode) {
-                // the message that was at the head of the buffer has been written
-                changed = true;
-            } else if (messageHashCode != 0 && messageHashCode == lastMessageHashCode && progress != lastProgress) {
-                // the same message was partially written
-                changed = true;
-            } else if (pendingWriteBytes < lastPendingWriteBytes) {
-                changed = true;
-            }
-            lastMessageHashCode = messageHashCode;
-            lastPendingWriteBytes = pendingWriteBytes;
-            lastProgress = progress;
-            return changed;
         }
 
         @Override
