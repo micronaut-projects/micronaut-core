@@ -29,16 +29,20 @@ import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscription;
+import reactor.core.Disposable;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -64,6 +68,16 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
     private final Consumer<@Nullable Throwable> onEnd;
     private final AtomicBoolean ended = new AtomicBoolean();
     private final boolean clientFailures;
+    /**
+     * The longest wait for the next piece of the body while the consumer has demand, or
+     * {@code null} for no limit. The request timeout of the JDK client ends when the headers
+     * arrive, so a stalled body is only caught here.
+     */
+    private final @Nullable Duration readTimeout;
+    private Flow.@Nullable Subscription upstream;
+    private long outstanding;
+    private boolean done;
+    private @Nullable Disposable timeoutTask;
 
     public ByteBodySubscriber(BodySizeLimits limits) {
         this(limits, false, null);
@@ -79,9 +93,25 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
      *                       of the JDK client when it failed
      */
     public ByteBodySubscriber(BodySizeLimits limits, boolean clientFailures, @Nullable Consumer<@Nullable Throwable> onEnd) {
+        this(limits, clientFailures, onEnd, null);
+    }
+
+    /**
+     * @param limits         The body size limits
+     * @param clientFailures Whether an I/O failure of the body is passed on as an
+     *                       {@link HttpClientException}, as the failures of the bodies of the
+     *                       streams of the Netty client, instead of as it is
+     * @param onEnd          Called once when the body ends: with {@code null} when it is
+     *                       complete, or when its consumer let the rest go, and with the failure
+     *                       of the JDK client when it failed
+     * @param readTimeout    The longest wait for the next piece of the body while the consumer
+     *                       has demand, or {@code null} for no limit
+     */
+    ByteBodySubscriber(BodySizeLimits limits, boolean clientFailures, @Nullable Consumer<@Nullable Throwable> onEnd, @Nullable Duration readTimeout) {
         this.mapped = BODY_FACTORY.adapt(defer, limits, null, null);
         this.clientFailures = clientFailures;
         this.onEnd = onEnd;
+        this.readTimeout = readTimeout == null || readTimeout.isNegative() || readTimeout.isZero() ? null : readTimeout;
     }
 
     private void end(@Nullable Throwable failure) {
@@ -97,14 +127,19 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
+        synchronized (this) {
+            upstream = subscription;
+        }
         defer.onSubscribe(new Subscription() {
             @Override
             public void request(long n) {
+                demand(n);
                 subscription.request(n);
             }
 
             @Override
             public void cancel() {
+                finish();
                 // the consumer let the rest of the body go
                 end(null);
                 subscription.cancel();
@@ -112,8 +147,81 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
         });
     }
 
+    private synchronized void demand(long n) {
+        if (readTimeout == null || done || n <= 0) {
+            return;
+        }
+        boolean idle = outstanding == 0;
+        outstanding = outstanding + n < 0 ? Long.MAX_VALUE : outstanding + n;
+        if (idle) {
+            restartTimeout();
+        }
+    }
+
+    private synchronized void received() {
+        if (readTimeout == null || done) {
+            return;
+        }
+        if (outstanding != Long.MAX_VALUE) {
+            outstanding--;
+        }
+        if (outstanding > 0) {
+            restartTimeout();
+        } else {
+            cancelTimeout();
+        }
+    }
+
+    private void restartTimeout() {
+        cancelTimeout();
+        Duration timeout = readTimeout;
+        if (timeout != null) {
+            timeoutTask = Schedulers.parallel().schedule(this::timedOut, timeout.toNanos(), TimeUnit.NANOSECONDS);
+        }
+    }
+
+    private void cancelTimeout() {
+        Disposable task = timeoutTask;
+        if (task != null) {
+            task.dispose();
+            timeoutTask = null;
+        }
+    }
+
+    private synchronized boolean finish() {
+        if (done) {
+            return false;
+        }
+        done = true;
+        cancelTimeout();
+        return true;
+    }
+
+    private void timedOut() {
+        Flow.Subscription s;
+        synchronized (this) {
+            if (done || outstanding == 0) {
+                return;
+            }
+            finish();
+            s = upstream;
+        }
+        if (s != null) {
+            s.cancel();
+        }
+        // reported to the load balancer as a timeout
+        end(new HttpTimeoutException("Read Timeout while reading the response body"));
+        defer.onError(new ReadTimeoutException(true));
+    }
+
     @Override
     public void onNext(List<ByteBuffer> item) {
+        synchronized (this) {
+            if (done) {
+                return;
+            }
+        }
+        received();
         if (item.isEmpty()) {
             defer.onNext(BODY_FACTORY.readBufferFactory().createEmpty());
         } else if (item.size() == 1) {
@@ -148,6 +256,9 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
 
     @Override
     public void onError(Throwable throwable) {
+        if (!finish()) {
+            return;
+        }
         if (isTruncatedBody(throwable)) {
             throwable = new ResponseClosedException("Connection closed before the response body was received completely", true);
         }
@@ -189,6 +300,9 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
 
     @Override
     public void onComplete() {
+        if (!finish()) {
+            return;
+        }
         end(null);
         defer.onComplete();
     }

@@ -36,8 +36,12 @@ import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.AttributeKey;
+import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.ScheduledFuture;
+import io.netty.util.internal.ThreadExecutorMap;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -49,9 +53,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Implementation of the {@link WebSocketSession} interface for Netty.
@@ -65,6 +68,8 @@ public class NettyWebSocketSession implements WebSocketSession {
      * The WebSocket session is stored within a Channel attribute using the given key.
      */
     public static final AttributeKey<NettyWebSocketSession> WEB_SOCKET_SESSION_KEY = AttributeKey.newInstance("micronaut.websocket.session");
+
+    private static final Logger LOG = LoggerFactory.getLogger(NettyWebSocketSession.class);
 
     private final String id;
     private final Channel channel;
@@ -233,17 +238,42 @@ public class NettyWebSocketSession implements WebSocketSession {
                     } else {
                         frame = messageEncoder.encodeMessage(message, mediaType);
                     }
-                    channel.writeAndFlush(frame).sync().get();
+                    ChannelFuture future = channel.writeAndFlush(frame);
+                    if (awaitWrite(future) && !future.isSuccess()) {
+                        throw new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause());
+                    }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new WebSocketSessionException("Send interrupt: " + e.getMessage(), e);
-                } catch (ExecutionException e) {
-                    throw new WebSocketSessionException("Send Failure: " + e.getMessage(), e);
                 }
             }
         } else {
             throw new WebSocketSessionException("Session closed");
         }
+    }
+
+    /**
+     * Wait for a write of a blocking send or broadcast, unless the caller is an event loop thread
+     * and the write is still pending. The write is completed by the event loop of the receiving
+     * channel, which may be the calling loop or a loop that is itself blocked in a send to a
+     * channel of the calling loop. On an event loop the frame is already queued on the channel at
+     * this point, so a later failure is only logged.
+     *
+     * @param future The future of the write
+     * @return {@code true} if the write is done, {@code false} if it is still pending
+     * @throws InterruptedException If the thread is interrupted while waiting
+     */
+    static boolean awaitWrite(Future<Void> future) throws InterruptedException {
+        if (!future.isDone() && ThreadExecutorMap.currentExecutor() != null) {
+            future.addListener(f -> {
+                if (!f.isSuccess() && LOG.isDebugEnabled()) {
+                    LOG.debug("Failed to send WebSocket message: {}", f.cause().getMessage(), f.cause());
+                }
+            });
+            return false;
+        }
+        future.await();
+        return true;
     }
 
     @Override

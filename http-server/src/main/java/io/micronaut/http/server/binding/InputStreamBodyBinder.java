@@ -61,7 +61,8 @@ public final class InputStreamBodyBinder implements NonBlockingBodyArgumentBinde
                 return BindingResult.empty();
             }
             try {
-                InputStream s = new SizeLimitInputStream(server.byteBody().toInputStream());
+                // the body is claimed now, but only read once the route reads the stream
+                InputStream s = UnconsumedBodyGuard.discardIfUnconsumed(source, new SizeLimitInputStream(server.byteBody().toInputStream()));
                 return () -> Optional.of(s);
             } catch (ContentLengthExceededException t) {
                 if (LOG.isTraceEnabled()) {

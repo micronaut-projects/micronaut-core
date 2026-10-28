@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -337,6 +338,10 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                     boolean requiresSlash = i + 1 != segments.length;
                     int end = readText(uri, pos, requiresSlash);
                     if (end > pos) { // Deny empty path
+                        if (decodesToSeparator(uri, pos, end)) {
+                            // the handler receives the decoded value, which must still be a single segment
+                            return null;
+                        }
                         pos = end;
                     } else {
                         return null;
@@ -345,7 +350,14 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                 case REGEXP -> {
                     Matcher matcher = segment.pattern.matcher(uri);
                     matcher.region(pos, length);
-                    return matcher.matches() ? matcher : null;
+                    if (!matcher.matches()) {
+                        return null;
+                    }
+                    if (uri.indexOf('%', pos) != -1 && !matchesDecoded(segment, uri.substring(pos), matcher)) {
+                        // the handler receives the decoded values, which must still satisfy the template
+                        return null;
+                    }
+                    return matcher;
                 }
                 default -> throw new IllegalStateException("Unsupported segment type: " + segment.type);
             }
@@ -375,6 +387,43 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                 default -> throw new IllegalStateException("Unsupported segment type: " + segment.type);
             }
         }
+    }
+
+    private static boolean decodesToSeparator(String uri, int from, int to) {
+        int percent = uri.indexOf('%', from);
+        if (percent == -1 || percent >= to) {
+            return false;
+        }
+        return decodeSeparators(uri.substring(from, to)).indexOf('/') != -1;
+    }
+
+    private static boolean matchesDecoded(Segment segment, String uri, Matcher rawMatcher) {
+        String decodedUri = decodeSeparators(uri);
+        Matcher decodedMatcher = segment.pattern.matcher(decodedUri);
+        if (!decodedMatcher.matches()) {
+            return false;
+        }
+        int groupInx = 2;
+        for (int i = 0; i < segment.regexpVariables.length; i++) {
+            String rawGroup = rawMatcher.group(groupInx);
+            String decodedGroup = decodedMatcher.group(groupInx);
+            if (rawGroup == null ? decodedGroup != null : !Objects.equals(decodeSeparators(rawGroup), decodedGroup)) {
+                return false;
+            }
+            groupInx += 2;
+        }
+        return true;
+    }
+
+    /**
+     * Decode the percent-encoded path separators of a value, which a template must not see
+     * encoded when the handler receives them decoded.
+     *
+     * @param value The raw value
+     * @return The value with {@code %2F} and {@code %5C} decoded
+     */
+    private static String decodeSeparators(String value) {
+        return value.replace("%2F", "/").replace("%2f", "/").replace("%5C", "\\").replace("%5c", "\\");
     }
 
     private static int readText(String input, int from, boolean requiresSlash) {

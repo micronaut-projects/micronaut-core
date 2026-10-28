@@ -92,6 +92,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -245,86 +246,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     @Nullable
     private ChannelHandlerContext handlerContext;
-
-    /**
-     * Default constructor.
-     *
-     * @param nettyEmbeddedServices      The netty embedded services
-     * @param webSocketSessionRepository The web socket sessions repository
-     * @param handshaker                 The handshaker
-     * @param webSocketBean              The web socket bean
-     * @param request                    The request used to create the websocket
-     * @param routeMatch                 The route match
-     * @param ctx                        The channel handler context
-     * @param executorSelector           The executor selector
-     * @param coroutineHelper            Helper for kotlin coroutines
-     * @param routeEndpoint              The endpoint of a WebSocket route of handler functions, or {@code null} for a bean
-     * @param routeExecutor              The executor of the WebSocket route of handler functions, or {@code null} for a bean
-     * @param propagatedContext          The context of the upgrade request after the filters
-     * @param releaseRequest             Releases the request used to create the websocket once
-     *                                   the session ended
-     */
-    @SuppressWarnings("checkstyle:ParameterNumber")
-    NettyServerWebSocketHandler(
-        NettyEmbeddedServices nettyEmbeddedServices,
-        WebSocketSessionRepository webSocketSessionRepository,
-        WebSocketServerHandshaker handshaker,
-        WebSocketBean<?> webSocketBean,
-        HttpRequest<?> request,
-        UriRouteMatch<Object, Object> routeMatch,
-        ChannelHandlerContext ctx,
-        ThreadSelectionConfiguration threadSelection,
-        ExecutorSelector executorSelector,
-        @Nullable CoroutineHelper coroutineHelper,
-        @Nullable WebSocketRouteEndpoint routeEndpoint,
-        @Nullable Executor routeExecutor,
-        PropagatedContext propagatedContext,
-        Runnable releaseRequest) {
-        super(
-                nettyEmbeddedServices.getRequestArgumentSatisfier().getBinderRegistry(),
-                nettyEmbeddedServices.getMediaTypeCodecRegistry(),
-                nettyEmbeddedServices.getMessageBodyHandlerRegistry(),
-                webSocketBean,
-                request,
-                routeMatch.getVariableValues(),
-                handshaker.version(),
-                handshaker.selectedSubprotocol(),
-                webSocketSessionRepository,
-                nettyEmbeddedServices.getApplicationContext().getConversionService());
-
-        this.threadSelection = threadSelection;
-        this.executorSelector = executorSelector;
-        this.releaseRequest = releaseRequest;
-        this.eventLoop = ctx.channel().eventLoop();
-        this.routeExecutor = routeExecutor;
-        // the handlers run in the context of the upgrade request, e.g. with the elements that a
-        // filter added to it, and with the upgrade request as the current request
-        this.propagatedContext = propagatedContext.plus(new ServerHttpRequestContext(request));
-        this.routeEndpoint = routeEndpoint;
-        this.maxConcurrentMessages = routeEndpoint == null ? 0 : routeEndpoint.maxConcurrentMessages();
-        this.streamsMessages = routeEndpoint != null && routeEndpoint.streamsMessages();
-        this.maxPendingFrames = routeEndpoint == null ? 0 : routeEndpoint.maxPendingMessages();
-        this.pingHandler = routeEndpoint == null ? null : routeEndpoint.pingMethod();
-        this.pingArgument = routeEndpoint == null ? null : routeEndpoint.pingArgument();
-
-        this.channel = ctx.channel();
-        this.serverSession = createWebSocketSession(ctx);
-
-        if (routeEndpoint != null) {
-            // the handler functions declare the type of their message: it is never bound from the
-            // upgrade request, e.g. from a query parameter of the same name
-            this.bodyArgument = routeEndpoint.messageArgument();
-            this.pongArgument = routeEndpoint.pongArgument();
-        } else {
-            ExecutableBinder<WebSocketState> binder = new DefaultExecutableBinder<>();
-            this.bodyArgument = messageHandler == null ? null : bodyArgument(binder, webSocketBean, messageHandler);
-            this.pongArgument = pongHandler == null ? null : pongArgument(binder, webSocketBean, pongHandler);
-        }
-
-        this.nettyEmbeddedServices = nettyEmbeddedServices;
-        this.coroutineHelper = coroutineHelper;
-        RouteAttributes.setRouteMatch(request, routeMatch);
-
+=======
         if (routeEndpoint != null) {
             // the first message is handled once the open handler is done
             opening = true;
@@ -345,7 +267,21 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 handlerFailed(handlerCtx == null ? ctx : handlerCtx, error);
             }, NettyServerWebSocketHandler::releaseDiscarded);
         }
-        callOpenMethod(ctx).onComplete((v, t) -> {
+        ExecutionFlow<?> openFlow = callOpenMethod(ctx);
+        // the messages of a bean are handled once the open handler completed, which may reject
+        // the session
+        boolean beanOpenPending = routeEndpoint == null && openFlow.tryComplete() == null;
+        if (routeEndpoint == null) {
+            opening = beanOpenPending;
+        }
+        openFlow.onComplete((v, t) -> {
+            if (beanOpenPending) {
+                if (channel.eventLoop().inEventLoop()) {
+                    opened();
+                } else {
+                    channel.eventLoop().execute(this::opened);
+                }
+            }
             if (t != null) {
                 forwardErrorToUser(ctx, e -> {
                     if (LOG.isErrorEnabled()) {
@@ -574,6 +510,9 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
+        if (routeEndpoint == null && beanFrameRead(ctx, msg)) {
+            return;
+        }
         if (maxConcurrentMessages > 0 && !dispatching) {
             dispatching = true;
             try {
@@ -963,12 +902,87 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         });
     }
 
+    /**
+     * @return Whether the open handler still runs, the frames wait
+     */
+    boolean isOpening() {
+        return opening;
+    }
+
+    /**
+     * @return Whether the frames can be read: the open handler completed and did not close the session
+     */
+    boolean readsFrames() {
+        return !opening && serverSession.isOpen();
+    }
+
+    /**
+     * Hold the frames of a {@code @ServerWebSocket} bean while its open handler runs, and drop
+     * the frames of a session that the open handler closed.
+     *
+     * @param ctx The context
+     * @param msg The message
+     * @return Whether the message was taken care of
+     */
+    private boolean beanFrameRead(ChannelHandlerContext ctx, Object msg) {
+        if (msg instanceof WebSocketFrame && !serverSession.isOpen()) {
+            // the session was closed (e.g. by the open handler), no frame reaches the handlers
+            return true;
+        }
+        if (opening && msg instanceof WebSocketFrame frame) {
+            // the frames are already inflated, hold no more than a message may have
+            bytesWhileOpening += frame.content().readableBytes();
+            if (bytesWhileOpening > getMaxPayloadLength()) {
+                releaseFramesWhileOpening();
+                rejectTooLargeMessage(ctx);
+                return true;
+            }
+            framesWhileOpening.add(frame.retain());
+            return true;
+        }
+        return false;
+    }
+
+    private void releaseFramesWhileOpening() {
+        WebSocketFrame frame;
+        while ((frame = framesWhileOpening.poll()) != null) {
+            frame.release();
+        }
+        bytesWhileOpening = 0;
+    }
+
+    /**
+     * Handles the frames received while the open handler ran, and reads the next.
+     */
+    private void opened() {
+        opening = false;
+        bytesWhileOpening = 0;
+        ChannelHandlerContext ctx = channel.pipeline().context(this);
+        WebSocketFrame frame;
+        while ((frame = framesWhileOpening.poll()) != null) {
+            try {
+                if (ctx != null) {
+                    super.channelRead0(ctx, frame);
+                }
+            } catch (Throwable t) {
+                // not called from the inbound pipeline, so handle the error as it would
+                exceptionCaught(ctx, t);
+            } finally {
+                frame.release();
+            }
+        }
+        if (ctx != null && serverSession.isOpen()) {
+            channel.config().setAutoRead(true);
+        }
+    }
+
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
         handlerContext = null;
         frameDecoder = null;
         decodeTrigger = null;
         heldReads = null;
+        releaseFramesWhileOpening();
         WebSocketFrame frame;
         while ((frame = pendingFrames.poll()) != null) {
             frame.release();

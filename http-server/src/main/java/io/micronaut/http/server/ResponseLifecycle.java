@@ -48,6 +48,7 @@ import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.body.stream.InputStreamByteBody;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.exceptions.NotAcceptableException;
 import io.micronaut.http.server.exceptions.response.Error;
@@ -227,6 +228,12 @@ public abstract class ResponseLifecycle {
                 // the response of a HEAD request: the elements are not written; the route
                 // executor discarded the body it moved aside already
                 ResponseStreams.discard(elements, byteBodyFactory, ioExecutor());
+            } else if (headBody instanceof CloseableByteBody byteBody) {
+                // the body is not written, release it as the writer of a GET response does
+                byteBody.close();
+            } else if (body instanceof ReferenceCounted referenceCounted) {
+                // the route executor releases the bodies it moves aside, but not one set later
+                referenceCounted.release();
             }
             if (headBody instanceof BodyElements<?>) {
                 // the headers of a GET request: the media type the elements are written with
@@ -330,7 +337,7 @@ public abstract class ResponseLifecycle {
         }
         if (messageBodyWriter == null || !responseBodyType.isInstance(body) || !messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
             // the route declares no type for the body, e.g. a handler route: the runtime class of the body
-            responseBodyType = (Argument<Object>) BODY_ARGUMENTS.get(body.getClass());
+            responseBodyType = fallbackBodyType(responseBodyType, body);
             if (responseMediaTypes == null) {
                 responseMediaTypes = Collections.singletonList(responseMediaType);
             }
@@ -650,7 +657,7 @@ public abstract class ResponseLifecycle {
                 Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
 
                 if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
-                    responseBodyType = Argument.ofInstance(message);
+                    responseBodyType = fallbackBodyType(responseBodyType, message);
                     messageBodyWriter = wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType)));
                 }
                 return pieces.write(messageBodyWriter, responseBodyType, finalMediaType, message);
@@ -681,10 +688,43 @@ public abstract class ResponseLifecycle {
             };
         }
 
-        return ResponsePieces.write(bodyPublisher, writePiece, pieces::close).map(items -> {
+        // items dropped after a cancel are released: the items of the body publisher that were not
+        // written yet; the pieces that were written already are closed by the pieces
+        return ResponsePieces.write(bodyPublisher, writePiece, pieces::close, this::discardItem).map(items -> {
             CloseableByteBody byteBody = isJson.getAsBoolean() ? concatenateJson(items) : concatenate(items);
             return ByteBodyHttpResponseWrapper.wrap(response, byteBody);
         }).onErrorResume(t -> (ExecutionFlow) handleStreamingError(request, t));
+    }
+
+    /**
+     * Release an item of a streamed response body that is dropped without being written.
+     *
+     * @param item The item, either an item of the body publisher or a written piece
+     */
+    protected void discardItem(Object item) {
+        if (item instanceof CloseableByteBody byteBody) {
+            byteBody.close();
+        } else if (item instanceof ReferenceCounted referenceCounted) {
+            referenceCounted.release();
+        }
+    }
+
+    /**
+     * The type to look up a fallback writer with, when the writer of the route does not write the body
+     * in the selected media type. The annotations of the route (for example a JSON view) still apply
+     * to a body of the declared type.
+     *
+     * @param declaredType The declared response body type
+     * @param body The body
+     * @return The type of the body
+     */
+    @SuppressWarnings("unchecked")
+    private static Argument<Object> fallbackBodyType(Argument<Object> declaredType, Object body) {
+        Argument<Object> type = (Argument<Object>) BODY_ARGUMENTS.get(body.getClass());
+        if (declaredType.isInstance(body) && !declaredType.getAnnotationMetadata().isEmpty()) {
+            return type.withAnnotationMetadata(declaredType.getAnnotationMetadata());
+        }
+        return type;
     }
 
     /**
@@ -763,6 +803,10 @@ public abstract class ResponseLifecycle {
             } else if (hse.getMessage() != null) {
                 errorResponse.body(hse.getMessage());
             }
+        } else if (t instanceof ContentLengthExceededException) {
+            // a streamed request body over the size limit, answered like ContentLengthExceededHandler
+            // does for a body that is read before the route returns
+            errorResponse = createContentLengthExceededResponse(request, t);
         } else {
             errorResponse = routeExecutor.createDefaultErrorResponse(request, t);
         }
@@ -785,24 +829,33 @@ public abstract class ResponseLifecycle {
         return e;
     }
 
-    private MutableHttpResponse<?> createJsonSyntaxErrorResponse(HttpRequest<?> request, Throwable t) {
-        MutableHttpResponse<?> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
-        try {
-            response = routeExecutor.getErrorResponseProcessor().processResponse(
-                ErrorContext.builder(request)
-                    .cause(t)
-                    .error(new Error() {
-                        @Override
-                        public String getMessage() {
-                            return "Invalid JSON: " + t.getMessage();
-                        }
+    private MutableHttpResponse<?> createContentLengthExceededResponse(HttpRequest<?> request, Throwable t) {
+        return processErrorResponse(request, HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE), ErrorContext.builder(request)
+            .cause(t)
+            .errorMessage(Objects.requireNonNullElse(t.getMessage(), "Unknown error"))
+            .build());
+    }
 
-                        @Override
-                        public Optional<String> getTitle() {
-                            return Optional.of("Invalid JSON");
-                        }
-                    })
-                    .build(), response);
+    private MutableHttpResponse<?> createJsonSyntaxErrorResponse(HttpRequest<?> request, Throwable t) {
+        return processErrorResponse(request, HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON"), ErrorContext.builder(request)
+            .cause(t)
+            .error(new Error() {
+                @Override
+                public String getMessage() {
+                    return "Invalid JSON: " + t.getMessage();
+                }
+
+                @Override
+                public Optional<String> getTitle() {
+                    return Optional.of("Invalid JSON");
+                }
+            })
+            .build());
+    }
+
+    private MutableHttpResponse<?> processErrorResponse(HttpRequest<?> request, MutableHttpResponse<?> response, ErrorContext errorContext) {
+        try {
+            response = routeExecutor.getErrorResponseProcessor().processResponse(errorContext, response);
         } catch (Exception e) {
             routeExecutor.logException(e);
         }

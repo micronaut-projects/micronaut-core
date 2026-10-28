@@ -72,6 +72,8 @@ public final class RawFormFieldArgumentBinder implements TypedRequestArgumentBin
             Function.identity());
 
         BasicHttpAttributes.addRouteWaitsFor(source, CompletableFutureExecutionFlow.just(future));
+        // the field body is only read once the route consumes it
+        BasicHttpAttributes.addUnconsumedBodyDiscard(source, () -> future.thenAccept(RawFormField::close));
 
         return new PendingRequestBindingResult<>() {
 

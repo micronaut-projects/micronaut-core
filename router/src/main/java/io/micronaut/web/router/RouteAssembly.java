@@ -1012,17 +1012,14 @@ public final class RouteAssembly {
         }
 
         private void addFilterRoutes(List<FilterRoute> routes) {
-            String path = RouteAssembly.this.contextPath;
+            // the patterns are made relative to the context path by each filter route, which also
+            // matches them against the routes outside the context path
+            String path = appendContextPath ? RouteAssembly.this.contextPath : null;
             List<String> resolved = patterns;
-            if (appendContextPath && path != null) {
-                resolved = patterns.stream()
-                    .map(pattern -> ServerFilterRouteBuilder.prependContextPath(path, pattern))
-                    .toList();
-            }
             // like the filter methods of a filter bean: a filter route per filter, all with the same
             // order, which the stable sort of the server filters keeps in the order of the chain
             for (GenericHttpFilter filter : filters.chain()) {
-                routes.add(filterRoute(filter, resolved, preMatching));
+                routes.add(filterRoute(filter, resolved, path, preMatching));
             }
             if (preMatching) {
                 // like a bean with a @PreMatching @ResponseFilter method, which filters the response
@@ -1030,12 +1027,12 @@ public final class RouteAssembly {
                 // filters the response of the route: the chain runs one or the other, as it drops the
                 // pre-matching filters when it matches the route
                 for (GenericHttpFilter filter : filters.responseChain()) {
-                    routes.add(filterRoute(filter, resolved, false));
+                    routes.add(filterRoute(filter, resolved, path, false));
                 }
             }
         }
 
-        private DefaultFilterRoute filterRoute(GenericHttpFilter filter, List<String> patterns, boolean isPreMatching) {
+        private DefaultFilterRoute filterRoute(GenericHttpFilter filter, List<String> patterns, @Nullable String contextPath, boolean isPreMatching) {
             GenericHttpFilter ordered = GenericHttpFilter.withOrder(filter, order);
             DefaultFilterRoute route = new DefaultFilterRoute(() -> ordered, AnnotationMetadata.EMPTY_METADATA, isPreMatching).fixedOrder(order);
             route.patternStyle(patternStyle);
@@ -1046,6 +1043,8 @@ public final class RouteAssembly {
             if (httpMethods != null) {
                 route.methods(httpMethods);
             }
+            // after the patterns and the pattern style
+            route.contextPath(contextPath);
             return route;
         }
     }

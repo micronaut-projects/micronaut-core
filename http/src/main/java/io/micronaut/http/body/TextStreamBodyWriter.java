@@ -25,6 +25,7 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.sse.Event;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -36,6 +37,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Handler for SSE events.
@@ -54,6 +56,7 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
     private static final byte[] RETRY_PREFIX = "retry: ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] COMMENT_PREFIX = ": ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
+    private static final Pattern LINE_BREAK = Pattern.compile("\r\n|\r|\n");
     private static final List<MediaType> JSON_TYPE_LIST = List.of(MediaType.APPLICATION_JSON_TYPE);
 
     @Nullable
@@ -81,10 +84,27 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
     @SuppressWarnings("unchecked")
     private static Argument<Object> getBodyType(Argument<?> type) {
         if (type.getType().equals(Event.class)) {
-            return (Argument<Object>) type.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            return dataType(type);
         } else {
             return (Argument<Object>) type;
         }
+    }
+
+    /**
+     * The type of the data of an event. The annotations of the event type (for example a JSON view
+     * of the route) apply to its data.
+     *
+     * @param eventType The event type
+     * @return The data type
+     */
+    @SuppressWarnings("unchecked")
+    private static Argument<Object> dataType(Argument<?> eventType) {
+        Argument<Object> dataType = (Argument<Object>) eventType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        if (dataType.getAnnotationMetadata().isEmpty()) {
+            return dataType.withAnnotationMetadata(eventType.getAnnotationMetadata());
+        }
+        // the type argument can carry type-use annotations (e.g. Event<@Valid T>), keep both
+        return dataType.withAnnotationMetadata(new AnnotationMetadataHierarchy(eventType.getAnnotationMetadata(), dataType.getAnnotationMetadata()));
     }
 
     @Override
@@ -104,7 +124,7 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
         Event<?> event;
         if (object instanceof Event<?> e) {
             event = e;
-            bodyType = (Argument<Object>) type.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            bodyType = dataType(type);
         } else {
             event = Event.of(object);
         }
@@ -126,36 +146,70 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
             body = baos.toByteArray();
         }
 
-        writeAttribute(output, COMMENT_PREFIX, event.getComment());
-        writeAttribute(output, ID_PREFIX, event.getId());
-        writeAttribute(output, EVENT_PREFIX, event.getName());
+        String comment = event.getComment();
+        if (comment != null) {
+            // each line of the comment is a comment line of its own
+            for (String line : LINE_BREAK.split(comment, -1)) {
+                writeAttribute(output, COMMENT_PREFIX, line);
+            }
+        }
+        // the id and the name cannot contain line breaks, and clients ignore an id that contains NUL
+        writeAttribute(output, ID_PREFIX, removeChars(event.getId(), "\r\n\0"));
+        writeAttribute(output, EVENT_PREFIX, removeChars(event.getName(), "\r\n"));
         Duration retry = event.getRetry();
         if (retry != null) {
             writeAttribute(output, RETRY_PREFIX, String.valueOf(retry.toMillis()));
         }
 
-        // Write the data
-        int start = 0;
-        while (start < body.length) {
-            int end = indexOf(body, (byte) '\n', start);
-            if (end == -1) {
-                end = body.length - 1;
+        // Write the data, one data line per line. CRLF, LF and CR all end a line, and a trailing line
+        // break gets a final empty data line. Empty data gets no data line, so that clients don't
+        // dispatch an event, e.g. for a comment used as keep-alive
+        if (body.length > 0) {
+            int start = 0;
+            while (true) {
+                int end = indexOfLineBreak(body, start);
+                if (end == -1) {
+                    output.write(DATA_PREFIX).write(body, start, body.length - start).write(NEWLINE);
+                    break;
+                }
+                output.write(DATA_PREFIX).write(body, start, end - start).write(NEWLINE);
+                start = end + 1;
+                if (body[end] == '\r' && start < body.length && body[start] == '\n') {
+                    start++;
+                }
             }
-            output.write(DATA_PREFIX).write(body, start, end - start + 1);
-            start = end + 1;
         }
 
-        // Write new lines for event separation
-        output.write(NEWLINE).write(NEWLINE);
+        // Write new line for event separation
+        output.write(NEWLINE);
     }
 
-    private static int indexOf(byte[] haystack, @SuppressWarnings("SameParameterValue") byte needle, int start) {
+    private static int indexOfLineBreak(byte[] haystack, int start) {
         for (int i = start; i < haystack.length; i++) {
-            if (haystack[i] == needle) {
+            if (haystack[i] == '\n' || haystack[i] == '\r') {
                 return i;
             }
         }
         return -1;
+    }
+
+    @Nullable
+    private static String removeChars(@Nullable String value, String chars) {
+        if (value == null) {
+            return null;
+        }
+        StringBuilder builder = null;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (chars.indexOf(c) != -1) {
+                if (builder == null) {
+                    builder = new StringBuilder(value.length()).append(value, 0, i);
+                }
+            } else if (builder != null) {
+                builder.append(c);
+            }
+        }
+        return builder == null ? value : builder.toString();
     }
 
     /**

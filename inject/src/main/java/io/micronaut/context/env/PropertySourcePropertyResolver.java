@@ -44,6 +44,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -93,7 +94,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private volatile ResolverState state = new ResolverState();
     /**
      * The state that catalog writes go into. The same instance as {@link #state}, except while a
-     * refresh builds a replacement that is not published yet. Guarded by {@link #catalogLock}.
+     * refresh builds a replacement, or {@link #addToCopy(Runnable)} writes into a copy, that is not
+     * published yet. Guarded by {@link #catalogLock}.
      */
     private ResolverState writeState = state;
     /**
@@ -107,11 +109,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     private final AtomicLong revision = new AtomicLong();
     /**
-     * The thread {@link #refresh(Runnable)} is building a replacement state on, or {@code null}
-     * outside a refresh. Written under {@link #catalogLock}, read without it by every lookup.
+     * The thread {@link #refresh(Runnable)} is building a replacement state on, or
+     * {@link #addToCopy(Runnable)} is writing a copy on, or {@code null} otherwise. Written under
+     * {@link #catalogLock}, read without it by every lookup.
      */
     @SuppressWarnings("java:S3077") // a thread reference, not a mutable object
     private volatile Thread refreshingThread;
+    /**
+     * Whether {@link #refreshingThread} is writing a copy in {@link #addToCopy(Runnable)} rather
+     * than building a replacement in {@link #refresh(Runnable)}. Guarded by {@link #catalogLock}.
+     */
+    private boolean adding;
     /**
      * The state that the lookups of the current thread are kept on while
      * {@link #onState(ResolverState, Supplier)} runs them a second time. The outermost second run
@@ -284,21 +292,83 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     void refresh(Runnable rebuild) {
         synchronized (catalogLock) {
-            if (refreshingThread != null) {
+            if (refreshingThread != null && !adding) {
                 // Already inside a refresh, its outermost call publishes.
                 rebuild.run();
                 return;
             }
+            // A refresh that a property source runs while it is added publishes as any other refresh
+            // does, and the add goes on writing into a copy of what it published. If it fails, the
+            // add goes on writing into its copy.
+            boolean insideAdd = adding;
+            ResolverState before = writeState;
+            boolean published = false;
+            adding = false;
             refreshingThread = Thread.currentThread();
             try {
                 rebuild.run();
                 state = writeState;
                 revision.addAndGet(2);
+                published = true;
             } finally {
-                refreshingThread = null;
-                writeState = state;
+                adding = insideAdd;
+                refreshingThread = insideAdd ? Thread.currentThread() : null;
+                if (!published) {
+                    writeState = before;
+                } else if (insideAdd) {
+                    writeState = copyForAdd(state);
+                } else {
+                    writeState = state;
+                }
             }
         }
+    }
+
+    /**
+     * Adds property sources to the published catalogs. The writes of {@code add} go into a copy of
+     * the published state, which shares the first-letter maps the add does not write into, and the
+     * copy is published in a single step once {@code add} completes, also if it fails, as the writes
+     * of a failed add have always been kept. A lookup on another thread therefore never iterates a
+     * first-letter map that is being written. The lists and maps that indexed keys expand into are
+     * written in place, as before. Inside a refresh, the add writes into the state the refresh is
+     * building, as before.
+     *
+     * @param add The add to run
+     */
+    void addToCopy(Runnable add) {
+        synchronized (catalogLock) {
+            if (refreshingThread != null) {
+                // the refresh or the add that this thread runs publishes what is written
+                add.run();
+                return;
+            }
+            writeState = copyForAdd(state);
+            adding = true;
+            refreshingThread = Thread.currentThread();
+            try {
+                add.run();
+            } finally {
+                state = writeState;
+                // the processing went into the copy, so the published revision changes once, as the copy is published
+                revision.addAndGet(2);
+                refreshingThread = null;
+                adding = false;
+            }
+        }
+    }
+
+    /**
+     * A copy of the published state for an add to write into.
+     *
+     * @param published The published state
+     * @return The copy
+     */
+    private static ResolverState copyForAdd(ResolverState published) {
+        // Odd from now on, as while a property source is processed into a state: a lookup that
+        // reads the published state no longer caches what it reads, nor replaces what is
+        // remembered for the copy, which shares those remembered values.
+        published.revision.getAndUpdate(revision -> revision | 1);
+        return new ResolverState(published);
     }
 
     /**
@@ -314,9 +384,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         // lock is taken before the change runs, as a refresh takes it before the environment locks
         // its property sources, so the two locks are always taken in the same order.
         synchronized (catalogLock) {
-            Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(state.catalog);
+            // inside an add, with what it has written so far, as before
+            Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog((adding ? writeState : state).catalog);
             change.run();
-            return diffCatalog(copiedCatalog, state.catalog);
+            return diffCatalog(copiedCatalog, (adding ? writeState : state).catalog);
         }
     }
 
@@ -673,7 +744,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 Optional<T> converted;
                 if (entries != null) {
                     // iff entries is null, the value is from placeholderResolutionCache and doesn't need this step
-                    value = resolvePlaceHoldersIfNecessary(currentState, value);
+                    value = resolvePlaceHoldersIfNecessary(currentState, value, name, lookupRevision);
                     cache(currentState.placeholderResolutionCache, name, value, lookupRevision);
                 }
                 if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
@@ -1340,6 +1411,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 if (allowCreate && entries == null) {
                     entries = new LinkedHashMap<>(5);
                     catalog[index] = entries;
+                } else if (allowCreate && resolverState.sharedMaps != null && resolverState.sharedMaps.remove(entries)) {
+                    // a map that a copy shares with the published state is copied before the copy writes into it
+                    entries = new LinkedHashMap<>(entries);
+                    catalog[index] = entries;
                 }
                 return entries;
             }
@@ -1392,6 +1467,98 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             // the caches of a replacement being refreshed are not the published ones
             revision.incrementAndGet();
         }
+    }
+
+    /**
+     * Resets the caches, and forgets what the expressions of the properties have resolved to, as a
+     * property source added to or removed from a running environment does.
+     */
+    void resetCachesAndRememberedValues() {
+        // Forgotten before the revision changes: a lookup that reads the new revision then finds the
+        // values forgotten, so what it caches for that revision is what is remembered again.
+        readState().rememberedValues.clear();
+        resetCaches();
+    }
+
+    /**
+     * Resolves the placeholders of a property's text, with the memory of its expressions.
+     *
+     * @param resolverState  The state the text was read from
+     * @param text           The text
+     * @param place          Where the text was found: the name it was looked up by, a {@link ListElement} or a {@link MapValue}
+     * @param lookupRevision The revision read before the catalogs
+     * @return The text with its placeholders resolved
+     */
+    private Object resolvePlaceholders(ResolverState resolverState, String text, Object place, long lookupRevision) {
+        if (propertyPlaceholderResolver instanceof DefaultPropertyPlaceholderResolver placeholderResolver) {
+            return placeholderResolver.resolveRequiredPlaceholdersObject(text, (placeholder, expression) ->
+                value -> remember(resolverState, place, text, new ExpressionPosition(placeholder, expression), value, lookupRevision));
+        }
+        return propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(text);
+    }
+
+    /**
+     * What an expression of a property's text resolves to, the value remembered for it if there is one.
+     *
+     * <p>Some expressions, such as {@code random.port}, resolve to another value every time, and the
+     * cache of resolved values is not used after a property source is processed. A property source
+     * that reads such a value while the property sources are being processed would be left with one
+     * that no later lookup returns. So the resolvers of such expressions, the
+     * {@link RememberingPropertyExpressionResolver}s, remember what an expression has resolved to
+     * here, with the text, by the place the text was found at and the position of the expression in
+     * it. It is used again for as long as a lookup finds the same text there. The other expressions
+     * of the text, such as the property that {@code http://${app.host}:${random.port}/} names, are
+     * resolved as before, by every lookup that does not find the value cached.</p>
+     *
+     * <p>A lookup that read the text before a property source replaced it can finish after a later
+     * lookup has remembered the replacement. Like the caches, the memory only takes a text from a
+     * lookup that has read the catalogs as they still are, or from the thread that is changing them,
+     * which holds their lock and so reads them as they are. It also takes it when nothing is
+     * remembered at the place: what is remembered for a text is only used by a lookup that finds the
+     * same text.</p>
+     *
+     * @param resolverState  The state the text was read from
+     * @param place          Where the text was found, see {@link #resolvePlaceholders(ResolverState, String, Object, long)}
+     * @param text           The text
+     * @param position       The position of the expression in the text
+     * @param value          Resolves the expression
+     * @param lookupRevision The revision read before the catalogs
+     * @return What the expression resolves to
+     */
+    private Object remember(ResolverState resolverState, Object place, String text, ExpressionPosition position,
+                            Supplier<Object> value, long lookupRevision) {
+        RememberedText remembered = resolverState.rememberedValues.get(place);
+        if (remembered != null && remembered.text().equals(text)) {
+            Object rememberedValue = remembered.values().get(position);
+            if (rememberedValue != null) {
+                return rememberedValue;
+            }
+        }
+        Object resolved = value.get();
+        boolean changingCatalogs = Thread.holdsLock(catalogLock);
+        Object[] result = {resolved};
+        // Checked within compute, which a lookup at the place by another thread waits for: by the time
+        // another lookup can read a text that this one has not read, the revision has changed.
+        resolverState.rememberedValues.compute(place, (key, earlier) -> {
+            if (earlier != null && earlier.text().equals(text)) {
+                // what a lookup of another thread may have remembered for the expression meanwhile
+                Object other = earlier.values().putIfAbsent(position, resolved);
+                if (other != null) {
+                    result[0] = other;
+                }
+                return earlier;
+            }
+            boolean current = earlier == null
+                || changingCatalogs
+                || ((lookupRevision & 1) == 0 && resolverState.revision.get() == lookupRevision);
+            if (!current) {
+                return earlier;
+            }
+            Map<ExpressionPosition, Object> values = new ConcurrentHashMap<>(2);
+            values.put(position, resolved);
+            return new RememberedText(text, values);
+        });
+        return result[0];
     }
 
     /**
@@ -1463,10 +1630,28 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @return The value with its placeholders resolved
      */
     private Object resolvePlaceHoldersIfNecessary(ResolverState resolverState, Object value) {
+        return resolvePlaceHoldersIfNecessary(resolverState, value, null, 0);
+    }
+
+    /**
+     * Resolves the placeholders of a value. The expressions that remember what they resolve to,
+     * such as the random ones, keep it for the place the text was found at.
+     *
+     * @param resolverState  The state the value was read from, which the properties the
+     *                       placeholders name are read from too
+     * @param value          The value
+     * @param place          Where the value was found: the name it was looked up by, a {@link ListElement}
+     *                       or a {@link MapValue}; {@code null} if nothing is remembered
+     * @param lookupRevision The revision read before the catalogs
+     * @return The value with its placeholders resolved
+     */
+    private Object resolvePlaceHoldersIfNecessary(ResolverState resolverState, Object value, @Nullable Object place, long lookupRevision) {
         if (value instanceof CharSequence) {
             String str = value.toString();
             if (str.contains(propertyPlaceholderResolver.getPrefix())) {
-                return onState(resolverState, () -> propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(str));
+                return onState(resolverState, () -> place != null
+                    ? resolvePlaceholders(resolverState, str, place, lookupRevision)
+                    : propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(str));
             }
             // without a placeholder there is nothing to resolve
             return str;
@@ -1474,15 +1659,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             List<?> newList = new ArrayList<>(list);
             final ListIterator i = newList.listIterator();
             while (i.hasNext()) {
+                Object elementPlace = place != null ? new ListElement(place, i.nextIndex()) : null;
                 final Object o = i.next();
                 if (o instanceof CharSequence) {
-                    i.set(resolvePlaceHoldersIfNecessary(resolverState, o));
+                    i.set(resolvePlaceHoldersIfNecessary(resolverState, o, elementPlace, lookupRevision));
                 } else if (o instanceof Map<?,?> submap) {
                     Map<Object, Object> newMap = CollectionUtils.newLinkedHashMap(submap.size());
                     for (Map.Entry<?, ?> entry : submap.entrySet()) {
                         final Object k = entry.getKey();
                         final Object v = entry.getValue();
-                        newMap.put(k, resolvePlaceHoldersIfNecessary(resolverState, v));
+                        Object valuePlace = elementPlace != null ? new MapValue(elementPlace, k) : null;
+                        newMap.put(k, resolvePlaceHoldersIfNecessary(resolverState, v, valuePlace, lookupRevision));
                     }
                     i.set(newMap);
                 }
@@ -1547,17 +1734,101 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         // place. A bare key stores its value by reference and clears the name; the next indexed key
         // targeting that base copies the value once and records it here. Guarded by `catalogLock`.
         private final Set<String> rawOwnedBases = new HashSet<>();
+        /**
+         * For a copy of a published state, see {@link PropertySourcePropertyResolver#addToCopy(Runnable)}: the first-letter maps it
+         * still shares with the published state, which it copies before it writes into them.
+         * {@code null} for a state that is not a copy.
+         */
+        private final @Nullable Set<Map<String, DefaultPropertyEntry>> sharedMaps;
 
         private final Map<String, CachedValue> containsCache = new ConcurrentHashMap<>(20);
         /**
-         * Cache for values <i>before</i> conversion. This avoids recomputing placeholders, which keeps
-         * random values (e.g. {@code ${random.port}} stable).
+         * Cache for values <i>before</i> conversion. This avoids recomputing placeholders. What
+         * expressions such as {@code ${random.port}} resolve to is kept in
+         * {@link #rememberedValues} as well, which keeps them stable for the lookups of a property.
          */
         private final Map<String, CachedValue> placeholderResolutionCache = new ConcurrentHashMap<>(20);
+        /**
+         * What the {@link RememberingPropertyExpressionResolver}s have resolved the expressions of
+         * the texts to, by the place the text was found at: the name it was looked up by, a
+         * {@link ListElement} or a {@link MapValue}. Unlike the caches it is kept when a property
+         * source is processed. It holds one entry per looked-up name, or place in a list, whose text
+         * holds, or held, such an expression. A refresh publishes another state, so the expressions
+         * are resolved again after a refresh.
+         */
+        private final Map<Object, RememberedText> rememberedValues;
         /**
          * Cache for values <i>after</i> conversion.
          */
         private final Map<ConversionCacheKey, CachedValue> resolvedValueCache = new ConcurrentHashMap<>(20);
+
+        ResolverState() {
+            rememberedValues = new ConcurrentHashMap<>(4);
+            sharedMaps = null;
+        }
+
+        /**
+         * A copy of a published state, which shares its first-letter maps until it writes into them,
+         * and the values remembered for its expressions. The caches start empty, as a property source
+         * processed into the published state leaves them.
+         *
+         * @param published The published state
+         */
+        ResolverState(ResolverState published) {
+            System.arraycopy(published.catalog, 0, catalog, 0, CATALOG_SIZE);
+            System.arraycopy(published.rawCatalog, 0, rawCatalog, 0, CATALOG_SIZE);
+            System.arraycopy(published.nonGenerated, 0, nonGenerated, 0, CATALOG_SIZE);
+            rememberedValues = published.rememberedValues;
+            sharedMaps = Collections.newSetFromMap(new IdentityHashMap<>());
+            addMaps(sharedMaps, catalog);
+            addMaps(sharedMaps, rawCatalog);
+            addMaps(sharedMaps, nonGenerated);
+            rawOwnedBases.addAll(published.rawOwnedBases);
+        }
+
+        private static void addMaps(Set<Map<String, DefaultPropertyEntry>> maps, @Nullable Map<String, DefaultPropertyEntry>[] catalog) {
+            for (Map<String, DefaultPropertyEntry> entries : catalog) {
+                if (entries != null) {
+                    maps.add(entries);
+                }
+            }
+        }
+    }
+
+    /**
+     * What the expressions of a text have resolved to.
+     *
+     * @param text   The text
+     * @param values What its expressions have resolved to, by their position in the text
+     */
+    private record RememberedText(String text, Map<ExpressionPosition, Object> values) {
+    }
+
+    /**
+     * The position of an expression in a text.
+     *
+     * @param placeholder The index of its placeholder among the segments of the text
+     * @param expression  Its index among the expressions of the placeholder
+     */
+    private record ExpressionPosition(int placeholder, int expression) {
+    }
+
+    /**
+     * The place of an element of a list, the key of what its expressions have resolved to.
+     *
+     * @param list  The place of the list
+     * @param index The index of the element
+     */
+    private record ListElement(Object list, int index) {
+    }
+
+    /**
+     * The place of a value of a map, the key of what its expressions have resolved to.
+     *
+     * @param map The place of the map
+     * @param key The key of the value, compared with {@code equals}
+     */
+    private record MapValue(Object map, @Nullable Object key) {
     }
 
     /**

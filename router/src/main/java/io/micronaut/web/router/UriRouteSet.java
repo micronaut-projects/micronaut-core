@@ -1316,10 +1316,31 @@ final class UriRouteSet {
     }
 
     private static boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route, @Nullable Set<Integer> ports) {
-        if (ports == null || route.getPort() != null) {
+        if (route.getPort() != null) {
             return false;
         }
-        return !ports.contains(request.getServerAddress().getPort());
+        return !exposesDefaultRoutes(request, ports);
+    }
+
+    /**
+     * Whether the routes without a port of their own are exposed to the request.
+     *
+     * @param request The request
+     * @param ports   The default ports, or {@code null} if the routes are exposed on every port
+     * @return Whether the default routes are exposed
+     */
+    static boolean exposesDefaultRoutes(HttpRequest<?> request, @Nullable Set<Integer> ports) {
+        if (ports == null) {
+            return true;
+        }
+        // the server tells the setting of the listener that received the request. That covers
+        // listeners without a port (UNIX domain sockets, QUIC streams) and listeners that share a
+        // port on different addresses
+        Optional<Boolean> listenerExposes = RouteAttributes.getListenerExposesDefaultRoutes(request);
+        if (listenerExposes.isPresent()) {
+            return listenerExposes.get();
+        }
+        return ports.contains(request.getServerAddress().getPort());
     }
 
     /**

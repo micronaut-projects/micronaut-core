@@ -22,9 +22,11 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.io.file.TemporaryFileResource;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.body.InternalByteBody;
+import io.micronaut.http.body.stream.ReadBufferCoalescing;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.form.FormCapableHttpRequest;
@@ -128,6 +130,9 @@ public final class FormFactory {
         FormBinding.checkFieldsCanBeRead(fchr);
         completer = new FormRouteCompleter(fchr);
         request.setAttribute(COMPLETER, completer);
+        // if the route fails before it returns, the fields of parameters that would only be
+        // subscribed to by the route are released
+        BasicHttpAttributes.addUnconsumedBodyDiscard(request, completer::discardUnsubscribed);
         return completer;
     }
 
@@ -348,7 +353,7 @@ public final class FormFactory {
                     latestPieceWritten = file;
                 } else {
                     // no transfer, just save to memory
-                    Objects.requireNonNull(memory).add(buffer);
+                    ReadBufferCoalescing.add(Objects.requireNonNull(memory), buffer, bufferFactory);
                     Objects.requireNonNull(subscription).request(1);
                     return;
                 }

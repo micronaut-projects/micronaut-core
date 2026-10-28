@@ -44,7 +44,10 @@ import org.reactivestreams.Publisher;
 
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+
+import java.util.OptionalLong;
 
 /**
  * {@link ByteBodyFactory} implementation with netty-optimized bodies.
@@ -146,10 +149,13 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
             sb.complete(body.trailers());
             return new StreamingNettyByteBody(sb);
         }
-        NettyBodyAdapter adapter = new NettyBodyAdapter(loop, body.toReadBufferPublisher(), null);
+        // read the trailers before the body is claimed; the claiming adapter releases the body if
+        // it is discarded before it is started
+        CompletionStage<io.micronaut.http.HttpHeaders> trailers = body.trailers();
+        AbstractBodyAdapter adapter = createClaimingBodyAdapter(body);
         StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb);
-        adapter.setTrailers(body.trailers());
+        adapter.setTrailers(trailers);
         expectedLength.ifPresent(sb::setExpectedLength);
         return new StreamingNettyByteBody(sb);
     }

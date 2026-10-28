@@ -416,6 +416,15 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 return ub;
             });
 
+            final Router router = this.nettyEmbeddedServices.getRouter();
+            final boolean restrictDefaultRoutes = isDefault && (CollectionUtils.isNotEmpty(router.getExposedPorts())
+                || listenerConfigurations.stream().anyMatch(cfg -> !cfg.isExposeDefaultRoutes()));
+            if (restrictDefaultRoutes) {
+                // the ports of the listeners are only known once they are bound. Until then, serve
+                // no default route on any of them, so that a listener that does not expose them
+                // never serves one while the others are being bound
+                router.applyDefaultPorts(List.of());
+            }
             List<Listener> listeners = new ArrayList<>();
             for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
                 listeners.add(bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig));
@@ -423,19 +432,21 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             this.activeListeners = Collections.unmodifiableList(listeners);
             watchConfiguration();
 
-            if (isDefault) {
-                final Router router = this.nettyEmbeddedServices.getRouter();
-                final Set<Integer> exposedPorts = router.getExposedPorts();
-                if (CollectionUtils.isNotEmpty(exposedPorts)) {
-                    router.applyDefaultPorts(listeners.stream()
-                            .filter(l -> l.config.isExposeDefaultRoutes())
-                            .map(l -> Objects.requireNonNull(l.serverChannel).localAddress())
-                            .filter(InetSocketAddress.class::isInstance)
-                            .map(addr -> ((InetSocketAddress) addr).getPort())
-                            .toList());
-                }
+            if (restrictDefaultRoutes) {
+                router.applyDefaultPorts(listeners.stream()
+                        .filter(l -> l.config.isExposeDefaultRoutes())
+                        .map(l -> Objects.requireNonNull(l.serverChannel).localAddress())
+                        .filter(InetSocketAddress.class::isInstance)
+                        .map(addr -> ((InetSocketAddress) addr).getPort())
+                        .toList());
             }
-            fireStartupEvents();
+            try {
+                fireStartupEvents();
+            } catch (RuntimeException e) {
+                // the server is not running, so stop() would not close the listeners: close them now
+                stopInternal(false);
+                throw e;
+            }
             running.set(true);
         }
     }
@@ -1494,13 +1505,23 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         void setServerChannel(Channel serverChannel) {
             this.serverChannel = serverChannel;
+            // the requests read it from their connection's listener: the port alone does not tell
+            // the listener (QUIC, UNIX domain sockets, listeners on one port and different addresses)
+            serverChannel.attr(NettyHttpRequest.LISTENER_EXPOSES_DEFAULT_ROUTES).set(config.isExposeDefaultRoutes());
             this.listenerCustomizer = rootCustomizer.specializeForChannel(serverChannel, NettyServerCustomizer.ChannelRole.LISTENER);
             refresh();
         }
 
         @Override
         protected void initChannel(Channel ch) throws Exception {
-            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextWrapper.takeRetained());
+            SslContextHolder contextHolder = contextWrapper.takeRetained();
+            if (contextHolder == null && config.isSsl()) {
+                // never serve plaintext on a TLS listener while its SSL context is pending or failed
+                LOG.warn("Closing connection on TLS listener {}: SSL context not available", serverChannel);
+                ch.close();
+                return;
+            }
+            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextHolder);
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
             cp.initChannel();

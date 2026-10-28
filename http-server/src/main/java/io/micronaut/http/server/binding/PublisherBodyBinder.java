@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -37,6 +38,7 @@ import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
@@ -95,7 +97,7 @@ public final class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<
                 return BindingResult.empty();
             }
             @SuppressWarnings("unchecked")
-            Argument<Object> targetType = (Argument<Object>) context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            Argument<Object> targetType = (Argument<Object>) valueType(context);
             boolean single = Publishers.isSingle(context.getArgument().getType()) || context.getArgument().isSpecifiedSingle();
             Optional<String> bodyComponent = context.getAnnotationMetadata().stringValue(Body.class);
             if (bodyComponent.isPresent()) {
@@ -111,7 +113,11 @@ public final class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<
                     .or(() -> bodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType))
                         .flatMap(PublisherBodyBinder::chunked));
                 if (reader.isPresent()) {
-                    Publisher<?> pub = reader.get().readChunked(targetType, mediaType, source.getHeaders(), rootBody.toByteBufferPublisher());
+                    // the body is taken now, but only read once the route subscribes
+                    Publisher<ByteBuffer<?>> input = UnconsumedBodyGuard.openWhenSubscribed(source, rootBody.move(), ByteBody::toByteBufferPublisher);
+                    // every element is buffered in memory before it is decoded
+                    Publisher<?> pub = reader.get().readChunked(targetType, mediaType, source.getHeaders(), input,
+                        bodyAnnotationBinder.maxRequestBufferSize());
                     return () -> Optional.of(convertPublisher(pub, context));
                 }
             }
@@ -157,6 +163,23 @@ public final class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<
     @SuppressWarnings("unchecked")
     private static Optional<ChunkedMessageBodyReader<Object>> chunked(MessageBodyReader<?> reader) {
         return reader instanceof ChunkedMessageBodyReader<?> chunked ? Optional.of((ChunkedMessageBodyReader<Object>) chunked) : Optional.empty();
+    }
+
+    /**
+     * The type of the value a reactive or future body parameter wraps. The annotations of the
+     * parameter (for example a JSON view) apply to the value, as they do for a parameter that is
+     * not wrapped.
+     *
+     * @param context The conversion context of the parameter
+     * @return The value type
+     */
+    static Argument<?> valueType(ArgumentConversionContext<?> context) {
+        Argument<?> valueType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        if (valueType.getAnnotationMetadata().isEmpty()) {
+            return valueType.withAnnotationMetadata(context.getAnnotationMetadata());
+        }
+        // the type argument can carry type-use annotations (e.g. Mono<@Valid T>), keep both
+        return valueType.withAnnotationMetadata(new AnnotationMetadataHierarchy(context.getAnnotationMetadata(), valueType.getAnnotationMetadata()));
     }
 
     static RuntimeException extractError(@Nullable Object message, ArgumentConversionContext<?> conversionContext) {
