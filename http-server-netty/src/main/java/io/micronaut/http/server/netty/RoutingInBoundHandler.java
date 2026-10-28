@@ -21,6 +21,8 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ConditionalExecutionExecutor;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.PropagatedContextElement;
+import io.micronaut.core.propagation.ThreadPropagatedContextElement;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpMethod;
@@ -146,37 +148,51 @@ public final class RoutingInBoundHandler implements RequestHandler {
         try {
             request.release();
         } finally {
-            if (!terminateEventPublisher.isEmpty()) {
-                // the response may be written while another request of the same connection is
-                // current (pipelining). Neither its propagated context nor its thread-bound state
-                // (e.g. MDC) may leak into the event: the task is submitted from this request's
-                // own context (an instrumented executor captures that one), and it never runs
-                // inline, since the thread-bound state of the current request can't be undone here
-                PropagatedContext eventContext = PropagatedContext.empty().plus(new ServerHttpRequestContext(request));
-                Runnable publish = () -> eventContext.propagate(() -> {
-                    try {
-                        publishRequestEvent(request, terminateEventPublisher, new HttpRequestTerminatedEvent(request));
-                    } catch (Throwable throwable) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error publishing request terminated event: {}", throwable.getMessage(), throwable);
-                        }
-                    }
-                });
-                try {
-                    Executor executor = getRequestEventExecutor();
-                    if (executor instanceof ConditionalExecutionExecutor cee && cee.canExecuteImmediately()) {
-                        // a fresh event loop task starts without any thread-bound state
-                        executor = request.getChannelHandlerContext().executor();
-                    }
-                    Executor target = executor;
-                    eventContext.propagate(() -> target.execute(publish));
-                } catch (RuntimeException e) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Skipping request terminated event publication during shutdown: {}", e.getMessage(), e);
-                    }
+            try {
+                publishTerminatedEvent(request);
+            } catch (RuntimeException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Skipping request terminated event publication during shutdown: {}", e.getMessage(), e);
                 }
             }
         }
+    }
+
+    private void publishTerminatedEvent(NettyHttpRequest<?> request) {
+        if (terminateEventPublisher.isEmpty()) {
+            return;
+        }
+        // the response may be written while another request of the same connection is
+        // current (pipelining). Neither its propagated context nor its thread-bound state
+        // (e.g. MDC) may leak into the event: the task is submitted from this request's
+        // own context (an instrumented executor captures that one), and it does not run
+        // inline while the current context has thread-bound state, which can't be undone here
+        PropagatedContext eventContext = PropagatedContext.empty().plus(new ServerHttpRequestContext(request));
+        Runnable publish = () -> eventContext.propagate(() -> {
+            try {
+                publishRequestEvent(request, terminateEventPublisher, new HttpRequestTerminatedEvent(request));
+            } catch (Throwable throwable) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Error publishing request terminated event: {}", throwable.getMessage(), throwable);
+                }
+            }
+        });
+        Executor executor = getRequestEventExecutor();
+        if (executor instanceof ConditionalExecutionExecutor cee && cee.canExecuteImmediately() && hasThreadElements(PropagatedContext.getOrEmpty())) {
+            // a fresh event loop task starts without any thread-bound state
+            executor = request.getChannelHandlerContext().executor();
+        }
+        Executor target = executor;
+        eventContext.propagate(() -> target.execute(publish));
+    }
+
+    private static boolean hasThreadElements(PropagatedContext context) {
+        for (PropagatedContextElement element : context.getAllElements()) {
+            if (element instanceof ThreadPropagatedContextElement<?>) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
