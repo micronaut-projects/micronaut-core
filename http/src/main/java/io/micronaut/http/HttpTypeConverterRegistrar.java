@@ -21,9 +21,7 @@ import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.cookie.SameSite;
 
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The HTTP converters registrar.
@@ -48,18 +46,17 @@ public final class HttpTypeConverterRegistrar implements TypeConverterRegistrar 
                 }
             }
         });
-        Map<CharSequence, Optional<SameSite>> conversions = new ConcurrentHashMap<>();
         conversionService.addConverter(CharSequence.class, SameSite.class, (object, targetType, context) -> {
             if (object == null) {
                 return Optional.empty();
             }
-            return conversions.computeIfAbsent(object, charSequence -> {
-                try {
-                    return Optional.of(SameSite.valueOf(StringUtils.capitalize(object.toString().toLowerCase())));
-                } catch (IllegalArgumentException e) {
-                    return Optional.empty();
+            String value = object.toString();
+            for (SameSite sameSite : SameSite.values()) {
+                if (sameSite.name().equalsIgnoreCase(value)) {
+                    return Optional.of(sameSite);
                 }
-            });
+            }
+            return Optional.empty();
         });
     }
 }
