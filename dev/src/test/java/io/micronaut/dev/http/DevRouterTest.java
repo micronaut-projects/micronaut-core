@@ -295,6 +295,27 @@ class DevRouterTest {
         }
     }
 
+    @Test
+    void aRebuildAddingABodyConditionThatReadsMoreThanTheServerBuffersKeepsThePreviousRoutes() throws IOException {
+        try (ApplicationContext context = ApplicationContext.run(Map.of(
+            "spec.name", "DevRouterTest",
+            "micronaut.server.port", -1,
+            "micronaut.server.max-request-buffer-size", 1024,
+            DevelopmentMode.PROPERTY, true))) {
+            EmbeddedServer server = context.getBean(EmbeddedServer.class).start();
+            DevRouter devRouter = context.getBean(DevRouter.class);
+            Router first = devRouter.current();
+
+            // the server would refuse to start with this route: the table that holds it is not served either
+            context.registerSingleton(HttpRoutes.class, routes -> routes.POST("/dev-router/large")
+                .where(RequestCondition.bodyText(text -> true).maxBytes(4096))
+                .consumesAll().handle((request, variables) -> text("large")));
+            assertSame(first, devRouter.current());
+            assertTrue(post(server.getPort(), "/dev-router/large", "body").startsWith("404 "));
+            assertEquals("200 static", get(server, "/dev-router/static"));
+        }
+    }
+
     private static List<String> routes(Router router) {
         return router.uriRoutes().map(route -> route.getHttpMethodName() + " " + route.getUriMatchTemplate().toPathString()).sorted().toList();
     }

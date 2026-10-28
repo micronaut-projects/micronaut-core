@@ -123,6 +123,8 @@ public final class DevRouter implements Router {
 
     private final BeanContext context;
     private final Object lock = new Object();
+    // whether the HTTP server is present, whose limit of the bytes a body condition reads a rebuilt table is checked against
+    private final boolean checksBodyLimits;
     private volatile @Nullable Router router; // NOSONAR java:S3077 replaced whole by a rebuild; a built router is never changed through it
     private volatile @Nullable List<Integer> defaultPorts; // NOSONAR java:S3077 an unmodifiable list, replaced whole
     private volatile int rebuilds;
@@ -137,6 +139,7 @@ public final class DevRouter implements Router {
      */
     DevRouter(BeanContext context) {
         this.context = context;
+        this.checksBodyLimits = ClassUtils.isPresent("io.micronaut.http.server.HttpServerConfiguration", context.getClassLoader());
         if (context instanceof WatchableBeanContext watchable) {
             // registered while this bean is created: the watches belong to it and close when it is destroyed
             watchable.definitions(RouteBuilder.class).watch(this::onChange);
@@ -243,8 +246,14 @@ public final class DevRouter implements Router {
      * without them a router serves those routes on every listener, such as the management one.
      *
      * @param fresh The router
+     * @throws io.micronaut.context.exceptions.ConfigurationException if a body condition of a route reads more than the
+     * server may buffer, as the server would fail to start with it: the previous routes stay
      */
     private void install(Router fresh) {
+        if (checksBodyLimits) {
+            // as the server checks the table it was created with: a route added since may read more than it buffers
+            DevRouteLimits.check(context, fresh);
+        }
         List<Integer> ports = defaultPorts;
         if (ports != null) {
             fresh.applyDefaultPorts(ports);
