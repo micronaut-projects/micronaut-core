@@ -20,6 +20,7 @@ import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +30,7 @@ import java.util.Map;
  * and the diagnostics for the explicit switches it could not honour.
  *
  * @param decisions   The decisions, in source order
- * @param bodies      The compiled bodies by {@link Ir.CompiledBody#key()}
+ * @param bodies      The compiled bodies by {@link Ir.CompiledBody#key()}, in the order the planner lowered them
  * @param diagnostics The warnings (errors in strict mode) for explicit switches that are not honoured
  * @param trace       Whether the compiled bodies count their entries
  * @author Graeme Rocher
@@ -48,7 +49,9 @@ public record StaticCompilationPlan(List<StaticCompilationDecision> decisions,
 
     public StaticCompilationPlan {
         decisions = decisions == null ? List.of() : List.copyOf(decisions);
-        bodies = bodies == null ? Map.of() : Map.copyOf(bodies);
+        // in the order the planner lowered the bodies: Map.copyOf iterates in an order salted per JVM, which
+        // made the methods of a generated class change places from one build to the next
+        bodies = bodies == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(bodies));
         diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
     }
 

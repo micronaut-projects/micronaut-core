@@ -79,13 +79,18 @@ class StaticCompilationCorpusTest {
 
         Map<String, Integer> outcomes = new TreeMap<>();
         Map<String, Integer> reasons = new TreeMap<>();
+        Map<String, Integer> delegations = new TreeMap<>();
         for (StaticCompilationDecision decision : decisions) {
             outcomes.merge(decision.outcome().name(), 1, Integer::sum);
             for (StaticCompilationDecision.Reason reason : decision.reasons()) {
                 reasons.merge(reason.rule(), 1, Integer::sum);
             }
+            if (decision.delegation() != null) {
+                int why = decision.delegation().indexOf('(');
+                delegations.merge(why < 0 ? decision.delegation() : decision.delegation().substring(0, why), 1, Integer::sum);
+            }
         }
-        System.out.println("== " + corpus + ": " + decisions.size() + " decisions " + outcomes + ", reasons " + reasons);
+        System.out.println("== " + corpus + ": " + decisions.size() + " decisions " + outcomes + ", reasons " + reasons + ", delegation " + delegations);
         List<String> made = decisions.stream().map(decision -> line(pythonSrc, decision)).sorted().toList();
         Path madeFile = new File(out, "decisions.txt").toPath();
         Files.write(madeFile, made);
@@ -106,7 +111,7 @@ class StaticCompilationCorpusTest {
     }
 
     /**
-     * @return The decision as a line of the recorded file: the source relative to the corpus, the function, the outcome
+     * @return The decision as a line of the recorded file: the source relative to the corpus, the function, the outcome, and for a compiled body its delegation
      */
     private static String line(File pythonSrc, StaticCompilationDecision decision) {
         SourceSpan span = decision.span();
@@ -116,7 +121,9 @@ class StaticCompilationCorpusTest {
             Path path = Path.of(span.path()).toAbsolutePath().normalize();
             source = (path.startsWith(root) ? root.relativize(path) : path).toString().replace(File.separatorChar, '/');
         }
-        return source + " " + decision.qualifiedName() + " " + decision.outcome().name();
+        // a compiled body carries whether its Python callers run it, so a loss of delegation shows here
+        String delegation = decision.delegation() == null ? "" : " delegation=" + decision.delegation();
+        return source + " " + decision.qualifiedName() + " " + decision.outcome().name() + delegation;
     }
 
     private static void deleteRecursively(Path directory) throws IOException {
