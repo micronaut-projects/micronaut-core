@@ -143,6 +143,48 @@ class Test {
         !members.hasStereotype("nestedretention.Limit")
     }
 
+    void 'test annotations in a container that is not repeatable retain what they compose'() {
+        given:
+        def definition = buildBeanDefinition('legacycontainer.Test', '''
+package legacycontainer
+
+import io.micronaut.context.annotation.AliasFor
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Executable
+import io.micronaut.core.annotation.Retainable
+
+@Retainable
+@Retention(AnnotationRetention.RUNTIME)
+annotation class Limit(val min: Int = 0, val max: Int = 100)
+
+@Limit(min = 1)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class Bundled(
+    @get:AliasFor(annotationName = "legacycontainer.Limit", member = "min", applyDefault = true)
+    val min: Int = 1
+) {
+    @Retention(AnnotationRetention.RUNTIME)
+    annotation class List(val value: Array<Bundled>)
+}
+
+@Bean
+class Test {
+
+    @Bundled.List([Bundled(min = 3), Bundled(min = 7)])
+    @Executable
+    fun bundled(): String = ""
+}
+''')
+        def bundled = definition.getRequiredMethod("bundled").getAnnotationMetadata()
+                .getAnnotation('legacycontainer.Bundled$List')
+                .getAnnotations("value")
+
+        expect: 'each occurrence read back from the bean definition retains what it composes, aliases applied'
+        bundled*.values == [[min: 3], [min: 7]]
+        bundled.collect { it.getStereotypes()*.annotationName } == [['legacycontainer.Limit']] * 2
+        bundled.collect { it.getStereotypes()*.values } == [[[min: 3]], [[min: 7]]]
+    }
+
     private static Map<String, Object> range(int from) {
         return [name: 'Range', values: [from: from], stereotypes: [bounded(from)]]
     }
