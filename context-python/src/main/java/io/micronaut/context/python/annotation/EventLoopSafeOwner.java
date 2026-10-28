@@ -24,7 +24,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks a generated class declaring a method annotated with {@link EventLoopSafe}. The Python
+ * Marks a generated class declaring a route annotated with {@link EventLoopSafe}. The Python
  * processor adds it; a singleton bean of the class is created when the application starts, so the
  * first request of such a route does not create the bean, which runs Python, on the event loop.
  *
