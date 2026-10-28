@@ -180,6 +180,15 @@ final class JsonChunkedProcessor {
         return buf;
     }
 
+    /**
+     * The generator of {@link Flux#generate(java.util.concurrent.Callable, java.util.function.BiFunction, java.util.function.Consumer)}
+     * for the nodes of one input chunk.
+     *
+     * @param chunk The generator state: the chunk that is being split
+     * @param sink  The sink that receives at most one node
+     * @return The state for the next round, always the same chunk. {@code Flux.generate} requires
+     * the state to be returned, it is how this method fits its {@code BiFunction}
+     */
     private Chunk splitNext(Chunk chunk, SynchronousSink<Node> sink) {
         if (!enter()) {
             sink.complete();
