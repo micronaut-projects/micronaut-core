@@ -49,10 +49,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -254,6 +256,7 @@ final class BodyRouteSelector {
         return ExecutionFlow.just(true);
     }
 
+    @SuppressWarnings("unchecked")
     private <V> ExecutionFlow<Boolean> meets(Selection<?, ?> selection, RequestCondition.Body<V> condition) {
         RequestBody body = selection.body;
         if (body.length() > condition.effectiveMaxBytes(selection.serverLimit)) {
@@ -263,8 +266,13 @@ final class BodyRouteSelector {
         if (value.isEmpty()) {
             return ExecutionFlow.just(false);
         }
+        Predicate<? super V> predicate = condition.predicate();
         CompletionStage<Boolean> stage;
         try {
+            if (predicate != null) {
+                // a synchronous predicate: no stage to wait for
+                return ExecutionFlow.just(predicate.test(value.get()));
+            }
             stage = condition.condition().apply(value.get());
         } catch (RuntimeException e) {
             return failed(selection.request, e);
@@ -272,11 +280,26 @@ final class BodyRouteSelector {
         if (stage == null) {
             return ExecutionFlow.just(false);
         }
+        if (stage.getClass() == CompletableFuture.class && ((CompletableFuture<Boolean>) stage).isDone()) {
+            // decided already, e.g. by a cache: nothing to stop waiting for when the request is abandoned
+            return completed((CompletableFuture<Boolean>) stage, selection.request);
+        }
         return CompletableFutureExecutionFlow.just(detached(selection, stage))
             .map(Boolean.TRUE::equals)
             .onErrorResume(error -> error instanceof ConditionAbandoned || error.getCause() instanceof ConditionAbandoned
                 ? ExecutionFlow.error(error)
                 : failed(selection.request, error));
+    }
+
+    /**
+     * The outcome of a completed stage of a condition.
+     */
+    private static ExecutionFlow<Boolean> completed(CompletableFuture<Boolean> stage, HttpRequest<?> request) {
+        try {
+            return ExecutionFlow.just(Boolean.TRUE.equals(stage.join()));
+        } catch (CompletionException | CancellationException e) {
+            return failed(request, e);
+        }
     }
 
     /**

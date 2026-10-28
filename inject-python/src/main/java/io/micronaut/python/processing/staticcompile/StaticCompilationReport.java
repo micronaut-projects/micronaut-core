@@ -65,7 +65,8 @@ public final class StaticCompilationReport {
      */
     public static final String STATE_FILE = "decisions.properties";
 
-    private static final String STATE_VERSION = "1";
+    // 2: the decisions carry their delegation status
+    private static final String STATE_VERSION = "2";
 
     private StaticCompilationReport() {
     }
@@ -256,6 +257,9 @@ public final class StaticCompilationReport {
                 if (decision.outcome() == Outcome.COMPILED || decision.outcome() == Outcome.CANDIDATE) {
                     out.append(String.format("              statements %d · java calls %d · bridge calls %d · helpers %d%n",
                         decision.stats().statements(), decision.stats().javaCalls(), decision.stats().bridgeCalls(), decision.stats().helperCalls()));
+                    if (decision.delegation() != null) {
+                        out.append("              python callers: ").append(decision.delegation()).append('\n');
+                    }
                 }
                 for (Reason reason : decision.reasons()) {
                     out.append("              [").append(reason.rule()).append("] ");
@@ -273,6 +277,19 @@ public final class StaticCompilationReport {
         out.append('\n');
         for (Map.Entry<Outcome, List<StaticCompilationDecision>> entry : byOutcome.entrySet()) {
             out.append(String.format("%-13s %d%n", entry.getKey().name(), entry.getValue().size()));
+        }
+        Map<String, Integer> byDelegation = new TreeMap<>();
+        for (StaticCompilationDecision decision : decisions) {
+            String delegation = decision.delegation();
+            if (delegation != null) {
+                int reason = delegation.indexOf('(');
+                byDelegation.merge(reason < 0 ? delegation : delegation.substring(0, reason), 1, Integer::sum);
+            }
+        }
+        if (!byDelegation.isEmpty()) {
+            // how many compiled bodies their Python callers run, by how
+            out.append('\n');
+            byDelegation.forEach((status, count) -> out.append(String.format("delegation %-12s %d%n", status, count)));
         }
         Map<String, Integer> byRule = new TreeMap<>();
         for (StaticCompilationDecision decision : decisions) {

@@ -142,9 +142,9 @@ def route_add(title: Annotated[str, NotBlank]) -> str:
         PythonStatic.entries('python.LibraryController#longest') == 1
         PythonStatic.entries('python.Script#route_size') == 1
         PythonStatic.entries('python.Script#route_add') == 0
-        // the module route runs in Python and calls the Python object: the body calls Java and a str
-        // helper the delegation does not analyse, so its Python callers keep the Python body
-        PythonStatic.entries('python.Library#add') == 1
+        // the module route runs in Python and calls the Python object: the body calls Java once and
+        // strips a str, which has no side effect, so its Python callers run the Java body too
+        PythonStatic.entries('python.Library#add') == 2
         PythonStatic.entries('python.Library#size') == 2
         PythonStatic.entries('python.Library#shelf') == 1
         PythonStatic.entries('python.Library#longest') == 1
@@ -163,7 +163,8 @@ def route_add(title: Annotated[str, NotBlank]) -> str:
         then:
         def e2 = thrown(HttpClientResponseException)
         e2.status == HttpStatus.BAD_REQUEST
-        PythonStatic.entries('python.Library#add') == 1
+        // the validation advice rejected the call before the Java body ran
+        PythonStatic.entries('python.Library#add') == 2
 
         when: "a numeric constraint is violated"
         client.retrieve("/library/longest/0")

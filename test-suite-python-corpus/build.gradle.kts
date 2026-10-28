@@ -103,6 +103,21 @@ tasks.named<Test>("test") {
         inputs.files(override.map { files(it) }.orElse(files()))
             .withPropertyName("corpus.$corpus.dir").withPathSensitivity(PathSensitivity.RELATIVE)
     }
+    // the stage times StaticCompilationBudgetTest prints, one clock read per stage
+    systemProperty("micronaut.python.timings", "true")
+    // the budget test: -Pcorpus.budget.assert asserts the ratio of the modes, the others set the repeats
+    listOf("corpus.budget.rounds", "corpus.budget.warmup", "corpus.budget.copies", "corpus.budget.limit",
+        "corpus.budget.cold", "corpus.budget.session", "corpus.budget.jvm-args").forEach { name ->
+        providers.gradleProperty(name).orNull?.let { systemProperty(name, it) }
+    }
+    // the arguments of the JVMs compiling (this one and those of the cold rounds), for instance those of a
+    // build's Python compile tasks: -Pcorpus.budget.jvm-args="-XX:+UnlockExperimentalVMOptions -XX:-UseJVMCICompiler ..."
+    providers.gradleProperty("corpus.budget.jvm-args").orNull?.let { arguments ->
+        jvmArgs(arguments.split(Regex("\\s+")).filter { it.isNotBlank() })
+    }
+    providers.gradleProperty("corpus.budget.assert").orNull?.let {
+        systemProperty("corpus.budget.assert", (it.isEmpty() || it.toBoolean()).toString())
+    }
     // the class paths of the applications, given to the compiler by the test
     doFirst {
         systemProperty("corpus.fullstack.classpath", fullstackClasspath.asPath)
