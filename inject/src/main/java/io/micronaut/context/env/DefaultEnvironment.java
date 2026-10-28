@@ -285,6 +285,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
+    boolean processingAdd() {
+        return addedAfterSnapshot.get() != null;
+    }
+
+    @Override
     public Environment removePropertySource(PropertySource propertySource) {
         propertySources.remove(propertySource.getName());
         if (isRunning() && !reading.get()) {
