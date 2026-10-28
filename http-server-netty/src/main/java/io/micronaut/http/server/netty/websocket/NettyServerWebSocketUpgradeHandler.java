@@ -15,7 +15,11 @@
  */
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
@@ -88,6 +92,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     public static final String COMPRESSION_HANDLER = "WebSocketServerCompressionHandler";
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyServerWebSocketUpgradeHandler.class);
+    private static final int DEFAULT_MAX_PAYLOAD_LENGTH = 65536;
     private static final AsciiString WEB_SOCKET_HEADER_VALUE = AsciiString.cached("websocket");
 
     private final Router router;
@@ -121,6 +126,26 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     @Override
     public boolean acceptInboundMessage(Object msg) {
         return msg instanceof NettyHttpRequest && isWebSocketUpgrade((NettyHttpRequest<?>) msg);
+    }
+
+    /**
+     * Compute the largest {@link OnMessage#maxPayloadLength()} of the server WebSocket endpoints. A
+     * compressed frame must not inflate past it.
+     *
+     * @param beanContext The bean context
+     * @return The largest payload length
+     */
+    @Internal
+    public static int maxPayloadLength(BeanContext beanContext) {
+        int max = 0;
+        for (BeanDefinition<?> definition : beanContext.getBeanDefinitions(Qualifiers.byStereotype(ServerWebSocket.class))) {
+            for (ExecutableMethod<?, ?> method : definition.getExecutableMethods()) {
+                if (method.isAnnotationPresent(OnMessage.class)) {
+                    max = Math.max(max, method.intValue(OnMessage.class, "maxPayloadLength").orElse(DEFAULT_MAX_PAYLOAD_LENGTH));
+                }
+            }
+        }
+        return max == 0 ? DEFAULT_MAX_PAYLOAD_LENGTH : max;
     }
 
     private boolean isWebSocketUpgrade(@NonNull NettyHttpRequest<?> request) {

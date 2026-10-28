@@ -113,10 +113,12 @@ final class HttpPipelineBuilder {
     private final HttpRequestCertificateHandler requestCertificateHandler = new HttpRequestCertificateHandler();
 
     private final NettyServerCustomizer serverCustomizer;
+    private final int webSocketMaxPayloadLength;
 
     HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, NettyServerCustomizer serverCustomizer) {
         this.server = server;
         this.embeddedServices = embeddedServices;
+        this.webSocketMaxPayloadLength = NettyServerWebSocketUpgradeHandler.maxPayloadLength(embeddedServices.getApplicationContext());
         this.sslConfiguration = sslConfiguration;
         this.routingInBoundHandler = routingInBoundHandler;
         this.hostResolver = hostResolver;
@@ -265,7 +267,7 @@ final class HttpPipelineBuilder {
          * and netty requests, and routing.
          */
         private void insertMicronautHandlers() {
-            pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
+            pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler(webSocketMaxPayloadLength));
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
             pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);

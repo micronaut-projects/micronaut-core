@@ -63,6 +63,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -88,6 +89,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      */
     public static final String ID = "websocket-handler";
 
+    private static final int MAX_PENDING_FRAMES = 64;
+
     protected final Logger LOG = LoggerFactory.getLogger(getClass());
 
     protected final ArgumentBinderRegistry<WebSocketState> webSocketBinder;
@@ -104,6 +107,16 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     private final AtomicBoolean closeInitiated = new AtomicBoolean(false);
     private final AtomicReference<CompositeByteBuf> frameBuffer = new AtomicReference<>();
     private final int maxPayloadLength;
+    /**
+     * Data frames read while a message is being handled. They are handled in order once the
+     * handler of the message completes, and reading is paused once they add up to a message.
+     * Control frames are not queued. Only accessed on the event loop.
+     */
+    private final ArrayDeque<WebSocketFrame> pendingFrames = new ArrayDeque<>();
+    private long pendingBytes;
+    private boolean messageInFlight;
+    private boolean drainingPendingFrames;
+    private boolean readPaused;
 
     /**
      * Default constructor.
@@ -212,7 +225,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     private void handleException(ChannelHandlerContext ctx, Throwable cause) {
-        cleanupBuffer();
+        releaseFrameBuffer();
         forwardErrorToUser(ctx, e -> handleUnexpected(ctx, e), cause);
     }
 
@@ -301,10 +314,26 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof WebSocketFrame) {
-            handleWebSocketFrame(ctx, (WebSocketFrame) msg);
+            WebSocketFrame frame = (WebSocketFrame) msg;
+            if ((messageInFlight || !pendingFrames.isEmpty()) && isDataFrame(frame)) {
+                // a message is being handled: keep the frame until it completes, and stop reading
+                // once the kept frames add up to a message
+                pendingFrames.add(frame.retain());
+                pendingBytes += frame.content().readableBytes();
+                if (!readPaused && (pendingBytes >= maxPayloadLength || pendingFrames.size() >= MAX_PENDING_FRAMES)) {
+                    readPaused = true;
+                    ctx.channel().config().setAutoRead(false);
+                }
+            } else {
+                handleWebSocketFrame(ctx, frame);
+            }
         } else {
             ctx.fireChannelRead(msg);
         }
+    }
+
+    private static boolean isDataFrame(WebSocketFrame frame) {
+        return frame instanceof TextWebSocketFrame || frame instanceof BinaryWebSocketFrame || frame instanceof ContinuationWebSocketFrame;
     }
 
     /**
@@ -393,16 +422,30 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         Object result = invokeExecutable(boundExecutable, messageHandler);
                         if (Publishers.isConvertibleToPublisher(result)) {
                             Flux<?> flowable = Flux.from(instrumentPublisher(ctx, result));
+                            messageInFlight = true;
                             flowable.subscribe(
                                     o -> {
                                     },
-                                    error -> messageProcessingException(ctx, error),
-                                    () -> messageHandled(ctx, v)
+                                    error -> {
+                                        try {
+                                            messageProcessingException(ctx, error);
+                                        } finally {
+                                            messageCompletedOnEventLoop(ctx);
+                                        }
+                                    },
+                                    () -> {
+                                        try {
+                                            messageHandled(ctx, v);
+                                        } finally {
+                                            messageCompletedOnEventLoop(ctx);
+                                        }
+                                    }
                             );
                         } else {
                             messageHandled(ctx, v);
                         }
                     } catch (Throwable e) {
+                        messageInFlight = false;
                         messageProcessingException(ctx, e);
                     }
 
@@ -415,9 +458,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 }
             }
         } else if (msg instanceof PingWebSocketFrame) {
-            // respond with pong
-            PingWebSocketFrame frame = (PingWebSocketFrame) msg.retain();
-            ctx.writeAndFlush(new PongWebSocketFrame(frame.content()));
+            // respond with pong, unless the peer does not read what was already written
+            if (ctx.channel().isWritable()) {
+                ctx.writeAndFlush(new PongWebSocketFrame(msg.content().retain()));
+            }
 
         } else if (msg instanceof PongWebSocketFrame) {
             if (pongHandler != null) {
@@ -471,6 +515,50 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
     }
 
+    private void messageCompletedOnEventLoop(ChannelHandlerContext ctx) {
+        if (ctx.executor().inEventLoop()) {
+            messageCompleted(ctx);
+        } else {
+            try {
+                ctx.executor().execute(() -> messageCompleted(ctx));
+            } catch (RejectedExecutionException ignored) {
+                // the event loop is shutting down
+            }
+        }
+    }
+
+    /**
+     * Called on the event loop once the handler of a message completes. Handles the frames read
+     * meanwhile, until the next message is in flight, and resumes reading once all are handled.
+     */
+    private void messageCompleted(ChannelHandlerContext ctx) {
+        messageInFlight = false;
+        if (drainingPendingFrames) {
+            return;
+        }
+        drainingPendingFrames = true;
+        try {
+            WebSocketFrame frame;
+            while (!messageInFlight && (frame = pendingFrames.poll()) != null) {
+                pendingBytes -= frame.content().readableBytes();
+                try {
+                    handleWebSocketFrame(ctx, frame);
+                } catch (Throwable t) {
+                    // not called from the inbound pipeline, so handle the error as it would
+                    exceptionCaught(ctx, t);
+                } finally {
+                    frame.release();
+                }
+            }
+        } finally {
+            drainingPendingFrames = false;
+        }
+        if (readPaused && !messageInFlight && pendingFrames.isEmpty() && !closeInitiated.get()) {
+            readPaused = false;
+            ctx.channel().config().setAutoRead(true);
+        }
+    }
+
     private void messageProcessingException(ChannelHandlerContext ctx, Throwable e) {
         if (LOG.isErrorEnabled()) {
             LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
@@ -512,7 +600,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             writeCloseFrameAndTerminate(ctx, cr);
             return;
         }
-        cleanupBuffer();
+        releaseBuffers();
         if (closed.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Closing WebSocket session {} with reason {}", getSession(), cr);
@@ -649,7 +737,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     private void sendCloseFrameAndClose(ChannelHandlerContext ctx, CloseWebSocketFrame closeFrame, CloseReason closeReason) {
-        cleanupBuffer();
+        releaseBuffers();
         // RFC 6455 section 7.1.1: close the connection once the close frame is sent, whether or not
         // there is an @OnClose handler. Force the close if the peer does not read the close frame
         // in time.
@@ -685,10 +773,24 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         writeCloseFrameAndTerminate(ctx, CloseReason.MESSAGE_TO_BIG);
     }
 
-    private void cleanupBuffer() {
+    private void releaseFrameBuffer() {
         CompositeByteBuf buffer = frameBuffer.getAndSet(null);
         if (buffer != null) {
             buffer.release();
+        }
+    }
+
+    /**
+     * Releases the partial message and the queued frames, once the session ends.
+     */
+    private void releaseBuffers() {
+        releaseFrameBuffer();
+        if (!drainingPendingFrames) {
+            WebSocketFrame frame;
+            while ((frame = pendingFrames.poll()) != null) {
+                frame.release();
+            }
+            pendingBytes = 0;
         }
     }
 }
