@@ -76,6 +76,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.populateServiceId;
@@ -94,6 +98,15 @@ abstract class AbstractJdkHttpClient {
     public static final String H2C_ERROR_MESSAGE = "H2C is not supported by the JDK HTTP client";
     public static final String H3_ERROR_MESSAGE = "HTTP/3 is not supported by the JDK HTTP client";
     public static final String WEIRD_ALPN_ERROR_MESSAGE = "The only supported ALPN modes are [" + HttpVersionSelection.ALPN_HTTP_1 + "] or [" + HttpVersionSelection.ALPN_HTTP_1 + "," + HttpVersionSelection.ALPN_HTTP_2 + "]";
+    /**
+     * The headers that are never copied to a redirect to another origin.
+     */
+    private static final List<String> ALWAYS_CROSS_ORIGIN_FILTERED_HEADERS = List.of(
+        io.micronaut.http.HttpHeaders.AUTHORIZATION,
+        io.micronaut.http.HttpHeaders.COOKIE,
+        io.micronaut.http.HttpHeaders.ORIGIN,
+        io.micronaut.http.HttpHeaders.REFERER
+    );
     @Nullable
     protected final LoadBalancer loadBalancer;
     @Nullable
@@ -239,7 +252,8 @@ abstract class AbstractJdkHttpClient {
             builder.version(HttpClient.Version.HTTP_1_1);
         }
 
-        builder.followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER);
+        // redirects are followed by sendAsync, so that the redirect settings of the configuration apply
+        builder.followRedirects(HttpClient.Redirect.NEVER);
         if (cookies) {
             builder.cookieHandler(cookieManager);
         }
@@ -473,7 +487,7 @@ abstract class AbstractJdkHttpClient {
                 HttpHeadersUtil.trace(log,
                     () -> httpRequest.headers().map().keySet(),
                     headerName -> httpRequest.headers().allValues(headerName));
-                return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+                return sendAsync(client, httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
             })
             .flatMap(Mono::fromCompletionStage)
             .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
@@ -493,5 +507,185 @@ abstract class AbstractJdkHttpClient {
                     sink.next(response(netResponse, bodyType));
                 }
             });
+    }
+
+    /**
+     * Send a request, and follow the redirects of the response if the configuration says so.
+     * The JDK client does not follow redirects itself, because it would copy headers the
+     * configuration filters (e.g. {@link HttpClientConfiguration#getRedirectCrossOriginFilteredHeaders()})
+     * to the redirect target.
+     *
+     * @param httpClient  The JDK client to send the request with
+     * @param request     The request
+     * @param bodyHandler The handler of the body of the final response
+     * @param <T>         The body type
+     * @return The final response
+     */
+    final <T> CompletableFuture<java.net.http.HttpResponse<T>> sendAsync(
+        HttpClient httpClient,
+        HttpRequest request,
+        java.net.http.HttpResponse.BodyHandler<T> bodyHandler
+    ) {
+        if (!configuration.isFollowRedirects()) {
+            return httpClient.sendAsync(request, bodyHandler);
+        }
+        CompletableFuture<java.net.http.HttpResponse<T>> result = new CompletableFuture<>();
+        AtomicReference<CompletableFuture<?>> inFlight = new AtomicReference<>();
+        // cancelling the result cancels the exchange that is in flight
+        result.whenComplete((response, error) -> {
+            CompletableFuture<?> exchange = inFlight.get();
+            if (result.isCancelled() && exchange != null) {
+                exchange.cancel(true);
+            }
+        });
+        sendFollowingRedirects(httpClient, request, bodyHandler, 0, result, inFlight);
+        return result;
+    }
+
+    private <T> void sendFollowingRedirects(
+        HttpClient httpClient,
+        HttpRequest request,
+        java.net.http.HttpResponse.BodyHandler<T> bodyHandler,
+        int redirectCount,
+        CompletableFuture<java.net.http.HttpResponse<T>> result,
+        AtomicReference<CompletableFuture<?>> inFlight
+    ) {
+        if (result.isDone()) {
+            return;
+        }
+        CompletableFuture<java.net.http.HttpResponse<T>> exchange = httpClient.sendAsync(request, responseInfo -> redirectUri(request, responseInfo.statusCode(), responseInfo.headers()) == null
+            ? bodyHandler.apply(responseInfo)
+            // the body of a redirect that is followed is discarded
+            : java.net.http.HttpResponse.BodySubscribers.replacing(null));
+        inFlight.set(exchange);
+        if (result.isCancelled()) {
+            exchange.cancel(true);
+            return;
+        }
+        exchange.whenComplete((response, error) -> {
+            if (error != null) {
+                result.completeExceptionally(error);
+                return;
+            }
+            try {
+                URI location = redirectUri(request, response.statusCode(), response.headers());
+                if (location == null) {
+                    result.complete(response);
+                    return;
+                }
+                int nextRedirectCount = redirectCount + 1;
+                if (nextRedirectCount > configuration.getMaxRedirects()) {
+                    result.completeExceptionally(populateServiceId(
+                        new HttpClientException("Maximum number of redirects exceeded at redirect count: " + nextRedirectCount),
+                        clientId,
+                        configuration
+                    ));
+                    return;
+                }
+                HttpRequest redirectRequest = redirectRequest(request, response.statusCode(), location);
+                if (log.isDebugEnabled()) {
+                    log.debug("Client {} Following redirect {} to: {}", clientId, response.statusCode(), redirectRequest);
+                }
+                sendFollowingRedirects(httpClient, redirectRequest, bodyHandler, nextRedirectCount, result, inFlight);
+            } catch (Throwable t) {
+                // result must always complete, or the caller waits forever
+                result.completeExceptionally(t instanceof HttpClientException || !(t instanceof Exception) ? t : populateServiceId(
+                    new HttpClientException("Failed to follow the redirect: " + t.getMessage(), t),
+                    clientId,
+                    configuration
+                ));
+            }
+        });
+    }
+
+    /**
+     * The URI a response redirects to, if the redirect is followed.
+     *
+     * @param request    The request
+     * @param statusCode The status of the response
+     * @param headers    The headers of the response
+     * @return The redirect URI, or {@code null} if the response is not a redirect to follow
+     */
+    @Nullable
+    private URI redirectUri(HttpRequest request, int statusCode, java.net.http.HttpHeaders headers) {
+        if (statusCode != 301 && statusCode != 302 && statusCode != 303 && statusCode != 307 && statusCode != 308) {
+            return null;
+        }
+        Optional<String> location = headers.firstValue(io.micronaut.http.HttpHeaders.LOCATION);
+        if (location.isEmpty()) {
+            return null;
+        }
+        URI redirectUri;
+        try {
+            redirectUri = request.uri().resolve(new URI(location.get()));
+        } catch (URISyntaxException | IllegalArgumentException e) {
+            return null;
+        }
+        if (redirectUri.getHost() == null) {
+            if (log.isDebugEnabled()) {
+                log.debug("Client {} Not following redirect {} to a location without a host: {}", clientId, statusCode, location.get());
+            }
+            return null;
+        }
+        String scheme = redirectUri.getScheme();
+        // like HttpClient.Redirect.NORMAL: no redirects from https to http
+        if (scheme == null || !(scheme.equalsIgnoreCase(request.uri().getScheme()) || scheme.equalsIgnoreCase("https"))) {
+            return null;
+        }
+        return redirectUri;
+    }
+
+    /**
+     * Build the request that follows a redirect. The headers the configuration filters for
+     * this redirect are not copied.
+     *
+     * @param request    The request that was redirected
+     * @param statusCode The redirect status
+     * @param location   The redirect URI
+     * @return The request to the redirect URI
+     */
+    private HttpRequest redirectRequest(HttpRequest request, int statusCode, URI location) {
+        String method = request.method();
+        // a 303 changes the method to GET (but, unlike HttpClient.Redirect.NORMAL, keeps HEAD
+        // as RFC 9110 allows), a 301 or 302 only changes a POST to a GET like
+        // HttpClient.Redirect.NORMAL, and any other redirect keeps the method and body
+        boolean changeToGet = (statusCode == 303 && !method.equals(io.micronaut.http.HttpMethod.HEAD.name())) ||
+            ((statusCode == 301 || statusCode == 302) && method.equals(io.micronaut.http.HttpMethod.POST.name()));
+        // the body headers are kept for a 307 or 308 like in the Netty client, and for a
+        // 301 or 302 that sends the body again
+        boolean preserveBody = statusCode == 307 || statusCode == 308 ||
+            (!changeToGet && request.bodyPublisher().map(body -> body.contentLength() != 0).orElse(false));
+        Set<String> filteredHeaders = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        filteredHeaders.addAll(configuration.getRedirectAlwaysFilteredHeaders());
+        if (!isSameOrigin(request.uri(), location)) {
+            filteredHeaders.addAll(configuration.getRedirectCrossOriginFilteredHeaders());
+            // HttpClient.Redirect.NORMAL never sends these to another origin, whatever the configuration
+            filteredHeaders.addAll(ALWAYS_CROSS_ORIGIN_FILTERED_HEADERS);
+        }
+        if (!preserveBody) {
+            filteredHeaders.addAll(configuration.getRedirectAdditionalNonPreserveBodyFilteredHeaders());
+        }
+        HttpRequest.Builder builder = HttpRequest.newBuilder(request, (name, value) -> !filteredHeaders.contains(name))
+            .uri(location);
+        if (changeToGet) {
+            builder.GET();
+        }
+        return builder.build();
+    }
+
+    private static boolean isSameOrigin(URI a, URI b) {
+        String hostA = a.getHost();
+        String hostB = b.getHost();
+        return hostA != null && hostB != null &&
+            a.getScheme().equalsIgnoreCase(b.getScheme()) &&
+            hostA.equalsIgnoreCase(hostB) &&
+            effectivePort(a) == effectivePort(b);
+    }
+
+    private static int effectivePort(URI uri) {
+        if (uri.getPort() != -1) {
+            return uri.getPort();
+        }
+        return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
     }
 }
