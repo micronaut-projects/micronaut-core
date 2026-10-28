@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
@@ -95,6 +96,12 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
 
         values = Collections.unmodifiableList(values);
         enumConstants = Collections.unmodifiableList(enumConstants);
+    }
+
+    @Override
+    protected @NonNull GroovyClassElement copyConstructor() {
+        // a copy, an array of the enum with its type annotations among them, stays an enum
+        return new GroovyEnumElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, getArrayDimensions());
     }
 
     @Override

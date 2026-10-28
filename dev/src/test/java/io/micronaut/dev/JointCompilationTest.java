@@ -34,7 +34,7 @@ class JointCompilationTest {
         RecordingCompiler javac = new RecordingCompiler(SourceKind.JAVA, Set.of());
         Map<SourceKind, SourceCompiler> compilers = compilers(python, javac);
 
-        assertEquals(Map.of(SourceKind.JAVA, SourceKind.PYTHON), DevRuntime.jointOwners(manifest, compilers));
+        assertEquals(Map.of(SourceKind.JAVA, SourceKind.PYTHON), Compilations.jointOwners(manifest, compilers));
 
         DevRuntime.compileMissingOutputs(manifest, compilers);
 
@@ -56,7 +56,7 @@ class JointCompilationTest {
         RecordingCompiler javac = new RecordingCompiler(SourceKind.JAVA, Set.of());
         Map<SourceKind, SourceCompiler> compilers = compilers(python, javac);
 
-        assertTrue(DevRuntime.jointOwners(manifest, compilers).isEmpty());
+        assertTrue(Compilations.jointOwners(manifest, compilers).isEmpty());
 
         DevRuntime.compileMissingOutputs(manifest, compilers);
 

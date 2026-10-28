@@ -45,6 +45,7 @@ import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.web.router.DefaultRouter;
 import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteRejections;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
@@ -205,6 +206,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 return;
             }
 
+            Objects.requireNonNull(next).prepareAsyncRequestBody(msg);
             // the route is matched by the lifecycle, after the pre-matching filters, so that a
             // failure to match, e.g. of a route condition, is answered with an error response
             WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, router);
@@ -572,6 +574,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
         @Override
         protected @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request) {
+            // the rejection of a route selector is the one of this routing
+            RouteRejections.clear(request);
             // the conditions of the route, e.g. a @RouteCondition, which reads the request of the
             // context, apply to the upgrade request. Router.find(HttpMethod, path, request) only
             // matches the method and the path, so the conditions are tested here, once
@@ -584,6 +588,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                                                                       @Nullable UriRouteMatch<Object, Object> routeMatch,
                                                                       PropagatedContext propagatedContext) {
             if (routeMatch == null) {
+                // a route selector that rejected the upgrade answers 406 or 415, as for other requests
+                ExecutionFlow<HttpResponse<?>> rejection = rejectionResponse(request, propagatedContext);
+                if (rejection != null) {
+                    return rejection;
+                }
                 return ExecutionFlow.error(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
             }
             this.propagatedContext = propagatedContext;

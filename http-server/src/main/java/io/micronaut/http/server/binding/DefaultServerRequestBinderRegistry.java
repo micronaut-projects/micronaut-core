@@ -65,7 +65,8 @@ public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRe
             formFactory
         ));
         internalRequestBinderRegistry.addArgumentBinder(new InputStreamBodyBinder(bodyBinder));
-        internalRequestBinderRegistry.addArgumentBinder(new StreamingFileUploadBinder(formFactory));
+        StreamingFileUploadBinder streamingFileUploadBinder = new StreamingFileUploadBinder(formFactory);
+        internalRequestBinderRegistry.addArgumentBinder(streamingFileUploadBinder);
         CompletedFileUploadBinder completedFileUploadBinder = new CompletedFileUploadBinder(formFactory);
         internalRequestBinderRegistry.addArgumentBinder(completedFileUploadBinder);
         PublisherPartUploadBinder publisherPartUploadBinder = new PublisherPartUploadBinder(conversionService, formFactory);
@@ -73,6 +74,7 @@ public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRe
         PartUploadAnnotationBinder<Object> partUploadAnnotationBinder = new PartUploadAnnotationBinder<>(
             conversionService,
             completedFileUploadBinder,
+            streamingFileUploadBinder,
             publisherPartUploadBinder,
             formFactory
         );
@@ -91,4 +93,10 @@ public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRe
         return internalRequestBinderRegistry.findArgumentBinder(argument);
     }
 
+    @Internal
+    @Override
+    public boolean bindsRequestAsIs(Argument<?> argument) {
+        // a subclass may find another binder than the internal registry
+        return getClass() == DefaultServerRequestBinderRegistry.class && internalRequestBinderRegistry.bindsRequestAsIs(argument);
+    }
 }

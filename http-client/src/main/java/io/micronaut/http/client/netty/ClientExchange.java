@@ -22,6 +22,7 @@ import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
@@ -221,7 +222,7 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
             byteBody.close();
             poolHandle.release();
             // the response handling may have claimed the selection before it failed
-            NettyHttpClient.releaseSelection(plan.selection());
+            AbstractHttpClient.releaseSelection(plan.selection());
         } else {
             // the response listener owns the exchange, even if it already ended (e.g. a
             // customizer failed it): it cancels the stream writer, releases the pool handle and
@@ -281,7 +282,7 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
             closeReplay();
             poolHandle.release();
             // the request is not sent, so the listener never reports the selection
-            NettyHttpClient.releaseSelection(selection);
+            AbstractHttpClient.releaseSelection(selection);
             client.completeExceptionallySafe(sink, client.decorate(new HttpClientException("Failed to send the request on the connection", e)));
             return false;
         } catch (Throwable t) {
@@ -593,7 +594,7 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
             if (sink.isCancelled() || !sink.tryCompleteExceptionally(new NettyHttpClient.StaleConnectionException(retry.body()))) {
                 retry.close();
                 // nothing sends the request again
-                NettyHttpClient.releaseSelection(plan.selection());
+                AbstractHttpClient.releaseSelection(plan.selection());
             }
         }
     }
@@ -668,9 +669,9 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
         if (!reported) {
             reported = true;
             if (outcome != null) {
-                NettyHttpClient.report(plan.selection(), outcome);
+                AbstractHttpClient.report(plan.selection(), outcome);
             } else {
-                NettyHttpClient.releaseSelection(plan.selection());
+                AbstractHttpClient.releaseSelection(plan.selection());
             }
         }
     }

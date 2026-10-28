@@ -119,10 +119,50 @@ class LocatorOncePerRequestTest {
         assertEquals(1, roots.get());
         // one call for each of the two levels
         assertEquals(2, nodes.get());
+
+        HttpRequest<?> filtered = HttpRequest.GET("/tree/other/sub/3/sub/4/leaf");
+        var match = router.resolve(filtered, candidate -> true).matchOrNull();
+        assertNotNull(match);
+        assertEquals("other", match.getVariableValues().get("root"));
+        assertEquals("4", match.getVariableValues().get("n"));
+        assertEquals(2, roots.get());
+        assertEquals(4, nodes.get());
+    }
+
+    @Test
+    void filteredResolutionReusesAPendingLocatorsSuccessOrFailure() {
+        for (boolean fail : List.of(false, true)) {
+            AtomicInteger calls = new AtomicInteger();
+            CompletableFuture<String> order = new CompletableFuture<>();
+            LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.GET("/items", (request, variables) -> HttpResponse.ok()));
+            Router router = router(routes -> routes.locateAsync("/orders/{id}", (request, variables) -> {
+                calls.incrementAndGet();
+                return order;
+            }, target -> items));
+            var request = HttpRequest.GET("/orders/5/items");
+            RuntimeException first = assertThrows(RuntimeException.class, () -> router.resolve(request, candidate -> true));
+            var pending = RouteLocator.pendingLocation(first);
+            assertNotNull(pending);
+            RuntimeException second = assertThrows(RuntimeException.class, () -> router.resolve(request, candidate -> true));
+            assertSame(pending, RouteLocator.pendingLocation(second));
+            if (fail) {
+                IllegalStateException failure = new IllegalStateException("no order");
+                order.completeExceptionally(failure);
+                assertSame(failure, assertThrows(IllegalStateException.class, () -> router.resolve(request, candidate -> true)));
+                assertSame(failure, assertThrows(IllegalStateException.class, () -> router.resolve(request, candidate -> true)));
+            } else {
+                order.complete("order");
+                var match = router.resolve(request, candidate -> true).matchOrNull();
+                assertNotNull(match);
+                assertEquals("5", match.getVariableValues().get("id"));
+                assertNotNull(router.resolve(request, candidate -> true).matchOrNull());
+            }
+            assertEquals(1, calls.get());
+        }
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         return new DefaultRouter(List.of(), List.of(() -> assembly));

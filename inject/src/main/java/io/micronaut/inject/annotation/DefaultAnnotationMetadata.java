@@ -28,6 +28,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
@@ -40,7 +41,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -179,9 +179,40 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         this.hasEvaluatedExpressions = hasEvaluatedExpressions;
     }
 
+    /**
+     * Creates the metadata of an element that declares everything it has: the declared annotations and stereotypes are
+     * all of them, and are shared rather than stored twice.
+     *
+     * @param declaredAnnotations     The declared annotations, which are all the annotations
+     * @param declaredStereotypes     The declared stereotypes, which are all the stereotypes
+     * @param annotationsByStereotype The annotations by stereotype
+     * @param hasPropertyExpressions  Whether property expressions exist in the metadata
+     * @param hasEvaluatedExpressions Whether evaluated expressions exist in the metadata
+     * @return The metadata
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public static DefaultAnnotationMetadata ofDeclared(
+            @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
+            @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
+            @Nullable Map<String, List<String>> annotationsByStereotype,
+            boolean hasPropertyExpressions,
+            boolean hasEvaluatedExpressions) {
+        return new DefaultAnnotationMetadata(
+            declaredAnnotations,
+            declaredStereotypes,
+            declaredStereotypes,
+            declaredAnnotations,
+            annotationsByStereotype,
+            hasPropertyExpressions,
+            hasEvaluatedExpressions
+        );
+    }
+
     @Override
     public AnnotationMetadata getDeclaredMetadata() {
-        if (isDeclaredOnly()) {
+        if (isDeclaredOnly() && stereotypesOnlyListDeclaredAnnotations()) {
             return this;
         }
         return new DefaultAnnotationMetadata(
@@ -200,6 +231,26 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     private boolean isDeclaredOnly() {
         return declaredAnnotations == allAnnotations && declaredStereotypes == allStereotypes;
+    }
+
+    /**
+     * @return True if every annotation {@link #annotationsByStereotype} lists is declared, so that
+     * {@link #declaredAnnotationsByStereotype()} would not narrow it. The compiler removes the annotations that are
+     * not retained at runtime, but not their names from the stereotype lists.
+     */
+    private boolean stereotypesOnlyListDeclaredAnnotations() {
+        if (annotationsByStereotype == null) {
+            return true;
+        }
+        for (List<String> annotations : annotationsByStereotype.values()) {
+            for (String annotation : annotations) {
+                if ((declaredAnnotations == null || !declaredAnnotations.containsKey(annotation))
+                        && (declaredStereotypes == null || !declaredStereotypes.containsKey(annotation))) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
@@ -1120,7 +1171,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Override
     public boolean hasAnnotation(@Nullable String annotation) {
-        return hasDeclaredAnnotation(annotation) || (allAnnotations != null && StringUtils.isNotEmpty(annotation) && allAnnotations.containsKey(annotation));
+        if (allAnnotations != null && StringUtils.isNotEmpty(annotation) && allAnnotations.containsKey(annotation)) {
+            return true;
+        }
+        // The same map when the metadata declares everything it has: no second lookup, unless a subclass may answer
+        // the declared lookup from elsewhere
+        return (declaredAnnotations != allAnnotations || getClass() != DefaultAnnotationMetadata.class)
+            && hasDeclaredAnnotation(annotation);
     }
 
     @Override
@@ -1248,6 +1305,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         }
         if (annotationsByStereotype != null) {
             List<String> annotations = annotationsByStereotype.get(stereotype);
+            if (annotations != null && annotations.size() == 1) {
+                String annotation = annotations.get(0);
+                if (findRepeatableAnnotationContainerInternal(annotation) == null) {
+                    // One annotation: no list to build and wrap
+                    return Collections.singletonList(getAnnotation(annotation));
+                }
+            }
             if (annotations != null) {
                 List<AnnotationValue<T>> result = new ArrayList<>(annotations.size());
                 for (String annotation : annotations) {
@@ -1644,37 +1708,36 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                                                                                          Map<String, Map<CharSequence, Object>> sourceStereotypes,
                                                                                          @Nullable
                                                                                          Map<String, Map<CharSequence, Object>> sourceAnnotations) {
-        if (!hasStereotype(repeatableTypeName)) {
+        if (getClass() != DefaultAnnotationMetadata.class && !hasStereotype(repeatableTypeName)) {
+            // A subclass may fill the maps while it answers, so it is asked before they are read
             return null;
         }
-        List<AnnotationValue<T>> results = null;
-        if (sourceAnnotations != null) {
-            Map<CharSequence, Object> values = sourceAnnotations.get(repeatableTypeName);
-            results = collectResult(results, values);
+        Map<CharSequence, Object> annotationValues = sourceAnnotations != null ? sourceAnnotations.get(repeatableTypeName) : null;
+        Map<CharSequence, Object> stereotypeValues = sourceStereotypes != null ? sourceStereotypes.get(repeatableTypeName) : null;
+        // Found in a map that hasStereotype consults: it would answer true, so skip it
+        boolean present = StringUtils.isNotEmpty(repeatableTypeName)
+            && (annotationValues != null && isStereotypeSource(sourceAnnotations)
+                || stereotypeValues != null && isStereotypeSource(sourceStereotypes));
+        if (!present && getClass() == DefaultAnnotationMetadata.class && !hasStereotype(repeatableTypeName)) {
+            return null;
         }
-        if (sourceStereotypes != null) {
-            Map<CharSequence, Object> values = sourceStereotypes.get(repeatableTypeName);
-            results = collectResult(results, values);
-        }
+        List<AnnotationValue<T>> results = collectResult(null, annotationValues);
+        results = collectResult(results, stereotypeValues);
         return results == null ? List.of() : results;
+    }
+
+    /**
+     * @param source The annotations or stereotypes
+     * @return Whether {@link #hasStereotype(String)} consults the map, for metadata that does not override it
+     */
+    private boolean isStereotypeSource(@Nullable Map<String, Map<CharSequence, Object>> source) {
+        return getClass() == DefaultAnnotationMetadata.class
+            && (source == allAnnotations || source == declaredAnnotations || source == allStereotypes);
     }
 
     @Nullable
     private Object getRawSingleValue(String annotation, String member, @Nullable Function<Object, Object> valueMapper) {
-        Object rawValue = getRawValue(annotation, member);
-        if (rawValue != null) {
-            if (rawValue.getClass().isArray()) {
-                int len = Array.getLength(rawValue);
-                if (len > 0) {
-                    rawValue = Array.get(rawValue, 0);
-                }
-            } else if (rawValue instanceof Iterable<?> iterable) {
-                Iterator<?> i = iterable.iterator();
-                if (i.hasNext()) {
-                    rawValue = i.next();
-                }
-            }
-        }
+        Object rawValue = ArrayUtils.firstElement(getRawValue(annotation, member));
         if (valueMapper != null && rawValue instanceof CharSequence) {
             return valueMapper.apply(rawValue);
         } else {

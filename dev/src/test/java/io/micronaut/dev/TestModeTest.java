@@ -18,7 +18,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TestModeTest {
@@ -127,33 +130,57 @@ class TestModeTest {
     }
 
     @Test
-    void aContextATestRunsWithTheDefaultLoaderSeesTheGeneration() throws Exception {
+    void aContextATestRunsSeesTheGenerationAndATestResourceTheBuildCopiedOnce() throws Exception {
         Path test = Files.createDirectories(project.resolve("src/test/java/app"));
-        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
-        Files.writeString(main.resolve("Greeter.java"), greeter("one"));
-        Files.writeString(main.resolve("Service.java"), "package app; @jakarta.inject.Singleton public class Service { }");
+        Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(project.resolve("src/main/java/app/Greeter.java"), greeter("one"));
         Files.writeString(test.resolve("ContextTest.java"), """
             package app;
             import io.micronaut.context.ApplicationContext;
             import org.junit.jupiter.api.Test;
             import static org.junit.jupiter.api.Assertions.assertEquals;
-            import static org.junit.jupiter.api.Assertions.assertTrue;
             public class ContextTest {
                 @Test
                 void runs() {
                     try (ApplicationContext context = ApplicationContext.run()) {
                         assertEquals("io.micronaut.dev.loader.GenerationClassLoader", context.getEnvironment().getClassLoader().getClass().getName());
-                        assertTrue(context.containsBean(Service.class));
+                        assertEquals("hello", context.getProperty("greeting", String.class).orElseThrow());
                     }
                 }
             }
             """);
+        Path config = Files.createDirectories(project.resolve("src/test/resources")).resolve("application-test.properties");
+        Files.writeString(config, "greeting=hi\n");
 
-        // the main sources run the annotation processors, so Service has a bean definition in the generation
-        runtime = new MicronautDevMain().launch(manifest("micronaut.dev.compile.java.options=-parameters\n"), new String[0]);
+        runtime = new MicronautDevMain().launch(manifest("micronaut.dev.generations=target/micronaut-dev/generations\n"), new String[0]);
 
         TestRunSummary first = runtime.lastTestRun().orElseThrow();
-        assertTrue(first.isSuccess(), Files.readString(project.resolve("build/test-results/TEST-app.ContextTest.xml")));
+        Path report = project.resolve("build/test-results/TEST-app.ContextTest.xml");
+        assertEquals(1, first.failed(), Files.readString(report));
+
+        // the build copies the test configuration into the test output, as Maven does: the copy, which is stale, is
+        // the same resource as the one read live, not a duplicate
+        Files.copy(config, project.resolve("build/test-classes/application-test.properties"));
+        Files.writeString(config, "greeting=hello\n");
+        runtime.changed(List.of(config), List.of());
+        TestRunSummary second = runtime.awaitTestRun(2, TIMEOUT);
+        assertTrue(second.isSuccess(), Files.readString(report));
+        // the generations go where the manifest says, a Maven build's target directory, marked as the launcher's
+        assertTrue(Files.isRegularFile(project.resolve("target/micronaut-dev/generations/.micronaut-dev-generations")));
+        assertFalse(Files.exists(project.resolve("build/micronaut-dev")));
+    }
+
+    @Test
+    void aGenerationsDirectoryHoldingFilesTheLauncherDidNotWriteIsNotEmptied() throws Exception {
+        Path precious = Files.createDirectories(project.resolve("generations")).resolve("notes.txt");
+        Files.writeString(precious, "mine");
+        Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(project.resolve("src/main/java/app/Greeter.java"), greeter("one"));
+
+        IllegalStateException failure = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+            () -> runtime = new MicronautDevMain().launch(manifest("micronaut.dev.generations=generations\n"), new String[0]));
+        assertTrue(failure.getMessage().contains("did not write"), failure.getMessage());
+        assertEquals("mine", Files.readString(precious));
     }
 
     @Test
@@ -304,6 +331,56 @@ class TestModeTest {
     }
 
     @Test
+    void theRunThatSpendsTheGenerationBudgetCompletesThenTheRuntimeClosesForARelaunch() throws Exception {
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Path test = Files.createDirectories(project.resolve("src/test/java/app"));
+        Path greeter = main.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        Files.writeString(test.resolve("GreeterTest.java"), greeterTest("one"));
+        // the first run takes the second generation: a budget of two would relaunch after it, and the relaunched process
+        // would run it again, without end
+        assertThrows(IllegalArgumentException.class, () -> manifest("micronaut.dev.max-generations=1\n"));
+        assertThrows(IllegalArgumentException.class, () -> manifest("micronaut.dev.max-generations=2\n"));
+        // without a first run, the first run is a change's: two suffice; run once, the budget does not matter
+        assertThrows(IllegalArgumentException.class, () -> manifest("micronaut.dev.max-generations=1\nmicronaut.dev.test.initial-run=false\n"));
+        assertEquals(2, manifest("micronaut.dev.max-generations=2\nmicronaut.dev.test.initial-run=false\n").maxGenerations());
+        assertEquals(1, manifest("micronaut.dev.max-generations=1\nmicronaut.dev.test.once=true\n").maxGenerations());
+
+        writeManifest("micronaut.dev.max-generations=3\n");
+        int[] status = {-2};
+        Thread launcher = new Thread(() -> {
+            try {
+                status[0] = new MicronautDevMain().runForStatus(new String[] {"--manifest", project.resolve("dev.properties").toString()});
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        launcher.start();
+        long deadline = System.nanoTime() + TIMEOUT.toNanos();
+        while ((DevRuntime.current() == null || DevRuntime.current().testRuns() < 1) && System.nanoTime() < deadline) {
+            Thread.sleep(50);
+        }
+        DevRuntime current = DevRuntime.current();
+        assertFalse(current.isGenerationBudgetSpent());
+
+        // a change runs its tests on generation three, the last of the budget: they run, then the runtime closes
+        Files.writeString(greeter, greeter("two"));
+        Files.writeString(test.resolve("GreeterTest.java"), greeterTest("two"));
+        current.changed(List.of(greeter, test.resolve("GreeterTest.java")), List.of());
+        launcher.join(TIMEOUT.toMillis());
+        assertFalse(launcher.isAlive());
+        assertEquals(MicronautDevMain.RELAUNCH, status[0]);
+        assertEquals(2, current.testRuns());
+        assertTrue(current.lastTestRun().orElseThrow().isSuccess());
+        assertTrue(current.isRelaunchRequested());
+        assertNull(DevRuntime.current());
+
+        // run once, the budget does not matter: the status is the tests'
+        writeManifest("micronaut.dev.max-generations=3\nmicronaut.dev.test.once=true\n");
+        assertEquals(0, new MicronautDevMain().runForStatus(new String[] {"--manifest", project.resolve("dev.properties").toString()}));
+    }
+
+    @Test
     void withoutAFirstRunAChangeIsComparedWithTheClassFilesTheRuntimeStartedWith() throws Exception {
         Path main = Files.createDirectories(project.resolve("src/main/java/app"));
         Path test = Files.createDirectories(project.resolve("src/test/java/app"));
@@ -373,6 +450,148 @@ class TestModeTest {
         assertEquals(0, status.get());
     }
 
+    @Test
+    void aChangeOfResourcesAloneIsPatchedIntoTheRunnersStateAndTheTestsRunOnTheSameGeneration() throws Exception {
+        PatchingTestRunner.reset();
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.createDirectories(project.resolve("src/test/java/app"));
+        Path greeter = main.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        // a resource the compiler of another language wrote beside the classes, as the Python compiler writes modules
+        // compiled as a build would, so that the output is up to date when the runtime starts
+        javac(project.resolve("build/classes"), greeter);
+        Path message = Files.createDirectories(project.resolve("build/classes/app")).resolve("message.txt");
+        Files.writeString(message, "one");
+        runtime = new MicronautDevMain().launch(manifest("micronaut.dev.test.runner=patching\n"), new String[0]);
+        assertEquals(1, runtime.testRuns());
+        int generation = runtime.generation();
+        ClassLoader first = PatchingTestRunner.RUN_LOADERS.get(0);
+        assertEquals(List.of("one"), PatchingTestRunner.RUN_MESSAGES);
+
+        // the resource changes and the classes compile the same: the runner patches it, the tests run on the same loader
+        Files.writeString(message, "two");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(2, TIMEOUT);
+        assertEquals(List.of(Set.of(PatchingTestRunner.MESSAGE)), PatchingTestRunner.PATCHES);
+        assertSame(first, PatchingTestRunner.RUN_LOADERS.get(1));
+        assertEquals("two", PatchingTestRunner.RUN_MESSAGES.get(1));
+        assertEquals(generation, runtime.generation(), "a patch takes no generation");
+        assertEquals(1, runtime.inPlacePatches());
+
+        // and again
+        Files.writeString(message, "three");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(3, TIMEOUT);
+        assertSame(first, PatchingTestRunner.RUN_LOADERS.get(2));
+        assertEquals("three", PatchingTestRunner.RUN_MESSAGES.get(2));
+        assertEquals(generation, runtime.generation());
+
+        // a run that no change preceded keeps the generation too, while the runner keeps state built over it
+        runtime.requestTests(TestRequest.ALL);
+        assertSame(first, PatchingTestRunner.RUN_LOADERS.get(3));
+        assertEquals(generation, runtime.generation());
+
+        // a change the runner refuses runs on a new generation, which reads it
+        PatchingTestRunner.refuse = true;
+        Files.writeString(message, "four");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(5, TIMEOUT);
+        ClassLoader fresh = PatchingTestRunner.RUN_LOADERS.get(4);
+        assertNotSame(first, fresh);
+        assertEquals("four", PatchingTestRunner.RUN_MESSAGES.get(4));
+        assertEquals(generation + 1, runtime.generation());
+        PatchingTestRunner.refuse = false;
+
+        // so does one whose patch fails
+        PatchingTestRunner.fail = true;
+        ClassLoader beforeFailure = PatchingTestRunner.RUN_LOADERS.get(4);
+        Files.writeString(message, "five");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(6, TIMEOUT);
+        assertNotSame(beforeFailure, PatchingTestRunner.RUN_LOADERS.get(5));
+        assertEquals("five", PatchingTestRunner.RUN_MESSAGES.get(5));
+        assertEquals(generation + 2, runtime.generation());
+        PatchingTestRunner.fail = false;
+
+        // a class change in the same batch as a patchable resource is not patched
+        ClassLoader beforeClassChange = PatchingTestRunner.RUN_LOADERS.get(5);
+        int patches = PatchingTestRunner.PATCHES.size();
+        Files.writeString(message, "six");
+        Files.writeString(greeter, greeter("two"));
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(7, TIMEOUT);
+        assertEquals(patches, PatchingTestRunner.PATCHES.size());
+        assertNotSame(beforeClassChange, PatchingTestRunner.RUN_LOADERS.get(6));
+        assertEquals("six", PatchingTestRunner.RUN_MESSAGES.get(6));
+
+        // an added resource is not patched either
+        ClassLoader beforeAdded = PatchingTestRunner.RUN_LOADERS.get(6);
+        Files.writeString(message, "seven");
+        Files.writeString(message.resolveSibling("other.txt"), "added");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(8, TIMEOUT);
+        assertEquals(patches, PatchingTestRunner.PATCHES.size());
+        assertNotSame(beforeAdded, PatchingTestRunner.RUN_LOADERS.get(7));
+        assertEquals("seven", PatchingTestRunner.RUN_MESSAGES.get(7));
+
+        // and one whose runner fails to offer a reloader
+        PatchingTestRunner.broken = true;
+        Files.writeString(message, "eight");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(9, TIMEOUT);
+        assertNotSame(PatchingTestRunner.RUN_LOADERS.get(7), PatchingTestRunner.RUN_LOADERS.get(8));
+        assertEquals("eight", PatchingTestRunner.RUN_MESSAGES.get(8));
+    }
+
+    @Test
+    void aChangeOfAResourceReadLiveRunsOnANewGenerationEvenWhenTheRunnerKeepsState() throws Exception {
+        PatchingTestRunner.reset();
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.createDirectories(project.resolve("src/test/java/app"));
+        Path greeter = main.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        javac(project.resolve("build/classes"), greeter);
+        Path message = Files.createDirectories(project.resolve("build/classes/app")).resolve("message.txt");
+        Files.writeString(message, "one");
+        runtime = new MicronautDevMain().launch(manifest("micronaut.dev.test.runner=patching\n"), new String[0]);
+        int generation = runtime.generation();
+
+        // the runner keeps state built over the generation, which a configuration file it read may have shaped: in a
+        // batch that changes one, a change the runner could take is not patched into state about to be discarded
+        Path config = Files.createDirectories(project.resolve("src/test/resources")).resolve("application-test.properties");
+        Files.writeString(config, "a=b\n");
+        Files.writeString(message, "two");
+        runtime.changed(List.of(config), List.of());
+        runtime.awaitTestRun(2, TIMEOUT);
+        assertTrue(PatchingTestRunner.PATCHES.isEmpty());
+        assertNotSame(PatchingTestRunner.RUN_LOADERS.get(0), PatchingTestRunner.RUN_LOADERS.get(1));
+        assertEquals("two", PatchingTestRunner.RUN_MESSAGES.get(1));
+        assertEquals(generation + 1, runtime.generation());
+    }
+
+    @Test
+    void patchingInPlaceCanBeTurnedOffInTestMode() throws Exception {
+        PatchingTestRunner.reset();
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.createDirectories(project.resolve("src/test/java/app"));
+        Path greeter = main.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        // compiled as a build would, so that the output is up to date when the runtime starts
+        javac(project.resolve("build/classes"), greeter);
+        Path message = Files.createDirectories(project.resolve("build/classes/app")).resolve("message.txt");
+        Files.writeString(message, "one");
+        runtime = new MicronautDevMain().launch(manifest("micronaut.dev.test.runner=patching\nmicronaut.dev.patch-in-place=false\n"), new String[0]);
+        int generation = runtime.generation();
+
+        Files.writeString(message, "two");
+        runtime.changed(List.of(greeter), List.of());
+        runtime.awaitTestRun(2, TIMEOUT);
+        assertTrue(PatchingTestRunner.PATCHES.isEmpty());
+        assertNotSame(PatchingTestRunner.RUN_LOADERS.get(0), PatchingTestRunner.RUN_LOADERS.get(1));
+        assertEquals("two", PatchingTestRunner.RUN_MESSAGES.get(1));
+        assertEquals(generation + 1, runtime.generation());
+    }
+
     private DevManifest manifest(String extra) throws Exception {
         return DevManifest.load(writeManifest(extra));
     }
@@ -414,4 +633,35 @@ class TestModeTest {
             }
             """.formatted(expected);
     }
+
+    @Test
+    void aContextATestRunsWithTheDefaultLoaderSeesTheGeneration() throws Exception {
+        Path test = Files.createDirectories(project.resolve("src/test/java/app"));
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(main.resolve("Greeter.java"), greeter("one"));
+        Files.writeString(main.resolve("Service.java"), "package app; @jakarta.inject.Singleton public class Service { }");
+        Files.writeString(test.resolve("ContextTest.java"), """
+            package app;
+            import io.micronaut.context.ApplicationContext;
+            import org.junit.jupiter.api.Test;
+            import static org.junit.jupiter.api.Assertions.assertEquals;
+            import static org.junit.jupiter.api.Assertions.assertTrue;
+            public class ContextTest {
+                @Test
+                void runs() {
+                    try (ApplicationContext context = ApplicationContext.run()) {
+                        assertEquals("io.micronaut.dev.loader.GenerationClassLoader", context.getEnvironment().getClassLoader().getClass().getName());
+                        assertTrue(context.containsBean(Service.class));
+                    }
+                }
+            }
+            """);
+
+        // the main sources run the annotation processors, so Service has a bean definition in the generation
+        runtime = new MicronautDevMain().launch(manifest("micronaut.dev.compile.java.options=-parameters\n"), new String[0]);
+
+        TestRunSummary first = runtime.lastTestRun().orElseThrow();
+        assertTrue(first.isSuccess(), Files.readString(project.resolve("build/test-results/TEST-app.ContextTest.xml")));
+    }
+
 }
