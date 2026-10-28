@@ -442,6 +442,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         payload.release();
                         messageProcessingException(ctx, e);
                         return;
+                    } catch (Throwable e) {
+                        // codecs don't release the buffer, and not every decode error is a CodecException
+                        payload.release();
+                        throw e;
                     }
                     MessageBodyReader<?> reader = data == null ? messageBodyHandlerRegistry.findReader(bodyArgument, mediaType).orElse(null) : null;
                     if (reader == null) {
@@ -454,8 +458,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                             // once the handler completes
                             readerOwned = data instanceof ReferenceCounted rc ? rc : null;
                         } catch (Throwable t) {
-                            // readers release the buffer on success only
-                            payload.release();
+                            // readers only release the buffer when they succeed
+                            if (payload.refCnt() > 0) {
+                                payload.release();
+                            }
                             throw t;
                         }
                     }
