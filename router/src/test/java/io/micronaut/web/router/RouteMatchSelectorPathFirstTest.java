@@ -148,6 +148,7 @@ class RouteMatchSelectorPathFirstTest {
         assertEquals("/g/sub", template(router.findClosest(HttpRequest.GET("/g/sub"))));
         // the locator route accepts OPTIONS, but GET /g/sub is more specific: no route, and GET is allowed
         MutableHttpRequest<?> options = HttpRequest.OPTIONS("/g/sub");
+        assertNull(router.resolve(options, match -> true).matchOrNull());
         assertNull(router.findClosest(options));
         assertEquals(Set.of("GET", "HEAD"), methods(router.findAny(options)));
         MutableHttpRequest<?> post = HttpRequest.POST("/g/sub", "");
@@ -211,6 +212,7 @@ class RouteMatchSelectorPathFirstTest {
         // as FilteredRouter, e.g. with API versioning: findAllClosest with a filter
         MutableHttpRequest<?> request = HttpRequest.create(HttpMethod.CUSTOM, "/cm/1/fixed", "REPORT")
             .header(HttpHeaders.ACCEPT, "text/plain").header(HttpHeaders.CONTENT_TYPE, "application/json");
+        assertNull(router.resolve(request, match -> true).matchOrNull());
         assertEquals(List.of(), router.findAllClosest(request, match -> true));
         DefaultUriRouteMatch<?, ?> rejection = RouteRejections.get(request);
         assertNotNull(rejection);
@@ -221,11 +223,15 @@ class RouteMatchSelectorPathFirstTest {
     void theSelectorOfTheCandidatesDecidesAfterTheFilter() {
         // the route of version 2 has no selector: without it, the candidates share the selector, which rejects
         MutableHttpRequest<?> request = get("/v/fixed", "text/plain");
+        assertNull(router.resolve(request, V1).matchOrNull());
         assertEquals(List.of(), router.findAllClosest(request, V1));
     }
 
     @Test
     void aRouteTheFilterExcludesDoesNotKeepALocatorRouteFromLocating() {
+        var resolved = router.resolve(HttpRequest.GET("/h/sub"), V1).matchOrNull();
+        assertNotNull(resolved);
+        assertEquals("sub", resolved.getVariableValues().get("id"));
         List<UriRouteMatch<Object, Object>> located = router.findAllClosest(HttpRequest.GET("/h/sub"), V1);
         assertEquals(1, located.size(), located.toString());
         assertEquals("sub", located.get(0).getVariableValues().get("id"));
