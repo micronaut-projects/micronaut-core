@@ -99,6 +99,9 @@ if (System.getenv("SONAR_TOKEN") != null) {
         properties {
             property "sonar.exclusions", analysisExcludes.join(",")
             property "sonar.coverage.exclusions", coverageExcludes.join(",")
+            // Test sources are not analysed for issues. Coverage of the main sources still comes
+            // from the JaCoCo reports, which do not need the test files to be indexed.
+            property "sonar.test.exclusions", "**/*"
         }
     }
 }
