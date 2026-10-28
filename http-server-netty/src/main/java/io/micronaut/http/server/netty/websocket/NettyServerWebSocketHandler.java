@@ -115,6 +115,10 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      * Whether the open handler runs: the frames wait. Event loop only.
      */
     private boolean opening;
+    /**
+     * The payload bytes held in {@link #framesWhileOpening}. Event loop only.
+     */
+    private long bytesWhileOpening;
 
     /**
      * Default constructor.
@@ -442,10 +446,25 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
         if (opening && msg instanceof WebSocketFrame frame) {
+            // the frames are already inflated, hold no more than a message may have
+            bytesWhileOpening += frame.content().readableBytes();
+            if (bytesWhileOpening > getMaxPayloadLength()) {
+                releaseFramesWhileOpening();
+                rejectTooLargeMessage(ctx);
+                return;
+            }
             framesWhileOpening.add(frame.retain());
         } else {
             super.channelRead0(ctx, msg);
         }
+    }
+
+    private void releaseFramesWhileOpening() {
+        WebSocketFrame frame;
+        while ((frame = framesWhileOpening.poll()) != null) {
+            frame.release();
+        }
+        bytesWhileOpening = 0;
     }
 
     /**
@@ -453,6 +472,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     private void opened() {
         opening = false;
+        bytesWhileOpening = 0;
         ChannelHandlerContext ctx = channel.pipeline().context(this);
         WebSocketFrame frame;
         while ((frame = framesWhileOpening.poll()) != null) {
@@ -474,10 +494,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        WebSocketFrame frame;
-        while ((frame = framesWhileOpening.poll()) != null) {
-            frame.release();
-        }
+        releaseFramesWhileOpening();
         channel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).set(null);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Removing WebSocket Server session: {}", serverSession);

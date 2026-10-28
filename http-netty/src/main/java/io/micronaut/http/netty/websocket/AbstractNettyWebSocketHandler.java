@@ -336,6 +336,13 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
     }
 
+    /**
+     * @return The largest message payload the message handler accepts
+     */
+    protected final int getMaxPayloadLength() {
+        return maxPayloadLength;
+    }
+
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof WebSocketFrame frame) {
@@ -818,7 +825,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
     }
 
-    private void rejectTooLargeMessage(ChannelHandlerContext ctx) {
+    /**
+     * Closes the session with {@link CloseReason#MESSAGE_TO_BIG}.
+     *
+     * @param ctx The context
+     */
+    protected final void rejectTooLargeMessage(ChannelHandlerContext ctx) {
         ctx.channel().config().setAutoRead(false);
         writeCloseFrameAndTerminate(ctx, CloseReason.MESSAGE_TO_BIG);
     }
