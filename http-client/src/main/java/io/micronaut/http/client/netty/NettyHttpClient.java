@@ -1298,9 +1298,12 @@ final class NettyHttpClient implements
                         DelayedExecutionFlow<HttpResponse<?>> delayed = DelayedExecutionFlow.create();
                         final StreamedHttpResponse nettyResponse = streamedResponse.getNettyResponse();
                         nettyResponse.subscribe(new Subscriber<>() {
-                            final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer();
+                            // max components so the buffer is not consolidated on every add past the default of 16
+                            final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer(Integer.MAX_VALUE);
+                            final int maxContentLength = configuration.getMaxContentLength();
                             @Nullable
                             Subscription s;
+                            boolean done;
 
                             @Override
                             public void onSubscribe(Subscription s) {
@@ -1310,18 +1313,40 @@ final class NettyHttpClient implements
 
                             @Override
                             public void onNext(HttpContent httpContent) {
-                                buffer.addComponent(true, httpContent.content());
+                                if (done) {
+                                    httpContent.release();
+                                    return;
+                                }
+                                ByteBuf content = httpContent.content();
+                                long newSize = (long) buffer.readableBytes() + content.readableBytes();
+                                if (newSize > maxContentLength) {
+                                    done = true;
+                                    content.release();
+                                    Objects.requireNonNull(s).cancel();
+                                    buffer.release();
+                                    completeExceptionallySafe(delayed, decorate(new ContentLengthExceededException(maxContentLength, newSize)));
+                                    return;
+                                }
+                                buffer.addComponent(true, content);
                                 Objects.requireNonNull(s).request(1);
                             }
 
                             @Override
                             public void onError(Throwable t) {
+                                if (done) {
+                                    return;
+                                }
+                                done = true;
                                 buffer.release();
                                 completeExceptionallySafe(delayed, t);
                             }
 
                             @Override
                             public void onComplete() {
+                                if (done) {
+                                    return;
+                                }
+                                done = true;
                                 try {
                                     FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
                                     boolean hasErrorType = errorType != HttpClient.DEFAULT_ERROR_TYPE;
