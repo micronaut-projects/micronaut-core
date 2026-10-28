@@ -45,17 +45,16 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.DecoderResult;
+import io.netty.handler.codec.TooLongFrameException;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpDecoderConfig;
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
@@ -1023,9 +1022,11 @@ final class HttpPipelineBuilder {
     }
 
     /**
-     * {@link HttpObjectAggregator} that closes the connection after any response it writes
-     * itself (417, 413). Those responses bypass the ordering and backpressure of
-     * {@link PipeliningServerHandler}, so the connection must not be kept open after them.
+     * {@link HttpObjectAggregator} for the non-streaming server types. An oversized request is
+     * passed on as a request with a failed decoder result, so that {@link PipeliningServerHandler}
+     * answers it with a 413 in order, after the responses to earlier pipelined requests, and
+     * closes the connection. The 417 for an unsupported expectation is written by the aggregator
+     * itself, so the connection is closed after it.
      */
     private static final class ClosingHttpObjectAggregator extends HttpObjectAggregator {
         ClosingHttpObjectAggregator(int maxContentLength, boolean closeOnExpectationFailed) {
@@ -1039,9 +1040,14 @@ final class HttpPipelineBuilder {
 
         @Override
         protected void handleOversizedMessage(ChannelHandlerContext ctx, HttpMessage oversized) throws Exception {
-            if (oversized instanceof HttpRequest) {
-                ctx.writeAndFlush(new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE, Unpooled.EMPTY_BUFFER, new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, 0).add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE), EmptyHttpHeaders.INSTANCE))
-                    .addListener(ChannelFutureListener.CLOSE);
+            if (oversized instanceof HttpRequest request) {
+                // the rest of the body is discarded by the aggregator
+                DefaultFullHttpRequest failed = new DefaultFullHttpRequest(
+                    request.protocolVersion(), request.method(), request.uri(), Unpooled.EMPTY_BUFFER,
+                    request.headers().copy(), EmptyHttpHeaders.INSTANCE);
+                failed.headers().remove(HttpHeaderNames.EXPECT);
+                failed.setDecoderResult(DecoderResult.failure(new TooLongFrameException("Request body exceeds " + maxContentLength() + " bytes")));
+                ctx.fireChannelRead(failed);
             } else {
                 super.handleOversizedMessage(ctx, oversized);
             }
