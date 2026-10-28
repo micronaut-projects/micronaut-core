@@ -389,6 +389,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     private static Optional<UriRouteMatch<Object, Object>> findWebSocketRoute(Router router, HttpRequest<?> request) {
         return router.find(HttpMethod.GET, request.getPath(), request)
             .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
+            // WebSocket endpoints are default routes, not upgraded on a listener that does not expose them
+            .filter(rm -> rm.getRouteInfo().getPort() != null || router.exposesDefaultRoutes(request))
             .findFirst();
     }
 
