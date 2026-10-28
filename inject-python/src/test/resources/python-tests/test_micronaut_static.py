@@ -3727,6 +3727,14 @@ class FixedAttributeTest(unittest.TestCase):
             bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
             self.assertEqual({"rate": False}, _self_reads(bodies[("Service", "total")]), escape)
 
+    def test_writes_bypassing_the_reported_setattr_in_the_compilation_unfix_the_attribute(self):
+        # the three spellings no __setattr__ of the class sees: the planner keeps the attribute in Python
+        for write in ("service.__dict__.update(rate=2.0)", "vars(service)[\"rate\"] = 2.0", "object.__setattr__(service, \"rate\", 2.0)"):
+            source = FIXED + f"\n\ndef bypass(service: Service) -> None:\n    {write}\n"
+            decisions, planner = plan(source, MODE_ALL, facts=FixedFacts())
+            bodies = {(body.className().split(".")[-1], body.methodName()): body for body in planner.bodies}
+            self.assertEqual({"rate": False}, _self_reads(bodies[("Service", "total")]), write)
+
     def test_a_patch_naming_the_attribute_unfixes_it(self):
         for patch in ('mock.patch.object(Service, "rate", 2.0)', 'mock.patch("pkg.Service.rate", 2.0)', 'monkeypatch.setattr(service, "rate", 2.0)', "mock.patch.multiple(service, rate=2.0)"):
             source = FIXED + f"\n\ndef patched(service, mock, monkeypatch) -> None:\n    {patch}\n"

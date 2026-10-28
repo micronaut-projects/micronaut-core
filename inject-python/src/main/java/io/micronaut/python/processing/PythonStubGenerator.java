@@ -5247,7 +5247,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * The private method of the stub reading an attribute fixed at construction (see
      * {@code StaticPlanner.fixed_attribute}): the slot of the attribute keeps the converted value
-     * for the Python object until a change of an attribute of an object of the class is reported,
+     * for the Python object until a change of one of the attributes the slots hold is reported,
      * see {@code PythonFixedAttributes}. The stub class gets the epoch of its slots once, each
      * attribute a transient slot, created on its first read.
      */

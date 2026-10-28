@@ -53,6 +53,11 @@ final class PythonFixedAttributesTest {
                 long epoch = attributes.epoch();
                 context.eval(PYTHON, "service.other = 1");
                 assertEquals(epoch, attributes.epoch(), "a first assignment changes no value read before");
+                int conversionsBefore = conversions.get();
+                context.eval(PYTHON, "for _ in range(5):\n    service.other += 1\ndel service.other");
+                assertEquals(epoch, attributes.epoch(), "a write of an attribute no slot holds reports nothing");
+                assertEquals(5L, slot.read(service, "rate", attributes, converter, false));
+                assertEquals(conversionsBefore, conversions.get(), "the value is still kept");
 
                 context.eval(PYTHON, "del service.rate");
                 assertNull(slot.read(service, "rate", attributes, converter, false), "a deleted attribute is read as missing");
