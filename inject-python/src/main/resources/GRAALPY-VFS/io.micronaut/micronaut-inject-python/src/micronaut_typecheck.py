@@ -12,7 +12,8 @@ Which functions are checked is decided by the compilation mode (``off``, ``warn`
 and by the ``TypeChecked`` decorator, whose accepted names are configured: the nearest
 declaration wins, a function over its class over its module over the mode; ``@TypeChecked``
 under mode ``off`` checks that scope at ``error`` severity, ``@TypeChecked(False)`` leaves it
-unchecked.
+unchecked. The resolution is :class:`ScopeResolver`, which the static planner shares for
+``CompileStatic`` (:mod:`micronaut_static`).
 """
 import ast
 import keyword
@@ -28,32 +29,61 @@ MODES = (MODE_OFF, MODE_WARN, MODE_ERROR)
 
 
 def switch_value(value):
-    """The boolean a ``TypeChecked`` member value denotes; a string spelling of the literal counts too."""
+    """The boolean the value of a scope switch (``TypeChecked``, ``CompileStatic``) denotes; a string spelling of the literal counts too."""
     if isinstance(value, str):
         return value.strip().lower() not in ("false", "0", "")
     return bool(value)
 
 
-class TypeCheckScope:
+# the scopes a switch can be declared at, outermost first; the nearest declaration wins
+SCOPE_MODE = "MODE"
+SCOPE_MODULE = "MODULE"
+SCOPE_CLASS = "CLASS"
+SCOPE_FUNCTION = "FUNCTION"
+
+
+class ScopeModes:
     """
-    Resolves the severity a definition is checked at from its decorators and its enclosing scope.
+    The modes of a feature switched by a scope annotation (``TypeChecked``, ``CompileStatic``) and
+    what each mode gives a definition: the value without any switch (``default``), the value of a
+    definition switched on (``on``) and of one switched off (``off``). ``feature`` names the feature
+    in the error for an unknown mode.
     """
 
-    def __init__(self, mode, annotation_names):
-        if mode not in MODES:
-            raise ValueError(f"Unknown type-check mode [{mode}]; expected one of {', '.join(MODES)}")
+    def __init__(self, feature, modes, default, on, off):
+        self.feature = feature
+        self.modes = tuple(modes)
+        self.default = default
+        self.on = on
+        self.off = off
+
+
+class ScopeResolver:
+    """
+    Resolves the value a definition gets from its decorators and its enclosing scopes: the nearest
+    accepted switch wins, a function over its class over its module over the compilation's mode. One
+    implementation serves the type checker (the severity a definition is checked at) and the static
+    planner (whether a function is compiled); :class:`ScopeModes` says what the modes and the
+    switches of each give. A resolution is the pair (value, scope), the scope being the one whose
+    declaration decided (``MODE``, ``MODULE``, ``CLASS`` or ``FUNCTION``).
+    """
+
+    def __init__(self, mode, annotation_names, modes):
+        if mode not in modes.modes:
+            raise ValueError(f"Unknown {modes.feature} mode [{mode}]; expected one of {', '.join(modes.modes)}")
         self.mode = mode
+        self.modes = modes
         self.annotation_names = frozenset(annotation_names or ())
 
     @property
-    def default_severity(self):
-        """The severity of a definition without an enclosing switch: None when the mode is off."""
-        return None if self.mode == MODE_OFF else self.mode
+    def default(self):
+        """The resolution of a definition without an enclosing switch: the mode's."""
+        return self.modes.default(self.mode), SCOPE_MODE
 
     def switch(self, decorators):
         """
-        True or False when one of the decorators is an accepted ``TypeChecked`` switch, None otherwise.
-        A bare ``@TypeChecked`` switches checking on.
+        True or False when one of the decorators is an accepted switch, None otherwise. A bare
+        decorator switches on.
         """
         for decorator in decorators or ():
             if decorator.annotationName() in self.annotation_names:
@@ -62,17 +92,67 @@ class TypeCheckScope:
                 return True if value is None else switch_value(value)
         return None
 
-    def severity(self, decorators, enclosing):
+    def within(self, decorators, scope, enclosing):
         """
-        The severity of a definition: its own switch when it has one, else the severity of the
-        enclosing scope. Switching on under mode ``off`` checks at ``error`` severity.
+        The resolution of a definition declared at the scope: its own switch when one of its
+        decorators is one, else the resolution of the enclosing scope.
         """
         switch = self.switch(decorators)
         if switch is None:
             return enclosing
-        if not switch:
-            return None
-        return MODE_ERROR if self.mode == MODE_OFF else self.mode
+        return (self.modes.on(self.mode) if switch else self.modes.off), scope
+
+    def module(self, module):
+        """The resolution of a module record: its own switch, else the mode's."""
+        return self.within(module.decorators, SCOPE_MODULE, self.default)
+
+    def classes(self, module):
+        """
+        The resolution of every class of a module record, by :func:`class_key`. A nested class is
+        declared within the class around it, a top-level class within its module, so an outer
+        class's switch applies to the classes nested in it unless they switch themselves.
+        """
+        module_scope = self.module(module)
+        enclosing = _enclosing_classes([node for _, node in module.classes if node is not None])
+        by_node = {id(node): class_def for class_def, node in module.classes if node is not None}
+        resolved = {}
+
+        def resolve_class(class_def, node):
+            key = class_key(class_def, node)
+            if key not in resolved:
+                outer_node = enclosing.get(id(node)) if node is not None else None
+                outer = resolve_class(by_node[id(outer_node)], outer_node) if outer_node is not None and id(outer_node) in by_node else module_scope
+                resolved[key] = self.within(class_def.decorators(), SCOPE_CLASS, outer)
+            return resolved[key]
+
+        for class_def, node in module.classes:
+            resolve_class(class_def, node)
+        return resolved
+
+    def resolve(self, module_decorators, class_decorators, function_decorators):
+        """The resolution of a function under the declarations of its module, its class (None for a module-level function) and its own."""
+        resolution = self.within(module_decorators, SCOPE_MODULE, self.default)
+        resolution = self.within(class_decorators, SCOPE_CLASS, resolution)
+        return self.within(function_decorators, SCOPE_FUNCTION, resolution)
+
+
+def class_key(class_def, node):
+    """The key of a recorded class in :meth:`ScopeResolver.classes`: its AST node, else its model."""
+    return id(node) if node is not None else id(class_def)
+
+
+# type checking: unchecked (None) under mode off, else checked at the mode's severity; switching on
+# under mode off checks at error severity
+TYPE_CHECK_MODES = ScopeModes(
+    "type-check", MODES,
+    default=lambda mode: None if mode == MODE_OFF else mode,
+    on=lambda mode: MODE_ERROR if mode == MODE_OFF else mode,
+    off=None)
+
+
+def TypeCheckScope(mode, annotation_names):
+    """The :class:`ScopeResolver` of type checking: resolves the severity a definition is checked at."""
+    return ScopeResolver(mode, annotation_names, TYPE_CHECK_MODES)
 
 
 class CheckUnit:
@@ -166,32 +246,22 @@ class TypeChecker:
         """
         units = []
         for module in self._modules.values():
-            module_severity = self.scope.severity(module.decorators, self.scope.default_severity)
+            module_scope = self.scope.module(module)
             for function_def, node in module.functions:
-                severity = self.scope.severity(function_def.decorators(), module_severity)
+                severity, _ = self.scope.within(function_def.decorators(), SCOPE_FUNCTION, module_scope)
                 units.append(CheckUnit(module.source_path, function_def.name(), function_def, node, None, severity, module))
             # a nested class takes the switch of the class around it, the nearest declaration winning
-            enclosing = _enclosing_classes([node for _, node in module.classes if node is not None])
-            by_node = {id(node): class_def for class_def, node in module.classes if node is not None}
-            class_scopes = {}
-
-            def class_scope(class_def, node):
-                key = id(node) if node is not None else id(class_def)
-                if key not in class_scopes:
-                    outer_node = enclosing.get(id(node)) if node is not None else None
-                    outer_severity = class_scope(by_node[id(outer_node)], outer_node)[0] if outer_node is not None and id(outer_node) in by_node else module_severity
-                    # a nested class is modelled by its binary name (Outer$Inner): its source name is Outer.Inner
-                    class_scopes[key] = (self.scope.severity(class_def.decorators(), outer_severity), class_def.name().replace("$", "."))
-                return class_scopes[key]
-
+            class_scopes = self.scope.classes(module)
             for class_def, node in module.classes:
-                class_severity, class_name = class_scope(class_def, node)
-                units.append(CheckUnit(module.source_path, class_name, None, node, class_def, class_severity, module))
+                resolved = class_scopes[class_key(class_def, node)]
+                # a nested class is modelled by its binary name (Outer$Inner): its source name is Outer.Inner
+                class_name = class_def.name().replace("$", ".")
+                units.append(CheckUnit(module.source_path, class_name, None, node, class_def, resolved[0], module))
                 members = list(class_def.functions())
                 if class_def.constructor() is not None:
                     members.append(class_def.constructor())
                 for function_def in members:
-                    severity = self.scope.severity(function_def.decorators(), class_severity)
+                    severity, _ = self.scope.within(function_def.decorators(), SCOPE_FUNCTION, resolved)
                     qualified_name = f"{class_name}.{function_def.name()}"
                     units.append(CheckUnit(module.source_path, qualified_name, function_def, function_node(node, function_def.name(), function_def), class_def, severity, module))
         return units
@@ -570,6 +640,8 @@ def _enclosing_classes(class_nodes):
 
     def visit(node, outer):
         for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.expr):
+                continue  # an expression holds no class
             if isinstance(child, ast.ClassDef):
                 if outer is not None:
                     enclosing[id(child)] = outer
@@ -1609,6 +1681,7 @@ class PythonClassModel:
         self._bases = None
         self._subclasses = None
         self._python_exception = False
+        self._assigned_outside = None  # the attributes of self a method other than __init__ assigns, collected once
 
     @property
     def bases(self):
@@ -1823,8 +1896,26 @@ class PythonClassModel:
     def subclasses(self):
         """The classes of the compilation extending this one: a value of the class may be any of them."""
         if self._subclasses is None:
-            self._subclasses = [model for model in self.classes.all() if model is not self and model.is_subclass_of(self)]
+            self._subclasses = self.classes.subclasses_of(self)
         return self._subclasses
+
+    def reached_bases(self):
+        """
+        The classes is_subclass_of finds on the way up from this class, itself included: the
+        compilation's classes among the bases, walked depth first, each qualified name expanded once.
+        """
+        reached = [self]
+        seen = set()
+        stack = [self]
+        while stack:
+            model = stack.pop()
+            if model.qualified in seen:
+                continue
+            seen.add(model.qualified)
+            bases = [base for base in model.bases if isinstance(base, PythonClassModel)]
+            reached.extend(bases)
+            stack.extend(reversed(bases))
+        return reached
 
     def subclass_defines(self, name):
         return any(subclass.find(name) is not None for subclass in self.subclasses)
@@ -1903,16 +1994,19 @@ class PythonClassModel:
 
     def _assigned_outside_constructor(self, name):
         """Whether a method other than __init__ assigns self.<name>: its type is then not the constructor's to say."""
-        for statement in getattr(self.node, "body", ()):
-            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and statement.name != "__init__" and statement.args.args:
-                receiver = statement.args.args[0].arg
-                for child in ast.walk(statement):
-                    if isinstance(child, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
-                        targets = child.targets if isinstance(child, ast.Assign) else [child.target]
-                        for target in targets:
-                            if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == receiver and target.attr == name:
-                                return True
-        return False
+        if self._assigned_outside is None:
+            assigned = set()
+            for statement in getattr(self.node, "body", ()):
+                if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and statement.name != "__init__" and statement.args.args:
+                    receiver = statement.args.args[0].arg
+                    for child in ast.walk(statement):
+                        if isinstance(child, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+                            targets = child.targets if isinstance(child, ast.Assign) else [child.target]
+                            for target in targets:
+                                if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == receiver:
+                                    assigned.add(target.attr)
+            self._assigned_outside = frozenset(assigned)
+        return name in self._assigned_outside
 
 
 def _receiver_assignments(function_node, name):
@@ -1963,6 +2057,7 @@ class PythonClasses:
         self.by_def = {}
         self.by_node = {}
         self.models = []
+        self._subclasses = None  # id(model) -> the classes extending it, see subclasses_of
         for module in checker._modules.values():
             for class_def, node in module.classes:
                 model = PythonClassModel(self, class_def, node, module)
@@ -1975,6 +2070,20 @@ class PythonClasses:
 
     def all(self):
         return self.models
+
+    def subclasses_of(self, model):
+        """
+        The classes of the compilation extending the class, in the order of the compilation: the
+        classes every class reaches on the way up (PythonClassModel.reached_bases) inverted once,
+        rather than every class asked whether it extends each class in turn.
+        """
+        if self._subclasses is None:
+            subclasses = {}
+            for candidate in self.models:
+                for reached in {id(base): base for base in candidate.reached_bases() if base is not candidate}.values():
+                    subclasses.setdefault(id(reached), []).append(candidate)
+            self._subclasses = subclasses
+        return list(self._subclasses.get(id(model), ()))
 
     def describe_base(self, module, base):
         """
