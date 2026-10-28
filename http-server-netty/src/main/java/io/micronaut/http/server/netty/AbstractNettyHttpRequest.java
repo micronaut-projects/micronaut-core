@@ -281,9 +281,14 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         // https://example.com/foo -> /foo, keeping the path as sent
         String rawPath = fullUri.getRawPath();
         var relative = new StringBuilder(rawPath == null || rawPath.isEmpty() ? "/" : rawPath);
-        String rawQuery = fullUri.getRawQuery();
-        if (rawQuery != null) {
-            relative.append('?').append(rawQuery);
+        String query = fullUri.getQuery();
+        if (query != null) {
+            // the query of an absolute-form target is decoded and re-quoted, as before
+            try {
+                relative.append('?').append(new URI(null, null, "/", query, null).getRawQuery());
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException(e);
+            }
         }
         String rawFragment = fullUri.getRawFragment();
         if (rawFragment != null) {
