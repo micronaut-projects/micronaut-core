@@ -443,8 +443,19 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         return opening;
     }
 
+    /**
+     * @return Whether the frames can be read: the open handler completed and did not close the session
+     */
+    boolean readsFrames() {
+        return !opening && serverSession.isOpen();
+    }
+
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
+        if (msg instanceof WebSocketFrame && !serverSession.isOpen()) {
+            // the session was closed (e.g. by the open handler), no frame reaches the handlers
+            return;
+        }
         if (opening && msg instanceof WebSocketFrame frame) {
             // the frames are already inflated, hold no more than a message may have
             bytesWhileOpening += frame.content().readableBytes();
