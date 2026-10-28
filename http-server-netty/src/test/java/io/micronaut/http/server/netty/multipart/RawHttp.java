@@ -17,21 +17,27 @@ public final class RawHttp {
     }
 
     /**
-     * Writes the request and reads the response head and its content-length body, or until the
-     * connection closes or the timeout passes.
+     * Writes the request, in the given chunks with a pause in between, and reads the response
+     * head and its content-length body, or until the connection closes or the timeout passes.
      *
      * @param port          The port
      * @param timeoutMillis The read timeout
-     * @param request       The request bytes
+     * @param chunks        The request bytes
      * @return The response text, empty when nothing arrived
      * @throws IOException on connection failure
+     * @throws InterruptedException if interrupted
      */
-    public static String exchange(int port, int timeoutMillis, byte[] request) throws IOException {
+    public static String exchange(int port, int timeoutMillis, byte[]... chunks) throws IOException, InterruptedException {
         try (Socket s = new Socket("127.0.0.1", port)) {
             s.setSoTimeout(timeoutMillis);
             OutputStream out = s.getOutputStream();
-            out.write(request);
-            out.flush();
+            for (int i = 0; i < chunks.length; i++) {
+                if (i > 0) {
+                    Thread.sleep(300);
+                }
+                out.write(chunks[i]);
+                out.flush();
+            }
             InputStream in = s.getInputStream();
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];

@@ -162,6 +162,40 @@ public final class Compressor {
     }
 
     /**
+     * Parse a weight without throwing for malformed input: an exception per malformed entry makes
+     * a long header expensive to examine.
+     *
+     * @param header The header
+     * @param start  The start of the weight, inclusive
+     * @param end    The end of the weight, exclusive
+     * @return The weight, or {@code 0} (ignore the encoding) if it is malformed
+     */
+    private static float parseWeight(String header, int start, int end) {
+        while (start < end && Character.isWhitespace(header.charAt(start))) {
+            start++;
+        }
+        while (end > start && Character.isWhitespace(header.charAt(end - 1))) {
+            end--;
+        }
+        boolean digits = false;
+        boolean dot = false;
+        for (int i = start; i < end; i++) {
+            char c = header.charAt(i);
+            if (c >= '0' && c <= '9') {
+                digits = true;
+            } else if (c == '.' && !dot) {
+                dot = true;
+            } else {
+                return 0.0f;
+            }
+        }
+        if (!digits) {
+            return 0.0f;
+        }
+        return Float.parseFloat(header.substring(start, end));
+    }
+
+    /**
      * Pick the response encoding from the {@code Accept-Encoding} header values. Each value is
      * a comma-separated list of {@code encoding[;q=weight]} entries; the entries are examined in
      * place, without splitting the header into strings.
@@ -192,12 +226,7 @@ public final class Compressor {
                 float q = 1.0f;
                 int equalsPos = header.indexOf('=', start, end);
                 if (equalsPos != -1) {
-                    try {
-                        q = Float.parseFloat(header.substring(equalsPos + 1, end));
-                    } catch (NumberFormatException e) {
-                        // Ignore encoding
-                        q = 0.0f;
-                    }
+                    q = parseWeight(header, equalsPos + 1, end);
                 }
                 if (header.indexOf("*", start, end) != -1) {
                     starQ = q;
