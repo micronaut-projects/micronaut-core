@@ -228,7 +228,9 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
         Map<String, Object> raw = rawVariables;
         if (raw == null) {
             Map<String, Object> matchVariables = matchInfo.getVariableValues();
-            if (matchVariables.containsValue(null)) {
+            if (CollectionUtils.isEmpty(matchVariables)) {
+                raw = Map.of();
+            } else if (matchVariables.containsValue(null)) {
                 // an optional variable that is absent has no value
                 raw = CollectionUtils.newLinkedHashMap(matchVariables.size());
                 for (Map.Entry<String, Object> entry : matchVariables.entrySet()) {
