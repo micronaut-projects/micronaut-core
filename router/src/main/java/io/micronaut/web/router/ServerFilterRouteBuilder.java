@@ -20,10 +20,8 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.context.ServerContextPathProvider;
@@ -33,7 +31,6 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import jakarta.inject.Singleton;
 
-import java.util.List;
 import java.util.function.Supplier;
 
 /**
@@ -63,28 +60,6 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Exe
     ) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         delegate = new BaseFilterProcessor<>(beanContext, ServerFilter.class) {
-            @NonNull
-            @Override
-            protected List<String> prependContextPath(@NonNull List<String> patterns) {
-                String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
-                if (contextPath != null) {
-                    patterns = patterns.stream()
-                        .map(pattern -> {
-                            if (!pattern.startsWith(contextPath)) {
-                                String newValue = StringUtils.prependUri(contextPath, pattern);
-                                if (newValue.charAt(0) != '/') {
-                                    newValue = "/" + newValue;
-                                }
-                                return newValue;
-                            } else {
-                                return pattern;
-                            }
-                        })
-                        .toList();
-                }
-                return patterns;
-            }
-
             @Override
             protected void addFilter(Supplier<GenericHttpFilter> factory, AnnotationMetadata methodAnnotations, FilterMetadata metadata) {
                 applyMetadata(ServerFilterRouteBuilder.this.addFilter(factory, methodAnnotations, metadata.isPreMatching()), metadata);
@@ -100,6 +75,9 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Exe
                 }
                 if (metadata.methods() != null) {
                     route.methods(metadata.methods().toArray(new HttpMethod[0]));
+                }
+                if (contextPathProvider != null && !Boolean.FALSE.equals(metadata.appendContextPath()) && route instanceof DefaultFilterRoute defaultFilterRoute) {
+                    defaultFilterRoute.contextPath(contextPathProvider.getContextPath());
                 }
             }
         };
