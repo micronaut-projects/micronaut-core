@@ -64,6 +64,7 @@ import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteInfo;
@@ -120,6 +121,7 @@ import java.net.URL;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -369,6 +371,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
 
             if (optionalFile.isPresent()) {
+                if (httpMethod != HttpMethod.GET && httpMethod != HttpMethod.HEAD) {
+                    // Static resources are only served for GET and HEAD
+                    if (optionalFile.get() instanceof StreamedFile) {
+                        try {
+                            ((StreamedFile) optionalFile.get()).getInputStream().close();
+                        } catch (IOException e) {
+                            // ignore
+                        }
+                    }
+                    Set<String> staticMethods = new HashSet<>(Arrays.asList(HttpMethod.GET.name(), HttpMethod.HEAD.name()));
+                    handleStatusError(
+                            ctx,
+                            nettyHttpRequest,
+                            HttpResponse.notAllowedGeneric(staticMethods),
+                            "Method [" + requestMethodName + "] not allowed for URI [" + request.getUri() + "]. Allowed methods: " + staticMethods);
+                    return;
+                }
                 filterAndEncodeResponse(ctx, nettyHttpRequest, Flux.just(HttpResponse.ok(optionalFile.get())));
                 return;
             }

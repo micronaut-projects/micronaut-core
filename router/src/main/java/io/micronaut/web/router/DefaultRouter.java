@@ -27,6 +27,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.FilterPatternStyle;
@@ -461,7 +462,13 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                     continue;
                 }
             }
-            filterRoute.match(method, uri).ifPresent(httpFilters::add);
+            Optional<HttpFilter> filter = filterRoute.match(method, uri);
+            if (!filter.isPresent() && method == HttpMethod.HEAD && routeMatch != null
+                    && routeMatch.getAnnotationMetadata().hasDeclaredAnnotation(Get.class)) {
+                // A HEAD route derived from a @Get method runs the GET handler, so the filters scoped to GET apply to it as well
+                filter = filterRoute.match(HttpMethod.GET, uri);
+            }
+            filter.ifPresent(httpFilters::add);
         }
         httpFilters.sort(OrderUtil.COMPARATOR);
         return Collections.unmodifiableList(httpFilters);

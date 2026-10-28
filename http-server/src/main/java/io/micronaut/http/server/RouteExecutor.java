@@ -75,7 +75,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -399,36 +399,13 @@ public final class RouteExecutor {
             return upstreamResponsePublisher;
         }
         List<HttpFilter> filters = new ArrayList<>(httpFilters);
-        AtomicInteger integer = new AtomicInteger();
         int len = filters.size();
         final Function<MutableHttpResponse<?>, Publisher<MutableHttpResponse<?>>> handleStatusException = (response) ->
                 handleStatusException(requestReference.get(), response);
         final Function<Throwable, Publisher<MutableHttpResponse<?>>> onError = (t) ->
                 onError(t, requestReference.get());
 
-        ServerFilterChain filterChain = new ServerFilterChain() {
-            @SuppressWarnings("unchecked")
-            @Override
-            public Publisher<MutableHttpResponse<?>> proceed(io.micronaut.http.HttpRequest<?> request) {
-                int pos = integer.incrementAndGet();
-                if (pos > len) {
-                    throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
-                }
-                if (pos == len) {
-                    return upstreamResponsePublisher;
-                }
-                HttpFilter httpFilter = filters.get(pos);
-
-                requestReference.set(request);
-                try {
-                    return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(request, this))
-                            .flatMap(handleStatusException)
-                            .onErrorResume(onError);
-                } catch (Throwable t) {
-                    return onError.apply(t);
-                }
-            }
-        };
+        ServerFilterChain filterChain = new FilterChainAt(1, filters, len, requestReference, upstreamResponsePublisher, handleStatusException, onError);
         HttpFilter httpFilter = filters.get(0);
         HttpRequest<?> request = requestReference.get();
         try {
@@ -894,4 +871,55 @@ public final class RouteExecutor {
         return HttpResponse.status(status);
     }
 
+    /**
+     * The chain passed to the filter at a position. It proceeds once, to the filter at the next position.
+     */
+    private static final class FilterChainAt implements ServerFilterChain {
+        private final int pos;
+        private final List<HttpFilter> filters;
+        private final int len;
+        private final AtomicReference<HttpRequest<?>> requestReference;
+        private final Publisher<MutableHttpResponse<?>> upstreamResponsePublisher;
+        private final Function<MutableHttpResponse<?>, Publisher<MutableHttpResponse<?>>> handleStatusException;
+        private final Function<Throwable, Publisher<MutableHttpResponse<?>>> onError;
+        private final AtomicBoolean proceeded = new AtomicBoolean();
+
+        FilterChainAt(int pos,
+                      List<HttpFilter> filters,
+                      int len,
+                      AtomicReference<HttpRequest<?>> requestReference,
+                      Publisher<MutableHttpResponse<?>> upstreamResponsePublisher,
+                      Function<MutableHttpResponse<?>, Publisher<MutableHttpResponse<?>>> handleStatusException,
+                      Function<Throwable, Publisher<MutableHttpResponse<?>>> onError) {
+            this.pos = pos;
+            this.filters = filters;
+            this.len = len;
+            this.requestReference = requestReference;
+            this.upstreamResponsePublisher = upstreamResponsePublisher;
+            this.handleStatusException = handleStatusException;
+            this.onError = onError;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Publisher<MutableHttpResponse<?>> proceed(io.micronaut.http.HttpRequest<?> request) {
+            if (!proceeded.compareAndSet(false, true)) {
+                throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
+            }
+            if (pos == len) {
+                return upstreamResponsePublisher;
+            }
+            HttpFilter httpFilter = filters.get(pos);
+
+            requestReference.set(request);
+            try {
+                ServerFilterChain next = new FilterChainAt(pos + 1, filters, len, requestReference, upstreamResponsePublisher, handleStatusException, onError);
+                return Flux.from((Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(request, next))
+                        .flatMap(handleStatusException)
+                        .onErrorResume(onError);
+            } catch (Throwable t) {
+                return onError.apply(t);
+            }
+        }
+    }
 }
