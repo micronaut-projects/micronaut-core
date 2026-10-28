@@ -17,6 +17,25 @@ public final class RawHttp {
     }
 
     /**
+     * Writes the request and reads the response head and its content-length body, or until the
+     * connection closes or the timeout passes.
+     *
+     * @param port          The port
+     * @param timeoutMillis The read timeout
+     * @param request       The request bytes
+     * @return The response text, empty when nothing arrived
+     * @throws IOException on connection failure
+     */
+    public static String exchange(int port, int timeoutMillis, byte[] request) throws IOException {
+        try {
+            return exchange(port, timeoutMillis, new byte[][]{request});
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new java.io.InterruptedIOException(e.getMessage());
+        }
+    }
+
+    /**
      * Writes the request, in the given chunks with a pause in between, and reads the response
      * head and its content-length body, or until the connection closes or the timeout passes.
      *

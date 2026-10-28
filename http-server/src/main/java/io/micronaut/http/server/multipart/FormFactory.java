@@ -26,6 +26,7 @@ import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.body.InternalByteBody;
+import io.micronaut.http.body.stream.ReadBufferCoalescing;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.form.FormCapableHttpRequest;
@@ -325,7 +326,7 @@ public final class FormFactory {
                     latestPieceWritten = file;
                 } else {
                     // no transfer, just save to memory
-                    Objects.requireNonNull(memory).add(buffer);
+                    ReadBufferCoalescing.add(Objects.requireNonNull(memory), buffer, bufferFactory);
                     Objects.requireNonNull(subscription).request(1);
                     return;
                 }
