@@ -21,6 +21,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.LazySendingSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
@@ -175,6 +176,11 @@ public abstract class ResponseLifecycle {
             return buildFinalResponse(nettyRequest, (MutableHttpResponse<Object>) response, responseBodyType, responseMediaType, body, messageBodyWriter, false);
         } else {
             response.body(null);
+            if (body instanceof CloseableByteBody byteBody) {
+                // the body of a HEAD response is not written, release it as the writer of a GET
+                // response does
+                byteBody.close();
+            }
 
             return encodeNoBody(response);
         }
@@ -240,12 +246,27 @@ public abstract class ResponseLifecycle {
                 });
         }
 
-        httpContentPublisher = httpContentPublisher.doOnDiscard(CloseableByteBody.class, CloseableByteBody::close);
+        // items dropped after a cancel are released: the pieces that were written already, and the
+        // items of the body publisher that were not written yet
+        httpContentPublisher = httpContentPublisher.doOnDiscard(Object.class, this::discardItem);
 
         return LazySendingSubscriber.create(httpContentPublisher).map(items -> {
             CloseableByteBody byteBody = isJson ? concatenateJson(items) : concatenate(items);
             return ByteBodyHttpResponseWrapper.wrap(response, byteBody);
         }).onErrorResume(t -> (ExecutionFlow) handleStreamingError(request, t));
+    }
+
+    /**
+     * Release an item of a streamed response body that is dropped without being written.
+     *
+     * @param item The item, either an item of the body publisher or a written piece
+     */
+    protected void discardItem(Object item) {
+        if (item instanceof CloseableByteBody byteBody) {
+            byteBody.close();
+        } else if (item instanceof ReferenceCounted referenceCounted) {
+            referenceCounted.release();
+        }
     }
 
     /**

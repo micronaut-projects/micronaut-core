@@ -37,6 +37,7 @@ import io.micronaut.http.server.ResponseLifecycle;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.util.LeakPresenceDetector;
+import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -81,6 +82,15 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
         }
 
         return super.encodeNoBody(response);
+    }
+
+    @Override
+    protected void discardItem(Object item) {
+        if (item instanceof io.netty.util.ReferenceCounted) {
+            ReferenceCountUtil.release(item);
+        } else {
+            super.discardItem(item);
+        }
     }
 
     private NettyByteBodyFactory byteBodyFactory() {

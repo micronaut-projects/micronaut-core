@@ -44,6 +44,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.codec.CodecException;
@@ -585,6 +586,8 @@ public final class RouteExecutor {
             final Object o = response.getBody().orElse(null);
             if (o instanceof ReferenceCounted referenceCounted) {
                 referenceCounted.release();
+            } else if (o instanceof CloseableByteBody byteBody) {
+                byteBody.close();
             }
             response.body(null);
             if (o != null) {
