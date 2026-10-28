@@ -236,11 +236,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     /**
      * Whether the listener of a channel without a port exposes the default routes.
      *
-     * @param channel The connection, or the HTTP/2 stream
+     * @param channel The connection, or the HTTP/2 stream, {@code null} for a detached context
      * @return The setting of the listener, or {@code null} if it has a port
      */
-    private static @Nullable Boolean listenerExposesDefaultRoutes(Channel channel) {
-        if (channel.localAddress() instanceof InetSocketAddress) {
+    private static @Nullable Boolean listenerExposesDefaultRoutes(@Nullable Channel channel) {
+        if (channel == null || channel.localAddress() instanceof InetSocketAddress) {
             return null;
         }
         Boolean exposes = channel.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
