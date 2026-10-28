@@ -63,6 +63,7 @@ public final class TypeFacts {
      */
     public static final String PYTHON_TYPE_PREFIX = "python:";
 
+    private static final String INTROSPECTED = "io.micronaut.core.annotation.Introspected";
     private static final String OBJECT_TYPE = "java.lang.Object";
     private static final String SHORT_TYPE = "short";
     private static final String FLOAT_TYPE = "float";
@@ -148,6 +149,21 @@ public final class TypeFacts {
             });
             return result != null && result;
         });
+    }
+
+    /**
+     * Whether a type is introspected: the generated class of an introspected Python class holds the
+     * state of its objects in Java fields of its own.
+     *
+     * @param qualifiedName The type
+     * @return Whether it is introspected; {@code true} for an unknown or incomplete type
+     */
+    public boolean isIntrospected(String qualifiedName) {
+        Boolean result = complete(() -> {
+            ClassElement element = resolveClass(qualifiedName);
+            return element == null || element.hasStereotype(INTROSPECTED);
+        });
+        return result == null || result;
     }
 
     /**
