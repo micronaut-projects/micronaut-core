@@ -65,6 +65,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakeException;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
 import io.netty.handler.ssl.SslHandler;
@@ -179,7 +180,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-        if (isWebSocketUpgrade(request)) {
+        // a request whose head failed to decode is answered like any other request: 400 and close
+        if (isWebSocketUpgrade(request) && !request.decoderResult().isFailure()) {
             NettyHttpRequest<?> msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
 
             Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getPath(), msg)
@@ -193,6 +195,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 }
             });
             responseFlow.onComplete((response, throwable) -> {
+                // the upgrade does not read the body of its request
+                body.close();
                 if (response != null) {
                     writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response, outboundAccess);
                 }
@@ -221,6 +225,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Cancelling websocket upgrade, handler was removed while request was processing");
             }
+            next.responseWritten(msg);
             return;
         }
 
@@ -231,7 +236,18 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             //Adding new handler to the existing pipeline to handle WebSocket Messages
             WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
 
-            handleHandshake(ctx, msg, webSocketBean, actualResponse);
+            try {
+                handleHandshake(ctx, msg, webSocketBean, actualResponse);
+            } catch (WebSocketServerHandshakeException e) {
+                // rejected before anything was written: answered like a malformed request
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Rejecting websocket upgrade: {}", e.getMessage());
+                }
+                outboundAccess.attachment(msg);
+                outboundAccess.closeAfterWrite();
+                next.writeResponse(outboundAccess, msg, HttpResponse.badRequest(), null);
+                return;
+            }
 
             ChannelPipeline pipeline = ctx.pipeline();
 
@@ -256,8 +272,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 } catch (NoSuchElementException ignored) {
                 }
 
-                // websocket needs auto read for now
-                ctx.channel().config().setAutoRead(true);
+                // websocket needs auto read for now, once the open handler completed
+                ctx.channel().config().setAutoRead(!webSocketHandler.isOpening());
             } catch (Throwable e) {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Error opening WebSocket: {}", e.getMessage(), e);
@@ -265,6 +281,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
             }
         } else {
+            // the request is released once the response was written
+            outboundAccess.attachment(msg);
             next.writeResponse(outboundAccess, msg, actualResponse, null);
         }
     }
