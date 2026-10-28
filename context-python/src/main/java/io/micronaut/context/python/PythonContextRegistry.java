@@ -29,15 +29,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Supplier;
 
 /**
@@ -49,6 +51,14 @@ import java.util.function.Supplier;
  * {@link Context#equals(Object)} so the creator instance and the views returned by
  * {@link Value#getContext()} share one entry. It is deliberately static: contexts are JVM objects and
  * the shutdown gates must see every execution, whichever application context started it.
+ * <p>
+ * Entering and leaving an execution, which every call into Python does, takes no lock: the states are
+ * looked up in a concurrent map, and each state counts its executions in one atomic word together with
+ * whether the context is closing, whether a listener waits for it to become idle and whether the state
+ * was dropped. Marking a context closing and counting an execution in are therefore one atomic step
+ * each, so an outermost execution either counts before the close sees the context idle or is refused.
+ * The registry lock guards the listeners, the creation and removal of states, and the transition to
+ * idle when a listener waits for it.
  *
  * @author Micronaut Team
  * @since 5.2.0
@@ -57,9 +67,11 @@ import java.util.function.Supplier;
 final class PythonContextRegistry {
 
     private static final Logger LOG = LoggerFactory.getLogger(PythonContextRegistry.class);
-    private static final AtomicInteger ACTIVE_EXECUTIONS = new AtomicInteger();
+    /** The executions of every context; a sum, never below the executions the states count. */
+    private static final LongAdder ACTIVE_EXECUTIONS = new LongAdder();
     private static final Object LOCK = new Object();
-    private static final HashMap<Context, ContextState> CONTEXT_STATES = new HashMap<>();
+    /** The states, read without the lock; created and removed under {@link #LOCK}. */
+    private static final ConcurrentHashMap<Context, ContextState> CONTEXT_STATES = new ConcurrentHashMap<>();
     /** The contexts of each engine that are being built and not registered yet; guarded by {@link #LOCK}. */
     private static final HashMap<Engine, Integer> PENDING_BUILDS = new HashMap<>();
     /** The {@link #onNoContexts} listeners waiting for the builds of an engine to end; guarded by {@link #LOCK}. */
@@ -76,10 +88,7 @@ final class PythonContextRegistry {
      * @return The state
      */
     static ContextState state(Context context) {
-        ContextState existing;
-        synchronized (LOCK) {
-            existing = CONTEXT_STATES.get(context);
-        }
+        ContextState existing = CONTEXT_STATES.get(context);
         if (existing != null) {
             return existing;
         }
@@ -98,9 +107,7 @@ final class PythonContextRegistry {
      * @return The state, or {@code null} when the context is unknown
      */
     static @Nullable ContextState existingState(Context context) {
-        synchronized (LOCK) {
-            return CONTEXT_STATES.get(context);
-        }
+        return CONTEXT_STATES.get(context);
     }
 
     /**
@@ -183,8 +190,8 @@ final class PythonContextRegistry {
             ContextState contextState = CONTEXT_STATES.remove(context);
             if (contextState != null) {
                 listeners = List.copyOf(contextState.noContextListeners);
-                // executions still in flight leave the aggregate now; their exit finds no state
-                ACTIVE_EXECUTIONS.addAndGet(-contextState.activeExecutions);
+                // executions still in flight leave the aggregate now; their exit finds the state dropped
+                ACTIVE_EXECUTIONS.add(-contextState.detach());
                 fileSystem = contextState.fileSystem;
                 contextState.clear(context);
             } else {
@@ -221,10 +228,7 @@ final class PythonContextRegistry {
      * @param context The context the application used
      */
     static void forgetScopedProxies(Context context) {
-        ContextState state;
-        synchronized (LOCK) {
-            state = CONTEXT_STATES.get(context);
-        }
+        ContextState state = CONTEXT_STATES.get(context);
         if (state != null) {
             synchronized (state.scopedProxies) {
                 state.scopedProxies.clear();
@@ -245,7 +249,7 @@ final class PythonContextRegistry {
         synchronized (LOCK) {
             ContextState state = CONTEXT_STATES.remove(context);
             if (state != null) {
-                ACTIVE_EXECUTIONS.addAndGet(-state.activeExecutions);
+                ACTIVE_EXECUTIONS.add(-state.detach());
                 state.clear(context);
             }
         }
@@ -260,32 +264,46 @@ final class PythonContextRegistry {
      * @param context The context entering Python execution
      */
     static void enterExecution(Context context) {
-        if (!tryEnterExecution(context, false, true)) {
+        if (tryEnterExecution(context, false, true) == null) {
             throw new IllegalStateException("The Python context is closing");
         }
     }
 
     /**
-     * Count an execution under the registry lock, where the closing state is decided too.
+     * Count an execution in the state of its context, in the one atomic step that also reads whether
+     * the context is closing (see {@link ContextState#tryEnter}). No lock is taken unless the context
+     * is seen for the first time.
      *
      * @param context The context
      * @param nested Whether the calling frame already executes in this context: nested entries of
      * an execution that started before the close are allowed to finish
      * @param createState Whether a context seen for the first time gets a state; the Netty callback
      * path passes {@code false} so an unregistered (closed) context is not revived
-     * @return {@code false} when the context is closing, or untracked and {@code createState} is false
+     * @return The state the execution is counted in, or {@code null} when the context is closing, or
+     * untracked and {@code createState} is false
      */
-    private static boolean tryEnterExecution(Context context, boolean nested, boolean createState) {
-        synchronized (LOCK) {
-            ContextState state = createState
-                ? CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState())
-                : CONTEXT_STATES.get(context);
-            if (state == null || (state.closing && !nested)) {
-                return false;
+    private static @Nullable ContextState tryEnterExecution(Context context, boolean nested, boolean createState) {
+        while (true) {
+            ContextState state = CONTEXT_STATES.get(context);
+            if (state == null) {
+                if (!createState) {
+                    return null;
+                }
+                synchronized (LOCK) {
+                    state = CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
+                }
             }
-            state.activeExecutions++;
-            ACTIVE_EXECUTIONS.incrementAndGet();
-            return true;
+            // counted in the aggregate first: it never reads below what the states count
+            ACTIVE_EXECUTIONS.increment();
+            int entered = state.tryEnter(nested);
+            if (entered == ContextState.ENTERED) {
+                return state;
+            }
+            ACTIVE_EXECUTIONS.decrement();
+            if (entered == ContextState.REFUSED) {
+                return null;
+            }
+            // the state was dropped meanwhile: count the execution in the state the context has now
         }
     }
 
@@ -323,10 +341,11 @@ final class PythonContextRegistry {
         CallableOp<Boolean, RuntimeException> run = () -> {
             ExecutionFrame frame = CURRENT_EXECUTION.get();
             boolean nested = frame.contexts.contains(ctx);
-            if (!tryEnterExecution(ctx, nested, false)) {
+            ContextState state = tryEnterExecution(ctx, nested, false);
+            if (state == null) {
                 return false;
             }
-            runEnteredExecutionFrame(ctx, frame, () -> {
+            runEnteredExecutionFrame(ctx, state, frame, () -> {
                 operation.run();
                 return null;
             });
@@ -340,10 +359,11 @@ final class PythonContextRegistry {
 
     private static <T, X extends Throwable> T runWithExecutionFrame(Context ctx, ExecutionFrame frame, CallableOp<T, X> operation) throws X {
         boolean nested = frame.contexts.contains(ctx);
-        if (!tryEnterExecution(ctx, nested, true)) {
+        ContextState state = tryEnterExecution(ctx, nested, true);
+        if (state == null) {
             throw new IllegalStateException("The Python context is closing");
         }
-        return runEnteredExecutionFrame(ctx, frame, operation);
+        return runEnteredExecutionFrame(ctx, state, frame, operation);
     }
 
     /**
@@ -360,10 +380,11 @@ final class PythonContextRegistry {
     static <T, X extends Throwable> T withTrackedExecutionFrame(Context ctx, CallableOp<T, X> operation) throws X {
         CallableOp<T, X> run = () -> {
             ExecutionFrame frame = CURRENT_EXECUTION.get();
-            if (!tryEnterExecution(ctx, frame.contexts.contains(ctx), false)) {
+            ContextState state = tryEnterExecution(ctx, frame.contexts.contains(ctx), false);
+            if (state == null) {
                 throw new IllegalStateException("The Python context is closing or closed");
             }
-            return runEnteredExecutionFrame(ctx, frame, operation);
+            return runEnteredExecutionFrame(ctx, state, frame, operation);
         };
         if (CURRENT_EXECUTION.isBound()) {
             return run.call();
@@ -389,18 +410,18 @@ final class PythonContextRegistry {
         return contexts.isEmpty() ? null : contexts.get(contexts.size() - 1);
     }
 
-    private static <T, X extends Throwable> T runEnteredExecutionFrame(Context ctx, ExecutionFrame frame, CallableOp<T, X> operation) throws X {
+    private static <T, X extends Throwable> T runEnteredExecutionFrame(Context ctx, ContextState state, ExecutionFrame frame, CallableOp<T, X> operation) throws X {
         frame.contexts.add(ctx);
         Context entered = null;
         try {
             // a closed or cancelled context throws on enter: the frame and the counters must still unwind
-            entered = enterIfPossible(ctx);
+            entered = enterIfPossible(ctx, state);
             return operation.call();
         } finally {
             if (entered != null) {
                 entered.leave();
             }
-            exitExecutionFrame(ctx, frame);
+            exitExecutionFrame(ctx, state, frame);
         }
     }
 
@@ -412,10 +433,10 @@ final class PythonContextRegistry {
      * once and the outcome is remembered, so no exception is created per bridge call.
      *
      * @param ctx The context of the execution
+     * @param state The state the execution is counted in
      * @return The entered context instance, or {@code null} when the context could not be entered
      */
-    private static @Nullable Context enterIfPossible(Context ctx) {
-        ContextState state = state(ctx);
+    private static @Nullable Context enterIfPossible(Context ctx, ContextState state) {
         Context enterable = state.enterable.get();
         if (enterable == null) {
             if (state.enterUnsupported) {
@@ -441,34 +462,62 @@ final class PythonContextRegistry {
      * @param context The context leaving Python execution
      */
     static void exitExecution(Context context) {
-        List<Runnable> listeners = new ArrayList<>();
-        synchronized (LOCK) {
-            ContextState state = CONTEXT_STATES.get(context);
-            // an execution whose context was forgotten or unregistered left the aggregate at that time
-            if (state != null && state.activeExecutions > 0) {
-                state.activeExecutions--;
-                ACTIVE_EXECUTIONS.updateAndGet(value -> Math.max(0, value - 1));
-                if (state.activeExecutions == 0 && !state.noActiveExecutionsListeners.isEmpty()) {
-                    listeners.addAll(state.noActiveExecutionsListeners);
-                    state.noActiveExecutionsListeners.clear();
-                }
-            }
+        ContextState state = CONTEXT_STATES.get(context);
+        if (state != null) {
+            exitExecution(state);
         }
-        runNoActiveExecutionsListeners(listeners);
+    }
+
+    /**
+     * Count an execution out of the state it was counted in. The context becoming idle while a
+     * listener waits for it is the only transition that takes the registry lock.
+     *
+     * @param state The state
+     */
+    private static void exitExecution(ContextState state) {
+        long left = state.tryExit();
+        if (left < 0) {
+            // an execution whose state was dropped (the context forgotten or unregistered) left the aggregate then
+            return;
+        }
+        ACTIVE_EXECUTIONS.decrement();
+        if (ContextState.idleAndAwaited(left)) {
+            runNoActiveExecutionsListeners(drainIdle(state));
+        }
+    }
+
+    /**
+     * The listeners waiting for a context to become idle, taken under the registry lock when the
+     * context is idle still: an execution that started since the last one ended leaves them to the
+     * exit that makes the context idle again.
+     */
+    private static List<Runnable> drainIdle(ContextState state) {
+        synchronized (LOCK) {
+            if (!state.isIdle()) {
+                return List.of();
+            }
+            state.stopAwaiting();
+            if (state.noActiveExecutionsListeners.isEmpty()) {
+                return List.of();
+            }
+            List<Runnable> listeners = List.copyOf(state.noActiveExecutionsListeners);
+            state.noActiveExecutionsListeners.clear();
+            return listeners;
+        }
     }
 
     @SuppressWarnings("ReferenceEquality")
-    private static void exitExecutionFrame(Context ctx, ExecutionFrame frame) {
+    private static void exitExecutionFrame(Context ctx, ContextState state, ExecutionFrame frame) {
         List<Context> contexts = frame.contexts;
         if (contexts.isEmpty()) {
-            exitExecution(ctx);
+            exitExecution(state);
             return;
         }
         Context removed = contexts.removeLast();
         if (removed != ctx) {
             contexts.remove(ctx);
         }
-        exitExecution(ctx);
+        exitExecution(state);
         if (contexts.isEmpty()) {
             runExecutionExitListeners(frame);
         }
@@ -527,7 +576,7 @@ final class PythonContextRegistry {
                 // only the state probed, not one recreated meanwhile
                 if (state != null && state == snapshot.get(context)) {
                     CONTEXT_STATES.remove(context);
-                    ACTIVE_EXECUTIONS.addAndGet(-state.activeExecutions);
+                    ACTIVE_EXECUTIONS.add(-state.detach());
                     state.clear(context);
                     dropped++;
                 }
@@ -546,7 +595,7 @@ final class PythonContextRegistry {
      * @return Whether the context of the state may be probed
      */
     private static boolean isProbeable(ContextState state) {
-        return !state.registered && !state.closing && state.activeExecutions == 0;
+        return !state.registered && state.isIdleAndOpen();
     }
 
     private static boolean isClosed(Context context) {
@@ -605,14 +654,12 @@ final class PythonContextRegistry {
      * @return The count, or 0 for an unknown context
      */
     static int activeExecutions(Context context) {
-        synchronized (LOCK) {
-            ContextState state = CONTEXT_STATES.get(context);
-            return state == null ? 0 : state.activeExecutions;
-        }
+        ContextState state = CONTEXT_STATES.get(context);
+        return state == null ? 0 : state.activeExecutions();
     }
 
     static int activeExecutions() {
-        return ACTIVE_EXECUTIONS.get();
+        return (int) Math.max(0, ACTIVE_EXECUTIONS.sum());
     }
 
     /**
@@ -651,12 +698,15 @@ final class PythonContextRegistry {
         boolean runNow;
         synchronized (LOCK) {
             ContextState state = CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
-            if (closing) {
-                state.closing = true;
-            }
-            runNow = state.activeExecutions == 0;
-            if (!runNow) {
-                state.noActiveExecutionsListeners.add(listener);
+            // the listener is in place before the count is read: an exit that makes the context idle
+            // afterwards finds it, and one that made it idle before leaves the count at zero here
+            state.noActiveExecutionsListeners.add(listener);
+            runNow = state.await(closing);
+            if (runNow) {
+                state.noActiveExecutionsListeners.remove(state.noActiveExecutionsListeners.size() - 1);
+                if (state.noActiveExecutionsListeners.isEmpty()) {
+                    state.stopAwaiting();
+                }
             }
         }
         if (runNow) {
@@ -728,38 +778,34 @@ final class PythonContextRegistry {
     }
 
     private static void onNoActiveExecutions(Collection<Context> contexts, Runnable listener, boolean closing) {
-        List<Context> activeContexts;
+        // one count for each active context, and one this registration drops once the gates are in place
+        AtomicInteger remaining = new AtomicInteger(1);
+        Runnable gate = () -> {
+            if (remaining.decrementAndGet() == 0) {
+                listener.run();
+            }
+        };
         synchronized (LOCK) {
-            HashSet<Context> seen = new HashSet<>();
-            if (closing) {
-                for (Context context : contexts) {
-                    CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState()).closing = true;
-                }
-            }
-            activeContexts = contexts.stream()
-                .filter(seen::add)
-                .filter(ctx -> {
-                    ContextState state = CONTEXT_STATES.get(ctx);
-                    return state != null && state.activeExecutions > 0;
-                })
-                .toList();
-            if (activeContexts.isEmpty()) {
-                activeContexts = List.of();
-            } else {
-                AtomicInteger remaining = new AtomicInteger(activeContexts.size());
-                Runnable gate = () -> {
-                    if (remaining.decrementAndGet() == 0) {
-                        listener.run();
+            // each context once, in the order given
+            for (Context context : new LinkedHashSet<>(contexts)) {
+                ContextState state = closing
+                    ? CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState())
+                    : CONTEXT_STATES.get(context);
+                if (state != null) {
+                    remaining.incrementAndGet();
+                    state.noActiveExecutionsListeners.add(gate);
+                    if (state.await(closing)) {
+                        // idle: no exit will run the gate
+                        state.noActiveExecutionsListeners.remove(state.noActiveExecutionsListeners.size() - 1);
+                        if (state.noActiveExecutionsListeners.isEmpty()) {
+                            state.stopAwaiting();
+                        }
+                        remaining.decrementAndGet();
                     }
-                };
-                for (Context activeContext : activeContexts) {
-                    CONTEXT_STATES.computeIfAbsent(activeContext, ignored -> new ContextState()).noActiveExecutionsListeners.add(gate);
                 }
             }
         }
-        if (activeContexts.isEmpty()) {
-            listener.run();
-        }
+        gate.run();
     }
 
     /**
@@ -862,6 +908,21 @@ final class PythonContextRegistry {
      * The runtime state of one GraalPy context.
      */
     static final class ContextState {
+        /** {@link #tryEnter} counted the execution. */
+        static final int ENTERED = 0;
+        /** {@link #tryEnter} refused the execution: the context is closing. */
+        static final int REFUSED = 1;
+        /** {@link #tryEnter} found the state dropped: the context has another state, or none. */
+        static final int DROPPED = 2;
+        /** Set once a close listener is registered: no new outermost execution may start. */
+        private static final long CLOSING = 1L << 62;
+        /** Set while a listener waits for the context to become idle: the exit to idle takes the lock. */
+        private static final long AWAITED = 1L << 61;
+        /** Set when the state is dropped from the registry: its executions left the aggregate then. */
+        private static final long DROPPED_STATE = 1L << 60;
+        /** The executions in flight. */
+        private static final long COUNT = DROPPED_STATE - 1;
+
         final Object lock = new Object();
         /** The enterable creator instance of this context, when known. */
         final AtomicReference<@Nullable Context> enterable = new AtomicReference<>();
@@ -910,11 +971,104 @@ final class PythonContextRegistry {
          * long as that wrapper and nothing here keeps it alive.
          */
         final Map<Value, Value> viewedValues = Collections.synchronizedMap(new WeakHashMap<>());
+        /** Guarded by {@link #LOCK}. */
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
+        /** Guarded by {@link #LOCK}. */
         private final List<Runnable> noContextListeners = new ArrayList<>();
-        private int activeExecutions;
-        /** Set once a close listener is registered: no new outermost execution may start. */
-        private boolean closing;
+        /** The executions in flight, with the {@link #CLOSING}, {@link #AWAITED} and {@link #DROPPED_STATE} flags. */
+        private final AtomicLong executions = new AtomicLong();
+
+        /**
+         * Count an execution in, unless the context is closing and the execution is an outermost one.
+         *
+         * @param nested Whether the execution is nested in one of the same context
+         * @return {@link #ENTERED}, {@link #REFUSED} or {@link #DROPPED}
+         */
+        int tryEnter(boolean nested) {
+            long current = executions.get();
+            while (true) {
+                if ((current & DROPPED_STATE) != 0) {
+                    return DROPPED;
+                }
+                if ((current & CLOSING) != 0 && !nested) {
+                    return REFUSED;
+                }
+                long witness = executions.compareAndExchange(current, current + 1);
+                if (witness == current) {
+                    return ENTERED;
+                }
+                current = witness;
+            }
+        }
+
+        /**
+         * Count an execution out.
+         *
+         * @return The word after the exit, or {@code -1} when the state was dropped or counts no execution
+         */
+        long tryExit() {
+            long current = executions.get();
+            while (true) {
+                if ((current & DROPPED_STATE) != 0 || (current & COUNT) == 0) {
+                    return -1;
+                }
+                long witness = executions.compareAndExchange(current, current - 1);
+                if (witness == current) {
+                    return current - 1;
+                }
+                current = witness;
+            }
+        }
+
+        /**
+         * @param word The word an exit left
+         * @return Whether the exit made the context idle while a listener waits for it
+         */
+        static boolean idleAndAwaited(long word) {
+            return (word & COUNT) == 0 && (word & AWAITED) != 0;
+        }
+
+        /**
+         * Mark that a listener waits for the context to become idle, and that the context closes when
+         * {@code closing}; in one step with reading the count. Called under {@link #LOCK}.
+         *
+         * @param closing Whether the listener closes the context
+         * @return Whether the context is idle now
+         */
+        boolean await(boolean closing) {
+            long flags = AWAITED | (closing ? CLOSING : 0);
+            return (executions.updateAndGet(word -> word | flags) & COUNT) == 0;
+        }
+
+        /**
+         * No listener waits any longer. Called under {@link #LOCK}.
+         */
+        void stopAwaiting() {
+            executions.updateAndGet(word -> word & ~AWAITED);
+        }
+
+        /**
+         * Drop the state from the registry. Called under {@link #LOCK}.
+         *
+         * @return The executions it counted, which leave the aggregate
+         */
+        long detach() {
+            return executions.getAndSet(DROPPED_STATE) & COUNT;
+        }
+
+        boolean isIdle() {
+            long word = executions.get();
+            return (word & COUNT) == 0 && (word & DROPPED_STATE) == 0;
+        }
+
+        boolean isIdleAndOpen() {
+            return (executions.get() & (COUNT | CLOSING)) == 0;
+        }
+
+        int activeExecutions() {
+            long word = executions.get();
+            return (word & DROPPED_STATE) != 0 ? 0 : (int) (word & COUNT);
+        }
 
         private void clear(Context owner) {
             // tell each pooled bean to forget this context before the state goes. A holder's map is a
@@ -938,8 +1092,6 @@ final class PythonContextRegistry {
             fileSystem = null;
             noActiveExecutionsListeners.clear();
             noContextListeners.clear();
-            activeExecutions = 0;
-            closing = false;
         }
     }
 

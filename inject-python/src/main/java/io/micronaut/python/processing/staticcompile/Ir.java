@@ -82,10 +82,40 @@ public sealed interface Ir {
      * A sequence of statements.
      *
      * @param statements The statements
+     * @param lines      The Python line each statement is lowered from, 0 for one lowered from none;
+     *                   empty when no line is known. The generated Java maps its lines to them
+     *                   (see {@link StaticLineMap})
      */
-    record Body(List<Statement> statements) implements Statement {
+    record Body(List<Statement> statements, List<Integer> lines) implements Statement {
         public Body {
             statements = List.copyOf(statements);
+            // the lowering passes Python ints, which a polyglot list may give as any Number
+            List<?> given = lines;
+            List<Integer> copied = new java.util.ArrayList<>(given.size());
+            for (Object line : given) {
+                copied.add(line instanceof Number number ? number.intValue() : 0);
+            }
+            if (!copied.isEmpty() && copied.size() != statements.size()) {
+                throw new IllegalArgumentException("A body of " + statements.size() + " statements has " + copied.size() + " lines");
+            }
+            lines = List.copyOf(copied);
+        }
+
+        /**
+         * A body whose statements have no known line.
+         *
+         * @param statements The statements
+         */
+        public Body(List<Statement> statements) {
+            this(statements, List.of());
+        }
+
+        /**
+         * @param index The index of a statement
+         * @return The Python line of the statement, 0 when it is not known
+         */
+        public int line(int index) {
+            return lines.isEmpty() ? 0 : lines.get(index);
         }
     }
 
@@ -271,8 +301,11 @@ public sealed interface Ir {
      * @param property The property
      * @param type     The Java type of the property
      * @param accessor Whether the property is a Python {@code @property}, whose getter runs on the Python object
+     * @param fixed    Whether the attribute is fixed at construction: {@code __init__} assigns it and nothing
+     *                 writes it later, so the stub reads it from the Python object once and from a Java field
+     *                 afterwards (see {@code StaticPlanner.fixed_attribute})
      */
-    record SelfProperty(String property, String type, boolean accessor) implements Expression {
+    record SelfProperty(String property, String type, boolean accessor, boolean fixed) implements Expression {
     }
 
     /**
@@ -347,8 +380,9 @@ public sealed interface Ir {
      * @param receiver The receiver, a value of a generated class
      * @param name     The attribute
      * @param type     The Java type of the value
+     * @param accessor Whether the attribute is a Python {@code @property}, whose getter runs on the Python object
      */
-    record PythonMember(Expression receiver, String name, String type) implements Expression {
+    record PythonMember(Expression receiver, String name, String type, boolean accessor) implements Expression {
     }
 
     /**
@@ -381,13 +415,32 @@ public sealed interface Ir {
      * the Python class called with the arguments, the Python exception wrapped in the generated Java
      * class through its {@code Value} constructor, as the runtime wraps a Python exception that
      * reaches Java code. Its Java value is the {@code RuntimeException} a {@code raise} throws.
+     * <p>
+     * A lazy exception is created as the Java exception alone, with the message
+     * {@code BaseException.__str__} gives the arguments: its generated class creates the Python
+     * exception from the class reference and the arguments the first time the Python object is
+     * needed (it reaches Python, or an exception handler converts it). The planner makes an
+     * exception lazy only when nothing of its class can tell the difference: neither the class
+     * nor a Python base defines {@code __new__}, {@code __init__}, {@code __str__}, {@code __repr__}
+     * or {@code args}, and its builtin base takes its arguments as {@code BaseException} does.
      *
      * @param type      The generated class, a RuntimeException
      * @param arguments The arguments of the Python class, boxed
+     * @param lazy      Whether the Python exception is created when it is first needed
      */
-    record NewPythonException(String type, List<Expression> arguments) implements Expression {
+    record NewPythonException(String type, List<Expression> arguments, boolean lazy) implements Expression {
         public NewPythonException {
             arguments = List.copyOf(arguments);
+        }
+
+        /**
+         * An exception created through its Python class when it is raised.
+         *
+         * @param type      The generated class, a RuntimeException
+         * @param arguments The arguments of the Python class, boxed
+         */
+        public NewPythonException(String type, List<Expression> arguments) {
+            this(type, arguments, false);
         }
     }
 
@@ -556,6 +609,15 @@ public sealed interface Ir {
      *                       module's class
      * @param exceptions     How the Java exception of a Python exception class the body throws reaches a
      *                       Python caller of the rewritten function
+     * @param pythonParameters Per parameter, the Python name ({@code Outer.Inner}) of the plain class of the
+     *                       compilation whose generated class the parameter is, which wraps the Python object a
+     *                       Python caller passes, or an empty string
+     * @param callsCompiledCode Whether the body calls code of the compilation that computes a result of its
+     *                       own (a compiled function, a method of a Python class through its generated class),
+     *                       which may overflow where Python promotes
+     * @param pythonEntries  What may make the body enter Python, which decides whether a route whose body
+     *                       it is runs on the event loop (see {@link EventLoopSafety}); {@code null} when the
+     *                       planner did not find it out
      */
     record CompiledBody(String className,
                         String methodName,
@@ -569,13 +631,35 @@ public sealed interface Ir {
                         boolean advised,
                         boolean staticMethod,
                         boolean moduleLevel,
-                        ExceptionCrossing exceptions) {
+                        ExceptionCrossing exceptions,
+                        List<String> pythonParameters,
+                        boolean callsCompiledCode,
+                        @Nullable PythonEntries pythonEntries) {
         public CompiledBody {
             Objects.requireNonNull(className, "className");
             Objects.requireNonNull(exceptions, "exceptions");
             Objects.requireNonNull(methodName, "methodName");
             parameterNames = List.copyOf(parameterNames);
             parameterTypes = List.copyOf(parameterTypes);
+            pythonParameters = pythonParameters == null ? List.of() : List.copyOf(pythonParameters);
+        }
+
+        /**
+         * @param index The position of a parameter
+         * @return The Python name of the plain class of the compilation the parameter takes, or an empty string
+         */
+        public String pythonParameter(int index) {
+            return index < pythonParameters.size() ? pythonParameters.get(index) : "";
+        }
+
+        /**
+         * @param entries What may make the body enter Python
+         * @return The body with them
+         */
+        public CompiledBody withPythonEntries(PythonEntries entries) {
+            return new CompiledBody(className, methodName, parameterNames, parameterTypes, returnType,
+                body, span, stats, wrapsCheckedExceptions, advised, staticMethod, moduleLevel, exceptions, pythonParameters, callsCompiledCode,
+                entries);
         }
 
         /**
@@ -592,6 +676,26 @@ public sealed interface Ir {
          */
         public static String key(String className, String methodName) {
             return className + "#" + methodName;
+        }
+    }
+
+    /**
+     * What may make a compiled body enter Python, as the planner finds it: what in the body does by
+     * itself, the compiled functions of the compilation it calls through Java, and the generated
+     * classes it constructs and the accessors of introspected ones it calls, which enter Python unless
+     * their generated constructor only assigns Java fields and the accessor only touches its field. {@link EventLoopSafety#safeBodies} decides from them, over the whole plan, which bodies
+     * never enter Python.
+     *
+     * @param entry         What in the body enters Python by itself, or {@code null} for nothing
+     * @param callees       The keys ({@link CompiledBody#key()}) of the compiled bodies the body calls
+     * @param constructions The constructors of generated classes the body calls, as
+     *                      {@code <class>#<number of parameters>}, and the accessors of introspected ones, as
+     *                      {@code <class>.<property>}
+     */
+    record PythonEntries(@Nullable String entry, List<String> callees, List<String> constructions) {
+        public PythonEntries {
+            callees = List.copyOf(callees);
+            constructions = List.copyOf(constructions);
         }
     }
 
