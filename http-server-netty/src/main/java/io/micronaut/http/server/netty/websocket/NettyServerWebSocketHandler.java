@@ -69,10 +69,12 @@ import reactor.core.scheduler.Schedulers;
 import reactor.util.context.Context;
 
 import java.security.Principal;
+import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -104,6 +106,15 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     private final Argument<?> pongArgument;
     private final ThreadSelectionConfiguration threadSelection;
     private final ExecutorSelector executorSelector;
+    private final Channel channel;
+    /**
+     * The frames received while the open handler runs, handled once it completed. Event loop only.
+     */
+    private final Queue<WebSocketFrame> framesWhileOpening = new ArrayDeque<>();
+    /**
+     * Whether the open handler runs: the frames wait. Event loop only.
+     */
+    private boolean opening;
 
     /**
      * Default constructor.
@@ -191,7 +202,19 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         this.coroutineHelper = coroutineHelper;
         RouteAttributes.setRouteMatch(request, routeMatch);
 
-        callOpenMethod(ctx).onComplete((v, t) -> {
+        this.channel = ctx.channel();
+        ExecutionFlow<?> openFlow = callOpenMethod(ctx);
+        boolean openPending = openFlow.tryComplete() == null;
+        // the messages are handled once the open handler completed, which may reject the session
+        opening = openPending;
+        openFlow.onComplete((v, t) -> {
+            if (openPending) {
+                if (channel.eventLoop().inEventLoop()) {
+                    opened();
+                } else {
+                    channel.eventLoop().execute(this::opened);
+                }
+            }
             if (t != null) {
                 forwardErrorToUser(ctx, e -> {
                     if (LOG.isErrorEnabled()) {
@@ -409,9 +432,52 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         });
     }
 
+    /**
+     * @return Whether the open handler still runs, the frames wait
+     */
+    boolean isOpening() {
+        return opening;
+    }
+
+    @Override
+    protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
+        if (opening && msg instanceof WebSocketFrame frame) {
+            framesWhileOpening.add(frame.retain());
+        } else {
+            super.channelRead0(ctx, msg);
+        }
+    }
+
+    /**
+     * Handles the frames received while the open handler ran, and reads the next.
+     */
+    private void opened() {
+        opening = false;
+        ChannelHandlerContext ctx = channel.pipeline().context(this);
+        WebSocketFrame frame;
+        while ((frame = framesWhileOpening.poll()) != null) {
+            try {
+                if (ctx != null) {
+                    super.channelRead0(ctx, frame);
+                }
+            } catch (Throwable t) {
+                // not called from the inbound pipeline, so handle the error as it would
+                exceptionCaught(ctx, t);
+            } finally {
+                frame.release();
+            }
+        }
+        if (ctx != null && serverSession.isOpen()) {
+            channel.config().setAutoRead(true);
+        }
+    }
+
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        Channel channel = ctx.channel();
+        WebSocketFrame frame;
+        while ((frame = framesWhileOpening.poll()) != null) {
+            frame.release();
+        }
         channel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).set(null);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Removing WebSocket Server session: {}", serverSession);
