@@ -472,6 +472,23 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     /**
+     * Marks a {@code HEAD} route that runs the handler of a {@code GET} route of the same path, so
+     * the filters scoped to {@code GET} apply to it as well.
+     *
+     * @param route The HEAD route created by this builder
+     * @return The route
+     * @see UriRouteInfo#isImplicitHead()
+     * @since 5.2.18
+     */
+    @Internal
+    protected final UriRoute markImplicitHead(UriRoute route) {
+        if (route instanceof DefaultUriRoute defaultUriRoute) {
+            defaultUriRoute.markImplicitHead();
+        }
+        return route;
+    }
+
+    /**
      * Abstract class for base {@link MethodBasedRouteInfo}.
      */
     abstract static class AbstractRoute implements Route {
@@ -786,24 +803,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
     }
 
-        /**
-     * Marks a {@code HEAD} route that runs the handler of a {@code GET} route of the same path, so
-     * the filters scoped to {@code GET} apply to it as well.
-     *
-     * @param route The HEAD route created by this builder
-     * @return The route
-     * @see UriRouteInfo#isImplicitHead()
-     * @since 5.2.18
-     */
-    @Internal
-    protected final UriRoute markImplicitHead(UriRoute route) {
-        if (route instanceof DefaultUriRoute defaultUriRoute) {
-            defaultUriRoute.markImplicitHead();
-        }
-        return route;
-    }
-
-/**
+    /**
      * The default route impl.
      */
     final class DefaultUriRoute extends AbstractRoute implements UriRoute {
