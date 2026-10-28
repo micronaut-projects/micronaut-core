@@ -228,7 +228,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         }
         if (isRunning() && !reading.get()) {
             propertyPlaceholderResolver.resetCachesAndRememberedValues();
-            LOG.debug("Processing property source: {} convention: {}", propertySource.getName(), propertySource.getConvention());
             propertyPlaceholderResolver.processAddedPropertySource(propertySource, propertySource.getConvention(), snapshotsWhenRegistered);
         }
         return this;
@@ -504,6 +503,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         for (PropertySource propertySource : propertySources) {
             internalProcessPropertySource(propertySource);
         }
+        // not in a finally: a read that fails leaves no processed snapshot, so an add that waited for it processes its property source
         propertyPlaceholderResolver.finishProcessing(registrySnapshot);
     }
 

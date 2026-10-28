@@ -399,8 +399,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         synchronized (catalogLock) {
             RegistrySnapshot snapshot = writeState.processedSnapshot;
             if (snapshot == null || snapshot.number() <= snapshotsWhenRegistered || !snapshot.propertySources().contains(propertySource)) {
+                log.debug("Processing property source: {} convention: {}", propertySource.getName(), convention);
                 // into a copy of the published catalogs, which lookups on other threads keep reading until it is published
                 addToCopy(() -> processPropertySource(propertySource, convention));
+            } else {
+                log.debug("Property source {} was already processed, in its order, by the read of snapshot {}", propertySource.getName(), snapshot.number());
             }
         }
     }
@@ -1777,8 +1780,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         /**
          * The snapshot of the start or the refresh that processed all of its property sources into these
          * catalogs, in their order, and was the last to start to. Catalogs that are new or reset have none, and a
-         * start or a refresh clears it when it starts to process into them. Guarded by the monitor of
-         * {@code catalogLock}, the lock object of the resolver.
+         * start or a refresh clears it when it starts to process into them. It keeps the property sources it
+         * holds reachable while these catalogs, or copies of them, are published: one removed since stays
+         * referenced until the next refresh or stop. Guarded by the monitor of {@code catalogLock}, the lock
+         * object of the resolver.
          */
         private @Nullable RegistrySnapshot processedSnapshot;
 
