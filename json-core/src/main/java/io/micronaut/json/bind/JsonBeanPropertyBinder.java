@@ -49,6 +49,11 @@ import java.util.stream.Collectors;
 @Primary
 final class JsonBeanPropertyBinder implements BeanPropertyBinder {
 
+    /**
+     * The maximum number of nested objects and arrays a single key may describe.
+     */
+    private static final int MAX_NESTING_DEPTH = 100;
+
     private final JsonMapper jsonMapper;
     private final int arraySizeThreshhold;
     private final BeanProvider<JsonBeanPropertyBinderExceptionHandler> exceptionHandlers;
@@ -153,15 +158,25 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
 
     private JsonNode buildSourceObjectNode(Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws IOException {
         ObjectBuilder rootNode = new ObjectBuilder();
+        // array padding is bounded by the threshold plus the size of the keys, so a key can not
+        // allocate much more than its own length, however deeply it nests indexed segments
+        long paddingBudget = arraySizeThreshhold;
         for (Map.Entry<? extends CharSequence, ? super Object> entry : source) {
             CharSequence key = entry.getKey();
             Object value = entry.getValue();
             String property = key.toString();
+            paddingBudget += property.length();
+            int depth = 0;
             ValueBuilder current = rootNode;
             String index = null;
             Iterator<String> tokenIterator = StringUtils.splitOmitEmptyStringsIterator(property, '.');
             while (tokenIterator.hasNext()) {
                 String token = tokenIterator.next();
+                if (++depth > MAX_NESTING_DEPTH) {
+                    throw new IllegalArgumentException(
+                        "Property " + property.substring(0, Math.min(property.length(), 100)) + " exceeds the maximum nesting depth of " + MAX_NESTING_DEPTH
+                    );
+                }
                 int j = token.indexOf('[');
                 if (j > -1 && token.endsWith("]")) {
                     index = token.substring(j + 1, token.length() - 1);
@@ -189,7 +204,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
                         if (arrayIndex < arraySizeThreshhold) {
 
                             if (arrayIndex >= arrayNode.values.size()) {
-                                expandArrayToThreshold(arrayIndex, arrayNode);
+                                paddingBudget = consumePadding(paddingBudget, expandArrayToThreshold(arrayIndex, arrayNode));
                             }
                             ValueBuilder jsonNode = arrayNode.values.get(arrayIndex);
                             if (!(jsonNode instanceof ObjectBuilder)) {
@@ -215,7 +230,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
                                 } else {
                                     arrayNode = (ArrayBuilder) existing;
                                 }
-                                expandArrayToThreshold(arrayIndex, arrayNode);
+                                paddingBudget = consumePadding(paddingBudget, expandArrayToThreshold(arrayIndex, arrayNode));
                                 jsonNode = getOrCreateNodeAtIndex(arrayNode, arrayIndex);
                             } else {
                                 if (!(existing instanceof ObjectBuilder)) {
@@ -241,7 +256,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
                     } else if (current instanceof ArrayBuilder && StringUtils.isDigits(index)) {
                         ArrayBuilder arrayNode = (ArrayBuilder) current;
                         int arrayIndex = Integer.parseInt(index);
-                        expandArrayToThreshold(arrayIndex, arrayNode);
+                        paddingBudget = consumePadding(paddingBudget, expandArrayToThreshold(arrayIndex, arrayNode));
                         ObjectBuilder jsonNode = getOrCreateNodeAtIndex(arrayNode, arrayIndex);
 
                         current = new ObjectBuilder();
@@ -263,12 +278,25 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
         return (ObjectBuilder) jsonNode;
     }
 
-    private void expandArrayToThreshold(int arrayIndex, ArrayBuilder arrayNode) {
+    private long consumePadding(long paddingBudget, int added) {
+        long remaining = paddingBudget - added;
+        if (remaining < 0) {
+            throw new IllegalArgumentException(
+                "Array indexes exceed the maximum allowed threshold of " + arraySizeThreshhold
+            );
+        }
+        return remaining;
+    }
+
+    private int expandArrayToThreshold(int arrayIndex, ArrayBuilder arrayNode) {
+        int added = 0;
         if (arrayIndex < arraySizeThreshhold) {
             while (arrayNode.values.size() < arrayIndex + 1) {
                 arrayNode.values.add(FixedValue.NULL);
+                added++;
             }
         }
+        return added;
     }
 
     private interface ValueBuilder {

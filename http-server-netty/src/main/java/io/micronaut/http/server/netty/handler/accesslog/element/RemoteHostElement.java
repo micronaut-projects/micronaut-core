@@ -48,7 +48,7 @@ final class RemoteHostElement implements LogElement {
 
     @Override
     public String onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
-        return channel.remoteAddress().getAddress().getHostName();
+        return channel.remoteAddress().getHostString();
     }
 
     @Override

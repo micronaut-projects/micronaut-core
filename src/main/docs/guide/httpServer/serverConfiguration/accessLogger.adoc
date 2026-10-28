@@ -84,7 +84,7 @@ These are the supported markers:
 * *%A* - Local IP address
 * *%b* - Bytes sent, excluding HTTP headers, or '-' if no bytes were sent
 * *%B* - Bytes sent, excluding HTTP headers
-* *%h* - Remote host name
+* *%h* - Remote host. No reverse DNS lookup is done, so this is the remote IP address
 * *%H* - Request protocol
 * *%{<header>}i* - Request header. If the argument is omitted (*%i*) all headers are printed
 * *%{<header>}o* - Response header. If the argument is omitted (*%o*) all headers are printed

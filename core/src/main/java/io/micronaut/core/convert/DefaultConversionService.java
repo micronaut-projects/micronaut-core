@@ -88,6 +88,11 @@ import java.util.function.Function;
 public class DefaultConversionService implements ConversionService<DefaultConversionService> {
 
     private static final int CACHE_MAX = 150;
+    /**
+     * The maximum length of a string converted to {@link BigInteger} or {@link BigDecimal}. Parsing
+     * costs quadratic time in the number of digits.
+     */
+    private static final int MAX_BIG_NUMBER_LENGTH = 1000;
     private static final TypeConverter UNCONVERTIBLE = (object, targetType, context) -> Optional.empty();
 
     private final Map<ConvertiblePair, TypeConverter> typeConverters = new ConcurrentHashMap<>();
@@ -411,6 +416,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             if (StringUtils.isEmpty(object)) {
                 return Optional.empty();
             }
+            if (object.length() > MAX_BIG_NUMBER_LENGTH) {
+                context.reject(object, new NumberFormatException("Number exceeds the maximum length of " + MAX_BIG_NUMBER_LENGTH + " characters"));
+                return Optional.empty();
+            }
             try {
                 BigInteger converted = new BigInteger(object.toString());
                 return Optional.of(converted);
@@ -493,6 +502,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // String -> BigDecimal
         addConverter(CharSequence.class, BigDecimal.class, (CharSequence object, Class<BigDecimal> targetType, ConversionContext context) -> {
             if (StringUtils.isEmpty(object)) {
+                return Optional.empty();
+            }
+            if (object.length() > MAX_BIG_NUMBER_LENGTH) {
+                context.reject(object, new NumberFormatException("Number exceeds the maximum length of " + MAX_BIG_NUMBER_LENGTH + " characters"));
                 return Optional.empty();
             }
             try {

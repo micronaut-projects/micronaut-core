@@ -48,7 +48,7 @@ final class LocalHostElement implements LogElement {
 
     @Override
     public String onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
-        return channel.localAddress().getAddress().getHostName();
+        return channel.localAddress().getHostString();
     }
 
     @Override
