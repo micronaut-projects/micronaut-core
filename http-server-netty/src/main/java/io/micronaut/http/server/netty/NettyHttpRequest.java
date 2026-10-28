@@ -64,7 +64,7 @@ import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.FormDemuxer;
-import io.micronaut.web.router.DefaultRouter;
+import io.micronaut.web.router.RouteAttributes;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
@@ -128,7 +128,7 @@ import java.util.function.Supplier;
 @Internal
 public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T> {
     /**
-     * Whether the connections of a listener that has no port expose the default routes.
+     * Whether a listener exposes the default routes, set on the channel of the listener.
      */
     static final AttributeKey<Boolean> LISTENER_EXPOSES_DEFAULT_ROUTES = AttributeKey.valueOf("micronaut.listener.exposes-default-routes");
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
@@ -229,25 +229,25 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         this.body = body;
         Boolean listenerExposes = listenerExposesDefaultRoutes(ctx.channel());
         if (listenerExposes != null) {
-            setAttribute(DefaultRouter.LISTENER_EXPOSES_DEFAULT_ROUTES, listenerExposes);
+            RouteAttributes.setListenerExposesDefaultRoutes(this, listenerExposes);
         }
     }
 
     /**
-     * Whether the listener of a channel without a port exposes the default routes.
+     * Whether the listener of a channel exposes the default routes.
      *
-     * @param channel The connection, or the HTTP/2 stream, {@code null} for a detached context
-     * @return The setting of the listener, or {@code null} if it has a port
+     * @param channel The connection or a stream of it, {@code null} for a detached context
+     * @return The setting of the listener, or {@code null} if the channel is not of a listener
      */
     private static @Nullable Boolean listenerExposesDefaultRoutes(@Nullable Channel channel) {
-        if (channel == null || channel.localAddress() instanceof InetSocketAddress) {
-            return null;
+        // a stream's parent is its connection (HTTP/2, the QUIC connection of an HTTP/3 stream),
+        // whose parent is the channel of the listener
+        for (Channel c = channel; c != null; c = c.parent()) {
+            if (c.hasAttr(LISTENER_EXPOSES_DEFAULT_ROUTES)) {
+                return c.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
+            }
         }
-        Boolean exposes = channel.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
-        if (exposes == null && channel.parent() != null) {
-            exposes = channel.parent().attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
-        }
-        return exposes;
+        return null;
     }
 
     @Override

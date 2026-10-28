@@ -1410,16 +1410,15 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         void setServerChannel(Channel serverChannel) {
             this.serverChannel = serverChannel;
+            // the requests read it from their connection's listener: the port alone does not tell
+            // the listener (QUIC, UNIX domain sockets, listeners on one port and different addresses)
+            serverChannel.attr(NettyHttpRequest.LISTENER_EXPOSES_DEFAULT_ROUTES).set(config.isExposeDefaultRoutes());
             this.listenerCustomizer = rootCustomizer.specializeForChannel(serverChannel, NettyServerCustomizer.ChannelRole.LISTENER);
             refresh();
         }
 
         @Override
         protected void initChannel(Channel ch) throws Exception {
-            if (config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.UNIX) {
-                // the default routes are restricted by port, which this listener does not have
-                ch.attr(NettyHttpRequest.LISTENER_EXPOSES_DEFAULT_ROUTES).set(config.isExposeDefaultRoutes());
-            }
             SslContextHolder contextHolder = contextWrapper.takeRetained();
             if (contextHolder == null && config.isSsl()) {
                 // never serve plaintext on a TLS listener while its SSL context is pending or failed

@@ -68,6 +68,7 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakeException;
+import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
 import io.netty.handler.ssl.SslHandler;
@@ -276,9 +277,23 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             //Adding new handler to the existing pipeline to handle WebSocket Messages
             WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
 
+            if (!isSupportedVersion(msg)) {
+                // Hixie-75/76 or an unknown version: nothing is written to the channel directly
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Rejecting websocket upgrade with an unsupported version: {}", msg.getHeaders().get(HttpHeaderNames.SEC_WEBSOCKET_VERSION));
+                }
+                outboundAccess.attachment(msg);
+                outboundAccess.closeAfterWrite();
+                Objects.requireNonNull(next).writeResponse(outboundAccess, msg,
+                    HttpResponse.status(HttpStatus.UPGRADE_REQUIRED)
+                        .header(HttpHeaderNames.SEC_WEBSOCKET_VERSION, WebSocketVersion.V13.toHttpHeaderValue()),
+                    null);
+                return;
+            }
+
             try {
                 handleHandshake(ctx, msg, webSocketBean, actualResponse);
-            } catch (WebSocketServerHandshakeException e) {
+            } catch (RuntimeException e) {
                 // rejected before anything was written: answered like a malformed request
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Rejecting websocket upgrade: {}", e.getMessage());
@@ -312,8 +327,9 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 } catch (NoSuchElementException ignored) {
                 }
 
-                // websocket needs auto read for now, once the open handler completed
-                ctx.channel().config().setAutoRead(!webSocketHandler.isOpening());
+                // websocket needs auto read for now, once the open handler completed and did not
+                // close the session
+                ctx.channel().config().setAutoRead(webSocketHandler.readsFrames());
             } catch (Throwable e) {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Error opening WebSocket: {}", e.getMessage(), e);
@@ -325,6 +341,21 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             outboundAccess.attachment(msg);
             Objects.requireNonNull(next).writeResponse(outboundAccess, msg, actualResponse, null);
         }
+    }
+
+    /**
+     * @param request The upgrade request
+     * @return Whether the request asks for a WebSocket version of RFC 6455 or its drafts 7 and 8
+     */
+    private static boolean isSupportedVersion(HttpRequest<?> request) {
+        String version = request.getHeaders().get(HttpHeaderNames.SEC_WEBSOCKET_VERSION);
+        if (version == null) {
+            return false;
+        }
+        String trimmed = version.trim();
+        return trimmed.equals(WebSocketVersion.V13.toHttpHeaderValue())
+            || trimmed.equals(WebSocketVersion.V08.toHttpHeaderValue())
+            || trimmed.equals(WebSocketVersion.V07.toHttpHeaderValue());
     }
 
     /**
@@ -363,15 +394,15 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         }
         Channel channel = ctx.channel();
         if (handshaker == null) {
-            return WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(channel);
-        } else {
-            return handshaker.handshake(
-                    channel,
-                    req.toFullHttpRequest(),
-                    nettyHeaders,
-                    channel.newPromise()
-            );
+            // the version was checked before
+            throw new WebSocketServerHandshakeException("Unsupported WebSocket version");
         }
+        return handshaker.handshake(
+                channel,
+                req.toFullHttpRequest(),
+                nettyHeaders,
+                channel.newPromise()
+        );
     }
 
     /**
