@@ -45,6 +45,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -142,10 +143,14 @@ final class ConfigurationStaleness {
                 }
             }
         }
-        List<Outcome> after = customOutcomes(current, before.components());
-        for (int i = 0; i < after.size() && i < before.outcomes().size(); i++) {
-            Outcome outcome = after.get(i);
-            if (!Objects.equals(outcome.result(), before.outcomes().get(i).result())) {
+        // paired by the component and the condition, which name an outcome whatever the order they are evaluated in
+        Map<List<String>, Object> answered = new HashMap<>();
+        for (Outcome outcome : before.outcomes()) {
+            answered.put(outcome.key(), outcome.result());
+        }
+        for (Outcome outcome : customOutcomes(current, before.components())) {
+            List<String> key = outcome.key();
+            if (answered.containsKey(key) && !Objects.equals(outcome.result(), answered.get(key))) {
                 return outcome.component() + " has a custom condition " + outcome.condition() + " that the change flipped";
             }
         }
@@ -451,7 +456,7 @@ final class ConfigurationStaleness {
      *
      * @param references Every bean reference, the disabled ones too
      * @param components Each bean reference and bean configuration with a requirement
-     * @param outcomes   What each custom condition among them answered, in order
+     * @param outcomes   What each custom condition among them answered
      */
     record Requirements(List<BeanDefinitionReference<?>> references, List<Conditional> components, List<Outcome> outcomes) {
         static final Requirements NONE = new Requirements(List.of(), List.of(), List.of());
@@ -476,6 +481,13 @@ final class ConfigurationStaleness {
      * @param result    True or false, or the type of what it threw
      */
     record Outcome(String component, String condition, Object result) {
+
+        /**
+         * @return What names the outcome: the component and the condition
+         */
+        List<String> key() {
+            return List.of(component, condition);
+        }
     }
 
 }
