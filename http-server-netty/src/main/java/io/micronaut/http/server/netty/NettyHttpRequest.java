@@ -64,6 +64,7 @@ import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.FormDemuxer;
+import io.micronaut.web.router.DefaultRouter;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
@@ -91,6 +92,7 @@ import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -125,6 +127,10 @@ import java.util.function.Supplier;
  */
 @Internal
 public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T> {
+    /**
+     * Whether the connections of a listener that has no port expose the default routes.
+     */
+    static final AttributeKey<Boolean> LISTENER_EXPOSES_DEFAULT_ROUTES = AttributeKey.valueOf("micronaut.listener.exposes-default-routes");
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
@@ -221,6 +227,27 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = body;
+        Boolean listenerExposes = listenerExposesDefaultRoutes(ctx.channel());
+        if (listenerExposes != null) {
+            setAttribute(DefaultRouter.LISTENER_EXPOSES_DEFAULT_ROUTES, listenerExposes);
+        }
+    }
+
+    /**
+     * Whether the listener of a channel without a port exposes the default routes.
+     *
+     * @param channel The connection, or the HTTP/2 stream
+     * @return The setting of the listener, or {@code null} if it has a port
+     */
+    private static @Nullable Boolean listenerExposesDefaultRoutes(Channel channel) {
+        if (channel.localAddress() instanceof InetSocketAddress) {
+            return null;
+        }
+        Boolean exposes = channel.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
+        if (exposes == null && channel.parent() != null) {
+            exposes = channel.parent().attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
+        }
+        return exposes;
     }
 
     @Override

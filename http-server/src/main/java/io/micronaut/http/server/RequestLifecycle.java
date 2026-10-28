@@ -466,7 +466,8 @@ public class RequestLifecycle {
                 protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
                     if (this.routeMatch == null) {
                         //Check if there is a file for the route before returning route not found
-                        FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
+                        // static resources are default routes, not served on a listener that does not expose them
+                        FileCustomizableResponseType fileCustomizableResponseType = routeExecutor.router.exposesDefaultRoutes(request) ? findFile(request) : null;
                         if (fileCustomizableResponseType != null) {
                             HttpMethod method = request.getMethod();
                             if (method != HttpMethod.GET && method != HttpMethod.HEAD) {
