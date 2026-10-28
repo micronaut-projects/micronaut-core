@@ -202,6 +202,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String STATIC_ADVICE_BIND = "bindStaticAdvice";
     // the parameter of a compiled delegate method carrying the Python object
     private static final String COMPILED_SELF = "__mnSelf";
+    // the Python object a stub extending a Python class stub last bound to the compiled bodies of its classes
+    private static final String COMPILED_BOUND_FIELD = "graalpyInternalCompiledValue";
     // the prefix of the shared entry of a compiled body: a private name, which the stub bridges no Python method under
     private static final String SHARED_ENTRY_PREFIX = "__mnShared_";
     public static final ClassTypeDef PYTHON_ASYNCIO_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonAsyncioRuntime");
@@ -1307,10 +1309,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         .addParameter(ParameterDef.of(PYTHON_CLASS_REFERENCE_PARAMETER, PYTHON_CLASS_REFERENCE))
                         .build(((aThis, methodParameters) -> {
                                 if (extendsPythonClass) {
-                                    // the object lives in the base stub's field: reached through asPolyglotValue()
+                                    // the object lives in the base stub's field: reached through asPolyglotValue(),
+                                    // which binds it to the compiled bodies of the classes of the stub
                                     return StatementDef.multi(
                                         invokeOwnedObjectSuperConstructor(aThis, superType, methodParameters.get(0)),
-                                        bindWrapper(model, aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE))
+                                        bindsCompiled(model) ? aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE) : StatementDef.multi()
                                     );
                                 }
                                 return StatementDef.multi(
@@ -1954,6 +1957,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ))
                     );
                 } else if (extendsPythonClass) {
+                    if (bindsCompiled(model)) {
+                        // the base stub keeps the object and creates it again once its application has shut
+                        // down, binding the compiled bodies of its own classes only: an object this stub has not
+                        // bound yet is bound to the bodies of every class of its MRO here
+                        FieldDef bound = FieldDef.builder(COMPILED_BOUND_FIELD)
+                            .ofType(POLYGLOT_VALUE)
+                            .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
+                            .build();
+                        builder.addField(bound);
+                        return aThis.superRef().invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).newLocal(VALUE_PARAMETER, value -> StatementDef.multi(
+                            value.notEqualsReferentially(aThis.field(bound)).doIf(StatementDef.multi(
+                                bindWrapper(model, value),
+                                aThis.field(bound).assign(value)
+                            )),
+                            value.returning()
+                        ));
+                    }
                     return aThis.superRef().invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).returning();
                 } else {
                     return StatementDef.multi(
@@ -5360,6 +5380,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             binds.add(PYTHON_STATIC.invokeStatic("bindCompiled", TypeDef.VOID, value, ExpressionDef.constant(owner.getName()), compiledDelegateType(owner).instantiate()));
         }
         return value.isNonNull().doIf(StatementDef.multi(binds));
+    }
+
+    /**
+     * Whether the Python object of the stub is bound to compiled bodies, see {@link #bindWrapper}.
+     */
+    private static boolean bindsCompiled(ClassStubModel model) {
+        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
+        return plan != null && !compiledOwnersOf(plan, model).isEmpty();
     }
 
     /**
