@@ -376,7 +376,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof WebSocketFrame frame) {
-            if ((messageInFlight || !pendingFrames.isEmpty()) && isDataFrame(frame)) {
+            if (holdsFramesWhileMessageHandled() && (messageInFlight || !pendingFrames.isEmpty()) && isDataFrame(frame)) {
                 // a message is being handled: keep the frame until it completes, and stop reading
                 // once the kept frames add up to a message
                 pendingFrames.add(frame.retain());
@@ -391,6 +391,17 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         } else {
             ctx.fireChannelRead(msg);
         }
+    }
+
+    /**
+     * Whether the data frames read while a message is being handled wait until it completes. A
+     * subclass that controls how many messages are handled at the same time itself returns
+     * {@code false}.
+     *
+     * @return {@code true} to handle the messages one after the other
+     */
+    protected boolean holdsFramesWhileMessageHandled() {
+        return true;
     }
 
     private static boolean isDataFrame(WebSocketFrame frame) {

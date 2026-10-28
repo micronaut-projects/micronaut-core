@@ -617,6 +617,13 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         routeFrameRead(ctx, msg);
     }
 
+    @Override
+    protected boolean holdsFramesWhileMessageHandled() {
+        // a WebSocket route reads its messages as its maximum of concurrent messages allows, see
+        // routeFrameRead
+        return routeEndpoint == null;
+    }
+
     private void routeFrameRead(ChannelHandlerContext ctx, Object msg) {
         if (maxConcurrentMessages > 0) {
             framesReceived++;
