@@ -90,6 +90,10 @@ abstract class MultiplexedServerHandler {
         private HttpRequest request;
 
         private List<ByteBuf> bufferedContent;
+        /**
+         * Number of bytes in {@link #bufferedContent}.
+         */
+        private long bufferedLength;
         private BufferConsumer.Upstream writerUpstream;
         private InputStreamer streamer;
         /**
@@ -178,11 +182,23 @@ abstract class MultiplexedServerHandler {
                 if (endOfStream) {
                     // we got the full message before readComplete
                     acceptFullBody(data);
+                } else if (bufferedLength + data.readableBytes() > bodySizeLimits.maxBufferSize()) {
+                    // a decompressed body can grow far beyond the flow control window, so stop
+                    // buffering before the limit is exceeded and let the streaming buffer apply
+                    // the size limits and backpressure
+                    devolveToStreaming();
+                    InputStreamer s = streamer;
+                    if (s == null) {
+                        data.release();
+                    } else {
+                        s.add(byteBodyFactory().readBufferFactory().adapt(data));
+                    }
                 } else {
                     if (bufferedContent == null) {
                         bufferedContent = new ArrayList<>();
                     }
                     bufferedContent.add(data);
+                    bufferedLength += data.readableBytes();
                 }
             } else {
                 streamer.add(byteBodyFactory().readBufferFactory().adapt(data));
@@ -212,6 +228,7 @@ abstract class MultiplexedServerHandler {
                 fullBody = composite;
             }
             bufferedContent = null;
+            bufferedLength = 0;
 
             requestAccepted = true;
             notifyDataConsumed(fullBody.readableBytes());
@@ -256,6 +273,7 @@ abstract class MultiplexedServerHandler {
                     streamer.add(byteBodyFactory().readBufferFactory().adapt(buf));
                 }
                 bufferedContent = null;
+                bufferedLength = 0;
             }
             requestAccepted = true;
             streamer.dest.setExpectedLengthFrom(request.headers());
@@ -303,6 +321,7 @@ abstract class MultiplexedServerHandler {
                     buf.release();
                 }
                 bufferedContent = null;
+                bufferedLength = 0;
             }
         }
 

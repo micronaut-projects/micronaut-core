@@ -52,7 +52,6 @@ import io.netty.handler.codec.compression.Brotli;
 import io.netty.handler.codec.compression.BrotliDecoder;
 import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.compression.SnappyFrameDecoder;
-import io.netty.handler.codec.compression.ZlibCodecFactory;
 import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -552,6 +551,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             outboundQueue.add(outboundAccess);
 
             EmbeddedChannel decompressionChannel;
+            ZlibBodyDecoder zlibDecoder = null;
             if (requestDecompressionEnabled) {
                 HttpHeaders headers = request.headers();
                 String contentEncoding = getContentEncoding(headers);
@@ -559,12 +559,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     decompressionChannel = null;
                 } else if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) ||
                     HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = newDecompressionChannel(
-                        ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP, maxZlibAllocation()));
+                    zlibDecoder = new ZlibBodyDecoder(ZlibWrapper.GZIP, maxZlibAllocation());
+                    decompressionChannel = newDecompressionChannel(zlibDecoder);
                 } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) ||
                     HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = newDecompressionChannel(
-                        ZlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE, maxZlibAllocation()));
+                    zlibDecoder = new ZlibBodyDecoder(ZlibWrapper.ZLIB_OR_NONE, maxZlibAllocation());
+                    decompressionChannel = newDecompressionChannel(zlibDecoder);
                 } else if (Brotli.isAvailable() && HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding)) {
                     decompressionChannel = newDecompressionChannel(new BrotliDecoder());
                 } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
@@ -599,7 +599,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (decompressionChannel == null) {
                     inboundHandler = optimisticBufferingInboundHandler;
                 } else {
-                    inboundHandler = new DecompressingInboundHandler(decompressionChannel, optimisticBufferingInboundHandler);
+                    inboundHandler = new DecompressingInboundHandler(decompressionChannel, zlibDecoder, optimisticBufferingInboundHandler);
                 }
                 if (full) {
                     inboundHandler.read(new DefaultLastHttpContent(((FullHttpRequest) request).content()));
@@ -900,10 +900,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     private class DecompressingInboundHandler extends InboundHandler {
         private final EmbeddedChannel channel;
+        @Nullable
+        private final ZlibBodyDecoder zlibDecoder;
         private InboundHandler delegate;
 
-        public DecompressingInboundHandler(EmbeddedChannel channel, InboundHandler delegate) {
+        public DecompressingInboundHandler(EmbeddedChannel channel, @Nullable ZlibBodyDecoder zlibDecoder, InboundHandler delegate) {
             this.channel = channel;
+            this.zlibDecoder = zlibDecoder;
             this.delegate = delegate;
 
             channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
@@ -937,6 +940,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             try {
                 channel.writeInbound(compressed);
                 if (last) {
+                    if (zlibDecoder != null && zlibDecoder.isTruncated()) {
+                        throw new DecompressionException("Request body ended before the end of the compressed stream");
+                    }
                     if (channel.isOpen()) {
                         channel.finish();
                     }
@@ -953,6 +959,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (last) {
                 delegate.read(LastHttpContent.EMPTY_LAST_CONTENT);
             }
+        }
+
+        @Override
+        boolean needMore() {
+            return delegate.needMore();
         }
 
         void dispose() {
