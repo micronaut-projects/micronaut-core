@@ -119,7 +119,11 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                             BeanIntrospectionReference::isPresent
                     );
                     for (BeanIntrospectionReference<Object> reference : beanIntrospectionReferences) {
-                        resolvedIntrospectionMap.put(reference.getName(), reference);
+                        String typeName = reference.getName();
+                        if (ClassUtils.isJavaBasicType(typeName)) {
+                            throw new IllegalArgumentException(ClassUtils.basicJavaTypeRegistrationMessage(typeName));
+                        }
+                        resolvedIntrospectionMap.put(typeName, reference);
                     }
                     this.introspectionMap = resolvedIntrospectionMap;
                 }
