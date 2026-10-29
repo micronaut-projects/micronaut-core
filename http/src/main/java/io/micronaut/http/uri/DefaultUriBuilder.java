@@ -341,6 +341,8 @@ class DefaultUriBuilder implements UriBuilder {
             String pathStr = path.toString();
             if (isTemplate(pathStr, values)) {
                 pathStr = UriTemplate.of(pathStr).expand(values);
+            } else {
+                pathStr = encodePath(pathStr);
             }
 
             builder.append(pathStr);
@@ -440,5 +442,26 @@ class DefaultUriBuilder implements UriBuilder {
 
     private String encode(String userInfo) {
         return URLEncoder.encode(userInfo, StandardCharsets.UTF_8);
+    }
+
+    private static String encodePath(String path) {
+        if (path.indexOf('{') < 0 && path.indexOf('}') < 0 && path.indexOf(' ') < 0) {
+            return path;
+        }
+        StringBuilder sb = new StringBuilder(path.length() + 8);
+        int len = path.length();
+        for (int i = 0; i < len; i++) {
+            char c = path.charAt(i);
+            if (c == '{') {
+                sb.append("%7B");
+            } else if (c == '}') {
+                sb.append("%7D");
+            } else if (c == ' ') {
+                sb.append("%20");
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 }
