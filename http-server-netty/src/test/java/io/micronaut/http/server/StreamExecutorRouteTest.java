@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Controller;
@@ -119,6 +120,26 @@ class StreamExecutorRouteTest {
     }
 
     /**
+     * A single value body of a route that does not declare the type of its body is left to the
+     * response writer: the status of the response is kept, also when the body is empty.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void aSingleBodyOfAnUntypedRouteKeepsTheResponse(boolean compatibility) {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", SPEC, "micronaut.server.port", -1))) {
+            ctx.getBean(RouteExecutor.class).forceCompatibility = compatibility;
+            EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
+            try (HttpClient client = ctx.createBean(HttpClient.class, server.getURL())) {
+                HttpResponse<String> empty = client.toBlocking().exchange(HttpRequest.GET("/stream/hand-off/single-empty"), String.class);
+                assertEquals(HttpStatus.CREATED, empty.getStatus());
+                HttpResponse<String> single = client.toBlocking().exchange(HttpRequest.GET("/stream/hand-off/single"), String.class);
+                assertEquals(HttpStatus.CREATED, single.getStatus());
+                assertTrue(single.body().contains("value"), single.body());
+            }
+        }
+    }
+
+    /**
      * A response completed later, on the thread of the timer.
      */
     private static CompletableFuture<HttpResponse<Flux<String>>> delayed(RouteTestTimer timer) {
@@ -184,6 +205,18 @@ class StreamExecutorRouteTest {
         @ExecuteOn(HandOffExecutor.NAME)
         Mono<HttpResponse<?>> handOffMono() {
             return Mono.fromSupplier(() -> HttpResponse.ok(thread()));
+        }
+
+        @Get(value = "/hand-off/single-empty", produces = MediaType.APPLICATION_JSON)
+        @ExecuteOn(HandOffExecutor.NAME)
+        HttpResponse<?> handOffSingleEmpty() {
+            return HttpResponse.created(Mono.empty());
+        }
+
+        @Get(value = "/hand-off/single", produces = MediaType.APPLICATION_JSON)
+        @ExecuteOn(HandOffExecutor.NAME)
+        HttpResponse<?> handOffSingle() {
+            return HttpResponse.created(Mono.just("value"));
         }
 
         @Get(value = "/hand-off/error", produces = MediaType.APPLICATION_JSON)

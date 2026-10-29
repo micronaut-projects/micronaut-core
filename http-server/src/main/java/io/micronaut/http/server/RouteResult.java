@@ -120,7 +120,7 @@ abstract sealed class RouteResult {
      */
     private boolean publisherBody(RouteInfo<?> routeInfo, MutableHttpResponse<?> response) {
         return responseBodyAsyncOrReactive(routeInfo)
-            || untypedResponseBodyOnExecutor(routeInfo) && Publishers.isConvertibleToPublisher(response.body());
+            || untypedResponseBodyOnExecutor(routeInfo) && streamedBody(response.body());
     }
 
     /**
@@ -133,7 +133,18 @@ abstract sealed class RouteResult {
      */
     private boolean nestedPublisherBody(RouteInfo<?> routeInfo, MutableHttpResponse<?> response) {
         return nestedResponseBodyAsyncOrReactive(routeInfo)
-            || untypedNestedResponseBodyOnExecutor(routeInfo) && Publishers.isConvertibleToPublisher(response.body());
+            || untypedNestedResponseBodyOnExecutor(routeInfo) && streamedBody(response.body());
+    }
+
+    /**
+     * A single value body, e.g. a {@code Mono}, is left to the response writer: only a stream is
+     * subscribed to by the writer, and the status and the headers of the response are kept.
+     *
+     * @param body The body of the response
+     * @return Whether the body is a publisher of a stream
+     */
+    private static boolean streamedBody(@Nullable Object body) {
+        return body != null && Publishers.isConvertibleToPublisher(body) && !Publishers.isSingle(body.getClass());
     }
 
     CompletionStage<MutableHttpResponse<?>> fromCompletionStage(HttpRequest<?> request,
@@ -695,7 +706,7 @@ abstract sealed class RouteResult {
 
         @Override
         final boolean untypedResponseBodyOnExecutor(RouteInfo<?> routeInfo) {
-            // the stream executor is selected once, when a body is first streamed
+            // the stream executor is selected once, when it is first needed
             return preparedUntypedResponseBody && streamExecutor(routeInfo) != null;
         }
 
