@@ -2,10 +2,12 @@ package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
 import org.jspecify.annotations.NonNull
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -13,6 +15,7 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.netty.NettyClientCustomizer
+import io.micronaut.http.context.event.HttpResponseWrittenEvent
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.buffer.ByteBuf
@@ -30,7 +33,11 @@ import io.netty.handler.codec.http.HttpHeaderValues
 import jakarta.inject.Singleton
 import spock.lang.Specification
 
+import java.util.Arrays
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ThreadLocalRandom
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.LockSupport
 
 class CompressionSpec extends Specification {
     protected Map<String, Object> serverOptions() {
@@ -103,6 +110,39 @@ class CompressionSpec extends Specification {
         1         | 0      | false
         1         | 1      | true
         -1        | 10000  | false
+    }
+
+    def 'responseWritten event reports compressed bytes'() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'CompressionSpec', 'micronaut.server.netty.compression-threshold': 0] + serverOptions())
+
+        byte[] uncompressed = new byte[10_000]
+        Arrays.fill(uncompressed, (byte) 'A')
+        server.applicationContext.getBean(Ctrl).data = uncompressed
+        def recorder = server.applicationContext.getBean(WrittenEventRecorder)
+        recorder.events.clear()
+
+        def client = server.applicationContext.createBean(HttpClient, server.URI).toBlocking()
+
+        when:
+        byte[] compressed = client.retrieve(HttpRequest.GET("/compress").header("Accept-Encoding", "gzip"), byte[])
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (recorder.events.isEmpty() && System.nanoTime() < deadline) {
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(10))
+        }
+        // grace period to catch duplicate events
+        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(200))
+
+        then:
+        compressed.length < uncompressed.length
+        recorder.events.size() == 1
+        recorder.events[0].status == HttpStatus.OK
+        // bytesWritten is the post-compression body size, i.e. the bytes on the wire
+        recorder.events[0].bytesWritten == compressed.length
+
+        cleanup:
+        client.close()
+        server.stop()
     }
 
     def decompression(ChannelHandler compressor, CharSequence contentEncoding) {
@@ -202,6 +242,17 @@ class CompressionSpec extends Specification {
         @Produces("text/plain")
         InputStream sendStream() {
             return new ByteArrayInputStream(data)
+        }
+    }
+
+    @Requires(property = "spec.name", value = "CompressionSpec")
+    @Singleton
+    static class WrittenEventRecorder implements ApplicationEventListener<HttpResponseWrittenEvent> {
+        final CopyOnWriteArrayList<HttpResponseWrittenEvent> events = new CopyOnWriteArrayList<>()
+
+        @Override
+        void onApplicationEvent(HttpResponseWrittenEvent event) {
+            events.add(event)
         }
     }
 
