@@ -22,7 +22,8 @@ import io.netty.handler.codec.compression.ZlibWrapper;
 
 /**
  * Creates streaming gzip and deflate handlers for HTTP connections and streams.
- * Each call must return a fresh handler whose resources are released when it is removed.
+ * Calls may arrive concurrently from different event loops. Each call must return a fresh
+ * handler whose resources are released when it is removed.
  * A replacement bean applies independently of the configured channel transport.
  *
  * @since 5.3.0

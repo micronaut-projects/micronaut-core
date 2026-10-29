@@ -1704,6 +1704,10 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @EachProperty("listeners")
     public static final class NettyListenerConfiguration {
         private final String name;
+        @Nullable
+        private String eventLoopGroup;
+        @Nullable
+        private String parentEventLoopGroup;
         private Family family = Family.TCP;
         private boolean ssl;
         @Nullable
@@ -1742,6 +1746,43 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Deprecated
         public NettyListenerConfiguration() {
             this("unknown");
+        }
+
+        /**
+         * @return The named worker group, or {@code null} to inherit the server worker group
+         * @since 5.3.0
+         */
+        public @Nullable String getEventLoopGroup() {
+            return eventLoopGroup;
+        }
+
+        /**
+         * Selects an existing named event loop group for this listener's connections or UDP socket.
+         *
+         * @param eventLoopGroup The group name, or {@code null} to inherit the server worker group
+         * @since 5.3.0
+         */
+        public void setEventLoopGroup(@Nullable String eventLoopGroup) {
+            this.eventLoopGroup = eventLoopGroup;
+        }
+
+        /**
+         * @return The named TCP acceptor group, or {@code null} to inherit the server parent group
+         * @since 5.3.0
+         */
+        public @Nullable String getParentEventLoopGroup() {
+            return parentEventLoopGroup;
+        }
+
+        /**
+         * Selects an existing named acceptor group. It must support the selected worker transport's
+         * server channel. QUIC listeners do not use a TCP acceptor group.
+         *
+         * @param parentEventLoopGroup The group name, or {@code null} to inherit the server parent group
+         * @since 5.3.0
+         */
+        public void setParentEventLoopGroup(@Nullable String parentEventLoopGroup) {
+            this.parentEventLoopGroup = parentEventLoopGroup;
         }
 
         /**
