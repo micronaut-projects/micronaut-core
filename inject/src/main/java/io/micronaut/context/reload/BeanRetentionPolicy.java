@@ -28,11 +28,20 @@ import java.util.Set;
  *
  * <p>Retaining a bean is for what is expensive to create and independent of the application's
  * classes: a connection pool, a client, a script engine. Policies are beans, consulted in
- * {@link Ordered order}; a bean is retained when any policy says so, and the launcher then checks
- * that the bean's own class is not stale and that, according to the {@link BeanDependencyGraph},
- * nothing it received is stale either. A retained bean is dropped, and created again by the new
- * context, when configuration under one of the prefixes the policy
- * {@link #observedConfigurationPrefixes(BeanRegistration) declares} changed.</p>
+ * {@link Ordered order}, and each {@link #decide(BeanRegistration) decides} a singleton: it
+ * {@link Decision#RETAIN retains} it, {@link Decision#REFUSE refuses} it, or
+ * {@link Decision#ABSTAIN abstains}. A bean is retained when a policy retains it and none refuses
+ * it, whatever their order, so that a module can veto what another policy, an
+ * {@link io.micronaut.context.annotation.Retain} annotation or {@code micronaut.dev.retain} asks for:
+ * a client that would instantiate a class of the application named by its configuration, which the
+ * context cannot see. A refused bean is destroyed and created again by the new context, as any bean
+ * that is not retained, and so is a retained bean that holds a refused one.</p>
+ *
+ * <p>The launcher then checks that the bean's own class is not stale and that, according to the
+ * {@link BeanDependencyGraph}, nothing it received is stale either, and the context refuses a bean
+ * that holds state bound to it; a policy cannot override these checks. A retained bean is dropped,
+ * and created again by the new context, when configuration under one of the prefixes a policy that
+ * retains it {@link #observedConfigurationPrefixes(BeanRegistration) declares} changed.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -41,21 +50,41 @@ import java.util.Set;
 public interface BeanRetentionPolicy extends Ordered {
 
     /**
-     * Whether the given singleton survives a restart.
+     * Decides whether the given singleton survives a restart.
      *
      * @param registration The bean's registration
-     * @return True to retain it
+     * @return {@link Decision#RETAIN} to retain it, {@link Decision#REFUSE} to keep it from being retained whatever
+     * another policy decides, or {@link Decision#ABSTAIN} to leave it to the other policies
      */
-    boolean retain(BeanRegistration<?> registration);
+    Decision decide(BeanRegistration<?> registration);
 
     /**
      * The configuration prefixes a change under which invalidates a retained bean this policy
-     * retains, so that a changed connection URL produces a new pool.
+     * {@link Decision#RETAIN retains}, so that a changed connection URL produces a new pool.
      *
      * @param registration The retained bean's registration
      * @return The prefixes, empty if no configuration change invalidates the bean
      */
     default Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
         return Set.of();
+    }
+
+    /**
+     * What a policy decides for a singleton.
+     */
+    enum Decision {
+        /**
+         * The singleton survives the restart, unless a policy refuses it.
+         */
+        RETAIN,
+        /**
+         * The singleton does not survive the restart, whatever the other policies decide: it is destroyed with the
+         * context and created again by the next one, as is a retained bean that holds it.
+         */
+        REFUSE,
+        /**
+         * The policy has no say on the singleton.
+         */
+        ABSTAIN
     }
 }

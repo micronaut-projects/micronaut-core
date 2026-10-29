@@ -16,10 +16,10 @@
 package io.micronaut.context.reload;
 
 import io.micronaut.context.BeanRegistration;
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -30,10 +30,10 @@ import java.util.function.Predicate;
 
 /**
  * What a restart retains according to {@link BeanRetentionPolicy} beans: a singleton a policy
- * {@link BeanRetentionPolicy#retain(BeanRegistration) retains}, unless the change behind the restart touched a
- * configuration prefix that one of the policies retaining it {@link BeanRetentionPolicy#observedConfigurationPrefixes(BeanRegistration) observes}
- * for it: a pool kept across a changed URL would be the old pool, so the next context creates it again from the
- * changed configuration.
+ * {@link BeanRetentionPolicy.Decision#RETAIN retains}, unless a change touched a configuration prefix one of the
+ * policies that retain it declares for it, and unless a policy {@link BeanRetentionPolicy.Decision#REFUSE refuses} it,
+ * whatever their order. A refusal also keeps a bean that holds the refused one from being retained, and the context
+ * that stops logs which policy refused.
  *
  * @author graemerocher
  * @since 5.3.0
@@ -62,17 +62,17 @@ public final class PolicyRetentionCriteria implements RetentionCriteria {
 
     /**
      * Whether a policy retains the singleton and the change touched none of the prefixes the policies that retain it
-     * observe for it.
+     * declare for it: a pool kept across a changed URL would be the old pool. A refusal is answered by
+     * {@link #refusedBy(BeanRegistration)}.
      *
      * @param registration The singleton's registration
      * @return True to retain it
-     * @see DefaultBeanContext#stopRetaining(RetentionCriteria)
      */
     @Override
     public boolean retain(BeanRegistration<?> registration) {
         boolean retained = false;
         for (BeanRetentionPolicy policy : policies) {
-            if (!policy.retain(registration)) {
+            if (policy.decide(registration) != BeanRetentionPolicy.Decision.RETAIN) {
                 continue;
             }
             retained = true;
@@ -89,7 +89,7 @@ public final class PolicyRetentionCriteria implements RetentionCriteria {
     public Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration) {
         Set<String> prefixes = new LinkedHashSet<>();
         for (BeanRetentionPolicy policy : policies) {
-            if (policy.retain(registration)) {
+            if (policy.decide(registration) == BeanRetentionPolicy.Decision.RETAIN) {
                 prefixes.addAll(policy.observedConfigurationPrefixes(registration));
             }
         }
@@ -99,5 +99,21 @@ public final class PolicyRetentionCriteria implements RetentionCriteria {
     @Override
     public boolean isReplaced(Class<?> type) {
         return replacedClass.test(type);
+    }
+
+    /**
+     * The first policy that refuses the singleton.
+     *
+     * @param registration The singleton's registration
+     * @return The policy, or null when none refuses it
+     */
+    @Override
+    public @Nullable BeanRetentionPolicy refusedBy(BeanRegistration<?> registration) {
+        for (BeanRetentionPolicy policy : policies) {
+            if (policy.decide(registration) == BeanRetentionPolicy.Decision.REFUSE) {
+                return policy;
+            }
+        }
+        return null;
     }
 }
