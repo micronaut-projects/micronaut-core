@@ -85,6 +85,11 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
     private boolean timeoutPending;
     private long outstanding;
     private boolean done;
+    /**
+     * Counts the armed and cancelled timeouts, so that one that fires after it was replaced or
+     * cancelled does nothing. Guarded by this.
+     */
+    private long timeoutGeneration;
     private @Nullable Disposable timeoutTask;
 
     public ByteBodySubscriber(BodySizeLimits limits) {
@@ -184,11 +189,13 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
         cancelTimeout();
         Duration timeout = readTimeout;
         if (timeout != null) {
-            timeoutTask = Schedulers.parallel().schedule(this::timedOut, timeout.toNanos(), TimeUnit.NANOSECONDS);
+            long generation = ++timeoutGeneration;
+            timeoutTask = Schedulers.parallel().schedule(() -> timedOut(generation), timeout.toNanos(), TimeUnit.NANOSECONDS);
         }
     }
 
     private void cancelTimeout() {
+        timeoutGeneration++;
         Disposable task = timeoutTask;
         if (task != null) {
             task.dispose();
@@ -205,10 +212,11 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
         return true;
     }
 
-    private void timedOut() {
+    private void timedOut(long generation) {
         Flow.Subscription s;
         synchronized (this) {
-            if (done || outstanding == 0) {
+            // a timeout replaced or cancelled after it began to run waits for this monitor
+            if (done || outstanding == 0 || generation != timeoutGeneration) {
                 return;
             }
             if (delivering) {
