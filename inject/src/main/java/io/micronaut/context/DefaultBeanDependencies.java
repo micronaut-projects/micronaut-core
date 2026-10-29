@@ -175,8 +175,8 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
 
     /**
      * Rejects further resolution through this owner while keeping what it holds, as the destruction of its bean begins.
-     * The destruction callbacks of the invocation may still resolve, on its thread and until it returns; what they
-     * create is destroyed with the owner.
+     * The destruction callbacks of the invocation may still resolve until it returns, on its thread or on another
+     * one they hand work to; what they create is destroyed with the owner.
      *
      * @param invocation The destruction invocation, or null when its callbacks may not resolve through this owner
      */
@@ -190,13 +190,15 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
     }
 
     /**
-     * @return Whether a resolution may be attached to this owner: it is open, or the current thread runs the
-     * destruction invocation that stopped it
+     * @return Whether a resolution may be attached to this owner: it is open, or the destruction invocation that
+     * stopped it has not returned yet. The invocation is not confined to its thread, since a destruction callback
+     * may hand work to another thread and wait for it; what that work creates is attached atomically with the
+     * release of the owner, and so destroyed with it or not at all
      */
     private synchronized boolean isResolvable() {
         return switch (state) {
             case OPEN -> true;
-            case RESOLUTION_STOPPED, DESTRUCTION_CLAIMED -> stoppedBy != null && stoppedBy.isDestructionInvocationActive();
+            case RESOLUTION_STOPPED, DESTRUCTION_CLAIMED -> stoppedBy != null && stoppedBy.isDestructionInvocationOpen();
             case OWNERSHIP_RELEASED -> false;
         };
     }
