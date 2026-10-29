@@ -2,6 +2,7 @@ package io.micronaut.inject.dependencies
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 
@@ -307,6 +308,68 @@ class Holder { static BeanDependencyGroup group; }
 
         then:
         log.EVENTS == ['async temporary', 'resource1', 'async retained', 'owner', 'resource2']
+    }
+
+    void "work a pre-destroy method waits for on another thread resolves through the owner's resolver"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@Singleton class Owner {
+    final BeanDependencyResolver resolver;
+    Owner(BeanDependencyResolver resolver) { this.resolver = resolver; }
+    @PreDestroy void close() {
+        CompletableFuture.runAsync(() -> {
+            resolver.getBean(Resource.class);
+            resolver.getBean(Shared.class);
+            Log.EVENTS.add("async");
+        }).join();
+        Log.EVENTS.add("owner");
+    }
+}
+''')
+        def owner = ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        ctx.close()
+
+        then: 'what the other thread created is destroyed with the owner, the singleton created during shutdown after it'
+        log.EVENTS == ['async', 'owner', 'resource1', 'shared']
+
+        when: 'the destruction has completed'
+        CompletableFuture.runAsync { owner.resolver.getBean(ctx.classLoader.loadClass('test.Resource')) }.get(30, TimeUnit.SECONDS)
+
+        then:
+        def e = thrown(ExecutionException)
+        e.cause instanceof IllegalStateException
+    }
+
+    void "work a pre-destroy method waits for on another thread resolves through the owner's resolver outside shutdown"() {
+        given:
+        def ctx = buildContext(HEADER + '''
+@Singleton class Owner {
+    final BeanDependencyResolver resolver;
+    Owner(BeanDependencyResolver resolver) { this.resolver = resolver; }
+    @PreDestroy void close() {
+        CompletableFuture.runAsync(() -> {
+            resolver.getBean(Resource.class);
+            Log.EVENTS.add("async");
+        }).join();
+        Log.EVENTS.add("owner");
+    }
+}
+''')
+        def ownerType = ctx.classLoader.loadClass('test.Owner')
+        ctx.getBean(ownerType)
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        ctx.destroyBean(ownerType)
+
+        then:
+        log.EVENTS == ['async', 'owner', 'resource1']
+
+        cleanup:
+        ctx.close()
     }
 
     void "work a destruction callback does not wait for is rejected once the callbacks complete"() {
