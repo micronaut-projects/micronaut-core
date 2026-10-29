@@ -27,7 +27,8 @@ import java.util.Optional;
 
 /**
  * Binds {@link java.util.Locale} arguments in controller methods using
- * the {@link io.micronaut.core.util.LocaleResolver}.
+ * the {@link io.micronaut.core.util.LocaleResolver}, falling back to the
+ * default locale when the locale of the request cannot be resolved.
  *
  * @author James Kleeh
  * @since 2.3.0
@@ -51,11 +52,7 @@ public class LocaleArgumentBinder implements TypedRequestArgumentBinder<Locale> 
 
     @Override
     public BindingResult<Locale> bind(ArgumentConversionContext<Locale> context, HttpRequest<?> source) {
-        final Optional<Locale> locale = localeResolver.resolve(source);
-        if (locale.isPresent()) {
-            return () -> locale;
-        } else {
-            return BindingResult.UNSATISFIED;
-        }
+        final Optional<Locale> locale = Optional.of(localeResolver.resolveOrDefault(source));
+        return () -> locale;
     }
 }
