@@ -34,8 +34,8 @@ import java.util.Map;
  */
 @Internal
 class CustomSafeConstructor extends SafeConstructor {
-    CustomSafeConstructor() {
-        super(new LoaderOptions());
+    CustomSafeConstructor(LoaderOptions loaderOptions) {
+        super(loaderOptions);
         yamlConstructors.put(Tag.TIMESTAMP, new ConstructIsoTimestampString());
     }
 
