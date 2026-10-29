@@ -66,6 +66,13 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
+tasks.named<GroovyCompile>("compileTestGroovy") {
+    // The largest Groovy compilation of the build, up to 1.2 GB live on its own. A compiler daemon
+    // that compiled other Groovy sources first still holds part of their memory, and the 2 GB of the
+    // convention ran out compiling these sources in such a daemon. A larger heap also gives this
+    // compilation a daemon of its own: a daemon with less memory cannot be reused for it.
+    groovyOptions.forkOptions.memoryMaximumSize = "3g"
+}
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 //compileTestGroovy.groovyOptions.fork = true
 
