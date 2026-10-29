@@ -352,9 +352,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 log.debug("Starting environment {} for active names {}", this, getActiveNames());
                 if (reading.compareAndSet(false, true)) {
                     try {
-                        readPropertySources(getPropertySourceRootName());
+                        readIntoCopy(() -> readPropertySources(getPropertySourceRootName()));
                         if (!isRefreshing()) {
-                            // a start writes where lookups read
+                            // what the start read is published, or is with the add or the start it runs in
                             propertiesPublished();
                         }
                     } finally {
