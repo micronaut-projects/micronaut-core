@@ -1,35 +1,41 @@
-A locator route routes the requests under a prefix to the routes of a target located at runtime, like a JAX-RS sub-resource locator. The routes of the target are declared by an api:web.router.builder.LocatedRoutes[], whose URIs are relative to the prefix and whose handlers receive the located target.
+A locator routes a path prefix to a target found at request time, such as a shop selected by a path variable. An api:web.router.builder.LocatedRoutes[] declares that target's routes relative to the prefix. Its handlers receive the target as an additional argument.
 
 snippet::io.micronaut.docs.server.functional.LocatorRoutes[tags="imports,clazz", indent=0, title="Locator routes"]
 
-<1> One `LocatedRoutes` instance for the routes of every located shop, kept in a field: the router declares its routes once, when the first shop is located, and every locator route that returns the same instance shares them.
-<2> `locate(prefix, locator, routes)`: the locator finds the target of the request, here from a path variable of the prefix. `GET /shops/north/items/1` is answered by the route `/items/{index}` of the located routes, with the path variables of the prefix and of the route.
-<3> `locateAsync` takes a locator that returns a `CompletionStage` of the target, e.g. loaded from a database: the request is matched with the located routes when the stage completes, without blocking the thread that matched it.
-<4> `locate(prefix, locator, routesOf)`: a function selects the `LocatedRoutes` of each target, e.g. by its type or its state.
-<5> `targetType()` is the type of the located targets: the handlers receive the target of that type, and a located target of another type fails the request.
-<6> `routes(...)` declares the routes of a located shop on a api:web.router.builder.LocatedHttpRouteBuilder[], relative to the prefix. Its route methods, such as `GET(uri)`, return a api:web.router.builder.LocatedHttpRouteSpec[], whose terminals, and those of its body stages, also take a handler that receives the target, e.g. `(request, pathVariables, shop) -> ...`. A route at `/` is at the prefix itself. Its groups, declared with `group(...)` or `path(...)`, are of type api:web.router.builder.LocatedHttpRouteGroup[]: their routes and locators receive the target too, and their error and status routes are local to their routes.
-<7> The handlers that do not take the target as an argument, e.g. the shortcuts such as `GET(uri, handler)`, read it from their path variables with `LocatedRoutes.locatedTarget(pathVariables, type)`.
+<1> Reuse one `LocatedRoutes` instance for a target type. Its route definitions are built once and shared across targets.
+<2> `locate(prefix, locator, routes)` finds the target. Here `/shops/north/items/1` reaches `/items/{index}` with both prefix and route variables available.
+<3> Use `locateAsync` when finding the target returns a `CompletionStage`.
+<4> A function can choose the `LocatedRoutes` for each target, for example according to its type.
+<5> `targetType()` declares the target type expected by the handlers.
+<6> Declare relative routes with handlers such as `(request, pathVariables, shop) -> ...`. A route at `/` matches the locator's prefix. Nested groups and local error routes are supported.
+<7> Handlers without a target parameter can retrieve it with `LocatedRoutes.locatedTarget(pathVariables, type)`.
 
-A locator that returns `null`, or a stage that completes with `null`, is a `404`. A locator that throws, or a failed stage, is handled by the error routes, those of the groups of the locator route first. When the located routes have no route for the rest of the path, the request is answered like a request that no route matches: `404`, or `405`, `415` or `406` if a located route matches the path with another method or media type. No other route of the application is tried.
+=== Matching and Execution
 
-The filters of the matched located route apply, after the filters of the groups of the locator route, and the server filters apply to the full path. A located route inherits from the groups enclosing its locator route what a route declared in those groups has, and its own settings, and those of the groups of its `LocatedRoutes`, take precedence: the annotations given with `annotate(...)`, so a filter bound to a `@FilterMatcher` annotation of such a group runs for it and the `@Produces`, `@Consumes`, `@Status` and `@ExecuteOn` of the group apply to it; the attributes; and the media types and the executor, given with `consumes(...)`, `produces(...)`, `executeOn(...)` or `nonBlocking()`, including when the request is matched by its media types. Located routes may declare locator routes of their own, which locate again from the rest of the path, and error routes in their groups. They cannot declare global error or status routes or ports, and have no `serverFilter`: those belong to the application routes, and declaring a global error or status route or a port fails when the routes are declared. Routes that fail to declare fail every request routed to them, and are declared again for the next one. The URI template of a request routed to a located route, e.g. the `uri` of the HTTP server metrics, is the template of the route under the prefixes of its locator routes, such as `/shops/{shop}/items/{index}`.
+The locator runs at most once per request. A `null` target produces `404`; exceptions use normal error handling, starting with the locator's groups.
 
-A synchronous locator runs while the request is matched, on the thread that matches it, typically an event loop thread, and must not block. The target is located once per request and kept for the rest of the request: a locator, synchronous or asynchronous, runs at most once per request, also when the request is answered with a `405` whose allowed methods are those of the located routes. A request with a custom HTTP method, such as `PROPFIND`, is located like any other: it is answered by the located route of that method, or by a located route declared with `any(...)`, and otherwise with a `405` whose allowed methods are those of the located routes. The constraints of a located route see the path variables of the prefixes, as its handler does.
+Once a target is selected, routing continues within its routes. If none matches, the response is `404`, `405`, `415` or `406` as appropriate. The request does not fall back to unrelated application routes.
 
-The server waits for the stage of an asynchronous locator without blocking. When the client goes away before the stage completes, the Netty server stops waiting for it, when the connection closes or the HTTP/2 stream is reset, without cancelling it: a locator may return a stage it shares with other requests, e.g. of a cache. A CORS preflight request for a path under the prefix of an asynchronous locator is answered once the locator has located its target, with the methods of its located routes, before the filters that run after the routes are matched.
+Synchronous locators run during route matching, typically on the event loop, and must not block. Use `locateAsync` for asynchronous work. The server stops waiting if the client disconnects, without cancelling the returned stage, which may be shared.
 
-==== Locators that read the body
+=== Groups and Settings
 
-A locator that needs the body of the request to locate its target, e.g. a JAX-RS resource that reads `@FormParam` fields before its sub-resource locator runs, is declared with `locator(prefix)`, followed by a body stage, like the body stages of a route, and `locate` or `locateAsync`:
+Located routes inherit filters, annotations, attributes, media types and executors from the groups enclosing the locator. Their own settings and groups can override these defaults. Filters run from the enclosing locator groups inward to the matched route.
+
+Located routes can contain further locators. They cannot declare server filters, global error or status routes, dedicated ports, WebSocket routes or static resource routes. Declare those on the application builder instead.
+
+=== Locators That Read the Body
+
+Use `locator(prefix)` followed by a body stage when finding the target requires request data:
 
 snippet::io.micronaut.docs.server.functional.FormLocatorRoutes[tags="imports,clazz", indent=0, title="A locator that reads the form"]
 
-<1> `locator(prefix)` declares a locator route whose locator reads the body. It matches every request under the prefix, like `locate(...)`.
-<2> The body stage: `form()` for the submitted form, `body(type)` for the body decoded to a type, like a `@Body` argument, or `body()` for an api:http.body.AsyncRequestBody[] the locator reads itself.
-<3> The locator receives the body once it was read. It runs on the thread that completed the read, typically an event loop thread, and must not block: use `locateAsync` for a target that is loaded later.
-<4> The located route reads the body again. The form is read once: the locator and the located route receive the same form, with its files.
-<5> A request whose content type is not a form, such as this `GET`, a `HEAD`, a CORS preflight or a JSON body for a located route, is located with the empty form, see api:http.form.FormData#empty()[], without reading its body, like a JAX-RS `@FormParam` without a form entity. A form that fails to read fails the request.
+<1> Start a locator that reads the body.
+<2> Choose `form()`, a decoded `body(type)`, or `body()` for an api:http.body.AsyncRequestBody[].
+<3> The locator runs when the body is ready, usually on the event loop. Use `locateAsync` for work that completes later.
+<4> The located route can read the form too; it receives the same collected form and files.
+<5> A form locator receives `FormData.empty()` for a non-form request without reading its body. A malformed form fails the request.
 
-NOTE: A `form()` locator reads the form from a copy of the body, which needs a server that decodes a form from a split of the bytes of the request, as the Netty server does. On a server that does not, e.g. a servlet container, a form request under such a locator fails.
+Body-reading locators use a copy of the body and buffer it within `micronaut.server.max-request-buffer-size`. Larger bodies produce `413`. A decoded body is required unless its type is nullable.
 
-The locator reads a copy of the body, see api:http.body.AsyncRequestBody#copy()[], so the body is held to `micronaut.server.max-request-buffer-size` as a whole, with a `413` for a larger body. With `body(type)`, a request without a body is a `400`, unless the type is nullable. What the read of the locator left open is released before the request is matched with the located routes, and when the client goes away, while the body is read or while the locator waits for its stage. Otherwise the locator is an asynchronous locator: it runs once per request, and its failures are answered by the error routes.
+NOTE: Form locators require a server that supports decoding forms from a copy of the request bytes, such as Netty. They are not supported on servers without that capability, such as servlet containers.
