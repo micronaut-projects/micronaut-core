@@ -648,6 +648,126 @@ class AnnotationValueSpec extends Specification {
         empty.matches(new AnnotationValue("test.Named", [value: ""] as Map<CharSequence, Object>, defaults))
     }
 
+    void "test matches() takes a member bound to the empty string for one left out with no default recorded"() {
+        given: "compiled metadata records no default of the empty string, so a member defaulting to it is left out"
+        def compiled = new AnnotationValue("test.Zone", [:] as Map<CharSequence, Object>, [region: "eu"] as Map<CharSequence, Object>)
+        def empty = new AnnotationValue("test.Zone", [value: ""] as Map<CharSequence, Object>, (Map<CharSequence, Object>) null)
+        def leftOut = new AnnotationValue("test.Zone", [:] as Map<CharSequence, Object>, (Map<CharSequence, Object>) null)
+
+        expect:
+        empty.matches(leftOut)
+        leftOut.matches(empty)
+        empty.matches(compiled)
+        compiled.matches(empty)
+        new AnnotationValue("test.Zone", [value: "", region: "eu"] as Map<CharSequence, Object>, [region: "eu"] as Map<CharSequence, Object>).matches(compiled)
+        compiled.matches(new AnnotationValue("test.Zone", [value: "", region: "eu"] as Map<CharSequence, Object>, [region: "eu"] as Map<CharSequence, Object>))
+
+        and: "any other value of a member the other side leaves out with no default still differs"
+        !new AnnotationValue("test.Zone", [value: "x"] as Map<CharSequence, Object>).matches(compiled)
+        !compiled.matches(new AnnotationValue("test.Zone", [value: "x"] as Map<CharSequence, Object>))
+        !new AnnotationValue("test.Zone", [value: [] as String[]] as Map<CharSequence, Object>).matches(leftOut)
+        !leftOut.matches(new AnnotationValue("test.Zone", [value: [] as String[]] as Map<CharSequence, Object>))
+    }
+
+    private static final Map<CharSequence, Object> NOTED_DEFAULTS = [level: "INFO", note: ""] as Map<CharSequence, Object>
+    private static final String[] NOTED_NON_BINDING = ["note"] as String[]
+
+    void "test bindingHashCode() agrees with matches()"() {
+        expect: "values that match hash alike"
+        left.matches(right)
+        left.bindingHashCode() == right.bindingHashCode()
+
+        where:
+        left                                                                                                   | right
+        // an enum constant and the name compiled metadata holds
+        AnnotationValue.builder("test.Tier").member("level", MatchedLevel.GOLD).build()                         | new AnnotationValue("test.Tier", [level: "GOLD"] as Map<CharSequence, Object>)
+        AnnotationValue.builder("test.Tier").member("levels", MatchedLevel.GOLD, MatchedLevel.SILVER).build()   | new AnnotationValue("test.Tier", [levels: ["GOLD", "SILVER"] as String[]] as Map<CharSequence, Object>)
+        // a class and its class value
+        new AnnotationValue("test.Typed", [value: String] as Map<CharSequence, Object>)                         | new AnnotationValue("test.Typed", [value: new AnnotationClassValue<>(String.name)] as Map<CharSequence, Object>)
+        // a primitive array, the boxed array and a list
+        new AnnotationValue("test.Ports", [value: [1, 2] as int[]] as Map<CharSequence, Object>)                | new AnnotationValue("test.Ports", [value: [1, 2] as Integer[]] as Map<CharSequence, Object>)
+        new AnnotationValue("test.Ports", [value: [1, 2] as int[]] as Map<CharSequence, Object>)                | new AnnotationValue("test.Ports", [value: [1, 2]] as Map<CharSequence, Object>)
+        // the empty string and a member left out with no default recorded
+        new AnnotationValue("test.Zone", [value: ""] as Map<CharSequence, Object>)                              | new AnnotationValue("test.Zone", [:] as Map<CharSequence, Object>)
+        // a member left out at its default, and one writing the default down
+        new AnnotationValue("test.Audited", [:] as Map<CharSequence, Object>, [level: "INFO"] as Map<CharSequence, Object>) | new AnnotationValue("test.Audited", [level: "INFO"] as Map<CharSequence, Object>)
+        // a non-binding member both sides list
+        noted("one", "first", NOTED_NON_BINDING, NOTED_DEFAULTS)                                                              | noted("one", "second", NOTED_NON_BINDING, NOTED_DEFAULTS)
+        noted("one", "first", NOTED_NON_BINDING, NOTED_DEFAULTS)                                                              | noted("one", null, NOTED_NON_BINDING, NOTED_DEFAULTS)
+        // a nested annotation, whichever of its non-binding members it binds
+        new AnnotationValue("test.Scoped", [scope: noted("x", "first", NOTED_NON_BINDING, NOTED_DEFAULTS)] as Map<CharSequence, Object>) | new AnnotationValue("test.Scoped", [scope: noted("x", "second", null, null)] as Map<CharSequence, Object>)
+    }
+
+    void "test bindingHashCode() tells apart values binding a member differently"() {
+        expect:
+        new AnnotationValue("test.Tier", [level: "GOLD"] as Map<CharSequence, Object>).bindingHashCode() !=
+                new AnnotationValue("test.Tier", [level: "SILVER"] as Map<CharSequence, Object>).bindingHashCode()
+        new AnnotationValue("test.Tier", [level: "GOLD"] as Map<CharSequence, Object>).bindingHashCode() !=
+                new AnnotationValue("test.Other", [level: "GOLD"] as Map<CharSequence, Object>).bindingHashCode()
+        new AnnotationValue("test.Ports", [value: [1, 2] as int[]] as Map<CharSequence, Object>).bindingHashCode() !=
+                new AnnotationValue("test.Ports", [value: [2, 1] as int[]] as Map<CharSequence, Object>).bindingHashCode()
+    }
+
+    private static AnnotationValue<?> noted(String value, String note, String[] nonBinding, Map<CharSequence, Object> defaults) {
+        Map<CharSequence, Object> values = [value: value] as Map<CharSequence, Object>
+        if (note != null) {
+            values.note = note
+        }
+        if (nonBinding != null) {
+            values[AnnotationUtil.NON_BINDING_ATTRIBUTE] = nonBinding
+        }
+        return new AnnotationValue("test.Noted", values, (Map<CharSequence, Object>) defaults)
+    }
+
+    void "test matches() compares an enum constant with the name compiled metadata holds"() {
+        given: "a value built at runtime keeping the constant, and the compiled value holding its name"
+        def built = AnnotationValue.builder("test.Tier").member("level", MatchedLevel.GOLD).build()
+        def compiled = new AnnotationValue("test.Tier", [level: "GOLD"] as Map<CharSequence, Object>)
+
+        expect:
+        built.matches(compiled)
+        compiled.matches(built)
+        !built.matches(new AnnotationValue("test.Tier", [level: "SILVER"] as Map<CharSequence, Object>))
+
+        and: "an array of constants matches the array of their names"
+        AnnotationValue.builder("test.Tier").member("levels", MatchedLevel.GOLD, MatchedLevel.SILVER).build()
+                .matches(new AnnotationValue("test.Tier", [levels: ["GOLD", "SILVER"] as String[]] as Map<CharSequence, Object>))
+        new AnnotationValue("test.Tier", [levels: ["GOLD", "SILVER"] as String[]] as Map<CharSequence, Object>)
+                .matches(AnnotationValue.builder("test.Tier").member("levels", MatchedLevel.GOLD, MatchedLevel.SILVER).build())
+        !AnnotationValue.builder("test.Tier").member("levels", MatchedLevel.SILVER, MatchedLevel.GOLD).build()
+                .matches(new AnnotationValue("test.Tier", [levels: ["GOLD", "SILVER"] as String[]] as Map<CharSequence, Object>))
+    }
+
+    void "test matches() compares a class with the class value or name compiled metadata holds"() {
+        given:
+        def compiled = new AnnotationValue("test.Typed", [value: new AnnotationClassValue<>(String.name)] as Map<CharSequence, Object>)
+
+        expect: "a class put in the members as it is, the class value and the class name are the same member"
+        new AnnotationValue("test.Typed", [value: String] as Map<CharSequence, Object>).matches(compiled)
+        compiled.matches(new AnnotationValue("test.Typed", [value: String] as Map<CharSequence, Object>))
+        new AnnotationValue("test.Typed", [value: String.name] as Map<CharSequence, Object>).matches(compiled)
+        AnnotationValue.builder("test.Typed").member("value", String).build().matches(compiled)
+        !new AnnotationValue("test.Typed", [value: Integer] as Map<CharSequence, Object>).matches(compiled)
+
+        and: "an array of classes matches the array of their class values"
+        new AnnotationValue("test.Typed", [value: [String, Integer] as Class[]] as Map<CharSequence, Object>)
+                .matches(new AnnotationValue("test.Typed", [value: [new AnnotationClassValue<>(String.name), new AnnotationClassValue<>(Integer.name)] as AnnotationClassValue[]] as Map<CharSequence, Object>))
+    }
+
+    void "test matches() compares a primitive array with the boxed values"() {
+        given:
+        def compiled = new AnnotationValue("test.Ports", [value: [1, 2] as int[]] as Map<CharSequence, Object>)
+
+        expect:
+        compiled.matches(new AnnotationValue("test.Ports", [value: [1, 2] as Integer[]] as Map<CharSequence, Object>))
+        new AnnotationValue("test.Ports", [value: [1, 2] as Integer[]] as Map<CharSequence, Object>).matches(compiled)
+        compiled.matches(new AnnotationValue("test.Ports", [value: [1, 2]] as Map<CharSequence, Object>))
+        compiled.matches(new AnnotationValue("test.Ports", [value: [1, 2] as int[]] as Map<CharSequence, Object>))
+        !compiled.matches(new AnnotationValue("test.Ports", [value: [2, 1] as Integer[]] as Map<CharSequence, Object>))
+        !compiled.matches(new AnnotationValue("test.Ports", [value: [1, 2, 3] as int[]] as Map<CharSequence, Object>))
+        !compiled.matches(new AnnotationValue("test.Ports", [value: 1] as Map<CharSequence, Object>))
+    }
+
     void "mutate().defaultValues() works on a value built without defaults"() {
         when:
         AnnotationValue<?> av = AnnotationValue.builder("x.Y").member("a", 1).build()
@@ -682,3 +802,5 @@ class AnnotationValueSpec extends Specification {
 @interface Bar {}
 
 @interface Baz {}
+
+enum MatchedLevel { GOLD, SILVER }
