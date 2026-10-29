@@ -669,7 +669,13 @@ public final class RouteExecutor {
                 }
                 if (waitsFor != null) {
                     // e.g. the form of a request bean, which is still arriving
-                    return releaseRouteBodies(httpRequest, waitsFor.then(() -> {
+                    ExecutionFlow<?> waited = waitsFor.onErrorResume(e -> {
+                        // the route is never invoked, so a streaming body argument is not
+                        // consumed any more
+                        BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+                        return ExecutionFlow.error(e);
+                    });
+                    return releaseRouteBodies(httpRequest, waited.then(() -> {
                         FormRouteCompleter completer = FormFactory.getCompleterOrNull(httpRequest);
                         if (completer != null) {
                             completer.stopDeadlockDetection();
