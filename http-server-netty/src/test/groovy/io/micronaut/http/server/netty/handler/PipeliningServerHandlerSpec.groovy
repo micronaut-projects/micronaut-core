@@ -282,6 +282,75 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.finishAndReleaseAll()
     }
 
+    def 'a failing one-shot compression of the only streamed piece fails the response and closes'() {
+        given:
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        resp.headers().add(HttpHeaderNames.CONTENT_TYPE, 'text/plain')
+        def upstream = new RecordingUpstream()
+        def streamingBody = null
+        def written = 0
+        def failed = []
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                streamingBody = new NettyByteBodyFactory(ctx.channel()).createStreamingBody(BodySizeLimits.UNLIMITED, upstream)
+                outboundAccess.write(resp, streamingBody.rootBody())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                written++
+            }
+
+            @Override
+            void responseFailed(Object attachment, Throwable cause) {
+                failed << cause
+            }
+        })
+        handler.setCompressor(Compressor.create(new io.micronaut.http.server.netty.DefaultHttpCompressionStrategy(0, 6, 1048576),
+            new io.micronaut.http.netty.compression.NettyZlibCodecFactory() {
+                @Override
+                io.netty.handler.codec.compression.ZlibEncoder newZlibEncoder(ZlibWrapper wrapper, int level, int windowBits, int memLevel) {
+                    ZlibCodecFactory.newZlibEncoder(wrapper, level, windowBits, memLevel)
+                }
+
+                @Override
+                io.netty.handler.codec.compression.ZlibDecoder newZlibDecoder(ZlibWrapper wrapper, int maxAllocation) {
+                    ZlibCodecFactory.newZlibDecoder(wrapper, maxAllocation)
+                }
+
+                @Override
+                ByteBuf compressZlib(ZlibWrapper wrapper, int level, int windowBits, int memLevel, ByteBuf body, ByteBufAllocator allocator) {
+                    throw new IllegalStateException('provider failure')
+                }
+            }))
+        def ch = new EmbeddedChannel(handler)
+        def readBuffers = new NettyByteBodyFactory(ch).readBufferFactory()
+        def gzipRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/")
+        gzipRequest.headers().add(HttpHeaderNames.ACCEPT_ENCODING, 'gzip')
+
+        when:
+        ch.writeInbound(gzipRequest)
+        // the only piece arrives with the end of the body, so it is compressed in one provider call
+        streamingBody.sharedBuffer().addAndComplete(readBuffers.adapt(Unpooled.copiedBuffer("foo".repeat(100), StandardCharsets.UTF_8)))
+        ch.runPendingTasks()
+
+        then:
+        failed*.message == ['provider failure']
+        written == 1
+        !ch.isOpen()
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
     def 'writability handling is protocol-specific'() {
         given:
         int emitted = 0

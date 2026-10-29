@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.http.server.netty.DefaultHttpCompressionStrategy;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -41,7 +42,9 @@ import io.netty.handler.codec.http.HttpVersion;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Response compressor for the HTTP server. It holds no per-connection state, so the server
@@ -124,14 +127,19 @@ public final class Compressor {
             return null;
         }
         response.headers().add(HttpHeaderNames.CONTENT_ENCODING, encoding.contentEncoding);
-        ChannelHandler handler = switch (encoding) {
-            case BR -> zlibCodecFactory.newBrotliEncoder();
-            case ZSTD -> zlibCodecFactory.newZstdEncoder(strategy.getCompressionLevel(), strategy.getMaxZstdEncodeSize());
-            case SNAPPY -> zlibCodecFactory.newSnappyFrameEncoder();
-            case GZIP -> zlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP, gzipOptions.compressionLevel(), gzipOptions.windowBits(), gzipOptions.memLevel());
-            case DEFLATE -> zlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB, deflateOptions.compressionLevel(), deflateOptions.windowBits(), deflateOptions.memLevel());
+        Supplier<ChannelHandler> handler = switch (encoding) {
+            case BR -> zlibCodecFactory::newBrotliEncoder;
+            case ZSTD -> () -> zlibCodecFactory.newZstdEncoder(strategy.getCompressionLevel(), strategy.getMaxZstdEncodeSize());
+            case SNAPPY -> zlibCodecFactory::newSnappyFrameEncoder;
+            case GZIP -> () -> zlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP, gzipOptions.compressionLevel(), gzipOptions.windowBits(), gzipOptions.memLevel());
+            case DEFLATE -> () -> zlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB, deflateOptions.compressionLevel(), deflateOptions.windowBits(), deflateOptions.memLevel());
         };
-        return new Session(ctx, handler);
+        OneShot oneShot = switch (encoding) {
+            case GZIP -> (body, allocator) -> zlibCodecFactory.compressZlib(ZlibWrapper.GZIP, gzipOptions.compressionLevel(), gzipOptions.windowBits(), gzipOptions.memLevel(), body, allocator);
+            case DEFLATE -> (body, allocator) -> zlibCodecFactory.compressZlib(ZlibWrapper.ZLIB, deflateOptions.compressionLevel(), deflateOptions.windowBits(), deflateOptions.memLevel(), body, allocator);
+            default -> null;
+        };
+        return new Session(ctx, handler, oneShot);
     }
 
     /**
@@ -259,42 +267,135 @@ public final class Compressor {
         }
     }
 
+    /**
+     * Compresses a complete body in one call, or returns {@code null} to stream it instead.
+     */
+    @FunctionalInterface
+    interface OneShot {
+        @Nullable
+        ByteBuf compress(ByteBuf body, ByteBufAllocator allocator);
+    }
+
     static final class Session {
-        private final EmbeddedChannel compressionChannel;
+        private final ChannelHandlerContext ctx;
+        private final Supplier<ChannelHandler> handler;
+        private final @Nullable OneShot oneShot;
+        private @Nullable EmbeddedChannel compressionChannel;
+        /**
+         * The only data pushed so far, kept back while it may still be the whole body.
+         */
+        private @Nullable ByteBuf held;
+        private @Nullable ByteBuf compressed;
+        private boolean pushed = false;
         private boolean finished = false;
 
-        private Session(ChannelHandlerContext ctx, ChannelHandler handler) {
-            compressionChannel = new EmbeddedChannel(
-                ctx.channel().id(),
-                ctx.channel().metadata().hasDisconnect(),
-                ctx.channel().config(),
-                handler
-            );
+        private Session(ChannelHandlerContext ctx, Supplier<ChannelHandler> handler, @Nullable OneShot oneShot) {
+            this.ctx = ctx;
+            this.handler = handler;
+            this.oneShot = oneShot;
+        }
+
+        private EmbeddedChannel channel() {
+            EmbeddedChannel channel = compressionChannel;
+            if (channel == null) {
+                channel = new EmbeddedChannel(
+                    ctx.channel().id(),
+                    ctx.channel().metadata().hasDisconnect(),
+                    ctx.channel().config(),
+                    handler.get()
+                );
+                compressionChannel = channel;
+            }
+            return channel;
         }
 
         void push(ByteBuf data) {
             if (finished) {
                 throw new IllegalStateException("Compression already finished");
             }
-            if (data.isReadable()) {
-                compressionChannel.writeOutbound(data);
-            } else {
+            if (!data.isReadable()) {
                 data.release();
+            } else if (oneShot != null && !pushed) {
+                held = data;
+                pushed = true;
+            } else {
+                pushed = true;
+                EmbeddedChannel channel;
+                try {
+                    streamHeld();
+                    channel = channel();
+                } catch (RuntimeException | Error e) {
+                    data.release();
+                    throw e;
+                }
+                channel.writeOutbound(data);
+            }
+        }
+
+        private void streamHeld() {
+            ByteBuf data = held;
+            if (data != null) {
+                // Creating the encoder may throw; the held body stays owned here until the encoder takes it.
+                EmbeddedChannel channel = channel();
+                held = null;
+                channel.writeOutbound(data);
             }
         }
 
         void finish() {
-            if (!finished) {
-                compressionChannel.finish();
-                finished = true;
+            if (finished) {
+                return;
             }
+            ByteBuf body = held;
+            if (body != null) {
+                held = null;
+                ByteBuf result;
+                try {
+                    result = Objects.requireNonNull(oneShot).compress(body, ctx.alloc());
+                } catch (RuntimeException | Error e) {
+                    body.release();
+                    finished = true;
+                    throw e;
+                }
+                if (result != null) {
+                    body.release();
+                    compressed = result;
+                    finished = true;
+                    return;
+                }
+                EmbeddedChannel channel;
+                try {
+                    channel = channel();
+                } catch (RuntimeException | Error e) {
+                    body.release();
+                    finished = true;
+                    throw e;
+                }
+                channel.writeOutbound(body);
+            }
+            channel().finish();
+            finished = true;
         }
 
         void discard() {
+            ByteBuf body = held;
+            if (body != null) {
+                held = null;
+                body.release();
+            }
+            ByteBuf result = compressed;
+            if (result != null) {
+                compressed = null;
+                result.release();
+            }
             if (!finished) {
-                try {
-                    compressionChannel.finishAndReleaseAll();
-                } catch (DecompressionException ignored) {
+                // Without an encoder there is nothing to release; creating one just to discard it would be waste.
+                EmbeddedChannel channel = compressionChannel;
+                if (channel != null) {
+                    try {
+                        channel.finishAndReleaseAll();
+                    } catch (DecompressionException ignored) {
+                    }
                 }
                 finished = true;
             }
@@ -307,8 +408,13 @@ public final class Compressor {
             // fix content-length if necessary
             if (hr.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
                 long newContentLength = 0;
-                for (Object outboundMessage : compressionChannel.outboundMessages()) {
-                    newContentLength += ((ByteBuf) outboundMessage).readableBytes();
+                ByteBuf result = compressed;
+                if (result != null) {
+                    newContentLength = result.readableBytes();
+                } else {
+                    for (Object outboundMessage : channel().outboundMessages()) {
+                        newContentLength += ((ByteBuf) outboundMessage).readableBytes();
+                    }
                 }
                 ContentLengthValues.set(hr.headers(), newContentLength);
             }
@@ -316,6 +422,17 @@ public final class Compressor {
 
         @Nullable
         ByteBuf poll() {
+            ByteBuf result = compressed;
+            if (result != null) {
+                compressed = null;
+                return result;
+            }
+            // a caller polling before the end streams what it has pushed so far
+            streamHeld();
+            EmbeddedChannel compressionChannel = this.compressionChannel;
+            if (compressionChannel == null) {
+                return null;
+            }
             int n = compressionChannel.outboundMessages().size();
             if (n == 0) {
                 return null;

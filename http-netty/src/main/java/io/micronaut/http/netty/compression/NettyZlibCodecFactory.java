@@ -16,6 +16,8 @@
 package io.micronaut.http.netty.compression;
 
 import io.micronaut.core.annotation.Experimental;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.ChannelHandler;
 import io.netty.handler.codec.compression.Brotli;
 import io.netty.handler.codec.compression.BrotliDecoder;
@@ -33,6 +35,7 @@ import io.netty.handler.codec.http.websocketx.extensions.WebSocketClientExtensio
 import io.netty.handler.codec.http.websocketx.extensions.WebSocketServerExtensionHandler;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Creates compression handlers for HTTP connections, streams, and WebSocket extensions.
@@ -65,6 +68,26 @@ public interface NettyZlibCodecFactory {
      * @since 5.3.0
      */
     ZlibDecoder newZlibDecoder(ZlibWrapper wrapper, int maxAllocation);
+
+    /**
+     * Compresses a complete body into one zlib or gzip stream, in place of an encoder from
+     * {@link #newZlibEncoder} when the caller already has the whole body. The result must decode
+     * to the body, but need not match the encoder's bytes. The default returns {@code null}, so the
+     * caller streams the body through an encoder.
+     *
+     * @param wrapper The wrapper format, {@link ZlibWrapper#GZIP} or {@link ZlibWrapper#ZLIB}
+     * @param compressionLevel The compression level, from 0 to 9
+     * @param windowBits The window size, from 9 to 15
+     * @param memLevel The memory level, from 1 to 9
+     * @param body The complete body, still owned by the caller
+     * @param allocator The allocator for the result
+     * @return The compressed stream, owned by the caller, or {@code null} to use an encoder
+     * @since 5.3.0
+     */
+    default @Nullable ByteBuf compressZlib(ZlibWrapper wrapper, int compressionLevel, int windowBits, int memLevel,
+                                          ByteBuf body, ByteBufAllocator allocator) {
+        return null;
+    }
 
     /**
      * Creates a server handler that negotiates WebSocket compression extensions. The default

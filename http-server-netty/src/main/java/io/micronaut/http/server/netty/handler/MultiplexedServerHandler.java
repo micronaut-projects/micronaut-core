@@ -646,6 +646,12 @@ abstract class MultiplexedServerHandler {
                 if (owned != null) {
                     owned.release();
                 }
+                Compressor.Session failed = compressionSession;
+                if (!headersWritten && failed != null) {
+                    // the caller may still send a fallback response, which must not reuse the failed session
+                    compressionSession = null;
+                    failed.discard();
+                }
                 throw t;
             }
             if (!finish()) {
@@ -1039,7 +1045,10 @@ abstract class MultiplexedServerHandler {
                     held = data;
                     if (previous != null) {
                         // followed by the held piece in the same batch, which carries the promise
-                        writeData(previous, false, silentVoidPromise());
+                        if (!writeMiddle(previous, silentVoidPromise())) {
+                            flush();
+                            return;
+                        }
                     }
                     if (!batchPending) {
                         batchPending = true;
@@ -1049,7 +1058,11 @@ abstract class MultiplexedServerHandler {
                     // the final bytes go out with the frame that ends the stream
                     if (previous != null) {
                         if (data.isReadable()) {
-                            writeData(previous, false, silentVoidPromise());
+                            if (!writeMiddle(previous, silentVoidPromise())) {
+                                data.release();
+                                flush();
+                                return;
+                            }
                         } else {
                             data.release();
                             data = previous;
@@ -1091,8 +1104,26 @@ abstract class MultiplexedServerHandler {
                     data.release();
                     return;
                 }
-                writeData(data, false, requiredCtx().newPromise()
+                writeMiddle(data, requiredCtx().newPromise()
                     .addListener((ChannelFutureListener) future -> batchWritten(future, n)));
+            }
+
+            /**
+             * Write a piece before the end of the body. The first piece may create the compression encoder, which
+             * can fail after the headers went out: the stream is then reset.
+             *
+             * @return {@code true} iff the piece was written
+             */
+            private boolean writeMiddle(ByteBuf data, ChannelPromise promise) {
+                try {
+                    writeData(data, false, promise);
+                    return true;
+                } catch (Throwable t) {
+                    LOG.warn("Failed to write the streamed response: {}", t.getMessage(), t);
+                    requestHandler.responseFailed(attachment, t);
+                    reset(t);
+                    return false;
+                }
             }
 
             private void batchWritten(ChannelFuture future, long n) {
