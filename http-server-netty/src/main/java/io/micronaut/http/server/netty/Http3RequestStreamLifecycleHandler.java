@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.server.netty.handler.RequestBodyEvent;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -61,14 +62,41 @@ final class Http3RequestStreamLifecycleHandler extends ChannelDuplexHandler {
         ctx.close();
     }
 
+    /**
+     * Whether the request body streams to a consumer that may still read it.
+     */
+    private boolean bodyStreaming;
+    /**
+     * Whether the response is complete, so that the rest of the request is stopped once nobody
+     * reads it.
+     */
+    private boolean responseComplete;
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt == RequestBodyEvent.STREAMING) {
+            bodyStreaming = true;
+        } else if (evt == RequestBodyEvent.DONE) {
+            bodyStreaming = false;
+            if (responseComplete) {
+                stopInput((QuicStreamChannel) ctx.channel());
+            }
+        }
+        super.userEventTriggered(ctx, evt);
+    }
+
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
         if (msg instanceof LastHttpContent && !isInformational(msg)) {
             // the response is complete. The rest of the request body, if any, is not needed
-            // any more: the request handler discards it, so ask the peer to stop sending it.
+            // once nobody reads it: ask the peer to stop sending it then. An application may
+            // still read a streaming body after it responded
             promise = promise.unvoid().addListener(future -> {
                 if (future.isSuccess()) {
-                    stopInput((QuicStreamChannel) ctx.channel());
+                    responseComplete = true;
+                    if (!bodyStreaming) {
+                        stopInput((QuicStreamChannel) ctx.channel());
+                    }
                 }
             });
         }

@@ -1045,6 +1045,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // what arrives before the route reads the body is bounded by requested, not by the
             // buffer limit, for a reader that streams the body without holding it
             this.dest.setKeepInitialBytes();
+            requiredCtx().pipeline().fireUserEventTriggered(RequestBodyEvent.STREAMING);
         }
 
         @Override
@@ -1060,6 +1061,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (last) {
                 dest.completeWithTrailers(((LastHttpContent) message).trailingHeaders());
                 inboundHandler = baseInboundHandler;
+                requiredCtx().pipeline().fireUserEventTriggered(RequestBodyEvent.DONE);
             }
         }
 
@@ -1134,6 +1136,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 refreshNeedMore();
             }
             dest.discard();
+            requiredCtx().pipeline().fireUserEventTriggered(RequestBodyEvent.DONE);
         }
 
         @Override
