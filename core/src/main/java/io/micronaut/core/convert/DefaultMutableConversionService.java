@@ -94,6 +94,7 @@ import java.util.StringJoiner;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
@@ -162,6 +163,11 @@ public class DefaultMutableConversionService implements MutableConversionService
      */
     private final Map<ConvertiblePair, Registration> internalConverterOwners = CollectionUtils.newHashMap(300);
     private final Map<ConvertiblePair, Registration> customConverterOwners = new ConcurrentHashMap<>();
+
+    /**
+     * Changed after each registration or removal of a converter, so that a converter of {@link #resolveConverter(Class, Argument)} resolves again.
+     */
+    private final AtomicInteger converterVersion = new AtomicInteger();
 
     /**
      * The mutable conversion service which is adding new converters to the internal collection which is not synchronized.
@@ -255,23 +261,34 @@ public class DefaultMutableConversionService implements MutableConversionService
             return Optional.of((T) object);
         }
 
-        final AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
-        String formattingAnnotation;
-        if (annotationMetadata.hasStereotypeNonRepeating(Format.class)) {
-            formattingAnnotation = annotationMetadata.getAnnotationNameByStereotype(Format.class).orElse(null);
-        } else {
-            formattingAnnotation = null;
+        TypeConverter<Object, T> typeConverter = resolveTypeConverter(sourceType, targetType, formattingAnnotation(context.getAnnotationMetadata()));
+        if (typeConverter == UNCONVERTIBLE) {
+            return Optional.empty();
         }
+        return typeConverter.convert(object, targetType, context);
+    }
+
+    @Override
+    public <S, T> TypeConverter<S, T> resolveConverter(Class<S> sourceType, Argument<T> argument) {
+        return new CachingResolvedConverter<>(this, sourceType, argument);
+    }
+
+    @Nullable
+    private static String formattingAnnotation(AnnotationMetadata annotationMetadata) {
+        if (annotationMetadata.hasStereotypeNonRepeating(Format.class)) {
+            return annotationMetadata.getAnnotationNameByStereotype(Format.class).orElse(null);
+        }
+        return null;
+    }
+
+    private <T> TypeConverter<Object, T> resolveTypeConverter(Class<?> sourceType, Class<T> targetType, @Nullable String formattingAnnotation) {
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
         TypeConverter<Object, T> typeConverter = findConverter(pair);
         if (typeConverter == null) {
             typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
             addToConverterCache(pair, typeConverter);
         }
-        if (typeConverter == UNCONVERTIBLE) {
-            return Optional.empty();
-        }
-        return typeConverter.convert(object, targetType, context);
+        return typeConverter;
     }
 
     @Override
@@ -423,6 +440,7 @@ public class DefaultMutableConversionService implements MutableConversionService
             return true;
         });
         converterCache.clear();
+        converterVersion.incrementAndGet();
         return true;
     }
 
@@ -441,6 +459,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         if (typeConverters != internalConverters) {
             addToConverterCache(pair, typeConverter);
         }
+        converterVersion.incrementAndGet();
     }
 
     @Override
@@ -1374,6 +1393,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         customConverterOwners.clear();
         converterCache.clear();
         registerDefaultConverters();
+        converterVersion.incrementAndGet();
     }
 
     /**
@@ -1431,4 +1451,86 @@ public class DefaultMutableConversionService implements MutableConversionService
         }
     }
 
+
+    /**
+     * A converter resolved with {@link #resolveConverter(Class, Argument)}: it holds the converter of the
+     * values of the source type to the argument, looked up on the first conversion and again after a
+     * converter was registered or removed. A value of another type, another target type or a context
+     * with other annotation metadata is converted by the service as is.
+     *
+     * @param <S> The source type
+     * @param <T> The target type
+     */
+    private static final class CachingResolvedConverter<S, T> implements TypeConverter<S, T> {
+
+        private final DefaultMutableConversionService conversionService;
+        private final Class<S> sourceType;
+        private final Class<T> argumentType;
+        private final AnnotationMetadata annotationMetadata;
+        /**
+         * The type of the argument, or its wrapper type, as {@link #convert(Object, Class, Class, ConversionContext)} passes it to the converter.
+         */
+        private final Class<T> targetType;
+        /**
+         * Whether the values of the source type are returned as they are.
+         */
+        private final boolean unchanged;
+        @Nullable
+        private final String formattingAnnotation;
+        @Nullable
+        @SuppressWarnings("java:S3077") // holds an immutable value: volatile only publishes it
+        private volatile Resolution<T> resolution;
+
+        @SuppressWarnings("unchecked")
+        CachingResolvedConverter(DefaultMutableConversionService conversionService, Class<S> sourceType, Argument<T> argument) {
+            this.conversionService = conversionService;
+            this.sourceType = sourceType;
+            this.argumentType = argument.getType();
+            this.annotationMetadata = argument.getAnnotationMetadata();
+            this.targetType = argumentType.isPrimitive() ? (Class<T>) ReflectionUtils.getWrapperType(argumentType) : argumentType;
+            this.unchanged = targetType == Object.class
+                || targetType.isAssignableFrom(sourceType) && !Iterable.class.isAssignableFrom(sourceType) && !Map.class.isAssignableFrom(sourceType);
+            this.formattingAnnotation = unchanged ? null : formattingAnnotation(annotationMetadata);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Optional<T> convert(@Nullable S value, Class<T> type, ConversionContext context) {
+            if (value == null) {
+                return Optional.empty();
+            }
+            if (value.getClass() != sourceType || type != argumentType || context.getAnnotationMetadata() != annotationMetadata) {
+                return conversionService.convert(value, type, context);
+            }
+            if (unchanged) {
+                return Optional.of((T) value);
+            }
+            TypeConverter<Object, T> typeConverter = typeConverter();
+            if (typeConverter == UNCONVERTIBLE) {
+                return Optional.empty();
+            }
+            return typeConverter.convert(value, targetType, context);
+        }
+
+        private TypeConverter<Object, T> typeConverter() {
+            // the version is read before the lookup: a converter registered during it makes the next conversion look up again
+            int version = conversionService.converterVersion.get();
+            Resolution<T> current = resolution;
+            if (current == null || current.version != version) {
+                current = new Resolution<>(version, conversionService.resolveTypeConverter(sourceType, targetType, formattingAnnotation));
+                resolution = current;
+            }
+            return current.typeConverter;
+        }
+
+        /**
+         * The converter, as looked up at the version of the converters.
+         *
+         * @param version       The version
+         * @param typeConverter The converter
+         * @param <T>           The target type
+         */
+        private record Resolution<T>(int version, TypeConverter<Object, T> typeConverter) {
+        }
+    }
 }
