@@ -269,7 +269,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      * including a script on a malicious page, can send. When the request carries them, the Host header the request
      * was sent with is checked as well, so that such headers cannot switch the guard off.
      */
-    private static boolean isTargetLocal(HttpHostResolver hostResolver, HttpRequest<?> request) {
+    static boolean isTargetLocal(HttpHostResolver hostResolver, HttpRequest<?> request) {
         if (isHostLocal(hostResolver.resolve(request))) {
             return true;
         }
@@ -282,7 +282,8 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             return isHostNameLocal(extractHostName(hostHeader));
         }
         String uriHost = request.getUri().getHost();
-        return uriHost != null && isHostNameLocal(uriHost);
+        // URI.getHost() keeps the brackets of an IPv6 literal, like a Host header
+        return uriHost != null && isHostNameLocal(extractHostName(uriHost));
     }
 
     /*
