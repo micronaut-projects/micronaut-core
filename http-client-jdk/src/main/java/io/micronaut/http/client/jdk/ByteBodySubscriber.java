@@ -75,6 +75,14 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
      */
     private final @Nullable Duration readTimeout;
     private Flow.@Nullable Subscription upstream;
+    /**
+     * Whether {@link #onNext} hands a piece downstream. Guarded by this.
+     */
+    private boolean delivering;
+    /**
+     * Whether the read timeout elapsed while {@link #onNext} handed a piece downstream. Guarded by this.
+     */
+    private boolean timeoutPending;
     private long outstanding;
     private boolean done;
     private @Nullable Disposable timeoutTask;
@@ -203,9 +211,18 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
             if (done || outstanding == 0) {
                 return;
             }
+            if (delivering) {
+                // the downstream must not see an error while it handles a piece: report it after
+                timeoutPending = true;
+                return;
+            }
             finish();
             s = upstream;
         }
+        reportTimeout(s);
+    }
+
+    private void reportTimeout(Flow.@Nullable Subscription s) {
         if (s != null) {
             s.cancel();
         }
@@ -220,14 +237,31 @@ final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableB
             if (done) {
                 return;
             }
+            delivering = true;
         }
-        received();
-        if (item.isEmpty()) {
-            defer.onNext(BODY_FACTORY.readBufferFactory().createEmpty());
-        } else if (item.size() == 1) {
-            defer.onNext(BODY_FACTORY.readBufferFactory().adapt(item.get(0)));
-        } else {
-            defer.onNext(BODY_FACTORY.readBufferFactory().adapt(concat(item)));
+        try {
+            received();
+            if (item.isEmpty()) {
+                defer.onNext(BODY_FACTORY.readBufferFactory().createEmpty());
+            } else if (item.size() == 1) {
+                defer.onNext(BODY_FACTORY.readBufferFactory().adapt(item.get(0)));
+            } else {
+                defer.onNext(BODY_FACTORY.readBufferFactory().adapt(concat(item)));
+            }
+        } finally {
+            Flow.Subscription s = null;
+            boolean timeout;
+            synchronized (this) {
+                delivering = false;
+                timeout = timeoutPending && finish();
+                timeoutPending = false;
+                if (timeout) {
+                    s = upstream;
+                }
+            }
+            if (timeout) {
+                reportTimeout(s);
+            }
         }
     }
 
