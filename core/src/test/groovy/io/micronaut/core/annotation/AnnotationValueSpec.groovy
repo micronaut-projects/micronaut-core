@@ -648,6 +648,27 @@ class AnnotationValueSpec extends Specification {
         empty.matches(new AnnotationValue("test.Named", [value: ""] as Map<CharSequence, Object>, defaults))
     }
 
+    void "test matches() takes a member bound to the empty string for one left out with no default recorded"() {
+        given: "compiled metadata records no default of the empty string, so a member defaulting to it is left out"
+        def compiled = new AnnotationValue("test.Zone", [:] as Map<CharSequence, Object>, [region: "eu"] as Map<CharSequence, Object>)
+        def empty = new AnnotationValue("test.Zone", [value: ""] as Map<CharSequence, Object>, (Map<CharSequence, Object>) null)
+        def leftOut = new AnnotationValue("test.Zone", [:] as Map<CharSequence, Object>, (Map<CharSequence, Object>) null)
+
+        expect:
+        empty.matches(leftOut)
+        leftOut.matches(empty)
+        empty.matches(compiled)
+        compiled.matches(empty)
+        new AnnotationValue("test.Zone", [value: "", region: "eu"] as Map<CharSequence, Object>, [region: "eu"] as Map<CharSequence, Object>).matches(compiled)
+        compiled.matches(new AnnotationValue("test.Zone", [value: "", region: "eu"] as Map<CharSequence, Object>, [region: "eu"] as Map<CharSequence, Object>))
+
+        and: "any other value of a member the other side leaves out with no default still differs"
+        !new AnnotationValue("test.Zone", [value: "x"] as Map<CharSequence, Object>).matches(compiled)
+        !compiled.matches(new AnnotationValue("test.Zone", [value: "x"] as Map<CharSequence, Object>))
+        !new AnnotationValue("test.Zone", [value: [] as String[]] as Map<CharSequence, Object>).matches(leftOut)
+        !leftOut.matches(new AnnotationValue("test.Zone", [value: [] as String[]] as Map<CharSequence, Object>))
+    }
+
     void "test matches() compares an enum constant with the name compiled metadata holds"() {
         given: "a value built at runtime keeping the constant, and the compiled value holding its name"
         def built = AnnotationValue.builder("test.Tier").member("level", MatchedLevel.GOLD).build()

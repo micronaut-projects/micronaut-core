@@ -1529,7 +1529,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * symmetric.</p>
      *
      * <p>A member bound to the empty string is compared as that value: it does not match a value which leaves the
-     * member out when the default of the member is something else, as two annotation instances would not.</p>
+     * member out when the default of the member is something else, as two annotation instances would not. It
+     * matches a value which leaves the member out with no default recorded for it: compiled metadata records no
+     * default of the empty string, so such a member defaults to it.</p>
      *
      * <p>Member values are compared as compiled metadata records them, so that a value built at runtime matches
      * the compiled one: an enum constant as its name, a class or a class value as the class name, and a primitive
@@ -1566,9 +1568,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return true;
         }
         Set<String> nonBinding = nonBindingMembers(declared, otherDeclared);
-        if (completedSize(declared, defaults, nonBinding) != completedSize(otherDeclared, otherDefaults, nonBinding)) {
-            return false;
-        }
         for (Map.Entry<CharSequence, Object> member : declared.entrySet()) {
             if (!isNonBinding(member.getKey(), nonBinding)
                 && !matchesMember(member.getKey(), member.getValue(), otherDeclared, otherDefaults)) {
@@ -1581,7 +1580,32 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 return false;
             }
         }
+        // the members only the other side has, which this side leaves out with no default recorded
+        return lacksOnlyEmptyStrings(otherDeclared, declared, defaults, nonBinding)
+            && lacksOnlyEmptyStrings(otherDefaults, declared, defaults, nonBinding);
+    }
+
+    /**
+     * Whether every binding member of the given ones that a side neither declares nor has a default for is bound to
+     * the empty string: compiled metadata records no default of the empty string, so a member left out with no
+     * default is one defaulting to it.
+     */
+    private static boolean lacksOnlyEmptyStrings(Map<CharSequence, Object> members,
+                                                 Map<CharSequence, Object> declared,
+                                                 Map<CharSequence, Object> defaults,
+                                                 Set<String> nonBinding) {
+        for (Map.Entry<CharSequence, Object> member : members.entrySet()) {
+            CharSequence name = member.getKey();
+            if (!declared.containsKey(name) && !defaults.containsKey(name) && !isNonBinding(name, nonBinding)
+                && !isEmptyString(member.getValue())) {
+                return false;
+            }
+        }
         return true;
+    }
+
+    private static boolean isEmptyString(@Nullable Object value) {
+        return value instanceof String text && text.isEmpty();
     }
 
     /**
@@ -1623,28 +1647,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return defaults != null ? defaults : Collections.emptyMap();
     }
 
-    /**
-     * @return The number of binding members once the declared members are completed with the defaults
-     */
-    private static int completedSize(Map<CharSequence, Object> declared,
-                                     Map<CharSequence, Object> defaults,
-                                     Set<String> nonBinding) {
-        int size = declared.size();
-        if (!nonBinding.isEmpty()) {
-            for (CharSequence member : declared.keySet()) {
-                if (isNonBinding(member, nonBinding)) {
-                    size--;
-                }
-            }
-        }
-        for (CharSequence member : defaults.keySet()) {
-            if (!declared.containsKey(member) && !isNonBinding(member, nonBinding)) {
-                size++;
-            }
-        }
-        return size;
-    }
-
     private static boolean matchesMember(CharSequence member,
                                          @Nullable Object value,
                                          Map<CharSequence, Object> otherDeclared,
@@ -1655,7 +1657,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         } else if (otherDefaults.containsKey(member)) {
             otherValue = otherDefaults.get(member);
         } else {
-            return false;
+            // left out with no default recorded: compiled metadata records none of the empty string
+            return isEmptyString(value);
         }
         if (value == null || otherValue == null) {
             return value == null && otherValue == null;
