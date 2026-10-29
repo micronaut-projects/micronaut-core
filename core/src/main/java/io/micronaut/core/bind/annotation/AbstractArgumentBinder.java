@@ -21,7 +21,6 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
-import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
@@ -54,7 +53,8 @@ public abstract class AbstractArgumentBinder<T> {
      */
     private final boolean noDefaultValue;
     /**
-     * The conversion of a single string value to the argument of a specific binder.
+     * The converter of a string value to the argument of a specific binder, which values with the
+     * conversion service of the binder convert a single string value with.
      */
     @Nullable
     private final TypeConverter<String, T> stringConverter;
@@ -243,26 +243,12 @@ public abstract class AbstractArgumentBinder<T> {
                 return null;
             }
         }
-        if (stringConverter != null && values instanceof ConvertibleMultiValues<?> multiValues) {
-            // a single string value is converted as the multi values convert it
-            List<?> all = multiValues.getAll(annotationValue);
-            if (all.size() == 1 && all.get(0) instanceof String string) {
-                Optional<T> converted = stringConverter.convert(string, argument.getType(), context);
-                if (converted.isPresent()) {
-                    return converted.get();
-                }
-                return resolveDefault(argument, context);
-            }
-        }
-        Optional<T> value = values.get(annotationValue, context);
+        Optional<T> value = stringConverter != null && values.getConversionService() == conversionService
+            ? values.get(annotationValue, context, stringConverter)
+            : values.get(annotationValue, context);
         if (value.isPresent()) {
             return value.get();
         }
-        return resolveDefault(argument, context);
-    }
-
-    @Nullable
-    private Object resolveDefault(Argument<T> argument, ArgumentConversionContext<T> context) {
         String declaredDefault = resolveDefaultValue(argument);
         if (declaredDefault == null) {
             return null;

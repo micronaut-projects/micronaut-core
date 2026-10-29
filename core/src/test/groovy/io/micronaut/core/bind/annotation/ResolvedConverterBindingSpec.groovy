@@ -6,6 +6,7 @@ import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.DefaultMutableConversionService
+import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.convert.value.ConvertibleMultiValuesMap
 import io.micronaut.core.convert.value.ConvertibleValues
 import io.micronaut.core.type.Argument
@@ -37,6 +38,37 @@ class ResolvedConverterBindingSpec extends Specification {
         Argument.of(Optional, "value", Argument.of(Long))         | "5"    | Optional.of(5L)
         Argument.of(Optional, "value", Argument.of(Long))         | "x"    | Optional.empty()
         Argument.of(Integer, "value")                             | "x"    | Optional.empty()
+    }
+
+    void "values with another conversion service convert with their service"() {
+        given:
+        def binderService = new DefaultMutableConversionService()
+        def valuesService = new DefaultMutableConversionService()
+        valuesService.addConverter(String, Target, { String s, Class<Target> t, ConversionContext c -> Optional.of(new Target(s)) } as TypeConverter)
+        def argument = Argument.of(Target, "value")
+        def values = new ConvertibleMultiValuesMap<String>([value: ["a"]], valuesService)
+
+        when:
+        def specific = new TestBinder(binderService, argument).bind(ConversionContext.of(argument), values)
+        def general = new TestBinder(binderService).bind(ConversionContext.of(argument), values)
+
+        then:
+        specific.getValue().get().name == "a"
+        general.getValue().get().name == "a"
+    }
+
+    void "values convert a single string value with the converter of their conversion service"() {
+        given:
+        def service = new DefaultMutableConversionService()
+        def argument = Argument.of(Integer, "value")
+        def values = new ConvertibleMultiValuesMap<String>([one: ["10"], many: ["1", "2"], none: []], service)
+        TypeConverter<String, Integer> converter = { String s, Class<Integer> t, ConversionContext c -> Optional.of(42) } as TypeConverter
+
+        expect: "a single string value is converted with the converter, others as before"
+        values.get("one", ConversionContext.of(argument), converter).get() == 42
+        values.get("one", ConversionContext.of(argument)).get() == 10
+        values.get("many", ConversionContext.of(argument), converter) == values.get("many", ConversionContext.of(argument))
+        values.get("missing", ConversionContext.of(argument), converter).isEmpty()
     }
 
     void "a binder that overrides the resolution binds the value it resolves"() {
@@ -102,6 +134,14 @@ class ResolvedConverterBindingSpec extends Specification {
         @Override
         protected String getParameterName(Argument<T> argument) {
             return argument.getName()
+        }
+    }
+
+    static class Target {
+        final String name
+
+        Target(String name) {
+            this.name = name
         }
     }
 

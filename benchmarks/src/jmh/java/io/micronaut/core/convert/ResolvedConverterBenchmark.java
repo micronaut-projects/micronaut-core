@@ -37,9 +37,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Converting a string to an argument with {@link ConversionService#convert(Object, ArgumentConversionContext)}
- * against the converter of {@link ConversionService#resolveConverter}, alone and in a header binder. The binders of the {@code service}
- * variants run with a conversion service that keeps the default {@link ConversionService#resolveConverter},
- * which converts with the service for every value.
+ * against the converter of {@link ConversionService#resolveConverter}, alone and in a header binder. The binder of the
+ * {@code service} variant runs with another conversion service than the headers, so it gets the header as before;
+ * the binder of the {@code resolved} variant runs with the conversion service of the headers.
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
@@ -74,9 +74,10 @@ public class ResolvedConverterBenchmark {
         };
         argument = (Argument<Object>) target;
         value = type.equals("listOfInteger") ? "1,2,3" : "12345";
-        conversionService = new DefaultMutableConversionService();
-        resolvedConverter = conversionService.resolveConverter(String.class, argument);
         request = HttpRequest.GET("/").header(HEADER, value);
+        // the binder converts with the converter it resolved when the headers have its conversion service
+        conversionService = request.getHeaders().getConversionService();
+        resolvedConverter = conversionService.resolveConverter(String.class, argument);
         serviceBinder = new HeaderAnnotationBinder<>(new ServiceOnly(conversionService), argument);
         resolvedBinder = new HeaderAnnotationBinder<>(conversionService, argument);
         Object bound = bindHeaderResolved();

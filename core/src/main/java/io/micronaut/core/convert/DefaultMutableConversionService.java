@@ -270,6 +270,10 @@ public class DefaultMutableConversionService implements MutableConversionService
 
     @Override
     public <S, T> TypeConverter<S, T> resolveConverter(Class<S> sourceType, Argument<T> argument) {
+        if (getClass() != DefaultMutableConversionService.class) {
+            // a subclass may override the conversion: it converts every value
+            return MutableConversionService.super.resolveConverter(sourceType, argument);
+        }
         return new CachingResolvedConverter<>(this, sourceType, argument);
     }
 

@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleMultiValuesMap;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.MutableHttpParameters;
@@ -88,6 +89,11 @@ public class NettyHttpParameters implements MutableHttpParameters {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         return values.get(name, conversionContext);
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext, TypeConverter<String, T> converter) {
+        return values.get(name, conversionContext, converter);
     }
 
     @Override

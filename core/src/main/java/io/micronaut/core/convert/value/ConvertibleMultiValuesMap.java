@@ -17,6 +17,7 @@ package io.micronaut.core.convert.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
@@ -80,13 +81,21 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V>, 
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+        return get(name, conversionContext, null);
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext, @Nullable TypeConverter<String, T> converter) {
         List<V> values = getAll(name);
         if (!values.isEmpty()) {
             boolean hasSingleEntry = values.size() == 1;
             if (hasSingleEntry) {
                 final V v = values.get(0);
-                if (conversionContext.getArgument().getType().isInstance(v)) {
+                Class<T> type = conversionContext.getArgument().getType();
+                if (type.isInstance(v)) {
                     return Optional.of((T) v);
+                } else if (converter != null && v instanceof String string) {
+                    return converter.convert(string, type, conversionContext);
                 } else {
                     return conversionService.convert(v, conversionContext);
                 }
