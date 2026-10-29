@@ -373,6 +373,13 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         return maxPayloadLength;
     }
 
+    /**
+     * @return Whether reading is paused until the frames kept while a message is handled are handled
+     */
+    protected final boolean isReadPaused() {
+        return readPaused;
+    }
+
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof WebSocketFrame frame) {

@@ -126,6 +126,14 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      * the connection without a close.
      */
     private static final int MAX_HELD_READ_BYTES = 64 * 1024;
+    /**
+     * The number of frames held while the open handler runs at which reading stops.
+     */
+    private static final int PAUSE_FRAMES_WHILE_OPENING = 64;
+    /**
+     * The most frames held while the open handler runs, including what the last read brought.
+     */
+    private static final int MAX_FRAMES_WHILE_OPENING = 1024;
 
     private final NettyWebSocketSession serverSession;
     private final Channel channel;
@@ -198,6 +206,10 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      * The payload bytes held in {@link #framesWhileOpening}. Event loop only.
      */
     private long bytesWhileOpening;
+    /**
+     * The payload bytes of the message the last frame of {@link #framesWhileOpening} belongs to. Event loop only.
+     */
+    private long messageBytesWhileOpening;
     /**
      * Whether the open handler runs: the messages wait. Event loop only.
      */
@@ -1025,14 +1037,31 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             return true;
         }
         if (opening && msg instanceof WebSocketFrame frame) {
-            // the frames are already inflated, hold no more than a message may have
-            bytesWhileOpening += frame.content().readableBytes();
-            if (bytesWhileOpening > getMaxPayloadLength()) {
+            // the frames are already inflated: no held message may exceed the message limit, and
+            // reading stops once the held frames add up to a message or to many frames, past
+            // what the last read still brings the session is closed
+            int bytes = frame.content().readableBytes();
+            boolean data = frame instanceof TextWebSocketFrame || frame instanceof BinaryWebSocketFrame;
+            if (data) {
+                messageBytesWhileOpening = bytes;
+            } else if (frame instanceof ContinuationWebSocketFrame) {
+                messageBytesWhileOpening += bytes;
+            }
+            bytesWhileOpening += bytes;
+            if (messageBytesWhileOpening > getMaxPayloadLength()
+                || bytesWhileOpening > (long) getMaxPayloadLength() + MAX_HELD_READ_BYTES
+                || framesWhileOpening.size() >= MAX_FRAMES_WHILE_OPENING) {
                 releaseFramesWhileOpening();
                 rejectTooLargeMessage(ctx);
                 return true;
             }
             framesWhileOpening.add(frame.retain());
+            if (frame.isFinalFragment() && (data || frame instanceof ContinuationWebSocketFrame)) {
+                messageBytesWhileOpening = 0;
+            }
+            if (bytesWhileOpening >= getMaxPayloadLength() || framesWhileOpening.size() >= PAUSE_FRAMES_WHILE_OPENING) {
+                ctx.channel().config().setAutoRead(false);
+            }
             return true;
         }
         return false;
@@ -1044,6 +1073,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             frame.release();
         }
         bytesWhileOpening = 0;
+        messageBytesWhileOpening = 0;
     }
 
     /**
@@ -1052,6 +1082,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     private void opened() {
         opening = false;
         bytesWhileOpening = 0;
+        messageBytesWhileOpening = 0;
         ChannelHandlerContext ctx = channel.pipeline().context(this);
         WebSocketFrame frame;
         while ((frame = framesWhileOpening.poll()) != null) {
@@ -1066,7 +1097,8 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 frame.release();
             }
         }
-        if (ctx != null && serverSession.isOpen()) {
+        // the frames handled may have paused reading until the messages they make are handled
+        if (ctx != null && serverSession.isOpen() && !isReadPaused()) {
             channel.config().setAutoRead(true);
         }
     }
