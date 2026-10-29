@@ -338,7 +338,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                     boolean requiresSlash = i + 1 != segments.length;
                     int end = readText(uri, pos, requiresSlash);
                     if (end > pos) { // Deny empty path
-                        if (decodesToDotSegment(uri, pos, end)) {
+                        if (decodesToDotSegment(uri, pos, end) || startsWithEncodedSeparator(uri, pos)) {
                             // the handler receives the decoded value, an encoded separator may be part of it
                             // (see the raw values of a route), but never to climb out of the segment
                             return null;
@@ -356,7 +356,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                     }
                     if (uri.indexOf('%', pos) != -1
                         && (!matchesDecoded(segment, uri.substring(pos), matcher)
-                            || decodesToDotSegment(uri, pos, length) && !segment.pattern.matcher(decodeSeparators(uri.substring(pos))).matches())) {
+                            || needsSeparatorCheck(segment, uri, pos, length, matcher) && !matchesWithSeparators(segment, uri.substring(pos), matcher))) {
                         // the handler receives the decoded values: an encoded backslash must still satisfy
                         // the template, and an encoded slash may be part of them (see the raw values of a
                         // route), but never to climb out of a template that does not take a slash itself
@@ -412,6 +412,47 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
             }
         }
         return false;
+    }
+
+    private static boolean startsWithEncodedSeparator(String uri, int pos) {
+        // a decoded value that starts with a separator is an absolute path, e.g. for Path.resolve
+        return uri.regionMatches(true, pos, "%2F", 0, 3) || uri.regionMatches(true, pos, "%5C", 0, 3);
+    }
+
+    private static boolean needsSeparatorCheck(Segment segment, String uri, int pos, int length, Matcher rawMatcher) {
+        if (decodesToDotSegment(uri, pos, length)) {
+            return true;
+        }
+        int groupInx = 2;
+        for (int i = 0; i < segment.regexpVariables.length; i++) {
+            int start = rawMatcher.start(groupInx);
+            if (start != -1 && startsWithEncodedSeparator(uri, start)) {
+                return true;
+            }
+            groupInx += 2;
+        }
+        return false;
+    }
+
+    /**
+     * Whether the template matches the value with its separators decoded, binding each variable
+     * to its decoded raw value: a dot segment or an absolute path must not span the variables.
+     */
+    private static boolean matchesWithSeparators(Segment segment, String uri, Matcher rawMatcher) {
+        Matcher decodedMatcher = segment.pattern.matcher(decodeSeparators(uri));
+        if (!decodedMatcher.matches()) {
+            return false;
+        }
+        int groupInx = 2;
+        for (int i = 0; i < segment.regexpVariables.length; i++) {
+            String rawGroup = rawMatcher.group(groupInx);
+            String decodedGroup = decodedMatcher.group(groupInx);
+            if (rawGroup == null ? decodedGroup != null : !Objects.equals(decodeSeparators(rawGroup), decodedGroup)) {
+                return false;
+            }
+            groupInx += 2;
+        }
+        return true;
     }
 
     private static boolean matchesDecoded(Segment segment, String uri, Matcher rawMatcher) {
