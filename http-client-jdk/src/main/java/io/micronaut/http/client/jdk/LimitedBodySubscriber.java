@@ -99,7 +99,8 @@ final class LimitedBodySubscriber<T> implements HttpResponse.BodySubscriber<T> {
 
     @Override
     public void onComplete() {
-        if (!failed.get()) {
+        // settled once: a read timeout that fires as the body ends is not followed by a completion
+        if (failed.compareAndSet(false, true)) {
             cancelTimeout();
             delegate.onComplete();
         }
@@ -108,11 +109,13 @@ final class LimitedBodySubscriber<T> implements HttpResponse.BodySubscriber<T> {
     private void fail(Throwable failure) {
         if (failed.compareAndSet(false, true)) {
             cancelTimeout();
+            // the body fails with this failure first: cancelling makes the JDK client close the
+            // connection, which it would otherwise report as a truncated body
+            delegate.onError(failure);
             Flow.Subscription s = subscription;
             if (s != null) {
                 s.cancel();
             }
-            delegate.onError(failure);
         }
     }
 
