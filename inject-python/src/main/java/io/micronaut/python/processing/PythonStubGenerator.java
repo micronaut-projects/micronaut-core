@@ -4229,7 +4229,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     static ExpressionDef pythonClassReference(ClassElement owner, ClassElement element) {
         if (!(element instanceof AbstractPythonClassElement) || owner.getName().equals(element.getName())) {
-            return javaClassType(owner).getStaticField("__PYTHON_CLASS_REFERENCE", PYTHON_CLASS_REFERENCE);
+            return javaClassType(owner).getStaticField(PYTHON_CLASS_REFERENCE_FIELD, PYTHON_CLASS_REFERENCE);
         }
         return javaClassType(owner).getStaticField(pythonClassReferenceFieldName(element), PYTHON_CLASS_REFERENCE);
     }
