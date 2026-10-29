@@ -1861,10 +1861,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 writeCompressing(message, true, true);
             } catch (RuntimeException | Error e) {
                 // the compression session took the body and released it, so message must not be released again
+                // record the failure first: marking the response written completes its callbacks
+                requestHandler.responseFailed(outboundAccess.attachment, e);
                 outboundHandler = null;
                 super.discardOutbound();
                 markResponseWritten();
-                requestHandler.responseFailed(outboundAccess.attachment, e);
                 LOG.warn("Failed to compress the response. The error cannot be forwarded to the client.", e);
                 requiredFlushCoalescer().flushNow();
                 requiredCtx().close();
