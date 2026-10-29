@@ -589,7 +589,12 @@ public abstract class ResponseLifecycle {
             headers.remove(HttpHeaders.TRANSFER_ENCODING);
         }
         if (request.getMethod() == HttpMethod.HEAD) {
-            byteBodyResponse.close();
+            // closing a stream may block, and this can run on the event loop
+            if (byteBodyResponse.byteBody() instanceof InputStreamByteBody) {
+                closeOnIoExecutor(byteBodyResponse);
+            } else {
+                byteBodyResponse.close();
+            }
             return ExecutionFlow.just(ByteBodyHttpResponseWrapper.wrap(response, byteBodyFactory.createEmpty()));
         }
         if (byteBodyResponse == response) {
