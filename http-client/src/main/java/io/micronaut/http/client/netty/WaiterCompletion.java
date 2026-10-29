@@ -18,10 +18,11 @@ package io.micronaut.http.client.netty;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.propagation.PropagatedContextElement;
 import io.micronaut.core.propagation.ThreadPropagatedContextElement;
-import io.netty.util.concurrent.GlobalEventExecutor;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Runs the continuation of a pooled request that waited for a connection in the context of the
@@ -38,7 +39,7 @@ final class WaiterCompletion {
      *
      * @param waiterContext The context of the waiting caller
      * @param freshExecutor An executor whose tasks start without thread-bound state, or
-     *                      {@code null} to use a global one
+     *                      {@code null} to use the common pool
      * @param completion    The completion
      */
     static void complete(PropagatedContext waiterContext, @Nullable Executor freshExecutor, Runnable completion) {
@@ -47,7 +48,14 @@ final class WaiterCompletion {
         if (current == null || current == waiterContext || !hasThreadElements(current)) {
             inWaiterContext.run();
         } else {
-            (freshExecutor == null ? GlobalEventExecutor.INSTANCE : freshExecutor).execute(inWaiterContext);
+            try {
+                // the common pool, not the single thread of the global event executor, which
+                // completions of other waiters would queue behind
+                (freshExecutor == null ? ForkJoinPool.commonPool() : freshExecutor).execute(inWaiterContext);
+            } catch (RejectedExecutionException e) {
+                // e.g. the event loop shuts down: the waiter is completed rather than stranded
+                inWaiterContext.run();
+            }
         }
     }
 
