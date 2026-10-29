@@ -8,6 +8,7 @@ import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.DefaultMutableConversionService
 import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.convert.value.ConvertibleMultiValuesMap
+import io.micronaut.core.convert.value.MutableConvertibleMultiValuesMap
 import io.micronaut.core.convert.value.ConvertibleValues
 import io.micronaut.core.type.Argument
 import spock.lang.Specification
@@ -69,6 +70,33 @@ class ResolvedConverterBindingSpec extends Specification {
         values.get("one", ConversionContext.of(argument)).get() == 10
         values.get("many", ConversionContext.of(argument), converter) == values.get("many", ConversionContext.of(argument))
         values.get("missing", ConversionContext.of(argument), converter).isEmpty()
+    }
+
+    void "values that override the lookup of a value bind the value they look up"() {
+        given:
+        def service = new DefaultMutableConversionService()
+        def argument = Argument.of(Integer, "value")
+        def values = new ConvertibleMultiValuesMap<String>([value: ["10"]], service) {
+            @Override
+            <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+                return Optional.of((T) 42)
+            }
+        }
+
+        expect:
+        new TestBinder(service, argument).bind(ConversionContext.of(argument), values).getValue() == Optional.of(42)
+        new TestBinder(service).bind(ConversionContext.of(argument), values).getValue() == Optional.of(42)
+    }
+
+    void "mutable multi values convert a single string value with the converter"() {
+        given:
+        def service = new DefaultMutableConversionService()
+        def argument = Argument.of(Integer, "value")
+        def values = new MutableConvertibleMultiValuesMap<String>([value: ["10"]], service)
+        TypeConverter<String, Integer> converter = { String s, Class<Integer> t, ConversionContext c -> Optional.of(42) } as TypeConverter
+
+        expect:
+        values.get("value", ConversionContext.of(argument), converter).get() == 42
     }
 
     void "a binder that overrides the resolution binds the value it resolves"() {

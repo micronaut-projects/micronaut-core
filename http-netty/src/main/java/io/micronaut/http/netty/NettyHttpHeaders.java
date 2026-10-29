@@ -112,11 +112,19 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
-        return get(name, conversionContext, null);
+        return getValue(name, conversionContext, null);
     }
 
     @Override
-    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext, @Nullable TypeConverter<String, T> converter) {
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext, TypeConverter<String, T> converter) {
+        if (getClass() != NettyHttpHeaders.class) {
+            // a subclass may override the lookup of a value
+            return get(name, conversionContext);
+        }
+        return getValue(name, conversionContext, converter);
+    }
+
+    private <T> Optional<T> getValue(CharSequence name, ArgumentConversionContext<T> conversionContext, @Nullable TypeConverter<String, T> converter) {
         List<String> values = nettyHeaders.getAll(name);
         if (!values.isEmpty()) {
             Class<T> type = conversionContext.getArgument().getType();

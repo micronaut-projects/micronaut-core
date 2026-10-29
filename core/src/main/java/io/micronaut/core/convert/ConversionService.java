@@ -81,10 +81,11 @@ public interface ConversionService {
     /**
      * Resolves the converter of values of the source type to the argument once, for a call site that
      * converts to the same argument repeatedly, such as an argument binder. The converter converts as
-     * {@link #convert(Object, Class, ConversionContext)} does, including with the converters added later,
-     * without looking up the converter for every value. It is meant to be called with the type of the
-     * argument and a context with its annotation metadata: another target type or annotation metadata is
-     * converted by this service as is.
+     * {@link #convert(Object, ArgumentConversionContext)} does with a context of the argument, or
+     * {@link #convert(Object, Class, ConversionContext)} with another context, including with the converters
+     * added later, without looking up the converter for every value. It is meant to be called with the type
+     * of the argument and a context with its annotation metadata: another target type or annotation metadata
+     * is converted by this service as is.
      *
      * @param sourceType The type of the values the converter is used for
      * @param argument   The target argument
@@ -94,8 +95,15 @@ public interface ConversionService {
      * @since 5.3.0
      */
     @Experimental
+    @SuppressWarnings("unchecked")
     default <S, T> TypeConverter<S, T> resolveConverter(Class<S> sourceType, Argument<T> argument) {
-        return this::convert;
+        return (value, targetType, context) -> {
+            if (context instanceof ArgumentConversionContext<?> argumentContext && argumentContext.getArgument().getType() == targetType) {
+                // converted as a call site with the context of the argument converts it
+                return convert(value, (ArgumentConversionContext<T>) argumentContext);
+            }
+            return convert(value, targetType, context);
+        };
     }
 
     /**

@@ -93,6 +93,10 @@ public class NettyHttpParameters implements MutableHttpParameters {
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext, TypeConverter<String, T> converter) {
+        if (getClass() != NettyHttpParameters.class) {
+            // a subclass may override the lookup of a value
+            return get(name, conversionContext);
+        }
         return values.get(name, conversionContext, converter);
     }
 

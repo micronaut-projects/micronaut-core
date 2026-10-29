@@ -126,6 +126,20 @@ class ResolvedConverterSpec extends Specification {
         service.resolveConverter(String, Argument.of(Integer)).convert("10", Integer, ConversionContext.of(Argument.of(Integer))).get() == 42
     }
 
+    void "a subclass of the default conversion service converts with its conversion of an argument"() {
+        given:
+        def service = new DefaultMutableConversionService() {
+            @Override
+            <T> Optional<T> convert(Object object, ArgumentConversionContext<T> context) {
+                return Optional.of((T) 42)
+            }
+        }
+        def argument = Argument.of(Integer)
+
+        expect:
+        service.resolveConverter(String, argument).convert("10", Integer, ConversionContext.of(argument)).get() == 42
+    }
+
     void "the default resolved converter of a conversion service converts with the service"() {
         given:
         ConversionService service = new ConversionService() {
