@@ -49,6 +49,16 @@ final class Http3RequestStreamLifecycleHandler extends ChannelDuplexHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(Http3RequestStreamLifecycleHandler.class);
 
+    /**
+     * Whether the request body streams to a consumer that may still read it.
+     */
+    private boolean bodyStreaming;
+    /**
+     * Whether the response is complete, so that the rest of the request is stopped once nobody
+     * reads it.
+     */
+    private boolean responseComplete;
+
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         if (LOG.isDebugEnabled()) {
@@ -61,16 +71,6 @@ final class Http3RequestStreamLifecycleHandler extends ChannelDuplexHandler {
         }
         ctx.close();
     }
-
-    /**
-     * Whether the request body streams to a consumer that may still read it.
-     */
-    private boolean bodyStreaming;
-    /**
-     * Whether the response is complete, so that the rest of the request is stopped once nobody
-     * reads it.
-     */
-    private boolean responseComplete;
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
