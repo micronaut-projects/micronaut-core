@@ -447,7 +447,11 @@ abstract class MultiplexedServerHandler {
                 if (writerUpstream != null) {
                     // a streaming response is in progress, and it cannot be completed any more.
                     // The body may never signal again (e.g. an idle event stream), so finish
-                    // here: that discards the body and cleans up the request.
+                    // here: that discards the body and cleans up the request. The response did
+                    // not complete, so the request is abandoned first: finish() marks the stream
+                    // finished, which onStreamClosed would take for a completed response
+                    reset = true;
+                    abandon();
                     finish();
                 } else {
                     // the response will never be written: let its body release what it holds.
