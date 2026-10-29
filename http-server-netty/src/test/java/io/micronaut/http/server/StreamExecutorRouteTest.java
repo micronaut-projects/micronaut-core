@@ -24,21 +24,33 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.web.router.builder.HttpRoutes;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import java.util.List;
 import java.util.Map;
@@ -77,6 +89,31 @@ class StreamExecutorRouteTest {
                 }
                 String plain = client.toBlocking().retrieve(HttpRequest.GET("/stream/plain"), String.class);
                 assertTrue(plain.substring(plain.indexOf(',')).contains(LOOP), "a route without an executor streams on the event loop: " + plain);
+            }
+        }
+    }
+
+    /**
+     * The route completes on its executor before the request thread waits for it, as when the
+     * event loop is descheduled under load: the response is then consumed on the event loop. The
+     * stream of a route whose declared response does not tell the type of its body, a handler
+     * route, a controller method or an exception handler returning {@code HttpResponse<?>} or
+     * {@code Mono<HttpResponse<?>>}, is subscribed to on the executor of the route all the same.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void theStreamRunsOnTheExecutorOfTheRouteWhenTheRouteCompletesFirst(boolean compatibility) {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", SPEC, "micronaut.server.port", -1))) {
+            ctx.getBean(RouteExecutor.class).forceCompatibility = compatibility;
+            EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
+            try (HttpClient client = ctx.createBean(HttpClient.class, server.getURL())) {
+                for (String path : List.of("/stream/hand-off/annotated", "/stream/hand-off/untyped", "/stream/hand-off/route", "/stream/hand-off/group/body",
+                    "/stream/hand-off/error", "/stream/hand-off/mono")) {
+                    String body = client.toBlocking().retrieve(HttpRequest.GET(path), String.class);
+                    String[] threads = body.substring(1, body.length() - 1).split(",");
+                    assertTrue(threads[0].startsWith(HandOffExecutor.THREAD), path + ": " + body);
+                    assertTrue(threads[1].startsWith(HandOffExecutor.THREAD), path + ": " + body);
+                }
             }
         }
     }
@@ -131,6 +168,29 @@ class StreamExecutorRouteTest {
             return HttpResponse.ok(thread());
         }
 
+        @Get(value = "/hand-off/annotated", produces = MediaType.APPLICATION_JSON)
+        @ExecuteOn(HandOffExecutor.NAME)
+        HttpResponse<Flux<String>> handOffAnnotated() {
+            return HttpResponse.ok(thread());
+        }
+
+        @Get(value = "/hand-off/untyped", produces = MediaType.APPLICATION_JSON)
+        @ExecuteOn(HandOffExecutor.NAME)
+        HttpResponse<?> handOffUntyped() {
+            return HttpResponse.ok(thread());
+        }
+
+        @Get(value = "/hand-off/mono", produces = MediaType.APPLICATION_JSON)
+        @ExecuteOn(HandOffExecutor.NAME)
+        Mono<HttpResponse<?>> handOffMono() {
+            return Mono.fromSupplier(() -> HttpResponse.ok(thread()));
+        }
+
+        @Get(value = "/hand-off/error", produces = MediaType.APPLICATION_JSON)
+        String handOffError() {
+            throw new HandOffException();
+        }
+
         @Get(value = "/plain", produces = MediaType.APPLICATION_JSON)
         HttpResponse<Flux<String>> plain() {
             return HttpResponse.ok(thread());
@@ -175,10 +235,86 @@ class StreamExecutorRouteTest {
             routes.GET("/stream/filtered/route").produces(MediaType.APPLICATION_JSON_TYPE).executeOn(TaskExecutors.BLOCKING)
                 .responseType(Argument.of(Flux.class, Argument.STRING))
                 .handle((request, pathVariables) -> HttpResponse.ok(thread()));
+            routes.GET("/stream/hand-off/route").produces(MediaType.APPLICATION_JSON_TYPE).executeOn(HandOffExecutor.NAME)
+                .handle((request, pathVariables) -> HttpResponse.ok(thread()));
+            routes.path("/stream/hand-off/group", group -> {
+                group.executeOn(HandOffExecutor.NAME);
+                group.GET("/body").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok(thread()));
+            });
             routes.path("/stream/group", group -> {
                 group.executeOn(TaskExecutors.BLOCKING);
                 group.GET("/body").produces(MediaType.APPLICATION_JSON_TYPE).handle((request, pathVariables) -> HttpResponse.ok(thread()));
             });
+        }
+    }
+
+    /**
+     * Runs a task on a thread of its own and returns once the task completed: the route
+     * completes its response before the request thread waits for it.
+     */
+    @Singleton
+    @Named(HandOffExecutor.NAME)
+    @Requires(property = "spec.name", value = SPEC)
+    static final class HandOffExecutor extends AbstractExecutorService {
+        static final String NAME = "stream-hand-off";
+        static final String THREAD = "stream-hand-off-";
+
+        private final AtomicInteger threads = new AtomicInteger();
+        private final ExecutorService delegate = Executors.newCachedThreadPool(task -> new Thread(task, THREAD + threads.incrementAndGet()));
+
+        @Override
+        public void execute(Runnable command) {
+            try {
+                delegate.submit(command).get(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            } catch (ExecutionException | TimeoutException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        @PreDestroy
+        @Override
+        public void shutdown() {
+            delegate.shutdown();
+        }
+
+        @Override
+        public List<Runnable> shutdownNow() {
+            return delegate.shutdownNow();
+        }
+
+        @Override
+        public boolean isShutdown() {
+            return delegate.isShutdown();
+        }
+
+        @Override
+        public boolean isTerminated() {
+            return delegate.isTerminated();
+        }
+
+        @Override
+        public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+            return delegate.awaitTermination(timeout, unit);
+        }
+    }
+
+    static final class HandOffException extends RuntimeException {
+    }
+
+    /**
+     * Answers {@link HandOffException} on the hand-off executor, with a streamed body.
+     */
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC)
+    static final class HandOffExceptionHandler implements ExceptionHandler<HandOffException, HttpResponse<?>> {
+        @Override
+        @ExecuteOn(HandOffExecutor.NAME)
+        @Produces(MediaType.APPLICATION_JSON)
+        public HttpResponse<?> handle(HttpRequest request, HandOffException exception) {
+            return HttpResponse.ok(thread());
         }
     }
 }

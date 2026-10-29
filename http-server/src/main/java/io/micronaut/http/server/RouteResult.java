@@ -101,10 +101,39 @@ abstract sealed class RouteResult {
             return ExecutionFlow.just(mutableHttpResponse);
         }
 
-        if (responseBodyAsyncOrReactive(routeInfo)) {
+        if (publisherBody(routeInfo, outgoingResponse)) {
             return processPublisherBody(propagatedContext, request, outgoingResponse, routeInfo);
         }
         return ExecutionFlow.just(outgoingResponse);
+    }
+
+    /**
+     * Whether the body of a response the route returned is a stage or a publisher, which
+     * {@link #processPublisherBody} adapts: by the declared type of the body, or, when the route
+     * does not declare it and streams on an executor, by the body itself. Otherwise a publisher
+     * in the response would stream on the thread that consumes the response, the event loop when
+     * the route completed before the request thread waited for it.
+     *
+     * @param routeInfo The route
+     * @param response  The response the route returned
+     * @return Whether the body is adapted as a stage or a publisher
+     */
+    private boolean publisherBody(RouteInfo<?> routeInfo, MutableHttpResponse<?> response) {
+        return responseBodyAsyncOrReactive(routeInfo)
+            || untypedResponseBodyOnExecutor(routeInfo) && Publishers.isConvertibleToPublisher(response.body());
+    }
+
+    /**
+     * Like {@link #publisherBody}, for a response a publisher the route returned emits, e.g. of
+     * a {@code Mono<HttpResponse<?>>}.
+     *
+     * @param routeInfo The route
+     * @param response  The response the publisher of the route emitted
+     * @return Whether the body is adapted as a stage or a publisher
+     */
+    private boolean nestedPublisherBody(RouteInfo<?> routeInfo, MutableHttpResponse<?> response) {
+        return nestedResponseBodyAsyncOrReactive(routeInfo)
+            || untypedNestedResponseBodyOnExecutor(routeInfo) && Publishers.isConvertibleToPublisher(response.body());
     }
 
     CompletionStage<MutableHttpResponse<?>> fromCompletionStage(HttpRequest<?> request,
@@ -208,7 +237,7 @@ abstract sealed class RouteResult {
                 MutableHttpResponse<?> response;
                 if (obj instanceof HttpResponse<?> httpResponse) {
                     response = httpResponse.toMutableResponse();
-                    if (responseBodyAsyncOrReactive(routeInfo)) {
+                    if (publisherBody(routeInfo, response)) {
                         return processPublisherBody(propagatedContext, request, response, routeInfo);
                     }
                 } else {
@@ -247,7 +276,7 @@ abstract sealed class RouteResult {
                     if (o instanceof HttpResponse<?> httpResponse) {
                         singleResponse = httpResponse.toMutableResponse();
                         // Mono<HttpResponse<Mono<T>>>
-                        if (nestedResponseBodyAsyncOrReactive(routeInfo)) {
+                        if (nestedPublisherBody(routeInfo, singleResponse)) {
                             return processPublisherBody(propagatedContext, request, singleResponse, routeInfo);
                         }
                     } else if (o instanceof HttpStatus status) {
@@ -265,9 +294,10 @@ abstract sealed class RouteResult {
             Publisher<HttpResponse<?>> bodyPublisher = (Publisher) publisher;
             Flux<MutableHttpResponse<?>> response = Flux.from(bodyPublisher)
                 .map(HttpResponse::toMutableResponse);
-            if (nestedResponseBodyAsyncOrReactive(routeInfo)) {
-                response = response.flatMap(resp ->
-                    ReactiveExecutionFlow.toPublisher(processPublisherBody(propagatedContext, request, resp, routeInfo)));
+            if (nestedResponseBodyAsyncOrReactive(routeInfo) || untypedNestedResponseBodyOnExecutor(routeInfo)) {
+                response = response.flatMap(resp -> nestedPublisherBody(routeInfo, resp)
+                    ? ReactiveExecutionFlow.toPublisher(processPublisherBody(propagatedContext, request, resp, routeInfo))
+                    : Mono.just(resp));
             }
             // the outer publisher sees the request and the propagated context, whether or not the
             // bodies of its responses are reactive
@@ -462,6 +492,26 @@ abstract sealed class RouteResult {
 
     /**
      * @param routeInfo The route
+     * @return Whether the route does not declare the type of the body of the response it
+     * returns, e.g. {@code HttpResponse<?>} or the response of a handler route, and a streamed
+     * body of the route has an executor, see {@link #streamExecutor}
+     */
+    boolean untypedResponseBodyOnExecutor(RouteInfo<?> routeInfo) {
+        return typeVariable(routeInfo.getReturnType()).getType() == Object.class && streamExecutor(routeInfo) != null;
+    }
+
+    /**
+     * @param routeInfo The route
+     * @return Whether the route does not declare the type of the body of the responses the
+     * publisher it returns emits, e.g. {@code Mono<HttpResponse<?>>}, and a streamed body of the
+     * route has an executor
+     */
+    boolean untypedNestedResponseBodyOnExecutor(RouteInfo<?> routeInfo) {
+        return typeVariable(typeVariable(routeInfo.getReturnType())).getType() == Object.class && streamExecutor(routeInfo) != null;
+    }
+
+    /**
+     * @param routeInfo The route
      * @return Whether the body of the response the stage or the publisher the route returns
      * completes with is a stage or a publisher
      */
@@ -580,6 +630,8 @@ abstract sealed class RouteResult {
         final boolean preparedStreamOfResponses;
         final boolean preparedKotlinUnit;
         final boolean preparedHasExecutor;
+        final boolean preparedUntypedResponseBody;
+        final boolean preparedUntypedNestedResponseBody;
         private final RouteInfo<?> routeInfo;
         /**
          * The executor of a streamed body, {@link #NO_EXECUTOR}, or {@code null} until a body is
@@ -602,6 +654,8 @@ abstract sealed class RouteResult {
             preparedKotlinUnit = routeInfo.isSuspended() && routeInfo instanceof MethodBasedRouteInfo<?, ?> mbri
                 && isKotlinFunctionReturnTypeUnit(mbri.getTargetMethod().getExecutableMethod());
             preparedHasExecutor = routeInfo.getExecutor(owner.serverConfiguration.getThreadSelection()) != null;
+            preparedUntypedResponseBody = first.getType() == Object.class;
+            preparedUntypedNestedResponseBody = nested.getType() == Object.class;
         }
 
         @Override
@@ -637,6 +691,17 @@ abstract sealed class RouteResult {
         @Override
         final boolean hasExecutor(RouteInfo<?> routeInfo) {
             return preparedHasExecutor;
+        }
+
+        @Override
+        final boolean untypedResponseBodyOnExecutor(RouteInfo<?> routeInfo) {
+            // the stream executor is selected once, when a body is first streamed
+            return preparedUntypedResponseBody && streamExecutor(routeInfo) != null;
+        }
+
+        @Override
+        final boolean untypedNestedResponseBodyOnExecutor(RouteInfo<?> routeInfo) {
+            return preparedUntypedNestedResponseBody && streamExecutor(routeInfo) != null;
         }
 
         @Override
