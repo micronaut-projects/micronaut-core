@@ -1,75 +1,68 @@
-Functional routes declare filters at three levels, with the same methods, from api:web.router.builder.RouteFilterSpec[]:
+Choose the filter scope according to the requests it should cover:
 
-* *route filters*, on the api:web.router.builder.HttpRouteSpec[] of a route, before its terminal: `routes.GET(uri).before(...).and().handle(...)`;
-* *group filters*, on an api:web.router.builder.HttpRouteGroup[], for the routes of the group only;
-* *server filters*, declared with `routes.serverFilter(patterns...)` on the api:web.router.builder.HttpRouteBuilder[] of an `HttpRoutes` bean only, never on a group: the functional form of a `@ServerFilter` bean, see api:web.router.builder.ServerFilterSpec[].
+* *Route filters* apply to one matched route: `routes.GET(uri).before(...).and().handle(...)`.
+* *Group filters* apply to matched routes in a group and its nested groups.
+* *Server filters*, declared with `routes.serverFilter(patterns...)`, apply to all matching request paths, including controller routes, static resources and unmatched requests.
+
+Use a server filter when you need to cover responses such as `404`, `405`, `415` or `406` that occur before a route is selected. Only the top-level builder declares server filters.
 
 snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="serverFilters", indent=0, title="Server filters"]
 
-<1> A server filter filters every request whose path matches one of its patterns, whatever answers it: a controller, a handler route, a static resource, or no route at all (`404`, `405`, ...). `methods(...)`, `order(int)`, `patternStyle(...)` and `appendContextPath(boolean)` correspond to the members of `@ServerFilter` and to `@Order`. A server filter is global: only the builder declares one, and a group has no `serverFilter` method.
-<2> A pre-matching server filter, like a `@PreMatching` filter bean, runs before the route is matched, and the route is matched with the request it continues with: here a URI rewritten in place.
+<1> Configure path patterns, HTTP methods and order as you would for a `@ServerFilter` bean.
+<2> `preMatching()` runs before routing, allowing the filter to rewrite the URI used for route selection.
 
-The filters of a route and of its groups are route filters: as with the filter methods of a controller, they need a matched route. A request under the prefix of a group that no route answers (`404`), or that a route of the group would answer with another method or media type (`405`, `415`, `406`), runs the server filters only: the `@ServerFilter` beans and the filters declared with `routes.serverFilter(patterns...)`, pre-matching ones (`routes.serverFilter(patterns...).preMatching()`) included.
-
-=== Filter methods
-
-The request and the response filters come in the same four families, so that their lambdas are never ambiguous:
+=== Filter Methods
 
 [cols="1,2"]
 |===
-|Method |Filter
+|Method |Behaviour
 
-|`before(RouteRequestFilter)`
-|A request filter that changes the request in place and returns nothing: the request continues.
+|`before(...)`
+|Change the request in place and continue.
 
-|`beforeReplacing(ReplacingRouteRequestFilter)`
-|A request filter that returns a response to answer instead of the route, a request to continue with, or `null` to continue with the request.
+|`beforeReplacing(...)`
+|Return a response to stop processing, a replacement request to continue, or `null` to keep the current request.
 
-|`after(RouteResponseFilter)`
-|A response filter that changes the response in place.
+|`after(...)`
+|Change the response in place.
 
-|`afterReplacing(ReplacingRouteResponseFilter)`
-|A response filter that returns a replacement response, or `null` to keep the response.
-
-|`beforeAsync(...)`, `beforeReplacingAsync(...)`, `afterAsync(...)`, `afterReplacingAsync(...)`
-|The same, returning a `CompletionStage`: the filter chain continues when it completes, for the replacing filters with what it completes with.
+|`afterReplacing(...)`
+|Return a replacement response, or `null` to keep the current response.
 |===
 
-Each method has a variant whose lambda also receives a api:core.propagation.MutablePropagatedContext[], selected by the number of parameters: `before((request, propagatedContext) -> ...)`. An element the filter adds is in scope for the filters after it, the handler and the error routes, as for a filter method with a `MutablePropagatedContext` parameter. An asynchronous filter's changes are taken when its stage completes.
+Each method has an asynchronous variant, such as `beforeAsync` or `afterReplacingAsync`, that returns a `CompletionStage`. The chain continues when that stage completes.
 
-=== Filter executors
+Overloads can receive api:core.propagation.MutablePropagatedContext[], for example `before((request, context) -> ...)`. Added context is available to subsequent filters, the handler and error routes. Asynchronous context changes take effect when the stage completes.
 
-Every filter method returns the api:web.router.builder.FilterSpec[] of the filter it added. A filter runs on the thread of the filter chain, like a filter method; `executeOn(executorName)` runs it on a named executor instead, like `@ExecuteOn` on a filter method, and `and()` goes back to the route, the group or the server filter to continue its declaration:
+=== Choosing an Executor
+
+Filters normally run on the filter-chain thread. Use `executeOn(...)` for blocking work, then `and()` to continue configuring the route or group:
 
 snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="filterExecutor", indent=0, title="A filter on an executor"]
 
-<1> A filter that blocks, e.g. on a database.
-<2> The filter runs on the blocking executor, and the filter chain continues on it. `nonBlocking()` keeps the filter on the thread of the filter chain, the default; the last of the two called wins. An asynchronous filter given an executor is called on it, and the chain continues where its stage completes.
-<3> `and()` returns the route, to declare its next filters, its settings and its terminal.
+<1> This filter performs blocking work.
+<2> Run it on the blocking executor. `nonBlocking()` restores execution on the filter-chain thread. An asynchronous filter's chain continues where its stage completes.
+<3> `and()` returns to the route declaration.
 
-NOTE: In Python, a Java method named after a Python keyword takes a trailing underscore: `and()` is `and_()`, and `or(...)` of a condition is `or_(...)`.
+NOTE: Python uses trailing underscores for Java methods named after keywords: `and_()` and `or_(...)`.
 
-A filter chooses its thread with the same methods as a route and a group, from api:web.router.builder.ExecutionSpec[]. Group filters and server filters have them too. The executor of a filter is fixed once the routes are built, or when the lambda of the group that declares the filter returns.
+=== Changing Requests and Responses
 
-=== Changing the request and the response
+Use `before` for in-place changes to headers, attributes or the URI. Use `beforeReplacing` to supply a replacement request, including one with a different method or body. Replacing the raw body requires a `ServerHttpRequest` with the replacement `byteBody()`.
 
-A request filter receives a `MutableHttpRequest`:
+Only a *pre-matching server filter* can change which route is selected. A later URI or method change does not trigger routing again.
 
-* Headers and attributes changed in place, and a URI set with `uri(...)`, are seen by the rest of the chain: a `before` filter is enough. Other changes, such as a new body, need a request to be returned by a `beforeReplacing` filter.
-* To answer the request instead of the route, a `beforeReplacing` filter returns a response. To continue with another request, it returns the request: an `HttpRequestWrapper` that overrides `getMethod()` changes the method, and a `ServerHttpRequest` with another `byteBody()` changes the body, which `@Body` arguments, body handlers and the `AsyncRequestBody` read.
-* A new URI or method only changes the matched route in a pre-matching server filter. The other filters run after the route was matched.
+Use `after` to update response headers or other mutable properties, and `afterReplacing` to return an entirely different response.
 
-A response filter declared with `after` changes the response in place; one declared with `afterReplacing` can return a new response, which the response filters after it and the client see.
+=== Filter Order
 
-=== Order
+Request processing proceeds through:
 
-Request filters run in this order, and response filters in the reverse order:
+. Server filters, including `@ServerFilter` beans, sorted together by order. Pre-matching filters run before routing.
+. Outer group filters, then nested group filters.
+. Route filters.
+. The handler.
 
-. the server filters: `@ServerFilter` beans and the filters declared with `routes.serverFilter(...)`, sorted together by their order (`0` by default); pre-matching filters run before the route is matched;
-. the filters of the outer group, then those of the inner groups;
-. the filters of the route;
-. the handler.
+Responses pass back through the scopes in reverse order. Within each route or group, request filters and response filters each retain declaration order. Response filters also see responses returned early by request filters at their own or an inner scope.
 
-Within a group or a route, request filters and response filters each run in the order they are declared. A response filter also sees the answer of a request filter of its own level or of an inner level.
-
-Exceptions thrown by a filter, or failed stages of an asynchronous filter, are handled like the exceptions of a filter method: by the error routes, the exception handlers, or with `500`.
+Filter failures use the normal error routes and exception handlers.
