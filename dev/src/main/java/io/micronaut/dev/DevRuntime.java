@@ -90,7 +90,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -127,7 +126,6 @@ public final class DevRuntime implements Closeable {
     private static final Duration COALESCE = Duration.ofMillis(150);
     private static final Duration APP_STOP_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration START_TIMEOUT = Duration.ofMinutes(5);
-    private static final int LEAK_TOLERANCE = 2;
     private static final int MAX_PROPAGATION_PASSES = 5;
 
     private final DevManifest manifest;
@@ -150,6 +148,7 @@ public final class DevRuntime implements Closeable {
     private volatile String[] arguments = new String[0]; // NOSONAR java:S3077 copied in and out, never mutated in place
     private volatile int retainedCount;
     private volatile boolean closed;
+    private final GenerationMemory memory;
     /**
      * Whether the runtime closed because its generation budget was spent, for its launcher to relaunch the process.
      */
@@ -161,7 +160,6 @@ public final class DevRuntime implements Closeable {
     private volatile boolean startFailed;
     private boolean contextClaimed; // guarded by lifecycle: whether the generation adopted its context, the first it created
     private volatile List<Path> watchedRoots = List.of(); // NOSONAR java:S3077 an immutable list, replaced whole
-    private final AtomicBoolean leakCheckPending = new AtomicBoolean();
     private @Nullable DirectoryWatcher watcher;
     // read by the request threads of the script filter and the /dev endpoint, set by the launcher
     private volatile @Nullable LiveReloadServer liveReload; // NOSONAR java:S3077 thread-safe server, replaced whole
@@ -206,6 +204,7 @@ public final class DevRuntime implements Closeable {
         this.relaunch = relaunch;
         this.manifest = manifest;
         this.classLoader = classLoader;
+        this.memory = new GenerationMemory(classLoader);
         this.launcher = launcher;
         this.compilers = new EnumMap<>(SourceKind.class);
         this.compilers.putAll(compilers);
@@ -274,6 +273,7 @@ public final class DevRuntime implements Closeable {
         arguments = args.clone();
         ApplicationContext first;
         try {
+            memory.initializeParentTierStatics();
             snapshot = OutputSnapshot.of(manifest.reloadableRoots());
             if (manifest.strategy() != DevReloadStrategy.RESTART && !NativeImageUtils.inImageRuntimeCode()) {
                 // the fast path needs an agent: the launcher's, or one attached now. A native image has none: its
@@ -650,6 +650,7 @@ public final class DevRuntime implements Closeable {
             throw new IllegalStateException("A development runtime already runs this process");
         }
         try {
+            memory.initializeParentTierStatics();
             snapshot = OutputSnapshot.of(manifest.reloadableRoots());
             // what the class files depend on and which are tests, before any change comes: a first change that removes a
             // constant, or deletes a test, needs to know the state it changes
@@ -869,6 +870,9 @@ public final class DevRuntime implements Closeable {
                 compiler.close();
             }
         } finally {
+            // whatever failed to stop: the threads of the shared schedulers end with them, and the schedule hook
+            // keeps this runtime's loader no longer
+            memory.releaseReactorThreads();
             // whatever failed to stop, whoever waits for the runtime to close is released
             CURRENT.compareAndSet(this, null);
             closedLatch.countDown();
@@ -914,28 +918,7 @@ public final class DevRuntime implements Closeable {
      * @throws IllegalStateException if a compilation fails
      */
     static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
-        Map<SourceKind, SourceKind> jointOwners = Compilations.jointOwners(manifest, compilers);
-        // decided before anything is compiled: two languages sharing one output are both missing, or neither
-        Set<SourceKind> missing = new LinkedHashSet<>();
-        for (SourceKind kind : compilers.keySet()) {
-            if (!jointOwners.containsKey(kind) && Compilations.embedded(manifest, kind) && !Files.isDirectory(manifest.classOutput(kind))) {
-                missing.add(kind);
-            }
-        }
-        for (Map.Entry<SourceKind, SourceCompiler> entry : compilers.entrySet()) {
-            SourceKind kind = entry.getKey();
-            if (!missing.contains(kind)) {
-                continue;
-            }
-            CompilationRequest request = new CompilationRequest(kind, Compilations.compilationRoots(manifest, kind, jointOwners), Set.of(), Set.of(), true, manifest.compileClasspath(),
-                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), Compilations.compileOptions(manifest, kind, jointOwners)).asFull();
-            CompilationResult result = entry.getValue().compile(request);
-            if (!result.isSuccess()) {
-                CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
-                throw new IllegalStateException(failure.describe());
-            }
-            LOG.info("Compiled {} {} source(s) in {} ms", result.compiledSources().size(), kind, result.duration().toMillis());
-        }
+        Compilations.compileMissingOutputs(manifest, compilers);
     }
 
     /**
@@ -1418,7 +1401,7 @@ public final class DevRuntime implements Closeable {
             return;
         }
         ApplicationContext old = context;
-        classLoader.swap();
+        GenerationClassLoader retired = classLoader.swap();
         Collection<BeanRegistration<?>> retained = List.of();
         if (old != null) {
             ClassChangeEvent event = new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART);
@@ -1433,7 +1416,13 @@ public final class DevRuntime implements Closeable {
                 old.stop();
             }
             awaitApplicationThread();
+            // the swap emptied the shared caches, but what read the retired generation since, a restart watcher or
+            // the stopping context, filled them again with its classes: forgotten again now that it no longer runs
+            GenerationMemory.forgetRetired(retired);
         }
+        // a thread a retained bean started in a retired generation took that generation's loader as its context
+        // class loader, and keeps it as long as the bean lives
+        memory.releaseThreads(Thread.currentThread(), applicationThread);
         retainedForNext = retained;
         started = new CompletableFuture<>();
         ApplicationContext fresh;
@@ -1654,47 +1643,7 @@ public final class DevRuntime implements Closeable {
     }
 
     void detectLeaks() {
-        if (NativeImageUtils.inImageRuntimeCode()) {
-            // a native image never unloads a class it defined at runtime: every retired generation stays, as the budget expects
-            return;
-        }
-        if (oldRetiredGenerations().isEmpty() || !leakCheckPending.compareAndSet(false, true)) {
-            // nothing older than the tolerance is reachable even before a collection, or a check pending covers this reload
-            return;
-        }
-        Thread thread = new Thread(() -> {
-            try {
-                Thread.sleep(2000);
-                // only a collection tells a retired generation the collector has yet to reach from one the application keeps;
-                // it runs on this thread, a moment after the reload, and only while an old generation is still reachable
-                System.gc(); // NOSONAR leak detection: a retired generation's loader is unreachable only once it is collected
-                List<Integer> old = oldRetiredGenerations();
-                if (!old.isEmpty()) {
-                    LOG.warn("{} retired generation(s) {} are still reachable after the reload: a static cache or a thread of the application keeps old classes alive", old.size(), old);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            } finally {
-                leakCheckPending.set(false);
-            }
-        }, "micronaut-dev-leak-detector");
-        thread.setDaemon(true);
-        thread.start();
-    }
-
-    private List<Integer> oldRetiredGenerations() {
-        return olderThanTolerance(classLoader.liveRetiredGenerations().stream().map(GenerationClassLoader::generation).toList(), classLoader.generation());
-    }
-
-    /**
-     * The retired generations that a reload should have released: those older than the tolerance.
-     *
-     * @param retired The generations of the retired loaders still reachable
-     * @param current The current generation
-     * @return The retired generations older than the tolerance
-     */
-    static List<Integer> olderThanTolerance(List<Integer> retired, int current) {
-        return retired.stream().filter(generation -> generation < current - LEAK_TOLERANCE).toList();
+        memory.detectLeaks();
     }
 
     /**

@@ -88,6 +88,12 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
      * @return A new Python polyglot engine.
      */
     static Engine buildPythonEngine(GraalPyEngineConfiguration engineConfiguration) {
+        // the first engine of the JVM initializes the polyglot runtime, which registers JVM-wide shutdown hooks on
+        // this thread: they would keep its context class loader, the application's, until the JVM exits
+        return GraalPyContextFactory.withContextClassLoader(GraalPyEngineFactory.class.getClassLoader(), () -> doBuildPythonEngine(engineConfiguration));
+    }
+
+    private static Engine doBuildPythonEngine(GraalPyEngineConfiguration engineConfiguration) {
         Engine.Builder builder = engineConfiguration.builder
             .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
             .logHandler(new GraalPySlf4jLogHandler());
