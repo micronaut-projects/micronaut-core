@@ -30,4 +30,9 @@ class AccessLogUnicodeSeparatorSpec extends Specification {
         where:
         value << ['é', '‧ ⁥⁪', 'привет']
     }
+
+    void "non-ASCII characters after a control character are logged unchanged"() {
+        expect:
+        AccessLog.escape('\u0001привет\u2028') == '\\x01привет\\u2028'
+    }
 }

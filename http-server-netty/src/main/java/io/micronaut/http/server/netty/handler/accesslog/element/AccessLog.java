@@ -178,7 +178,7 @@ public class AccessLog {
         builder.append(value, 0, i);
         for (; i < length; i++) {
             char c = value.charAt(i);
-            if (c > LATIN1_MAX) {
+            if (c > LATIN1_MAX && isControl(c)) {
                 builder.append("\\u")
                     .append(Character.forDigit(c >> 12, 16))
                     .append(Character.forDigit((c >> 8) & 0xF, 16))
