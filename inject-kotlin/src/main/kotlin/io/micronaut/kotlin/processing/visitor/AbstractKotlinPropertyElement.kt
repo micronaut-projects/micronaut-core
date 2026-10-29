@@ -15,6 +15,10 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.closestClassDeclaration
+import com.google.devtools.ksp.getAllSuperTypes
+import com.google.devtools.ksp.symbol.ClassKind
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -25,7 +29,6 @@ import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 import io.micronaut.inject.ast.annotation.PropertyElementAnnotationMetadata
 import java.util.*
 
@@ -70,12 +73,36 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
         if (overridden == null || overridden !is AbstractKotlinPropertyElement<*>) {
             return false
         }
+
         val nativeType = nativeType.element
         val overriddenNativeType = overridden.nativeType.element
-        if (nativeType == overriddenNativeType) {
-            return false
-        } else if (nativeType is KSPropertyDeclaration) {
-            return overriddenNativeType == nativeType.findOverridee()
+
+        if (nativeType == overriddenNativeType) return false
+
+        if (nativeType is KSPropertyDeclaration && overriddenNativeType is KSPropertyDeclaration) {
+            if (nativeType.simpleName.asString() != overriddenNativeType.simpleName.asString()) {
+                return false
+            }
+
+            if (nativeType.findOverridee() == overriddenNativeType) {
+                return true
+            }
+
+            // manually check overridden properties of interfaces as findOverridee() only works for the first declared interface
+            val declaration = nativeType.closestClassDeclaration()
+            val overriddenDeclaration = overriddenNativeType.closestClassDeclaration()
+
+            if (declaration != null && overriddenDeclaration != null) {
+                if (overriddenDeclaration.classKind != ClassKind.INTERFACE) {
+                    return false
+                }
+
+                val isInHierarchy = declaration.getAllSuperTypes().any { it.declaration == overriddenDeclaration }
+
+                if (isInHierarchy) {
+                    return true
+                }
+            }
         }
         return false
     }
