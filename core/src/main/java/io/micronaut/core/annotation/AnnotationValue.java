@@ -1529,7 +1529,13 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * symmetric.</p>
      *
      * <p>A member bound to the empty string is compared as that value: it does not match a value which leaves the
-     * member out when the default of the member is something else, as two annotation instances would not.</p>
+     * member out when the default of the member is something else, as two annotation instances would not. It
+     * matches a value which leaves the member out with no default recorded for it: compiled metadata records no
+     * default of the empty string, so such a member defaults to it.</p>
+     *
+     * <p>Member values are compared as compiled metadata records them, so that a value built at runtime matches
+     * the compiled one: an enum constant as its name, a class or a class value as the class name, and a primitive
+     * array element by element with the boxed values.</p>
      *
      * @param other The other annotation value
      * @return Whether the two are the same annotation
@@ -1562,9 +1568,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return true;
         }
         Set<String> nonBinding = nonBindingMembers(declared, otherDeclared);
-        if (completedSize(declared, defaults, nonBinding) != completedSize(otherDeclared, otherDefaults, nonBinding)) {
-            return false;
-        }
         for (Map.Entry<CharSequence, Object> member : declared.entrySet()) {
             if (!isNonBinding(member.getKey(), nonBinding)
                 && !matchesMember(member.getKey(), member.getValue(), otherDeclared, otherDefaults)) {
@@ -1577,7 +1580,32 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 return false;
             }
         }
+        // the members only the other side has, which this side leaves out with no default recorded
+        return lacksOnlyEmptyStrings(otherDeclared, declared, defaults, nonBinding)
+            && lacksOnlyEmptyStrings(otherDefaults, declared, defaults, nonBinding);
+    }
+
+    /**
+     * Whether every binding member of the given ones that a side neither declares nor has a default for is bound to
+     * the empty string: compiled metadata records no default of the empty string, so a member left out with no
+     * default is one defaulting to it.
+     */
+    private static boolean lacksOnlyEmptyStrings(Map<CharSequence, Object> members,
+                                                 Map<CharSequence, Object> declared,
+                                                 Map<CharSequence, Object> defaults,
+                                                 Set<String> nonBinding) {
+        for (Map.Entry<CharSequence, Object> member : members.entrySet()) {
+            CharSequence name = member.getKey();
+            if (!declared.containsKey(name) && !defaults.containsKey(name) && !isNonBinding(name, nonBinding)
+                && !isEmptyString(member.getValue())) {
+                return false;
+            }
+        }
         return true;
+    }
+
+    private static boolean isEmptyString(@Nullable Object value) {
+        return value instanceof String text && text.isEmpty();
     }
 
     /**
@@ -1619,28 +1647,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return defaults != null ? defaults : Collections.emptyMap();
     }
 
-    /**
-     * @return The number of binding members once the declared members are completed with the defaults
-     */
-    private static int completedSize(Map<CharSequence, Object> declared,
-                                     Map<CharSequence, Object> defaults,
-                                     Set<String> nonBinding) {
-        int size = declared.size();
-        if (!nonBinding.isEmpty()) {
-            for (CharSequence member : declared.keySet()) {
-                if (isNonBinding(member, nonBinding)) {
-                    size--;
-                }
-            }
-        }
-        for (CharSequence member : defaults.keySet()) {
-            if (!declared.containsKey(member) && !isNonBinding(member, nonBinding)) {
-                size++;
-            }
-        }
-        return size;
-    }
-
     private static boolean matchesMember(CharSequence member,
                                          @Nullable Object value,
                                          Map<CharSequence, Object> otherDeclared,
@@ -1651,7 +1657,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         } else if (otherDefaults.containsKey(member)) {
             otherValue = otherDefaults.get(member);
         } else {
-            return false;
+            // left out with no default recorded: compiled metadata records none of the empty string
+            return isEmptyString(value);
         }
         if (value == null || otherValue == null) {
             return value == null && otherValue == null;
@@ -1670,7 +1677,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             if (value instanceof AnnotationValue<?> annotation) {
                 return otherValue instanceof AnnotationValue<?> otherAnnotation && annotation.matches(otherAnnotation);
             }
-            return !(otherValue instanceof AnnotationValue<?>) && AnnotationUtil.areEqual(value, otherValue);
+            return !(otherValue instanceof AnnotationValue<?>) && recorded(value).equals(recorded(otherValue));
         }
         if (container != otherContainer && !(value instanceof AnnotationValue<?>) && !(otherValue instanceof AnnotationValue<?>)) {
             // a single value and an array of values are different values, unless the single value is an annotation
@@ -1696,12 +1703,33 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return Whether the value holds values: an array of objects, of annotations for instance, or a collection
      */
     private static boolean isContainer(Object value) {
-        return value instanceof Object[] || value instanceof Collection<?>;
+        return value instanceof Object[] || value instanceof Collection<?> || value.getClass().isArray();
+    }
+
+    /**
+     * A single member value as compiled metadata records it: an enum constant as its name, and a class, or a
+     * class value, as the class name, so that a value built at runtime compares equal to the compiled one.
+     */
+    private static Object recorded(Object value) {
+        if (value instanceof Enum<?> constant) {
+            return constant.name();
+        }
+        if (value instanceof Class<?> type) {
+            return type.getName();
+        }
+        if (value instanceof AnnotationClassValue<?> classValue) {
+            return classValue.getName();
+        }
+        return value;
     }
 
     private static List<?> asList(Object value) {
         if (value instanceof Object[] array) {
             return Arrays.asList(array);
+        }
+        if (value.getClass().isArray()) {
+            // a primitive array, compared element by element with the boxed values
+            return Arrays.asList(ArrayUtils.toWrapperArray(value));
         }
         if (value instanceof List<?> list) {
             return list;
@@ -1723,6 +1751,67 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return getValues();
         }
         return values;
+    }
+
+    /**
+     * A hash code that agrees with {@link #matches(AnnotationValue)}, for keying values compared through it.
+     *
+     * <p>The binding members are hashed once completed with the defaults the value carries, compared as
+     * {@link #matches(AnnotationValue)} compares them: an enum constant as its name, a class as the class name and
+     * a primitive array as the boxed values. The members the value lists under
+     * {@link AnnotationUtil#NON_BINDING_ATTRIBUTE} are left out, and so are the members bound to {@code null} or to
+     * the empty string; an annotation held by a member is hashed by its name alone, since its own non-binding
+     * members and defaults may be known to one side only.</p>
+     *
+     * <p>Two values that match hash alike when each carries the defaults of its annotation, or declares every
+     * member, and lists its non-binding members, as compiled metadata does. {@link #matches(AnnotationValue)} also
+     * fills in the defaults and the non-binding members a value lacks from the other value, which a hash code of
+     * one value cannot do: complete a value built at runtime with them first.</p>
+     *
+     * @return The hash code
+     * @since 5.3.0
+     */
+    public int bindingHashCode() {
+        Map<CharSequence, Object> declared = memberValues();
+        Map<CharSequence, Object> defaults = nonNullDefaults(getDefaultValues());
+        Set<String> nonBinding = nonBindingMembers(declared, Collections.emptyMap());
+        int hash = annotationName.hashCode();
+        for (Map.Entry<CharSequence, Object> member : declared.entrySet()) {
+            hash += bindingHashCode(member.getKey(), member.getValue(), nonBinding);
+        }
+        for (Map.Entry<CharSequence, Object> member : defaults.entrySet()) {
+            if (!declared.containsKey(member.getKey())) {
+                hash += bindingHashCode(member.getKey(), member.getValue(), nonBinding);
+            }
+        }
+        return hash;
+    }
+
+    private static int bindingHashCode(CharSequence member, @Nullable Object value, Set<String> nonBinding) {
+        if (value == null || isEmptyString(value) || isNonBinding(member, nonBinding)
+            || AnnotationUtil.STEREOTYPES_MEMBER.contentEquals(member)) {
+            return 0;
+        }
+        return member.toString().hashCode() ^ valueHashCode(value);
+    }
+
+    private static int valueHashCode(Object value) {
+        if (value instanceof AnnotationValue<?> annotation) {
+            return annotation.getAnnotationName().hashCode();
+        }
+        if (isContainer(value)) {
+            List<?> values = asList(value);
+            if (values.size() == 1 && values.get(0) instanceof AnnotationValue<?> annotation) {
+                // matches() takes a single annotation for a repeatable member holding it once
+                return annotation.getAnnotationName().hashCode();
+            }
+            int hash = 1;
+            for (Object element : values) {
+                hash = 31 * hash + (element == null ? 0 : valueHashCode(element));
+            }
+            return hash;
+        }
+        return recorded(value).hashCode();
     }
 
     @Override
