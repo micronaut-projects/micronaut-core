@@ -209,6 +209,11 @@ public final class DefaultHttpClientBuilder {
         return this;
     }
 
+    DefaultHttpClientBuilder domainSocketChannelFactory(ChannelFactory<? extends Channel> domainSocketChannelFactory) {
+        delegate.domainSocketChannelFactory(domainSocketChannelFactory);
+        return this;
+    }
+
     DefaultHttpClientBuilder clientCustomizer(NettyClientCustomizer clientCustomizer) {
         delegate.clientCustomizer(clientCustomizer);
         return this;
