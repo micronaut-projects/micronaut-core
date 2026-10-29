@@ -1085,6 +1085,21 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     /**
+     * The failure of buffering the error body of a streaming exchange. A body past
+     * max-content-length keeps the upstream status, without the body, with the limit as the cause.
+     *
+     * @param response The response with the error status
+     * @param failure  The buffering failure
+     * @return The failure
+     */
+    private Throwable errorBodyFailure(R response, HttpClientException failure) {
+        if (failure instanceof ContentLengthExceededException) {
+            return decorate(new HttpClientResponseException(response.reason(), failure, new ElementResponse<>(response, null)));
+        }
+        return failure;
+    }
+
+    /**
      * The failure of a streaming exchange whose response has an error status, with the error body
      * decoded into the error type.
      *
@@ -1517,7 +1532,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 if (resp.code() >= 400) {
                     // the error body is decoded into the error type, as for exchange
                     return InternalByteBody.bufferFlow(resp.byteBody())
-                        .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
+                        .onErrorResume(t -> ExecutionFlow.error(errorBodyFailure(resp, handleResponseError(mutableRequest, target.instance(), t))))
                         .flatMap(av -> errorStatusResponse(errorType, resp, av));
                 }
                 if (!hasBody(resp)) {

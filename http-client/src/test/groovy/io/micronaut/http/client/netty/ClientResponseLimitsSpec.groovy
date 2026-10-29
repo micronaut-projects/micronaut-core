@@ -8,6 +8,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.exceptions.ContentLengthExceededException
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.sse.EventStreamDecoder
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
@@ -162,8 +163,10 @@ class ClientResponseLimitsSpec extends Specification {
         when:
         Flux.from(client.dataStream(HttpRequest.GET("/err"), Argument.of(String))).blockLast(Duration.ofSeconds(40))
 
-        then:
-        thrown(ContentLengthExceededException)
+        then: 'the upstream status is kept, the limit is the cause'
+        def responseException = thrown(HttpClientResponseException)
+        responseException.status.code == 500
+        responseException.cause instanceof ContentLengthExceededException
 
         when:
         long t = closedAfter.get(40, TimeUnit.SECONDS)
