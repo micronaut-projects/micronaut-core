@@ -6,7 +6,6 @@ import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.DefaultMutableConversionService
-import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.convert.value.ConvertibleMultiValuesMap
 import io.micronaut.core.convert.value.ConvertibleValues
 import io.micronaut.core.type.Argument
@@ -40,22 +39,15 @@ class ResolvedConverterBindingSpec extends Specification {
         Argument.of(Integer, "value")                             | "x"    | Optional.empty()
     }
 
-    void "a value the resolved converter converted is not converted again"() {
+    void "a binder that overrides the resolution binds the value it resolves"() {
         given:
         def service = new DefaultMutableConversionService()
-        def converted = [1, 2]
-        service.addConverter(String, List, { String s, Class<List> t, ConversionContext c -> Optional.of(converted) } as TypeConverter)
-        def argument = Argument.of(List, "value", Argument.of(Integer))
-        def values = new ConvertibleMultiValuesMap<String>([value: ["anything"]], service)
+        def argument = Argument.of(Integer, "value")
+        def values = new ConvertibleMultiValuesMap<String>([value: ["10"]], service)
 
-        when:
-        def specific = new TestBinder(service, argument).bind(ConversionContext.of(argument), values)
-        def general = new TestBinder(service).bind(ConversionContext.of(argument), values)
-
-        then: "the specific binder keeps the list, the general one converts it to a copy"
-        specific.getValue().get().is(converted)
-        general.getValue().get() == converted
-        !general.getValue().get().is(converted)
+        expect:
+        new ResolvingBinder(service, argument).bind(ConversionContext.of(argument), values).getValue() == Optional.of(42)
+        new ResolvingBinder(service).bind(ConversionContext.of(argument), values).getValue() == Optional.of(42)
     }
 
     void "a single value the specific binder cannot convert binds the default value"() {
@@ -110,6 +102,22 @@ class ResolvedConverterBindingSpec extends Specification {
         @Override
         protected String getParameterName(Argument<T> argument) {
             return argument.getName()
+        }
+    }
+
+    static class ResolvingBinder<T> extends TestBinder<T> {
+
+        ResolvingBinder(ConversionService conversionService) {
+            super(conversionService)
+        }
+
+        ResolvingBinder(ConversionService conversionService, Argument<T> argument) {
+            super(conversionService, argument)
+        }
+
+        @Override
+        protected Object doResolve(ArgumentConversionContext<T> context, ConvertibleValues<?> values, String name) {
+            return 42
         }
     }
 }
