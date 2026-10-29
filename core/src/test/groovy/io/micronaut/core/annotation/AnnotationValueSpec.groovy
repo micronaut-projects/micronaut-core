@@ -648,6 +648,55 @@ class AnnotationValueSpec extends Specification {
         empty.matches(new AnnotationValue("test.Named", [value: ""] as Map<CharSequence, Object>, defaults))
     }
 
+    void "test matches() compares an enum constant with the name compiled metadata holds"() {
+        given: "a value built at runtime keeping the constant, and the compiled value holding its name"
+        def built = AnnotationValue.builder("test.Tier").member("level", MatchedLevel.GOLD).build()
+        def compiled = new AnnotationValue("test.Tier", [level: "GOLD"] as Map<CharSequence, Object>)
+
+        expect:
+        built.matches(compiled)
+        compiled.matches(built)
+        !built.matches(new AnnotationValue("test.Tier", [level: "SILVER"] as Map<CharSequence, Object>))
+
+        and: "an array of constants matches the array of their names"
+        AnnotationValue.builder("test.Tier").member("levels", MatchedLevel.GOLD, MatchedLevel.SILVER).build()
+                .matches(new AnnotationValue("test.Tier", [levels: ["GOLD", "SILVER"] as String[]] as Map<CharSequence, Object>))
+        new AnnotationValue("test.Tier", [levels: ["GOLD", "SILVER"] as String[]] as Map<CharSequence, Object>)
+                .matches(AnnotationValue.builder("test.Tier").member("levels", MatchedLevel.GOLD, MatchedLevel.SILVER).build())
+        !AnnotationValue.builder("test.Tier").member("levels", MatchedLevel.SILVER, MatchedLevel.GOLD).build()
+                .matches(new AnnotationValue("test.Tier", [levels: ["GOLD", "SILVER"] as String[]] as Map<CharSequence, Object>))
+    }
+
+    void "test matches() compares a class with the class value or name compiled metadata holds"() {
+        given:
+        def compiled = new AnnotationValue("test.Typed", [value: new AnnotationClassValue<>(String.name)] as Map<CharSequence, Object>)
+
+        expect: "a class put in the members as it is, the class value and the class name are the same member"
+        new AnnotationValue("test.Typed", [value: String] as Map<CharSequence, Object>).matches(compiled)
+        compiled.matches(new AnnotationValue("test.Typed", [value: String] as Map<CharSequence, Object>))
+        new AnnotationValue("test.Typed", [value: String.name] as Map<CharSequence, Object>).matches(compiled)
+        AnnotationValue.builder("test.Typed").member("value", String).build().matches(compiled)
+        !new AnnotationValue("test.Typed", [value: Integer] as Map<CharSequence, Object>).matches(compiled)
+
+        and: "an array of classes matches the array of their class values"
+        new AnnotationValue("test.Typed", [value: [String, Integer] as Class[]] as Map<CharSequence, Object>)
+                .matches(new AnnotationValue("test.Typed", [value: [new AnnotationClassValue<>(String.name), new AnnotationClassValue<>(Integer.name)] as AnnotationClassValue[]] as Map<CharSequence, Object>))
+    }
+
+    void "test matches() compares a primitive array with the boxed values"() {
+        given:
+        def compiled = new AnnotationValue("test.Ports", [value: [1, 2] as int[]] as Map<CharSequence, Object>)
+
+        expect:
+        compiled.matches(new AnnotationValue("test.Ports", [value: [1, 2] as Integer[]] as Map<CharSequence, Object>))
+        new AnnotationValue("test.Ports", [value: [1, 2] as Integer[]] as Map<CharSequence, Object>).matches(compiled)
+        compiled.matches(new AnnotationValue("test.Ports", [value: [1, 2]] as Map<CharSequence, Object>))
+        compiled.matches(new AnnotationValue("test.Ports", [value: [1, 2] as int[]] as Map<CharSequence, Object>))
+        !compiled.matches(new AnnotationValue("test.Ports", [value: [2, 1] as Integer[]] as Map<CharSequence, Object>))
+        !compiled.matches(new AnnotationValue("test.Ports", [value: [1, 2, 3] as int[]] as Map<CharSequence, Object>))
+        !compiled.matches(new AnnotationValue("test.Ports", [value: 1] as Map<CharSequence, Object>))
+    }
+
     void "mutate().defaultValues() works on a value built without defaults"() {
         when:
         AnnotationValue<?> av = AnnotationValue.builder("x.Y").member("a", 1).build()
@@ -682,3 +731,5 @@ class AnnotationValueSpec extends Specification {
 @interface Bar {}
 
 @interface Baz {}
+
+enum MatchedLevel { GOLD, SILVER }

@@ -1531,6 +1531,10 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * <p>A member bound to the empty string is compared as that value: it does not match a value which leaves the
      * member out when the default of the member is something else, as two annotation instances would not.</p>
      *
+     * <p>Member values are compared as compiled metadata records them, so that a value built at runtime matches
+     * the compiled one: an enum constant as its name, a class or a class value as the class name, and a primitive
+     * array element by element with the boxed values.</p>
+     *
      * @param other The other annotation value
      * @return Whether the two are the same annotation
      * @since 5.2.0
@@ -1670,7 +1674,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             if (value instanceof AnnotationValue<?> annotation) {
                 return otherValue instanceof AnnotationValue<?> otherAnnotation && annotation.matches(otherAnnotation);
             }
-            return !(otherValue instanceof AnnotationValue<?>) && AnnotationUtil.areEqual(value, otherValue);
+            return !(otherValue instanceof AnnotationValue<?>) && recorded(value).equals(recorded(otherValue));
         }
         if (container != otherContainer && !(value instanceof AnnotationValue<?>) && !(otherValue instanceof AnnotationValue<?>)) {
             // a single value and an array of values are different values, unless the single value is an annotation
@@ -1696,12 +1700,33 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return Whether the value holds values: an array of objects, of annotations for instance, or a collection
      */
     private static boolean isContainer(Object value) {
-        return value instanceof Object[] || value instanceof Collection<?>;
+        return value instanceof Object[] || value instanceof Collection<?> || value.getClass().isArray();
+    }
+
+    /**
+     * A single member value as compiled metadata records it: an enum constant as its name, and a class, or a
+     * class value, as the class name, so that a value built at runtime compares equal to the compiled one.
+     */
+    private static Object recorded(Object value) {
+        if (value instanceof Enum<?> constant) {
+            return constant.name();
+        }
+        if (value instanceof Class<?> type) {
+            return type.getName();
+        }
+        if (value instanceof AnnotationClassValue<?> classValue) {
+            return classValue.getName();
+        }
+        return value;
     }
 
     private static List<?> asList(Object value) {
         if (value instanceof Object[] array) {
             return Arrays.asList(array);
+        }
+        if (value.getClass().isArray()) {
+            // a primitive array, compared element by element with the boxed values
+            return Arrays.asList(ArrayUtils.toWrapperArray(value));
         }
         if (value instanceof List<?> list) {
             return list;
