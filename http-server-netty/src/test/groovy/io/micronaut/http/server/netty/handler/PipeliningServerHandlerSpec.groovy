@@ -14,7 +14,6 @@ import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.micronaut.http.netty.body.StreamingNettyByteBody
 import io.micronaut.http.server.netty.HttpCompressionStrategy
-import io.micronaut.buffer.netty.NettyReadBufferFactory
 import io.netty.buffer.AbstractByteBufAllocator
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
