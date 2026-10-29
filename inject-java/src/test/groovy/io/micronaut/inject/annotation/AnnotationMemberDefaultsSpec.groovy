@@ -17,6 +17,7 @@ package io.micronaut.inject.annotation
 
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
@@ -29,8 +30,8 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
  */
 class AnnotationMemberDefaultsSpec extends AbstractTypeElementSpec {
 
-    private void compileTestSource() {
-        buildBeanDefinition('defaults.Test', '''
+    private BeanDefinition<?> compileTestSource() {
+        return buildBeanDefinition('defaults.Test', '''
 package defaults;
 
 import io.micronaut.context.annotation.Bean;
@@ -125,6 +126,25 @@ class Test {
 
         and: 'the result is identical to the other two languages'
         DefaultsRecordingVisitor.describe(defaults) == EXPECTED_FROM_CONTEXT
+    }
+
+    void 'test a member bound to the empty string matches the written metadata, which records no such default'() {
+        when:
+        def compiled = compileTestSource().getAnnotation('defaults.Defaults')
+
+        then: 'the written metadata leaves the empty string default out'
+        !compiled.getDefaultValues()?.containsKey('emptyStringValue')
+
+        and: 'a value binding the member to the empty string is the same annotation, both ways'
+        new AnnotationValue('defaults.Defaults', [emptyStringValue: ''] as Map<CharSequence, Object>).matches(compiled)
+        compiled.matches(new AnnotationValue('defaults.Defaults', [emptyStringValue: ''] as Map<CharSequence, Object>))
+        new AnnotationValue('defaults.Defaults', [emptyStringValue: ''] as Map<CharSequence, Object>, compiled.getDefaultValues()).matches(compiled)
+
+        and: 'another value of it, or the empty string for a member with another default, is not'
+        !new AnnotationValue('defaults.Defaults', [emptyStringValue: 'x'] as Map<CharSequence, Object>).matches(compiled)
+        !compiled.matches(new AnnotationValue('defaults.Defaults', [emptyStringValue: 'x'] as Map<CharSequence, Object>))
+        !new AnnotationValue('defaults.Defaults', [stringValue: ''] as Map<CharSequence, Object>).matches(compiled)
+        !compiled.matches(new AnnotationValue('defaults.Defaults', [stringValue: ''] as Map<CharSequence, Object>))
     }
 
     void 'test annotation member defaults are visible on the AnnotationValue read from the element API'() {
