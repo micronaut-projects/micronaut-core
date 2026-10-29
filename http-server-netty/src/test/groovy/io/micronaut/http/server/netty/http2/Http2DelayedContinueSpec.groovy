@@ -26,8 +26,8 @@ import io.netty.handler.codec.http2.Http2FrameCodecBuilder
 import io.netty.handler.codec.http2.Http2HeadersFrame
 import io.netty.handler.codec.http2.Http2StreamFrame
 import io.netty.util.ReferenceCountUtil
-import org.jspecify.annotations.NonNull
 import jakarta.annotation.PreDestroy
+import org.jspecify.annotations.NonNull
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
