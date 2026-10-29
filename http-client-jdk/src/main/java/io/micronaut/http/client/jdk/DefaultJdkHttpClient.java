@@ -171,4 +171,9 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
     public boolean isRunning() {
         return false;
     }
+
+    @Override
+    public HttpClientConfiguration getConfiguration() {
+        return configuration;
+    }
 }
