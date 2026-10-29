@@ -342,6 +342,13 @@ public class RequestLifecycle {
         return previousRequestRouteInfo.map(RouteInfo::getDeclaringType).orElse(null);
     }
 
+    private ExecutionFlow<HttpResponse<?>> executeStatusRoute(HttpRequest<?> request, PropagatedContext propagatedContext, RouteMatch<?> statusRoute) {
+        // like an error route, the status route is the route of the request from now on: e.g. the
+        // body it binds belongs to it
+        RouteExecutor.setRouteAttributes(request, statusRoute);
+        return executeRoute(request, propagatedContext, statusRoute);
+    }
+
     private ExecutionFlow<HttpResponse<?>> handleErrorRoute(HttpRequest<?> request, PropagatedContext propagatedContext, RouteMatch<?> errorRoute, Throwable cause) {
         RouteExecutor.setRouteAttributes(request, errorRoute);
         if (routeExecutor.serverConfiguration.isLogHandledExceptions()) {
@@ -800,7 +807,7 @@ public class RequestLifecycle {
                     // the status route replaces the response and its bytes
                     byteBodyResponse.close();
                 }
-                return executeRoute(request, propagatedContext, statusRoute);
+                return executeStatusRoute(request, propagatedContext, statusRoute);
             }
         }
         return ExecutionFlow.just(response);
@@ -874,7 +881,7 @@ public class RequestLifecycle {
             statusRoute = GroupErrorRoutes.findStatusRoute(request, rejected.getRouteInfo(), status.getCode());
         }
         if (statusRoute != null) {
-            return executeRoute(request, propagatedContext, statusRoute);
+            return executeStatusRoute(request, propagatedContext, statusRoute);
         }
         RouteMatch<?> errorRoute = router.findErrorRoute(declaringType, cause, request).orElse(null);
         if (errorRoute == null) {
@@ -1177,7 +1184,7 @@ public class RequestLifecycle {
                                                                         HttpStatus status,
                                                                         PropagatedContext propagatedContext) {
         return routeExecutor.router.findStatusRoute(status, request)
-                .map(routeMatch -> executeRoute(request, propagatedContext, routeMatch))
+                .map(routeMatch -> executeStatusRoute(request, propagatedContext, routeMatch))
                 .orElse(null);
     }
 
