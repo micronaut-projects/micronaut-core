@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
@@ -124,6 +125,21 @@ abstract class MultiplexedServerHandler {
     }
 
     /**
+     * Convert a response status code to a {@link HttpStatus}, or {@code null} if the code is not
+     * one of the registered statuses.
+     *
+     * @param code The status code
+     * @return The status, or {@code null}
+     */
+    private static @Nullable HttpStatus safeStatusOf(int code) {
+        try {
+            return HttpStatus.valueOf(code);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
      * An HTTP/2 or HTTP/3 stream.
      */
     abstract class MultiplexedStream implements OutboundAccess {
@@ -182,6 +198,18 @@ abstract class MultiplexedServerHandler {
          * the event loop.
          */
         private @Nullable ChannelPromise finalWrite;
+
+        /**
+         * The response status captured when the response is written, for the
+         * {@link io.micronaut.http.context.event.HttpResponseWrittenEvent}.
+         */
+        private @Nullable HttpStatus capturedStatus;
+
+        /**
+         * Accumulated response body bytes (post-compression), for the
+         * {@link io.micronaut.http.context.event.HttpResponseWrittenEvent}.
+         */
+        private long bytesWritten;
 
         MultiplexedStream(int streamId) {
             if (JfrSupport.isRecorderInitialized() && Http2RequestEvent.isTurnedOn()) {
@@ -503,7 +531,7 @@ abstract class MultiplexedServerHandler {
             }
             finished = true;
             disposeWriteSide();
-            requestHandler.responseWritten(attachment);
+            requestHandler.responseWritten(attachment, capturedStatus, bytesWritten);
             return true;
         }
 
@@ -530,6 +558,7 @@ abstract class MultiplexedServerHandler {
             }
 
             NettyByteBodyFactory byteBodyFactory = byteBodyFactory();
+            capturedStatus = safeStatusOf(response.status().code());
             if (body instanceof AvailableByteBody available) {
                 writeFull(response, NettyByteBodyFactory.toByteBuf(available));
             } else {
@@ -570,6 +599,7 @@ abstract class MultiplexedServerHandler {
                 compressionSession.finish();
                 ByteBuf compressed = compressionSession.poll();
                 if (compressed != null) {
+                    bytesWritten += compressed.readableBytes();
                     writeData0(compressed, false, requiredCtx().voidPromise());
                 }
             }
@@ -615,6 +645,8 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
+            capturedStatus = safeStatusOf(response.status().code());
+
             // the content that is not handed to the compression or the connection yet
             ByteBuf owned = content;
             try {
@@ -639,7 +671,8 @@ abstract class MultiplexedServerHandler {
                 owned = null;
                 if (!empty) {
                     // bypass writeDataCompressing
-                    writeData0(Objects.requireNonNull(content), true, endPromise(response));
+                    bytesWritten += Objects.requireNonNull(content).readableBytes();
+                    writeData0(content, true, endPromise(response));
                 } else if (content != null) {
                     content.release();
                 }
@@ -774,6 +807,7 @@ abstract class MultiplexedServerHandler {
 
         private void writeData(ByteBuf data, boolean endStream, ChannelPromise promise) {
             if (compressionSession == null) {
+                bytesWritten += data.readableBytes();
                 writeData0(data, endStream, promise);
             } else {
                 writeDataCompressing(compressionSession, data, endStream, promise);
@@ -786,6 +820,9 @@ abstract class MultiplexedServerHandler {
                 compressionChannel.finish();
             }
             ByteBuf compressed = compressionChannel.poll();
+            if (compressed != null) {
+                bytesWritten += compressed.readableBytes();
+            }
             if (compressed == null) {
                 if (endStream) {
                     writeData0(Unpooled.EMPTY_BUFFER, true, promise);
