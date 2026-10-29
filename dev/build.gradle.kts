@@ -42,6 +42,8 @@ dependencies {
     // a Netty application in development mode, run in a JVM of its own, to see what Netty keeps from its first use
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(projects.micronautJacksonDatabind)
+    // a declarative client of a development mode application, on the event loops retained across generations
+    testImplementation(projects.micronautHttpClient)
     // a Reactor application in development mode, run in a JVM of its own, to see what the shared schedulers' threads keep
     testImplementation(libs.managed.reactor)
     // an H2 data source retained across generations, in a JVM of its own, to see what H2 keeps from its first use
