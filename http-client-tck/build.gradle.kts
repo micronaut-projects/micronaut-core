@@ -4,6 +4,7 @@ plugins {
 }
 dependencies {
     annotationProcessor(projects.micronautInjectJava)
+    annotationProcessor(projects.micronautGraal)
     api(libs.junit.jupiter)
     api(projects.micronautHttpTck)
     api(libs.managed.jackson.annotations)
