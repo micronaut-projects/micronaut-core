@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
@@ -44,6 +46,7 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.resolver.AddressResolverGroup;
 
 import java.net.URI;
+import java.util.Objects;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -102,6 +105,8 @@ final class NettyHttpClientBuilder {
     @Nullable
     ExecutorService blockingExecutor = null;
     NettyHttpClient.@Nullable LifecycleListener lifecycleListener = null;
+
+    NettyZlibCodecFactory zlibCodecFactory = DefaultNettyZlibCodecFactory.INSTANCE;
 
     NettyHttpClientBuilder() {
     }
@@ -188,6 +193,18 @@ final class NettyHttpClientBuilder {
         ArgumentUtils.requireNonNull("certificateProviders", certificateProviders);
         this.sslFactory = sslFactory;
         this.certificateProviders = certificateProviders;
+        return this;
+    }
+
+    /**
+     * Sets the factory for fresh gzip and deflate response decoders.
+     *
+     * @param zlibCodecFactory The codec factory
+     * @return This builder
+     * @since 5.3.0
+     */
+    public NettyHttpClientBuilder zlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
+        this.zlibCodecFactory = Objects.requireNonNull(zlibCodecFactory);
         return this;
     }
 
