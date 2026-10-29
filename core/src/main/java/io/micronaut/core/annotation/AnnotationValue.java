@@ -1753,6 +1753,67 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return values;
     }
 
+    /**
+     * A hash code that agrees with {@link #matches(AnnotationValue)}, for keying values compared through it.
+     *
+     * <p>The binding members are hashed once completed with the defaults the value carries, compared as
+     * {@link #matches(AnnotationValue)} compares them: an enum constant as its name, a class as the class name and
+     * a primitive array as the boxed values. The members the value lists under
+     * {@link AnnotationUtil#NON_BINDING_ATTRIBUTE} are left out, and so are the members bound to {@code null} or to
+     * the empty string; an annotation held by a member is hashed by its name alone, since its own non-binding
+     * members and defaults may be known to one side only.</p>
+     *
+     * <p>Two values that match hash alike when each carries the defaults of its annotation, or declares every
+     * member, and lists its non-binding members, as compiled metadata does. {@link #matches(AnnotationValue)} also
+     * fills in the defaults and the non-binding members a value lacks from the other value, which a hash code of
+     * one value cannot do: complete a value built at runtime with them first.</p>
+     *
+     * @return The hash code
+     * @since 5.3.0
+     */
+    public int bindingHashCode() {
+        Map<CharSequence, Object> declared = memberValues();
+        Map<CharSequence, Object> defaults = nonNullDefaults(getDefaultValues());
+        Set<String> nonBinding = nonBindingMembers(declared, Collections.emptyMap());
+        int hash = annotationName.hashCode();
+        for (Map.Entry<CharSequence, Object> member : declared.entrySet()) {
+            hash += bindingHashCode(member.getKey(), member.getValue(), nonBinding);
+        }
+        for (Map.Entry<CharSequence, Object> member : defaults.entrySet()) {
+            if (!declared.containsKey(member.getKey())) {
+                hash += bindingHashCode(member.getKey(), member.getValue(), nonBinding);
+            }
+        }
+        return hash;
+    }
+
+    private static int bindingHashCode(CharSequence member, @Nullable Object value, Set<String> nonBinding) {
+        if (value == null || isEmptyString(value) || isNonBinding(member, nonBinding)
+            || AnnotationUtil.STEREOTYPES_MEMBER.contentEquals(member)) {
+            return 0;
+        }
+        return member.toString().hashCode() ^ valueHashCode(value);
+    }
+
+    private static int valueHashCode(Object value) {
+        if (value instanceof AnnotationValue<?> annotation) {
+            return annotation.getAnnotationName().hashCode();
+        }
+        if (isContainer(value)) {
+            List<?> values = asList(value);
+            if (values.size() == 1 && values.get(0) instanceof AnnotationValue<?> annotation) {
+                // matches() takes a single annotation for a repeatable member holding it once
+                return annotation.getAnnotationName().hashCode();
+            }
+            int hash = 1;
+            for (Object element : values) {
+                hash = 31 * hash + (element == null ? 0 : valueHashCode(element));
+            }
+            return hash;
+        }
+        return recorded(value).hashCode();
+    }
+
     @Override
     public int hashCode() {
         return 31 * annotationName.hashCode() + AnnotationUtil.calculateHashCode(memberValues());

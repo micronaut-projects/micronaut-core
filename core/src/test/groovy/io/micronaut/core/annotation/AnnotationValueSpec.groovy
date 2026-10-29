@@ -669,6 +669,56 @@ class AnnotationValueSpec extends Specification {
         !leftOut.matches(new AnnotationValue("test.Zone", [value: [] as String[]] as Map<CharSequence, Object>))
     }
 
+    private static final Map<CharSequence, Object> NOTED_DEFAULTS = [level: "INFO", note: ""] as Map<CharSequence, Object>
+    private static final String[] NOTED_NON_BINDING = ["note"] as String[]
+
+    void "test bindingHashCode() agrees with matches()"() {
+        expect: "values that match hash alike"
+        left.matches(right)
+        left.bindingHashCode() == right.bindingHashCode()
+
+        where:
+        left                                                                                                   | right
+        // an enum constant and the name compiled metadata holds
+        AnnotationValue.builder("test.Tier").member("level", MatchedLevel.GOLD).build()                         | new AnnotationValue("test.Tier", [level: "GOLD"] as Map<CharSequence, Object>)
+        AnnotationValue.builder("test.Tier").member("levels", MatchedLevel.GOLD, MatchedLevel.SILVER).build()   | new AnnotationValue("test.Tier", [levels: ["GOLD", "SILVER"] as String[]] as Map<CharSequence, Object>)
+        // a class and its class value
+        new AnnotationValue("test.Typed", [value: String] as Map<CharSequence, Object>)                         | new AnnotationValue("test.Typed", [value: new AnnotationClassValue<>(String.name)] as Map<CharSequence, Object>)
+        // a primitive array, the boxed array and a list
+        new AnnotationValue("test.Ports", [value: [1, 2] as int[]] as Map<CharSequence, Object>)                | new AnnotationValue("test.Ports", [value: [1, 2] as Integer[]] as Map<CharSequence, Object>)
+        new AnnotationValue("test.Ports", [value: [1, 2] as int[]] as Map<CharSequence, Object>)                | new AnnotationValue("test.Ports", [value: [1, 2]] as Map<CharSequence, Object>)
+        // the empty string and a member left out with no default recorded
+        new AnnotationValue("test.Zone", [value: ""] as Map<CharSequence, Object>)                              | new AnnotationValue("test.Zone", [:] as Map<CharSequence, Object>)
+        // a member left out at its default, and one writing the default down
+        new AnnotationValue("test.Audited", [:] as Map<CharSequence, Object>, [level: "INFO"] as Map<CharSequence, Object>) | new AnnotationValue("test.Audited", [level: "INFO"] as Map<CharSequence, Object>)
+        // a non-binding member both sides list
+        noted("one", "first", NOTED_NON_BINDING, NOTED_DEFAULTS)                                                              | noted("one", "second", NOTED_NON_BINDING, NOTED_DEFAULTS)
+        noted("one", "first", NOTED_NON_BINDING, NOTED_DEFAULTS)                                                              | noted("one", null, NOTED_NON_BINDING, NOTED_DEFAULTS)
+        // a nested annotation, whichever of its non-binding members it binds
+        new AnnotationValue("test.Scoped", [scope: noted("x", "first", NOTED_NON_BINDING, NOTED_DEFAULTS)] as Map<CharSequence, Object>) | new AnnotationValue("test.Scoped", [scope: noted("x", "second", null, null)] as Map<CharSequence, Object>)
+    }
+
+    void "test bindingHashCode() tells apart values binding a member differently"() {
+        expect:
+        new AnnotationValue("test.Tier", [level: "GOLD"] as Map<CharSequence, Object>).bindingHashCode() !=
+                new AnnotationValue("test.Tier", [level: "SILVER"] as Map<CharSequence, Object>).bindingHashCode()
+        new AnnotationValue("test.Tier", [level: "GOLD"] as Map<CharSequence, Object>).bindingHashCode() !=
+                new AnnotationValue("test.Other", [level: "GOLD"] as Map<CharSequence, Object>).bindingHashCode()
+        new AnnotationValue("test.Ports", [value: [1, 2] as int[]] as Map<CharSequence, Object>).bindingHashCode() !=
+                new AnnotationValue("test.Ports", [value: [2, 1] as int[]] as Map<CharSequence, Object>).bindingHashCode()
+    }
+
+    private static AnnotationValue<?> noted(String value, String note, String[] nonBinding, Map<CharSequence, Object> defaults) {
+        Map<CharSequence, Object> values = [value: value] as Map<CharSequence, Object>
+        if (note != null) {
+            values.note = note
+        }
+        if (nonBinding != null) {
+            values[AnnotationUtil.NON_BINDING_ATTRIBUTE] = nonBinding
+        }
+        return new AnnotationValue("test.Noted", values, (Map<CharSequence, Object>) defaults)
+    }
+
     void "test matches() compares an enum constant with the name compiled metadata holds"() {
         given: "a value built at runtime keeping the constant, and the compiled value holding its name"
         def built = AnnotationValue.builder("test.Tier").member("level", MatchedLevel.GOLD).build()
