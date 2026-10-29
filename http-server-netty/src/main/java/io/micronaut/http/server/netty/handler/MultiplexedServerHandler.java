@@ -646,6 +646,12 @@ abstract class MultiplexedServerHandler {
                 if (owned != null) {
                     owned.release();
                 }
+                Compressor.Session failed = compressionSession;
+                if (!headersWritten && failed != null) {
+                    // the caller may still send a fallback response, which must not reuse the failed session
+                    compressionSession = null;
+                    failed.discard();
+                }
                 throw t;
             }
             if (!finish()) {
