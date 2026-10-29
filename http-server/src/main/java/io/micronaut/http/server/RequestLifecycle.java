@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server;
 
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -219,6 +221,10 @@ public class RequestLifecycle {
         return flux.flatMap(rm -> routeExecutor.callRoute(propagatedContext, rm, filteredRequest));
     }
 
+    private static boolean isStoppingOrStopped(BeanContext beanContext) {
+        return beanContext instanceof DefaultBeanContext defaultBeanContext ? defaultBeanContext.isStoppingOrStopped() : !beanContext.isRunning();
+    }
+
     private ExecutionFlow<HttpResponse<?>> handleStatusException(ExecutionFlow<HttpResponse<?>> flux,
                                                                  HttpRequest<?> request,
                                                                  RouteMatch<?> routeMatch,
@@ -307,6 +313,15 @@ public class RequestLifecycle {
         }
         final Throwable cause = t;
 
+        if (isStoppingOrStopped(routeExecutor.beanContext)) {
+            // the context stopped while the request was in flight, as in a shutdown or a development restart: the error
+            // routes and exception handlers stopped with it, and resolving them from a stopped context would fail in turn.
+            // A context that is still starting, such as for a request a StartupEvent listener makes, has them
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Request {} {} failed after the context stopped: {}", request.getMethodName(), request.getUri(), cause.toString(), cause);
+            }
+            return ExecutionFlow.just(HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE));
+        }
         RouteMatch<?> errorRoute = routeExecutor.findErrorRoute(cause, findDeclaringType(request), request);
         if (errorRoute != null) {
             return handleErrorRoute(request, propagatedContext, errorRoute, cause);

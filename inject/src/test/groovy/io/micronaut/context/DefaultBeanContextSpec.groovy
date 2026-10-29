@@ -1,6 +1,9 @@
 package io.micronaut.context
 
 
+import io.micronaut.context.event.ApplicationEventListener
+import io.micronaut.context.event.ShutdownEvent
+import io.micronaut.context.event.StartupEvent
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.ApplicationConfiguration
@@ -125,6 +128,75 @@ class DefaultBeanContextSpec extends Specification {
         then:
             IllegalStateException e = thrown()
             e.message == "Cannot resolve beans until the context is running"
+    }
+
+    def "looking up a bean definition in a closed context throws IllegalStateException, not a null pointer"() {
+        given:
+            ApplicationContext context = ApplicationContext.run()
+
+        expect:
+            context.findBeanDefinition(ApplicationConfiguration).isPresent()
+
+        when: 'a lookup races the stop, as a request still in flight does'
+            context.close()
+            context.findBeanDefinition(ApplicationConfiguration)
+
+        then:
+            IllegalStateException e = thrown()
+            e.message == "Cannot resolve bean definitions until the context is running"
+    }
+
+    def "a context that starts is not running but not stopping either, and one that stops is"() {
+        given:
+            DefaultBeanContext context = new DefaultBeanContext()
+            List<Boolean> duringStartup = []
+            List<Boolean> duringShutdown = []
+            context.registerSingleton(new ApplicationEventListener<StartupEvent>() {
+                @Override
+                void onApplicationEvent(StartupEvent event) {
+                    duringStartup << context.isRunning() << context.isStoppingOrStopped()
+                }
+            })
+            context.registerSingleton(new ApplicationEventListener<ShutdownEvent>() {
+                @Override
+                void onApplicationEvent(ShutdownEvent event) {
+                    duringShutdown << context.isStoppingOrStopped()
+                }
+            })
+
+        when:
+            context.start()
+
+        then: 'a request a StartupEvent listener makes still finds the error routes and exception handlers'
+            duringStartup == [false, false]
+            context.isRunning()
+            !context.isStoppingOrStopped()
+
+        when:
+            context.stop()
+
+        then:
+            duringShutdown == [true]
+            context.isStoppingOrStopped()
+    }
+
+    def "a context whose start failed counts as stopped, though it never stopped"() {
+        given:
+            DefaultBeanContext context = new DefaultBeanContext()
+            context.registerSingleton(new ApplicationEventListener<StartupEvent>() {
+                @Override
+                void onApplicationEvent(StartupEvent event) {
+                    throw new IllegalStateException("bad start")
+                }
+            })
+
+        when:
+            context.start()
+
+        then:
+            thrown(IllegalStateException)
+            !context.isRunning()
+            context.isStoppingOrStopped()
     }
 
     def "container conversion only expands arrays and containers convertible to Iterable"() {
