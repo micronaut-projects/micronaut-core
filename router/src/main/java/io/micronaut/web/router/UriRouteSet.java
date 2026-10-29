@@ -1340,7 +1340,7 @@ final class UriRouteSet {
         if (listenerExposes.isPresent()) {
             return listenerExposes.get();
         }
-        return ports.contains(request.getServerAddress().getPort());
+        return ports.contains(RouteAttributes.getServerPort(request));
     }
 
     /**

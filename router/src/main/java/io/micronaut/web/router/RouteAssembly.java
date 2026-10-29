@@ -1743,7 +1743,7 @@ public final class RouteAssembly {
             predicates.addAll(conditions);
             if (effectivePort != null) {
                 int routePort = effectivePort;
-                predicates.add(httpRequest -> httpRequest.getServerAddress().getPort() == routePort);
+                predicates.add(httpRequest -> RouteAttributes.getServerPort(httpRequest) == routePort);
             }
             return List.copyOf(predicates);
         }

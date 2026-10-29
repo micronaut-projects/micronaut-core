@@ -220,4 +220,20 @@ public final class RouteAttributes {
     public static void setHeadBody(HttpResponse<?> response, Object body) {
         response.setAttribute(HttpAttributes.HEAD_BODY, body);
     }
+
+    /**
+     * The port of the address the request was received on, or {@code -1} when the address has no
+     * port, e.g. a UNIX domain socket or a QUIC stream, whose address is not an
+     * {@link java.net.InetSocketAddress}.
+     *
+     * @param request The request
+     * @return The port, or {@code -1}
+     */
+    static int getServerPort(HttpRequest<?> request) {
+        try {
+            return request.getServerAddress().getPort();
+        } catch (ClassCastException e) {
+            return -1;
+        }
+    }
 }
