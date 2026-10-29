@@ -727,8 +727,10 @@ abstract class AbstractJdkHttpClient {
         boolean lastRedirect = redirectCount >= configuration.getMaxRedirects();
         CompletableFuture<java.net.http.HttpResponse<T>> exchange = httpClient.sendAsync(request, responseInfo -> lastRedirect || redirectUri(request, responseInfo.statusCode(), responseInfo.headers()) == null
             ? bodyHandler.apply(responseInfo)
-            // the body of a redirect that is followed is discarded
-            : java.net.http.HttpResponse.BodySubscribers.replacing(null));
+            // the body of a redirect that is followed is discarded, within the read timeout and
+            // the maximum content length: the request timeout of the JDK client ends at the headers
+            : new LimitedBodySubscriber<>(java.net.http.HttpResponse.BodySubscribers.<T>replacing(null),
+                configuration.getMaxContentLength(), configuration.getReadTimeout().orElse(null)));
         inFlight.set(exchange);
         if (result.isCancelled()) {
             exchange.cancel(true);
