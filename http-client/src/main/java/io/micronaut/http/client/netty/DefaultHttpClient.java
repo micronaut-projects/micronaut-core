@@ -1475,7 +1475,9 @@ public class DefaultHttpClient implements
                     }
 
                     try {
-                        return server.resolve(includeContextPath ? ContextPathUtils.prepend(requestURI, contextPath) : requestURI);
+                        // Service-ID load balancers may select URLs with different base paths.
+                        String resolvedContextPath = contextPath == null ? server.getURI().getRawPath() : contextPath;
+                        return server.resolve(includeContextPath ? ContextPathUtils.prepend(requestURI, resolvedContextPath) : requestURI);
                     } catch (URISyntaxException e) {
                         throw decorate(new HttpClientException("Failed to construct the request URI", e));
                     }
