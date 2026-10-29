@@ -8,6 +8,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.netty.NettyHttpRequestBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
@@ -29,6 +30,20 @@ class NettyClientHttpRequestSpec extends Specification {
         then:
         req.getParameters().get("param", Argument.listOf(Boolean)).get() == [true, false]
         req.uri.toString() == "/foo?param=true&param=false"
+    }
+
+    void "the request target of an absolute URI keeps its percent-encoding"() {
+        given:
+        def factory = new NettyClientHttpRequestFactory()
+
+        expect:
+        target(factory.get("https://example.com/search?q=a%26b%3Dc")) == "/search?q=a%26b%3Dc"
+        target(factory.get("https://example.com/a%2Fb?q=1")) == "/a%2Fb?q=1"
+        target(factory.get("/search?q=a%26b%3Dc")) == "/search?q=a%26b%3Dc"
+    }
+
+    private static String target(MutableHttpRequest<?> request) {
+        ((NettyHttpRequestBuilder) request).toHttpRequestWithoutBody().uri()
     }
 
     void "test combination of URI params and request params"() {

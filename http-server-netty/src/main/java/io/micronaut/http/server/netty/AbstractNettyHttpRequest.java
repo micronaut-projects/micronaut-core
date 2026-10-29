@@ -253,6 +253,10 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         URI fullUri = URI.create(url);
         if (fullUri.getAuthority() != null || fullUri.getScheme() != null) {
             // https://example.com/foo -> /foo
+            String relative = toRelativeReference(fullUri);
+            if (relative != null) {
+                return URI.create(relative);
+            }
             try {
                 fullUri = new URI(
                     null, // scheme
@@ -266,6 +270,33 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             }
         }
         return fullUri;
+    }
+
+    /**
+     * Assemble the path, query and fragment of a request target as a relative reference, keeping
+     * the percent-encoding they arrived with. The decoded components must not be used: an encoded
+     * {@code &}, {@code ;} or {@code =} of a query parameter value would come back as a separator
+     * and split the value into further parameters.
+     *
+     * @param uri The request target, with a scheme or an authority
+     * @return The relative reference, or {@code null} if the path cannot be one, because a
+     * relative reference whose path starts with {@code //} is read back as an authority
+     */
+    private static @Nullable String toRelativeReference(URI uri) {
+        String rawPath = uri.getRawPath();
+        if (rawPath == null || rawPath.startsWith("//")) {
+            return null;
+        }
+        StringBuilder relative = new StringBuilder(rawPath);
+        String rawQuery = uri.getRawQuery();
+        if (rawQuery != null) {
+            relative.append('?').append(rawQuery);
+        }
+        String rawFragment = uri.getRawFragment();
+        if (rawFragment != null) {
+            relative.append('#').append(rawFragment);
+        }
+        return relative.toString();
     }
 
     /**
