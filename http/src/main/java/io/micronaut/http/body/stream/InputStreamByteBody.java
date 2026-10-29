@@ -140,14 +140,6 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
         return Flux.from(new StreamPublisher(toInputStream(), context.ioExecutor()));
     }
 
-    private void closeOnIoExecutor(ExtendedInputStream s) {
-        try {
-            context.ioExecutor().execute(s::close);
-        } catch (RejectedExecutionException e) {
-            s.close();
-        }
-    }
-
     @Override
     public Publisher<ReadBuffer> toReadBufferPublisher() {
         return BodyPublishers.map(new StreamPublisher(toInputStream(), context.ioExecutor()), context.bodyFactory.readBufferFactory()::adapt);
