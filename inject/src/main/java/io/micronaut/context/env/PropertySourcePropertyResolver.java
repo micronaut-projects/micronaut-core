@@ -354,7 +354,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * copy is published in a single step once {@code add} completes, also if it fails, as the writes
      * of a failed add have always been kept. A lookup on another thread therefore never iterates a
      * first-letter map that is being written. The lists and maps that indexed keys expand into are
-     * written in place. Called with {@link #catalogLock} held, outside a refresh or another add.
+     * written in place. A start that is not part of a refresh reads into a copy the same way, see
+     * {@link #readIntoCopy(Runnable)}. Called with {@link #catalogLock} held, outside a refresh or
+     * another add.
      *
      * @param add The add to run
      */
@@ -371,6 +373,26 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             mirrorPublishedState();
             refreshingThread = null;
             adding = false;
+        }
+    }
+
+    /**
+     * Runs the read of a start. Outside a refresh or an add, the read writes into a copy of the
+     * published catalogs, as an add does, see {@link #addToCopy(Runnable)}: a lookup on another
+     * thread sees the properties from before the start until the read completes, and then all of
+     * them. The copy is published also if the read fails, as a failed start has always kept what it
+     * read. Within a refresh or an add, the read writes where they write. Called with the catalog
+     * lock held.
+     *
+     * @param read The read to run
+     */
+    void readIntoCopy(Runnable read) {
+        synchronized (catalogLock) {
+            if (refreshingThread == null) {
+                addToCopy(read);
+            } else {
+                read.run();
+            }
         }
     }
 
