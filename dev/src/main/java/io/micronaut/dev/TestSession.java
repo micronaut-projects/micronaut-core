@@ -29,6 +29,7 @@ import io.micronaut.dev.test.Cancellation;
 import io.micronaut.dev.test.JUnitXmlReportWriter;
 import io.micronaut.dev.test.TestEventListener;
 import io.micronaut.dev.test.TestEventListeners;
+import io.micronaut.dev.test.TestFileNames;
 import io.micronaut.dev.test.TestId;
 import io.micronaut.dev.test.TestOutcome;
 import io.micronaut.dev.test.TestReportListener;
@@ -472,14 +473,37 @@ final class TestSession {
             if (isJvmKind(kind)) {
                 continue;
             }
+            Path rootPath = root.path().toAbsolutePath().normalize();
+            // a file another root holds at the same relative path is named relative to the directory the roots share
+            Path shared = TestFileNames.base(roots, rootPath, false);
             for (String extension : kind.extensions()) {
-                if (name.endsWith("." + extension)
-                    && (Files.isRegularFile(root.path().resolve(name).normalize()) || Files.isRegularFile(root.path().resolveSibling(name).normalize()))) {
+                if (name.endsWith("." + extension) && isFileOfRoot(root, rootPath, shared, name)) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a name of results names a file of a test source root: relative to the root, to its parent, or to the
+     * directory the roots share, when the file it names there is within the root.
+     *
+     * @param root     The test source root
+     * @param rootPath Its absolute, normalized path
+     * @param shared   The directory the roots share, or null
+     * @param name     The name
+     * @return Whether the file is there
+     */
+    private static boolean isFileOfRoot(SourceRoot root, Path rootPath, @Nullable Path shared, String name) {
+        if (Files.isRegularFile(root.path().resolve(name).normalize()) || Files.isRegularFile(root.path().resolveSibling(name).normalize())) {
+            return true;
+        }
+        if (shared == null) {
+            return false;
+        }
+        Path inShared = shared.resolve(name).normalize();
+        return inShared.startsWith(rootPath) && Files.isRegularFile(inShared);
     }
 
     /**
@@ -512,6 +536,12 @@ final class TestSession {
                 if (base.getParent() != null) {
                     names.add(base.getParent().relativize(absolute).toString().replace('\\', '/'));
                 }
+                Path shared = TestFileNames.base(roots, base, false);
+                if (shared != null) {
+                    // the name of a file another root holds at the same relative path
+                    names.add(TestFileNames.slashed(shared.relativize(absolute)));
+                }
+                names.add(TestFileNames.slashed(base) + "/" + TestFileNames.slashed(base.relativize(absolute)));
             }
         }
         return names;
