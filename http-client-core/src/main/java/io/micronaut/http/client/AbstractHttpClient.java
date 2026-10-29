@@ -1697,8 +1697,8 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 Publisher<ByteBuffer<?>> input = response.byteBody().toByteBufferPublisher();
                 Publisher<? extends O> decoded = Iterable.class.isAssignableFrom(type.getType())
                     // a collection type reads a top-level JSON array as one value, which the
-                    // element-limited read would unwrap
-                    ? reader.readChunked(type, mediaType, response.getHeaders(), input)
+                    // element-limited read would unwrap: the value is limited as a whole
+                    ? PieceReaders.readCollections(reader, type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize())
                     // every element is buffered in memory before it is decoded
                     : reader.readChunked(type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize());
                 return new ElementResponse<>(response, decoded);

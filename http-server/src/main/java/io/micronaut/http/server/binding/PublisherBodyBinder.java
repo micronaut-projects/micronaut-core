@@ -33,6 +33,7 @@ import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodyElementsPublisher;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.body.stream.ReactorInterop;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.InternalByteBody;
@@ -118,8 +119,9 @@ public final class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<
                     Publisher<?> pub;
                     if (Iterable.class.isAssignableFrom(targetType.getType())) {
                         // Publisher<List<T>> reads a top-level JSON array as one value, which the
-                        // element-limited read would unwrap
-                        pub = reader.get().readChunked(targetType, mediaType, source.getHeaders(), input);
+                        // element-limited read would unwrap: the value is limited as a whole
+                        pub = PieceReaders.readCollections(reader.get(), targetType, mediaType, source.getHeaders(), input,
+                            bodyAnnotationBinder.maxRequestBufferSize());
                     } else {
                         // every element is buffered in memory before it is decoded
                         pub = reader.get().readChunked(targetType, mediaType, source.getHeaders(), input,
