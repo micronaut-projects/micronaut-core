@@ -323,6 +323,55 @@ class StartWhileLookingUpSpec extends Specification {
         env.stop()
     }
 
+    void "#operation on another thread between two of a start's property sources applies to what the start has read so far, and lookups see what it leaves until the start ends"() {
+        given:
+        ConventionGate later = new ConventionGate('later', ['app.second': 'two'], 2)
+        GatedSource gated = new GatedSource('gated', ordered('app.third': 'three', 'app.fourth': 'four'), 3, 'app.fourth')
+        DefaultEnvironment env = environmentWith(PropertySource.of('data', ['app.first': 'one'], 1), later, gated)
+
+        when: "the start has read data and parks before later"
+        later.armed.set(true)
+        Lookup starting = new Lookup({ env.start() })
+        assert later.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        Object returned = run(env)
+        Map<String, Object> left = env.getProperty('app', Map).orElse([:])
+
+        and: "the start reads later and parks partway through gated"
+        gated.armed.set(true)
+        later.release.countDown()
+        assert gated.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        Map<String, Object> during = env.getProperty('app', Map).orElse([:])
+        gated.release.countDown()
+        starting.join()
+
+        then:
+        !starting.thread.alive
+        starting.failure == null
+        check(returned)
+        left == leaves
+        during == leaves
+        env.getProperty('app', Map).get() == after
+
+        cleanup:
+        later.release.countDown()
+        gated.release.countDown()
+        env.stop()
+
+        where:
+        // as before, a refresh while a start reads publishes no properties, and the start goes on
+        [operation, run, check, leaves, after] << [
+                ['stop()', { DefaultEnvironment e -> e.stop() }, { true },
+                 [:], [second: 'two', third: 'three', fourth: 'four']],
+                ['refresh()', { DefaultEnvironment e -> e.refresh() }, { true },
+                 [:], [second: 'two', third: 'three', fourth: 'four']],
+                ['refreshAndDiff()', { DefaultEnvironment e -> e.refreshAndDiff() }, { Map<String, Object> diff -> diff.keySet() == ['app.first'] as Set },
+                 [:], [second: 'two', third: 'three', fourth: 'four']],
+                ['addPropertySource on the resolver',
+                 { DefaultEnvironment e -> ((PropertySourcePropertyResolver) e.delegate()).addPropertySource(PropertySource.of('extra', ['app.extra': 'x'])) }, { true },
+                 [first: 'one', extra: 'x'], [first: 'one', extra: 'x', second: 'two', third: 'three', fourth: 'four']]
+        ]
+    }
+
     private static Lookup lookupWhileStartWrites(DefaultEnvironment env, GatedSource gated, ParkedValue parked, Closure<?> lookup) {
         gated.armed.set(true)
         Lookup starting = new Lookup({ env.start() })

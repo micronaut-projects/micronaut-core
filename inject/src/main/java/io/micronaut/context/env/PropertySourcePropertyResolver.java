@@ -380,10 +380,21 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * this thread, it is processed into what they write, as before. Otherwise it is one of a start's
      * property sources, which are all processed into one copy of the published state, as an add's
      * are, see {@link #addToCopy(Runnable)}. {@link #publishStartCopy()} publishes that copy in a
-     * single step: once the start has processed them, also if it fails, or before anything else uses
-     * the catalogs between two of them, so that it finds them as the start has left them. A lookup on
-     * another thread therefore sees the properties from before the start until then, and never a
-     * first-letter map that is being written.
+     * single step: once the start has processed them, also if it fails, or before anything else
+     * writes the catalogs or compares them between two of them, such as a stop, a refresh or a diff,
+     * so that it finds them as the start has left them. Until then a lookup sees the properties from
+     * before the start, on another thread and also on the starting thread between two of its
+     * property sources, such as in {@link PropertySource#getConvention()}. Only within a property
+     * source does the starting thread see what the start has processed so far. A lookup never
+     * iterates a first-letter map that is being written.
+     *
+     * <p>As with an add, the copy shares the lists and maps that indexed keys expand into, which are
+     * written in place, and the random values remembered for the properties: one that is looked up
+     * within a property source replaces what is remembered for the published state if the text has
+     * changed. If the published state is not empty, as after a refresh of a stopped environment or
+     * once the copy has been published between two property sources, a lookup on another thread may
+     * therefore see such a list or map change before the copy is published, and resolve such a
+     * random value anew each time until then.</p>
      *
      * @param propertySource The property source
      * @param convention     The property convention
@@ -416,10 +427,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     /**
      * Publishes the copy that a start processes its property sources into, see
      * {@link #processReadPropertySource(PropertySource, PropertySource.PropertyConvention)}, if there
-     * is one. Called when the start has processed its property sources, also if it fails, and by
-     * everything else that uses the catalogs, first: between two of the start's property sources
-     * they are then as the start has left them. Does nothing within a refresh, or within a property
-     * source that this thread processes.
+     * is one. Called when the start has processed its property sources, also if it fails, and first
+     * by everything else that writes the catalogs or compares them: between two of the start's
+     * property sources they are then as the start has left them. Lookups do not call it. Does nothing
+     * within a refresh, or within a property source that this thread processes.
      */
     void publishStartCopy() {
         synchronized (catalogLock) {
