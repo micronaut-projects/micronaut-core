@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.netty.http2.Http2ConnectionWindow;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogConnectionEncoder;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListener;

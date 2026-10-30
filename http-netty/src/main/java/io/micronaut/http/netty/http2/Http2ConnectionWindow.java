@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.handler;
+package io.micronaut.http.netty.http2;
 
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.ChannelHandlerContext;
@@ -34,9 +34,10 @@ import org.jspecify.annotations.Nullable;
  * stream; the connection window starts at {@link Http2CodecUtil#DEFAULT_WINDOW_SIZE} and can only
  * be raised with a {@code WINDOW_UPDATE} on stream 0.
  * <p>
- * The {@link Http2ServerHandler} does this itself. This handler is for pipelines built around
- * netty's {@link io.netty.handler.codec.http2.Http2FrameCodec}, which cannot be extended: it is
- * added right after the codec, raises the window and then removes itself.
+ * A connection handler that can be extended does this itself, by calling {@link #raise} once the
+ * preface has been written. This handler is for pipelines built around netty's
+ * {@link io.netty.handler.codec.http2.Http2FrameCodec}, which cannot be extended: it is added
+ * right after the codec, raises the window and then removes itself.
  *
  * @since 5.2.2
  * @author Graeme Rocher

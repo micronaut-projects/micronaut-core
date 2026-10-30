@@ -37,6 +37,7 @@ import io.micronaut.http.netty.NettySslContextBuilder;
 import io.micronaut.http.netty.SslContextAutoLoader;
 import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.micronaut.http.netty.http2.Http2ConnectionWindow;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.http.ssl.SslConfiguration;
@@ -737,16 +738,42 @@ public class ConnectionManager {
         });
     }
 
-    private Http2FrameCodec makeFrameCodec() {
+    private Http2Settings initialSettings() {
         Http2Settings defaultSettings = Http2Settings.defaultSettings();
 
         HttpClientConfiguration.Http2ClientConfiguration http2Configuration = configuration.getHttp2Configuration();
         defaultSettings.maxHeaderListSize(http2Configuration == null
             ? HttpClientConfiguration.Http2ClientConfiguration.DEFAULT_MAX_HEADER_LIST_SIZE
             : http2Configuration.getMaxHeaderListSize());
+        Integer initialWindowSize = http2Configuration == null
+            ? HttpClientConfiguration.Http2ClientConfiguration.DEFAULT_INITIAL_WINDOW_SIZE
+            : http2Configuration.getInitialWindowSize();
+        if (initialWindowSize != null) {
+            defaultSettings.initialWindowSize(initialWindowSize);
+        }
+        return defaultSettings;
+    }
 
+    /**
+     * Add the frame codec and, right after it, the handler that raises the receive window of the
+     * connection as a whole. {@code SETTINGS_INITIAL_WINDOW_SIZE} only sets the window of each
+     * stream; the connection window starts at the protocol default and is raised with a
+     * {@code WINDOW_UPDATE} on stream 0.
+     *
+     * @param pipeline   The pipeline to add to
+     * @param frameCodec The frame codec, built by {@link #makeFrameCodec()}
+     */
+    private void addFrameCodec(ChannelPipeline pipeline, Http2FrameCodec frameCodec) {
+        HttpClientConfiguration.Http2ClientConfiguration http2Configuration = configuration.getHttp2Configuration();
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, frameCodec);
+        pipeline.addLast(new Http2ConnectionWindow(frameCodec, Http2ConnectionWindow.effectiveWindowSize(
+            initialSettings(),
+            http2Configuration == null ? null : http2Configuration.getInitialConnectionWindowSize())));
+    }
+
+    private Http2FrameCodec makeFrameCodec() {
         Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forClient()
-            .initialSettings(defaultSettings);
+            .initialSettings(initialSettings());
 
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
@@ -1061,7 +1088,7 @@ public class ConnectionManager {
                         @Override
                         protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
                             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
-                                ctx.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
+                                addFrameCodec(ctx.pipeline(), makeFrameCodec());
                                 Channel ch1 = ctx.channel();
                                 initHttp2(pool, ch1, channelCustomizer, false);
                             } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
@@ -1127,7 +1154,7 @@ public class ConnectionManager {
                 new ChannelInitializer<Channel>() {
                     @Override
                     protected void initChannel(Channel ch) throws Exception {
-                        ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, frameCodec);
+                        addFrameCodec(ch.pipeline(), frameCodec);
                         initHttp2(pool, ch, connectionCustomizer, false);
                     }
                 });
@@ -1174,7 +1201,7 @@ public class ConnectionManager {
             insertPcapLoggingHandlerLazy(ch, "outer");
 
             configureProxy(ch.pipeline(), false, pool.requestKey.getHost(), pool.requestKey.getPort());
-            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
+            addFrameCodec(ch.pipeline(), makeFrameCodec());
             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
             initHttp2(pool, ch, connectionCustomizer, true);
 
