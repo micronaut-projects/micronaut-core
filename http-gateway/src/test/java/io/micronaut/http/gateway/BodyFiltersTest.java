@@ -101,6 +101,14 @@ class BodyFiltersTest extends GatewayTestBase {
     }
 
     @Test
+    void rb17TheSizeLimitOfTheRouteAppliesToAChunkedBodyThatIsRewritten() throws Exception {
+        assertEquals(413, chunked("/sized-rewrite/inspect/x", "x".repeat(8), "x".repeat(8)).status());
+        RawHttp.Response small = chunked("/sized-rewrite/inspect/x", "abc", "de");
+        assertEquals(200, small.status(), small.toString());
+        assertEquals("ABCDE", small.inspected("body"));
+    }
+
+    @Test
     void bt01TheResponseBodyIsRewrittenDecodedAndEncodedAgain() throws Exception {
         RawHttp.Response response = get("/modify-response/up/gzip", "Accept-Encoding: gzip");
         assertEquals(200, response.status(), response.toString());
@@ -206,6 +214,8 @@ class BodyFiltersTest extends GatewayTestBase {
         public void routes(GatewayRouteBuilder gateway) {
             gateway.route("modify-request").path("/modify-request/**")
                 .filters(GatewayFilters.stripPrefix(1), GatewayFilters.modifyRequestBody(64, upper)).uri(upstream);
+            gateway.route("sized-rewrite").path("/sized-rewrite/**")
+                .filters(GatewayFilters.stripPrefix(1), GatewayFilters.requestSize(10), GatewayFilters.modifyRequestBody(64, upper)).uri(upstream);
             gateway.route("modify-response").path("/modify-response/**")
                 .filters(GatewayFilters.stripPrefix(1), GatewayFilters.modifyResponseBody(4096, upper)).uri(upstream);
             gateway.route("json-top").path("/json-top/**")

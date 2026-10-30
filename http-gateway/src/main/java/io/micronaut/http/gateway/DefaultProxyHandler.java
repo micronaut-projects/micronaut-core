@@ -96,6 +96,7 @@ final class DefaultProxyHandler implements ProxyHandler {
     );
 
     private static final String UPSTREAM_OF_ROUTE = "The upstream of the gateway route ";
+    private static final String FILTER_REPLACED_BODY = "A gateway route relays the bytes of the body of a request, and a filter replaced the body";
 
     private final GatewayRoute route;
     private final ProxyHandlerFactory factory;
@@ -299,9 +300,15 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
         ByteBodyFactory factory = bodyFactory(request);
         if (claimed == null) {
+            if (request.getBody().isPresent()) {
+                // as for a relay without a rewriter: the bytes of the request are gone
+                return CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, FILTER_REPLACED_BODY));
+            }
             claimed = factory.createEmpty();
         }
-        long max = Long.MAX_VALUE;
+        // the limit of the route applies to the body before it is rewritten, e.g. a chunked one
+        long sizeLimit = GatewayFilters.maxRequestSize(route.getFilters());
+        long max = sizeLimit < 0 ? Long.MAX_VALUE : sizeLimit;
         List<BodyRewriter> rewriters = new ArrayList<>(rewrites.size());
         for (GatewayFilters.ModifyRequestBody rewrite : rewrites) {
             max = Math.min(max, rewrite.maxBytes());
@@ -686,13 +693,6 @@ final class DefaultProxyHandler implements ProxyHandler {
 
         /**
          * @param request The request
-         * @param retry   The retries of the route, if any: the body of a request whose method
-         *                they send again is kept up to their limit
-         * @param sizeLimit The maximum number of bytes of the body, {@code -1} for no limit
-         * @return The body of the request
-         */
-        /**
-         * @param request The request
          * @param body    The body to send instead of the one of the request, all there
          * @return The body of the request, which can be sent again
          */
@@ -704,6 +704,13 @@ final class DefaultProxyHandler implements ProxyHandler {
             return prepared;
         }
 
+        /**
+         * @param request The request
+         * @param retry   The retries of the route, if any: the body of a request whose method
+         *                they send again is kept up to their limit
+         * @param sizeLimit The maximum number of bytes of the body, {@code -1} for no limit
+         * @return The body of the request
+         */
         static RequestBody of(HttpRequest<?> request, @Nullable GatewayRetry retry, @Nullable GatewayCircuitBreaker circuitBreaker, long sizeLimit) {
             long replayLimit = retry != null && retry.retriesMethod(request.getMethodName()) ? retry.maxReplayBytes() : -1;
             if (circuitBreaker != null && circuitBreaker.fallback() != null) {
@@ -724,8 +731,7 @@ final class DefaultProxyHandler implements ProxyHandler {
             CloseableByteBody taken = RawHttpClientSupport.claimServerRequestBody(request);
             if (taken == null) {
                 if (request.getBody().isPresent()) {
-                    throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                        "A gateway route relays the bytes of the body of a request, and a filter replaced the body");
+                    throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, FILTER_REPLACED_BODY);
                 }
                 return;
             }
