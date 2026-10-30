@@ -383,4 +383,46 @@ class ReflectionBeanIntrospectionSpec extends Specification {
         then: "it is written through the setter"
         bean.read() == "written"
     }
+
+    void "a field shadowed by a field of a sub class is read and written as a member"() {
+        given:
+        def introspection = ReflectionBeanIntrospection.of(ShadowingSub, EnumSet.of(Introspected.AccessKind.FIELD))
+        def bean = new ShadowingSub()
+        def property = introspection.getRequiredProperty("x", String)
+        def members = property.members
+
+        expect: "the property by name is the field of the sub class"
+        introspection.beanProperties.count { it.name == "x" } == 1
+        members*.declaringType == [ShadowingSub, ShadowingBase]
+        members*.writable == [true, true]
+
+        when:
+        members[0].write(bean, "sub")
+        members[1].write(bean, "base")
+
+        then: "each field holds its own value"
+        bean.x == "sub"
+        bean.baseX() == "base"
+        members*.read(bean) == ["sub", "base"]
+        property.get(bean) == "sub"
+
+        and: "a final field cannot be written"
+        !introspection.getRequiredProperty("fixed", String).members[0].writable
+
+        when:
+        introspection.getRequiredProperty("fixed", String).members[0].write(bean, "other")
+
+        then:
+        thrown(UnsupportedOperationException)
+    }
+
+    static class ShadowingBase {
+        public String x
+        public final String fixed = "fixed"
+        String baseX() { return this.@x }
+    }
+
+    static class ShadowingSub extends ShadowingBase {
+        public String x
+    }
 }
