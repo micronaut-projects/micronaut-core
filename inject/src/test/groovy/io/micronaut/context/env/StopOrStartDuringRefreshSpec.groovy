@@ -3,11 +3,15 @@ package io.micronaut.context.env
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.RefreshTestSupport.Gate
 import io.micronaut.context.env.RefreshTestSupport.NeedsLock
+import io.micronaut.context.env.RefreshTestSupport.Parking
 import io.micronaut.context.env.RefreshTestSupport.ParkingEnvironment
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Timeout
 
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 
 import static io.micronaut.context.env.RefreshTestSupport.WAIT_SECONDS
@@ -185,6 +189,159 @@ class StopOrStartDuringRefreshSpec extends Specification {
 
         where:
         bootstrap << [false, true]
+    }
+
+    void "a thread that holds a lock which code run by stopping the environment needs, and stops it during the refresh, does not deadlock with the refresh that carries the stop out, when it then #how"() {
+        given: "an environment whose resetCaches(), once armed, needs a lock of the application on the refreshing thread"
+        ReentrantLock appLock = new ReentrantLock()
+        ResetCachesNeedsLockEnvironment env = new ResetCachesNeedsLockEnvironment(appLock)
+        env.addPropertySource(new MapPropertySource('data', ['app.value': 'old']))
+        env.start()
+        CountDownLatch stopped = new CountDownLatch(1)
+
+        when: "another thread takes the lock and stops the environment once the refresh has read, and makes its next call while the refresh runs that code"
+        Thread refresher = parkIn(env.started) { env.refresh() }
+        Thread caller = daemon('caller') {
+            appLock.lock()
+            try {
+                env.stop()
+                stopped.countDown()
+                if (env.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)) {
+                    nextCall.call(env)
+                }
+            } finally {
+                appLock.unlock()
+            }
+        }
+        assert stopped.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        env.arm()
+        release(env.started, refresher)
+        caller.join(WAIT_SECONDS * 1000L)
+
+        then: "the call returned while that code waited for the lock, which it then got"
+        !caller.alive
+        env.gotLock.get()
+
+        and: "the later call counts"
+        env.running == running
+
+        cleanup:
+        env.started.release.countDown()
+        env.stop()
+
+        where:
+        how                           | running | nextCall
+        'starts the environment'      | true    | { Environment e -> e.start() }
+        'stops the environment again' | false   | { Environment e -> e.stop() }
+    }
+
+    void "a start from another thread is not lost when code that the refresh runs has stopped the environment #when"() {
+        given:
+        ParkingEnvironment env = new ParkingEnvironment()
+        Map<String, Object> data = ['app.value': 'old']
+        env.addPropertySource(new MapPropertySource('data', data))
+        StopsThenParks code = new StopsThenParks(env)
+        Gate gate = new Gate()
+        env.addPropertySource(gate)
+        if (when == 'while the refresh reads') {
+            env.addPropertySource(code)
+        }
+        env.start()
+
+        when: "the code stops the environment and parks the refresh, and another thread then starts the environment"
+        data.put('app.value', 'new')
+        code.stopNext.set(true)
+        Thread refresher
+        if (when == 'while the refresh reads') {
+            refresher = parkIn(code) { env.refresh() }
+        } else {
+            // parked once the refresh has read, so that the add is queued rather than only registered
+            refresher = parkIn(env.started) { env.refresh() }
+            code.arm()
+            Thread adder = daemon('adder') { env.addPropertySource(code) }
+            adder.join(WAIT_SECONDS * 1000L)
+            env.started.release.countDown()
+            assert code.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        }
+        Thread starter = daemon('starter') { env.start() }
+        starter.join(WAIT_SECONDS * 1000L)
+        boolean startReturnedWhileParked = !starter.alive
+        release(code, refresher)
+
+        then: "the start returned while the refresh was parked, and the environment runs with what it read last"
+        startReturnedWhileParked
+        env.running
+        env.getProperty('app.value', String).get() == 'new'
+        env.getProperty('stopping.key', String).get() == 'stopping'
+
+        cleanup:
+        gate.release.countDown()
+        env.started.release.countDown()
+        code.release.countDown()
+        env.stop()
+
+        where:
+        when << ['while the refresh reads', 'when the refresh processes it on top']
+    }
+
+    /**
+     * A parking environment whose resetCaches(), once armed, needs the given lock the next time the
+     * refreshing thread runs it.
+     */
+    static class ResetCachesNeedsLockEnvironment extends ParkingEnvironment {
+        final CountDownLatch entered = new CountDownLatch(1)
+        final AtomicBoolean gotLock = new AtomicBoolean()
+        private final ReentrantLock lock
+        private final AtomicBoolean armed = new AtomicBoolean()
+
+        ResetCachesNeedsLockEnvironment(ReentrantLock lock) {
+            this.lock = lock
+        }
+
+        void arm() {
+            armed.set(true)
+        }
+
+        @Override
+        protected void resetCaches() {
+            super.resetCaches()
+            // the name first: the fields are not set yet while the constructor runs
+            if (Thread.currentThread().name == 'refresher' && armed.compareAndSet(true, false)) {
+                entered.countDown()
+                if (lock.tryLock(RefreshTestSupport.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                    gotLock.set(true)
+                    lock.unlock()
+                }
+            }
+        }
+    }
+
+    /**
+     * A property source that, once asked to, stops the environment the next time it is iterated,
+     * and that, once armed, then parks the thread that iterates it.
+     */
+    static class StopsThenParks extends Parking implements PropertySource {
+        final AtomicBoolean stopNext = new AtomicBoolean()
+        private final Environment env
+
+        StopsThenParks(Environment env) {
+            this.env = env
+        }
+
+        @Override
+        String getName() { 'stops-then-parks' }
+
+        @Override
+        Object get(String key) { key == 'stopping.key' ? 'stopping' : null }
+
+        @Override
+        Iterator<String> iterator() {
+            if (stopNext.compareAndSet(true, false)) {
+                env.stop()
+            }
+            pass()
+            return ['stopping.key'].iterator()
+        }
     }
 
     private static void startOrStop(Environment env, String what) {

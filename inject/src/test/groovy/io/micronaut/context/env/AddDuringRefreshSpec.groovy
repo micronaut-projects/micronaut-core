@@ -7,6 +7,7 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Timeout
 
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -128,7 +129,7 @@ class AddDuringRefreshSpec extends Specification {
         env.stop()
     }
 
-    void "of two property sources by one name added while the refresh is parked once it has read, the later one is processed on top, and the earlier one not at all"() {
+    void "of two property sources by one name added while the refresh is parked once it has read, both are processed, the later one on top, as when the adds waited"() {
         given:
         ParkingEnvironment env = new ParkingEnvironment()
         env.addPropertySource(PropertySource.of('data', ['app.value': 'data']))
@@ -147,7 +148,7 @@ class AddDuringRefreshSpec extends Specification {
         then:
         addsReturnedWhileParked
         env.getProperty('named.value', String).get() == 'second'
-        !env.getProperty('first.only', String).isPresent()
+        env.getProperty('first.only', String).get() == 'first'
         env.getProperty('app.value', String).get() == 'data'
 
         cleanup:
@@ -322,7 +323,7 @@ class AddDuringRefreshSpec extends Specification {
         how << ['on a running environment', 'during a refresh']
     }
 
-    void "a property source added while the next refresh is active is left to that refresh, not to the one that has just stopped being active"() {
+    void "a refresh that another thread stops while it reads publishes nothing, and then carries out the stop and the calls made after it in their order: a refresh that gave up waiting, and an add"() {
         given:
         PublishParkingEnvironment env = new PublishParkingEnvironment()
         env.addPropertySource(PropertySource.of('data', ['app.value': 'data']))
@@ -330,9 +331,8 @@ class AddDuringRefreshSpec extends Specification {
         env.addPropertySource(reading)
         env.start()
         PropertySource added = PropertySource.of('added', ['added.key': 'added'])
-        Throwable secondFailure = null
 
-        when: "the first refresh is stopped while it reads, and parked once it is no longer active, before it publishes"
+        when: "the refresh is stopped while it reads, and parked when it decides not to publish"
         Thread first = parkIn(reading) { env.refresh() }
         Thread stopper = daemon('stopper') { env.stop() }
         stopper.join(WAIT_SECONDS * 1000L)
@@ -340,31 +340,25 @@ class AddDuringRefreshSpec extends Specification {
         reading.release.countDown()
         assert env.publishing.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
 
-        and: "a second refresh, which then fails, becomes active, and a property source is added meanwhile"
-        env.failing.set(true)
-        Thread second = daemon('second-refresh') {
-            try {
-                env.refresh()
-            } catch (Throwable t) {
-                secondFailure = t
-            }
+        and: "another thread refreshes, and then adds a property source"
+        long start = System.nanoTime()
+        Thread other = daemon('other') {
+            env.refresh()
+            env.addPropertySource(added)
         }
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(WAIT_SECONDS)
-        while (second.alive && second.state != Thread.State.BLOCKED) {
-            assert System.nanoTime() < deadline: 'the second refresh never waited for the lock'
-            Thread.sleep(5)
-        }
-        Thread adder = daemon('adder') { env.addPropertySource(added) }
-        adder.join(WAIT_SECONDS * 1000L)
-        boolean addReturned = !adder.alive
+        other.join(WAIT_SECONDS * 1000L)
+        long otherMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
+        boolean otherReturned = !other.alive
         release(env.publishing, first)
-        second.join(3 * WAIT_SECONDS * 1000L)
 
-        then: "the second refresh failed, and processed the property source on top"
+        then: "the refresh gave up after about two seconds, and the add returned"
         !stopper.alive
-        addReturned
-        !second.alive
-        secondFailure instanceof IllegalStateException
+        otherReturned
+        otherMillis >= 1000 && otherMillis < 5000
+
+        and: "as had they waited: stopped, then refreshed, which also read the added property source"
+        env.running
+        env.getProperty('app.value', String).get() == 'data'
         env.getProperty('added.key', String).get() == 'added'
 
         cleanup:
@@ -395,6 +389,109 @@ class AddDuringRefreshSpec extends Specification {
         refreshing.refreshed.get()
         diff == ['app.value': 'old']
         env.getProperty('queued.value', String).get() == 'queued'
+
+        cleanup:
+        env.started.release.countDown()
+        env.stop()
+    }
+
+    void "a thread that holds a lock a property source it adds during the refresh needs, and then #how, does not deadlock with the refresh that processes the property source"() {
+        given: "a property source that, once armed, needs a lock of the application"
+        ReentrantLock appLock = new ReentrantLock()
+        ParkingEnvironment env = new ParkingEnvironment()
+        env.addPropertySource(PropertySource.of('data', ['app.value': 'data']))
+        env.start()
+        NeedsLock needsLock = new NeedsLock(appLock)
+        needsLock.arm()
+        CountDownLatch added = new CountDownLatch(1)
+        Throwable failure = null
+
+        when: "another thread takes the lock, adds the property source once the refresh has read, and makes its next call while the refresh processes the property source"
+        env.failing.set(failing)
+        Thread refresher = parkIn(env.started) {
+            try {
+                env.refresh()
+            } catch (Throwable t) {
+                failure = t
+            }
+        }
+        Thread caller = daemon('caller') {
+            appLock.lock()
+            try {
+                env.addPropertySource(needsLock)
+                added.countDown()
+                if (needsLock.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)) {
+                    nextCall.call(env)
+                }
+            } finally {
+                appLock.unlock()
+            }
+        }
+        assert added.await(WAIT_SECONDS, TimeUnit.SECONDS)
+        release(env.started, refresher)
+        caller.join(WAIT_SECONDS * 1000L)
+
+        then: "the call returned while the property source waited for the lock, which it then got"
+        !caller.alive
+        needsLock.gotLock.get()
+        (failure != null) == failing
+
+        cleanup:
+        env.started.release.countDown()
+        env.stop()
+
+        where:
+        how                                                        | failing | nextCall
+        'adds another property source'                             | false   | { Environment e -> e.addPropertySource(PropertySource.of('other', ['other.key': 'other'])) }
+        'stops the environment'                                    | false   | { Environment e -> e.stop() }
+        'starts the environment'                                   | false   | { Environment e -> e.start() }
+        'refreshes the environment'                                | false   | { Environment e -> e.refresh() }
+        'adds another property source, and the refresh fails'      | true    | { Environment e -> e.addPropertySource(PropertySource.of('other', ['other.key': 'other'])) }
+    }
+
+    void "a property source that throws an error when the refresh processes it on top does not leave that refresh active"() {
+        given:
+        ParkingEnvironment env = new ParkingEnvironment()
+        Map<String, Object> data = ['app.value': 'old']
+        env.addPropertySource(new MapPropertySource('data', data))
+        env.start()
+        PropertySource throwing = new PropertySource() {
+            @Override
+            String getName() { 'throwing' }
+
+            @Override
+            Object get(String key) { null }
+
+            @Override
+            Iterator<String> iterator() {
+                throw new AssertionError('cannot read throwing')
+            }
+        }
+        Throwable failure = null
+
+        when: "it is added once the refresh has read"
+        Thread refresher = parkIn(env.started) {
+            try {
+                env.refresh()
+            } catch (Throwable t) {
+                failure = t
+            }
+        }
+        Thread adder = daemon('adder') { env.addPropertySource(throwing) }
+        adder.join(WAIT_SECONDS * 1000L)
+        release(env.started, refresher)
+        env.removePropertySource(throwing)
+
+        and: "the next refresh comes"
+        data.put('app.value', 'new')
+        long start = System.nanoTime()
+        env.refresh()
+        long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
+
+        then: "the error reached the refresh, and the next refresh read at once rather than wait for it"
+        failure instanceof AssertionError
+        millis < 1000
+        env.getProperty('app.value', String).get() == 'new'
 
         cleanup:
         env.started.release.countDown()
@@ -514,7 +611,7 @@ class AddDuringRefreshSpec extends Specification {
 
     /**
      * A parking environment whose refresh, once armed, also parks when it decides whether to publish
-     * what it read, once it is no longer active, with the lock of the catalogs held.
+     * what it read, with the lock of the catalogs held.
      */
     static class PublishParkingEnvironment extends ParkingEnvironment {
         final Parking publishing = new Parking()

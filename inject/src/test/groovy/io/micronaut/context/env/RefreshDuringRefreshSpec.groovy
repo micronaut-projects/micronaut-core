@@ -2,6 +2,7 @@ package io.micronaut.context.env
 
 import io.micronaut.context.env.RefreshTestSupport.Gate
 import io.micronaut.context.env.RefreshTestSupport.NeedsLock
+import org.slf4j.Logger
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Timeout
@@ -34,6 +35,8 @@ class RefreshDuringRefreshSpec extends Specification {
         ReentrantLock appLock = new ReentrantLock()
         NeedsLock needsLock = new NeedsLock(appLock)
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
+        Logger logger = Mock(Logger)
+        env.log = logger
         env.addPropertySource(new MapPropertySource('data', data))
         env.addPropertySource(needsLock)
         env.start()
@@ -88,6 +91,9 @@ class RefreshDuringRefreshSpec extends Specification {
         !first.alive
         needsLock.gotLock.get()
         env.getProperty('app.value', String).get() == 'b'
+
+        and: "no refresh is logged as not carried out"
+        0 * logger.warn(*_)
 
         cleanup:
         go.countDown()
@@ -201,9 +207,11 @@ class RefreshDuringRefreshSpec extends Specification {
         env.stop()
     }
 
-    void "a property source whose code refreshes the environment on another thread every time it is read makes the refresh read once more, and no more"() {
+    void "a property source whose code refreshes the environment on another thread every time it is read makes the refresh read once more, and no more, and the refresh not carried out is logged"() {
         given:
         DefaultEnvironment env = new DefaultEnvironment(withoutDefaultPropertySources())
+        Logger logger = Mock(Logger)
+        env.log = logger
         RefreshesOnAnotherThread refreshing = new RefreshesOnAnotherThread(env)
         env.addPropertySource(refreshing)
         env.start()
@@ -219,6 +227,9 @@ class RefreshDuringRefreshSpec extends Specification {
         !refresher.alive
         refreshing.reads.get() == 2
         refreshing.otherReturned.get()
+
+        and: "the refresh that asked after the read made once more is logged as not carried out"
+        1 * logger.warn({ String message -> message.contains('was not carried out') })
 
         cleanup:
         refreshing.everyTime = false
