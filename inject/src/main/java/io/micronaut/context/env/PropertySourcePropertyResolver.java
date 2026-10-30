@@ -115,12 +115,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     private boolean adding;
     /**
-     * The thread whose start has processed property sources into {@link #writeState}, a copy of the
-     * published state that is not published yet, see
-     * {@link #processReadPropertySource(PropertySource, PropertySource.PropertyConvention)}, or
-     * {@code null}. Guarded by {@link #catalogLock}.
+     * The thread whose start processes its property sources into {@link #writeState}, a copy that is
+     * not published yet, or {@code null}. Written under {@link #catalogLock}, read without it by
+     * every lookup, see {@link #readState()}.
      */
     private Thread startingThread;
+    /**
+     * That copy as the start's last property source has left it, which the starting thread reads
+     * between two of them, or {@code null}. Written under {@link #catalogLock}.
+     */
+    @SuppressWarnings("java:S3077") // only read while no property source is processed into it
+    private volatile ResolverState startCopy;
     /**
      * The state that the lookups of the current thread are kept on while
      * {@link #onState(ResolverState, Supplier)} runs them a second time. The outermost second run
@@ -208,12 +213,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * cannot resolve) must be answered from the catalog being built, not from the one the rebuild
      * is replacing. Every other thread keeps reading the published state until the rebuild is
      * published in one step, except for a thread that {@link #onState(ResolverState, Supplier)}
-     * keeps on the state a lookup has started with.
+     * keeps on the state a lookup has started with. The starting thread also reads its start's copy
+     * between two of its property sources, such as in {@link PropertySource#getConvention()}.
      *
      * @return The state to read the catalogs and the caches from
      */
     private ResolverState readState() {
-        if (refreshingThread == Thread.currentThread()) {
+        Thread current = Thread.currentThread();
+        if (refreshingThread == current) {
             // Only the refreshing thread takes this branch, and it holds `catalogLock` for the
             // whole rebuild, so it reads a field that no other thread can be writing.
             return writeState;
@@ -225,6 +232,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             Object[] pinned = pinnedState.get();
             if (pinned != null && pinned[0] != null) {
                 return (ResolverState) pinned[0];
+            }
+        }
+        // A plain read, a hint: a stale value only leads to the checks below. A start notes its thread
+        // before it keeps its copy in the volatile field, so the second check rules out another's.
+        if (startingThread == current) {
+            ResolverState copy = startCopy;
+            if (copy != null && startingThread == current) {
+                return copy;
             }
         }
         return state;
@@ -378,23 +393,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     /**
      * Processes a property source that a start or a refresh reads. Within a refresh, or an add on
      * this thread, it is processed into what they write, as before. Otherwise it is one of a start's
-     * property sources, which are all processed into one copy of the published state, as an add's
-     * are, see {@link #addToCopy(Runnable)}. {@link #publishStartCopy()} publishes that copy in a
-     * single step: once the start has processed them, also if it fails, or before anything else
-     * writes the catalogs or compares them between two of them, such as a stop, a refresh or a diff,
-     * so that it finds them as the start has left them. Until then a lookup sees the properties from
-     * before the start, on another thread and also on the starting thread between two of its
-     * property sources, such as in {@link PropertySource#getConvention()}. Only within a property
-     * source does the starting thread see what the start has processed so far. A lookup never
-     * iterates a first-letter map that is being written.
+     * property sources, which all go into one copy of the published state, as an add's do, see
+     * {@link #addToCopy(Runnable)}. {@link #publishStartCopy()} publishes the copy in one step once
+     * the start has processed them, also if it fails, or first when anything else writes or compares
+     * the catalogs between two of them. Until then lookups on other threads see the properties from
+     * before the start, never a first-letter map being written; the starting thread sees the copy.
      *
-     * <p>As with an add, the copy shares the lists and maps that indexed keys expand into, which are
-     * written in place, and the random values remembered for the properties: one that is looked up
-     * within a property source replaces what is remembered for the published state if the text has
-     * changed. If the published state is not empty, as after a refresh of a stopped environment or
-     * once the copy has been published between two property sources, a lookup on another thread may
-     * therefore see such a list or map change before the copy is published, and resolve such a
-     * random value anew each time until then.</p>
+     * <p>As with an add, the copy shares with the published state the lists and maps that indexed
+     * keys expand into, which are written in place, and the remembered random values, which a lookup
+     * on the starting thread replaces if the text has changed. So if the published state is not
+     * empty, as after a refresh of a stopped environment, a lookup on another thread can see such a
+     * list change, or get a new random value each time, before the copy is published.</p>
      *
      * @param propertySource The property source
      * @param convention     The property convention
@@ -420,23 +429,24 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             } finally {
                 refreshingThread = null;
                 adding = false;
+                // what this thread reads until its next property source, see readState()
+                startCopy = writeState;
             }
         }
     }
 
     /**
-     * Publishes the copy that a start processes its property sources into, see
-     * {@link #processReadPropertySource(PropertySource, PropertySource.PropertyConvention)}, if there
-     * is one. Called when the start has processed its property sources, also if it fails, and first
-     * by everything else that writes the catalogs or compares them: between two of the start's
-     * property sources they are then as the start has left them. Lookups do not call it. Does nothing
-     * within a refresh, or within a property source that this thread processes.
+     * Publishes the copy that a start processes its property sources into, if there is one: when the
+     * start has processed them, also if it fails, and first by everything else that writes or
+     * compares the catalogs, which then finds them as the start has left them. Does nothing within a
+     * refresh, or within a property source that this thread processes.
      */
     void publishStartCopy() {
         synchronized (catalogLock) {
             if (startingThread != null && refreshingThread == null) {
                 state = writeState;
                 startingThread = null;
+                startCopy = null;
             }
         }
     }

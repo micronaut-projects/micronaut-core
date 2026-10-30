@@ -252,6 +252,57 @@ class StartWhileLookingUpSpec extends Specification {
         env.stop()
     }
 
+    void "a property source that chooses its convention from the properties read before it gets the same keys from #start as from a refresh"() {
+        given:
+        List<String> seen = []
+        DefaultEnvironment env = environmentWith(PropertySource.of('data', ['app.naming': 'env'], 1))
+        // not a MapPropertySource, whose keys a configuration import reads before the start processes any property source
+        env.addPropertySource(new PropertySource() {
+            @Override
+            String getName() { 'choosing' }
+
+            @Override
+            int getOrder() { 2 }
+
+            @Override
+            Object get(String key) { key == 'MY_KEY' ? 'v' : null }
+
+            @Override
+            Iterator<String> iterator() { ['MY_KEY'].iterator() }
+
+            @Override
+            PropertySource.PropertyConvention getConvention() {
+                String naming = env.getProperty('app.naming', String).orElse(null)
+                seen << naming
+                return naming == 'env' ? PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE : PropertySource.PropertyConvention.JAVA_PROPERTIES
+            }
+        })
+        if (start == 'a start after stop()') {
+            env.start()
+            env.stop()
+        }
+        seen.clear()
+
+        when:
+        env.start()
+
+        then: "getConvention() finds the property that data has given, so the key is read as an environment variable"
+        seen && seen.every { it == 'env' }
+        env.getProperty('my.key', String).orElse(null) == 'v'
+
+        when:
+        env.refresh()
+
+        then:
+        env.getProperty('my.key', String).orElse(null) == 'v'
+
+        cleanup:
+        env.stop()
+
+        where:
+        start << ['a first start', 'a start after stop()']
+    }
+
     void "a random value that a property source reads while a start after stop() processes it is the value that lookups return after it"() {
         given:
         String[] read = new String[1]
