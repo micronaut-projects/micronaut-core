@@ -97,6 +97,16 @@ class ProxyPathsTest {
     }
 
     @Test
+    void aReservedExpansionMatchesTheRestOfThePath() {
+        GatewayPathPattern rest = GatewayPathPattern.parse("/files/{+rest}");
+        assertEquals("/files/{+rest}", rest.template());
+        assertEquals(java.util.List.of("rest"), rest.variables());
+        assertEquals(Map.of("rest", "a/b/c"), rest.rawVariables("/files/a/b/c"));
+        assertEquals(Map.of("rest", "a"), rest.rawVariables("/files/a"));
+        assertNull(rest.rawVariables("/files"));
+    }
+
+    @Test
     void hostHeaders() {
         assertNull(DefaultProxyHandler.hostRejection(io.micronaut.http.HttpRequest.GET("/").header("Host", "api.example.com:8443")));
         assertNull(DefaultProxyHandler.hostRejection(io.micronaut.http.HttpRequest.GET("/").header("Host", "[::1]:80")));

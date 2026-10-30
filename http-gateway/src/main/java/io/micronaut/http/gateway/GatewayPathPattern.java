@@ -86,7 +86,16 @@ record GatewayPathPattern(String template, boolean prefix, Pattern raw, List<Str
                 } else if (segment.length() > 2 && segment.charAt(0) == '{' && segment.charAt(segment.length() - 1) == '}'
                     && segment.indexOf('{', 1) < 0) {
                     int colon = segment.indexOf(':');
-                    String name = segment.substring(1, colon < 0 ? segment.length() - 1 : colon);
+                    boolean reserved = segment.charAt(1) == '+';
+                    String name = segment.substring(reserved ? 2 : 1, colon < 0 ? segment.length() - 1 : colon);
+                    if (reserved) {
+                        // a reserved expansion matches the rest of the path, slashes included
+                        template.append('/').append(segment);
+                        raw.append("/(?<v").append(variables.size()).append(">.+)");
+                        variables.add(name);
+                        segmentStart = i;
+                        continue;
+                    }
                     if (colon < 0) {
                         // a variable of the whole segment matches every character of a segment, e.g. +
                         template.append('/').append(segment, 0, segment.length() - 1).append(ANY_SEGMENT).append('}');
