@@ -1362,6 +1362,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             return NettyHttpRequest.this.getMethod();
         }
 
+        @Override
+        public String getMethodName() {
+            return NettyHttpRequest.this.getMethodName();
+        }
+
         // the connection is the connection of the request, whatever the URI of the view
 
         @Override
