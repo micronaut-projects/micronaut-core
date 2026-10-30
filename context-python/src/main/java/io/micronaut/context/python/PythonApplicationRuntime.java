@@ -23,9 +23,11 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.graalvm.polyglot.Context;
 import org.jspecify.annotations.Nullable;
 
+import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -61,6 +63,16 @@ import java.util.function.Supplier;
  * runtime, that record is JVM-wide and the last writer wins: when two application contexts start in
  * parallel, an early Python bean of one may build the GraalPy context of the other, exactly as it
  * would have resolved the other's installed runtime.
+ * <p>
+ * Generated code can also create a Python object before its application context exists at all: the
+ * instance of a {@code @MicronautTest} class is created, and asked for the properties of its
+ * application context ({@code TestPropertyProvider}), before that context is built. When no runtime
+ * is installed and no application context is starting, {@link #requireForNewInstance()} builds a
+ * primary context from the default configuration and installs it <em>unclaimed</em>; the GraalPy
+ * context bean of the next application context claims it ({@link #claimUnclaimed()}) instead of
+ * building one, so the object lives in the primary context of that application, which owns and
+ * closes the context from then on. The {@code graalpy.context} and {@code graalpy.engine}
+ * configuration of that application does not apply to the claimed context.
  *
  * @author Micronaut Team
  * @since 5.2.0
@@ -75,7 +87,11 @@ final class PythonApplicationRuntime {
     private static final ThreadLocal<Boolean> BOOTSTRAPPING = ThreadLocal.withInitial(() -> false);
     /** The installed runtimes, the one generated code resolves last; guarded by itself. */
     private static final List<PythonApplicationRuntime> INSTALLED = new ArrayList<>();
+    /** The installed runtime no application context owns yet; guarded by {@link #INSTALLED}. */
+    private static @Nullable PythonApplicationRuntime unclaimed;
     private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
+    /** Serializes building the unclaimed runtime, so concurrent callers build one context. */
+    private static final Object UNCLAIMED_LOCK = new Object();
 
     private final Context context;
     private final @Nullable ClassLoader classLoader;
@@ -130,6 +146,79 @@ final class PythonApplicationRuntime {
                 "Make sure micronaut-context-python is on the classpath.");
         }
         return runtime;
+    }
+
+    /**
+     * The runtime generated code creates a Python object of a generated class in, which must be
+     * installed or can be installed.
+     * <p>
+     * Like {@link #require()}, but when no runtime is installed and no application context is
+     * starting, a primary context is built from the default configuration and installed unclaimed,
+     * for the GraalPy context bean of the next application context to claim.
+     *
+     * @return The installed runtime
+     * @throws IllegalStateException When no runtime is installed and none can be built
+     */
+    static PythonApplicationRuntime requireForNewInstance() {
+        PythonApplicationRuntime runtime = CURRENT.get();
+        if (runtime != null) {
+            return runtime;
+        }
+        WeakReference<BeanContext> recorded = BOOTSTRAP_CONTEXT.get();
+        if ((recorded != null && recorded.get() != null) || BOOTSTRAPPING.get()) {
+            // an application context is starting: its GraalPy context bean provides the runtime
+            return require();
+        }
+        synchronized (UNCLAIMED_LOCK) {
+            runtime = CURRENT.get();
+            if (runtime != null) {
+                return runtime;
+            }
+            ClassLoader classLoader = GraalPyContextCustomizers.currentClassLoader();
+            Context context;
+            // generated code reached while main.py is evaluated cannot build a second context
+            BOOTSTRAPPING.set(true);
+            try {
+                context = GraalPyContextFactory.buildStandaloneContext(classLoader, Map.of(), GraalPyContextFactory.APPLICATION_MAIN);
+            } catch (IOException e) {
+                throw new IllegalStateException("Failed to initialize the GraalPy context: " + e.getMessage(), e);
+            } finally {
+                BOOTSTRAPPING.remove();
+            }
+            runtime = new PythonApplicationRuntime(context, classLoader);
+            synchronized (INSTALLED) {
+                install(runtime);
+                unclaimed = runtime;
+            }
+            return runtime;
+        }
+    }
+
+    /**
+     * Claim the runtime installed by {@link #requireForNewInstance()} for the primary context of the
+     * application context that is starting. A runtime is claimed once: the GraalPy context bean of a
+     * nested application builds a context of its own.
+     *
+     * @return The unclaimed runtime, now owned by the caller, or {@code null} when there is none
+     */
+    static @Nullable PythonApplicationRuntime claimUnclaimed() {
+        synchronized (INSTALLED) {
+            PythonApplicationRuntime runtime = unclaimed;
+            unclaimed = null;
+            return runtime;
+        }
+    }
+
+    /**
+     * The runtime installed by {@link #requireForNewInstance()} that no application context has
+     * claimed yet.
+     *
+     * @return The unclaimed runtime, or {@code null} when there is none
+     */
+    static @Nullable PythonApplicationRuntime unclaimed() {
+        synchronized (INSTALLED) {
+            return unclaimed;
+        }
     }
 
     /**
@@ -205,6 +294,9 @@ final class PythonApplicationRuntime {
     static boolean uninstall(PythonApplicationRuntime runtime) {
         synchronized (INSTALLED) {
             boolean removed = INSTALLED.remove(runtime);
+            if (unclaimed == runtime) {
+                unclaimed = null;
+            }
             CURRENT.set(INSTALLED.isEmpty() ? null : INSTALLED.getLast());
             return removed;
         }
@@ -238,6 +330,7 @@ final class PythonApplicationRuntime {
         synchronized (INSTALLED) {
             List<PythonApplicationRuntime> removed = List.copyOf(INSTALLED);
             INSTALLED.clear();
+            unclaimed = null;
             CURRENT.set(null);
             return removed;
         }
