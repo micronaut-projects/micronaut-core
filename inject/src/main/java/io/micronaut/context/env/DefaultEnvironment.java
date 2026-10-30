@@ -66,6 +66,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -102,6 +103,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
     private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList("classpath:/", "file:config/");
+    /**
+     * How long a refresh waits for the turn that a refresh on another thread has, in nanoseconds:
+     * two seconds. After that, it leaves its read to that refresh.
+     */
+    private static final long REFRESH_TURN_WAIT_NANOS = 2_000_000_000L;
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
     protected final MutableConversionService mutableConversionService;
@@ -144,10 +150,21 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     private boolean stoppedDuringRefresh;
     /**
+     * Whether a refresh that could not wait for the turn has asked the refresh with the turn to
+     * read the property sources once more. Guarded by the registration lock.
+     */
+    private boolean readAgain;
+    /**
      * Whether the refresh that the current thread runs with the turn publishes nothing, as the
      * environment was stopped meanwhile. Guarded by the catalog lock.
      */
     private boolean dropRefresh;
+    /**
+     * Whether the refresh that the current thread runs with the turn reads the property sources once
+     * more once it has published, as a refresh that could not wait for it asked. Guarded by the
+     * catalog lock.
+     */
+    private boolean readingAgain;
     /**
      * What the {@link #refreshAndDiff()} of the current thread compares.
      */
@@ -490,7 +507,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * Refreshes the environment, see {@link AtomicRefresh#refresh()}. The refresh takes the turn
      * before it takes the lock of the catalogs, and stops and starts the environment, which reads
      * the property sources into a replacement catalog that it then publishes in one step. While it
-     * has the turn, a start, a stop or a refresh from another thread does not wait for the lock.
+     * has the turn, a start, a stop or a refresh from another thread does not wait for the lock. A
+     * refresh waits for the turn at most two seconds, and otherwise leaves its read to the refresh
+     * that has it, which reads the property sources once more before it ends.
      */
     void refreshProperties() {
         if (Thread.holdsLock(catalog)) {
@@ -499,13 +518,28 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             refreshComparing(this::restart);
             return;
         }
-        takeRefreshTurn();
+        if (!takeRefreshTurn()) {
+            return;
+        }
         synchronized (catalog) {
             try {
                 refreshComparing(this::restartInTurn);
+                if (readingAgain) {
+                    readingAgain = false;
+                    try {
+                        refreshComparing(this::restartOnceMore);
+                    } catch (RuntimeException e) {
+                        // what this refresh read is published, and the refresh that asked has returned
+                        log.error("Error reading the property sources once more, for a refresh that could not wait for this one", e);
+                    }
+                }
             } finally {
-                // when the read has failed, the turn is still held
-                boolean stopped = endRefreshTurn() || dropRefresh;
+                readingAgain = false;
+                boolean stopped;
+                synchronized (registrationLock) {
+                    // when a read has failed, the turn is still held
+                    stopped = endRefreshTurn() || dropRefresh;
+                }
                 dropRefresh = false;
                 if (stopped) {
                     stop();
@@ -515,52 +549,66 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     /**
-     * Takes the turn of a refresh, once no other thread has it, and once the threads that are about
-     * to take the lock of the catalogs, as they found no turn, have let go of it.
+     * Takes the turn of a refresh, and waits for the threads that, finding no turn, are about to
+     * take the lock of the catalogs or hold it. While another thread has the turn, it waits for it at
+     * most two seconds. If it does not get it by then, or is interrupted meanwhile, it asks the
+     * refresh with the turn to read the property sources once more before it ends.
+     *
+     * @return Whether the current thread has the turn, rather than leaving its read to another
      */
-    private void takeRefreshTurn() {
+    private boolean takeRefreshTurn() {
         boolean interrupted = false;
-        synchronized (registrationLock) {
-            while (refreshTurn != null) {
-                try {
-                    registrationLock.wait();
-                } catch (InterruptedException e) {
-                    interrupted = true;
+        try {
+            synchronized (registrationLock) {
+                long deadline = System.nanoTime() + REFRESH_TURN_WAIT_NANOS;
+                while (refreshTurn != null) {
+                    long left = deadline - System.nanoTime();
+                    if (left <= 0 || interrupted) {
+                        readAgain = true;
+                        return false;
+                    }
+                    try {
+                        TimeUnit.NANOSECONDS.timedWait(registrationLock, left);
+                    } catch (InterruptedException e) {
+                        interrupted = true;
+                    }
                 }
-            }
-            refreshTurn = Thread.currentThread();
-            while (lockTakers > 0) {
-                try {
-                    registrationLock.wait();
-                } catch (InterruptedException e) {
-                    interrupted = true;
+                refreshTurn = Thread.currentThread();
+                while (lockTakers > 0) {
+                    try {
+                        registrationLock.wait();
+                    } catch (InterruptedException e) {
+                        interrupted = true;
+                    }
                 }
+                return true;
             }
-        }
-        if (interrupted) {
-            Thread.currentThread().interrupt();
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
     /**
      * Ends the turn of the refresh the current thread runs, if it still has it. From now on other
-     * threads take the lock of the catalogs, which it holds until it has published. Called with that
-     * lock held.
+     * threads take the lock of the catalogs, which it holds until it has published. A read asked of
+     * it that it has not made, as a read failed, is left to the next refresh. Called with the
+     * registration lock held, and the lock of the catalogs.
      *
      * @return Whether another thread stopped the environment during the turn, and did not start it
      * again
      */
     private boolean endRefreshTurn() {
-        synchronized (registrationLock) {
-            if (refreshTurn != Thread.currentThread()) {
-                return false;
-            }
-            refreshTurn = null;
-            boolean stopped = stoppedDuringRefresh;
-            stoppedDuringRefresh = false;
-            registrationLock.notifyAll();
-            return stopped;
+        if (refreshTurn != Thread.currentThread()) {
+            return false;
         }
+        refreshTurn = null;
+        readAgain = false;
+        boolean stopped = stoppedDuringRefresh;
+        stoppedDuringRefresh = false;
+        registrationLock.notifyAll();
+        return stopped;
     }
 
     /**
@@ -572,13 +620,35 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     /**
-     * The rebuild of a refresh that has the turn: once the property sources are read, the turn ends,
-     * and whether the refresh publishes is decided.
+     * The rebuild of a refresh that has the turn. Once the property sources are read, the turn ends
+     * and whether the refresh publishes is decided, unless a refresh that could not wait for it has
+     * asked it to read once more: it then keeps the turn, publishes and reads again, see
+     * {@link #restartOnceMore()}.
      */
     private void restartInTurn() {
         stop();
         start();
-        dropRefresh = endRefreshTurn();
+        synchronized (registrationLock) {
+            if (readAgain && !stoppedDuringRefresh) {
+                readAgain = false;
+                readingAgain = true;
+            } else {
+                dropRefresh = endRefreshTurn();
+            }
+        }
+    }
+
+    /**
+     * The rebuild of the read that a refresh with the turn makes once more. It is the last: once the
+     * property sources are read, the turn ends, so that refreshes which keep asking cannot keep it
+     * reading. A refresh that asked meanwhile has returned, and its read is left to the next refresh.
+     */
+    private void restartOnceMore() {
+        stop();
+        start();
+        synchronized (registrationLock) {
+            dropRefresh = endRefreshTurn();
+        }
     }
 
     /**
@@ -623,7 +693,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         }
         if (difference.changes == null) {
-            // it published nothing, as the environment was stopped meanwhile
+            // It published nothing: the environment was stopped meanwhile, or the refresh left its
+            // read to the refresh that another thread runs, which reports what it changes.
             return new LinkedHashMap<>();
         }
         return difference.changes;
