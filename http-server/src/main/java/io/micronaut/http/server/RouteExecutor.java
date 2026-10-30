@@ -290,6 +290,27 @@ public final class RouteExecutor {
         }
     }
 
+    /**
+     * Log an exception that was handled by an error route or an exception handler, when
+     * {@link HttpServerConfiguration#isLogHandledExceptions()} is enabled. Only a handled
+     * exception that the handler mapped to a server error (5xx) response is logged at the
+     * {@code ERROR} level; one mapped to any other response, such as a security rejection
+     * answered with a 401 or 403, is expected rather than unexpected and is logged at the
+     * {@code DEBUG} level.
+     *
+     * @param cause    The handled exception
+     * @param response The response the error route or exception handler produced for it
+     */
+    void logHandledException(Throwable cause, HttpResponse<?> response) {
+        if (response.code() >= 500) {
+            logException(cause);
+        } else if (isIgnorable(cause)) {
+            logIgnoredException(cause);
+        } else if (LOG.isDebugEnabled()) {
+            LOG.debug("Handled exception occurred: {}", cause.getMessage(), cause);
+        }
+    }
+
     static boolean isIgnorable(Throwable cause) {
         if (cause instanceof ClosedChannelException || cause instanceof BaseSharedBuffer.IncorrectContentLengthException) {
             return true;
