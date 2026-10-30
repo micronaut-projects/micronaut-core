@@ -219,6 +219,9 @@ public final class RawRequestOptions {
      * policy of a gateway: the exchange then fails with the closed connection. Defaults to
      * {@code true}, also for {@link #proxy()}.
      *
+     * <p>Only the Netty client supports this option. The JDK client ignores it: whether it sends a
+     * request again on a closed connection is decided by the {@code java.net.http} client.</p>
+     *
      * @return Whether the client retries a request on a closed reused connection
      * @since 5.3.0
      */

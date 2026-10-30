@@ -9,6 +9,8 @@ import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 
+import java.nio.charset.StandardCharsets
+
 /**
  * A raw exchange with {@link RawRequestOptions#isRetryStaleConnection()} turned off leaves the
  * retries to the caller, e.g. a gateway: the client does not send an idempotent request again
@@ -52,6 +54,41 @@ class StaleConnectionRawProxySpec extends Specification {
         thrown(Exception)
         server.requests*.toString() == ['0/0 GET /first', '0/1 GET /second']
         server.connections.get() == 1
+    }
+
+    void "a redirect of an exchange that does not retry a closed connection is not sent again"() {
+        given: "a server that redirects to the closing server"
+        ServerSocket redirecting = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        Thread.startVirtualThread {
+            try {
+                redirecting.accept().withCloseable { Socket socket ->
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(socket.inputStream, StandardCharsets.US_ASCII))
+                    String line
+                    while ((line = reader.readLine()) != null && !line.isEmpty()) {
+                        // skip the request head
+                    }
+                    socket.outputStream.write("HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:${server.port}/second\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII))
+                    socket.outputStream.flush()
+                }
+            } catch (IOException ignored) {
+                // closed
+            }
+        }
+        RawRequestOptions noRetryFollowing = NO_RETRY.toBuilder().followRedirects(true).build()
+
+        expect:
+        exchange('/first', NO_RETRY) == 200
+
+        when:
+        Mono.from(client.exchange(HttpRequest.GET("http://127.0.0.1:${redirecting.localPort}/redirect"), null, null, noRetryFollowing)).block()
+
+        then: "the redirected request fails with the closed connection, and was sent once"
+        thrown(Exception)
+        server.requests*.toString() == ['0/0 GET /first', '0/1 GET /second']
+        server.connections.get() == 1
+
+        cleanup:
+        redirecting.close()
     }
 
     void "a proxy exchange with the default options is still sent again"() {

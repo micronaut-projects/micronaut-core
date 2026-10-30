@@ -1051,6 +1051,13 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         ));
     }
 
+    @Override
+    protected void copyRedirectAttributes(MutableHttpRequest<?> request, MutableHttpRequest<?> redirect) {
+        super.copyRedirectAttributes(request, redirect);
+        // a caller that retries on its own also retries the redirected request on its own
+        request.getAttribute(NO_STALE_CONNECTION_RETRY).ifPresent(noRetry -> redirect.setAttribute(NO_STALE_CONNECTION_RETRY, noRetry));
+    }
+
     private static void applyOptions(MutableHttpRequest<?> request, RawRequestOptions options) {
         if (options.isAllowUpgrade()) {
             request.setAttribute(ALLOW_UPGRADE, Boolean.TRUE);

@@ -522,7 +522,9 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      */
     public ExecutionFlow<ResolvedTarget> resolveRequestURI(HttpRequest<?> request, ServiceInstance instance) {
         LoadBalancer balancer = loadBalancer;
-        LoadBalancerSelection selection = balancer == null ? null : new LoadBalancerSelection(balancer, instance);
+        // without a load balancer no outcome is reported, but the exchange still names the
+        // instance, e.g. in an UnprocessedRequestException
+        LoadBalancerSelection selection = new LoadBalancerSelection(balancer == null ? LoadBalancer.empty() : balancer, instance);
         URI requestURI = request.getUri();
         if (requestURI.getScheme() != null) {
             return ExecutionFlow.just(new ResolvedTarget(requestURI, selection));
@@ -531,9 +533,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             applyAuthorization(request, instance);
             return ExecutionFlow.just(new ResolvedTarget(resolveAgainst(instance, requestURI, true), selection));
         } catch (RuntimeException e) {
-            if (selection != null) {
-                selection.release();
-            }
+            selection.release();
             return ExecutionFlow.error(e);
         }
     }

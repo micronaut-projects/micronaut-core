@@ -170,6 +170,19 @@ class RawServiceInstanceTest {
     }
 
     @Test
+    void aClientWithoutALoadBalancerNamesTheSelectedInstanceInAFailure() throws Exception {
+        URI dead = closedPort();
+        ServiceInstance deadInstance = ServiceInstance.of("unbalanced", dead);
+        try (ApplicationContext clients = ApplicationContext.run(Map.of("spec.name", SPEC_NAME + "-unbalanced"));
+             RawHttpClient client = clients.createBean(RawHttpClient.class)) {
+            UnprocessedRequestException failure = Assertions.assertThrows(UnprocessedRequestException.class,
+                () -> exchange(client, HttpRequest.GET("/raw-service-instance/ok"), deadInstance));
+            Assertions.assertEquals(UnprocessedRequestException.Reason.CONNECT, failure.getReason());
+            Assertions.assertSame(deadInstance, failure.getServiceInstance().orElseThrow(), "the failure names the selected instance");
+        }
+    }
+
+    @Test
     void theOptionsKeepTheInstance() {
         ServiceInstance instance = ServiceInstance.of("pool", URI.create("http://127.0.0.1:8080"));
         RawRequestOptions options = RawRequestOptions.proxy().toBuilder().serviceInstance(instance).build();
