@@ -34,6 +34,24 @@ graalpy:
       engine.CompilerThreads: 4
 ----
 
+== Native POSIX and external resources
+
+By default, Python resources use GraalPy's virtual filesystem and Java POSIX backend. Libraries that require native POSIX facilities, such as Unix sockets on Linux or macOS, need physical resources and explicit native access:
+
+[configuration]
+----
+graalpy:
+  context:
+    resource-directory: /path/to/prepared/python-resources
+    allow-native-access: true
+    options:
+      python.PosixModuleBackend: native
+----
+
+The resource directory must already contain the application's `src` and any required `venv` resources. Prepare it once with GraalPy's existing resource extraction API before starting contexts; extraction replaces matching files and must not run while contexts are using the directory. The caller owns the directory, which is shared by primary and pooled contexts and is not deleted when they close.
+
+Selecting external resources enables host-filesystem access even with the Java POSIX backend; access is not confined to the resource directory. Native POSIX additionally bypasses the virtual filesystem and its IO restrictions. Neither mode is a sandbox or a promise of full POSIX compatibility; the default remains Java/VFS. See https://graalpy.org/jvm-developers/docs/#posix-backend-issues[GraalPy's POSIX backend documentation]. A launcher that bootstraps a reusable context must supply the same configuration before Python modules are collected; later application startup does not reconfigure an existing context.
+
 == Host class lookup
 
 Python code can look up any class the application class loader can load, through `java.type("...")` and `from ... import ...`. That is the default and needs no configuration: the application's own packages, the JDK, Micronaut and every library on the classpath are visible.

@@ -350,11 +350,28 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     public static Context bootstrapReusableContext(ClassLoader classLoader,
                                                    Map<String, String> options,
                                                    String applicationMain) throws IOException {
+        GraalPyContextConfiguration contextConfiguration = new GraalPyContextConfiguration();
+        contextConfiguration.setOptions(options);
+        return bootstrapReusableContext(classLoader, contextConfiguration, applicationMain);
+    }
+
+    /**
+     * Bootstrap a reusable context with the same resource and permission configuration as an
+     * application context. Configuration applies only to the initial bootstrap; later calls
+     * return the existing reusable context unchanged.
+     *
+     * @param classLoader The application class loader
+     * @param contextConfiguration The context configuration
+     * @param applicationMain The Python source resource to evaluate after the generated launcher
+     * @return The initialized GraalPy context
+     * @throws IOException If the context cannot load application resources
+     */
+    public static Context bootstrapReusableContext(ClassLoader classLoader,
+                                                   GraalPyContextConfiguration contextConfiguration,
+                                                   String applicationMain) throws IOException {
         if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
             return PythonContextRuntime.getContext();
         }
-        GraalPyContextConfiguration contextConfiguration = new GraalPyContextConfiguration();
-        contextConfiguration.getBuilder().options(options);
         Engine engine = GraalPyEngineFactory.buildPythonEngine();
         Context context = null;
         try {
@@ -455,16 +472,37 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         long now = System.currentTimeMillis();
 
 
-        VirtualFileSystem fileSystem = buildVirtualFileSystem(VirtualFileSystem.newBuilder()
-            .resourceDirectory(APPLICATION_PATH)
-            .resourceClassLoader(classLoader));
+        Path resourceDirectory = contextConfiguration.getResourceDirectory();
+        String posixBackend = contextConfiguration.getOptions().getOrDefault("python.PosixModuleBackend", "java");
+        if ("native".equals(posixBackend) && resourceDirectory == null) {
+            throw new IllegalArgumentException("Native POSIX requires graalpy.context.resource-directory with physical src and venv resources");
+        }
+        VirtualFileSystem fileSystem = null;
+        Path sourceDirectory;
+        if (resourceDirectory == null) {
+            fileSystem = buildVirtualFileSystem(VirtualFileSystem.newBuilder()
+                .resourceDirectory(APPLICATION_PATH)
+                .resourceClassLoader(classLoader));
+            sourceDirectory = Path.of(fileSystem.getMountPoint(), "src");
+        } else {
+            if (!Files.isDirectory(resourceDirectory.resolve("src"))) {
+                throw new IOException("GraalPy resource-directory must contain prepared src resources");
+            }
+            sourceDirectory = resourceDirectory.resolve("src");
+        }
         // the engine must not close under a context it does not know of yet, such as one a pool
         // warm-up builds while the application shuts down
         PythonContextRegistry.beginContextBuild(engine);
         Context context;
         try {
-            Context.Builder builder = contextConfiguration.getBuilder()
-                .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
+            Context.Builder builder = contextConfiguration.getBuilder();
+            if (fileSystem == null) {
+                builder.apply(GraalPyResources.forExternalDirectory(resourceDirectory));
+            } else {
+                builder.apply(GraalPyResources.forVirtualFileSystem(fileSystem));
+            }
+            // the resource helpers select the Java backend: restore the configured one
+            builder.option("python.PosixModuleBackend", posixBackend)
                 .logHandler(new GraalPySlf4jLogHandler())
                 .allowExperimentalOptions(true)
                 .allowCreateProcess(true)
@@ -495,7 +533,9 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             try {
                 context = builder.build();
             } catch (RuntimeException e) {
-                closeQuietly(fileSystem);
+                if (fileSystem != null) {
+                    closeQuietly(fileSystem);
+                }
                 throw e;
             }
             PythonContextRegistry.registerContext(context, fileSystem);
@@ -528,8 +568,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             LOG.debug("GraalPy Java import finder installed in {}ms", System.currentTimeMillis() - now);
             // Try to load the generated pyronaut_application.py from META-INF
             now = System.currentTimeMillis();
-            evaluateMain(classLoader, INTERNAL_MAIN, context, fileSystem);
-            evaluateMain(classLoader, applicationMain, context, fileSystem);
+            evaluateMain(classLoader, INTERNAL_MAIN, context, sourceDirectory);
+            evaluateMain(classLoader, applicationMain, context, sourceDirectory);
             LOG.debug("GraalPy main.py evaluated in {}ms", System.currentTimeMillis() - now);
             // the dataclass wrappers the manifests record are registered by the first Java import, which
             // sources declaring only dataclasses may not make
@@ -564,13 +604,17 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     }
 
     static void evaluateMain(ClassLoader classLoader, String mainPy, Context context, VirtualFileSystem vfs) throws IOException {
+        evaluateMain(classLoader, mainPy, context, Path.of(vfs.getMountPoint(), "src"));
+    }
+
+    private static void evaluateMain(ClassLoader classLoader, String mainPy, Context context, Path sourceDirectory) throws IOException {
         String mainPyPath = APPLICATION_SRC_PATH + mainPy;
         try (InputStream inputStream = classLoader
             .getResourceAsStream(mainPyPath)) {
 
             if (inputStream != null) {
                 LOG.debug("Evaluating main.py {}", mainPyPath);
-                String modulePath = Path.of(vfs.getMountPoint(), "src", mainPy).toString();
+                String modulePath = sourceDirectory.resolve(mainPy).toString();
                 Value loader = PythonContextRuntime.helper(context, "__micronaut_load_vfs_module", LOAD_VFS_MODULE_SOURCE);
                 loader.executeVoid(modulePath);
             }
