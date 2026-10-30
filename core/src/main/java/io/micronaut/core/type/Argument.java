@@ -465,6 +465,43 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * This argument with each type variable named among the substitutions replaced by the type given for it, at any
+     * depth: in the type arguments, in the bounds of a wildcard and in the component of an array. So
+     * {@code Map<K, ? extends List<V>[]>} with {@code K := String} and {@code V := Integer} is
+     * {@code Map<String, ? extends List<Integer>[]>}. This is the substitution
+     * {@link TypeHierarchy#getTypeClosure(Argument)} applies to the super types of a parameterized type.
+     *
+     * <p>The substitutions are the variables of one declaration, the {@code K} and {@code V} of {@code Box<K, V>},
+     * matched by {@link GenericPlaceholder#getVariableName() name}: only an
+     * {@link #isUnresolvedTypeVariable() unresolved type variable}, or an array of one, is replaced. A variable that is
+     * not named is kept as it is, its bounds included. A wildcard and a type resolved in place of a variable
+     * ({@link GenericPlaceholder#isResolved()}) are not variables, even when they are named after a type parameter:
+     * the bounds of a wildcard and the type arguments of a resolved type are substituted instead.</p>
+     *
+     * <p>The substitution is simultaneous and is not applied again to the types it gives: with
+     * <code>T := List&lt;U&gt;</code> and {@code U := String}, <code>Map&lt;T, U&gt;</code> is
+     * <code>Map&lt;List&lt;U&gt;, String&gt;</code>, and <code>T := List&lt;T&gt;</code> gives
+     * <code>List&lt;T&gt;</code> once, so a given type may name variables of another declaration that happen to share
+     * a name.</p>
+     *
+     * <p>The type given takes the place of the use of the variable: it is given the name of the use, the name of the
+     * parameter or of the type parameter it stands in, and the annotations written on the use, {@code @A T} with
+     * {@code T := String} being {@code @A String}; a use without annotations keeps those of the type given. An array
+     * of a variable is the array of the type given, {@code T[]} with {@code T := List<String>} being
+     * {@code List<String>[]}; given a wildcard, which there is no array of, it is a wildcard bounded by the arrays of
+     * its bounds. Everything else keeps its shape, its name and its annotations.</p>
+     *
+     * @param substitutions The types to give the variables, by the name of the variable
+     * @return The substituted argument, this argument when there are no substitutions
+     * @since 5.3.0
+     */
+    @Experimental
+    default Argument<?> substituteTypeVariables(Map<String, ? extends Argument<?>> substitutions) {
+        Objects.requireNonNull(substitutions, "Substitutions cannot be null");
+        return TypeClosure.substitute(this, substitutions);
+    }
+
+    /**
      * Convert an argument array to a class array.
      *
      * @param arguments The arguments
