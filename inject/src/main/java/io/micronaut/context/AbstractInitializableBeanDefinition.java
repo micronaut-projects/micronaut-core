@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.DependsOn;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.Environment;
@@ -31,8 +32,10 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -2541,7 +2544,39 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
             return new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
         }
+        if (isDisabledByRequiredBean(argument)) {
+            return new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by required bean [" +
+                argument.getTypeName() + "]: " + e.getMessage());
+        }
         return new DependencyInjectionException(resolutionContext, e);
+    }
+
+    /**
+     * Determines whether this bean declares a {@link Requires} on the bean that was being resolved when it was found
+     * to be disabled. When that is the case the requirement can no longer be satisfied, so the dependent bean is
+     * itself disabled rather than raising a dependency injection failure.
+     *
+     * @param argument the argument whose resolution produced a {@link DisabledBeanException}
+     * @return {@code true} if a declared {@code @Requires(bean = ...)} references the argument type
+     */
+    private boolean isDisabledByRequiredBean(Argument<?> argument) {
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        if (!annotationMetadata.hasStereotype(Requires.class)) {
+            return false;
+        }
+        String requiredTypeName = argument.getType().getName();
+        for (AnnotationValue<Requires> requirement : annotationMetadata.getAnnotationValuesByType(Requires.class)) {
+            AnnotationClassValue<?> bean = requirement.annotationClassValue(RequiresCondition.MEMBER_BEAN).orElse(null);
+            if (bean != null && bean.getName().equals(requiredTypeName)) {
+                return true;
+            }
+            for (AnnotationClassValue<?> beans : requirement.annotationClassValues(RequiresCondition.MEMBER_BEANS)) {
+                if (beans.getName().equals(requiredTypeName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private <K> @Nullable K resolveBeanFromProvider(
