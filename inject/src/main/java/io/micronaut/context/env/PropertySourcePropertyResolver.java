@@ -411,7 +411,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     void processReadPropertySource(PropertySource propertySource, PropertySource.PropertyConvention convention) {
         synchronized (catalogLock) {
             if (refreshingThread != null) {
-                // the refresh or the add that this thread runs publishes what is written
+                // under the lock only this thread can be writing, within its own refresh or add, which publishes what is written
                 processPropertySource(propertySource, convention);
                 return;
             }
@@ -422,6 +422,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 writeState = copyForAdd(state);
                 startingThread = current;
             }
+            // as addToCopy does: this thread's lookups read the copy, and calls nested in the property source see an add
             adding = true;
             refreshingThread = current;
             try {
