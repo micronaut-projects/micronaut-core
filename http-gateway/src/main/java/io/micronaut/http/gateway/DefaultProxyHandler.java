@@ -53,7 +53,9 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -87,15 +89,14 @@ final class DefaultProxyHandler implements ProxyHandler {
     private final GatewayRoute route;
     private final ProxyHandlerFactory factory;
     private final RawRequestOptions options;
+    private final RawRequestOptions retainHostOptions;
     @Nullable
     private final RetryOperations retryOperations;
     @Nullable
     private final CircuitBreakerGuard guard;
     private final List<GatewayPathPattern> patterns;
-    @Nullable
-    private volatile AsyncRawHttpClient client;
-    @Nullable
-    private volatile AsyncRawHttpClient upgradeClient;
+    private final AtomicReference<@Nullable AsyncRawHttpClient> client = new AtomicReference<>();
+    private final AtomicReference<@Nullable AsyncRawHttpClient> upgradeClient = new AtomicReference<>();
 
     DefaultProxyHandler(GatewayRoute route, ProxyHandlerFactory factory) {
         this.route = route;
@@ -111,6 +112,7 @@ final class DefaultProxyHandler implements ProxyHandler {
             .responseTimeout(route.getResponseTimeout())
             .activityTimeout(route.getActivityTimeout());
         this.options = builder.build();
+        this.retainHostOptions = options.toBuilder().retainHostHeader(true).build();
         GatewayRetry retry = route.getRetry();
         this.retryOperations = retry == null ? null
             : factory.retryOperationsFactory().createRetryOperations(retry.toPolicy(RetryableAttempt.class::isInstance));
@@ -125,7 +127,7 @@ final class DefaultProxyHandler implements ProxyHandler {
 
     @Override
     public CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables) {
-        request.setAttribute(GatewayAttributes.ROUTE_ID, route.getId());
+        GatewayRequestContext context = GatewayRequestContext.of(request, route);
         String rejected = hostRejection(request);
         if (rejected == null) {
             rejected = ProxyPaths.upstreamRejection(request.getPath());
@@ -157,8 +159,14 @@ final class DefaultProxyHandler implements ProxyHandler {
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
-        Relay relay = new Relay(request, pathVariables, exchange, upstream, body);
-        return relay.start();
+        Relay relay = new Relay(request, context, pathVariables, exchange, upstream, body);
+        CompletableFuture<HttpResponse<?>> result = relay.start();
+        if (request instanceof ServerHttpRequest<?> server && !result.isDone()) {
+            // a client that goes away cancels the relay: the attempt in flight, its connection, its
+            // permits and the retries still to come
+            server.whenAbandoned(() -> result.cancel(false));
+        }
+        return result;
     }
 
     /**
@@ -222,7 +230,7 @@ final class DefaultProxyHandler implements ProxyHandler {
                 headers.add(name, value);
             }
         });
-        List<String> upgrade = isUpgrade(request) ? upgradeProtocols(request) : List.of();
+        List<String> upgrade = isUpgrade(request) ? allowedUpgradeProtocols(request) : List.of();
         HttpHeadersUtil.stripHopByHopHeaders(headers);
         removeForwardedAliases(headers);
         if (!upgrade.isEmpty()) {
@@ -290,6 +298,26 @@ final class DefaultProxyHandler implements ProxyHandler {
 
     /**
      * @param request A request that asks to switch protocols
+     * @return The protocols it asks for that the route relays, see
+     * {@link GatewayRoute#getUpgradeProtocols()}: a request for another protocol is relayed as a
+     * plain request
+     */
+    private List<String> allowedUpgradeProtocols(HttpRequest<?> request) {
+        List<String> protocols = upgradeProtocols(request);
+        Set<String> allowed = route.getUpgradeProtocols();
+        List<String> relayed = new ArrayList<>(protocols.size());
+        for (String protocol : protocols) {
+            int version = protocol.indexOf('/');
+            String name = (version < 0 ? protocol : protocol.substring(0, version)).toLowerCase(Locale.ROOT);
+            if (allowed.contains(name)) {
+                relayed.add(protocol);
+            }
+        }
+        return relayed;
+    }
+
+    /**
+     * @param request A request that asks to switch protocols
      * @return The protocols it asks for, but {@code h2c}: a relay never upgrades the connection to
      * the upstream to HTTP/2
      */
@@ -327,18 +355,15 @@ final class DefaultProxyHandler implements ProxyHandler {
     }
 
     private AsyncRawHttpClient client(boolean upgrade) {
-        AsyncRawHttpClient c = upgrade ? upgradeClient : client;
+        AtomicReference<@Nullable AsyncRawHttpClient> ref = upgrade ? upgradeClient : client;
+        AsyncRawHttpClient c = ref.get();
         if (c == null) {
             synchronized (this) {
-                c = upgrade ? upgradeClient : client;
+                c = ref.get();
                 if (c == null) {
                     HttpVersionSelection version = upgrade ? HttpVersionSelection.forWebsocket() : factory.httpVersion(route);
                     c = factory.rawClient(route, version);
-                    if (upgrade) {
-                        upgradeClient = c;
-                    } else {
-                        client = c;
-                    }
+                    ref.set(c);
                 }
             }
         }
@@ -371,7 +396,9 @@ final class DefaultProxyHandler implements ProxyHandler {
             || cause instanceof UnprocessedRequestException unprocessed && unprocessed.getReason() == UnprocessedRequestException.Reason.CONNECT_TIMEOUT) {
             return new UpstreamException(HttpStatus.GATEWAY_TIMEOUT, id, "The upstream of the gateway route " + id + " did not answer in time", cause);
         }
-        return new UpstreamException(HttpStatus.BAD_GATEWAY, id, "The upstream of the gateway route " + id + " failed: " + cause.getMessage(), cause);
+        // the cause names internal hosts and addresses: it is logged and kept, not sent to the client
+        LOG.debug("The upstream of the gateway route {} failed", id, cause);
+        return new UpstreamException(HttpStatus.BAD_GATEWAY, id, "The upstream of the gateway route " + id + " failed", cause);
     }
 
     private static Throwable unwrap(Throwable failure) {
@@ -392,27 +419,16 @@ final class DefaultProxyHandler implements ProxyHandler {
      * @param instance The instance, or {@code null}
      * @return The request to send
      */
-    private static MutableHttpRequest<?> forInstance(MutableHttpRequest<Object> upstream, @Nullable ServiceInstance instance) {
-        if (instance == null) {
-            return upstream;
+    private static MutableHttpRequest<?> forInstance(MutableHttpRequest<Object> upstream, URI uri, @Nullable ServiceInstance instance) {
+        // the attempts are sent one after the other: the upstream request is reused, not copied
+        URI base = instance == null ? null : instance.getURI();
+        String basePath = base == null ? null : base.getRawPath();
+        if (base == null || basePath == null || basePath.isEmpty() || basePath.equals("/")) {
+            return upstream.uri(uri);
         }
-        URI base = instance.getURI();
-        String basePath = base.getRawPath();
-        if (basePath == null || basePath.isEmpty() || basePath.equals("/")) {
-            return upstream;
-        }
-        URI uri = upstream.getUri();
-        String absolute = base.getScheme() + "://" + base.getRawAuthority()
+        return upstream.uri(URI.create(base.getScheme() + "://" + base.getRawAuthority()
             + ProxyPaths.prefix(basePath, uri.getRawPath())
-            + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery());
-        MutableHttpRequest<Object> copy = HttpRequest.create(upstream.getMethod(), absolute, upstream.getMethodName());
-        MutableHttpHeaders headers = copy.getHeaders();
-        upstream.getHeaders().forEach((name, values) -> {
-            for (String value : values) {
-                headers.add(name, value);
-            }
-        });
-        return copy;
+            + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery())));
     }
 
     /**
@@ -508,7 +524,8 @@ final class DefaultProxyHandler implements ProxyHandler {
          * @return Whether the body can be sent by an attempt after the first
          */
         synchronized boolean canResend() {
-            return !claimed || body == null || replayable;
+            // a streaming body that an attempt took is gone: a retry would send no body
+            return !claimed || replayable || body == null && !moved;
         }
 
         /**
@@ -547,23 +564,27 @@ final class DefaultProxyHandler implements ProxyHandler {
      */
     private final class Relay {
         private final HttpRequest<?> request;
+        private final GatewayRequestContext context;
         private final PathVariables pathVariables;
         private final ProxyExchange exchange;
         private final MutableHttpRequest<Object> upstream;
         private final RequestBody body;
         private final boolean upgrade;
+        private final URI upstreamUri;
         private final List<URI> tried = new ArrayList<>(2);
         private final AtomicInteger attempts = new AtomicInteger();
         private final AtomicReference<@Nullable CompletableFuture<?>> current = new AtomicReference<>();
         private final CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
 
-        Relay(HttpRequest<?> request, PathVariables pathVariables, ProxyExchange exchange, MutableHttpRequest<Object> upstream, RequestBody body) {
+        Relay(HttpRequest<?> request, GatewayRequestContext context, PathVariables pathVariables, ProxyExchange exchange, MutableHttpRequest<Object> upstream, RequestBody body) {
             this.request = request;
+            this.context = context;
             this.pathVariables = pathVariables;
             this.exchange = exchange;
             this.upstream = upstream;
             this.body = body;
             this.upgrade = isUpgrade(upstream);
+            this.upstreamUri = upstream.getUri();
         }
 
         CompletableFuture<HttpResponse<?>> start() {
@@ -579,7 +600,7 @@ final class DefaultProxyHandler implements ProxyHandler {
             CompletionStage<HttpResponse<?>> relayed = retryOperations == null ? attempt() : retryOperations.executeCompletionStage(this::attempt);
             relayed.whenComplete((response, failure) -> {
                 body.release();
-                request.setAttribute(GatewayAttributes.ATTEMPTS, attempts.get());
+                context.attempts(attempts.get());
                 if (failure == null) {
                     if (!result.complete(response) && response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
                         byteBodyResponse.close();
@@ -604,12 +625,13 @@ final class DefaultProxyHandler implements ProxyHandler {
             if (reason instanceof RetryableAttempt attempt && attempt.getCause() != null) {
                 reason = attempt.getCause();
             }
-            request.setAttribute(GatewayAttributes.FAILURE, reason);
+            context.failure(reason);
             fallback.handle(request, pathVariables).whenComplete((response, error) -> {
                 if (error != null) {
                     result.completeExceptionally(unwrap(error));
-                } else {
-                    result.complete(response);
+                } else if (!result.complete(response) && response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                    // the relay was cancelled: nothing takes the response of the fallback
+                    byteBodyResponse.close();
                 }
             });
         }
@@ -628,7 +650,14 @@ final class DefaultProxyHandler implements ProxyHandler {
                 return CompletableFuture.failedFuture(new IllegalStateException("The relay was cancelled"));
             }
             CompletableFuture<@Nullable ServiceInstance> selected = route.isLoadBalanced() ? select() : CompletableFuture.completedFuture(null);
-            return selected.thenCompose(instance -> send(attempt, instance));
+            return selected.thenCompose(instance -> {
+                if (result.isDone()) {
+                    // cancelled while the instance was selected
+                    release(instance);
+                    return CompletableFuture.failedFuture(new IllegalStateException("The relay was cancelled"));
+                }
+                return send(attempt, instance);
+            });
         }
 
         private CompletionStage<HttpResponse<?>> send(int attempt, @Nullable ServiceInstance instance) {
@@ -636,7 +665,7 @@ final class DefaultProxyHandler implements ProxyHandler {
             if (instance != null) {
                 tried.add(instance.getURI());
             }
-            request.setAttribute(GatewayAttributes.UPSTREAM, target);
+            context.upstream(target);
             exchange.target(target);
             // the permit is taken right before the exchange, which always reports its outcome, and
             // before the body is taken from the request: while the circuit is open, a fallback
@@ -645,6 +674,7 @@ final class DefaultProxyHandler implements ProxyHandler {
             try {
                 permit = guard == null ? null : guard.acquire();
             } catch (RuntimeException open) {
+                release(instance);
                 return CompletableFuture.failedFuture(open);
             }
             CloseableByteBody attemptBody;
@@ -653,22 +683,30 @@ final class DefaultProxyHandler implements ProxyHandler {
             } catch (RuntimeException e) {
                 if (permit != null) {
                     // the upstream was not called: nothing to hold against it
-                    permit.onSuccess();
+                    permit.release();
                 }
+                release(instance);
                 return CompletableFuture.failedFuture(e);
             }
-            RawRequestOptions attemptOptions = options.toBuilder()
-                .retainHostHeader(exchange.isRetainHostHeader())
-                .serviceInstance(instance)
-                .build();
+            RawRequestOptions attemptOptions = instance == null
+                ? (exchange.isRetainHostHeader() ? retainHostOptions : options)
+                : options.toBuilder()
+                    .retainHostHeader(exchange.isRetainHostHeader())
+                    .serviceInstance(instance)
+                    .build();
             CompletableFuture<HttpResponse<?>> exchanged;
             try {
-                exchanged = client(upgrade).exchange(forInstance(upstream, instance), attemptBody, attemptOptions).toCompletableFuture();
+                exchanged = client(upgrade).exchange(forInstance(upstream, upstreamUri, instance), attemptBody, attemptOptions).toCompletableFuture();
             } catch (RuntimeException e) {
+                // nothing was sent: the selection and the permit are given back, not held against the upstream
                 if (attemptBody != null) {
                     attemptBody.close();
                 }
-                exchanged = CompletableFuture.failedFuture(e);
+                if (permit != null) {
+                    permit.release();
+                }
+                release(instance);
+                return CompletableFuture.failedFuture(e);
             }
             current.set(exchanged);
             if (result.isCancelled()) {
@@ -784,7 +822,8 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
 
         private void selectNot(LoadBalancer loadBalancer, CompletableFuture<@Nullable ServiceInstance> selected, @Nullable ServiceInstance first, int selections) {
-            first(loadBalancer.select()).whenComplete((instance, failure) -> {
+            // the key of the request, e.g. for a sticky load balancer, as the client of the service selects with
+            first(loadBalancer.select(factory.loadBalancerDiscriminator(route, request))).whenComplete((instance, failure) -> {
                 if (failure != null) {
                     if (first != null) {
                         selected.complete(first);
@@ -792,16 +831,47 @@ final class DefaultProxyHandler implements ProxyHandler {
                         selected.completeExceptionally(unwrap(failure));
                     }
                 } else if (instance == null) {
+                    release(loadBalancer, first);
                     selected.completeExceptionally(new NoAvailableServiceException(route.getServiceId()));
                 } else if (!tried.contains(instance.getURI())) {
+                    // a selection that is not sent is released, e.g. for the exchanges in flight of p2c
+                    release(loadBalancer, first);
+                    selected.complete(instance);
+                } else if (first == null && selections + 1 >= Math.min(MAX_SELECTIONS, tried.size() + 1)) {
+                    // every instance the load balancer gives was tried: try one again
                     selected.complete(instance);
                 } else if (selections + 1 >= Math.min(MAX_SELECTIONS, tried.size() + 1)) {
-                    // every instance the load balancer gives was tried: try one again
-                    selected.complete(first == null ? instance : first);
+                    release(loadBalancer, instance);
+                    selected.complete(first);
                 } else {
+                    if (first != null) {
+                        release(loadBalancer, instance);
+                    }
                     selectNot(loadBalancer, selected, first == null ? instance : first, selections + 1);
                 }
             });
+        }
+
+        /**
+         * Release a selected instance that no exchange is sent to: no outcome is held against it.
+         *
+         * @param instance The instance, or {@code null}
+         */
+        private void release(@Nullable ServiceInstance instance) {
+            if (instance == null) {
+                return;
+            }
+            try {
+                release(factory.loadBalancer(route), instance);
+            } catch (RuntimeException e) {
+                LOG.debug("The selection of {} for the gateway route {} could not be released", instance.getURI(), route.getId(), e);
+            }
+        }
+
+        private static void release(LoadBalancer loadBalancer, @Nullable ServiceInstance instance) {
+            if (instance != null) {
+                loadBalancer.report(instance, LoadBalancer.Outcome.CANCELLED);
+            }
         }
     }
 

@@ -101,6 +101,9 @@ class ResilienceTest extends GatewayTestBase {
         p.put("micronaut.http.services.ipv6.urls", List.of("http://[::1]:" + upstream2.getPort() + "/inspect"));
         p.put("micronaut.http.services.stale.urls", List.of("${test.scripted}"));
         p.put("micronaut.http.services.sticky.urls", List.of(dead, one));
+        p.put("micronaut.http.services.released.urls", List.of(dead, one));
+        p.put("micronaut.http.services.keyed.urls", List.of(one));
+        p.put("micronaut.http.services.keyed.load-balancer-key-header", "X-Session");
         p.put("micronaut.retry.circuit-breakers.recovering.reset", "1s");
         p.put("micronaut.retry.circuit-breakers.windowed.request-volume-threshold", 3);
         p.put("micronaut.retry.circuit-breakers.windowed.failure-ratio", 1);
@@ -212,6 +215,74 @@ class ResilienceTest extends GatewayTestBase {
         gateway.getApplicationContext().getBean(ProxyHandlerFactory.class).loadBalancer("sticky", sticky);
         for (int i = 0; i < 3; i++) {
             assertEquals(upstream.getPort(), instancePort(get("/sticky/up/instance")));
+        }
+    }
+
+    @Test
+    void ry10TheSelectionsTheRetryDoesNotSendAreReleased() throws IOException {
+        URI dead = URI.create("http://127.0.0.1:" + deadPort);
+        URI alive = upstream.getURI();
+        AtomicInteger selections = new AtomicInteger();
+        List<String> reports = new java.util.concurrent.CopyOnWriteArrayList<>();
+        LoadBalancer recording = new LoadBalancer() {
+            @Override
+            public org.reactivestreams.Publisher<ServiceInstance> select(Object discriminator) {
+                return Publishers.just(ServiceInstance.of("released", selections.getAndIncrement() % 3 == 2 ? alive : dead));
+            }
+
+            @Override
+            public void report(ServiceInstance serviceInstance, Outcome outcome) {
+                reports.add(serviceInstance.getURI().getPort() + " " + outcome);
+            }
+        };
+        gateway.getApplicationContext().getBean(ProxyHandlerFactory.class).loadBalancer("released", recording);
+        // the dead instance, again the dead instance, which was tried and is released, then the alive one
+        assertEquals(upstream.getPort(), instancePort(get("/released/up/instance")));
+        assertEquals(List.of(deadPort + " CANCELLED"), reports);
+    }
+
+    @Test
+    void lb16TheLoadBalancerSelectsWithTheKeyOfTheRequest() throws IOException {
+        List<Object> keys = new java.util.concurrent.CopyOnWriteArrayList<>();
+        LoadBalancer keyed = discriminator -> {
+            keys.add(String.valueOf(io.micronaut.http.client.loadbalance.LoadBalancerKey.of(discriminator)));
+            return Publishers.just(ServiceInstance.of("keyed", upstream.getURI()));
+        };
+        gateway.getApplicationContext().getBean(ProxyHandlerFactory.class).loadBalancer("keyed", keyed);
+        assertEquals(upstream.getPort(), instancePort(get("/keyed/up/instance", "X-Session: session-1")));
+        assertEquals(List.of("session-1"), keys);
+    }
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(e);
+        }
+    }
+
+    @Test
+    void ry17AStreamingBodyThatAnAttemptTookIsNotRetriedWithoutIt() throws IOException {
+        String part = "streamed-payload";
+        String payload = part + part;
+        RawHttp.Response response;
+        try (RawHttp http = new RawHttp(gateway.getPort())) {
+            // the rest of the body arrives after the attempt took it: the body streams
+            http.send("POST /retry-post/flaky?key=ry17&failures=1 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n"
+                + "Content-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n"
+                + Integer.toHexString(part.length()) + "\r\n" + part + "\r\n");
+            sleep(300);
+            http.send(Integer.toHexString(part.length()) + "\r\n" + part + "\r\n0\r\n\r\n");
+            response = http.read(false);
+        }
+        if (response.status() == 200) {
+            // the body was sent again: all of it
+            assertEquals("attempt 2 " + Upstream.digest(payload.getBytes()), response.text(), response.toString());
+        } else {
+            // the body could not be sent again: the response of the only attempt
+            assertEquals(503, response.status(), response.toString());
+            assertEquals(1, counters().get("flaky-ry17"));
         }
     }
 
@@ -432,7 +503,7 @@ class ResilienceTest extends GatewayTestBase {
     static class EchoFallback implements AsyncRequestHandler {
         @Override
         public CompletableFuture<HttpResponse<?>> handle(io.micronaut.http.HttpRequest<?> request, io.micronaut.http.PathVariables pathVariables) {
-            Throwable failure = request.getAttribute(GatewayAttributes.FAILURE, Throwable.class).orElse(null);
+            Throwable failure = GatewayRequestContext.find(request).flatMap(GatewayRequestContext::failure).orElse(null);
             String segment = pathVariables.contains("segment") ? pathVariables.getString("segment") : "-";
             Throwable root = failure;
             while (root != null && root.getCause() != null && !(root instanceof io.micronaut.retry.exception.CircuitOpenException)) {
@@ -493,6 +564,10 @@ class ResilienceTest extends GatewayTestBase {
             gateway.route("ipv6").path("/ipv6/**").filters(GatewayFilters.stripPrefix(1)).uri("lb://ipv6");
             gateway.route("halfdead").path("/halfdead/**").filters(GatewayFilters.stripPrefix(1)).retry(retry).uri("lb://halfdead");
             gateway.route("sticky").path("/sticky/**").filters(GatewayFilters.stripPrefix(1)).retry(retry).uri("lb://sticky");
+            gateway.route("released").path("/released/**").filters(GatewayFilters.stripPrefix(1)).retry(retry).uri("lb://released");
+            gateway.route("keyed").path("/keyed/**").filters(GatewayFilters.stripPrefix(1)).uri("lb://keyed");
+            gateway.route("retry-post").path("/retry-post/**").filters(GatewayFilters.stripPrefix(1))
+                .retry(retry.withStatuses(503).withMethods("POST")).uri(upstream);
             gateway.route("stale").path("/stale/**").filters(GatewayFilters.stripPrefix(1)).retry(retry).uri("lb://stale");
             gateway.route("retry").path("/retry/**")
                 .filters(GatewayFilters.stripPrefix(1), GatewayFilters.addRequestHeader("X-Added", "gw"))

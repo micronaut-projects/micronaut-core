@@ -19,6 +19,7 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClientConfiguration;
@@ -26,6 +27,8 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.RawHttpClientRegistry;
+import io.micronaut.http.client.ServiceHttpClientConfiguration;
+import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.server.util.ForwardedHeaders;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.retry.CircuitBreakerRegistry;
@@ -35,6 +38,7 @@ import jakarta.inject.Singleton;
 import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -77,6 +81,7 @@ public final class ProxyHandlerFactory {
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final RetryOperationsFactory retryOperationsFactory;
     private final Map<String, LoadBalancer> loadBalancers = new ConcurrentHashMap<>();
+    private final Map<String, Optional<ServiceHttpClientConfiguration>> serviceConfigurations = new ConcurrentHashMap<>();
 
     ProxyHandlerFactory(RawHttpClientRegistry clientRegistry,
                         LoadBalancerResolver loadBalancerResolver,
@@ -88,7 +93,7 @@ public final class ProxyHandlerFactory {
         this.loadBalancerResolver = loadBalancerResolver;
         this.beanLocator = beanLocator;
         this.forwardedHeaders = configuration.getForwarded().toForwardedHeaders();
-        this.xForwarded = configuration.getForwarded().isXForwarded();
+        this.xForwarded = configuration.getForwarded().isXForwardedHeaders();
         this.circuitBreakerRegistry = circuitBreakerRegistry;
         this.retryOperationsFactory = retryOperationsFactory;
     }
@@ -135,6 +140,22 @@ public final class ProxyHandlerFactory {
         String serviceId = route.getServiceId();
         return loadBalancers.computeIfAbsent(serviceId, id -> loadBalancerResolver.resolve(id)
             .orElseThrow(() -> new NoAvailableServiceException(id)));
+    }
+
+    /**
+     * The discriminator a load balanced route selects the instance of a request with, as the
+     * client of the service does: the request, whose load balancer key is read from the key
+     * header of the service, if it configures one, see
+     * {@link ServiceHttpClientConfiguration#getLoadBalancerKeyHeader()}.
+     *
+     * @param route   A load balanced route
+     * @param request The inbound request
+     * @return The discriminator
+     */
+    Object loadBalancerDiscriminator(GatewayRoute route, HttpRequest<?> request) {
+        Optional<ServiceHttpClientConfiguration> configuration = serviceConfigurations.computeIfAbsent(route.getServiceId(),
+            id -> beanLocator.findBean(ServiceHttpClientConfiguration.class, Qualifiers.byName(id)));
+        return configuration.<Object>map(c -> LoadBalancerKey.discriminator(request, c)).orElse(request);
     }
 
     /**
