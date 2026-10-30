@@ -5,8 +5,8 @@ import io.micronaut.core.io.buffer.ByteArrayBufferFactory
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.body.CloseableByteBody
-import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.body.stream.AvailableByteArrayBody
+import io.micronaut.http.cookie.Cookie
 import spock.lang.Specification
 
 class RawHttpRequestWrapperSpec extends Specification {
@@ -20,7 +20,7 @@ class RawHttpRequestWrapperSpec extends Specification {
             expectedLength: { -> bytes.expectedLength() },
             move          : { -> bytes.move() },
         ] as CloseableByteBody
-        def wrapper = new RawHttpRequestWrapper<Object>(ConversionService.SHARED, HttpRequest.POST("http://localhost/echo", null), tracked)
+        def wrapper = new NettyRawHttpRequestWrapper<Object>(ConversionService.SHARED, HttpRequest.POST("http://localhost/echo", null), tracked)
 
         expect:
         wrapper.byteBodyDirect().is(tracked)
@@ -52,7 +52,7 @@ class RawHttpRequestWrapperSpec extends Specification {
         given:
         CloseableByteBody bytes = AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, new byte[0])
         def request = HttpRequest.GET("http://localhost/echo").header(HttpHeaders.COOKIE, "kept=1; replaced=old")
-        def wrapper = new RawHttpRequestWrapper<Object>(ConversionService.SHARED, request, bytes)
+        def wrapper = new NettyRawHttpRequestWrapper<Object>(ConversionService.SHARED, request, bytes)
 
         when:
         wrapper.cookie(Cookie.of("replaced", "new")).cookie(Cookie.of("added", "2"))

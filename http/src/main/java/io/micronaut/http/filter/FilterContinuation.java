@@ -27,10 +27,24 @@ import io.micronaut.http.HttpRequest;
  * response has been received and processed by downstream filters.<br>
  * A continuation can either return the value immediately (e.g.
  * {@code FilterContinuation<HttpResponse<?>>}), in which case the call to {@link #proceed()} will
- * block, or it can return a reactive wrapper (e.g.
- * {@code FilterContinuation<Publisher<HttpResponse<?>>>}). With a reactive wrapper,
- * {@link #proceed()} will not block, and downstream processing will happen asynchronously (after
- * the reactive stream is subscribed to).
+ * block, or it can return a {@link java.util.concurrent.CompletionStage} (e.g.
+ * {@code FilterContinuation<CompletionStage<HttpResponse<?>>>}, or a
+ * {@link java.util.concurrent.CompletableFuture}), or a reactive wrapper (e.g.
+ * {@code FilterContinuation<Publisher<HttpResponse<?>>>}). With a stage, {@link #proceed()} will
+ * not block, starts the downstream processing, and returns a stage that completes with its result.
+ * With a reactive wrapper, {@link #proceed()} will not block, and downstream processing will
+ * happen asynchronously (after the reactive stream is subscribed to).<br>
+ * A filter method with a {@link java.util.concurrent.CompletionStage} continuation must return the
+ * response (e.g. as a {@code CompletionStage<HttpResponse<?>>}), a {@code void} method is
+ * rejected. The continuation is declared with exactly {@code CompletionStage} or
+ * {@code CompletableFuture}, no other subtype. It proceeds once: a second {@link #proceed()} throws
+ * an {@link IllegalStateException}. The stage and the stages derived from it complete with the
+ * propagated context of the downstream, so that their callbacks see it when they run as the stage
+ * completes. Cancelling the stage returned by {@link #proceed()}, a stage derived from it, or the
+ * filter itself, is a hint to the downstream that the response is no longer needed. Completing
+ * the original or derived continuation future exceptionally (including {@code orTimeout})
+ * also sends this hint. This propagation through derived futures is specific to filter
+ * continuations; ordinary {@code CompletionStage} dependent stages do not cancel their source.
  *
  * @param <R> The type to return in {@link #proceed()}
  */
@@ -51,11 +65,17 @@ public interface FilterContinuation<R> {
      * may block in the netty HTTP server should use
      * {@link io.micronaut.scheduling.annotation.ExecuteOn} to avoid running on the event loop.</b>
      * <br>
+     * If {@link R} is a {@link java.util.concurrent.CompletionStage}, this method will return
+     * immediately, after starting the downstream processing, with a stage that completes with the
+     * downstream result. It can only be called once.
+     * <br>
      * If {@link R} is a reactive type, this method will return immediately. Downstream processing
      * will happen when the reactive stream is subscribed to, and the reactive stream will produce
      * the downstream result when available.
      *
      * @return The downstream result, or reactive stream wrapper thereof
+     * @throws IllegalStateException if {@link R} is a {@link java.util.concurrent.CompletionStage}
+     * and the continuation proceeded already
      */
     R proceed();
 }

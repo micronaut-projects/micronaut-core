@@ -38,6 +38,8 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
     private OwnershipState state = OwnershipState.OPEN;
     /** The destruction invocation a temporary group belongs to, which may resolve during shutdown; null for any other owner. */
     final @Nullable DefaultBeanResolutionContext destructionContext;
+    /** The destruction invocation that stopped resolution, whose callbacks may still resolve through this owner. */
+    private @Nullable DefaultBeanResolutionContext stoppedBy;
 
     /** Creates the owner of a bean being created, or of an independent group. */
     DefaultBeanDependencies() {
@@ -93,6 +95,27 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
     }
 
     /**
+     * Finds the dependent this owner created for the given bean. Identity selects it, not equality. A dependent whose
+     * destruction has begun, such as one closed directly rather than through this owner, is no longer found, although
+     * this owner keeps it until it is removed or the owner closes.
+     *
+     * @param bean The bean
+     * @param <T> The bean type
+     * @return The registration, or null when this owner does not hold the bean
+     */
+    @SuppressWarnings({"unchecked", "ReferenceEquality"}) // A lifecycle belongs to an instance, even when two beans compare equal.
+    <T> @Nullable BeanRegistration<T> find(T bean) {
+        // the list is immutable: the dependents' own state is read outside this owner's lock
+        for (BeanRegistration<?> candidate : dependentBeans()) {
+            DefaultBeanDependencies candidateDependencies = candidate.getDependencies();
+            if (candidate.bean() == bean && (candidateDependencies == null || !candidateDependencies.isClosing())) {
+                return (BeanRegistration<T>) candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Destroys every owned dependent in reverse creation order. All of them are attempted; the first failure is
      * rethrown with the later ones suppressed on it.
      *
@@ -134,17 +157,50 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
     }
 
     /**
+     * Records shared registrations that the owner only orders its destruction by, as an owner rebound to another
+     * context carries over those of the one it replaces.
+     *
+     * @param registrations The shared registrations
+     */
+    synchronized void requireAll(List<BeanRegistration<?>> registrations) {
+        attach(List.of(), registrations);
+    }
+
+    /**
      * @return Whether this owner stopped accepting new dependencies
      */
     synchronized boolean isClosing() {
         return state != OwnershipState.OPEN;
     }
 
-    /** Rejects further resolution through this owner while keeping what it holds, as the destruction of its bean begins. */
-    synchronized void stopResolving() {
+    /**
+     * Rejects further resolution through this owner while keeping what it holds, as the destruction of its bean begins.
+     * The destruction callbacks of the invocation may still resolve until it returns, on its thread or on another
+     * one they hand work to; what they create is destroyed with the owner.
+     *
+     * @param invocation The destruction invocation, or null when its callbacks may not resolve through this owner
+     */
+    synchronized void stopResolving(@Nullable DefaultBeanResolutionContext invocation) {
         if (state == OwnershipState.OPEN) {
             state = OwnershipState.RESOLUTION_STOPPED;
         }
+        if (state != OwnershipState.OWNERSHIP_RELEASED && stoppedBy == null) {
+            stoppedBy = invocation;
+        }
+    }
+
+    /**
+     * @return Whether a resolution may be attached to this owner: it is open, or the destruction invocation that
+     * stopped it has not returned yet. The invocation is not confined to its thread, since a destruction callback
+     * may hand work to another thread and wait for it; what that work creates is attached atomically with the
+     * release of the owner, and so destroyed with it or not at all
+     */
+    private synchronized boolean isResolvable() {
+        return switch (state) {
+            case OPEN -> true;
+            case RESOLUTION_STOPPED, DESTRUCTION_CLAIMED -> stoppedBy != null && stoppedBy.isDestructionInvocationOpen();
+            case OWNERSHIP_RELEASED -> false;
+        };
     }
 
     /**
@@ -170,6 +226,7 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
         List<BeanRegistration<?>> taken = owned;
         owned = List.of();
         required = List.of();
+        stoppedBy = null;
         interceptorCandidates = InterceptorCandidates.Unresolved.INSTANCE;
         return taken;
     }
@@ -216,13 +273,14 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
     }
 
     /**
-     * Throws when nothing can be resolved through this owner any more: it is closing, the context is shutting down,
-     * or the destruction invocation it belongs to has returned.
+     * Throws when nothing can be resolved through this owner any more: it is closing and the lookup is not made by
+     * its destruction callbacks, the context is shutting down and its callbacks have ended, or the destruction
+     * invocation it belongs to has returned.
      *
      * @param context The context
      */
     synchronized void checkOpen(DefaultBeanContext context) {
-        if (isClosing() || destructionContext != null && !destructionContext.isDestructionInvocationActive()
+        if (!isResolvable() || destructionContext != null && !destructionContext.isDestructionInvocationActive()
             || destructionContext == null && context.isDependencyResolutionClosed()) {
             throw new IllegalStateException("Cannot resolve a dependency after owner destruction or context shutdown has begun");
         }
@@ -240,6 +298,7 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
      */
     <T> T resolve(DefaultBeanContext context, @Nullable BeanDefinition<?> definition,
                   Function<? super DefaultBeanResolutionContext, T> operation) {
+        long shutdownPhase = context.shutdownPhase();
         checkOpen(context);
         // User factories run outside the owner lock. Publication is atomic with closing.
         List<BeanRegistration<?>> created = List.of();
@@ -249,6 +308,10 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
                 created = resolution.getAndResetDependentBeans();
                 synchronized (this) {
                     checkOpen(context);
+                    if (destructionContext == null) {
+                        // A temporary destruction group releases its dependents itself.
+                        context.trackShutdownDependents(shutdownPhase, this, created);
+                    }
                     attach(created, resolution.requiredBeans());
                 }
                 return result;
@@ -263,7 +326,7 @@ final class DefaultBeanDependencies implements DependentBeanProvider, BeanDepend
     @Override
     public <S> @Nullable S resolveDependencies(BeanLocator context, @Nullable BeanDefinition<?> definition,
                                                Function<BeanResolutionContext, S> operation) {
-        if (!(context instanceof DefaultBeanContext beanContext) || isClosing()) {
+        if (!(context instanceof DefaultBeanContext beanContext) || !isResolvable()) {
             return null;
         }
         return resolve(beanContext, definition, operation);

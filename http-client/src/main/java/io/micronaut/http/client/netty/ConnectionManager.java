@@ -18,6 +18,7 @@ package io.micronaut.http.client.netty;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.naming.NameUtils;
@@ -124,8 +125,6 @@ import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
@@ -307,6 +306,13 @@ public class ConnectionManager {
             threadFactory,
             NioIoHandler.newFactory()
         );
+    }
+
+    /**
+     * @return The event loop group the connections of this manager run on
+     */
+    EventLoopGroup eventLoopGroup() {
+        return group;
     }
 
     /**
@@ -612,10 +618,11 @@ public class ConnectionManager {
      *
      * @param requestKey The remote to connect to
      * @param handler The websocket message handler
-     * @return A mono that will complete when the handshakes complete
+     * @return A flow that completes empty once the channel pipeline is set up. If the flow is
+     * cancelled before that, the channel is closed
      */
-    final Mono<?> connectForWebsocket(NettyHttpClient.RequestKey requestKey, ChannelHandler handler) {
-        Sinks.Empty<Object> initial = new CancellableMonoSink<>(null);
+    final ExecutionFlow<@Nullable Void> connectForWebsocket(NettyHttpClient.RequestKey requestKey, ChannelHandler handler) {
+        DelayedExecutionFlow<@Nullable Void> initial = DelayedExecutionFlow.create();
 
         ChannelFuture connectFuture = doConnect(requestKey, new CustomizerAwareInitializer() {
             @Override
@@ -626,14 +633,14 @@ public class ConnectionManager {
                     SslContext sslContext = buildWebsocketSslContext(requestKey);
                     if (sslContext != null) {
                         try {
-                            ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
+                            addSslHandler(ch.pipeline(), null, sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort()));
                         } finally {
                             ReferenceCountUtil.release(sslContext);
                         }
                     }
                 } catch (Throwable e) {
                     // report the failure instead of letting the channel close with a generic error
-                    initial.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + describe(e), e));
+                    initial.tryCompleteExceptionally(new WebSocketSessionException("Error opening WebSocket client session: " + describe(e), e));
                     ch.close();
                     return;
                 }
@@ -660,11 +667,12 @@ public class ConnectionManager {
                     }
                     ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
                     Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION).onInitialPipelineBuilt();
-                    if (initial.tryEmitEmpty().isSuccess()) {
+                    // a cancelled connect closes the channel instead of completing
+                    if (!initial.isCancelled() && initial.tryComplete(null)) {
                         return;
                     }
                 } catch (Throwable e) {
-                    initial.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + describe(e), e));
+                    initial.tryCompleteExceptionally(new WebSocketSessionException("Error opening WebSocket client session: " + describe(e), e));
                 }
                 // failed
                 ch.close();
@@ -672,11 +680,11 @@ public class ConnectionManager {
         }, group);
         withPropagation(connectFuture, future -> {
             if (!future.isSuccess()) {
-                initial.tryEmitError(future.cause());
+                initial.tryCompleteExceptionally(future.cause());
             }
         });
 
-        return initial.asMono();
+        return initial;
     }
 
     private void configureProxy(ChannelPipeline pipeline, boolean secure, String host, int port) {
@@ -761,10 +769,19 @@ public class ConnectionManager {
     private SslHandler configureSslHandler(SslHandler sslHandler) {
         sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
         SSLEngine engine = sslHandler.engine();
-        SSLParameters params = engine.getSSLParameters();
-        params.setEndpointIdentificationAlgorithm("HTTPS");
-        engine.setSSLParameters(params);
+        if (!(configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration acsc) || acsc.isEndpointIdentification()) {
+            SSLParameters params = engine.getSSLParameters();
+            params.setEndpointIdentificationAlgorithm("HTTPS");
+            engine.setSSLParameters(params);
+        }
         return sslHandler;
+    }
+
+    private void addSslHandler(ChannelPipeline pipeline, @Nullable String name, SslHandler sslHandler) {
+        pipeline.addLast(name, configureSslHandler(sslHandler));
+        if (configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.getHostnameVerifier() != null) {
+            pipeline.addLast(new HostnameVerifierHandler(acsc.getHostnameVerifier(), sslHandler.engine()));
+        }
     }
 
     /**
@@ -1044,7 +1061,7 @@ public class ConnectionManager {
             SslContext sslContext = this.sslContext.get();
             if (sslContext != null) {
                 try {
-                    ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)));
+                    addSslHandler(ch.pipeline(), ChannelPipelineCustomizer.HANDLER_SSL, sslContext.newHandler(ch.alloc(), host, port));
                 } finally {
                     ReferenceCountUtil.release(sslContext);
                 }

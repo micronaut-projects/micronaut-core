@@ -20,14 +20,11 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
-import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.naming.conventions.StringConvention;
-import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -52,7 +49,7 @@ import java.util.Map;
 @Requires(beans = Environment.class)
 @Requires(property = PropertiesLoggingLevelsConfigurer.LOGGER_PROPERTY_PREFIX)
 @Internal
-final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListener<RefreshEvent>, Ordered {
+final class PropertiesLoggingLevelsConfigurer {
 
     static final String LOGGER_PROPERTY_PREFIX = "logger";
     static final String LOGGER_LEVELS_PROPERTY_PREFIX = LOGGER_PROPERTY_PREFIX + ".levels";
@@ -80,19 +77,12 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
     }
 
     /**
-     * Sets log level according to properties on refresh.
-     *
-     * @param event refresh event
+     * Sets the log levels again from the current properties, for a refresh of the configuration: see
+     * {@link PropertiesLoggingLevelsRefreshListener} and {@link PropertiesLoggingLevelsWatcher}.
      */
-    @Override
-    public void onApplicationEvent(RefreshEvent event) {
+    void refresh() {
         initLogging();
         configureLogLevels();
-    }
-
-    @Override
-    public int getOrder() {
-        return Ordered.HIGHEST_PRECEDENCE;
     }
 
     private void initLogging() {

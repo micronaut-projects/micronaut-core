@@ -1,3 +1,6 @@
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+
 plugins {
     id("io.micronaut.build.internal.convention-base")
     id("io.micronaut.build.internal.convention-python")
@@ -31,7 +34,10 @@ dependencies {
     api(projects.micronautJacksonDatabind)
     api(projects.micronautRouter)
     api(projects.micronautRuntime)
+    api(projects.micronautRetry)
     api(projects.micronautCoreReactive)
+    // FormDemuxerBenchmark decodes forms like the server does
+    api(libs.managed.netty.contrib.multipart.core)
 
     api(platform(libs.test.boms.micronaut.validation))
     api(libs.managed.reactor)
@@ -53,6 +59,14 @@ val jmhProfilers = providers.gradleProperty("jmh.profilers")
     .getOrElse(emptyList())
 val jmhPoolSizes = providers.gradleProperty("jmh.poolSizes")
     .map { it.split(",").map(String::trim).filter(String::isNotEmpty) }
+// -Pjmh.benchmarkParameters='mode=STATIC;warm=false|true;fixture=shop' narrows a benchmark's @Param matrix
+val jmhBenchmarkParameters = providers.gradleProperty("jmh.benchmarkParameters")
+    .map { spec ->
+        spec.split(";").map(String::trim).filter(String::isNotEmpty).associate { assignment ->
+            val (name, values) = assignment.split("=", limit = 2)
+            name.trim() to values.split("|").map(String::trim).filter(String::isNotEmpty)
+        }
+    }
 val jmhHumanOutput = providers.gradleProperty("jmh.humanOutput")
     .map(layout.projectDirectory::file)
 // Benchmark switches read by BenchOptions in the forked JMH JVM. A -D on the Gradle command line
@@ -60,10 +74,16 @@ val jmhHumanOutput = providers.gradleProperty("jmh.humanOutput")
 // -Pjmh.dateHeader=true, -Pjmh.accessLog=true
 val jmhBenchSwitches = listOf(
     "jmh.dateHeader" to "micronaut.bench.date-header",
-    "jmh.accessLog" to "micronaut.bench.access-log"
+    "jmh.accessLog" to "micronaut.bench.access-log",
+    // -Pjmh.pythonSampler=/path/histogram.txt profiles the Python side of the compilation pipeline
+    "jmh.pythonSampler" to "micronaut.python.cpusampler"
 ).mapNotNull { (property, systemProperty) ->
     providers.gradleProperty(property).orNull?.let { "-D$systemProperty=$it" }
-}
+} + (if (jmhIncludes.any { it.contains("PythonPipelineBenchmark") }) listOf(
+    // the stage timings PythonPipelineBenchmark reports; a JMH -jvmArgsAppend replaces the @Fork ones,
+    // and no other benchmark pays for the instrumentation
+    "-Dmicronaut.python.timings=true"
+) else emptyList())
 
 jmh {
     includes = jmhIncludes
@@ -76,9 +96,51 @@ jmh {
     jmhPoolSizes.orNull?.let { sizes ->
         benchmarkParameters.put("poolSize", objects.listProperty(String::class.java).value(sizes))
     }
+    jmhBenchmarkParameters.orNull?.forEach { (name, values) ->
+        benchmarkParameters.put(name, objects.listProperty(String::class.java).value(values))
+    }
     humanOutputFile.set(jmhHumanOutput)
     jvmArgsAppend.addAll(jmhBenchSwitches)
     duplicateClassesStrategy = DuplicatesStrategy.WARN
+}
+
+// The fat jar keeps every copy of a duplicated entry, so a service loader would only see the first
+// META-INF/services file of each name. The service files are merged into one file per service.
+val mergedServices = layout.buildDirectory.dir("jmh-merged-services")
+val mergeJmhServices = tasks.register("mergeJmhServices") {
+    val classpath = configurations.named("jmhRuntimeClasspath")
+    val jmhOutput = sourceSets.named("jmh").map { it.output }
+    val mainOutput = sourceSets.named("main").map { it.output }
+    inputs.files(classpath, jmhOutput, mainOutput)
+    outputs.dir(mergedServices)
+    doLast {
+        val services = sortedMapOf<String, LinkedHashSet<String>>()
+        fun add(name: String, text: String) {
+            val lines = services.getOrPut(name) { LinkedHashSet() }
+            text.lineSequence().map(String::trim).filter { it.isNotEmpty() && !it.startsWith("#") }.forEach(lines::add)
+        }
+        (jmhOutput.get().files + mainOutput.get().files + classpath.get().files).forEach { root ->
+            if (root.isDirectory) {
+                root.resolve("META-INF/services").listFiles()?.filter { it.isFile }?.forEach { add(it.name, it.readText()) }
+            } else if (root.isFile && root.name.endsWith(".jar")) {
+                val zip = ZipFile(root)
+                try {
+                    for (entry: ZipEntry in zip.entries().toList()) {
+                        val name: String = entry.name
+                        if (!entry.isDirectory && name.startsWith("META-INF/services/") && name.indexOf('/', "META-INF/services/".length) < 0) {
+                            add(name.substringAfterLast('/'), zip.getInputStream(entry).bufferedReader().readText())
+                        }
+                    }
+                } finally {
+                    zip.close()
+                }
+            }
+        }
+        val dir = mergedServices.get().asFile.resolve("META-INF/services")
+        dir.deleteRecursively()
+        dir.mkdirs()
+        services.forEach { (name, lines) -> dir.resolve(name).writeText(lines.joinToString("\n", postfix = "\n")) }
+    }
 }
 
 tasks {
@@ -89,6 +151,18 @@ tasks {
     named<Jar>("jmhJar") {
         isZip64 = true
         manifest.attributes["Multi-Release"] = "true"
+        dependsOn(mergeJmhServices)
+        val mergedDir = mergedServices.get().asFile
+        // the merged files replace every copy of the service files of the classpath
+        eachFile {
+            if (path.startsWith("META-INF/services/") && !file.toPath().startsWith(mergedDir.toPath())) {
+                exclude()
+            }
+        }
+        from(mergedServices)
+        // the GraalPy virtual filesystems stay in the module jars on the classpath: a copy in the
+        // benchmark jar is a second instance GraalPy refuses to choose between
+        exclude("GRAALPY-VFS/**")
     }
 }
 

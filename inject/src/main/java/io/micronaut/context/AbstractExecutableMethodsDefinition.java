@@ -16,7 +16,9 @@
 package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.PropertySourcePropertyResolver;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -26,13 +28,16 @@ import io.micronaut.core.type.GenericPlaceholder;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ImmutableStringIntMap;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
+import io.micronaut.inject.annotation.RegisteredAnnotationBuilders;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -55,6 +61,10 @@ import java.util.stream.Stream;
 public abstract class AbstractExecutableMethodsDefinition<T> implements ExecutableMethodsDefinition<T>, EnvironmentConfigurable, BeanContextConfigurable {
 
     private final MethodReference[] methodsReferences;
+    /**
+     * The generated definition invoking the methods: this one, or the one a copy is made from.
+     */
+    private final AbstractExecutableMethodsDefinition<T> dispatcher;
     private final DispatchedExecutableMethod<T, ?>[] executableMethods;
     @Nullable
     private Environment environment;
@@ -69,7 +79,26 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
     protected AbstractExecutableMethodsDefinition(MethodReference[] methodsReferences) {
         this.methodsReferences = methodsReferences;
+        this.dispatcher = this;
         this.executableMethods = new DispatchedExecutableMethod[methodsReferences.length];
+    }
+
+    private AbstractExecutableMethodsDefinition(AbstractExecutableMethodsDefinition<T> dispatcher) {
+        this.methodsReferences = dispatcher.methodsReferences;
+        this.dispatcher = dispatcher;
+        this.executableMethods = new DispatchedExecutableMethod[methodsReferences.length];
+    }
+
+    /**
+     * A copy with its own methods, invoked by this definition. A generated bean definition keeps its methods
+     * definition in a static field, shared by every context that loads the bean definition, so each loaded bean
+     * definition takes a copy: the methods, their metadata and the values they keep then belong to one context, and
+     * are dropped with it.
+     *
+     * @return The copy
+     */
+    AbstractExecutableMethodsDefinition<T> copy() {
+        return new Copy<>(dispatcher);
     }
 
     @Override
@@ -205,9 +234,18 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     @Override
     public <R> ExecutableMethod<T, R> getExecutableMethodByIndex(int index) {
         DispatchedExecutableMethod<T, R> executableMethod = (DispatchedExecutableMethod<T, R>) executableMethods[index];
+        return executableMethod != null ? executableMethod : createExecutableMethod(index);
+    }
+
+    /**
+     * Creates the method at the index once: the callers sharing this definition, such as the proxies of a
+     * non-singleton bean created concurrently, get the same method and the values it keeps.
+     */
+    private synchronized <R> ExecutableMethod<T, R> createExecutableMethod(int index) {
+        DispatchedExecutableMethod<T, R> executableMethod = (DispatchedExecutableMethod<T, R>) executableMethods[index];
         if (executableMethod == null) {
             MethodReference methodsReference = methodsReferences[index];
-            executableMethod = new DispatchedExecutableMethod<>(this, index, methodsReference, methodsReference.annotationMetadata);
+            executableMethod = new DispatchedExecutableMethod<>(dispatcher, index, methodsReference, methodsReference.annotationMetadata);
             if (environment != null) {
                 executableMethod.configure(environment);
             }
@@ -413,6 +451,54 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     }
 
     /**
+     * A copy of a generated definition with its own methods. The generated definition invokes them and answers the
+     * lifecycle method indexes.
+     *
+     * @param <T> The type
+     */
+    private static final class Copy<T> extends AbstractExecutableMethodsDefinition<T> {
+
+        private final AbstractExecutableMethodsDefinition<T> generated;
+
+        private Copy(AbstractExecutableMethodsDefinition<T> generated) {
+            super(generated);
+            this.generated = generated;
+        }
+
+        @Override
+        protected Object dispatch(int index, T target, @Nullable Object[] args) {
+            return generated.dispatch(index, target, args);
+        }
+
+        @Override
+        protected Method getTargetMethodByIndex(int index) {
+            return generated.getTargetMethodByIndex(index);
+        }
+
+        @Override
+        protected int @Nullable [] getPostConstructMethodIndexes() {
+            return generated.getPostConstructMethodIndexes();
+        }
+
+        @Override
+        protected int @Nullable [] getPreDestroyMethodIndexes() {
+            return generated.getPreDestroyMethodIndexes();
+        }
+
+        @Override
+        public boolean requiresMethodProcessing() {
+            return generated.requiresMethodProcessing();
+        }
+
+        @Override
+        protected <R> @Nullable ExecutableMethod<T, R> getMethod(String name, Class<?>... argumentTypes) {
+            // The generated definition looks the method up by name, then the copy returns its own method at that index
+            ExecutableMethod<T, R> method = generated.getMethod(name, argumentTypes);
+            return method instanceof DispatchedExecutableMethod<T, R> dispatched ? getExecutableMethodByIndex(dispatched.index) : null;
+        }
+    }
+
+    /**
      * An {@link ExecutableMethod} instance based on dispatching by index.
      *
      * @param <T> The type
@@ -421,9 +507,36 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     private static final class DispatchedExecutableMethod<T, R> implements ExecutableMethod<T, R>,
         EnvironmentConfigurable, BeanContextConfigurable, UnsafeExecutable<T, R> {
 
+        /**
+         * A kept {@code null} value.
+         */
+        private static final Object NULL_VALUE = new Object();
+        private static final long NOT_CACHEABLE = -1;
+        private static final int ENTRY_VALUE = 0;
+        private static final int ENTRY_ANNOTATION_VALUE = 1;
+        private static final int ENTRY_ANNOTATION = 2;
+        private static final int ENTRY_UNEVALUATED_VALUE = 3;
+        private static final byte CACHE_NEVER = 0;
+        private static final byte CACHE_STATIC = 1;
+        private static final byte CACHE_PER_REVISION = 2;
+
         private final AbstractExecutableMethodsDefinition dispatcher;
         private final int index;
         private final MethodReference methodReference;
+        /**
+         * The generated metadata of the method, wrapped by the configured metadata.
+         */
+        private final AnnotationMetadata declaredAnnotationMetadata;
+        /**
+         * The class loader of the context that configured the method, which builds the annotations of the
+         * application.
+         */
+        @SuppressWarnings("java:S3077") // a class loader reference, published once configured
+        private volatile @Nullable ClassLoader classLoader;
+        /**
+         * The metadata resolving the property placeholders with the environment of the last configured context.
+         */
+        private AnnotationMetadata environmentAnnotationMetadata;
         private AnnotationMetadata annotationMetadata;
         @Nullable
         private ReturnType<R> returnType;
@@ -433,6 +546,232 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         @SuppressWarnings("java:S3077") // a Method is immutable: publishing the reference publishes it
         private volatile Method targetMethod;
 
+        // Built on first use and published without synchronization: ImmutableStringIntMap is filled in
+        // its constructor and only has final fields, so it is safe to share via a data race.
+        // Concurrent first calls may each build an equal table; that is harmless.
+        @Nullable
+        private ImmutableStringIntMap argumentIndex;
+
+        /**
+         * The values kept by {@link #getCachedValue(Class, Function)} and the annotation lookups: the revision and the
+         * metadata they were computed for, then key/entry pairs. {@code null} until a value is kept, then replaced by a longer copy
+         * for each new key, or by a new array for a new revision.
+         */
+        @SuppressWarnings("java:S3077") // never modified once published: volatile publishes it
+        private volatile Object @Nullable [] cachedValues;
+        /**
+         * How values derived from the metadata can be kept, updated when the metadata is replaced. The method is
+         * configured before it is published to callers, so the configuration fields are not read concurrently with
+         * their writes.
+         */
+        private byte cacheMode;
+        /**
+         * How values derived only from the unevaluated metadata can be kept: as {@link #cacheMode}, ignoring the
+         * evaluated expressions.
+         */
+        private byte unevaluatedCacheMode;
+        /**
+         * The properties that the placeholders of the metadata resolve from, set by the environment.
+         */
+        @Nullable
+        private PropertySourcePropertyResolver properties;
+        /**
+         * The environment and the context the method was last configured with: configuring it again with the same
+         * ones, as each proxy sharing the method does, keeps its values.
+         */
+        @Nullable
+        private Environment configuredEnvironment;
+        @Nullable
+        private BeanContext configuredBeanContext;
+
+        @Override
+        @SuppressWarnings({"unchecked", "NullAway", "java:S2637"}) // V is nullable when the factory returns null
+        public <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
+            AnnotationMetadata metadata = annotationMetadata;
+            long revision = revision();
+            if (revision == NOT_CACHEABLE) {
+                return factory.apply(this);
+            }
+            Object kept = find(metadata, revision, key, ENTRY_VALUE);
+            if (kept != null) {
+                return (V) unmask(kept);
+            }
+            return (V) unmask(keep(metadata, revision, key, mask(factory.apply(this)), ENTRY_VALUE));
+        }
+
+        @Override
+        @SuppressWarnings({"unchecked", "NullAway"}) // V is nullable when the factory returns null
+        public <V extends @Nullable Object> V getCachedUnevaluatedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
+            AnnotationMetadata metadata = annotationMetadata;
+            long revision = revision(ENTRY_UNEVALUATED_VALUE);
+            if (revision == NOT_CACHEABLE) {
+                return factory.apply(this);
+            }
+            Object kept = find(metadata, revision, key, ENTRY_UNEVALUATED_VALUE);
+            if (kept == null) {
+                kept = keep(metadata, revision, key, new KeptUnevaluatedValue(factory.apply(this)), ENTRY_UNEVALUATED_VALUE);
+            }
+            return (V) ((KeptUnevaluatedValue) kept).value;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <A extends Annotation> @Nullable AnnotationValue<A> getCachedAnnotationValue(Class<A> annotationType) {
+            AnnotationMetadata metadata = annotationMetadata;
+            long revision = revision();
+            if (revision == NOT_CACHEABLE) {
+                return metadata.getAnnotation(annotationType);
+            }
+            Object kept = find(metadata, revision, annotationType, ENTRY_ANNOTATION_VALUE);
+            if (kept == null) {
+                kept = keep(metadata, revision, annotationType, new KeptAnnotationValue(metadata.getAnnotation(annotationType)), ENTRY_ANNOTATION_VALUE);
+            }
+            return (AnnotationValue<A>) ((KeptAnnotationValue) kept).value;
+        }
+
+        /**
+         * Builds the annotation of this method with the builder registered for its type, among the builders of
+         * the class loader of the context too.
+         */
+        private <A extends Annotation> @Nullable A buildAnnotation(Class<A> annotationType) {
+            AnnotationValue<A> annotationValue = getCachedAnnotationValue(annotationType);
+            ClassLoader loader = classLoader;
+            return annotationValue != null
+                ? RegisteredAnnotationBuilders.build(annotationType, annotationValue,
+                    loader != null ? loader : Thread.currentThread().getContextClassLoader())
+                : null;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <A extends Annotation> @Nullable A getCachedAnnotation(Class<A> annotationType) {
+            AnnotationMetadata metadata = annotationMetadata;
+            long revision = revision();
+            if (revision == NOT_CACHEABLE) {
+                return buildAnnotation(annotationType);
+            }
+            Object kept = find(metadata, revision, annotationType, ENTRY_ANNOTATION);
+            if (kept == null) {
+                // Kept apart from a value kept by getCachedValue under the same annotation type
+                kept = keep(metadata, revision, annotationType, new KeptAnnotation(buildAnnotation(annotationType)), ENTRY_ANNOTATION);
+            }
+            return (A) ((KeptAnnotation) kept).annotation;
+        }
+
+        /**
+         * @param metadata The metadata of the method
+         * @param revision The revision
+         * @param key      The key
+         * @param kind     The kind of entry
+         * @return The kept entry, or {@code null} if none is kept for the metadata and the revision
+         */
+        @Nullable
+        private Object find(AnnotationMetadata metadata, long revision, Class<?> key, int kind) {
+            Object[] values = cachedValues;
+            if (values != null && values[1] == metadata && (long) values[0] == revision) {
+                for (int i = 2; i < values.length; i += 2) {
+                    if (values[i] == key && entryKind(values[i + 1]) == kind) {
+                        return values[i + 1];
+                    }
+                }
+            }
+            return null;
+        }
+
+        /**
+         * The revision of what values derived from the metadata depend on, read before deriving them.
+         *
+         * @return {@code 0} when the metadata is static, the revision of the properties when it resolves property
+         * placeholders, or {@link #NOT_CACHEABLE} when values can't be kept: evaluated expressions depend on the
+         * invocation
+         */
+        private long revision() {
+            return revision(cacheMode);
+        }
+
+        /**
+         * The revision of what entries of the given kind depend on.
+         *
+         * @param kind The kind of entry
+         * @return The revision, as {@link #revision()} returns it
+         */
+        private long revision(int kind) {
+            return kind == ENTRY_UNEVALUATED_VALUE ? revision(unevaluatedCacheMode) : revision(cacheMode);
+        }
+
+        private long revision(byte mode) {
+            return switch (mode) {
+                case CACHE_STATIC -> 0;
+                case CACHE_PER_REVISION -> Objects.requireNonNull(properties).getRevision();
+                default -> NOT_CACHEABLE;
+            };
+        }
+
+        /**
+         * Computes how values derived from the metadata can be kept.
+         */
+        private void updateCacheMode() {
+            if (annotationMetadata.hasPropertyExpressions()) {
+                unevaluatedCacheMode = properties != null ? CACHE_PER_REVISION : CACHE_NEVER;
+            } else {
+                unevaluatedCacheMode = CACHE_STATIC;
+            }
+            cacheMode = annotationMetadata.hasEvaluatedExpressions() || argumentsAnnotationsWithExpressions
+                ? CACHE_NEVER : unevaluatedCacheMode;
+        }
+
+        /**
+         * Keeps the entry under the key, unless another call kept one first, or the metadata or the properties it was
+         * computed from changed meanwhile. Synchronized with the configuration, which replaces them.
+         *
+         * @param metadata The metadata the entry was computed from
+         * @param revision The revision the entry was computed for
+         * @param key      The key
+         * @param entry    The entry
+         * @param kind     The kind of entry
+         * @return The kept entry
+         */
+        private synchronized Object keep(AnnotationMetadata metadata, long revision, Class<?> key, Object entry, int kind) {
+            if (metadata != annotationMetadata || revision(kind) != revision) {
+                return entry;
+            }
+            Object[] values = cachedValues;
+            if (values == null || values[1] != metadata || (long) values[0] != revision) {
+                // The entries of other metadata or of an older revision are dropped
+                cachedValues = new Object[] {revision, metadata, key, entry};
+                return entry;
+            }
+            for (int i = 2; i < values.length; i += 2) {
+                if (values[i] == key && entryKind(values[i + 1]) == kind) {
+                    return values[i + 1];
+                }
+            }
+            Object[] newValues = Arrays.copyOf(values, values.length + 2);
+            newValues[values.length] = key;
+            newValues[values.length + 1] = entry;
+            cachedValues = newValues;
+            return entry;
+        }
+
+        private static int entryKind(Object entry) {
+            if (entry instanceof KeptAnnotationValue) {
+                return ENTRY_ANNOTATION_VALUE;
+            }
+            if (entry instanceof KeptUnevaluatedValue) {
+                return ENTRY_UNEVALUATED_VALUE;
+            }
+            return entry instanceof KeptAnnotation ? ENTRY_ANNOTATION : ENTRY_VALUE;
+        }
+
+        private static Object mask(@Nullable Object value) {
+            return value != null ? value : NULL_VALUE;
+        }
+
+        @Nullable
+        private static Object unmask(Object value) {
+            return value == NULL_VALUE ? null : value;
+        }
+
         private DispatchedExecutableMethod(AbstractExecutableMethodsDefinition dispatcher,
                                            int index,
                                            MethodReference methodReference,
@@ -440,25 +779,62 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             this.dispatcher = dispatcher;
             this.index = index;
             this.methodReference = methodReference;
+            this.declaredAnnotationMetadata = annotationMetadata;
+            this.environmentAnnotationMetadata = annotationMetadata;
             this.annotationMetadata = annotationMetadata;
             MethodArguments methodArguments = methodArguments(methodReference);
             this.arguments = methodArguments.arguments;
             this.argumentsAnnotationsWithExpressions = methodArguments.argumentsAnnotationsWithExpressions;
+            updateCacheMode();
         }
 
         @Override
-        public void configure(Environment environment) {
-            if (annotationMetadata.hasPropertyExpressions()) {
-                annotationMetadata = new MethodAnnotationMetadata(annotationMetadata, environment);
+        public synchronized void configure(Environment environment) {
+            if (environment == configuredEnvironment) {
+                return;
+            }
+            configuredEnvironment = environment;
+            cachedValues = null;
+            if (declaredAnnotationMetadata.hasPropertyExpressions()) {
+                environmentAnnotationMetadata = new MethodAnnotationMetadata(declaredAnnotationMetadata, environment);
+                annotationMetadata = environmentAnnotationMetadata;
+            }
+            properties = environment instanceof PropertyResolverDelegate delegate
+                && delegate.delegate() instanceof PropertySourcePropertyResolver resolver ? resolver : null;
+            updateCacheMode();
+            if (configuredBeanContext != null) {
+                // the metadata of the new environment is evaluated with the context the method is configured with
+                applyBeanContext(configuredBeanContext);
             }
         }
 
         @Override
-        public void configure(BeanContext beanContext) {
-            annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
-            if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
-                eam.configure(beanContext);
+        public synchronized void configure(BeanContext beanContext) {
+            if (beanContext == configuredBeanContext) {
+                return;
             }
+            configuredBeanContext = beanContext;
+            cachedValues = null;
+            applyBeanContext(beanContext);
+        }
+
+        private void applyBeanContext(BeanContext beanContext) {
+            classLoader = beanContext.getClassLoader();
+            if (annotationMetadata instanceof EvaluatedAnnotationMetadata current
+                && current.getAnnotationMetadata() == environmentAnnotationMetadata) {
+                // The same environment: configure the wrapper the return type may already hold, as before
+                current.configure(beanContext);
+            } else {
+                AnnotationMetadata wrapped = EvaluatedAnnotationMetadata.wrapIfNecessary(environmentAnnotationMetadata);
+                if (wrapped instanceof EvaluatedAnnotationMetadata eam) {
+                    // configured before it is published, so a concurrent reader never evaluates without a context
+                    eam.configure(beanContext);
+                }
+                annotationMetadata = wrapped;
+                // built from the previous metadata
+                returnType = null;
+            }
+            updateCacheMode();
             if (argumentsAnnotationsWithExpressions) {
                 for (Argument<?> argument : arguments) {
                     AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
@@ -505,6 +881,17 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         }
 
         @Override
+        public int argumentIndexOf(String name) {
+            ArgumentUtils.requireNonNull("name", name);
+            ImmutableStringIntMap index = argumentIndex;
+            if (index == null) {
+                index = ImmutableStringIntMap.of(arguments, Argument::getName, true, null);
+                argumentIndex = index;
+            }
+            return index.get(name, -1);
+        }
+
+        @Override
         public Method getTargetMethod() {
             // The generated getTargetMethodByIndex looks the method up reflectively on every call; resolve once
             Method method = targetMethod;
@@ -529,6 +916,8 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                     returnTypeAnnotationMetadata = annotationMetadata;
                 }
                 if (returnTypeArgument.getAnnotationMetadata() != returnTypeAnnotationMetadata) {
+                    // An array keeps the component it was written with, and the annotations of it
+                    Argument<?> componentType = returnTypeArgument.componentType();
                     returnTypeArgument = returnTypeArgument.isRawType() ? Argument.ofRawType(
                             returnTypeArgument.getType(),
                             null,
@@ -539,6 +928,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                             returnTypeAnnotationMetadata,
                             returnTypeArgument.getTypeParameters()
                     );
+                    if (componentType != null) {
+                        returnTypeArgument = returnTypeArgument.withComponentType(componentType);
+                    }
                 }
                 returnType = new DefaultReturnType<>(
                         returnTypeArgument,
@@ -679,4 +1071,33 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             return environment;
         }
     }
+
+    /**
+     * A value kept by {@code getCachedAnnotationValue}, told apart from a value kept by {@code getCachedValue} under
+     * the same annotation type.
+     *
+     * @param value The annotation value or {@code null} when the method doesn't have the annotation
+     */
+    private record KeptAnnotationValue(@Nullable AnnotationValue<?> value) {
+    }
+
+
+    /**
+     * An annotation kept by {@code getCachedAnnotation}, told apart from a value kept by {@code getCachedValue} under
+     * the same annotation type.
+     *
+     * @param annotation The annotation or {@code null} when the method doesn't have it
+     */
+    private record KeptAnnotation(@Nullable Annotation annotation) {
+    }
+
+    /**
+     * A value kept by {@code getCachedUnevaluatedValue}, told apart from a value kept by {@code getCachedValue} under
+     * the same key.
+     *
+     * @param value The value
+     */
+    private record KeptUnevaluatedValue(@Nullable Object value) {
+    }
+
 }

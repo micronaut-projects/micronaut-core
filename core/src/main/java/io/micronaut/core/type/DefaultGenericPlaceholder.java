@@ -146,6 +146,14 @@ final class DefaultGenericPlaceholder<T>
         this.resolved = resolved;
     }
 
+    private DefaultGenericPlaceholder(DefaultGenericPlaceholder<T> placeholder, @Nullable Argument<?> componentType) {
+        super(placeholder, componentType);
+        this.name = placeholder.name;
+        this.variableName = placeholder.variableName;
+        this.bounds = placeholder.bounds;
+        this.resolved = placeholder.resolved;
+    }
+
     @Override
     public List<Argument<?>> getBounds() {
         if (bounds != null) {
@@ -178,11 +186,21 @@ final class DefaultGenericPlaceholder<T>
     public Argument<T> withName(@Nullable String name) {
         // Renaming the argument does not rename the variable it stands for, so an implicit variable name,
         // the name this argument was given, is resolved before the new one replaces it
-        return new DefaultGenericPlaceholder<>(getType(), name, getVariableName(), getAnnotationMetadata(), getTypeParameters(), bounds, resolved);
+        return keepComponentType(new DefaultGenericPlaceholder<>(getType(), name, getVariableName(), getAnnotationMetadata(), getTypeParameters(), bounds, resolved));
     }
 
     @Override
     public Argument<T> withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return new DefaultGenericPlaceholder<>(getType(), name, variableName, annotationMetadata, getTypeParameters(), bounds, resolved);
+        return keepComponentType(new DefaultGenericPlaceholder<>(getType(), name, variableName, annotationMetadata, getTypeParameters(), bounds, resolved));
+    }
+
+    @Override
+    protected DefaultArgument<T> copyWithComponentType(@Nullable Argument<?> componentType) {
+        return new DefaultGenericPlaceholder<>(this, componentType);
+    }
+
+    @Override
+    public Argument<T> withTypeParameters(Argument<?>... typeParameters) {
+        return new DefaultGenericPlaceholder<>(getType(), name, variableName, getAnnotationMetadata(), typeParameters, bounds, resolved);
     }
 }

@@ -60,13 +60,11 @@ public final class ContextMethodCall extends AbstractMethodCall {
         if (candidateMethods.isEmpty()) {
             throw new ExpressionCompilationException(
                 "No method [ " + name + stringifyArguments(ctx) + " ] available in evaluation context");
-        } else if (candidateMethods.size() > 1) {
-            throw new ExpressionCompilationException(
-                "Ambiguous expression evaluation context reference. Found " + candidateMethods.size() +
-                    " matching methods: " + candidateMethods);
         }
-
-        return candidateMethods.iterator().next();
+        return CandidateMethod.selectMostSpecific(candidateMethods).orElseThrow(() ->
+            new ExpressionCompilationException(
+                "Ambiguous expression evaluation context reference. Found " + candidateMethods.size() +
+                    " matching methods: " + candidateMethods));
     }
 
     @Override

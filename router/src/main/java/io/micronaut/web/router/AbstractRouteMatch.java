@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -25,14 +26,11 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.PostponedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
-import io.micronaut.http.bind.binders.UnmatchedRequestArgumentBinder;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.inject.UnsafeExecutionHandle;
 import io.micronaut.web.router.builder.DefaultPathVariables;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
@@ -40,6 +38,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -56,23 +55,28 @@ import java.util.Optional;
  */
 abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
+    private static final String WRONG_ARGUMENT_TYPES = "Wrong argument types to method: ";
+
     private static final @Nullable Object[] EMPTY_VALUES = new Object[0];
-    private static final boolean[] EMPTY_FULFILLED = new boolean[0];
-    private static final PostponedRequestArgumentBinder<?>[] EMPTY_POSTPONED = new PostponedRequestArgumentBinder[0];
-    private static final PendingRequestBindingResult<?>[] EMPTY_PENDING = new PendingRequestBindingResult[0];
+    /**
+     * The value of an argument that is not fulfilled yet.
+     */
+    private static final Object UNFULFILLED = new Object();
 
     protected final ConversionService conversionService;
     protected final MethodBasedRouteInfo<T, R> routeInfo;
-    protected final MethodExecutionHandle<T, R> methodExecutionHandle;
-    protected final @Nullable UnsafeExecutionHandle<T, R> unsafeMethodExecutionHandle;
-    protected final ExecutableMethod<T, R> executableMethod;
-
-    private final Argument<?>[] arguments;
-    private final String[] argumentNames;
-    private final @Nullable Object[] argumentValues;
-    private final PostponedRequestArgumentBinder<Object>[] postponedArgumentBinders;
-    private final PendingRequestBindingResult<?>[] pendingRequestBindingResults;
-    private final boolean[] fulfilledArguments;
+    private final RouteArgumentPlan<T, R> argumentPlan;
+    /**
+     * The values of the arguments, {@link #UNFULFILLED} for an argument that is not fulfilled
+     * yet; created when the binding starts, so a match that is never bound, e.g. a candidate that
+     * is rejected, allocates nothing.
+     */
+    private @Nullable Object @Nullable [] argumentValues;
+    /**
+     * Results waiting for the body or postponed binding, including unmatched errors that
+     * filters may replace; created only when needed.
+     */
+    private ArgumentBinder.BindingResult<?> @Nullable [] pendingRequestBindingResults;
     private boolean fulfilled;
     private boolean beforeBindersApplied;
     private boolean afterBindersApplied;
@@ -86,27 +90,11 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     protected AbstractRouteMatch(MethodBasedRouteInfo<T, R> routeInfo, ConversionService conversionService) {
         this.routeInfo = routeInfo;
         this.conversionService = conversionService;
-        this.methodExecutionHandle = routeInfo.getTargetMethod();
-        this.executableMethod = methodExecutionHandle.getExecutableMethod();
-        this.arguments = executableMethod.getArguments();
-        this.argumentNames = routeInfo.getArgumentNames();
-        int length = arguments.length;
+        this.argumentPlan = routeInfo instanceof DefaultMethodBasedRouteInfo<T, R> info
+            ? info.getArgumentPlan() : new RouteArgumentPlan<>(routeInfo);
+        int length = argumentPlan.arguments.length;
         if (length == 0) {
-            // empty arrays cannot be written to, so a route without arguments shares them
             this.argumentValues = EMPTY_VALUES;
-            this.fulfilledArguments = EMPTY_FULFILLED;
-            this.postponedArgumentBinders = (PostponedRequestArgumentBinder<Object>[]) EMPTY_POSTPONED;
-            this.pendingRequestBindingResults = EMPTY_PENDING;
-        } else {
-            this.argumentValues = new Object[length];
-            this.fulfilledArguments = new boolean[length];
-            this.postponedArgumentBinders = new PostponedRequestArgumentBinder[length];
-            this.pendingRequestBindingResults = new PendingRequestBindingResult[length];
-        }
-        if (methodExecutionHandle instanceof UnsafeExecutionHandle<?, ?>) {
-            unsafeMethodExecutionHandle = (UnsafeExecutionHandle<T, R>) methodExecutionHandle;
-        } else {
-            unsafeMethodExecutionHandle = null;
         }
         this.fulfilled = length == 0;
     }
@@ -123,20 +111,20 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public ExecutableMethod<T, R> getExecutableMethod() {
-        return executableMethod;
+        return argumentPlan.executableMethod;
     }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return executableMethod.getAnnotationMetadata();
+        return argumentPlan.executableMethod.getAnnotationMetadata();
     }
 
     @Override
     public Optional<Argument<?>> getRequiredInput(String name) {
-        for (int i = 0; i < argumentNames.length; i++) {
-            String argumentName = argumentNames[i];
+        for (int i = 0; i < argumentPlan.argumentNames.length; i++) {
+            String argumentName = argumentPlan.argumentNames[i];
             if (name.equals(argumentName)) {
-                return Optional.of(arguments[i]);
+                return Optional.of(argumentPlan.arguments[i]);
             }
         }
         return Optional.empty();
@@ -147,16 +135,19 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (fulfilled) {
             return true;
         }
-        for (int i = 0; i < arguments.length; i++) {
-            boolean isFulfilled = fulfilledArguments[i];
-            if (isFulfilled) {
+        ArgumentBinder.BindingResult<?>[] pendingRequestBindingResults = this.pendingRequestBindingResults;
+        if (pendingRequestBindingResults == null) {
+            // nothing waits, so nothing was fulfilled since the binding
+            return false;
+        }
+        for (int i = 0; i < argumentPlan.arguments.length; i++) {
+            if (isArgumentFulfilled(i)) {
                 continue;
             }
-            PendingRequestBindingResult<?> pendingRequestBindingResult = pendingRequestBindingResults[i];
+            ArgumentBinder.BindingResult<?> pendingRequestBindingResult = pendingRequestBindingResults[i];
             if (pendingRequestBindingResult != null && !pendingRequestBindingResult.isPending()) {
-                Argument<?> argument = arguments[i];
+                Argument<?> argument = argumentPlan.arguments[i];
                 setBindingResult(i, argument, pendingRequestBindingResult);
-                failOnConversionErrors(argument, pendingRequestBindingResult);
             }
         }
         checkIfFulfilled();
@@ -165,10 +156,10 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public boolean isSatisfied(String name) {
-        for (int i = 0; i < argumentNames.length; i++) {
-            String argumentName = argumentNames[i];
+        for (int i = 0; i < argumentPlan.argumentNames.length; i++) {
+            String argumentName = argumentPlan.argumentNames[i];
             if (name.equals(argumentName)) {
-                return fulfilledArguments[i];
+                return isArgumentFulfilled(i);
             }
         }
         return false;
@@ -180,23 +171,28 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     }
 
     @Override
+    public boolean hasTargetMethod() {
+        return routeInfo.getTargetMethod().hasTargetMethod();
+    }
+
+    @Override
     public String getMethodName() {
-        return executableMethod.getMethodName();
+        return argumentPlan.executableMethod.getMethodName();
     }
 
     @Override
     public Class<T> getDeclaringType() {
-        return executableMethod.getDeclaringType();
+        return argumentPlan.executableMethod.getDeclaringType();
     }
 
     @Override
     public Argument<?>[] getArguments() {
-        return executableMethod.getArguments();
+        return argumentPlan.executableMethod.getArguments();
     }
 
     @Override
     public ReturnType<R> getReturnType() {
-        return executableMethod.getReturnType();
+        return argumentPlan.executableMethod.getReturnType();
     }
 
     @Override
@@ -204,7 +200,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     public R invoke(@Nullable Object... arguments) {
         Argument<?>[] targetArguments = getArguments();
         if (targetArguments.length == 0) {
-            return methodExecutionHandle.invoke();
+            return argumentPlan.methodExecutionHandle.invoke();
         } else {
             List<Object> argumentList = new ArrayList<>(arguments.length);
             Map<String, Object> variables = getVariableValues();
@@ -215,18 +211,18 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 Object value = variables.get(name);
                 if (value != null) {
                     Optional<?> result = conversionService.convert(value, targetArgument.getType());
-                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException("Wrong argument types to method: " + executableMethod)));
+                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException(WRONG_ARGUMENT_TYPES + argumentPlan.executableMethod)));
                 } else if (valueIterator.hasNext()) {
                     Optional<?> result = conversionService.convert(valueIterator.next(), targetArgument.getType());
-                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException("Wrong argument types to method: " + executableMethod)));
+                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException(WRONG_ARGUMENT_TYPES + argumentPlan.executableMethod)));
                 } else if (i < arguments.length) {
                     Optional<?> result = conversionService.convert(arguments[i++], targetArgument.getType());
-                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException("Wrong argument types to method: " + executableMethod)));
+                    argumentList.add(result.orElseThrow(() -> new IllegalArgumentException(WRONG_ARGUMENT_TYPES + argumentPlan.executableMethod)));
                 } else {
-                    throw new IllegalArgumentException("Wrong number of arguments to method: " + executableMethod);
+                    throw new IllegalArgumentException("Wrong number of arguments to method: " + argumentPlan.executableMethod);
                 }
             }
-            return methodExecutionHandle.invoke(argumentList.toArray());
+            return argumentPlan.methodExecutionHandle.invoke(argumentList.toArray());
         }
     }
 
@@ -235,16 +231,17 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     public R execute() {
         Argument<?>[] targetArguments = getArguments();
         if (targetArguments.length == 0) {
-            if (unsafeMethodExecutionHandle != null) {
-                return unsafeMethodExecutionHandle.invokeUnsafe();
+            if (argumentPlan.unsafeMethodExecutionHandle != null) {
+                return argumentPlan.unsafeMethodExecutionHandle.invokeUnsafe();
             }
-            return methodExecutionHandle.invoke();
+            return argumentPlan.methodExecutionHandle.invoke();
         }
         if (fulfilled) {
-            if (unsafeMethodExecutionHandle != null) {
-                return unsafeMethodExecutionHandle.invokeUnsafe(argumentValues);
+            @Nullable Object[] argumentValues = argumentValues();
+            if (argumentPlan.unsafeMethodExecutionHandle != null) {
+                return argumentPlan.unsafeMethodExecutionHandle.invokeUnsafe(argumentValues);
             }
-            return methodExecutionHandle.invoke(argumentValues);
+            return argumentPlan.methodExecutionHandle.invoke(argumentValues);
         }
         if (!beforeBindersApplied) {
             throw new IllegalStateException("Argument binders before filters not processed!");
@@ -252,17 +249,19 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (!afterBindersApplied) {
             throw new IllegalStateException("Argument binders after filters not processed!");
         }
-        for (int i = 0; i < arguments.length; i++) {
-            if (fulfilledArguments[i]) {
+        @Nullable Object[] argumentValues = argumentValues();
+        ArgumentBinder.BindingResult<?>[] pendingRequestBindingResults = this.pendingRequestBindingResults;
+        for (int i = 0; i < argumentPlan.arguments.length; i++) {
+            if (argumentValues[i] != UNFULFILLED) {
                 continue;
             }
-            PendingRequestBindingResult<?> pendingRequestBindingResult = pendingRequestBindingResults[i];
-            Argument<?> argument = arguments[i];
+            ArgumentBinder.BindingResult<?> pendingRequestBindingResult = pendingRequestBindingResults == null ? null : pendingRequestBindingResults[i];
+            Argument<?> argument = argumentPlan.arguments[i];
             if (pendingRequestBindingResult != null) {
                 setBindingResultOfFail(i, argument, pendingRequestBindingResult);
                 continue;
             }
-            Object value = getVariableValues().get(argumentNames[i]);
+            Object value = variableValueOf(i);
             if (value != null) {
                 setValue(i, argument, value);
                 continue;
@@ -274,12 +273,12 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             if (!argument.isNullable()) {
                 throw UnsatisfiedRouteException.create(argument);
             }
+            argumentValues[i] = null;
         }
-        if (methodExecutionHandle instanceof UnsafeExecutionHandle) {
-            UnsafeExecutionHandle<T, R> unsafeExecutionHandle = (UnsafeExecutionHandle<T, R>) methodExecutionHandle;
-            return unsafeExecutionHandle.invokeUnsafe(argumentValues);
+        if (argumentPlan.unsafeMethodExecutionHandle != null) {
+            return argumentPlan.unsafeMethodExecutionHandle.invokeUnsafe(argumentValues);
         }
-        return methodExecutionHandle.invoke(argumentValues);
+        return argumentPlan.methodExecutionHandle.invoke(argumentValues);
     }
 
     @Override
@@ -287,23 +286,98 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (fulfilled) {
             return;
         }
-        for (int i = 0; i < argumentNames.length; i++) {
-            if (fulfilledArguments[i]) {
+        @Nullable Object[] argumentValues = argumentValues();
+        for (int i = 0; i < argumentPlan.argumentNames.length; i++) {
+            if (argumentValues[i] != UNFULFILLED) {
                 continue;
             }
-            String argumentName = argumentNames[i];
+            String argumentName = argumentPlan.argumentNames[i];
             Object value = newValues.get(argumentName);
             if (value != null) {
-                setValue(i, arguments[i], value);
+                setValue(i, argumentPlan.arguments[i], value);
             }
         }
         checkIfFulfilled();
     }
 
     /**
+     * Fulfill the arguments of a route to a handler function that reads only the request and the
+     * path variables, without the argument binders: the request is the argument as is, like the
+     * binder of an {@code HttpRequest} without a body type gives it, and the path variables are
+     * decoded now, where the binders would decode them. A value already given with
+     * {@link #fulfill(Map)} is kept. The match is then fulfilled, as if it was bound.
+     *
+     * @param request The request
+     * @throws IllegalStateException if an argument is neither the request nor the path variables
+     * @since 5.3.0
+     */
+    @Internal
+    public final void fulfillDirectly(HttpRequest<?> request) {
+        if (fulfilled) {
+            return;
+        }
+        if (beforeBindersApplied) {
+            throw new IllegalStateException("Argument before filters already processed!");
+        }
+        @Nullable Object[] argumentValues = argumentValues();
+        for (int i = 0; i < argumentPlan.arguments.length; i++) {
+            if (argumentValues[i] != UNFULFILLED) {
+                continue;
+            }
+            Class<?> type = argumentPlan.arguments[i].getType();
+            if (type == PathVariables.class) {
+                argumentValues[i] = pathVariables();
+            } else if (type == HttpRequest.class) {
+                // decoded like the binders decode them, so a malformed variable fails the same
+                getVariableValues();
+                argumentValues[i] = request;
+            } else {
+                throw new IllegalStateException("The argument " + argumentPlan.arguments[i] + " of the route " + routeInfo + " is bound by a binder");
+            }
+        }
+        checkIfFulfilled();
+        beforeBindersApplied = true;
+        afterBindersApplied = true;
+    }
+
+    /**
+     * The path variables of the match, as a route to a handler function receives them.
+     */
+    private PathVariables pathVariables() {
+        return new DefaultPathVariables(getVariableValues(), rawVariableValues(), conversionService, resolvedTarget(), selectedMediaType());
+    }
+
+    /**
+     * The value of the path variable named like the argument: never for the request, which is
+     * not a path segment, so a variable named {@code request} does not hide the request. The
+     * variables are decoded either way, so a malformed one fails the same.
+     */
+    private @Nullable Object variableValueOf(int index) {
+        Map<String, Object> variables = getVariableValues();
+        if (HttpRequest.class.isAssignableFrom(argumentPlan.arguments[index].getType())) {
+            return null;
+        }
+        return variables.get(argumentPlan.argumentNames[index]);
+    }
+
+    /**
+     * @return The values of the variables as they appear in the path, not percent-decoded
+     */
+    Map<String, Object> rawVariableValues() {
+        return getVariableValues();
+    }
+
+    /**
      * @return The target a {@link DynamicRouteTarget} resolved for the route, or {@code null}
      */
     @Nullable Object resolvedTarget() {
+        return null;
+    }
+
+    /**
+     * @return The media type of the response a route selector negotiated, or {@code null}
+     */
+    @Nullable MediaType selectedMediaType() {
         return null;
     }
 
@@ -315,36 +389,35 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (beforeBindersApplied) {
             throw new IllegalStateException("Argument before filters already processed!");
         }
-        RequestArgumentBinder<Object>[] argumentBinders = routeInfo.resolveArgumentBinders(requestBinderRegistry);
-        for (int i = 0; i < arguments.length; i++) {
-            if (fulfilledArguments[i]) {
+        RequestArgumentBinder<Object>[] argumentBinders = argumentPlan.binders(routeInfo, requestBinderRegistry).before;
+        @Nullable Object[] argumentValues = argumentValues();
+        RequestConversionContexts conversionContexts = null;
+        for (int i = 0; i < argumentPlan.arguments.length; i++) {
+            if (argumentValues[i] != UNFULFILLED) {
                 continue;
             }
-            Argument<Object> argument = (Argument<Object>) arguments[i];
-            if (arguments[i].getType() == PathVariables.class) {
+            Argument<Object> argument = (Argument<Object>) argumentPlan.arguments[i];
+            if (argumentPlan.arguments[i].getType() == PathVariables.class) {
                 // a handler function's path variables come from the match, not a binder
-                setValue(i, argument, new DefaultPathVariables(getVariableValues(), conversionService, resolvedTarget()));
+                setValue(i, argument, pathVariables());
                 continue;
             }
-            Object value = getVariableValues().get(argumentNames[i]);
+            Object value = variableValueOf(i);
             if (value != null) {
                 setValue(i, argument, value);
                 continue;
             }
             RequestArgumentBinder<Object> argumentBinder = argumentBinders[i];
-            if (argumentBinder instanceof PostponedRequestArgumentBinder<Object> postponedRequestArgumentBinder) {
-                postponedArgumentBinders[i] = postponedRequestArgumentBinder;
-                if (!(argumentBinder instanceof UnmatchedRequestArgumentBinder)) {
-                    // Allow for the unmatched request argument binder to run even so it's postponed
-                    continue;
-                }
-            }
             if (argumentBinder != null) {
+                if (conversionContexts == null) {
+                    conversionContexts = new RequestConversionContexts(request);
+                }
                 fulfillValue(
                     i,
                     argumentBinder,
                     argument,
-                    request
+                    request,
+                    conversionContexts
                 );
             }
         }
@@ -360,63 +433,86 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (afterBindersApplied) {
             throw new IllegalStateException("Argument binders after filters already processed!");
         }
-        for (int i = 0; i < arguments.length; i++) {
-            if (fulfilledArguments[i]) {
-                continue;
+        if (beforeBindersApplied) {
+            // the route holds the binders, so an argument the binding before the filters left
+            // unfulfilled, that has a postponed binder, is an argument the binder postponed
+            PostponedRequestArgumentBinder<Object>[] argumentBinders = argumentPlan.binders(routeInfo, requestBinderRegistry).after;
+            @Nullable Object[] argumentValues = argumentValues();
+            RequestConversionContexts conversionContexts = null;
+            for (int i = 0; i < argumentPlan.arguments.length; i++) {
+                if (argumentValues[i] != UNFULFILLED) {
+                    continue;
+                }
+                PostponedRequestArgumentBinder<Object> argumentBinder = argumentBinders[i];
+                if (argumentBinder != null) {
+                    if (conversionContexts == null) {
+                        // the filters may have changed the request
+                        conversionContexts = new RequestConversionContexts(request);
+                    }
+                    fulfillValuePostponed(
+                        i,
+                        argumentBinder,
+                        (Argument<Object>) argumentPlan.arguments[i],
+                        request,
+                        conversionContexts
+                    );
+                }
             }
-            Argument<Object> argument = (Argument<Object>) arguments[i];
-            PostponedRequestArgumentBinder<Object> argumentBinder = postponedArgumentBinders[i];
-            if (argumentBinder != null) {
-                fulfillValuePostponed(
-                    i,
-                    argumentBinder,
-                    argument,
-                    request
-                );
-            }
+            checkIfFulfilled();
         }
-        checkIfFulfilled();
         afterBindersApplied = true;
     }
 
     private <E> void fulfillValue(int index,
                                   RequestArgumentBinder<E> argumentBinder,
                                   Argument<E> argument,
-                                  HttpRequest<?> request) {
-        ArgumentConversionContext<E> conversionContext = newContext(argument, request);
+                                  HttpRequest<?> request,
+                                  RequestConversionContexts conversionContexts) {
+        ArgumentConversionContext<E> conversionContext = conversionContexts.newContext(argument);
         ArgumentBinder.BindingResult<E> bindingResult = argumentBinder.bind(conversionContext, request);
+        if (bindingResult.isPending()) {
+            // a pending result converts later, with the locale and the character encoding of the request as it is now
+            conversionContexts.resolve();
+        }
         fulfillValue(index, argument, bindingResult);
     }
 
     private <E> void fulfillValuePostponed(int index,
                                            PostponedRequestArgumentBinder<E> argumentBinder,
                                            Argument<E> argument,
-                                           HttpRequest<?> request) {
-        ArgumentConversionContext<E> conversionContext = newContext(argument, request);
+                                           HttpRequest<?> request,
+                                           RequestConversionContexts conversionContexts) {
+        ArgumentConversionContext<E> conversionContext = conversionContexts.newContext(argument);
         ArgumentBinder.BindingResult<E> bindingResult = argumentBinder.bindPostponed(conversionContext, request);
+        if (bindingResult.isPending()) {
+            // a pending result converts later, with the locale and the character encoding of the request as it is now
+            conversionContexts.resolve();
+        }
         fulfillValue(index, argument, bindingResult);
     }
 
-    private <E> ArgumentConversionContext<E> newContext(Argument<E> argument, HttpRequest<?> request) {
-        return ConversionContext.of(
-            argument,
-            request.getLocale().orElse(null),
-            request.getCharacterEncoding()
-        );
-    }
-
     private <E> void fulfillValue(int index, Argument<E> argument, ArgumentBinder.BindingResult<E> bindingResult) {
-        if (bindingResult instanceof PendingRequestBindingResult<?> pendingRequestBindingResult) {
-            pendingRequestBindingResults[index] = pendingRequestBindingResult;
+        if (bindingResult.isPending()) {
+            rememberBindingResult(index, bindingResult);
             return;
         }
+        // a conversion error fails the request where the value is bound: before the filters for the
+        // binders that run before them, like the unmatched binder
         failOnConversionErrors(argument, bindingResult);
         setBindingResult(index, argument, bindingResult);
     }
 
+    private void rememberBindingResult(int index, ArgumentBinder.BindingResult<?> bindingResult) {
+        ArgumentBinder.BindingResult<?>[] pendingRequestBindingResults = this.pendingRequestBindingResults;
+        if (pendingRequestBindingResults == null) {
+            pendingRequestBindingResults = new ArgumentBinder.BindingResult[argumentPlan.arguments.length];
+            this.pendingRequestBindingResults = pendingRequestBindingResults;
+        }
+        pendingRequestBindingResults[index] = bindingResult;
+    }
+
     private void setBindingResultOfFail(int index, Argument<?> argument, ArgumentBinder.BindingResult<?> bindingResult) {
         boolean isSet = setBindingResult(index, argument, bindingResult);
-        failOnConversionErrors(argument, bindingResult);
         if (isSet) {
             return;
         }
@@ -441,28 +537,17 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     }
 
     private boolean setBindingResult(int index, Argument<?> argument, ArgumentBinder.BindingResult<?> bindingResult) {
+        failOnConversionErrors(argument, bindingResult);
         if (!bindingResult.isSatisfied()) {
             return false;
         }
-        Object value;
-        if (argument.getType() == Optional.class) {
-            Optional<?> optionalValue = bindingResult.getValue();
-            if (optionalValue.isPresent()) {
-                value = optionalValue.get();
-            } else {
-                return false;
-            }
-        } else if (bindingResult.isPresentAndSatisfied()) {
-            value = bindingResult.get();
-        } else if (argument.isNullable() && bindingResult.isSatisfied()) {
-            value = null;
-        } else {
+        Optional<?> bound = bindingResult.getValue();
+        if (bound.isEmpty() && (argument.getType() == Optional.class || !argument.isNullable())) {
             return false;
         }
-        if (value != null && bindingResult.isConvertedToArgumentType() && argument.getType().isInstance(value)) {
-            // The binder already produced the value for the complete argument, including its type arguments
-            argumentValues[index] = value;
-            fulfilledArguments[index] = true;
+        Object value = bound.orElse(null);
+        if (value != null && bindingResult.isConvertedToArgumentType() && argumentPlan.wrapperTypes[index].isInstance(value)) {
+            argumentValues()[index] = value;
             return true;
         }
         setValue(index, argument, value);
@@ -470,18 +555,33 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     }
 
     private void setValue(int index, Argument<?> argument, @Nullable Object value) {
-        if (value != null) {
-            argumentValues[index] = convertValue(conversionService, argument, value);
+        argumentValues()[index] = value == null ? null : convertValue(conversionService, argument, value);
+    }
+
+    private boolean isArgumentFulfilled(int index) {
+        @Nullable Object[] argumentValues = this.argumentValues;
+        return argumentValues != null && argumentValues[index] != UNFULFILLED;
+    }
+
+    /**
+     * @return The values of the arguments, created when the binding starts
+     */
+    private @Nullable Object[] argumentValues() {
+        @Nullable Object[] argumentValues = this.argumentValues;
+        if (argumentValues == null) {
+            argumentValues = new Object[argumentPlan.arguments.length];
+            Arrays.fill(argumentValues, UNFULFILLED);
+            this.argumentValues = argumentValues;
         }
-        fulfilledArguments[index] = true;
+        return argumentValues;
     }
 
     private void checkIfFulfilled() {
         if (fulfilled) {
             return;
         }
-        for (boolean isFulfilled : fulfilledArguments) {
-            if (!isFulfilled) {
+        for (Object value : argumentValues()) {
+            if (value == UNFULFILLED) {
                 return;
             }
         }
@@ -521,5 +621,4 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         }
         return result.get();
     }
-
 }

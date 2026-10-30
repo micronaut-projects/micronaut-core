@@ -15,11 +15,16 @@
  */
 package io.micronaut.python.processing.element;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.model.TypeRef;
@@ -44,6 +49,7 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
     private final TypeVar typeVar;
     private final List<ClassElement> bounds;
     private Element declaringElement;
+    private final @Nullable ElementAnnotationMetadata typeUseAnnotationMetadata;
 
     public PythonGenericPlaceholderElement(TypeVar typeVar,
                                            PythonProcessingEnvironment environment,
@@ -55,20 +61,85 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
                                            PythonProcessingEnvironment environment,
                                            List<ClassElement> bounds,
                                            Element declaringElement) {
-        super(new ClassDef(typeVar.name()), environment);
+        this(typeVar, environment, bounds, declaringElement, null, 0);
+    }
+
+    private PythonGenericPlaceholderElement(TypeVar typeVar,
+                                            PythonProcessingEnvironment environment,
+                                            List<ClassElement> bounds,
+                                            Element declaringElement,
+                                            @Nullable ElementAnnotationMetadata typeUseAnnotationMetadata,
+                                            int arrayDimensions) {
+        super(new ClassDef(typeVar.name()), environment, arrayDimensions);
         this.typeVar = typeVar;
         this.bounds = bounds != null ? bounds : Collections.emptyList();
         this.declaringElement = declaringElement;
+        this.typeUseAnnotationMetadata = typeUseAnnotationMetadata;
+    }
+
+    /**
+     * The type variable used with type-use annotations, such as {@code Annotated[E, NotNull()]} as a type argument.
+     * The copy stays a {@link GenericPlaceholderElement}, so the type argument keeps naming the type variable.
+     *
+     * @param metadata The type-use annotation metadata of the type node
+     * @return The annotated type variable
+     */
+    public PythonGenericPlaceholderElement withTypeUseAnnotationMetadata(ElementAnnotationMetadata metadata) {
+        return copyWith(metadata, arrayDimensions);
     }
 
     @Override
-    protected ClassElement createWithArrayDimensions(int arrayDimensions) {
-        return new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement);
+    protected ClassElement createWithArrayDimensions(int dimensions) {
+        return copyWith(typeUseAnnotationMetadata, dimensions);
+    }
+
+    private PythonGenericPlaceholderElement copyWith(@Nullable ElementAnnotationMetadata metadata, int dimensions) {
+        PythonGenericPlaceholderElement copy = new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement, metadata, dimensions);
+        copyValues(copy);
+        return copy;
     }
 
     @Override
     protected AbstractPythonElement copyThis() {
-        return new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement);
+        return new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement, typeUseAnnotationMetadata, arrayDimensions);
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        if (typeUseAnnotationMetadata == null) {
+            return super.getAnnotationMetadataToWrite();
+        }
+        return typeUseAnnotationMetadata;
+    }
+
+    @NonNull
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        if (presetAnnotationMetadata != null) {
+            return super.getAnnotationMetadata();
+        }
+        AnnotationMetadata metadata = super.getAnnotationMetadata();
+        if (!bounds.isEmpty()) {
+            metadata = new AnnotationMetadataHierarchy(true, bounds.getFirst().getAnnotationMetadata(), metadata);
+        }
+        return typeUseAnnotationMetadata == null ? metadata
+            : new AnnotationMetadataHierarchy(true, metadata, typeUseAnnotationMetadata);
+    }
+
+    @Override
+    public @NonNull MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+        if (typeUseAnnotationMetadata == null) {
+            return super.getTypeAnnotationMetadata();
+        }
+        return typeUseAnnotationMetadata;
+    }
+
+    @Override
+    public @NonNull MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
+        if (typeUseAnnotationMetadata == null) {
+            return GenericPlaceholderElement.super.getGenericTypeAnnotationMetadata();
+        }
+        return typeUseAnnotationMetadata;
     }
 
     /**
@@ -136,13 +207,23 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
     }
 
     @Override
+    public String getName() {
+        return GenericBindings.firstBound(this).getName();
+    }
+
+    @Override
+    public String getPackageName() {
+        return GenericBindings.firstBound(this).getPackageName();
+    }
+
+    @Override
     public Optional<Element> getDeclaringElement() {
         return Optional.ofNullable(declaringElement);
     }
 
     @Override
     public boolean isAssignable(String type) {
-        return Object.class.getName().equals(type) || getName().equals(type);
+        return getBounds().stream().anyMatch(bound -> bound.isAssignable(type));
     }
 
     @Override

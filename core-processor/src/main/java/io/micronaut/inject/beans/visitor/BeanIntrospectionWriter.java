@@ -46,6 +46,7 @@ import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.beans.AbstractEnumBeanIntrospectionAndReference;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospectionAndReference;
+import io.micronaut.inject.beans.GeneratedBeanTypeHierarchy;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
@@ -130,6 +131,12 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
 
     private static final java.lang.reflect.Method GET_TYPE_ARGUMENTS_MAP_METHOD =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getTypeArgumentsMap");
+
+    private static final java.lang.reflect.Method BUILD_TYPE_HIERARCHY_METHOD =
+        ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "buildTypeHierarchy");
+
+    private static final java.lang.reflect.Constructor<?> BEAN_TYPE_HIERARCHY_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        GeneratedBeanTypeHierarchy.class, Class.class, AnnotationClassValue[].class, int[][].class, int[][].class, BeanIntrospection.class);
 
     private static final java.lang.reflect.Method GET_BP_INDEXED_SUBSET_METHOD =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getBeanPropertiesIndexedSubset", int[].class);
@@ -307,6 +314,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      * then reports that it separates the declarations.
      */
     private boolean membersDescribed;
+    private boolean hierarchyDescribed;
     private VisitorContext visitorContext;
 
     /**
@@ -517,6 +525,14 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      */
     void describeMembers() {
         this.membersDescribed = true;
+    }
+
+    /**
+     * Marks the hierarchy of the bean type as described: the introspection builds its
+     * {@link BeanIntrospection#getTypeHierarchy() type hierarchy}.
+     */
+    void describeHierarchy() {
+        this.hierarchyDescribed = true;
     }
 
     private List<BeanPropertyMemberData> visitPropertyMembers(List<PropertyMemberDef> members,
@@ -1142,6 +1158,17 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             classDefBuilder.addMethod(
                 MethodDef.override(GET_TYPE_ARGUMENTS_MAP_METHOD)
                     .build((aThis, methodParameters) -> thisType.getStaticField(typeArgumentsField).returning())
+            );
+        }
+        if (hierarchyDescribed) {
+            // built in the method, not in static fields: nothing is created until the hierarchy is asked for
+            TypeHierarchyDef hierarchy = TypeHierarchyDef.of(beanClassElement,
+                beanMethods.stream().map(BeanMethodData::methodElement).toList(), loadClassValueExpressionFn);
+            classDefBuilder.addMethod(
+                MethodDef.override(BUILD_TYPE_HIERARCHY_METHOD)
+                    .build((aThis, methodParameters) -> ClassTypeDef.of(GeneratedBeanTypeHierarchy.class).instantiate(
+                        BEAN_TYPE_HIERARCHY_CONSTRUCTOR, ExpressionDef.constant(beanType), hierarchy.types(), hierarchy.superTypes(),
+                        hierarchy.methodLevels(), aThis).returning())
             );
         }
 

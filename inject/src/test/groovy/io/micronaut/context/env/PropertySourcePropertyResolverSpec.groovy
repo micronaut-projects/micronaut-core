@@ -657,6 +657,18 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
     }
 
+    void "test an index past the end of a list property has no value"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [foo: ['a', 'b']])
+        )
+
+        expect:
+        resolver.getProperty('foo[1]', String).get() == 'b'
+        !resolver.getProperty('foo[2]', String).isPresent()
+        !resolver.getProperty('foo[5]', Object).isPresent()
+    }
+
     void "test getProperties"() {
         given:
         def values = [
@@ -989,6 +1001,37 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.containsProperty("extra.listval")
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10030")
+    void "test resolving a property below an index in the middle of the name"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [
+                        'outer.items[0].name'               : 'first',
+                        'outer.items[0].nested-items[0].foo': 'a',
+                        'outer.items[0].nested-items[1].foo': 'b',
+                        'outer.items[1].nested-items[0].foo': 'c',
+                        'outer.items[1].map[key].foo'       : 'd',
+                        'outer.items[1].inner.list[0].foo'  : 'e',
+                ])
+        )
+
+        expect:
+        resolver.getProperty('outer.items[0].nested-items', List).get() == [[foo: 'a'], [foo: 'b']]
+        resolver.getProperty('outer.items[1].nested-items', List).get() == [[foo: 'c']]
+        resolver.getProperty('outer.items[0].nested-items[1]', Map).get() == [foo: 'b']
+        resolver.getProperty('outer.items[0].nested-items[1].foo', String).get() == 'b'
+        resolver.getProperty('outer.items[1].map[key].foo', String).get() == 'd'
+        resolver.getProperty('outer.items[0].name', String).get() == 'first'
+        !resolver.getProperty('outer.items[2].nested-items', List).isPresent()
+        !resolver.getProperty('outer.items[0].missing', List).isPresent()
+        !resolver.getProperty('outer.items[0].name.foo', String).isPresent()
+        resolver.getProperty('outer.items[1].inner.list', List).get() == [[foo: 'e']]
+        resolver.getProperty('outer.items[1].inner.list[0].foo', String).get() == 'e'
+        resolver.containsProperties('outer.items[0].nested-items')
+        resolver.containsProperties('outer.items[1].inner.list')
+        !resolver.containsProperties('outer.items[0].missing')
+    }
+
     void "test expression resolver"() {
         given:
         Map<String, Object> parameters = [foo: "bar"]
@@ -1077,6 +1120,70 @@ class PropertySourcePropertyResolverSpec extends Specification {
         cleanup:
         classLoader.close()
         servicesRoot.toFile().deleteDir()
+    }
+
+    void "the revision changes when the properties may have changed"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(PropertySource.of("test", [foo: 'bar']))
+        long initial = resolver.revision
+
+        expect: 'lookups and placeholder resolution do not change it'
+        resolver.getProperty("foo", String).get() == 'bar'
+        resolver.containsProperty("foo")
+        resolver.propertyPlaceholderResolver.resolvePlaceholders('${foo}').get() == 'bar'
+        resolver.revision == initial
+
+        when:
+        resolver.addPropertySource(PropertySource.of("other", [foo: 'baz'], 100))
+
+        then:
+        resolver.revision > initial
+        resolver.getProperty("foo", String).get() == 'baz'
+
+        when:
+        long added = resolver.revision
+        resolver.resetCaches()
+
+        then:
+        resolver.revision > added
+    }
+
+    void "the revision of the environment changes when a property source is added or removed and on a refresh"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(['revision.foo': 'bar'])
+        DefaultEnvironment environment = (DefaultEnvironment) ctx.environment
+        PropertySourcePropertyResolver resolver = (PropertySourcePropertyResolver) environment.delegate()
+        long initial = resolver.revision
+
+        expect:
+        ctx.getProperty('revision.foo', String).get() == 'bar'
+        resolver.revision == initial
+
+        when:
+        def source = PropertySource.of("revision-override", ['revision.foo': 'baz'], 1000)
+        environment.addPropertySource(source)
+        long added = resolver.revision
+
+        then:
+        added > initial
+        ctx.getProperty('revision.foo', String).get() == 'baz'
+
+        when:
+        environment.removePropertySource(source)
+        long removed = resolver.revision
+
+        then:
+        removed > added
+
+        when:
+        environment.refresh()
+
+        then:
+        resolver.revision > removed
+        ctx.getProperty('revision.foo', String).get() == 'bar'
+
+        cleanup:
+        ctx.close()
     }
 
     interface PropertyExpressionResolverAutoCloseable extends PropertyExpressionResolver, AutoCloseable {

@@ -16,55 +16,147 @@
 package io.micronaut.http.server.binding;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.type.Argument;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.server.exceptions.UnsupportedMediaException;
 import io.micronaut.http.simple.SimpleHttpRequest;
-import io.micronaut.json.JsonMapper;
+import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.Router;
+import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.HttpRoutes;
+import io.micronaut.http.PathVariables;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
+import java.io.InputStream;
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 import java.util.Map;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The elements of a body on a server without micronaut-http-netty, which provides the readers
- * that decode the elements of JSON one at a time: this module's tests do not have it.
+ * JSON elements on a server without micronaut-http-netty: the readers live in json-core.
  */
 class AsyncRequestBodyWithoutNettyTest {
 
     private static final ByteBodyFactory BODIES = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
 
     @Test
-    void theElementsOfJsonNeedTheChunkedJsonReader() throws Exception {
-        Throwable failure = firstElementFailure("[{\"a\":1}]", MediaType.APPLICATION_JSON_TYPE);
-
-        // not a 415: the media type is supported, the reader is missing
-        UnsupportedOperationException e = assertInstanceOf(UnsupportedOperationException.class, failure);
-        assertTrue(e.getMessage().contains("micronaut-http-netty"), e.getMessage());
-        assertTrue(e.getMessage().contains(MediaType.APPLICATION_JSON), e.getMessage());
+    void sharedRegistryIsTheDefaultWithoutANettyServer() {
+        try (ApplicationContext ctx = ApplicationContext.run()) {
+            assertInstanceOf(DefaultServerRequestBinderRegistry.class, ctx.getBean(io.micronaut.http.bind.ServerRequestBinderRegistry.class));
+            assertInstanceOf(DefaultServerRequestBinderRegistry.class, ctx.getBean(RequestArgumentSatisfier.class).getBinderRegistry());
+        }
     }
 
     @Test
-    void theElementsOfAJsonStreamNeedTheChunkedJsonReader() throws Exception {
-        Throwable failure = firstElementFailure("{\"a\":1}\n", MediaType.APPLICATION_JSON_STREAM_TYPE);
+    void aLegacySecondaryReplacementRemainsTheServerRegistry() {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", "legacy-secondary-registry"))) {
+            assertInstanceOf(LegacyRegistry.class, ctx.getBean(RequestArgumentSatisfier.class).getBinderRegistry());
+            assertInstanceOf(LegacyRegistry.class, io.micronaut.http.bind.ServerRequestBinderRegistry.find(ctx).orElseThrow());
+        }
+    }
 
-        UnsupportedOperationException e = assertInstanceOf(UnsupportedOperationException.class, failure);
-        assertTrue(e.getMessage().contains("micronaut-http-netty"), e.getMessage());
+    @jakarta.inject.Singleton
+    @io.micronaut.context.annotation.Secondary
+    @io.micronaut.context.annotation.Replaces(io.micronaut.http.bind.DefaultRequestBinderRegistry.class)
+    @io.micronaut.context.annotation.Requires(property = "spec.name", value = "legacy-secondary-registry")
+    static class LegacyRegistry extends io.micronaut.http.bind.DefaultRequestBinderRegistry {
+        LegacyRegistry(io.micronaut.core.convert.ConversionService conversionService) {
+            super(conversionService);
+        }
+    }
+
+    @Test
+    void sharedFullBodyBinderReadsNonNettyRequestBytes() throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run();
+             OtherServerRequest server = request("{\"a\":1}", MediaType.APPLICATION_JSON_TYPE)) {
+            ServerBodyAnnotationBinder<Map> binder = ctx.getBean(ServerBodyAnnotationBinder.class);
+            var result = binder.bindFullBody(ConversionContext.of(Map.class), new HttpRequestWrapper<>(server));
+            BasicHttpAttributes.getRouteWaitsFor(server).toCompletableFuture().get(10, TimeUnit.SECONDS);
+            assertEquals(Map.of("a", 1), result.getValue().orElseThrow());
+        }
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void sharedFutureBodyBinderReadsNonNettyRequestBytes() throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run();
+             OtherServerRequest server = request("{\"a\":1}", MediaType.APPLICATION_JSON_TYPE)) {
+            CompletableFutureBodyBinder binder = new CompletableFutureBodyBinder(ctx.getBean(ServerBodyAnnotationBinder.class));
+            Argument argument = Argument.of(CompletableFuture.class, "body", Argument.of(Map.class));
+            var future = (CompletableFuture<?>) binder.bind(ConversionContext.of(argument), new HttpRequestWrapper<>(server)).getValue().orElseThrow();
+            assertEquals(Map.of("a", 1), future.get(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void singlePublisherBodyIsConvertedToItsDeclaredType() {
+        try (ApplicationContext ctx = ApplicationContext.run();
+             OtherServerRequest server = request("{\"a\":1}", MediaType.APPLICATION_JSON_TYPE)) {
+            PublisherBodyBinder binder = new PublisherBodyBinder(ctx.getBean(ServerBodyAnnotationBinder.class), new io.micronaut.core.convert.DefaultMutableConversionService());
+            Argument argument = Argument.of(reactor.core.publisher.Mono.class, "body", Argument.of(Map.class));
+            Object publisher = binder.bind(ConversionContext.of(argument), new HttpRequestWrapper<>(server)).getValue().orElseThrow();
+            assertEquals(Map.of("a", 1), assertInstanceOf(reactor.core.publisher.Mono.class, publisher).block(Duration.ofSeconds(10)));
+        }
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void sharedPublisherBodyBinderReadsNonNettyRequestBytes() {
+        try (ApplicationContext ctx = ApplicationContext.run();
+             OtherServerRequest server = request("[{\"a\":1},{\"a\":2}]", MediaType.APPLICATION_JSON_TYPE)) {
+            PublisherBodyBinder binder = new PublisherBodyBinder(ctx.getBean(ServerBodyAnnotationBinder.class), new io.micronaut.core.convert.DefaultMutableConversionService());
+            Argument argument = Argument.of(Flux.class, "body", Argument.of(Map.class));
+            Publisher<?> publisher = (Publisher<?>) binder.bind(ConversionContext.of(argument), new HttpRequestWrapper<>(server)).getValue().orElseThrow();
+            assertInstanceOf(Flux.class, publisher);
+            assertEquals(List.of(Map.of("a", 1), Map.of("a", 2)), Flux.from(publisher).collectList().block(Duration.ofSeconds(10)));
+        }
+    }
+
+    @Test
+    void sharedInputStreamBodyBinderReadsNonNettyRequestBytes() throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run();
+             OtherServerRequest server = request("hello", MediaType.TEXT_PLAIN_TYPE)) {
+            InputStreamBodyBinder binder = new InputStreamBodyBinder(ctx.getBean(ServerBodyAnnotationBinder.class));
+            try (InputStream input = binder.bind(ConversionContext.of(InputStream.class), new HttpRequestWrapper<>(server)).getValue().orElseThrow()) {
+                assertEquals("hello", new String(input.readAllBytes(), StandardCharsets.UTF_8));
+            }
+        }
+    }
+
+    @Test
+    void theElementsOfJsonAreReadWithoutNetty() throws Exception {
+        assertJsonElements("[{\"a\":1},{\"a\":2}]", MediaType.APPLICATION_JSON_TYPE);
+    }
+
+    @Test
+    void theElementsOfAJsonStreamAreReadWithoutNetty() throws Exception {
+        assertJsonElements("{\"a\":1}\n{\"a\":2}\n", MediaType.APPLICATION_JSON_STREAM_TYPE);
     }
 
     @Test
@@ -74,15 +166,71 @@ class AsyncRequestBodyWithoutNettyTest {
         assertInstanceOf(UnsupportedMediaException.class, failure);
     }
 
+    @Test
+    void aRequestWithoutAContentTypeIsReadAsTheRouteConsumes() throws Exception {
+        assertEquals(Map.of("a", 1), readBody(null, "/consumes-json"));
+    }
+
+    @Test
+    void aRequestWithoutAContentTypeIsReadAsJsonByARouteThatDeclaresNone() throws Exception {
+        assertEquals(Map.of("a", 1), readBody(null, "/consumes-nothing"));
+    }
+
+    @Test
+    void theContentTypeOfTheRequestIsNotReplacedByTheRoute() {
+        // the route consumes JSON, the request says it is text: the JSON reader is not used
+        assertThrows(ExecutionException.class, () -> readBody(MediaType.TEXT_PLAIN_TYPE, "/consumes-json"));
+    }
+
+    @Test
+    void aRouteThatConsumesSeveralTypesDoesNotChooseOne() {
+        assertThrows(ExecutionException.class, () -> readBody(null, "/consumes-several"));
+    }
+
+    @Test
+    void aRouteThatConsumesAnyTypeDoesNotChooseOne() {
+        assertThrows(ExecutionException.class, () -> readBody(null, "/consumes-any"));
+    }
+
+    /**
+     * Handler routes whose handler takes an {@link io.micronaut.http.body.AsyncRequestBody}: the route has no
+     * reader for the type that is read later.
+     */
+    @jakarta.inject.Singleton
+    @io.micronaut.context.annotation.Requires(property = "spec.name", value = "async-body-routes")
+    static class Routes implements HttpRoutes {
+        @Override
+        public void routes(HttpRouteBuilder routes) {
+            routes.POST("/consumes-json").consumes(MediaType.APPLICATION_JSON_TYPE).body().handleAsync(AsyncRequestBodyWithoutNettyTest::answer);
+            routes.POST("/consumes-nothing").body().handleAsync(AsyncRequestBodyWithoutNettyTest::answer);
+            routes.POST("/consumes-several").consumes(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_PLAIN_TYPE).body().handleAsync(AsyncRequestBodyWithoutNettyTest::answer);
+            routes.POST("/consumes-any").consumes(MediaType.ALL_TYPE).body().handleAsync(AsyncRequestBodyWithoutNettyTest::answer);
+        }
+    }
+
+    private static CompletableFuture<HttpResponse<?>> answer(HttpRequest<?> request, PathVariables pathVariables, AsyncRequestBody body) {
+        return CompletableFuture.<HttpResponse<?>>completedFuture(HttpResponse.ok());
+    }
+
+    private static Object readBody(MediaType contentType, String uri) throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", "async-body-routes"));
+             OtherServerRequest server = request("{\"a\":1}", contentType)) {
+            // the route the router matched, as the server does before it binds the body
+            RouteInfo<?> route = ctx.getBean(Router.class).findClosest(HttpRequest.POST(uri, null)).getRouteInfo();
+            RouteAttributes.setRouteInfo(server, route);
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
+            try {
+                return body.body(Map.class).toCompletableFuture().get(10, TimeUnit.SECONDS);
+            } finally {
+                body.releaseBody().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            }
+        }
+    }
+
     private static Throwable firstElementFailure(String content, MediaType contentType) throws Exception {
-        // a JSON mapper, which the JSON message body handler of json-core takes: this module's
-        // tests have none, and reading the elements must not use it
-        JsonMapper mapper = (JsonMapper) Proxy.newProxyInstance(JsonMapper.class.getClassLoader(), new Class<?>[]{JsonMapper.class}, (proxy, method, args) -> {
-            throw new AssertionError("Not used: " + method);
-        });
-        try (ApplicationContext ctx = ApplicationContext.builder().singletons(mapper).start();
+        try (ApplicationContext ctx = ApplicationContext.run();
              OtherServerRequest server = request(content, contentType)) {
-            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
             try (BodyElements<Map> elements = body.elements(Map.class)) {
                 ExecutionException e = assertThrows(ExecutionException.class, () -> elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS));
                 return e.getCause();
@@ -92,9 +240,25 @@ class AsyncRequestBodyWithoutNettyTest {
         }
     }
 
+    private static void assertJsonElements(String content, MediaType contentType) throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run();
+             OtherServerRequest server = request(content, contentType)) {
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
+            try (BodyElements<Map> elements = body.elements(Map.class)) {
+                assertEquals(Optional.of(Map.of("a", 1)), elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS));
+                assertEquals(Optional.of(Map.of("a", 2)), elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS));
+                assertEquals(Optional.empty(), elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS));
+            } finally {
+                body.releaseBody().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            }
+        }
+    }
+
     private static OtherServerRequest request(String content, MediaType contentType) {
         SimpleHttpRequest<Object> request = new SimpleHttpRequest<>(HttpMethod.POST, "/body", null);
-        request.contentType(contentType);
+        if (contentType != null) {
+            request.contentType(contentType);
+        }
         return new OtherServerRequest(request, content);
     }
 

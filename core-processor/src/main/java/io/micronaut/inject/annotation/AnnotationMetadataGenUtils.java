@@ -49,6 +49,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -84,6 +85,16 @@ public final class AnnotationMetadataGenUtils {
         "registerAnnotationDefaults",
         AnnotationClassValue.class,
         Map.class
+    );
+
+    private static final Method METHOD_OF_DECLARED = ReflectionUtils.getRequiredInternalMethod(
+        DefaultAnnotationMetadata.class,
+        "ofDeclared",
+        Map.class,
+        Map.class,
+        Map.class,
+        boolean.class,
+        boolean.class
     );
 
     private static final Method METHOD_REGISTER_ANNOTATION_TYPE = ReflectionUtils.getRequiredInternalMethod(
@@ -304,62 +315,6 @@ public final class AnnotationMetadataGenUtils {
         }
     }
 
-    /**
-     * The annotation metadata that a generated class holds at run time: what
-     * {@link #createAnnotationMetadataFieldAndInitialize(AnnotationMetadata, Function)} writes for the metadata,
-     * as an object. The annotations of source retention are not part of it, and a hierarchy of which a single
-     * level has annotations is that level.
-     *
-     * <p>The members keep the values of the metadata it is given.</p>
-     *
-     * @param annotationMetadata The annotation metadata
-     * @return The annotation metadata of the generated class
-     * @since 5.3.0
-     */
-    public static AnnotationMetadata runtimeMetadata(AnnotationMetadata annotationMetadata) {
-        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy hierarchy) {
-            List<AnnotationMetadata> notEmpty = CollectionUtils.iterableToList(hierarchy)
-                .stream().filter(h -> !h.isEmpty()).toList();
-            if (notEmpty.size() > 1) {
-                return new AnnotationMetadataHierarchy(
-                    runtimeMetadataOrReference(hierarchy.getRootMetadata()),
-                    runtimeMetadataOrReference(hierarchy.getDeclaredMetadata())
-                );
-            }
-            return notEmpty.isEmpty() ? AnnotationMetadata.EMPTY_METADATA : runtimeMetadataOrReference(notEmpty.get(0));
-        }
-        return runtimeMetadataOrReference(annotationMetadata);
-    }
-
-    /**
-     * The containers of the repeatable annotations that a generated class registers when it is initialised: the
-     * ones {@link #addAnnotationDefaults(List, AnnotationMetadata, Function)} writes for the metadata.
-     *
-     * @param annotationMetadata The annotation metadata
-     * @return The containers by the name of the repeatable annotation
-     * @since 5.3.0
-     */
-    public static Map<String, String> repeatableAnnotationContainers(AnnotationMetadata annotationMetadata) {
-        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
-            annotationMetadata = annotationMetadataHierarchy.merge();
-        }
-        if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
-            return repeatableAnnotationContainers(mutableAnnotationMetadata);
-        }
-        return Collections.emptyMap();
-    }
-
-    private static Map<String, String> repeatableAnnotationContainers(MutableAnnotationMetadata annotationMetadata) {
-        if (annotationMetadata.annotationRepeatableContainer == null || annotationMetadata.annotationRepeatableContainer.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        Map<String, String> annotationRepeatableContainer = new LinkedHashMap<>(annotationMetadata.annotationRepeatableContainer);
-        AnnotationMetadataSupport.getCoreRepeatableAnnotationsContainers().forEach(annotationRepeatableContainer::remove);
-        return Collections.unmodifiableMap(annotationRepeatableContainer);
-    }
-
     private static ExpressionDef. InvokeStaticMethod invokeLoadClassValueMethod(ClassTypeDef declaringType,
                                                                                Map<String, MethodDef> loadTypeMethods,
                                                                                String typeName) {
@@ -402,15 +357,18 @@ public final class AnnotationMetadataGenUtils {
         if (CollectionUtils.isNotEmpty(annotationDefaultValues)) {
             addAnnotationDefaultsInternal(statements, annotationDefaultValues, new HashSet<>(), loadClassValueExpressionFn);
         }
-        Map<String, String> annotationRepeatableContainer = repeatableAnnotationContainers(annotationMetadata);
-        if (!annotationRepeatableContainer.isEmpty()) {
+        if (annotationMetadata.annotationRepeatableContainer != null && !annotationMetadata.annotationRepeatableContainer.isEmpty()) {
+            Map<String, String> annotationRepeatableContainer = new LinkedHashMap<>(annotationMetadata.annotationRepeatableContainer);
+            AnnotationMetadataSupport.getCoreRepeatableAnnotationsContainers().forEach(annotationRepeatableContainer::remove);
             AnnotationMetadataSupport.registerRepeatableAnnotations(annotationRepeatableContainer);
-            statements.add(
-                TYPE_DEFAULT_ANNOTATION_METADATA.invokeStatic(
-                    METHOD_REGISTER_REPEATABLE_ANNOTATIONS,
-                    stringMapOf(annotationRepeatableContainer, loadClassValueExpressionFn)
-                )
-            );
+            if (!annotationRepeatableContainer.isEmpty()) {
+                statements.add(
+                    TYPE_DEFAULT_ANNOTATION_METADATA.invokeStatic(
+                        METHOD_REGISTER_REPEATABLE_ANNOTATIONS,
+                        stringMapOf(annotationRepeatableContainer, loadClassValueExpressionFn)
+                    )
+                );
+            }
         }
     }
 
@@ -434,8 +392,9 @@ public final class AnnotationMetadataGenUtils {
                                                       Function<String, ExpressionDef> loadClassValueExpressionFn) {
         final boolean typeOnly = CollectionUtils.isEmpty(annotationValues);
 
-        // skip already registered
-        if (typeOnly && AnnotationMetadataSupport.getRegisteredAnnotationType(annotationName).isPresent()
+        // skip the types the runtime registers itself; not those registered by code that ran in this JVM, which would
+        // make the generated class depend on what ran before the compilation, as in a compiler embedded in a running application
+        if (typeOnly && AnnotationMetadataSupport.isCoreAnnotationType(annotationName)
             || AnnotationMetadataSupport.getCoreAnnotationDefaults().containsKey(annotationName)) {
             return;
         }
@@ -478,7 +437,29 @@ public final class AnnotationMetadataGenUtils {
 
     private static ExpressionDef instantiateInternal(MutableAnnotationMetadata annotationMetadata,
                                                      Function<String, ExpressionDef> loadClassValueExpressionFn) {
-        Map<String, List<String>> annotationsByStereotype = withoutSourceRetention(annotationMetadata.annotationsByStereotype, annotationMetadata.getSourceRetentionAnnotations());
+        Map<String, List<String>> annotationsByStereotype = annotationMetadata.annotationsByStereotype;
+        if (annotationMetadata.getSourceRetentionAnnotations() != null && annotationsByStereotype != null) {
+            annotationsByStereotype = new LinkedHashMap<>(annotationsByStereotype);
+            for (String sourceRetentionAnnotation : annotationMetadata.getSourceRetentionAnnotations()) {
+                annotationsByStereotype.remove(sourceRetentionAnnotation);
+            }
+        }
+        Set<String> sourceRetentionAnnotations = annotationMetadata.getSourceRetentionAnnotations();
+        if (Objects.equals(withoutSourceRetention(annotationMetadata.declaredAnnotations, sourceRetentionAnnotations),
+                withoutSourceRetention(annotationMetadata.allAnnotations, sourceRetentionAnnotations))
+            && Objects.equals(withoutSourceRetention(annotationMetadata.declaredStereotypes, sourceRetentionAnnotations),
+                withoutSourceRetention(annotationMetadata.allStereotypes, sourceRetentionAnnotations))) {
+            // The element declares everything it has (nothing is inherited): emit the maps once and share them,
+            // instead of building identical declared and all maps
+            return TYPE_DEFAULT_ANNOTATION_METADATA.invokeStatic(
+                METHOD_OF_DECLARED,
+                pushCreateAnnotationData(annotationMetadata.declaredAnnotations, sourceRetentionAnnotations, loadClassValueExpressionFn),
+                pushCreateAnnotationData(annotationMetadata.declaredStereotypes, sourceRetentionAnnotations, loadClassValueExpressionFn),
+                GenUtils.stringMapOf(annotationsByStereotype, false, Collections.emptyList(), GenUtils::listOfString),
+                ExpressionDef.constant(annotationMetadata.hasPropertyExpressions()),
+                ExpressionDef.constant(annotationMetadata.hasEvaluatedExpressions())
+            );
+        }
         return TYPE_DEFAULT_ANNOTATION_METADATA
             .instantiate(
                 CONSTRUCTOR_ANNOTATION_METADATA,
@@ -500,10 +481,26 @@ public final class AnnotationMetadataGenUtils {
             );
     }
 
+    @Nullable
+    private static Map<String, Map<CharSequence, Object>> withoutSourceRetention(@Nullable Map<String, Map<CharSequence, Object>> annotationData,
+                                                                               @Nullable Set<String> sourceRetentionAnnotations) {
+        if (annotationData == null || sourceRetentionAnnotations == null || sourceRetentionAnnotations.isEmpty()) {
+            return annotationData;
+        }
+        Map<String, Map<CharSequence, Object>> filtered = new LinkedHashMap<>(annotationData);
+        filtered.keySet().removeAll(sourceRetentionAnnotations);
+        return filtered;
+    }
+
     private static ExpressionDef pushCreateAnnotationData(Map<String, Map<CharSequence, Object>> annotationData,
                                                           Set<String> sourceRetentionAnnotations,
                                                           Function<String, ExpressionDef> loadClassValueExpressionFn) {
-        annotationData = withoutSourceRetention(annotationData, sourceRetentionAnnotations);
+        if (annotationData != null) {
+            annotationData = new LinkedHashMap<>(annotationData);
+            for (String sourceRetentionAnnotation : sourceRetentionAnnotations) {
+                annotationData.remove(sourceRetentionAnnotation);
+            }
+        }
 
         return GenUtils.stringMapOf(annotationData, false, Collections.emptyMap(),
             attributes -> GenUtils.stringMapOf(writableValues(attributes), true, null,
@@ -522,52 +519,6 @@ public final class AnnotationMetadataGenUtils {
     public static ExpressionDef valuesMapExpression(Map<CharSequence, Object> values,
                                                     Function<String, ExpressionDef> loadClassValueExpressionFn) {
         return stringMapOf(values, loadClassValueExpressionFn);
-    }
-
-    /**
-     * The annotations that are written: the ones of source retention are not.
-     */
-    @Nullable
-    private static <V> Map<String, V> withoutSourceRetention(@Nullable Map<String, V> annotationData,
-                                                             Set<String> sourceRetentionAnnotations) {
-        if (annotationData == null || sourceRetentionAnnotations.isEmpty()) {
-            return annotationData;
-        }
-        annotationData = new LinkedHashMap<>(annotationData);
-        for (String sourceRetentionAnnotation : sourceRetentionAnnotations) {
-            annotationData.remove(sourceRetentionAnnotation);
-        }
-        return annotationData;
-    }
-
-    /**
-     * What {@link #pushNewAnnotationMetadataOrReference(AnnotationMetadata, Function)} writes, as an object: the
-     * metadata {@link #instantiateInternal(MutableAnnotationMetadata, Function)} creates, or the one of the class a
-     * reference names.
-     */
-    private static AnnotationMetadata runtimeMetadataOrReference(AnnotationMetadata annotationMetadata) {
-        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
-            annotationMetadata = MutableAnnotationMetadata.of(annotationMetadataHierarchy);
-        }
-        if (annotationMetadata.isEmpty()) {
-            return AnnotationMetadata.EMPTY_METADATA;
-        } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
-            Set<String> sourceRetentionAnnotations = mutableAnnotationMetadata.getSourceRetentionAnnotations();
-            return new DefaultAnnotationMetadata(
-                withoutSourceRetention(mutableAnnotationMetadata.declaredAnnotations, sourceRetentionAnnotations),
-                withoutSourceRetention(mutableAnnotationMetadata.declaredStereotypes, sourceRetentionAnnotations),
-                withoutSourceRetention(mutableAnnotationMetadata.allStereotypes, sourceRetentionAnnotations),
-                withoutSourceRetention(mutableAnnotationMetadata.allAnnotations, sourceRetentionAnnotations),
-                withoutSourceRetention(mutableAnnotationMetadata.annotationsByStereotype, sourceRetentionAnnotations),
-                mutableAnnotationMetadata.hasPropertyExpressions(),
-                mutableAnnotationMetadata.hasEvaluatedExpressions()
-            );
-        } else if (annotationMetadata instanceof AnnotationMetadataReference reference) {
-            return runtimeMetadata(reference.getAnnotationMetadata());
-        } else {
-            throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
-        }
     }
 
     private static ExpressionDef asValueExpression(Object value,

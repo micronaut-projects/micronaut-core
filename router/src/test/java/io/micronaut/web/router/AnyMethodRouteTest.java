@@ -36,6 +36,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -163,6 +164,16 @@ class AnyMethodRouteTest {
         assertEquals("pathless", target(router, HttpRequest.DELETE("/prefix")));
     }
 
+    @Test
+    void aRouteToAHandlerFunctionHasNoTargetMethod() {
+        Router router = router(routes -> routes.any("/things/{id}", handler("any")));
+        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.GET("/things/1"));
+
+        assertNotNull(match);
+        assertFalse(match.getRouteInfo().getTargetMethod().hasTargetMethod());
+        assertFalse(match.hasTargetMethod());
+    }
+
     private static String target(Router router, MutableHttpRequest<?> request) {
         UriRouteMatch<Object, Object> match = router.findClosest(request);
         assertNotNull(match, request.getMethodName() + " " + request.getPath());
@@ -185,7 +196,7 @@ class AnyMethodRouteTest {
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         return new DefaultRouter(List.of(), List.of(() -> assembly));

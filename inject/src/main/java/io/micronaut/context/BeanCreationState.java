@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,10 +35,32 @@ final class BeanCreationState {
     final BeanDefinition<?> definition;
     final DefaultBeanDependencies dependencies = new DefaultBeanDependencies();
     final List<BeanRegistration<?>> proxyInterceptors;
+    /** The creation this one is nested in on the same resolution context, which resumes when this one ends. */
+    final @Nullable BeanCreationState parent;
 
     BeanCreationState(BeanDefinition<?> definition, List<BeanRegistration<?>> proxyInterceptors) {
+        this(definition, proxyInterceptors, null);
+    }
+
+    BeanCreationState(BeanDefinition<?> definition, List<BeanRegistration<?>> proxyInterceptors,
+                      @Nullable BeanCreationState parent) {
         this.definition = definition;
         this.proxyInterceptors = proxyInterceptors;
+        this.parent = parent;
+    }
+
+    /**
+     * Whether this is the creation of the bean of the given definition. A qualified {@link BeanDefinitionDelegate},
+     * such as the one of an {@link io.micronaut.context.annotation.EachBean} bean, is created as itself, while the
+     * definition it wraps is the one instantiated and the one its injection segments name, so that definition
+     * matches too. This state, the one of the qualified bean, remains the owner.
+     *
+     * @param candidate The definition
+     * @return Whether this state creates the bean of the definition
+     */
+    boolean isCreating(BeanDefinition<?> candidate) {
+        return definition.equals(candidate)
+            || (definition instanceof BeanDefinitionDelegate<?> delegate && delegate.getDelegate().equals(candidate));
     }
 
     InterceptorCandidates lifecycleInterceptorCandidates() {

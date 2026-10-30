@@ -8,7 +8,11 @@ snippet::io.micronaut.docs.http.server.netty.websocket.ChatServerWebSocket[tags=
 <4> You can use a api:websocket.WebSocketBroadcaster[] to broadcast messages to every WebSocket session. You can filter which sessions to send to with a `Predicate`. Also, you could use the api:websocket.WebSocketSession[] instance to send a message to it with `WebSocketSession::send`.
 <5> The ann:websocket.annotation.OnClose[] annotation declares the method to invoke when the WebSocket is closed.
 
+NOTE: Like the URI of a controller, the URI of a ann:websocket.annotation.ServerWebSocket[] is under the context path of the server, `micronaut.server.context-path`, if one is configured. With a context path of `/app`, the example above is mapped under `/app/chat/{topic}/{username}`.
+
 TIP: A working example of WebSockets in action can be found at https://guides.micronaut.io/latest/micronaut-websocket.html[Micronaut Guides].
+
+TIP: A WebSocket endpoint can also be declared in code, as a route of the route builder, with its handlers as functions, streams of messages and backpressure: see <<functionalRoutesWebSocket, WebSocket Routes>>.
 
 For binding, method arguments to each WebSocket method can be:
 

@@ -20,9 +20,9 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.body.stream.BodyPublishers;
 import org.jetbrains.annotations.Contract;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -40,6 +40,8 @@ public abstract non-sealed class InternalByteBody implements ByteBody {
     private @Nullable Throwable primaryOpTrace;
     private @Nullable Throwable closeTrace;
     private volatile @Nullable String claimedBy;
+    // guarded by this: an asynchronous read may still be decoding a split before it consumes us
+    private @Nullable String reservedBy;
 
     /**
      * Record the first primary operation location, if tracking is enabled.
@@ -73,9 +75,7 @@ public abstract non-sealed class InternalByteBody implements ByteBody {
 
     @Override
     public Publisher<byte[]> toByteArrayPublisher() {
-        return Flux.from(toReadBufferPublisher())
-            .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
-            .map(ReadBuffer::toArray);
+        return BodyPublishers.map(toReadBufferPublisher(), ReadBuffer::toArray, BodyPublishers::closeReadBuffer);
     }
 
     @Override
@@ -141,6 +141,27 @@ public abstract non-sealed class InternalByteBody implements ByteBody {
      */
     public static @Nullable String claimDescription(ByteBody body) {
         return body instanceof InternalByteBody internal ? internal.claimedBy : null;
+    }
+
+    /**
+     * Reserve a primary read that may decode a split before consuming the original bytes.
+     * Other primary readers are refused immediately; copies can still split the bytes until
+     * they are consumed. The reservation lasts for the lifetime of this body.
+     *
+     * @param body The body
+     * @param reader The operation that owns the primary read
+     * @since 5.3.0
+     */
+    public static void reservePrimaryRead(ByteBody body, String reader) {
+        if (body instanceof InternalByteBody internal) {
+            synchronized (internal) {
+                if (internal.reservedBy != null) {
+                    throw new IllegalStateException("The body of the request was already read with "
+                        + internal.reservedBy + "(): read a copy() for each reader that must leave the body intact");
+                }
+                internal.reservedBy = reader;
+            }
+        }
     }
 
     /**

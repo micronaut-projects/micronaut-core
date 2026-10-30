@@ -13,3 +13,7 @@ snippet::io.micronaut.docs.http.client.raw.RawRetry[tags="imports,class", indent
 <2> A body that was never sent is handed back instead of being closed
 <3> Take the body from the exception; it is empty if the body was read or taken already
 <4> Send the body to the fallback server, which now owns it
+
+The future returned by `AsyncRawHttpClient.exchange` owns the pending exchange. Cancelling it or completing it exceptionally (including `orTimeout`) aborts outstanding work and releases the request body. A response arriving after cancellation or timeout is closed. Cancelling or timing out a dependent stage leaves the original exchange running.
+
+Once the response has arrived, the caller owns its body. Close the api:http.ByteBodyHttpResponse[] when finished, including when abandoning it after a later processing timeout. Cancelling an already completed exchange future does not release an active response body.

@@ -24,9 +24,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.QualifiedBeanType;
 
-import java.util.AbstractMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -98,28 +96,42 @@ final class QualifierUtils {
      * @return true if equals
      */
     public static boolean annotationQualifiersEquals(Object o1, Object o2) {
-        Map.Entry<String, Map<CharSequence, Object>> val1 = extractAnnotationAndBindingValues(o1);
+        AnnotationSelection val1 = extractAnnotationSelection(o1);
         if (val1 == null) {
             return false;
         }
-        Map.Entry<String, Map<CharSequence, Object>> val2 = extractAnnotationAndBindingValues(o2);
+        AnnotationSelection val2 = extractAnnotationSelection(o2);
         if (val2 == null) {
             return false;
         }
-        return Objects.equals(val1.getKey(), val2.getKey()) && Objects.equals(val1.getValue(), val2.getValue());
+        return val1.equals(val2);
     }
 
-    private static Map.@Nullable Entry<String, Map<CharSequence, Object>> extractAnnotationAndBindingValues(Object o) {
+    /**
+     * What an annotation qualifier selects by: the annotation, the binding members it compares, and whether a
+     * candidate that does not carry the annotation qualifies by its name. Two qualifiers that select different
+     * beans are not equal, which the bean context relies on when it caches a lookup by its qualifier.
+     *
+     * @param annotationName The annotation
+     * @param bindingValues  The binding members, or {@code null} when the annotation qualifies by its type alone
+     * @param matchByName    Whether a candidate qualifies by its name
+     */
+    private record AnnotationSelection(String annotationName,
+                                       @Nullable Map<CharSequence, Object> bindingValues,
+                                       boolean matchByName) {
+    }
+
+    private static @Nullable AnnotationSelection extractAnnotationSelection(Object o) {
         if (o instanceof AnnotationStereotypeQualifier<?> that) {
-            return new AbstractMap.SimpleEntry<>(that.stereotype, null);
+            return new AnnotationSelection(that.stereotype, null, true);
         } else if (o instanceof AnnotationMetadataQualifier<?> that) {
             if (that.qualifierAnn == null) {
-                return new AbstractMap.SimpleEntry<>(that.annotationName, null);
+                return new AnnotationSelection(that.annotationName, null, that.matchByName);
             } else {
-                return new AbstractMap.SimpleEntry<>(that.annotationName, that.qualifierAnn.getValues());
+                return new AnnotationSelection(that.annotationName, that.qualifierAnn.getValues(), that.matchByName);
             }
         } else if (o instanceof AnnotationQualifier<?> that) {
-            return new AbstractMap.SimpleEntry<>(that.annotation.annotationType().getName(), null);
+            return new AnnotationSelection(that.annotation.annotationType().getName(), null, false);
         }
         return null;
     }

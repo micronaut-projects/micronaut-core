@@ -87,6 +87,12 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     private final boolean isErrorRoute;
     private final boolean isPermitsBody;
     private final @Nullable MessageBodyWriter<R> messageBodyWriter;
+    /**
+     * The execution of the route an owner prepared, e.g. the server that executes it, or
+     * {@code null}. Published racily: the holder is immutable, so a thread sees a complete
+     * preparation or none, and prepares the route again.
+     */
+    private @Nullable PreparedExecution preparedExecution;
 
     public DefaultRouteInfo(ReturnType<? extends R> returnType,
                             Class<?> declaringType,
@@ -110,8 +116,9 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.messageBodyWriter = messageBodyHandlerRegistry.findWriter(argBodyType, producesMediaTypes)
             .map(w -> w.createSpecific(argBodyType))
             .orElse(null);
+        // a publisher of responses is answered by its first response; the field reactive is not set yet
         single = returnType.isSingleResult() ||
-            (isReactive() && returnType.getFirstTypeVariable()
+            (returnType.isReactive() && returnType.getFirstTypeVariable()
                 .filter(t -> HttpResponse.class.isAssignableFrom(t.getType())).isPresent()) ||
             returnType.isAsync() ||
             returnType.isSuspended();
@@ -125,7 +132,8 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.isErrorRoute = isErrorRoute;
         this.isPermitsBody = isPermitsBody;
         this.isVoid = returnType.isVoid();
-        isWebSocketRoute = annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
+        isWebSocketRoute = annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnMessage")
+            || annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnOpen");
         definedStatus = annotationMetadata.enumValue(Status.class, HttpStatus.class).orElse(null);
         definedContentDisposition = annotationMetadata.findAnnotation(ContentDisposition.class)
             .map(av -> ContentDispositionUtils.toHeaderValue(
@@ -271,11 +279,18 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
 
     @Override
     public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
-        return producesMediaTypesContainsAll || anyMediaTypesMatch(producesMediaTypes, acceptableTypes);
+        if (producesMediaTypesContainsAll) {
+            // the route must be able to answer in a type that is acceptable, see RouteExecutor
+            return !AcceptedMediaTypes.hasRejected(acceptableTypes) || AcceptedMediaTypes.negotiate(producesMediaTypes, true, acceptableTypes) != null;
+        }
+        return anyMediaTypesMatch(producesMediaTypes, acceptableTypes);
     }
 
     @Override
     public boolean doesProduce(@Nullable MediaType acceptableType) {
+        if (acceptableType != null && AcceptedMediaTypes.isRejected(acceptableType)) {
+            return false;
+        }
         return producesMediaTypesContainsAll || acceptableType == null || acceptableType.equals(MediaType.ALL_TYPE) || producesMediaTypes.contains(acceptableType);
     }
 
@@ -302,6 +317,10 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     private static boolean computeAnyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
+        if (AcceptedMediaTypes.hasRejected(acceptableTypes)) {
+            // an accepted type of the quality 0 is not acceptable, RFC 9110 12.4.2
+            return AcceptedMediaTypes.negotiate(producedMediaTypes, false, acceptableTypes) != null;
+        }
         for (MediaType acceptableType : acceptableTypes) {
             if (acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType)) {
                 return true;
@@ -415,6 +434,42 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     @Override
     public boolean needsRequestBody() {
         return isPermitsBody;
+    }
+
+    /**
+     * The execution of this route that an owner prepared with {@link #prepareExecution}.
+     *
+     * @param owner The owner, e.g. the server that executes the route
+     * @return The prepared execution, or {@code null} if the owner prepared none
+     * @since 5.3.0
+     */
+    @Internal
+    public final @Nullable Object findPreparedExecution(Object owner) {
+        PreparedExecution prepared = preparedExecution;
+        return prepared != null && prepared.owner == owner ? prepared.execution : null;
+    }
+
+    /**
+     * Keep the execution of this route an owner prepared, e.g. the server that executes it, for
+     * as long as the route lives: a located route lives as long as its route table. The route
+     * keeps the execution of one owner, the last one: another owner prepares it again.
+     *
+     * @param owner     The owner
+     * @param execution The prepared execution, immutable
+     * @since 5.3.0
+     */
+    @Internal
+    public final void prepareExecution(Object owner, Object execution) {
+        preparedExecution = new PreparedExecution(owner, execution);
+    }
+
+    /**
+     * The execution of the route an owner prepared.
+     *
+     * @param owner     The owner
+     * @param execution The execution
+     */
+    private record PreparedExecution(Object owner, Object execution) {
     }
 
     /**

@@ -1,0 +1,177 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.http.body.stream;
+
+import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+import reactor.core.CorePublisher;
+import reactor.core.scheduler.Schedulers;
+import reactor.core.CoreSubscriber;
+import reactor.core.publisher.Operators;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.util.context.Context;
+
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+/**
+ * Interop with Reactor sources, the only place the publishers of bodies refer to Reactor: a
+ * Reactor source is subscribed to with the Reactor context of the downstream subscriber, and with
+ * a discard hook, so that it releases the items it drops when it is cancelled. Delegating sources
+ * also receive that context when a hook is needed, because they may hide a Reactor source.
+ * Without Reactor, sources are subscribed to directly. Declared Reactor argument types are
+ * adapted here without requiring Reactor converter beans.
+ *
+ * <p>Public only because the server module ({@code io.micronaut.http.server}) subscribes to body
+ * sources through it as well; it is internal API.</p>
+ *
+ * @author Denis Stepanov
+ * @since 5.3.0
+ */
+@Internal
+public final class ReactorInterop {
+    private static final boolean REACTOR_PRESENT = reactorType() != null;
+
+    private ReactorInterop() {
+    }
+
+    /**
+     * Preserve Reactor's non-blocking-thread rules without requiring Reactor for native bodies.
+     * This includes predicates registered with Reactor, not just its thread marker interface.
+     *
+     * @return Whether Reactor forbids blocking on the current thread
+     */
+    public static boolean isInNonBlockingThread() {
+        return REACTOR_PRESENT && Schedulers.isInNonBlockingThread();
+    }
+
+    /**
+     * Adapt a native publisher to a declared Reactor argument without requiring converter beans.
+     *
+     * @param source The source
+     * @param type The declared argument type
+     * @param <T> The element type
+     * @return The Reactor publisher, or the source for other argument types
+     * @since 5.3.0
+     */
+    public static <T> Publisher<T> adaptPublisher(Publisher<T> source, Class<?> type) {
+        if (REACTOR_PRESENT && !type.isInstance(source)) {
+            if (type == Flux.class) {
+                return Flux.from(source);
+            }
+            if (type == Mono.class) {
+                return Mono.from(source);
+            }
+        }
+        return source;
+    }
+
+    private static @Nullable Class<?> reactorType() {
+        try {
+            // Unlike ClassUtils.isPresent, this class literal does not use Class.forName
+            // or require reflection metadata in a native image. Catch missing linkage so
+            // native Reactive Streams publishers can also be used without Reactor.
+            return CorePublisher.class;
+        } catch (NoClassDefFoundError e) {
+            return null;
+        }
+    }
+
+    /**
+     * Subscribe to a source.
+     *
+     * @param source     The source
+     * @param subscriber The subscriber
+     * @param downstream The subscriber whose Reactor context a Reactor source sees, once there is
+     *                   one, or {@code null}
+     * @param discard    Releases an item a Reactor source drops, or {@code null}
+     * @param <T>        The type of an item
+     */
+    public static <T> void subscribe(Publisher<T> source,
+                                     Subscriber<? super T> subscriber,
+                                     @Nullable Supplier<? extends @Nullable Subscriber<?>> downstream,
+                                     @Nullable Consumer<Object> discard) {
+        // Resolve Reactor types only when the optional library is available. A native
+        // publisher used by an async form decoder must also work without Reactor.
+        // A delegating native publisher may subscribe to a Reactor source internally. Pass the
+        // subscriber context/discard hook across that boundary, not just direct CorePublishers.
+        if (REACTOR_PRESENT && (source instanceof CorePublisher<?> || downstream != null || discard != null)) {
+            source.subscribe(new ContextSubscriber<>(subscriber, downstream, discard));
+        } else {
+            source.subscribe(subscriber);
+        }
+    }
+
+    /**
+     * Passes the signals of a Reactor source on, and gives it a context.
+     *
+     * @param <T> The type of an item
+     */
+    private static final class ContextSubscriber<T> implements CoreSubscriber<T> {
+        private final Subscriber<? super T> actual;
+        private final @Nullable Supplier<? extends @Nullable Subscriber<?>> downstream;
+        private final @Nullable Consumer<Object> discard;
+        private @Nullable Context context;
+
+        ContextSubscriber(Subscriber<? super T> actual, @Nullable Supplier<? extends @Nullable Subscriber<?>> downstream, @Nullable Consumer<Object> discard) {
+            this.actual = actual;
+            this.downstream = downstream;
+            this.discard = discard;
+        }
+
+        @Override
+        public Context currentContext() {
+            Context c = context;
+            if (c != null) {
+                return c;
+            }
+            Subscriber<?> d = downstream == null ? null : downstream.get();
+            c = d instanceof CoreSubscriber<?> core ? core.currentContext() : Context.empty();
+            if (discard != null) {
+                c = Operators.enableOnDiscard(c, discard);
+            }
+            if (downstream == null || d != null) {
+                // the downstream subscriber is known, its context does not change
+                context = c;
+            }
+            return c;
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            actual.onSubscribe(s);
+        }
+
+        @Override
+        public void onNext(T t) {
+            actual.onNext(t);
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            actual.onError(t);
+        }
+
+        @Override
+        public void onComplete() {
+            actual.onComplete();
+        }
+    }
+}

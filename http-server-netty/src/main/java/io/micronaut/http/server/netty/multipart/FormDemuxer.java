@@ -18,8 +18,8 @@ package io.micronaut.http.server.netty.multipart;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
@@ -31,6 +31,7 @@ import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.body.stream.SizeLimitTracker;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -40,17 +41,21 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
 import io.netty.contrib.multipart.ContentDisposition;
+import io.netty.contrib.multipart.FormDecoderException;
 import io.netty.contrib.multipart.ParsedHeaderValue;
 import io.netty.contrib.multipart.PostBodyDecoder;
+import io.netty.contrib.multipart.VintageAccess;
 import io.netty.contrib.multipart.TooManyFormFieldsException;
 import io.netty.contrib.multipart.UndecodedDataLimitExceededException;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -64,6 +69,15 @@ import java.util.Optional;
 public final class FormDemuxer implements BufferConsumer {
     private static final Logger LOG = LoggerFactory.getLogger(FormDemuxer.class);
     private final PostBodyDecoder decoder;
+    // the URL-encoded decoder whose content is kept as it appears, or null to decode the content
+    private final VintageAccess.@Nullable UrlEncodedDecoder undecoded;
+    // whether the undecoded content is validated like the decoded content would be
+    private final boolean validateUndecoded;
+    /**
+     * Finds the close delimiter of a multipart body, {@code null} for another body.
+     */
+    @Nullable
+    private final CloseDelimiter closeDelimiter;
     private final ByteBodyFactory byteBodyFactory;
     @Nullable
     private final EventLoop eventLoop;
@@ -72,7 +86,11 @@ public final class FormDemuxer implements BufferConsumer {
     @Nullable
     private final Upstream upstream;
 
-    private final Sinks.Many<RawFormField> sink = Sinks.many().unicast().onBackpressureBuffer();
+    /**
+     * The fields, buffered until they are requested. The upstream is started when the fields are
+     * subscribed to, and the fields that are not delivered are closed.
+     */
+    private final UnicastFieldPublisher<RawFormField> sink = new UnicastFieldPublisher<>(RawFormField::close, this::startUpstream, this::cancel);
 
     @Nullable
     private State state = new BeforeField(null);
@@ -81,8 +99,41 @@ public final class FormDemuxer implements BufferConsumer {
     private long unacknowledged = 0;
     private boolean decodeFailure = false;
 
-    public FormDemuxer(PostBodyDecoder decoder, Channel channel, BodySizeLimits fieldLimits, BodySizeLimits totalLimits, ByteBody byteBody) {
+    /**
+     * @param decoder           The decoder
+     * @param multipartBoundary The boundary of a multipart body, whose close delimiter must end
+     *                          the body: a body that ends before it, e.g. a truncated upload, fails
+     *                          like a malformed body. {@code null} for a body without one, e.g.
+     *                          URL-encoded data
+     * @param charset           The charset of the decoder, which it encodes the boundary with
+     * @param channel           The channel
+     * @param fieldLimits       The limits of a field
+     * @param totalLimits       The limits of the form
+     * @param byteBody          The body
+     */
+    public FormDemuxer(PostBodyDecoder decoder, @Nullable String multipartBoundary, Charset charset, Channel channel, BodySizeLimits fieldLimits, BodySizeLimits totalLimits, ByteBody byteBody) {
+        this(decoder, multipartBoundary, charset, channel, fieldLimits, totalLimits, byteBody, Content.DECODED);
+    }
+
+    /**
+     * @param decoder           The decoder
+     * @param multipartBoundary The boundary of a multipart body, {@code null} for URL-encoded data
+     * @param charset           The charset of the decoder, which it encodes the boundary with
+     * @param channel           The channel
+     * @param fieldLimits       The limits of a field
+     * @param totalLimits       The limits of the form
+     * @param byteBody          The body
+     * @param content           Whether the content of the fields is decoded, e.g. percent-decoded for
+     *                          URL-encoded data, or kept as it appears in the body. The limits and the
+     *                          validation of the form apply either way
+     */
+    public FormDemuxer(PostBodyDecoder decoder, @Nullable String multipartBoundary, Charset charset, Channel channel, BodySizeLimits fieldLimits,
+                       BodySizeLimits totalLimits, ByteBody byteBody, Content content) {
         this.decoder = decoder;
+        // a multipart field is not encoded: its content is the same either way
+        this.undecoded = content != Content.DECODED && decoder instanceof VintageAccess.UrlEncodedDecoder urlEncoded ? urlEncoded : null;
+        this.validateUndecoded = content == Content.UNDECODED_VALIDATED;
+        this.closeDelimiter = multipartBoundary == null ? null : CloseDelimiter.of(multipartBoundary, charset);
         this.fieldLimits = fieldLimits;
         if (byteBody instanceof AvailableByteBody abb) {
             // NettyBodyAnnotationBinder triggers this branch from outside the EventLoop sometimes,
@@ -120,14 +171,19 @@ public final class FormDemuxer implements BufferConsumer {
         }
     }
 
-    public Flux<RawFormField> fields() {
-        Flux<RawFormField> flux = sink.asFlux()
-            .doOnCancel(this::cancel)
-            .doOnDiscard(RawFormField.class, RawFormField::close);
+    /**
+     * The fields of the form, for a single subscriber.
+     *
+     * @return The fields
+     */
+    public Publisher<RawFormField> fields() {
+        return sink;
+    }
+
+    private void startUpstream() {
         if (upstream != null) {
-            flux = flux.doOnSubscribe(s -> upstream.start());
+            upstream.start();
         }
-        return flux;
     }
 
     private void cancel() {
@@ -148,12 +204,17 @@ public final class FormDemuxer implements BufferConsumer {
             e = new ContentLengthExceededException("Number of form fields exceeds configured limit");
         } else if (e instanceof UndecodedDataLimitExceededException) {
             e = new ContentLengthExceededException("Length of buffered form field exceeds configured limit");
+        } else if (e instanceof FormDecoderException) {
+            // a malformed body. The message of the decoder stays in the cause, out of the response
+            HttpStatusException badRequest = new HttpStatusException(HttpStatus.BAD_REQUEST, "Malformed form body");
+            badRequest.initCause(e);
+            e = badRequest;
         }
 
         if (state instanceof StreamingContent sc) {
             sc.baseSharedBuffer.error(e);
         }
-        if (sink.tryEmitError(e).isFailure()) {
+        if (!sink.error(e)) {
             LOG.debug("Failed to forward decoder failure", e);
         }
         updateUpstreamDemand();
@@ -215,8 +276,7 @@ public final class FormDemuxer implements BufferConsumer {
     private void emit(FormFieldMetadata metadata, ByteBody content) {
         assert eventLoop == null || eventLoop.inEventLoop();
         CloseableByteBody moved = content.move();
-        Sinks.EmitResult result = sink.tryEmitNext(new RawFormField(metadata, moved));
-        if (result.isFailure()) {
+        if (!sink.offer(new RawFormField(metadata, moved))) {
             moved.close();
         }
     }
@@ -244,7 +304,11 @@ public final class FormDemuxer implements BufferConsumer {
 
         unacknowledged += rb.readable();
         try {
-            decoder.add(decoderInput(NettyReadBufferFactory.toByteBuf(rb)));
+            ByteBuf buf = NettyReadBufferFactory.toByteBuf(rb);
+            if (closeDelimiter != null) {
+                closeDelimiter.scan(buf);
+            }
+            decoder.add(decoderInput(buf));
             forwardOutput();
         } catch (Exception e) {
             handleDecoderException(e);
@@ -258,13 +322,22 @@ public final class FormDemuxer implements BufferConsumer {
      * writes the next input into that buffer and compacts it in place. The bytes of a body can be
      * shared with another reader, e.g. a copy of the form that a filter decodes as it arrives
      * while the bytes are buffered for the route: writing into them corrupts the form the route
-     * reads. The decoder is given a composite view of the input, which it extends with components
-     * and compacts by dropping them, without writing into the bytes.
+     * reads. The multipart decoder is given a composite view of the input, which it extends with
+     * components and compacts by dropping them, without writing into the bytes. The URL-encoded
+     * decoder also percent-decodes the names, and the values that end its input, in place: it is
+     * given a private copy of the input, which is small, as the form is buffered.
      *
      * @param input The input, owned by the view
      * @return The view
      */
-    private static ByteBuf decoderInput(ByteBuf input) {
+    private ByteBuf decoderInput(ByteBuf input) {
+        if (decoder instanceof VintageAccess.UrlEncodedDecoder) {
+            try {
+                return input.alloc().buffer(input.readableBytes()).writeBytes(input);
+            } finally {
+                input.release();
+            }
+        }
         return input.alloc().compositeBuffer().addComponent(true, input);
     }
 
@@ -273,11 +346,19 @@ public final class FormDemuxer implements BufferConsumer {
         assert eventLoop == null || eventLoop.inEventLoop();
         try {
             decoder.endInput();
+            // the end of the input completes the last field, which the decoder validates then,
+            // e.g. a percent escape it was waiting on the rest of
+            forwardOutput();
         } catch (Exception e) {
             handleDecoderException(e);
             return;
         }
-        forwardOutput();
+        if (closeDelimiter != null && !closeDelimiter.found()) {
+            // the decoder ends the last part with the end of the input: a truncated body, or one
+            // with another closing boundary, would be read as a shorter form
+            handleDecoderException(new HttpStatusException(HttpStatus.BAD_REQUEST, "The multipart body ended before its closing boundary"));
+            return;
+        }
         eof();
     }
 
@@ -296,7 +377,7 @@ public final class FormDemuxer implements BufferConsumer {
         if (state instanceof StreamingContent sc) {
             sc.baseSharedBuffer.error(e);
         }
-        if (sink.tryEmitError(e).isFailure()) {
+        if (!sink.error(e)) {
             LOG.debug("Failed to forward failure", e);
         }
         eof();
@@ -309,12 +390,140 @@ public final class FormDemuxer implements BufferConsumer {
             }
             state = null;
             decoder.close();
-            sink.tryEmitComplete();
+            sink.complete();
         }
+    }
+
+    /**
+     * How the content of the fields is read.
+     */
+    public enum Content {
+        /**
+         * Decoded, e.g. percent-decoded for URL-encoded data.
+         */
+        DECODED,
+        /**
+         * As it appears in the body, for a decoder that validates nothing when it decodes the
+         * content, e.g. without the quirks that refuse malformed percent escapes.
+         */
+        UNDECODED,
+        /**
+         * As it appears in the body, validated like the decoded content, for a decoder that
+         * refuses malformed percent escapes.
+         */
+        UNDECODED_VALIDATED
+    }
+
+    /**
+     * @return The content of the current {@link PostBodyDecoder.Event#CONTENT} event, decoded or as
+     * it appears in the body
+     */
+    private ByteBuf content() {
+        VintageAccess.UrlEncodedDecoder urlEncoded = undecoded;
+        if (urlEncoded == null) {
+            return decoder.decodedContent();
+        }
+        ByteBuf content = urlEncoded.undecodedContent();
+        if (!validateUndecoded) {
+            return content;
+        }
+        // validated like the decoded content, e.g. the percent escapes the decoder refuses: the
+        // decoder does not split an escape between two contents
+        ByteBuf check = content.copy();
+        try {
+            urlEncoded.decodeComponent(check, false);
+        } catch (RuntimeException e) {
+            content.release();
+            throw e;
+        } finally {
+            check.release();
+        }
+        return content;
     }
 
     private static RuntimeException unexpectedEvent(PostBodyDecoder.Event event) {
         return new IllegalStateException("Unexpected event " + event);
+    }
+
+    /**
+     * Finds the close delimiter of a multipart body ({@code --boundary--} at the start of a line)
+     * in the bytes of the body as they arrive, see RFC 2046, section 5.1.1. The boundary does not
+     * occur in the content of a part, so its first occurrence ends the body; the epilogue that
+     * may follow is ignored. Like the decoder, a line may end with CRLF or with a bare LF, and the
+     * boundary is encoded with the charset of the decoder.
+     */
+    private static final class CloseDelimiter {
+        /**
+         * The delimiter that follows the LF, {@code --boundary--}.
+         */
+        private final byte[] delimiter;
+        /**
+         * The number of bytes of {@code LF--boundary--} matched so far, at the end of the bytes
+         * that were scanned. The boundary contains no LF, so a match can only start at an LF. The
+         * first delimiter of a body that has no preamble is not preceded by a line break: the
+         * body starts as if it followed one.
+         */
+        private int matched = 1;
+        private boolean found;
+
+        private CloseDelimiter(byte[] delimiter) {
+            this.delimiter = delimiter;
+        }
+
+        /**
+         * @param boundary The boundary of the body
+         * @param charset  The charset the decoder encodes the boundary with
+         * @return The matcher, or {@code null} if the boundary is not usable, i.e. it contains a
+         * line break, which the decoder could never match either
+         */
+        @Nullable
+        static CloseDelimiter of(String boundary, Charset charset) {
+            byte[] encoded = ("--" + boundary).getBytes(charset);
+            for (byte b : encoded) {
+                if (b == '\n' || b == '\r') {
+                    return null;
+                }
+            }
+            byte[] delimiter = Arrays.copyOf(encoded, encoded.length + 2);
+            delimiter[encoded.length] = '-';
+            delimiter[encoded.length + 1] = '-';
+            return new CloseDelimiter(delimiter);
+        }
+
+        boolean found() {
+            return found;
+        }
+
+        void scan(ByteBuf buf) {
+            if (found) {
+                return;
+            }
+            int i = buf.readerIndex();
+            int end = buf.writerIndex();
+            int m = matched;
+            while (i < end) {
+                if (m == 0) {
+                    // jump to the next line
+                    int lf = buf.indexOf(i, end, (byte) '\n');
+                    if (lf == -1) {
+                        break;
+                    }
+                    m = 1;
+                    i = lf + 1;
+                    continue;
+                }
+                byte b = buf.getByte(i++);
+                if (b == delimiter[m - 1]) {
+                    if (++m > delimiter.length) {
+                        found = true;
+                        return;
+                    }
+                } else {
+                    m = b == '\n' ? 1 : 0;
+                }
+            }
+            matched = m;
+        }
     }
 
     private abstract static sealed class State {
@@ -396,7 +605,7 @@ public final class FormDemuxer implements BufferConsumer {
         @Override
         void accept(PostBodyDecoder.Event event) {
             if (event == PostBodyDecoder.Event.CONTENT) {
-                ByteBuf content = decoder.decodedContent();
+                ByteBuf content = content();
                 buffers.add(content);
                 if (tracker.add(content.readableBytes()) != null) {
                     this.devolveToStreaming(true);
@@ -486,7 +695,7 @@ public final class FormDemuxer implements BufferConsumer {
         @Override
         void accept(PostBodyDecoder.Event event) {
             if (event == PostBodyDecoder.Event.CONTENT) {
-                add(decoder.decodedContent());
+                add(content());
             } else if (event == PostBodyDecoder.Event.FIELD_COMPLETE) {
                 baseSharedBuffer.complete();
                 if (fieldsPublisherCancelled) {

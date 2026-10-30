@@ -378,6 +378,44 @@ class DecoratorFormTest(unittest.TestCase):
             # Outside the source root the imports cannot be resolved and the module is left alone
             self.assertTrue(ast_equal(ast.parse(source), MicronautRuntimeTransformer(java_class_element, no_class_elements).visit(ast.parse(source))))
 
+    def test_shared_scan_cache_does_not_keep_answers_of_a_cut_short_import_cycle(self):
+        import itertools
+        with tempfile.TemporaryDirectory() as source_root:
+            package = os.path.join(source_root, "cycle")
+            os.makedirs(package)
+            sources = {
+                # a re-exports auth from b, b imports a back, c applies auth imported from a
+                "a": "from .b import auth\n",
+                "b": (
+                    "from micronaut.core.bind.annotation import Bindable\n"
+                    "from .a import auth as again\n"
+                    "@Bindable\n"
+                    "def auth():\n"
+                    "    def decorator(target):\n"
+                    "        return target\n"
+                    "    return decorator\n"
+                ),
+                "c": (
+                    "from .a import auth\n"
+                    "@auth\n"
+                    "class View:\n"
+                    "    pass\n"
+                ),
+            }
+            for name, text in sources.items():
+                with open(os.path.join(package, name + ".py"), "w", encoding="utf-8") as module:
+                    module.write(text)
+            for order in itertools.permutations(sources):
+                with self.subTest(order=order):
+                    # one compilation: the modules share the scan caches, in any transform order
+                    caches = {}
+                    for name in order:
+                        transformer = MicronautTransformer(java_class_element, java_class_elements, True, "cycle", source_root, caches=caches)
+                        code = unparse(transformer.visit(ast.parse(sources[name])))
+                        if name == "c":
+                            self.assertIn("@auth()\nclass View", code)
+                    self.assertFalse(caches["loading"])
+
     def test_generated_decorator_is_a_factory(self):
         transformer = MicronautTransformer(java_class_element, no_class_elements)
         transformer.visit(ast.parse("from micronaut.context.annotation import Executable, Replaces\n"))
@@ -515,10 +553,14 @@ class TransformerTest(unittest.TestCase):
         transformer.visit(ast.parse(source))
         errors = transformer.validation_errors
         self.assertEqual(4, len(errors), errors)
-        self.assertIn("Cannot resolve Java import [io.swagger.v3.oas.annotations.Operation]", errors[0])
-        self.assertIn("Cannot resolve Java package [io.nosuch.annotations]", errors[1])
-        self.assertIn("Cannot resolve Java package [io.nosuch.other]", errors[2])
-        self.assertIn("Cannot resolve Java package [io.nosuch.alias]", errors[3])
+        self.assertIn("Cannot resolve Java import [io.swagger.v3.oas.annotations.Operation]", errors[0].message())
+        self.assertEqual((1, 1), (errors[0].span().line(), errors[0].span().column()))
+        self.assertEqual("unresolved-import", errors[0].rule())
+        self.assertIn("Cannot resolve Java package [io.nosuch.annotations]", errors[1].message())
+        self.assertEqual(2, errors[1].span().line())
+        self.assertIn("Cannot resolve Java package [io.nosuch.other]", errors[2].message())
+        self.assertIn("Cannot resolve Java package [io.nosuch.alias]", errors[3].message())
+        self.assertEqual(4, errors[3].span().line())
 
     def test_relative_import_of_an_application_io_package_is_not_a_java_import(self):
         source = "from .io.util import helper\nfrom ..io import util\nfrom . import io\n"
@@ -536,7 +578,7 @@ class TransformerTest(unittest.TestCase):
         self.assertIn(
             "Java package import [import io.swagger.v3.oas.annotations] requires an alias such as "
             "[import io.swagger.v3.oas.annotations as annotations]",
-            errors[0],
+            errors[0].message(),
         )
 
     def test_io_annotation_clashing_with_a_generated_decorator_is_reported_with_an_alias_hint(self):
@@ -550,8 +592,8 @@ class TransformerTest(unittest.TestCase):
             transformer.visit(ast.parse("from io.swagger.v3.oas.annotations.headers import Header\n"))
         errors = transformer.validation_errors
         self.assertEqual(1, len(errors), errors)
-        self.assertIn("Java import [io.swagger.v3.oas.annotations.headers.Header] clashes with the decorator [Header]", errors[0])
-        self.assertIn("[from io.swagger.v3.oas.annotations.headers import Header as SwaggerHeader]", errors[0])
+        self.assertIn("Java import [io.swagger.v3.oas.annotations.headers.Header] clashes with the decorator [Header]", errors[0].message())
+        self.assertIn("[from io.swagger.v3.oas.annotations.headers import Header as SwaggerHeader]", errors[0].message())
 
 
 class RuntimeImportRewriteTest(unittest.TestCase):
@@ -601,9 +643,10 @@ class UnresolvedJavaImportTest(unittest.TestCase):
     def test_missing_name_in_a_reserved_java_namespace_is_an_error(self):
         errors = self._errors("from micronaut.absent.ua import UserAgentProvider\n")
         self.assertEqual(1, len(errors))
-        self.assertIn("UserAgentProvider", errors[0])
-        self.assertIn("micronaut.absent.ua", errors[0])
-        self.assertIn("io.micronaut.absent.ua.UserAgentProvider", errors[0])
+        self.assertIn("UserAgentProvider", errors[0].message())
+        self.assertIn("micronaut.absent.ua", errors[0].message())
+        self.assertIn("io.micronaut.absent.ua.UserAgentProvider", errors[0].message())
+        self.assertEqual(1, errors[0].span().line())
         self.assertEqual(1, len(self._errors("from io.lettuce.core.codec import RedisCodec\n")))
         self.assertEqual(1, len(self._errors("from jakarta.absent import Missing\n")))
         # GraalPy's java import hook finds a spec for any java.* name: still not a Python module

@@ -16,6 +16,8 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
@@ -26,6 +28,7 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -70,6 +73,37 @@ public interface ApplicationContextBuilder {
      */
     default ApplicationContextBuilder beanResolutionTrace(
         BeanResolutionTraceConfiguration configuration) {
+        return this;
+    }
+
+    /**
+     * Adds a tracer of bean resolution, which is active from the start of the context in addition to the tracer of
+     * the {@link BeanResolutionTraceMode} and to the other tracers.
+     *
+     * @param tracer The tracer
+     * @return This builder
+     * @since 5.3.0
+     * @see BeanResolutionTracer
+     */
+    @Experimental
+    default ApplicationContextBuilder beanResolutionTracer(BeanResolutionTracer tracer) {
+        return this;
+    }
+
+    /**
+     * Whether the tracers of bean resolution created by the {@link BeanResolutionTracerProvider} discovered with
+     * {@link java.util.ServiceLoader} are enabled. A provider can still activate its tracer when they are not, see
+     * {@link BeanResolutionTracerProvider#isEnabled(BeanResolutionTracerProvider.Activation)}.
+     *
+     * <p>Defaults to the value of the system property {@code micronaut.inject.trace.tracers} or the environment
+     * variable {@code MICRONAUT_INJECT_TRACE_TRACERS}, and otherwise to {@code false}.</p>
+     *
+     * @param enabled Whether discovered tracers are enabled
+     * @return This builder
+     * @since 5.3.0
+     */
+    @Experimental
+    default ApplicationContextBuilder beanResolutionTracerDiscovery(boolean enabled) {
         return this;
     }
 
@@ -394,6 +428,48 @@ public interface ApplicationContextBuilder {
      * @since 5.0
      */
     ApplicationContextBuilder eventsEnabled(boolean enabled);
+
+    /**
+     * Record which bean received which other bean, as a {@link BeanDependencyGraph} the built context
+     * exposes through {@link ConfigurableBeanContext#findDependencyGraph()}. A development launcher switches this on;
+     * it defaults to on only in {@link io.micronaut.context.env.DevelopmentMode development mode}, whether switched
+     * on by system property or by the configuration of the context. Switching it off here wins over both.
+     *
+     * @param enabled True to record the graph
+     * @return This builder
+     * @since 5.3.0
+     */
+    default ApplicationContextBuilder beanDependencyTrackingEnabled(boolean enabled) {
+        return this;
+    }
+
+    /**
+     * Whether {@code io.micronaut.runtime.Micronaut} reads the bean definitions on the common pool
+     * while it starts. Off by default; other builders ignore it.
+     *
+     * @param enabled True to prefetch the bean definitions
+     * @return This builder
+     * @since 5.3.0
+     */
+    @Experimental
+    default ApplicationContextBuilder beanDefinitionPrefetchEnabled(boolean enabled) {
+        return this;
+    }
+
+    /**
+     * Singleton registrations of a stopped context the built context adopts when it starts: the bean
+     * instances are registered under their definitions instead of being created again. A development
+     * launcher passes what {@link DefaultBeanContext#stopRetaining(java.util.function.Predicate)} returned.
+     *
+     * @param registrations The registrations to adopt
+     * @return This builder
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    default ApplicationContextBuilder retainedRegistrations(Collection<BeanRegistration<?>> registrations) {
+        return this;
+    }
 
     /**
      * Set a predicate to filter beans considered by the context.

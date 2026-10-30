@@ -29,6 +29,9 @@ dependencies {
     testImplementation(libs.jazzer.junit)
     testImplementation(libs.jazzer.api)
     testImplementation(libs.junit.jupiter.params)
+    // the Reactive Streams TCK of the publishers of bodies, run by the TestNG engine
+    testImplementation(libs.reactive.streams.tck)
+    testRuntimeOnly(libs.junit.testng.engine)
     // the coroutine extensions of the streams
     testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(libs.micronaut.test.junit5) {

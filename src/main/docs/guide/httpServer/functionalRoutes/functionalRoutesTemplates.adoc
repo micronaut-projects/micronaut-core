@@ -1,0 +1,17 @@
+Most applications should use the default URI templates and route selection. The experimental APIs in this section support integrations with other web frameworks that need different matching rules.
+
+=== Custom Template Languages
+
+Call `templates(parser)` on a group to provide an api:http.uri.RouteTemplateParser[]. It parses route paths and locator prefixes into api:http.uri.RouteTemplate[] instances.
+
+=== Custom Route Selection
+
+Use `selectedBy(selector)` on a group or route to provide an api:web.router.spi.RouteMatchSelector[]. The selector runs when all matching candidates share the same selector instance. Otherwise, Micronaut's normal matching policy applies.
+
+A selector can also negotiate the response media type. Handlers can read it with `RouteMatchSelector.selectedMediaType(pathVariables)`.
+
+By default, the router removes candidates with incompatible media types before invoking the selector. An integration that must choose by path first can return `true` from `selectsMediaTypes()` and report `Selection.notAcceptable(match)` or `Selection.unsupportedMediaType(match)` for `406` or `415`. Returning no selection instead means no route was found.
+
+For locator precedence, a selector can provide an `order()` comparator. It lets a more specific route take precedence over a locator of the same selector, including when determining allowed methods.
+
+See the API documentation for the full selection contract. Custom selectors cannot be combined with request-body conditions.

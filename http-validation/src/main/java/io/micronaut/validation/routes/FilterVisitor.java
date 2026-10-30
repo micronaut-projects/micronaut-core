@@ -61,6 +61,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -220,6 +221,14 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                         return;
                     }
                     continuationCreator = parameter;
+                    ClassElement continuationWrapper = parameterType.getFirstTypeArgument().orElse(null);
+                    if (continuationWrapper != null && continuationWrapper.isAssignable(CompletionStage.class)
+                        && !continuationWrapper.getName().equals(CompletionStage.class.getName())
+                        && !continuationWrapper.getName().equals(CompletableFuture.class.getName())) {
+                        // the continuation yields a CompletableFuture
+                        context.fail("Unsupported continuation type: " + continuationWrapper.getName() + ", declare it as CompletionStage or CompletableFuture", parameter);
+                        return;
+                    }
                     ClassElement continuationReturnType = resolveType(parameterType.getFirstTypeArgument().orElse(ClassElement.of(Object.class)));
                     if (!continuationReturnType.isAssignable(HttpResponse.class) && !continuationReturnType.isAssignable(MutableHttpResponse.class)) {
                         context.fail("Unsupported continuation type: " + continuationReturnType.getName(), parameter);
@@ -228,6 +237,17 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                 }
             }
             ClassElement returnType = resolveReturnType(element);
+            if (continuationCreator != null && returnType.isVoid()) {
+                ClassElement continuationType = continuationCreator.getGenericType().getFirstTypeArgument().orElse(null);
+                if (continuationType != null && isResultWrapper(continuationType)) {
+                    // the filter result is the response: a void method would complete the filter
+                    // before the downstream produced it, the same check as at runtime
+                    String simpleName = continuationType.getSimpleName();
+                    context.fail("A filter method with a FilterContinuation<" + simpleName + "<HttpResponse<?>>> must return the response, e.g. as "
+                        + simpleName + "<HttpResponse<?>>: a void method completes before the downstream produced the response", element);
+                    return;
+                }
+            }
             if (!returnType.isVoid()) {
                 if (isInvalidType(context, element, returnType, "Unsupported filter return type")) {
                     return;
@@ -317,6 +337,16 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
             returnType = returnType.getFirstTypeArgument().orElse(returnType);
         }
         return returnType;
+    }
+
+    /**
+     * @param type The type a continuation produces
+     * @return Whether it produces the response later, and must be returned by the filter method
+     * (an {@link ExecutionFlow} or a {@link CompletionStage}; a reactive continuation is
+     * subscribed to by the method)
+     */
+    private static boolean isResultWrapper(ClassElement type) {
+        return type.isAssignable(CompletionStage.class) || type.isAssignable(ExecutionFlow.class);
     }
 
     private static boolean isAsyncWrapper(ClassElement type) {

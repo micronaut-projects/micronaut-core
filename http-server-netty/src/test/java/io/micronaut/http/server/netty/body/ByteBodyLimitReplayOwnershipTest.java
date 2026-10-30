@@ -78,6 +78,29 @@ class ByteBodyLimitReplayOwnershipTest {
         return factory.adaptNetty(Flux.fromArray(parts).map(this::buf));
     }
 
+    @Test
+    void availableRebufferingTransfersAndReleasesTheOwnedBuffer() throws Exception {
+        ByteBuf bytes = buf("hello");
+        try (CloseableByteBody original = factory.adapt(bytes);
+             CloseableByteBody streaming = factory.toStreaming(original)) {
+            Assertions.assertEquals(5, streaming.expectedLength().orElseThrow());
+            try (CloseableAvailableByteBody available = streaming.buffer().get(10, TimeUnit.SECONDS)) {
+                Assertions.assertEquals("hello", available.toString(StandardCharsets.UTF_8));
+            }
+        }
+        Assertions.assertEquals(0, bytes.refCnt());
+    }
+
+    @Test
+    void unreadAvailableRebufferingReleasesTheOwnedBuffer() {
+        ByteBuf bytes = buf("hello");
+        try (CloseableByteBody original = factory.adapt(bytes)) {
+            factory.toStreaming(original).close();
+        }
+        channel.runPendingTasks();
+        Assertions.assertEquals(0, bytes.refCnt());
+    }
+
     private static String read(CloseableByteBody body) {
         return Flux.from(body.toReadBufferPublisher())
             .map(b -> {

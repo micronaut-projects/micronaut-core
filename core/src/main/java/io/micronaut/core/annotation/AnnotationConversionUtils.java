@@ -750,4 +750,34 @@ public final class AnnotationConversionUtils {
         }
         return values;
     }
+
+    /**
+     * Puts a member read from an annotation into the map {@link AnnotationBuilder#toMap(Annotation)} answers: an
+     * array is copied, so that the map does not share it with the annotation, and a member that is not set is left
+     * out.
+     *
+     * @param members The members
+     * @param name    The name of the member
+     * @param value   The value the accessor of the member answered
+     */
+    public static void putMember(Map<String, Object> members, String name, @Nullable Object value) {
+        if (value != null) {
+            members.put(name, copyArray(value));
+        }
+    }
+
+    private static Object copyArray(Object value) {
+        return switch (value) {
+            case Object[] array -> array.clone();
+            case int[] array -> array.clone();
+            case long[] array -> array.clone();
+            case short[] array -> array.clone();
+            case byte[] array -> array.clone();
+            case float[] array -> array.clone();
+            case double[] array -> array.clone();
+            case boolean[] array -> array.clone();
+            case char[] array -> array.clone();
+            default -> value;
+        };
+    }
 }

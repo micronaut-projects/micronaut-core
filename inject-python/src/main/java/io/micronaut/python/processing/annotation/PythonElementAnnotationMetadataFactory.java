@@ -141,7 +141,7 @@ public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnot
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForMethod(MethodElement methodElement) {
         if (methodElement instanceof PythonMethodElement pythonMethodElement) {
             return metadataBuilder.lookupOrBuildForMethod(
-                getNativeElement(methodElement.getDeclaringType()),
+                getNativeElement(methodElement.getOwningType()),
                 methodMetadataKey(pythonMethodElement.getNativeType())
             );
         }
@@ -152,6 +152,7 @@ public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnot
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForParameter(ParameterElement parameterElement) {
         if (parameterElement.getMethodElement() instanceof PythonMethodElement pythonMethodElement) {
             return metadataBuilder.lookupOrBuildForParameter(
+                getNativeElement(pythonMethodElement.getOwningType()),
                 getNativeElement(pythonMethodElement.getDeclaringType()),
                 getNativeElement(pythonMethodElement),
                 getNativeElement(parameterElement)
@@ -160,7 +161,14 @@ public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnot
         return super.lookupForParameter(parameterElement);
     }
 
-    private static FunctionDef methodMetadataKey(FunctionDef functionDef) {
+    /**
+     * The key the annotation metadata of a method is cached under, for the method's owning type: the function
+     * named with its arity, so that overloads of the same Python name are told apart.
+     *
+     * @param functionDef The function
+     * @return The key
+     */
+    static FunctionDef methodMetadataKey(FunctionDef functionDef) {
         int arity = functionDef.arguments().arguments().size();
         return new FunctionDef(
             functionDef.name() + "/" + arity,

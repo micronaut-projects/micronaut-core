@@ -17,6 +17,7 @@ package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.BodyElements;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -59,6 +60,21 @@ public final class ReleasingBodyElements<T> implements BodyElements<T> {
     @Override
     public CompletionStage<Optional<T>> next() {
         return elements.next();
+    }
+
+    @Override
+    public @Nullable T poll() {
+        return elements.poll();
+    }
+
+    @Override
+    public State state() {
+        return elements.state();
+    }
+
+    @Override
+    public @Nullable Throwable failure() {
+        return elements.failure();
     }
 
     @Override

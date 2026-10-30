@@ -56,6 +56,7 @@ public final class PropertyElementQuery {
     private boolean allowSetterWithZeroArgs;
     private boolean allowSetterWithMultipleArgs;
     private boolean allowStaticProperties;
+    private boolean includeInjected;
 
     private boolean ignoreSettersWithDifferingType;
     private Set<String> excludedAnnotations = Collections.emptySet();
@@ -91,6 +92,8 @@ public final class PropertyElementQuery {
             conf.excludes(CollectionUtils.setOf(annotation.stringValues(BeanProperties.MEMBER_EXCLUDES)));
 
             conf.excludedAnnotations(CollectionUtils.setOf(annotation.stringValues(BeanProperties.MEMBER_EXCLUDED_ANNOTATIONS)));
+            annotation.booleanValue(BeanProperties.MEMBER_INCLUDE_INJECTED)
+                .ifPresent(conf::includeInjected);
         }
 
         String[] readPrefixes = annotationMetadata.stringValues(AccessorsStyle.class, "readPrefixes");
@@ -418,6 +421,25 @@ public final class PropertyElementQuery {
      */
     public PropertyElementQuery allowSetterWithMultipleArgs(boolean allowSetterWithMultipleArgs) {
         this.allowSetterWithMultipleArgs = allowSetterWithMultipleArgs;
+        return this;
+    }
+
+    /**
+     * @return Whether injection points (fields and methods annotated with {@code @Inject}, {@code @Value} or {@code @Property}) are included as properties.
+     * @since 5.3.0
+     */
+    public boolean isIncludeInjected() {
+        return includeInjected;
+    }
+
+    /**
+     * Sets whether injection points (fields and methods annotated with {@code @Inject}, {@code @Value} or {@code @Property}) are included as properties.
+     * @param includeInjected True if injection points are included
+     * @return This PropertyElementQuery
+     * @since 5.3.0
+     */
+    public PropertyElementQuery includeInjected(boolean includeInjected) {
+        this.includeInjected = includeInjected;
         return this;
     }
 

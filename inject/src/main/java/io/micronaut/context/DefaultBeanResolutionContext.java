@@ -67,6 +67,14 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
         return !closed && destructionThread == Thread.currentThread() && context.isContextConfigured();
     }
 
+    /**
+     * @return Whether this destruction invocation has not returned yet, whichever thread asks: work its callbacks
+     * hand to another thread runs within it
+     */
+    boolean isDestructionInvocationOpen() {
+        return !closed && destructionThread != null && context.isContextConfigured();
+    }
+
     @Override
     public <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
         if (closed) {
@@ -81,6 +89,19 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
         try (BeanDependencyGroup group = new DefaultBeanDependencyResolver(context, new DefaultBeanDependencies(this))) {
             return action.apply(group);
         }
+    }
+
+    /**
+     * Opens a group for the caller to close, which resolves as {@link #withDependencies(Function)} does: during the
+     * synchronous destruction invocation for a context created for one, as an independent group otherwise.
+     *
+     * @return The group
+     */
+    BeanDependencyGroup newDependencyGroup() {
+        if (destructionThread == null) {
+            return context.createDependencyGroup();
+        }
+        return new DefaultBeanDependencyResolver(context, new DefaultBeanDependencies(this));
     }
 
     void require(BeanRegistration<?> registration) {

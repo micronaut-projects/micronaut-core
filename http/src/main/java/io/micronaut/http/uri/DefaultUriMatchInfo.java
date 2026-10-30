@@ -44,14 +44,32 @@ final class DefaultUriMatchInfo implements UriMatchInfo {
      * @param variables      The variables
      */
     DefaultUriMatchInfo(String uri, Map<String, Object> variableValues, List<UriMatchVariable> variables) {
+        this(uri, variableValues, variables, variableMap(variables));
+    }
+
+    /**
+     * @param uri            The URI
+     * @param variableValues The map of variable names with values
+     * @param variables      The variables
+     * @param variableMap    The unmodifiable map of the variables by name, shared by the matches of a template
+     */
+    DefaultUriMatchInfo(String uri, Map<String, Object> variableValues, List<UriMatchVariable> variables, Map<String, UriMatchVariable> variableMap) {
         this.uri = uri;
         this.variableValues = variableValues;
         this.variables = variables;
+        this.variableMap = variableMap;
+    }
+
+    /**
+     * @param variables The variables
+     * @return The unmodifiable map of the variables by name: the last variable of a repeated name, in the order of the first
+     */
+    static Map<String, UriMatchVariable> variableMap(List<UriMatchVariable> variables) {
         LinkedHashMap<String, UriMatchVariable> vm = CollectionUtils.newLinkedHashMap(variables.size());
         for (UriMatchVariable variable : variables) {
             vm.put(variable.getName(), variable);
         }
-        this.variableMap = Collections.unmodifiableMap(vm);
+        return Collections.unmodifiableMap(vm);
     }
 
     @Override

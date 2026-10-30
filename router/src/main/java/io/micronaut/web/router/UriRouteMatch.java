@@ -18,12 +18,14 @@ package io.micronaut.web.router;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchInfo;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * A {@link RouteMatch} that matches a URI and {@link HttpMethod}.
@@ -71,4 +73,32 @@ public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch
      */
     HttpMethod getHttpMethod();
 
+    /**
+     * The media type of the response that the
+     * {@link io.micronaut.web.router.spi.RouteMatchSelector route selector} of the kind of the
+     * route negotiated when it selected this match. The server uses it as the content type of
+     * the response when the handler does not set one.
+     *
+     * @return The media type, or empty if the match was not selected by a route selector or it
+     * negotiated none
+     * @since 5.3.0
+     */
+    default Optional<MediaType> getSelectedMediaType() {
+        return Optional.empty();
+    }
+
+    /**
+     * The values of the variables as they appear in the path of the request, not percent-decoded,
+     * unlike {@link #getVariableValues()}: e.g. {@code a%2Fb}, a {@code +} that is not a space,
+     * and the percent-encoded bytes of a non-ASCII value. For a route of a located target they
+     * include the raw values of the variables of the prefixes of the locator routes.
+     *
+     * @return The raw values, read-only
+     * @throws UnsupportedOperationException if this match does not have the raw values, e.g. an
+     * implementation of another router: it does not substitute the decoded ones
+     * @since 5.3.0
+     */
+    default Map<String, Object> getRawVariableValues() {
+        throw new UnsupportedOperationException("The match " + this + " does not have the raw values of its variables");
+    }
 }

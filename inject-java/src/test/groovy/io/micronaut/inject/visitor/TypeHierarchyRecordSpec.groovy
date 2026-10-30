@@ -1,0 +1,1018 @@
+package io.micronaut.inject.visitor
+
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.type.Argument
+import io.micronaut.core.type.GenericPlaceholder
+import io.micronaut.core.type.TypeHierarchies
+import io.micronaut.core.type.TypeHierarchy
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
+import io.micronaut.inject.test.hierarchy.IntrospectEveryClassVisitor
+import io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
+import io.micronaut.inject.test.hierarchy.TypeHierarchyFuzz
+
+
+import static io.micronaut.inject.test.hierarchy.TypeStrings.string
+import static io.micronaut.inject.test.hierarchy.TypeStrings.strings
+
+class TypeHierarchyRecordSpec extends AbstractTypeElementSpec {
+
+    private static final String SERVICE_PREFIX = '/CLASS_OUTPUT/META-INF/micronaut/' + TypeHierarchy.name + '/'
+
+    // the visitors of a test that replaces the ones of the spec
+    private Collection<TypeElementVisitor> visitors
+
+    /**
+     * The record of a type written by a top-level class, by default the type itself, importing itself.
+     */
+    static TypeHierarchy record(ClassLoader classLoader, String typeName, String recordPackage = typeName.substring(0, typeName.lastIndexOf('.')), String origin = topLevel(typeName)) {
+        def recordName = TypeHierarchies.recordClassName(typeName, recordPackage, origin)
+        assert classLoader.getResources("META-INF/micronaut/" + TypeHierarchy.name + "/" + recordName).hasMoreElements()
+        (TypeHierarchy) classLoader.loadClass(recordName).getConstructor().newInstance()
+    }
+
+    static String topLevel(String typeName) {
+        def simpleName = typeName.substring(typeName.lastIndexOf('.') + 1)
+        simpleName.contains('$') ? simpleName.substring(0, simpleName.indexOf('$')) : simpleName
+    }
+
+    static int size(ClassLoader classLoader, String recordName) {
+        classLoader.getResources(recordName.replace('.', '/') + ".class").nextElement().openStream().bytes.length
+    }
+
+    void "a generic class with a bounded variable"() {
+        given:
+        def classLoader = buildClassLoader('test.Payload', '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+import java.util.*;
+import java.util.function.Supplier;
+
+@TypeHierarchyImport
+public class Payload<T extends Number & Comparable<T>> extends ArrayList<T> implements Supplier<List<? extends T>> {
+    public List<? extends T> get() { return this; }
+}
+''')
+        def hierarchy = record(classLoader, 'test.Payload')
+
+        expect:
+        hierarchy.type == classLoader.loadClass('test.Payload')
+        hierarchy.typeVariables.size() == 1
+        hierarchy.typeVariables[0] instanceof GenericPlaceholder
+        hierarchy.typeVariables[0].variableName == 'T'
+        hierarchy.typeVariables[0].type == Number
+        strings(hierarchy.typeVariables[0].bounds) == ['Number', 'Comparable<T>']
+        string(hierarchy.genericSuperclass.get()) == 'ArrayList<T>'
+        hierarchy.genericSuperclass.get().typeParameters[0].isUnresolvedTypeVariable()
+        strings(hierarchy.genericInterfaces) == ['Supplier<List<? extends T>>']
+        string(hierarchy.declaration) == 'Payload<T>'
+
+        when:
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer))
+
+        then: "the closure comes from the record alone"
+        strings(closure) - ['SequencedCollection<Integer>'] == ['Payload<Integer>', 'ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>', 'Iterable<Integer>',
+                             'List<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Supplier<List<? extends Integer>>', 'Object']
+        println('record bytes test.Payload: ' + size(classLoader, TypeHierarchies.recordClassName('test.Payload', 'test', 'Payload')))
+        size(classLoader, TypeHierarchies.recordClassName('test.Payload', 'test', 'Payload')) < 4096
+    }
+
+    void "diamond interfaces are deduplicated and a requested JDK class is recorded"() {
+        given:
+        def classLoader = buildClassLoader('test.Diamond', '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+import java.util.*;
+
+interface Top<T> {}
+interface Left<T> extends Top<T> {}
+interface Right<T> extends Top<T> {}
+
+@TypeHierarchyImport(classes = {Top.class, Left.class, Right.class, Diamond.class, ArrayList.class, AbstractList.class, List.class, Collection.class, Iterable.class, AbstractCollection.class})
+public class Diamond extends ArrayList<Integer> implements Left<String>, Right<String> {
+}
+''')
+        def diamond = record(classLoader, 'test.Diamond')
+        def arrayList = record(classLoader, 'java.util.ArrayList', 'test', 'Diamond')
+
+        expect:
+        diamond.typeVariables.empty
+        string(diamond.genericSuperclass.get()) == 'ArrayList<Integer>'
+        strings(diamond.genericInterfaces) == ['Left<String>', 'Right<String>']
+        arrayList.type == ArrayList
+        arrayList.typeVariables*.variableName == ['E']
+        string(arrayList.genericSuperclass.get()) == 'AbstractList<E>'
+        strings(arrayList.genericInterfaces) == ['List<E>', 'RandomAccess', 'Cloneable', 'Serializable']
+
+        when:
+        def closure = diamond.getTypeClosure(Argument.of(diamond.type))
+
+        then: "the interfaces List adds in later JDKs aside"
+        strings(closure) - ['SequencedCollection<Integer>'] == ['Diamond', 'ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>', 'Iterable<Integer>',
+                             'List<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Left<String>', 'Top<String>', 'Right<String>', 'Object']
+        println('record bytes java.util.ArrayList: ' + size(classLoader, TypeHierarchies.recordClassName('java.util.ArrayList', 'test', 'Diamond')) + ', test.Diamond: ' + size(classLoader, TypeHierarchies.recordClassName('test.Diamond', 'test', 'Diamond')) + ', test.Top: ' + size(classLoader, TypeHierarchies.recordClassName('test.Top', 'test', 'Diamond')))
+        size(classLoader, TypeHierarchies.recordClassName('java.util.ArrayList', 'test', 'Diamond')) < 4096
+    }
+
+    void "a raw subtype erases the supertypes"() {
+        given:
+        def classLoader = buildClassLoader('test.Raw', '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+import java.util.*;
+
+@TypeHierarchyImport(classes = {Raw.class, ArrayList.class, AbstractList.class})
+public class Raw extends ArrayList implements Comparable {
+    public int compareTo(Object o) { return 0; }
+}
+''')
+        def raw = record(classLoader, 'test.Raw')
+
+        expect:
+        raw.genericSuperclass.get().isRawType()
+        string(raw.genericSuperclass.get()) == 'ArrayList'
+        raw.genericInterfaces[0].isRawType()
+
+        when:
+        def closure = raw.getTypeClosure(Argument.of(raw.type))
+
+        then:
+        strings(closure) - ['SequencedCollection'] == ['Raw', 'ArrayList', 'AbstractList', 'AbstractCollection', 'Collection', 'Iterable', 'List', 'RandomAccess', 'Cloneable', 'Serializable', 'Comparable', 'Object']
+        closure[1].isRawType()
+        closure[2].isRawType()
+        closure[6].isRawType()
+        !closure[closure.size() - 5].isRawType()
+    }
+
+    void "a generic array argument"() {
+        given:
+        def classLoader = buildClassLoader('test.Payload', '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+import java.util.function.Supplier;
+
+@TypeHierarchyImport
+public class Payload<T> implements Supplier<T[]> {
+    public T[] get() { return null; }
+}
+''')
+        def hierarchy = record(classLoader, 'test.Payload')
+
+        expect:
+        strings(hierarchy.genericInterfaces) == ['Supplier<T[]>']
+        hierarchy.genericInterfaces[0].typeParameters[0].type == Object[]
+        hierarchy.genericInterfaces[0].typeParameters[0].isTypeVariable()
+
+        when:
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, String))
+
+        then:
+        strings(closure) == ['Payload<String>', 'Supplier<String[]>', 'Object']
+        closure[1].typeParameters[0].type == String[]
+    }
+
+    void "a record of a type with a package-private supertype of its own package is written into the package of the origin"() {
+        given:
+        def classLoader = buildClassLoader(new JavaFiles()
+            .add('other.Base', '''
+package other;
+
+class Base<T> implements java.util.function.Supplier<T> {
+    public T get() { return null; }
+}
+''')
+            .add('other.Sub', '''
+package other;
+
+public class Sub extends Base<String> {
+}
+''')
+            .add('test.Holder', '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+
+@TypeHierarchyImport(classes = {other.Sub.class, java.util.ArrayList.class})
+public class Holder {
+}
+'''))
+        def sub = record(classLoader, 'other.Sub', 'test', 'Holder')
+
+        expect: "the base the origin cannot name is left out by name, and the types above it are kept"
+        classLoader.loadClass(TypeHierarchies.recordClassName('java.util.ArrayList', 'test', 'Holder'))
+        sub.genericSuperclass.empty
+        strings(sub.superTypes) == ['Supplier<String>', 'Object']
+        sub.omittedSuperTypeNames == ['other.Base']
+        strings(sub.getTypeClosure(Argument.of(sub.type))) == ['Sub', 'Supplier<String>', 'Object']
+    }
+
+    void "recording a type reports the super types the record leaves out, as the record lists them"() {
+        given: "a visitor that records the imported classes a second time and keeps what the API returned"
+        def classLoader = buildClassLoader('probe.Reported', '''
+package probe;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = {java.util.ArrayList.class, StringBuilder.class, java.util.jar.JarEntry.class})
+public class Reported {}
+''')
+        def arrayList = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.ArrayList', 'probe', 'Reported')]
+        def stringBuilder = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe', 'Reported')]
+        def jarEntry = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.jar.JarEntry', 'probe', 'Reported')]
+
+        expect: "a class whose closure the record names in full"
+        arrayList.className == TypeHierarchies.recordClassName('java.util.ArrayList', 'probe', 'Reported')
+        arrayList.omittedSuperTypeNames == []
+        arrayList.complete
+        record(classLoader, 'java.util.ArrayList', 'probe', 'Reported').omittedSuperTypeNames == []
+
+        and: "a class with a package-private superclass"
+        stringBuilder.className == TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe', 'Reported')
+        stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
+        !stringBuilder.complete
+        stringBuilder.omittedSuperTypeNames == record(classLoader, 'java.lang.StringBuilder', 'probe', 'Reported').omittedSuperTypeNames
+
+        and: "a class with a package-private ancestor of a third package"
+        jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
+        !jarEntry.complete
+        jarEntry.omittedSuperTypeNames == record(classLoader, 'java.util.jar.JarEntry', 'probe', 'Reported').omittedSuperTypeNames
+    }
+
+    void "a type no record can describe is reported instead of failing the compilation"() {
+        expect:
+        buildClassElement(new JavaFiles().add('p.Outer', '''
+package p;
+
+public class Outer<T> {
+    public class Inner implements java.util.function.Supplier<T> {
+        public T get() { return null; }
+    }
+}
+''')) { ClassElement outer, VisitorContext context ->
+            def inner = context.getClassElement('p.Outer$Inner').get()
+            def abstractStringBuilder = context.getClassElement('java.lang.AbstractStringBuilder').get()
+
+            assert context.tryRecordTypeHierarchy(inner, outer).empty
+            assert context.tryRecordTypeHierarchy(abstractStringBuilder, outer).empty
+
+            def refused = null
+            try {
+                context.recordTypeHierarchy(inner, outer)
+            } catch (io.micronaut.inject.processing.ProcessingException e) {
+                refused = e.message
+            }
+            assert refused.contains('The hierarchy of [p.Outer$Inner] cannot be recorded: it is an inner class of the generic class [p.Outer]')
+            try {
+                context.recordTypeHierarchy(abstractStringBuilder, outer)
+            } catch (io.micronaut.inject.processing.ProcessingException e) {
+                refused = e.message
+            }
+            assert refused.contains('The hierarchy of [java.lang.AbstractStringBuilder] cannot be recorded: the type is not public, and a record cannot be written into a package of the JDK')
+            true
+        }
+    }
+
+    void "a JDK class with a package-private ancestor is recorded in the package of the origin"() {
+        given:
+        def classLoader = buildClassLoader('probe.Hierarchies', '''
+package probe;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = {StringBuilder.class, java.util.ArrayList.class, java.util.jar.JarEntry.class})
+public class Hierarchies {}
+''')
+        def stringBuilder = record(classLoader, 'java.lang.StringBuilder', 'probe', 'Hierarchies')
+        def jarEntry = record(classLoader, 'java.util.jar.JarEntry', 'probe', 'Hierarchies')
+
+        expect: "AbstractStringBuilder is left out by name, the interfaces above it are kept"
+        TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe', 'Hierarchies') == 'probe.$$java.lang.$StringBuilder$TypeHierarchy$$Hierarchies'
+        record(classLoader, 'java.util.ArrayList', 'probe', 'Hierarchies').type == ArrayList
+        stringBuilder.type == StringBuilder
+        stringBuilder.genericSuperclass.empty
+        stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
+        !strings(stringBuilder.superTypes).contains('AbstractStringBuilder')
+        strings(stringBuilder.superTypes).containsAll(['Appendable', 'CharSequence', 'Comparable<StringBuilder>', 'Serializable'])
+        strings(stringBuilder.superTypes).last() == 'Object'
+
+        and: "an ancestor of a third package is left out the same way"
+        jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
+        strings(jarEntry.superTypes) == ['ZipEntry', 'Cloneable', 'Object']
+    }
+
+    void "a package-private ancestor of a third package is left out by name"() {
+        given:
+        def classLoader = buildClassLoader(new JavaFiles()
+            .add('b.HiddenBase', '''
+package b;
+
+class HiddenBase<T> implements java.util.function.Supplier<T> {
+    public T get() { return null; }
+}
+''')
+            .add('b.PublicMid', '''
+package b;
+
+public class PublicMid<T> extends HiddenBase<java.util.List<T>> {
+}
+''')
+            .add('a.Mid', '''
+package a;
+
+public class Mid extends b.PublicMid<Integer> {
+}
+''')
+            .add('c.Holder', '''
+package c;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+
+@TypeHierarchyImport(classes = {a.Mid.class, b.PublicMid.class})
+public class Holder {
+}
+'''))
+        def mid = record(classLoader, 'a.Mid', 'c', 'Holder')
+        def publicMid = record(classLoader, 'b.PublicMid', 'c', 'Holder')
+
+        expect: "both records are written into the package of the origin and name the base they leave out"
+        string(mid.genericSuperclass.get()) == 'PublicMid<Integer>'
+        strings(mid.superTypes) == ['PublicMid<Integer>', 'Supplier<List<Integer>>', 'Object']
+        mid.omittedSuperTypeNames == ['b.HiddenBase']
+        publicMid.genericSuperclass.empty
+        strings(publicMid.superTypes) == ['Supplier<List<T>>', 'Object']
+        publicMid.omittedSuperTypeNames == ['b.HiddenBase']
+        strings(publicMid.getTypeClosure(Argument.of(publicMid.type, String))) == ['PublicMid<String>', 'Supplier<List<String>>', 'Object']
+    }
+
+    void "a record of a type of the package of the origin names no omitted super type"() {
+        given:
+        def classLoader = buildClassLoader('test.Payload', '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+
+class Base<T> implements java.util.function.Supplier<T> {
+    public T get() { return null; }
+}
+
+@TypeHierarchyImport
+public class Payload extends Base<String> {
+}
+''')
+        def payload = record(classLoader, 'test.Payload')
+
+        expect:
+        string(payload.genericSuperclass.get()) == 'Base<String>'
+        payload.omittedSuperTypeNames.empty
+    }
+
+    void "a type recorded from its own package and from another is found in the record of its own package"() {
+        given:
+        def classLoader = buildClassLoader(new JavaFiles()
+            .add('p.Base', '''
+package p;
+
+class Base<T> implements java.util.function.Supplier<T> {
+    public T get() { return null; }
+}
+''')
+            .add('p.Sub', '''
+package p;
+
+public class Sub<T> extends Base<T> {
+}
+''')
+            .add('p.Local', '''
+package p;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = Sub.class)
+public class Local {
+}
+''')
+            .add('q.Foreign', '''
+package q;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = p.Sub.class)
+public class Foreign {
+}
+'''))
+        def local = record(classLoader, 'p.Sub', 'p', 'Local')
+        def foreign = record(classLoader, 'p.Sub', 'q', 'Foreign')
+
+        expect: "each record names what its package can"
+        strings(local.superTypes) == ['Base<T>', 'Supplier<T>', 'Object']
+        local.omittedSuperTypeNames.empty
+        strings(foreign.superTypes) == ['Supplier<T>', 'Object']
+        foreign.omittedSuperTypeNames == ['p.Base']
+        // the in-memory class loader of the test lists no service entries: which record a lookup prefers is the
+        // subject of TypeHierarchySpec in core
+    }
+
+    void "a type whose variable is bounded by a package-private class cannot be recorded from another package"() {
+        when: "leaving the bound out would change what the variable is bounded by and erases to"
+        buildClassLoader(new JavaFiles()
+            .add('b.Hidden', '''
+package b;
+
+class Hidden {
+}
+''')
+            .add('b.Bounded', '''
+package b;
+
+public class Bounded<T extends Hidden> {
+}
+''')
+            .add('c.Holder', '''
+package c;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = b.Bounded.class)
+public class Holder {
+}
+'''))
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('The hierarchy of [b.Bounded] cannot be recorded: the bounds of its variable T name a type that is not public and not of the package c')
+    }
+
+    void "a type with an inner class of a generic class among its super types is refused"() {
+        when: "the T of Outer<T>.Inner implements Supplier<T> is bound by the arguments of Outer, which a record does not keep"
+        buildClassLoader(new JavaFiles()
+            .add('p.Outer', '''
+package p;
+
+public class Outer<T> {
+    public class Inner implements java.util.function.Supplier<T> {
+        public T get() { return null; }
+    }
+}
+''')
+            .add('p.Sub', '''
+package p;
+
+public class Sub extends Outer<String>.Inner {
+    public Sub(Outer<String> outer) { outer.super(); }
+}
+''')
+            .add('q.Holder', '''
+package q;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = p.Sub.class)
+public class Holder {
+}
+'''))
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('The hierarchy of [p.Sub] cannot be recorded: its super type [p.Outer$Inner] is an inner class of the generic class [p.Outer]')
+    }
+
+    void "a static nested class of a generic class is recorded"() {
+        given:
+        def classLoader = buildClassLoader(new JavaFiles()
+            .add('p.Outer', '''
+package p;
+
+public class Outer<T> {
+    public static class Nested<U> implements java.util.function.Supplier<U> {
+        public U get() { return null; }
+    }
+}
+''')
+            .add('q.Holder', '''
+package q;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = p.Outer.Nested.class)
+public class Holder {
+}
+'''))
+
+        expect:
+        strings(record(classLoader, 'p.Outer$Nested', 'q', 'Holder').superTypes) == ['Supplier<U>', 'Object']
+    }
+
+    void "declarations naming package-private classes agree with reflection from the package of the type and from another (#typeName from #origin)"() {
+        given:
+        def classLoader = buildClassLoader(new JavaFiles()
+            .add('p.Base', '''
+package p;
+
+class Base {
+}
+''')
+            .add('p.Hidden', '''
+package p;
+
+class Hidden {
+}
+''')
+            .add('p.HiddenOuter', '''
+package p;
+
+class HiddenOuter {
+    public static class Nested {
+    }
+}
+''')
+            .add('p.Parent', '''
+package p;
+
+public class Parent<X> implements java.util.function.Consumer<X> {
+    public void accept(X x) { }
+}
+''')
+            .add('p.Cases', '''
+package p;
+
+import java.util.*;
+import java.util.function.*;
+
+public class Cases {
+    public static class Repeated extends Base implements Supplier<Map<List<String>, List<Hidden>>> {
+        public Map<List<String>, List<Hidden>> get() { return null; }
+    }
+    public static class HiddenArgument extends ArrayList<Hidden> {
+    }
+    public static class HiddenArray<T> extends Parent<Hidden[]> implements Supplier<T> {
+        public T get() { return null; }
+    }
+    public static class HiddenWildcard<T> implements Supplier<List<? extends Hidden>>, Comparable<T> {
+        public List<? extends Hidden> get() { return null; }
+        public int compareTo(T other) { return 0; }
+    }
+    public static class HiddenEnclosing implements Supplier<HiddenOuter.Nested> {
+        public HiddenOuter.Nested get() { return null; }
+    }
+}
+''')
+            .add('p.Local', '''
+package p;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = {Cases.Repeated.class, Cases.HiddenArgument.class, Cases.HiddenArray.class, Cases.HiddenWildcard.class, Cases.HiddenEnclosing.class})
+public class Local {
+}
+''')
+            .add('q.Foreign', '''
+package q;
+
+import p.Cases;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = {Cases.Repeated.class, Cases.HiddenArgument.class, Cases.HiddenArray.class, Cases.HiddenWildcard.class, Cases.HiddenEnclosing.class})
+public class Foreign {
+}
+'''))
+        def type = classLoader.loadClass(typeName)
+        def hierarchy = record(classLoader, typeName, origin, origin == 'p' ? 'Local' : 'Foreign')
+        Set<String> omitted = new LinkedHashSet<>()
+        def reflected = TypeHierarchyFuzz.Oracle.closure(type, TypeHierarchyFuzz.Oracle.identity(type), false, { false }, TypeHierarchyFuzz.Oracle.recordPackage(hierarchy.class), omitted)
+
+        expect:
+        TypeHierarchyFuzz.Oracle.recordPackage(hierarchy.class) == origin
+        strings(hierarchy.getTypeClosure(hierarchy.declaration)) - [sequenced(hierarchy)] == reflected - [sequenced(hierarchy)]
+        hierarchy.omittedSuperTypeNames == omitted as List
+        (origin == 'p') == omitted.empty
+
+        where:
+        [typeName, origin] << [['p.Cases$Repeated', 'p.Cases$HiddenArgument', 'p.Cases$HiddenArray', 'p.Cases$HiddenWildcard', 'p.Cases$HiddenEnclosing'], ['p', 'q']].combinations()
+    }
+
+    private static String sequenced(TypeHierarchy hierarchy) {
+        // the interface List adds in later JDKs, which reflection and the record agree on but a JDK can lack
+        'SequencedCollection' + (hierarchy.type.simpleName == 'HiddenArgument' ? '<Hidden>' : '')
+    }
+
+    void "a generic type met twice is checked with the arguments of each use"() {
+        given:
+        def classLoader = buildClassLoader(new JavaFiles()
+            .add('p.Base', '''
+package p;
+
+class Base {
+}
+''')
+            .add('p.Hidden', '''
+package p;
+
+class Hidden {
+}
+''')
+            .add('p.Sub', '''
+package p;
+
+import java.util.*;
+import java.util.function.Supplier;
+
+public class Sub extends Base implements Supplier<Map<List<String>, List<Hidden>>> {
+    public Map<List<String>, List<Hidden>> get() { return null; }
+}
+''')
+            .add('q.Holder', '''
+package q;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+
+@TypeHierarchyImport(classes = p.Sub.class)
+public class Holder {
+}
+'''))
+
+        when: "the record is instantiated: a class constant of p.Hidden would fail with an IllegalAccessError"
+        def sub = record(classLoader, 'p.Sub', 'q', 'Holder')
+
+        then: "the Supplier naming Hidden in the second List is left out with Base"
+        sub.genericInterfaces.empty
+        strings(sub.superTypes) == ['Object']
+        sub.omittedSuperTypeNames == ['p.Base', 'java.util.function.Supplier']
+    }
+
+    void "the same type is recorded once"() {
+        given:
+        def classLoader = buildClassLoader('test.One', '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+
+@TypeHierarchyImport(classes = {java.util.ArrayList.class, java.util.ArrayList.class})
+class One {
+}
+
+@TypeHierarchyImport(classes = java.util.ArrayList.class)
+class Two {
+}
+''')
+
+        expect: "once for each top-level class that records it"
+        record(classLoader, 'java.util.ArrayList', 'test', 'One').type == ArrayList
+        record(classLoader, 'java.util.ArrayList', 'test', 'Two').type == ArrayList
+    }
+
+    void "type-use annotations on the super types and their arguments are kept and follow a substituted variable"() {
+        given:
+        def classLoader = buildClassLoader('test.Annotated', '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+import java.lang.annotation.*;
+import java.util.*;
+import java.util.function.Supplier;
+
+@Target(ElementType.TYPE_USE) @Retention(RetentionPolicy.RUNTIME) @interface Marker {}
+@Target(ElementType.TYPE_USE) @Retention(RetentionPolicy.RUNTIME) @interface Other {}
+
+class Base<T> {
+}
+
+@TypeHierarchyImport
+public class Annotated<T> extends @Marker Base<@Marker T> implements Supplier<List<@Other String>> {
+    public List<@Other String> get() { return null; }
+}
+''')
+        def hierarchy = record(classLoader, 'test.Annotated')
+        def superclass = hierarchy.genericSuperclass.get()
+        def supplier = hierarchy.genericInterfaces[0]
+
+        expect: "the annotations of the type uses are those of the entries"
+        superclass.annotationMetadata.hasAnnotation('test.Marker')
+        superclass.typeParameters[0].annotationMetadata.hasAnnotation('test.Marker')
+        !supplier.annotationMetadata.hasAnnotation('test.Marker')
+        supplier.typeParameters[0].typeParameters[0].annotationMetadata.hasAnnotation('test.Other')
+        hierarchy.superTypes[0].annotationMetadata.hasAnnotation('test.Marker')
+        strings(hierarchy.superTypes) == ['Base<T>', 'Supplier<List<String>>', 'Object']
+
+        when:
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer))
+
+        then: "a substituted variable keeps the annotations of its use"
+        strings(closure) == ['Annotated<Integer>', 'Base<Integer>', 'Supplier<List<String>>', 'Object']
+        closure[1].annotationMetadata.hasAnnotation('test.Marker')
+        closure[1].typeParameters[0].annotationMetadata.hasAnnotation('test.Marker')
+        closure[2].typeParameters[0].typeParameters[0].annotationMetadata.hasAnnotation('test.Other')
+    }
+
+    void "wildcards of every kind are kept through the substitution and erased for a raw parameterization"() {
+        given:
+        def classLoader = buildClassLoader('test.Wild', '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+import java.util.*;
+import java.util.function.*;
+
+@TypeHierarchyImport
+public class Wild<T> implements Supplier<List<? extends T>>, Consumer<List<? super T>>, Function<List<?>, Map<? extends Number, ? super T>> {
+    public List<? extends T> get() { return null; }
+    public void accept(List<? super T> list) { }
+    public Map<? extends Number, ? super T> apply(List<?> list) { return null; }
+}
+''')
+        def hierarchy = record(classLoader, 'test.Wild')
+
+        expect:
+        strings(hierarchy.superTypes) == ['Supplier<List<? extends T>>', 'Consumer<List<? super T>>', 'Function<List<?>, Map<? extends Number, ? super T>>', 'Object']
+        hierarchy.superTypes[0].typeParameters[0].typeParameters[0].isWildcard()
+        hierarchy.superTypes[2].typeParameters[0].typeParameters[0].isWildcard()
+
+        when:
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, Integer))
+
+        then:
+        strings(closure) == ['Wild<Integer>', 'Supplier<List<? extends Integer>>', 'Consumer<List<? super Integer>>', 'Function<List<?>, Map<? extends Number, ? super Integer>>', 'Object']
+        closure[1].typeParameters[0].typeParameters[0].isWildcard()
+        closure[2].typeParameters[0].typeParameters[0].upperBounds*.type == [Object]
+        closure[2].typeParameters[0].typeParameters[0].lowerBounds*.type == [Integer]
+
+        when:
+        closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type))
+
+        then:
+        strings(closure) == ['Wild', 'Supplier', 'Consumer', 'Function', 'Object']
+        closure[1].isRawType() && closure[3].isRawType()
+    }
+
+    void "variables are swapped, nested and made arrays along the path"() {
+        given:
+        def classLoader = buildClassLoader('test.Swapped', '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+import java.util.*;
+
+@TypeHierarchyImport(classes = {Swapped.class, Nested.class})
+public class Swapped<K, V> extends HashMap<V, K> {
+}
+
+// no Comparable<Nested<T>> here: the javac element resolves the arguments of a type naming its declaring class to
+// Object (a recursion guard in AbstractJavaElement), so a self reference loses its variable under javac only
+class Nested<T> extends ArrayList<List<T[]>> implements Comparable<String> {
+    public int compareTo(String other) { return 0; }
+}
+''')
+        def swapped = record(classLoader, 'test.Swapped')
+        def nested = record(classLoader, 'test.Nested', 'test', 'Swapped')
+
+        expect:
+        strings(swapped.superTypes) == ['HashMap<V, K>', 'AbstractMap<V, K>', 'Map<V, K>', 'Cloneable', 'Serializable', 'Object']
+        strings(swapped.getTypeClosure(Argument.of(swapped.type, String, Integer))) == ['Swapped<String, Integer>', 'HashMap<Integer, String>', 'AbstractMap<Integer, String>', 'Map<Integer, String>', 'Cloneable', 'Serializable', 'Object']
+        strings(nested.getTypeClosure(Argument.of(nested.type, String))) - ['SequencedCollection<List<String[]>>'] == ['Nested<String>', 'ArrayList<List<String[]>>', 'AbstractList<List<String[]>>', 'AbstractCollection<List<String[]>>',
+                                                                                                                       'Collection<List<String[]>>', 'Iterable<List<String[]>>', 'List<List<String[]>>', 'RandomAccess', 'Cloneable', 'Serializable', 'Comparable<String>', 'Object']
+        nested.getTypeClosure(Argument.of(nested.type, String))[1].typeParameters[0].typeParameters[0].type == String[]
+    }
+
+    void "recursive and intersection bounds are recorded on the variables"() {
+        given:
+        def classLoader = buildClassLoader('test.Ordered', '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+import java.io.Serializable;
+import java.util.*;
+import java.util.function.Supplier;
+
+@TypeHierarchyImport
+public class Ordered<T extends Comparable<T> & Serializable, U extends List<T>> implements Supplier<U> {
+    public U get() { return null; }
+}
+''')
+        def hierarchy = record(classLoader, 'test.Ordered')
+
+        expect:
+        string(hierarchy.declaration) == 'Ordered<T, U>'
+        hierarchy.typeVariables*.variableName == ['T', 'U']
+        strings(hierarchy.typeVariables[0].bounds) == ['Comparable<T>', 'Serializable']
+        hierarchy.typeVariables[0].type == Comparable
+        strings(hierarchy.typeVariables[1].bounds) == ['List<T>']
+        hierarchy.typeVariables[1].type == List
+        strings(hierarchy.getTypeClosure(Argument.of(hierarchy.type, Argument.of(String), Argument.of(ArrayList, String)))) == ['Ordered<String, ArrayList<String>>', 'Supplier<ArrayList<String>>', 'Object']
+    }
+
+    void "a multidimensional array has the super types of the arrays it is an array of, and a record argument keeps its dimensions"() {
+        given:
+        def source = '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+import java.util.function.Function;
+
+@TypeHierarchyImport
+abstract class Matrix<T> implements Function<T[][], int[][]> {
+    String string;
+    String[][] strings;
+    int[][] ints;
+}
+'''
+        Map<String, List<String>> fields = buildClassElement(source) { ClassElement matrix ->
+            ['string', 'strings', 'ints'].collectEntries { [(it): elementStrings(fieldType(matrix, it))] }
+        }
+        def string = fields.string
+        def hierarchy = record(buildClassLoader('test.Matrix', source), 'test.Matrix')
+
+        expect: "String[][] is an array of the super types of String, then of those String[] has as an array"
+        string.last() == 'Object'
+        string.contains('Comparable<String>')
+        fields.strings == ['String[][]'] + string.tail().collect { it + '[][]' } +
+            ['Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+        elementStrings(ClassElement.of(String[][])) == ['String[][]'] + elementStrings(ClassElement.of(String)).tail().collect { it + '[][]' } +
+            ['Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+
+        and: "int[][] is an array of the super types of int[]"
+        fields.ints == ['int[][]', 'Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+        elementStrings(ClassElement.of(int[][])) == ['int[][]', 'Object[]', 'Cloneable[]', 'Serializable[]', 'Cloneable', 'Serializable', 'Object']
+
+        when:
+        def closure = hierarchy.getTypeClosure(Argument.of(hierarchy.type, String))
+        def ofArrays = hierarchy.getTypeClosure(Argument.of(hierarchy.type, String[]))
+
+        then:
+        strings(hierarchy.genericInterfaces) == ['Function<T[][], int[][]>']
+        strings(closure) == ['Matrix<String>', 'Function<String[][], int[][]>', 'Object']
+        closure[1].typeParameters*.type == [String[][], int[][]]
+        strings(ofArrays) == ['Matrix<String[]>', 'Function<String[][][], int[][]>', 'Object']
+        ofArrays[1].typeParameters*.type == [String[][][], int[][]]
+    }
+
+    private static ClassElement fieldType(ClassElement owner, String name) {
+        owner.getEnclosedElements(ElementQuery.ALL_FIELDS).find { it.name == name }.genericType
+    }
+
+    /**
+     * The super types of an element by simple name, arguments and dimensions, as the strings of a record read.
+     */
+    private static List<String> elementStrings(ClassElement type) {
+        type.getAllSuperTypes().collect { elementString(it) }
+    }
+
+    private static String elementString(ClassElement type) {
+        String name = type.name.substring(type.name.lastIndexOf('.') + 1)
+        String dimensions = "[]" * type.arrayDimensions
+        if (type.rawType || type.typeArguments.isEmpty()) {
+            return name + dimensions
+        }
+        return name + "<" + type.typeArguments.values().collect { elementString(it) }.join(", ") + ">" + dimensions
+    }
+
+    void "a parameterized usage records the declaration"() {
+        given: "a visitor that records the generic type of each field of FieldHolder"
+        def classLoader = buildClassLoader('test.FieldHolder', '''
+package test;
+
+import java.util.function.Supplier;
+
+class Box<T> implements Supplier<T> {
+    public T get() { return null; }
+}
+
+class FieldHolder {
+    Box<String> strings;
+}
+''')
+        def box = record(classLoader, 'test.Box', 'test', 'FieldHolder')
+
+        expect: "the record is of Box<T>, not of the Box<String> that was passed"
+        string(box.declaration) == 'Box<T>'
+        strings(box.genericInterfaces) == ['Supplier<T>']
+
+        when:
+        def closure = box.getTypeClosure(Argument.of(box.type, Integer))
+
+        then:
+        strings(closure) == ['Box<Integer>', 'Supplier<Integer>', 'Object']
+    }
+
+    void "a visitor introspecting every class records each type once per origin, never a record, and still visits the classes of a later round"() {
+        given: "a visitor that marks every class it sees @Introspected(hierarchy = true) and writes a source the first time"
+        visitors = [new IntrospectEveryClassVisitor(), new IntrospectedTypeElementVisitor()]
+
+        when:
+        def files = generate(new JavaFiles()
+            .add('introspectall.Seed', '''
+package introspectall;
+
+public class Seed<T> extends java.util.ArrayList<T> {
+}
+''')
+            .add('introspectall.Point', '''
+package introspectall;
+
+public record Point(int x, int y) implements Comparable<Point> {
+    public int compareTo(Point other) { return Integer.compare(x, other.x); }
+}
+'''))
+        def classLoader = new io.micronaut.annotation.processing.test.JavaFileObjectClassLoader(files)
+
+        then: "the records, their classes and service entries alike, are of the application classes only, the one of the later round included"
+        serviceRecordNames(files) == ['introspectall.$Later$TypeHierarchy$$Later', 'introspectall.$Point$TypeHierarchy$$Point', 'introspectall.$Seed$TypeHierarchy$$Seed'] as Set
+        classRecordNames(files) == serviceRecordNames(files)
+        files.every { !it.name.contains('$TypeHierarchy$TypeHierarchy') && !it.name.contains('$TypeHierarchy$Introspection') }
+
+        and: "the class written in a later round was visited and introspected"
+        files.any { it.name == '/CLASS_OUTPUT/introspectall/$Later$Introspection.class' }
+        string(record(classLoader, 'introspectall.Later').genericSuperclass.get()) == 'Seed<String>'
+
+        and: "a Java record is a class of the application"
+        strings(record(classLoader, 'introspectall.Point').superTypes) == ['Record', 'Comparable<Point>', 'Object']
+    }
+
+    void "two classes of a package recording the same type each own a record and its service entry"() {
+        when:
+        def files = generate(new JavaFiles()
+            .add('test.First', '''
+package test;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = {java.util.ArrayList.class, Shared.class})
+public class First {
+}
+''')
+            .add('test.Second', '''
+package test;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = {java.util.ArrayList.class, Shared.class})
+public class Second {
+}
+''')
+            .add('test.Shared', '''
+package test;
+
+public class Shared implements java.util.function.Supplier<String> {
+    public String get() { return null; }
+}
+'''))
+        def classLoader = new io.micronaut.annotation.processing.test.JavaFileObjectClassLoader(files)
+
+        then:
+        serviceRecordNames(files) == ['test.$$java.util.$ArrayList$TypeHierarchy$$First', 'test.$$java.util.$ArrayList$TypeHierarchy$$Second',
+                                      'test.$Shared$TypeHierarchy$$First', 'test.$Shared$TypeHierarchy$$Second'] as Set
+        classRecordNames(files) == serviceRecordNames(files)
+        ['First', 'Second'].every { origin ->
+            record(classLoader, 'java.util.ArrayList', 'test', origin).type == ArrayList
+                && strings(record(classLoader, 'test.Shared', 'test', origin).genericInterfaces) == ['Supplier<String>']
+        }
+    }
+
+    void "a type hierarchy record is never itself recorded"() {
+        expect:
+        buildClassElement(new JavaFiles().add('p.Fake', '''
+package p;
+
+public final class Fake extends io.micronaut.core.type.GeneratedTypeHierarchy {
+    public Fake() {
+        super(Fake.class, null, null, null, null, null);
+    }
+}
+''')) { ClassElement fake, VisitorContext context ->
+            assert context.tryRecordTypeHierarchy(fake, fake).empty
+            def refused = null
+            try {
+                context.recordTypeHierarchy(fake, fake)
+            } catch (io.micronaut.inject.processing.ProcessingException e) {
+                refused = e.message
+            }
+            assert refused.contains('The hierarchy of [p.Fake] cannot be recorded: it is a type hierarchy record generated by Micronaut')
+            true
+        }
+    }
+
+    private static Set<String> serviceRecordNames(Iterable<? extends javax.tools.JavaFileObject> files) {
+        files*.name.findAll { it.startsWith(SERVICE_PREFIX) }.collect { it.substring(SERVICE_PREFIX.length()) } as Set
+    }
+
+    private static Set<String> classRecordNames(Iterable<? extends javax.tools.JavaFileObject> files) {
+        files*.name.findAll { it.startsWith('/CLASS_OUTPUT/') && it.endsWith('.class') }
+            .collect { it.substring('/CLASS_OUTPUT/'.length(), it.length() - '.class'.length()).replace('/', '.') }
+            .findAll { TypeHierarchies.recordedTypeName(it) != null } as Set
+    }
+
+    @Override
+    protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
+        // local visitors replace the ones found as services: the annotation visitor is kept
+        return visitors ?: [new TypeHierarchyImportVisitor(), new FieldTypeRecordingVisitor(), new RecordingTypeHierarchyVisitor()]
+    }
+
+    static class FieldTypeRecordingVisitor implements TypeElementVisitor<Object, Object> {
+
+        @Override
+        void visitClass(ClassElement element, VisitorContext context) {
+            if (element.simpleName == 'FieldHolder') {
+                element.fields.each { field -> context.importTypeHierarchy(field.genericType, element) }
+            }
+        }
+
+        @Override
+        TypeElementVisitor.VisitorKind getVisitorKind() {
+            return TypeElementVisitor.VisitorKind.ISOLATING
+        }
+    }
+
+    protected ClassLoader buildClassLoader(JavaFiles files) {
+        return new io.micronaut.annotation.processing.test.JavaFileObjectClassLoader(generate(files))
+    }
+
+    protected Iterable<? extends javax.tools.JavaFileObject> generate(JavaFiles files) {
+        try (def parser = newJavaParser()) {
+            return parser.generate(files.files.stream()
+                .map { com.google.testing.compile.JavaFileObjects.forSourceString(it.key, it.value) }
+                .toArray(javax.tools.JavaFileObject[]::new))
+        }
+    }
+}

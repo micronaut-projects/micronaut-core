@@ -88,7 +88,9 @@ noReflection {
     allowIn("io.micronaut.context.python.PythonHttpConversion", "CLASS_LOADING")
     allowIn("io.micronaut.context.python.PythonInterfaceDefaults", "CLASS_LOADING", "CLASS_MEMBERS", "GENERIC_SIGNATURES", "PROXY", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.context.python.PythonInvocation", "REFLECTIVE_ACCESS")
-    allowIn("io.micronaut.context.python.PythonJavaBases", "CLASS_MEMBERS", "GENERIC_SIGNATURES", "INTERFACES")
+    allowIn("io.micronaut.context.python.PythonJavaBases", "CLASS_MEMBERS", "GENERIC_SIGNATURES", "INTERFACES", "REFLECTIVE_ACCESS")
+    // the names of a receiver's supertypes, once per class, to match the instance member names compiled for them
+    allowIn("io.micronaut.context.python.PythonJavaInstanceMembers", "INTERFACES")
     allowIn("io.micronaut.context.python.PythonPublishers", "CLASS_LOADING")
     allowIn("io.micronaut.context.python.aop.PythonProxyCreator", "ANNOTATIONS", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
 }

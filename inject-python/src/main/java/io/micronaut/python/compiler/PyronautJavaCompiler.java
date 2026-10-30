@@ -30,6 +30,9 @@ import io.micronaut.python.processing.PythonSourceVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonAnnotationProcessor;
 import io.micronaut.python.processing.PythonProcessingSession;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
+import io.micronaut.python.processing.staticcompile.StaticCompilationDecision;
 import org.jspecify.annotations.NonNull;
 
 import javax.annotation.processing.Processor;
@@ -99,6 +102,8 @@ final class PyronautJavaCompiler {
 
     private final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     private Consumer<ClassElement> classElementCallback;
+    private Consumer<PythonDiagnostic> pythonDiagnosticCallback;
+    private Consumer<StaticCompilationDecision> staticCompilationDecisionCallback;
     private boolean verboseErrors;
     private File errorDumpDirectory;
     private List<SourceSnapshot> sourceSnapshots = List.of();
@@ -127,6 +132,26 @@ final class PyronautJavaCompiler {
      */
     public void setClassElementCallback(Consumer<ClassElement> callback) {
         this.classElementCallback = callback;
+    }
+
+    /**
+     * Set the callback to be invoked for each problem found in the Python sources.
+     *
+     * @param callback The callback function
+     * @since 5.3.0
+     */
+    public void setPythonDiagnosticCallback(Consumer<PythonDiagnostic> callback) {
+        this.pythonDiagnosticCallback = callback;
+    }
+
+    /**
+     * Set the callback to be invoked for each static compilation decision.
+     *
+     * @param callback The callback function
+     * @since 5.3.0
+     */
+    public void setStaticCompilationDecisionCallback(Consumer<StaticCompilationDecision> callback) {
+        this.staticCompilationDecisionCallback = callback;
     }
 
     /**
@@ -620,13 +645,37 @@ final class PyronautJavaCompiler {
         String primaryMessage = primaryErrorMessage(primary, exception);
         StringBuilder message = new StringBuilder("Pyronaut processing failed: ")
             .append(primaryMessage);
-        if (primary != null) {
-            appendDiagnosticLocation(message, primary);
-            appendSourceSnippet(message, primary);
+        if (PythonDiagnostics.isLocated(primaryMessage)) {
+            // a Python diagnostic carries its own location and excerpt; the Java element it is
+            // attributed to is only the application class, so the javac location would mislead
+            appendOtherPythonDiagnostics(message, diagnostics, primary);
+        } else {
+            if (primary != null) {
+                appendDiagnosticLocation(message, primary);
+                appendSourceSnippet(message, primary);
+            }
+            appendPythonSnippet(message, primaryMessage);
         }
-        appendPythonSnippet(message, primaryMessage);
         appendDumpResult(message, dumpResult);
         return message.toString();
+    }
+
+    /**
+     * Appends the other located Python diagnostics, so a build failing on several problems in the
+     * Python sources shows all of them, not only the first.
+     */
+    private static void appendOtherPythonDiagnostics(StringBuilder message,
+                                                     List<Diagnostic<? extends JavaFileObject>> diagnostics,
+                                                     Diagnostic<? extends JavaFileObject> primary) {
+        for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics) {
+            if (diagnostic == primary || diagnostic.getKind() != Diagnostic.Kind.ERROR) {
+                continue;
+            }
+            String other = cleanMessage(diagnostic.getMessage(Locale.getDefault()));
+            if (PythonDiagnostics.isLocated(other)) {
+                message.append(System.lineSeparator()).append(System.lineSeparator()).append(other);
+            }
+        }
     }
 
     private String verboseMessage(String fullDetails, DumpResult dumpResult) {
@@ -670,7 +719,8 @@ final class PyronautJavaCompiler {
             if (!cleaned.isEmpty()) {
                 cleaned.append(System.lineSeparator());
             }
-            cleaned.append(trimmed);
+            // the excerpt of a Python diagnostic aligns its caret with the source line, so it keeps its indentation
+            cleaned.append(PythonDiagnostics.isExcerptLine(line) ? line.stripTrailing() : trimmed);
         }
         return cleaned.isEmpty() ? message.strip() : cleaned.toString();
     }
@@ -1039,6 +1089,12 @@ final class PyronautJavaCompiler {
         pythonProcessor.setProfiler(profiler);
         if (classElementCallback != null) {
             pythonProcessor.setClassElementCallback(classElementCallback);
+        }
+        if (pythonDiagnosticCallback != null) {
+            pythonProcessor.setDiagnosticCallback(pythonDiagnosticCallback);
+        }
+        if (staticCompilationDecisionCallback != null) {
+            pythonProcessor.setStaticCompilationDecisionCallback(staticCompilationDecisionCallback);
         }
         // Enable testing mode to ensure proper cleanup of GraalVM contexts
         // This prevents memory leaks in test environments

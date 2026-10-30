@@ -214,7 +214,8 @@ class RawClientCancellationTest {
 
                     @Override
                     HttpResponse<?> response() {
-                        return received.get();
+                        // Observe the response only after the publisher has terminated.
+                        return done.get() ? received.get() : null;
                     }
                 };
             }

@@ -40,12 +40,15 @@ import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.RouteMetadataAttributes;
 import io.micronaut.http.RouteMetadataHolder;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.body.AsyncRequestBodySource;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.DirectByteBodyAccess;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
@@ -97,11 +100,12 @@ import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.jspecify.annotations.NonNull;
+import io.micronaut.http.server.ResponseFailureRecorder;
+import io.micronaut.http.server.netty.handler.OutboundAccess;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import javax.net.ssl.SSLSession;
 import java.net.InetSocketAddress;
@@ -113,6 +117,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -123,7 +129,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder {
+public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder, AsyncRequestBodySource, ResponseFailureRecorder {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
@@ -209,7 +215,24 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private final CloseableByteBody body;
     @Nullable
     private Object legacyBody;
+    @Nullable
+    private NettyByteBodyFactory byteBodyFactory;
     private final RequestResourceScope disposalResources = new RequestResourceScope();
+    /**
+     * The connection of this request, for the callbacks of
+     * {@link #whenResponseCompleted} and {@link #whenAbandoned}. Both referents are thread-safe
+     * themselves: volatile only publishes the reference.
+     */
+    @SuppressWarnings("java:S3077")
+    private volatile @Nullable OutboundAccess outboundAccess;
+    @SuppressWarnings("java:S3077")
+    private volatile @Nullable ResponseCallbacks responseCallbacks;
+    private volatile boolean responseCleanedUp;
+    private volatile boolean responseUpgraded;
+    /**
+     * The first failure of the response, guarded by this request.
+     */
+    private @Nullable Throwable responseFailure;
     @Nullable
     private ParsedFormType parsedFormType;
 
@@ -222,6 +245,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     @Nullable
     private HttpRequest<?> filteredRequest;
+    private @Nullable AsyncRequestBodySource asyncBodies;
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
@@ -254,7 +278,31 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public ByteBodyFactory byteBodyFactory() {
-        return new NettyByteBodyFactory(channelHandlerContext.channel());
+        // one for the request, not one for each read of its body: a benign race at worst creates two
+        NettyByteBodyFactory factory = this.byteBodyFactory;
+        if (factory == null) {
+            factory = new NettyByteBodyFactory(channelHandlerContext.channel());
+            this.byteBodyFactory = factory;
+        }
+        return factory;
+    }
+
+    /**
+     * Set what gives the {@link AsyncRequestBody} of this request, see
+     * {@link AsyncRequestBody#of(HttpRequest)}.
+     *
+     * @param asyncBodies The source of the bodies
+     * @since 5.3.0
+     */
+    @Internal
+    public void setAsyncRequestBodySource(@Nullable AsyncRequestBodySource asyncBodies) {
+        this.asyncBodies = asyncBodies;
+    }
+
+    @Override
+    public @Nullable AsyncRequestBody asyncRequestBody(HttpRequest<?> request) {
+        AsyncRequestBodySource source = asyncBodies;
+        return source == null ? null : source.asyncRequestBody(request);
     }
 
     public void setLegacyBody(@Nullable Object legacyBody) {
@@ -338,11 +386,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
-        if (RouteMetadataAttributes.isAbsent(attributes, name)) {
-            // answered without creating the attribute map
-            return Optional.empty();
-        }
-        return getAttributes().get(name.toString(), type);
+        return RouteMetadataAttributes.getAttribute(this, attributes, name, type);
     }
 
     @Override
@@ -525,6 +569,110 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             }
         }
         return bodyConvertor;
+    }
+
+    /**
+     * Set the connection of this request, which serves the callbacks of
+     * {@link #whenResponseCompleted} and {@link #whenAbandoned}.
+     *
+     * @param outboundAccess The connection
+     */
+    @Internal
+    public void outboundAccess(OutboundAccess outboundAccess) {
+        this.outboundAccess = outboundAccess;
+    }
+
+    @Override
+    public boolean whenResponseCompleted(Consumer<@Nullable Throwable> callback) {
+        Objects.requireNonNull(callback, "callback");
+        ResponseCallbacks callbacks = responseCallbacks();
+        return callbacks != null && callbacks.whenCompleted(callback);
+    }
+
+    @Override
+    public @Nullable Runnable whenAbandoned(Runnable callback) {
+        Objects.requireNonNull(callback, "callback");
+        ResponseCallbacks callbacks = responseCallbacks();
+        return callbacks == null ? null : callbacks.whenAbandoned(callback);
+    }
+
+    /**
+     * @return The callbacks, created on first use, or {@code null} if this request has no
+     * connection or its response is already done
+     */
+    private @Nullable ResponseCallbacks responseCallbacks() {
+        ResponseCallbacks callbacks = responseCallbacks;
+        if (callbacks != null) {
+            return callbacks;
+        }
+        OutboundAccess access = outboundAccess;
+        if (access == null) {
+            return null;
+        }
+        synchronized (this) {
+            callbacks = responseCallbacks;
+            if (callbacks == null) {
+                if (responseCleanedUp) {
+                    return null;
+                }
+                callbacks = new ResponseCallbacks(access, responseFailure);
+                responseCallbacks = callbacks;
+            }
+        }
+        if (responseUpgraded) {
+            callbacks.upgraded();
+        }
+        // the response may have been cleaned up in the meantime, see responseCleanedUp
+        if (responseCleanedUp) {
+            callbacks.cleanedUp();
+        }
+        return callbacks;
+    }
+
+    /**
+     * Remember why the response to this request failed, for the callbacks of
+     * {@link #whenResponseCompleted}. The first failure wins.
+     *
+     * @param cause The failure
+     */
+    @Override
+    public void responseFailed(Throwable cause) {
+        // the transfer to the callbacks happens under the lock, so that they keep the same first failure
+        synchronized (this) {
+            if (responseFailure == null) {
+                responseFailure = cause;
+                ResponseCallbacks callbacks = responseCallbacks;
+                if (callbacks != null) {
+                    callbacks.fail(cause);
+                }
+            }
+        }
+    }
+
+    /**
+     * The response switched the protocol of the connection, e.g. a WebSocket handshake: the
+     * connection closing later ends the new protocol, it does not abandon this request.
+     */
+    @Internal
+    public void responseUpgraded() {
+        responseUpgraded = true;
+        ResponseCallbacks callbacks = responseCallbacks;
+        if (callbacks != null) {
+            callbacks.upgraded();
+        }
+    }
+
+    /**
+     * The request is cleaned up after its response: settle the callbacks of
+     * {@link #whenResponseCompleted} once the final write of the response completes.
+     */
+    void responseCleanedUp() {
+        // a volatile write before the read, so that a concurrent first registration sees one or the other
+        responseCleanedUp = true;
+        ResponseCallbacks callbacks = responseCallbacks;
+        if (callbacks != null) {
+            callbacks.cleanedUp();
+        }
     }
 
     /**
@@ -773,7 +921,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
-        return Optional.of(new DelegateStreamedHttpRequest(nettyRequest, NettyByteBodyFactory.toByteBufs(byteBody()).map(DefaultHttpContent::new)));
+        return Optional.of(new DelegateStreamedHttpRequest(nettyRequest, BodyPublishers.map(NettyByteBodyFactory.toByteBufs(byteBody()), DefaultHttpContent::new)));
     }
 
     @Override
@@ -854,11 +1002,21 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
-    public @NonNull Flux<RawFormField> getRawFormFields(ByteBody byteBody) {
+    public @NonNull Publisher<RawFormField> getRawFormFields(ByteBody byteBody) {
+        return formFields(byteBody, true);
+    }
+
+    @Override
+    public @NonNull Publisher<RawFormField> getEncodedFormFields(ByteBody byteBody) {
+        return formFields(byteBody, false);
+    }
+
+    private Publisher<RawFormField> formFields(ByteBody byteBody, boolean decodeContent) {
         NettyHttpServerConfiguration nhsc = (NettyHttpServerConfiguration) serverConfiguration;
         long undecodedLimit = Math.min(nhsc.getFieldMaxBufferedBytes(), nhsc.getFormMaxBufferedBytes());
+        Charset charset = getCharacterEncoding();
         PostBodyDecoder.Builder builder = PostBodyDecoder.builder()
-            .charset(getCharacterEncoding())
+            .charset(charset)
             .maxFields(nhsc.getFormMaxFields())
             .enableQuirks(nhsc.getFormDecoderQuirks().toArray(new DecoderQuirk[0]))
             .undecodedLimit(undecodedLimit > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) undecodedLimit);
@@ -874,16 +1032,34 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
         return new FormDemuxer(
             decoder,
+            formType instanceof NettyHttpRequest.FormTypeMultipart multipart ? multipart.boundary() : null,
+            charset,
             channelHandlerContext.channel(),
             new BodySizeLimits(nhsc.getFieldMaxBytes(), nhsc.getFieldMaxBufferedBytes()),
             new BodySizeLimits(nhsc.getFormMaxBytes(), nhsc.getFormMaxBufferedBytes()),
-            byteBody
+            byteBody,
+            content(decodeContent, nhsc.getFormDecoderQuirks())
         ).fields();
     }
 
     @Override
     public boolean hasFormBody() {
         return parseFormType() != null;
+    }
+
+    /**
+     * @param decode Whether the content is decoded
+     * @param quirks The quirks of the decoder
+     * @return How the form reads the content of its fields: undecoded content is only validated
+     * when the decoder refuses malformed percent escapes, which it checks when it decodes
+     */
+    private static FormDemuxer.Content content(boolean decode, Set<DecoderQuirk> quirks) {
+        if (decode) {
+            return FormDemuxer.Content.DECODED;
+        }
+        return quirks.contains(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE) || quirks.contains(DecoderQuirk.REFUSE_SHORT_PERCENT_DECODE)
+            ? FormDemuxer.Content.UNDECODED_VALIDATED
+            : FormDemuxer.Content.UNDECODED;
     }
 
     /**
@@ -960,7 +1136,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     /**
      * Mutable version of the request.
      */
-    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T>, FormCapableHttpRequest<T> {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T>, FormCapableHttpRequest<T>, AsyncRequestBodySource, ResponseFailureRecorder {
 
         @Nullable
         private URI uri;
@@ -1024,6 +1200,14 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
 
         @Override
+        public Publisher<RawFormField> getEncodedFormFields(ByteBody byteBody) {
+            if (bodySet) {
+                throw new IllegalStateException("The body of the request was set: it has no form fields to read");
+            }
+            return NettyHttpRequest.this.getEncodedFormFields(byteBody);
+        }
+
+        @Override
         public void addDisposalResource(Runnable dispose) {
             NettyHttpRequest.this.addDisposalResource(dispose);
         }
@@ -1068,8 +1252,28 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
 
         @Override
+        public @Nullable AsyncRequestBody asyncRequestBody(HttpRequest<?> request) {
+            return NettyHttpRequest.this.asyncRequestBody(request);
+        }
+
+        @Override
         public ByteBodyFactory byteBodyFactory() {
             return NettyHttpRequest.this.byteBodyFactory();
+        }
+
+        @Override
+        public boolean whenResponseCompleted(Consumer<@Nullable Throwable> callback) {
+            return NettyHttpRequest.this.whenResponseCompleted(callback);
+        }
+
+        @Override
+        public @Nullable Runnable whenAbandoned(Runnable callback) {
+            return NettyHttpRequest.this.whenAbandoned(callback);
+        }
+
+        @Override
+        public void responseFailed(Throwable cause) {
+            NettyHttpRequest.this.responseFailed(cause);
         }
 
         @Override

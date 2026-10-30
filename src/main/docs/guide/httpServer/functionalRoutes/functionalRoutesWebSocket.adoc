@@ -1,0 +1,65 @@
+Finish a `GET` route with `webSocket(...)` to declare WebSocket handlers instead of an HTTP response handler. Route groups, filters, conditions, order, ports and attributes apply to the upgrade request.
+
+Add the WebSocket dependency:
+
+dependency::micronaut-websocket[]
+
+The functional WebSocket APIs are in pkg:web.router.websocket[] and are experimental.
+
+=== Handlers
+
+snippet::io.micronaut.docs.server.functional.WebSocketRoutes[tags="echo", indent=0, title="A WebSocket route"]
+
+<1> Declare each connection handler at most once inside `webSocket(...)`.
+<2> The open handler receives the api:websocket.WebSocketSession[] and upgrade request. Path variables are available as session URI variables.
+<3> Declare the message type. Strings and bytes are read directly; other types are decoded from JSON.
+<4> Handle handler failures and decoding errors with `onError`. Without it, the connection closes with `1011`.
+<5> Return `null` when a handler finishes immediately.
+
+Handlers receive the session first and return a `CompletionStage` when work completes later. For example, return the stage from `session.sendAsync(...)`. Available callbacks include `onOpen`, `onMessage`, `onMessageStream`, `onPing`, `onPong`, `onClose` and `onError`.
+
+Handlers run on the event loop by default. Use `executeOn(TaskExecutors.BLOCKING)` for blocking work. Store per-connection state in session attributes, since handler instances are shared.
+
+Sessions work with `session.getOpenSessions()` and api:websocket.WebSocketBroadcaster[] alongside annotated WebSockets. Inject the broadcaster through `BeanProvider<WebSocketBroadcaster>` to avoid a startup dependency cycle.
+
+=== Upgrade Requests
+
+Application, group and route filters run on the upgrade request. Returning an HTTP response rejects the upgrade:
+
+snippet::io.micronaut.docs.server.functional.WebSocketRoutes[tags="filter", indent=0, title="A filter that rejects the upgrade"]
+
+<1> Reject a missing header with `403` before opening the connection.
+
+Conditions and route order also apply. Among functional WebSocket matches, the most specific route wins, then the lowest order. Functional WebSocket routes take precedence over `@ServerWebSocket` beans.
+
+Declare WebSocket routes on the application builder, not in located routes. They have no HTTP body media types or response type: group media types are ignored, and `consumes`, `produces` and `responseType` are not supported. Set the message type on the message handler instead.
+
+=== Message Streams
+
+`session.sendAllAsync(publisher)` sends a publisher's messages at the connection's pace. Its stage completes with `true` after all messages are sent, or `false` if the session closes first; closing cancels the publisher.
+
+Use `onMessageStream(...)` to receive a publisher of incoming messages:
+
+snippet::io.micronaut.docs.server.functional.WebSocketRoutes[tags="streams", indent=0, title="Streams of messages"]
+
+<1> Start an outgoing message stream when the connection opens.
+<2> The stream handler runs once per connection, after the open handler. Subscribe before the handler completes; otherwise incoming messages are discarded.
+<3> Pace reads by the replies sent. The incoming publisher completes before the close handler runs.
+
+Choose either `onMessage` or `onMessageStream`. Stream handlers follow subscriber demand and do not support `maxConcurrentMessages`.
+
+=== Delivery and Backpressure
+
+By default, handlers run sequentially per connection: the next message waits until the previous handler's stage completes. The server reads ahead up to `maxPendingMessages`, `16` by default. Fragmented messages count each fragment toward that limit.
+
+snippet::io.micronaut.docs.server.functional.WebSocketRoutes[tags="delivery", indent=0, title="Concurrent handlers"]
+
+<1> Run handlers on the blocking executor instead of the event loop.
+<2> Allow up to four message handlers per connection to run concurrently; completion order can differ from arrival order.
+<3> Allow up to 32 pending messages.
+
+When the pending limit is reached, message decoding pauses until handlers catch up. `maxPendingMessages(0)` disables this backpressure, so use it carefully.
+
+IMPORTANT: A handler's stage delays subsequent messages. To send an ongoing stream while continuing to receive messages, start the stream and return `null` rather than returning a stage that never completes.
+
+These delivery settings apply to functional WebSocket routes. Annotated `@ServerWebSocket` beans retain their existing behaviour.

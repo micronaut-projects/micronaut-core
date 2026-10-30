@@ -24,6 +24,7 @@ import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -50,8 +51,7 @@ import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
@@ -72,6 +72,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -226,6 +228,23 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         forwardErrorToUser(ctx, e -> handleUnexpected(ctx, e), cause);
     }
 
+    /**
+     * Handle the failure of a handler, e.g. of the stage a message handler returned. Unlike
+     * {@link #exceptionCaught}, the fragments of the message being read are kept: the failure may
+     * come at any time, also in the middle of the next message.
+     *
+     * @param ctx   The context
+     * @param cause The failure
+     * @since 5.3.0
+     */
+    protected final void handlerFailed(ChannelHandlerContext ctx, Throwable cause) {
+        if (!ctx.executor().inEventLoop()) {
+            ctx.executor().execute(() -> forwardErrorToUser(ctx, e -> handleUnexpected(ctx, e), cause));
+            return;
+        }
+        forwardErrorToUser(ctx, e -> handleUnexpected(ctx, e), cause);
+    }
+
     protected final void forwardErrorToUser(ChannelHandlerContext ctx, Consumer<Throwable> fallback, Throwable cause) {
         Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.errorMethod();
 
@@ -297,11 +316,36 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         } catch (Exception e) {
             return ExecutionFlow.error(e);
         }
+        if (result instanceof CompletionStage<?> stage && awaitsCompletionStages()) {
+            if (webSocketBean.closeMethod().orElse(null) == messageHandler || webSocketBean.errorMethod().orElse(null) == messageHandler) {
+                // the close does not wait for the stage of a close or error handler
+                stage.whenComplete((ignored, error) -> {
+                    if (error != null && LOG.isErrorEnabled()) {
+                        LOG.error("Error of the stage of the handler {} of WebSocket bean [{}]: {}", messageHandler.getExecutableMethod(), webSocketBean.getTarget(), error.getMessage(), error);
+                    }
+                });
+                return ExecutionFlow.just(stage);
+            }
+            // the handler is done once its stage completes, as for a publisher
+            return CompletableFutureExecutionFlow.just(stage);
+        }
         if (Publishers.isConvertibleToPublisher(result)) {
             return ReactiveExecutionFlow.fromPublisherEager(Publishers.convertToPublisher(conversionService, result), PropagatedContext.getOrEmpty());
         } else {
             return ExecutionFlow.just(result);
         }
+    }
+
+    /**
+     * Whether the {@link CompletionStage} a handler returns is awaited like a publisher: the open
+     * or message handler is done, and fails, with its stage. Otherwise the stage is a value of the
+     * handler, as before 5.3.
+     *
+     * @return Whether the stages of the handlers are awaited. {@code false} by default
+     * @since 5.3.0
+     */
+    protected boolean awaitsCompletionStages() {
+        return false;
     }
 
     @Override
@@ -336,6 +380,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             } else {
                 Argument<?> bodyArgument = this.getBodyArgument();
                 Object data;
+                ByteBuf content = null;
 
                 if (WebSocketFrame.class.isAssignableFrom(bodyArgument.getType())) {
                     data = msg.retain();
@@ -358,7 +403,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         return;
                     }
 
-                    ByteBuf content;
                     CompositeByteBuf buffer = frameBuffer.getAndSet(null);
                     if (buffer == null) {
                         content = msgContent;
@@ -368,31 +412,43 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     }
 
                     data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
-                    content.release();
+                    if (data != null) {
+                        content.release();
+                        content = null;
+                    }
                 }
 
-                if (data == null) {
+                if (data == null && content != null) {
+                    // the complete payload: a single frame or the assembled fragments
+                    ByteBuf payload = content;
                     MediaType mediaType;
                     try {
                         mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
                     } catch (IllegalArgumentException e) {
+                        payload.release();
                         exceptionCaught(ctx, e);
                         return;
                     }
                     try {
                         data = mediaTypeCodecRegistry.findCodec(mediaType)
-                            .map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())))
+                            .map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(payload)))
                             .orElse(null);
                     } catch (CodecException e) {
+                        payload.release();
                         messageProcessingException(ctx, e);
                         return;
                     }
-                    if (data == null) {
-                        MessageBodyReader<?> reader = messageBodyHandlerRegistry.findReader(bodyArgument, mediaType)
-                            .orElse(null);
-                        if (reader != null) {
-                            ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content().retain());
+                    MessageBodyReader<?> reader = data == null ? messageBodyHandlerRegistry.findReader(bodyArgument, mediaType).orElse(null) : null;
+                    if (reader == null) {
+                        payload.release();
+                    } else {
+                        ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(payload);
+                        try {
                             data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+                        } catch (Throwable t) {
+                            // readers release the buffer on success only
+                            payload.release();
+                            throw t;
                         }
                     }
                 }
@@ -460,7 +516,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                             if (LOG.isErrorEnabled()) {
                                 LOG.error("Error Processing WebSocket Pong Message [{}]: {}", webSocketBean, t.getMessage(), t);
                             }
-                            exceptionCaught(ctx, t);
+                            handlerFailed(ctx, t);
                         }
                         content.release();
                     });
@@ -468,7 +524,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error Processing WebSocket Message [{}]: {}", webSocketBean, e.getMessage(), e);
                     }
-                    exceptionCaught(ctx, e);
+                    handlerFailed(ctx, e);
                 }
             }
         } else if (msg instanceof CloseWebSocketFrame cwsf) {
@@ -485,7 +541,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         if (LOG.isErrorEnabled()) {
             LOG.error("Error Processing WebSocket Message [{}]: {}", webSocketBean, e.getMessage(), e);
         }
-        exceptionCaught(ctx, e);
+        // the message was read: the fragments of the next one, if any, are kept
+        handlerFailed(ctx, e);
     }
 
     /**
@@ -516,6 +573,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param writeCloseReason Whether to allow writing the close reason to the remote
      */
     protected void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr, boolean writeCloseReason) {
+        if (writeCloseReason) {
+            // echo the close frame first. Once it is written, this method is called again to
+            // invoke the @OnClose handler, and the connection is closed
+            writeCloseFrameAndTerminate(ctx, cr);
+            return;
+        }
         cleanupBuffer();
         if (closed.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
@@ -534,15 +597,14 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                             Collections.singletonList(cr)
                     );
 
-                    invokeAndClose(ctx, target, boundExecutable, methodExecutionHandle, true);
+                    invokeOnCloseAndClose(ctx, target, boundExecutable, methodExecutionHandle);
                 } catch (Throwable e) {
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error invoking @OnClose handler for WebSocket bean [{}]: {}", target, e.getMessage(), e);
                     }
-                }
-            } else {
-                if (writeCloseReason) {
-                    writeCloseFrameAndTerminate(ctx, cr);
+                    // the close handler could not be bound: the close frame was already written,
+                    // the connection is still closed
+                    ctx.close();
                 }
             }
         }
@@ -550,26 +612,27 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     private void handleCloseFrame(ChannelHandlerContext ctx, CloseWebSocketFrame cwsf) {
         CloseReason cr = new CloseReason(cwsf.statusCode(), cwsf.reasonText());
+        getSession().markCloseReceived();
         handleCloseReason(ctx, cr, true);
     }
 
-    private void invokeAndClose(ChannelHandlerContext ctx, Object target, BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> methodExecutionHandle, boolean isClose) {
+    /**
+     * Invoke the @OnClose handler. The connection is usually already closed or closing at this
+     * point (see {@link #writeCloseFrameAndTerminate(ChannelHandlerContext, int, String)}), the
+     * {@code ctx.close()} calls are a safety net for other callers of {@link #handleCloseReason}.
+     */
+    private void invokeOnCloseAndClose(ChannelHandlerContext ctx, Object target, BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> methodExecutionHandle) {
         ExecutionFlow<?> result;
         try {
             result = invokeExecutable(boundExecutable, methodExecutionHandle);
-        } catch (Exception e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Error invoking @OnClose handler {}.{}: {}", target.getClass().getSimpleName(), methodExecutionHandle.getExecutableMethod(), e.getMessage(), e);
-            }
-            ctx.close();
-            return;
+        } catch (Throwable e) {
+            // reported and closed like a failed handler
+            result = ExecutionFlow.error(e);
         }
 
         result.onComplete((v, t) -> {
-            if (t != null) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error subscribing to @{} handler for WebSocket bean [{}]: {}", (isClose ? "OnClose" : "OnError"), target, t.getMessage(), t);
-                }
+            if (t != null && LOG.isErrorEnabled()) {
+                LOG.error("Error subscribing to @OnClose handler for WebSocket bean [{}]: {}", target, t.getMessage(), t);
             }
             ctx.close();
         });
@@ -610,36 +673,88 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         if (LOG.isErrorEnabled()) {
             LOG.error("Unexpected Exception in WebSocket [{}]: {}", webSocketBean.getTarget(), cause.getMessage(), cause);
         }
-        Channel channel = ctx.channel();
-        if (channel.isOpen()) {
-            final CloseReason internalError = CloseReason.INTERNAL_ERROR;
-            writeCloseFrameAndTerminate(ctx, internalError);
-        }
+        writeCloseFrameAndTerminate(ctx, CloseReason.INTERNAL_ERROR);
     }
 
     private void writeCloseFrameAndTerminate(ChannelHandlerContext ctx, int code, String reason) {
-        cleanupBuffer();
-        final CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(code, reason);
-        ctx.channel().writeAndFlush(closeFrame)
-                      .addListener(future -> handleCloseReason(ctx, new CloseReason(code, reason), false));
+        if (!ctx.channel().isOpen() || closeInitiated.get()) {
+            // the connection is already gone, or a close frame was already sent and the
+            // connection is being closed
+            return;
+        }
+        // build the frame before changing any state, so that an invalid code fails early.
+        // A close frame received without a status code is echoed without one.
+        CloseWebSocketFrame closeFrame = code == -1 ? new CloseWebSocketFrame() : new CloseWebSocketFrame(code, reason);
+        if (!closeInitiated.compareAndSet(false, true)) {
+            closeFrame.release();
+            return;
+        }
+        // no data frames may be sent after the close frame. The session may not exist yet on the
+        // client if the handshake has not completed
+        NettyWebSocketSession session = ctx.channel().attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
+        if (session != null) {
+            session.markClosing();
+            if (!session.markCloseSent()) {
+                // a close frame is sent once (RFC 6455, 5.5.1): one was sent already, only the
+                // connection is closed
+                closeFrame.release();
+                ctx.channel().close();
+                return;
+            }
+        }
+        CloseReason closeReason = new CloseReason(code, reason);
+        if (ctx.executor().inEventLoop()) {
+            sendCloseFrameAndClose(ctx, closeFrame, closeReason);
+        } else {
+            try {
+                ctx.executor().execute(() -> sendCloseFrameAndClose(ctx, closeFrame, closeReason));
+            } catch (RejectedExecutionException e) {
+                closeFrame.release();
+                ctx.channel().close();
+            }
+        }
     }
 
-    private void rejectTooLargeMessage(ChannelHandlerContext ctx) {
-        if (closeInitiated.compareAndSet(false, true)) {
-            cleanupBuffer();
-            ctx.channel().config().setAutoRead(false);
-            getSession().markClosing();
-            CloseReason closeReason = CloseReason.MESSAGE_TO_BIG;
+    private void sendCloseFrameAndClose(ChannelHandlerContext ctx, CloseWebSocketFrame closeFrame, CloseReason closeReason) {
+        cleanupBuffer();
+        // RFC 6455 section 7.1.1: close the connection once the close frame is sent, whether or not
+        // there is an @OnClose handler. Force the close if the peer does not read the close frame
+        // in time.
+        ChannelFuture writeFuture = ctx.channel().writeAndFlush(closeFrame);
+        writeFuture.addListener(future -> {
+            if (!future.isSuccess() && LOG.isDebugEnabled()) {
+                LOG.debug("Failed to write the close frame of WebSocket channel {}: {}", ctx.channel(), future.cause().getMessage(), future.cause());
+            }
+        });
+        if (writeFuture.isDone()) {
+            // don't run @OnClose re-entrantly inside the caller (e.g. WebSocketSession.close())
+            try {
+                ctx.executor().execute(() -> closeFrameWritten(ctx, closeReason, null));
+            } catch (RejectedExecutionException e) {
+                closeFrameWritten(ctx, closeReason, null);
+            }
+        } else {
             ScheduledFuture<?> closeTimeout = ctx.executor().schedule(() -> {
                 ctx.close();
             }, 1, TimeUnit.SECONDS);
-            ctx.channel().writeAndFlush(new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason()))
-                .addListener(ChannelFutureListener.CLOSE)
-                .addListener(future -> {
-                    closeTimeout.cancel(false);
-                    handleCloseReason(ctx, closeReason, false);
-                });
+            writeFuture.addListener(future -> closeFrameWritten(ctx, closeReason, closeTimeout));
         }
+    }
+
+    private void closeFrameWritten(ChannelHandlerContext ctx, CloseReason closeReason, @Nullable ScheduledFuture<?> closeTimeout) {
+        if (closeTimeout != null) {
+            closeTimeout.cancel(false);
+        }
+        try {
+            handleCloseReason(ctx, closeReason, false);
+        } finally {
+            ctx.channel().close();
+        }
+    }
+
+    private void rejectTooLargeMessage(ChannelHandlerContext ctx) {
+        ctx.channel().config().setAutoRead(false);
+        writeCloseFrameAndTerminate(ctx, CloseReason.MESSAGE_TO_BIG);
     }
 
     private void cleanupBuffer() {
