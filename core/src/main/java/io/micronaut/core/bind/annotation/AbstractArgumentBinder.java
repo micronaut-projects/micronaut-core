@@ -20,6 +20,7 @@ import io.micronaut.core.bind.ArgumentBinder.BindingResult;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
@@ -51,6 +52,12 @@ public abstract class AbstractArgumentBinder<T> {
      * Whether the argument of a specific binder declares no default value, so it does not have to be looked up again.
      */
     private final boolean noDefaultValue;
+    /**
+     * The converter of a string value to the argument of a specific binder, which values with the
+     * conversion service of the binder convert a single string value with.
+     */
+    @Nullable
+    private final TypeConverter<String, T> stringConverter;
 
     /**
      * Constructor.
@@ -63,6 +70,7 @@ public abstract class AbstractArgumentBinder<T> {
         this.fallbackParameterName = null;
         this.defaultValue = null;
         this.noDefaultValue = false;
+        this.stringConverter = null;
     }
 
     /**
@@ -79,6 +87,7 @@ public abstract class AbstractArgumentBinder<T> {
         this.defaultValue = annotationMetadata.stringValue(Bindable.class, DEFAULT_VALUE_MEMBER).orElse(null);
         // Whether the member is declared does not depend on the environment, unlike its resolved value
         this.noDefaultValue = defaultValue == null && !annotationMetadata.isPresent(Bindable.class, DEFAULT_VALUE_MEMBER);
+        this.stringConverter = conversionService.resolveConverter(String.class, argument);
     }
 
     /**
@@ -234,11 +243,20 @@ public abstract class AbstractArgumentBinder<T> {
                 return null;
             }
         }
-        Optional<T> value = values.get(annotationValue, context);
+        Optional<T> value = stringConverter != null && values.getConversionService() == conversionService
+            ? values.get(annotationValue, context, stringConverter)
+            : values.get(annotationValue, context);
         if (value.isPresent()) {
             return value.get();
         }
-        return conversionService.convert(resolveDefaultValue(argument), context).orElse(null);
+        String declaredDefault = resolveDefaultValue(argument);
+        if (declaredDefault == null) {
+            return null;
+        }
+        if (stringConverter != null) {
+            return stringConverter.convert(declaredDefault, argument.getType(), context).orElse(null);
+        }
+        return conversionService.convert(declaredDefault, context).orElse(null);
     }
 
     @Nullable
