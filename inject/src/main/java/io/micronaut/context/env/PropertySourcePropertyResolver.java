@@ -332,10 +332,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             refreshingThread = Thread.currentThread();
             try {
                 rebuild.run();
-                state = writeState;
-                published = true;
-                mirrorPublishedState();
-                propertiesPublished();
+                if (publishesRefresh()) {
+                    state = writeState;
+                    published = true;
+                    mirrorPublishedState();
+                    propertiesPublished();
+                }
             } finally {
                 adding = insideAdd;
                 if (insideAdd) {
@@ -410,6 +412,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     void propertiesPublished() {
         // nothing to note
+    }
+
+    /**
+     * Whether a refresh that has rebuilt the catalogs publishes them. If not, they are discarded
+     * as those of a refresh that fails are, but without a failure. Called with the catalog lock
+     * held.
+     *
+     * @return Whether to publish them
+     */
+    boolean publishesRefresh() {
+        return true;
     }
 
     /**

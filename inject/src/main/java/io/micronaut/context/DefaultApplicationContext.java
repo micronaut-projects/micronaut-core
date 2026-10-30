@@ -964,24 +964,39 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
         @Override
         public Environment stop() {
             // The lock of the property catalogs, which a refresh holds while it stops and starts this
-            // environment: the bootstrap environment is only ever replaced under that lock.
-            synchronized (catalog) {
-                if (bootstrapEnvironment != null) {
-                    bootstrapEnvironment.stop();
-                    bootstrapEnvironment = null;
+            // environment: the bootstrap environment is only ever replaced under that lock. A stop
+            // from another thread during a refresh is left to the refresh, without the lock.
+            if (!beginStartOrStop(true)) {
+                return this;
+            }
+            try {
+                synchronized (catalog) {
+                    if (bootstrapEnvironment != null) {
+                        bootstrapEnvironment.stop();
+                        bootstrapEnvironment = null;
+                    }
+                    return super.stop();
                 }
-                return super.stop();
+            } finally {
+                endStartOrStop();
             }
         }
 
         @Override
         public Environment start() {
-            synchronized (catalog) {
-                if (bootstrapEnvironment == null && isRuntimeConfigured()) {
-                    bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
-                    startBootstrapEnvironment();
+            if (!beginStartOrStop(false)) {
+                return this;
+            }
+            try {
+                synchronized (catalog) {
+                    if (bootstrapEnvironment == null && isRuntimeConfigured()) {
+                        bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
+                        startBootstrapEnvironment();
+                    }
+                    return super.start();
                 }
-                return super.start();
+            } finally {
+                endStartOrStop();
             }
         }
 

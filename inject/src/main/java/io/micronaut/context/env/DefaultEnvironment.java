@@ -120,9 +120,38 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     /**
      * Held while a property source is registered by an add and the count of snapshots read, and
      * while a start or a refresh counts and takes its snapshot, so that one comes before the other.
-     * Nothing else runs with it held.
+     * It also guards the turn of a refresh, see {@link #takeRefreshTurn()}. Nothing else runs with
+     * it held.
      */
     private final Object registrationLock = new Object();
+    /**
+     * The thread whose refresh has the turn: from before it takes the catalog lock until it has
+     * read the property sources. A thread that does not hold the catalog lock does not take it
+     * while another thread has the turn, and so never waits for that refresh. Guarded by the
+     * registration lock.
+     */
+    private Thread refreshTurn;
+    /**
+     * How many threads found no refresh with the turn and go on to take the catalog lock, to start
+     * or to stop the environment. A refresh that takes the turn waits for them, as it would wait for
+     * the catalog lock they hold. Guarded by the registration lock.
+     */
+    private int lockTakers;
+    /**
+     * Whether another thread has stopped the environment, and not started it since, while a refresh
+     * has the turn. The refresh then publishes nothing and stops the environment once it has read.
+     * Guarded by the registration lock.
+     */
+    private boolean stoppedDuringRefresh;
+    /**
+     * Whether the refresh that the current thread runs with the turn publishes nothing, as the
+     * environment was stopped meanwhile. Guarded by the catalog lock.
+     */
+    private boolean dropRefresh;
+    /**
+     * What the {@link #refreshAndDiff()} of the current thread compares.
+     */
+    private final ThreadLocal<Difference> differences = new ThreadLocal<>();
     /**
      * How many snapshots of the registered property sources starts and refreshes have taken, see
      * {@link #alreadyProcessed(PropertySource)}. Guarded by the registration lock.
@@ -345,24 +374,32 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public Environment start() {
         // A refresh holds the lock of the catalogs from before it stops this environment until it
-        // has published what it read. A start from another thread waits for that here, rather than
-        // taking the read over and leaving the refresh to publish a catalog it has not filled.
-        synchronized (catalog) {
-            if (running.compareAndSet(false, true)) {
-                log.debug("Starting environment {} for active names {}", this, getActiveNames());
-                if (reading.compareAndSet(false, true)) {
-                    try {
-                        readIntoCopy(() -> readPropertySources(getPropertySourceRootName()));
-                        if (!isRefreshing()) {
-                            // what the start read is published, or is with the add or the start it runs in
-                            propertiesPublished();
+        // has published what it read. A start from another thread neither takes the read over, which
+        // would leave the refresh to publish a catalog it has not filled, nor waits for it: the
+        // refresh starts this environment again before it publishes.
+        if (!beginStartOrStop(false)) {
+            return this;
+        }
+        try {
+            synchronized (catalog) {
+                if (running.compareAndSet(false, true)) {
+                    log.debug("Starting environment {} for active names {}", this, getActiveNames());
+                    if (reading.compareAndSet(false, true)) {
+                        try {
+                            readIntoCopy(() -> readPropertySources(getPropertySourceRootName()));
+                            if (!isRefreshing()) {
+                                // what the start read is published, or is with the add or the start it runs in
+                                propertiesPublished();
+                            }
+                        } finally {
+                            // also when the read fails, or a property source added later is never processed
+                            reading.set(false);
                         }
-                    } finally {
-                        // also when the read fails, or a property source added later is never processed
-                        reading.set(false);
                     }
                 }
             }
+        } finally {
+            endStartOrStop();
         }
         return this;
     }
@@ -374,31 +411,222 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment stop() {
-        synchronized (catalog) {
-            running.set(false);
-            reading.set(false);
-            this.propertySources.values().removeAll(refreshablePropertySources);
-            reset();
-            if (!isRefreshing()) {
-                // what it processed is published no more; within a refresh it stays published
-                // until the refresh publishes, and if the refresh fails it stays so
-                publishedSnapshot = null;
+        // A stop from another thread during a refresh does not wait for it: the refresh publishes
+        // nothing, and stops this environment once it has read.
+        if (!beginStartOrStop(true)) {
+            return this;
+        }
+        try {
+            synchronized (catalog) {
+                running.set(false);
+                reading.set(false);
+                this.propertySources.values().removeAll(refreshablePropertySources);
+                reset();
+                if (!isRefreshing()) {
+                    // what it processed is published no more; within a refresh it stays published
+                    // until the refresh publishes, and if the refresh fails it stays so
+                    publishedSnapshot = null;
+                }
+                resetCaches();
             }
-            resetCaches();
+        } finally {
+            endStartOrStop();
         }
         return this;
     }
 
+    /**
+     * Called by {@link #start()} and {@link #stop()}, and by an override of them that takes the lock
+     * of the catalogs itself, before that lock is taken. While a refresh on another thread has the
+     * turn, the call is left to that refresh and the caller returns at once, without the lock: the
+     * refresh starts the environment again before it publishes, and once the environment is stopped
+     * it publishes nothing and stops it when it has read. Of a stop and a start made meanwhile, the
+     * later one counts. Otherwise the caller goes on, and calls {@link #endStartOrStop()} once it has
+     * let go of the lock.
+     *
+     * @param stop Whether the caller stops the environment, rather than starting it
+     * @return Whether the caller goes on, rather than leaving the call to the refresh
+     * @since 4.10.36
+     */
+    @Internal
+    protected final boolean beginStartOrStop(boolean stop) {
+        if (Thread.holdsLock(catalog)) {
+            // the stop and the start of a refresh, or a call from code that runs with the lock held
+            return true;
+        }
+        synchronized (registrationLock) {
+            if (refreshTurn != null) {
+                stoppedDuringRefresh = stop;
+                return false;
+            }
+            lockTakers++;
+            return true;
+        }
+    }
+
+    /**
+     * Called once a start or a stop for which {@link #beginStartOrStop(boolean)} returned
+     * {@code true} has let go of the lock of the catalogs.
+     *
+     * @since 4.10.36
+     */
+    @Internal
+    protected final void endStartOrStop() {
+        if (!Thread.holdsLock(catalog)) {
+            // counted by beginStartOrStop, which also found the lock not held
+            catalogLockReleased();
+        }
+    }
+
+    private void catalogLockReleased() {
+        synchronized (registrationLock) {
+            if (--lockTakers == 0 && refreshTurn != null) {
+                registrationLock.notifyAll();
+            }
+        }
+    }
+
+    /**
+     * Refreshes the environment, see {@link AtomicRefresh#refresh()}. The refresh takes the turn
+     * before it takes the lock of the catalogs, and stops and starts the environment, which reads
+     * the property sources into a replacement catalog that it then publishes in one step. While it
+     * has the turn, a start, a stop or a refresh from another thread does not wait for the lock.
+     */
+    void refreshProperties() {
+        if (Thread.holdsLock(catalog)) {
+            // From code that runs with the lock held, such as a property source that the refresh
+            // or an add processes: refreshes within what that code runs in, as before.
+            refreshComparing(this::restart);
+            return;
+        }
+        takeRefreshTurn();
+        synchronized (catalog) {
+            try {
+                refreshComparing(this::restartInTurn);
+            } finally {
+                // when the read has failed, the turn is still held
+                boolean stopped = endRefreshTurn() || dropRefresh;
+                dropRefresh = false;
+                if (stopped) {
+                    stop();
+                }
+            }
+        }
+    }
+
+    /**
+     * Takes the turn of a refresh, once no other thread has it, and once the threads that are about
+     * to take the lock of the catalogs, as they found no turn, have let go of it.
+     */
+    private void takeRefreshTurn() {
+        boolean interrupted = false;
+        synchronized (registrationLock) {
+            while (refreshTurn != null) {
+                try {
+                    registrationLock.wait();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+            refreshTurn = Thread.currentThread();
+            while (lockTakers > 0) {
+                try {
+                    registrationLock.wait();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Ends the turn of the refresh the current thread runs, if it still has it. From now on other
+     * threads take the lock of the catalogs, which it holds until it has published. Called with that
+     * lock held.
+     *
+     * @return Whether another thread stopped the environment during the turn, and did not start it
+     * again
+     */
+    private boolean endRefreshTurn() {
+        synchronized (registrationLock) {
+            if (refreshTurn != Thread.currentThread()) {
+                return false;
+            }
+            refreshTurn = null;
+            boolean stopped = stoppedDuringRefresh;
+            stoppedDuringRefresh = false;
+            registrationLock.notifyAll();
+            return stopped;
+        }
+    }
+
+    /**
+     * The rebuild of a refresh made from code that runs with the lock of the catalogs held.
+     */
+    private void restart() {
+        stop();
+        start();
+    }
+
+    /**
+     * The rebuild of a refresh that has the turn: once the property sources are read, the turn ends,
+     * and whether the refresh publishes is decided.
+     */
+    private void restartInTurn() {
+        stop();
+        start();
+        dropRefresh = endRefreshTurn();
+    }
+
+    /**
+     * Runs a refresh and, for the {@link #refreshAndDiff()} of the current thread, takes the
+     * difference between the catalog before it and what it published, before anything else is
+     * written into the catalogs. Called with the lock of the catalogs held.
+     *
+     * @param rebuild The rebuild
+     */
+    private void refreshComparing(Runnable rebuild) {
+        Difference difference = differences.get();
+        if (difference != null && difference.before == null) {
+            difference.before = copyCatalog(publishedCatalog());
+        }
+        refresh(rebuild);
+        if (difference != null && !dropRefresh) {
+            difference.changes = diffCatalog(difference.before, publishedCatalog());
+        }
+    }
+
+    @Override
+    boolean publishesRefresh() {
+        return !dropRefresh;
+    }
+
     @Override
     public Map<String, Object> refreshAndDiff() {
-        // Under the lock of the catalogs, which the refresh takes itself: the difference is between
-        // what was published before this refresh and what it has published. A property source that
-        // another thread adds to the catalogs, or another refresh, waits until it has been taken.
-        synchronized (catalog) {
-            Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(publishedCatalog());
+        // The refresh copies the catalog before it reads, and takes the difference once it has
+        // published, with the lock of the catalogs held: the difference is between what was published
+        // before this refresh and what it has published. A property source that another thread adds
+        // once it has published is not part of it.
+        Difference outer = differences.get();
+        Difference difference = new Difference();
+        differences.set(difference);
+        try {
             refresh();
-            return diffCatalog(copiedCatalog, publishedCatalog());
+        } finally {
+            if (outer == null) {
+                differences.remove();
+            } else {
+                differences.set(outer);
+            }
         }
+        if (difference.changes == null) {
+            // it published nothing, as the environment was stopped meanwhile
+            return new LinkedHashMap<>();
+        }
+        return difference.changes;
     }
 
     @Override
@@ -1209,5 +1437,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param propertySources The property sources
      */
     private record RegistrySnapshot(long number, Set<PropertySource> propertySources) {
+    }
+
+    /**
+     * What a {@link #refreshAndDiff()} reports: the generated catalog before the refresh read, and
+     * what the refresh changed, or {@code null} while it has published nothing.
+     */
+    private static final class Difference {
+        private Map<String, DefaultPropertyEntry>[] before;
+        private Map<String, Object> changes;
     }
 }
