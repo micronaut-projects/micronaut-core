@@ -202,8 +202,9 @@ class ResponseCacheTest extends GatewayTestBase {
             ScriptedUpstream.write(out, "HTTP/1.1 200 OK\r\nCache-Control: max-age=60\r\nContent-Length: 10\r\n\r\nhalf");
             return false;
         });
-        get("/cached/cut");
-        get("/cached/cut");
+        // the client sees the cut too: the body ends before its Content-Length
+        getCut("/cached/cut");
+        getCut("/cached/cut");
         assertEquals(2, cut.get());
         answer("/big", "Cache-Control: max-age=60");
         scripted.on("/big", (request, in, out, socket) -> {
@@ -228,15 +229,126 @@ class ResponseCacheTest extends GatewayTestBase {
         assertEquals(2, calls("/upgrade"));
     }
 
+    private void getCut(String path) {
+        try {
+            get(path);
+        } catch (IOException e) {
+            // expected: the response was cut
+        }
+    }
+
+    private RawHttp.Response getWithHost(String path, String host) throws IOException {
+        return RawHttp.exchange(gateway.getPort(), "GET " + path + " HTTP/1.1\r\nHost: " + host + "\r\nConnection: close\r\n\r\n");
+    }
+
+    @Test
+    void ca09UsersWhoseCredentialsHaveTheSameHashCodeDoNotShareEntries() throws IOException {
+        // "Aa" and "BB" have the same hash code, and so do the lists of the headers
+        assertEquals(List.of("Bearer Aa").hashCode(), List.of("Bearer BB").hashCode());
+        answer("/collide", "Cache-Control: public, max-age=60");
+        assertEquals("call 1", get("/cached/collide", "Authorization: Bearer Aa").text());
+        assertEquals("call 2", get("/cached/collide", "Authorization: Bearer BB").text());
+        assertEquals("call 1", get("/cached/collide", "Authorization: Bearer Aa").text());
+        assertEquals("call 3", get("/cached/collide", "Cookie: s=Aa").text());
+        assertEquals("call 4", get("/cached/collide", "Cookie: s=BB").text());
+    }
+
+    @Test
+    void ca10TenantsOnOtherHostsDoNotShareEntries() throws IOException {
+        answer("/tenant", "Cache-Control: public, max-age=60");
+        assertEquals("call 1", getWithHost("/cached/tenant", "a.example").text());
+        assertEquals("call 2", getWithHost("/cached/tenant", "b.example").text());
+        assertEquals("call 1", getWithHost("/cached/tenant", "A.example").text(), "the host ignores the case");
+    }
+
+    @Test
+    void ca11TheFreshnessCountsTheAgeOfTheStoredResponse() throws IOException {
+        answer("/aged", "Cache-Control: max-age=10", "Age: 8");
+        assertEquals("call 1", get("/cached/aged").text());
+        assertEquals("call 1", get("/cached/aged").text());
+        CLOCK.addAndGet(3_000);
+        assertEquals("call 2", get("/cached/aged").text(), "8 seconds old when stored, 11 now: stale");
+    }
+
+    @Test
+    void ca12IfNoneMatchStarIsAnswered304WithoutAnETag() throws IOException {
+        answer("/star", "Cache-Control: max-age=60");
+        get("/cached/star");
+        RawHttp.Response star = get("/cached/star", "If-None-Match: *");
+        assertEquals(304, star.status(), star.toString());
+        assertEquals(1, calls("/star"));
+    }
+
+    @Test
+    void ca13AResponseReadBeforeAChangeOfTheResourceIsNotStored() throws Exception {
+        java.util.concurrent.CountDownLatch posted = new java.util.concurrent.CountDownLatch(1);
+        scripted.on("/race", (request, in, out, socket) -> {
+            request.readBody(in);
+            int n = calls.computeIfAbsent("/race", p -> new AtomicInteger()).incrementAndGet();
+            if (n == 1) {
+                // the first GET answers after the POST changed the resource
+                try {
+                    posted.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            String body = "call " + n;
+            ScriptedUpstream.write(out, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nCache-Control: max-age=60\r\nContent-Length: "
+                + body.length() + "\r\n\r\n" + body);
+            return true;
+        });
+        java.util.concurrent.CompletableFuture<RawHttp.Response> slow = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            try {
+                return get("/cached/race");
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        });
+        while (calls("/race") < 1) {
+            Thread.sleep(10);
+        }
+        assertEquals(200, send("POST", "/cached/race", "x", "Content-Type: text/plain").status());
+        posted.countDown();
+        assertEquals("call 1", slow.get(10, java.util.concurrent.TimeUnit.SECONDS).text());
+        Thread.sleep(200);
+        assertEquals("call 3", get("/cached/race").text(), "the response read before the POST was not stored");
+    }
+
+    @Test
+    void ca14AStoreThatFailsToInvalidateDoesNotFailTheRequest() throws IOException {
+        answer("/failing", "Cache-Control: no-store");
+        assertEquals(200, send("POST", "/failing-store/failing", "x", "Content-Type: text/plain").status());
+        assertEquals(200, get("/failing-store/failing").status());
+    }
+
     @Test
     void theStoreIsBoundedByItsCapacity() {
         InMemoryResponseCacheStore store = new InMemoryResponseCacheStore(1000);
         for (int i = 0; i < 10; i++) {
-            store.put("k" + i, new ResponseCacheStore.CachedResponse(200, List.of(), new byte[300], 0, 1000, 0, List.of()));
+            store.put("k" + i, "-", new ResponseCacheStore.CachedResponse(200, List.of(), new byte[300], 0, 1000, 0, List.of()));
         }
         assertTrue(store.size() <= 1000, String.valueOf(store.size()));
         assertEquals(2, store.count());
-        assertNull(store.get("k0").toCompletableFuture().join());
+        assertNull(store.get("k0", "-").toCompletableFuture().join());
+    }
+
+    @Test
+    void theStoreCountsItsKeysAndInvalidatesTheVariantsOfAResourceOnly() {
+        InMemoryResponseCacheStore store = new InMemoryResponseCacheStore(1_000_000);
+        ResponseCacheStore.CachedResponse tiny = new ResponseCacheStore.CachedResponse(200, List.of(), new byte[0], 0, 1000, 0, List.of());
+        String longQuery = "q".repeat(10_000);
+        store.put("r1 " + longQuery, "v1", tiny);
+        assertTrue(store.size() > 20_000, "the key is counted: " + store.size());
+        store.put("r1", "v1", tiny);
+        store.put("r1", "v2", tiny);
+        store.put("r2", "v1", tiny);
+        store.invalidate("r1");
+        assertNull(store.get("r1", "v1").toCompletableFuture().join());
+        assertNull(store.get("r1", "v2").toCompletableFuture().join());
+        assertEquals(tiny, store.get("r2", "v1").toCompletableFuture().join());
+        assertEquals(tiny, store.get("r1 " + longQuery, "v1").toCompletableFuture().join());
+        assertEquals(2, store.count());
     }
 
     @Singleton
@@ -253,6 +365,24 @@ class ResponseCacheTest extends GatewayTestBase {
         public void routes(GatewayRouteBuilder gateway) {
             gateway.route("cached").path("/cached/**").filters(GatewayFilters.stripPrefix(1),
                 new LocalResponseCache(store, Duration.ZERO, 1000, CLOCK::get)).uri(scripted);
+            ResponseCacheStore failing = new ResponseCacheStore() {
+                @Override
+                public java.util.concurrent.CompletionStage<ResponseCacheStore.@org.jspecify.annotations.Nullable CachedResponse> get(String resource, String variant) {
+                    return java.util.concurrent.CompletableFuture.completedFuture(null);
+                }
+
+                @Override
+                public java.util.concurrent.CompletionStage<?> put(String resource, String variant, CachedResponse response) {
+                    return java.util.concurrent.CompletableFuture.completedFuture(null);
+                }
+
+                @Override
+                public java.util.concurrent.CompletionStage<?> invalidate(String resource) {
+                    throw new IllegalStateException("the store is down");
+                }
+            };
+            gateway.route("failing-store").path("/failing-store/**").filters(GatewayFilters.stripPrefix(1),
+                new LocalResponseCache(failing, Duration.ZERO, 1000, CLOCK::get)).uri(scripted);
             gateway.route("cached-real-clock").path("/cached-real-clock/**").filters(GatewayFilters.stripPrefix(1),
                 GatewayFilters.localResponseCache(Duration.ZERO, 100_000)).uri(scripted);
         }

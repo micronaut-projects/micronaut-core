@@ -32,11 +32,17 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,7 +50,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 
 /**
@@ -57,9 +62,14 @@ import java.util.function.LongSupplier;
 @Internal
 final class LocalResponseCache implements GatewayFilter {
     private static final Logger LOG = LoggerFactory.getLogger(LocalResponseCache.class);
-    private static final String KEY = "micronaut.gateway.cache.key";
-    private static final String NO_STORE = "micronaut.gateway.cache.no-store";
-    private static final String HIT = "micronaut.gateway.cache.hit";
+    private static final String NO_STORE = "no-store";
+    private static final String PRIVATE = "private";
+    private static final String NO_CACHE = "no-cache";
+    private static final String MAX_AGE = "max-age";
+    /**
+     * The number of URIs whose Vary names and invalidations are remembered.
+     */
+    private static final int MAX_TRACKED_URIS = 10_000;
     private static final Set<String> UNSAFE = Set.of("POST", "PUT", "DELETE", "PATCH");
 
     private final ResponseCacheStore store;
@@ -67,9 +77,16 @@ final class LocalResponseCache implements GatewayFilter {
     private final long maxEntryBytes;
     private final LongSupplier clock;
     /**
-     * The names of the request headers the responses of a URI vary by, as last stored.
+     * The names of the request headers the responses of a URI vary by, as last stored, for the
+     * most recently used URIs only: a URI that is left out is looked up without them, a miss.
      */
-    private final Map<String, List<String>> varyByBase = new ConcurrentHashMap<>();
+    private final Map<String, List<String>> varyByBase = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, List<String>> eldest) {
+            return size() > MAX_TRACKED_URIS;
+        }
+    };
+    private final Invalidations invalidations = new Invalidations();
 
     LocalResponseCache(ResponseCacheStore store, Duration timeToLive, long maxEntryBytes, LongSupplier clock) {
         this.store = Objects.requireNonNull(store, "store");
@@ -94,31 +111,37 @@ final class LocalResponseCache implements GatewayFilter {
         String method = request.getMethodName();
         String base = base(request);
         if (UNSAFE.contains(method)) {
-            // a change of the resource: its responses are stale
-            return store.invalidate(base).handle((ignored, failure) -> null);
+            // a change of the resource: its responses are stale, and so is a response of the
+            // resource that is on its way, see store
+            state(request).unsafeBase = base;
+            return invalidate(base).thenApply(ignored -> null);
         }
         if (!method.equals("GET") && !method.equals("HEAD")
-            || request.getHeaders().contains(HttpHeaders.UPGRADE) || request.getHeaders().contains(HttpHeaders.RANGE)) {
+            || request.getHeaders().contains(HttpHeaders.UPGRADE) || request.getHeaders().contains(HttpHeaders.RANGE)
+            // preconditions only the upstream can evaluate
+            || request.getHeaders().contains(HttpHeaders.IF_MATCH) || request.getHeaders().contains(HttpHeaders.IF_UNMODIFIED_SINCE)) {
             return CompletableFuture.completedFuture(null);
         }
         Directives directives = Directives.of(request.getHeaders().getAll(HttpHeaders.CACHE_CONTROL));
-        if (directives.has("no-store")) {
-            request.setAttribute(NO_STORE, Boolean.TRUE);
+        if (directives.has(NO_STORE)) {
+            state(request).noStore = true;
             return CompletableFuture.completedFuture(null);
         }
-        String key = key(base, request, varyByBase.getOrDefault(base, List.of()));
+        String variant = variant(request, varyOf(base));
         if (method.equals("GET")) {
-            request.setAttribute(KEY, key);
+            State state = state(request);
+            state.base = base;
+            state.epoch = invalidations.epoch();
         }
-        boolean revalidate = directives.has("no-cache") || "0".equals(directives.value("max-age"))
-            || request.getHeaders().getAll("Pragma").stream().anyMatch(p -> p.toLowerCase(Locale.ROOT).contains("no-cache"));
+        boolean revalidate = directives.has(NO_CACHE) || "0".equals(directives.value(MAX_AGE))
+            || request.getHeaders().getAll("Pragma").stream().anyMatch(p -> p.toLowerCase(Locale.ROOT).contains(NO_CACHE));
         if (revalidate) {
             return CompletableFuture.completedFuture(null);
         }
-        long maxAge = seconds(directives.value("max-age"));
+        long maxAge = seconds(directives.value(MAX_AGE));
         CompletionStage<ResponseCacheStore.@Nullable CachedResponse> found;
         try {
-            found = store.get(key);
+            found = store.get(base, variant);
         } catch (RuntimeException e) {
             found = CompletableFuture.failedFuture(e);
         }
@@ -132,7 +155,8 @@ final class LocalResponseCache implements GatewayFilter {
             }
             long now = clock.getAsLong();
             long ageMillis = now - cached.storedAtMillis();
-            if (ageMillis >= cached.freshMillis()) {
+            // the age includes the Age of the response when it was stored
+            if (ageMillis + cached.initialAge() * 1000 >= cached.freshMillis()) {
                 return null;
             }
             long age = cached.initialAge() + ageMillis / 1000;
@@ -144,7 +168,7 @@ final class LocalResponseCache implements GatewayFilter {
     }
 
     private HttpResponse<?> answer(HttpRequest<?> request, ResponseCacheStore.CachedResponse cached, long age) {
-        request.setAttribute(HIT, Boolean.TRUE);
+        state(request).hit = true;
         String etag = null;
         String lastModified = null;
         for (Map.Entry<String, String> header : cached.headers()) {
@@ -183,14 +207,12 @@ final class LocalResponseCache implements GatewayFilter {
     private static boolean notModified(HttpRequest<?> request, @Nullable String etag, @Nullable String lastModified) {
         List<String> ifNoneMatch = request.getHeaders().getAll(HttpHeaders.IF_NONE_MATCH);
         if (!ifNoneMatch.isEmpty()) {
-            if (etag == null) {
-                return false;
-            }
-            String weak = etag.startsWith("W/") ? etag.substring(2) : etag;
+            String weak = etag == null ? null : etag.startsWith("W/") ? etag.substring(2) : etag;
             for (String value : ifNoneMatch) {
                 for (String tag : value.split(",")) {
                     String t = tag.strip();
-                    if (t.equals("*") || (t.startsWith("W/") ? t.substring(2) : t).equals(weak)) {
+                    // * matches any stored response, whether it has an ETag or not
+                    if (t.equals("*") || weak != null && (t.startsWith("W/") ? t.substring(2) : t).equals(weak)) {
                         return true;
                     }
                 }
@@ -210,18 +232,32 @@ final class LocalResponseCache implements GatewayFilter {
     }
 
     private void store(HttpRequest<?> request, MutableHttpResponse<?> response) {
-        String key = request.getAttribute(KEY, String.class).orElse(null);
-        if (key == null || request.getAttribute(HIT).isPresent() || request.getAttribute(NO_STORE).isPresent()
-            || request.getAttribute(GatewayAttributes.FAILURE).isPresent()) {
+        State state = (State) GatewayRequestContext.forFilters(request).removeState(this);
+        if (state == null) {
             return;
         }
-        String base = base(request);
+        String unsafeBase = state.unsafeBase;
+        if (unsafeBase != null) {
+            // the change is done: a response that a GET read before it is stale too
+            invalidate(unsafeBase);
+            return;
+        }
+        String base = state.base;
+        if (base == null || state.hit || state.noStore
+            || GatewayRequestContext.find(request).flatMap(GatewayRequestContext::failure).isPresent()) {
+            return;
+        }
         Directives directives = Directives.of(response.getHeaders().getAll(HttpHeaders.CACHE_CONTROL));
-        if (response.code() != 200 || directives.has("no-store") || directives.has("private") || directives.has("no-cache")
+        if (response.code() == 200 && (directives.has(NO_STORE) || directives.has(PRIVATE))) {
+            // the resource is no longer cacheable: an older response must not be served instead
+            invalidate(base);
+            return;
+        }
+        if (response.code() != 200 || directives.has(NO_STORE) || directives.has(PRIVATE) || directives.has(NO_CACHE)
             || response.getHeaders().contains(HttpHeaders.SET_COOKIE)
             || request.getHeaders().contains(HttpHeaders.AUTHORIZATION) && !directives.has("public") && directives.value("s-maxage") == null) {
-            // not cacheable: an older response of the URI must not be served instead
-            store.invalidate(base);
+            // not stored, and the stored response stays: a 304, a failure of the upstream or a
+            // response of one user says nothing about the stored one
             return;
         }
         List<String> vary = new ArrayList<>();
@@ -229,7 +265,6 @@ final class LocalResponseCache implements GatewayFilter {
             for (String name : value.split(",")) {
                 String n = name.strip().toLowerCase(Locale.ROOT);
                 if (n.equals("*")) {
-                    store.invalidate(base);
                     return;
                 }
                 if (!n.isEmpty()) {
@@ -245,8 +280,13 @@ final class LocalResponseCache implements GatewayFilter {
         if (length > maxEntryBytes) {
             return;
         }
-        varyByBase.put(base, List.copyOf(vary));
-        String storeKey = key(base, request, vary);
+        long epoch = state.epoch;
+        if (invalidations.invalidatedSince(base, epoch)) {
+            // the resource changed while this response was on its way
+            return;
+        }
+        rememberVary(base, vary);
+        String storeVariant = variant(request, vary);
         List<Map.Entry<String, String>> headers = new ArrayList<>();
         response.getHeaders().forEach((name, values) -> values.forEach(v -> headers.add(Map.entry(name, v))));
         long initialAge = seconds(response.getHeaders().get(HttpHeaders.AGE));
@@ -265,7 +305,23 @@ final class LocalResponseCache implements GatewayFilter {
             try (bytes) {
                 body = bytes.toByteArray();
             }
-            store.put(storeKey, new ResponseCacheStore.CachedResponse(status, headers, body, storedAt, fresh, Math.max(0, initialAge), vary));
+            if (invalidations.invalidatedSince(base, epoch)) {
+                return;
+            }
+            try {
+                store.put(base, storeVariant, new ResponseCacheStore.CachedResponse(status, headers, body, storedAt, fresh, Math.max(0, initialAge), vary))
+                    .whenComplete((ignored, e) -> {
+                        if (e != null) {
+                            LOG.debug("The response cache could not store a response", e);
+                        } else if (invalidations.invalidatedSince(base, epoch)) {
+                            // a change of the resource completed while the store was in progress: the
+                            // stored response is older than it
+                            invalidate(base);
+                        }
+                    });
+            } catch (RuntimeException e) {
+                LOG.debug("The response cache could not store a response", e);
+            }
         });
     }
 
@@ -274,14 +330,17 @@ final class LocalResponseCache implements GatewayFilter {
         if (sMaxAge >= 0) {
             return sMaxAge * 1000;
         }
-        long maxAge = seconds(directives.value("max-age"));
+        long maxAge = seconds(directives.value(MAX_AGE));
         if (maxAge >= 0) {
             return maxAge * 1000;
         }
         String expires = response.getHeaders().get(HttpHeaders.EXPIRES);
         if (expires != null) {
             try {
-                return ZonedDateTime.parse(expires, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli() - clock.getAsLong();
+                // the freshness left now, plus the age it already has, which the lookup counts
+                long initialAge = Math.max(0, seconds(response.getHeaders().get(HttpHeaders.AGE)));
+                return ZonedDateTime.parse(expires, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli() - clock.getAsLong()
+                    + initialAge * 1000;
             } catch (DateTimeParseException e) {
                 // an invalid Expires is in the past
                 return 0;
@@ -290,23 +349,109 @@ final class LocalResponseCache implements GatewayFilter {
         return timeToLive.toMillis();
     }
 
+    /**
+     * The resource of a request: the route, the host, so that the tenants of a route on several
+     * hosts do not share responses, and the path and the query. Each part but the last starts
+     * with its length, so that no two resources have the same base.
+     */
     private static String base(HttpRequest<?> request) {
+        String routeId = GatewayRequestContext.routeId(request);
+        String host = request.getHeaders().get(HttpHeaders.HOST);
+        if (host == null) {
+            host = Objects.requireNonNullElse(request.getUri().getRawAuthority(), "");
+        }
+        // the name of the host: the port does not tell tenants apart
+        host = hostName(host).toLowerCase(Locale.ROOT);
         String query = request.getUri().getRawQuery();
-        return GatewayAttributes.routeId(request) + " " + request.getPath() + (query == null ? "" : "?" + query);
+        return routeId.length() + ":" + routeId + " " + host.length() + ":" + host + " "
+            + request.getPath() + (query == null ? "" : "?" + query);
     }
 
     /**
-     * The key of a response: the URI, the credentials, so that users do not share responses,
-     * and the values of the headers the response varies by.
+     * The key of a response: the resource, the credentials, so that users do not share
+     * responses, and the values of the headers the response varies by. The credentials are a
+     * SHA-256 digest of all their values, never a hash code that two users could share.
      */
-    private static String key(String base, HttpRequest<?> request, List<String> vary) {
-        StringBuilder key = new StringBuilder(base).append('\n');
-        key.append(Objects.hashCode(request.getHeaders().getAll(HttpHeaders.AUTHORIZATION))).append(' ');
-        key.append(Objects.hashCode(request.getHeaders().getAll(HttpHeaders.COOKIE)));
+    private static String variant(HttpRequest<?> request, List<String> vary) {
+        StringBuilder key = new StringBuilder(credentialsDigest(request));
         for (String name : vary) {
             key.append('\n').append(name).append('=').append(String.join(",", request.getHeaders().getAll(name)));
         }
         return key.toString();
+    }
+
+    private static String hostName(String host) {
+        int colon = host.lastIndexOf(':');
+        int bracket = host.lastIndexOf(']');
+        return colon > bracket ? host.substring(0, colon) : host;
+    }
+
+    private static String credentialsDigest(HttpRequest<?> request) {
+        List<String> authorization = request.getHeaders().getAll(HttpHeaders.AUTHORIZATION);
+        List<String> cookies = request.getHeaders().getAll(HttpHeaders.COOKIE);
+        if (authorization.isEmpty() && cookies.isEmpty()) {
+            return "-";
+        }
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            // every Java platform has SHA-256
+            throw new IllegalStateException(e);
+        }
+        update(digest, authorization);
+        digest.update((byte) 0);
+        update(digest, cookies);
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static void update(MessageDigest digest, List<String> values) {
+        for (String value : values) {
+            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+            // the length first: the values cannot run into each other
+            digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+            digest.update(bytes);
+        }
+    }
+
+    /**
+     * Remove the responses of a resource. A store that fails, also synchronously, is logged:
+     * the request goes on.
+     *
+     * @param base The resource
+     * @return The stage of the removal, never failed
+     */
+    private CompletionStage<?> invalidate(String base) {
+        invalidations.invalidate(base);
+        CompletionStage<?> removal;
+        try {
+            removal = store.invalidate(base);
+        } catch (RuntimeException e) {
+            removal = CompletableFuture.failedFuture(e);
+        }
+        return removal.handle((ignored, failure) -> {
+            if (failure != null) {
+                LOG.debug("The response cache could not remove the responses of {}", base, failure);
+            }
+            return null;
+        });
+    }
+
+    private List<String> varyOf(String base) {
+        synchronized (varyByBase) {
+            return varyByBase.getOrDefault(base, List.of());
+        }
+    }
+
+    private void rememberVary(String base, List<String> vary) {
+        synchronized (varyByBase) {
+            if (vary.isEmpty()) {
+                // the default: nothing to keep
+                varyByBase.remove(base);
+            } else {
+                varyByBase.put(base, List.copyOf(vary));
+            }
+        }
     }
 
     private static long seconds(@Nullable String value) {
@@ -320,9 +465,74 @@ final class LocalResponseCache implements GatewayFilter {
         }
     }
 
+    private State state(HttpRequest<?> request) {
+        GatewayRequestContext context = GatewayRequestContext.forFilters(request);
+        State state = context.state(this, State.class);
+        if (state == null) {
+            state = new State();
+            context.state(this, state);
+        }
+        return state;
+    }
+
     @Override
     public String toString() {
         return "LocalResponseCache=" + timeToLive + ", " + maxEntryBytes;
+    }
+
+    /**
+     * When the resources were last invalidated, so that a response that a request read before
+     * the invalidation of its resource is not stored after it. The most recently invalidated
+     * resources are remembered; for a resource that is no longer remembered, a response read
+     * before the oldest forgotten invalidation is not stored.
+     */
+    private static final class Invalidations {
+        private final LinkedHashMap<String, Long> last = new LinkedHashMap<>(16, 0.75f, true);
+        private long epoch;
+        private long forgotten = -1;
+
+        synchronized long epoch() {
+            return epoch;
+        }
+
+        synchronized void invalidate(String base) {
+            epoch++;
+            last.put(base, epoch);
+            if (last.size() > MAX_TRACKED_URIS) {
+                Map.Entry<String, Long> eldest = last.entrySet().iterator().next();
+                forgotten = Math.max(forgotten, eldest.getValue());
+                last.remove(eldest.getKey());
+            }
+        }
+
+        /**
+         * @param base  A resource
+         * @param epoch The epoch a request read, {@code -1} if unknown
+         * @return Whether the resource was invalidated after the epoch, or may have been
+         */
+        synchronized boolean invalidatedSince(String base, long epoch) {
+            if (epoch < 0) {
+                return true;
+            }
+            Long at = last.get(base);
+            if (at != null) {
+                return at > epoch;
+            }
+            return forgotten > epoch;
+        }
+    }
+
+    /**
+     * What the lookup of a request leaves for the store of its response.
+     */
+    private static final class State {
+        @Nullable
+        private String unsafeBase;
+        @Nullable
+        private String base;
+        private long epoch = -1;
+        private boolean noStore;
+        private boolean hit;
     }
 
     /**
