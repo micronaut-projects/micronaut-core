@@ -2,16 +2,20 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.reactivestreams.Subscription;
+import reactor.core.publisher.BaseSubscriber;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 import java.nio.charset.StandardCharsets;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -90,6 +94,61 @@ class ReplayableByteBodyTest {
     void aChunkOverTheLimitIsReadOnce() {
         try (ReplayableByteBody replayable = FACTORY.replayable(streamed("more than ", "eight bytes"), 8)) {
             Assertions.assertEquals("more than eight bytes", read(replayable.next()));
+            Assertions.assertFalse(replayable.isReplayable());
+        }
+    }
+
+    /**
+     * A reader that has not taken a chunk over the limit yet is not given a further chunk: it
+     * would hold more than the limit. The upstream pushes regardless of the demand of the
+     * reader, like a connection with a window larger than the limit.
+     */
+    @Test
+    void aStalledReaderHoldingAChunkOverTheLimitGetsNoFurtherChunk() throws Exception {
+        ByteBodyFactory.StreamingBody body = FACTORY.createStreamingBody(new BodySizeLimits(Long.MAX_VALUE, 8), bytesConsumed -> { });
+        body.sharedBuffer().setReaderBufferLimit(8);
+        CompletableFuture<String> first = new CompletableFuture<>();
+        StringBuilder firstText = new StringBuilder();
+        BaseSubscriber<ReadBuffer> stalled = new BaseSubscriber<>() {
+            @Override
+            protected void hookOnSubscribe(Subscription subscription) {
+                // request nothing: the reader holds what arrives
+            }
+
+            @Override
+            protected void hookOnNext(ReadBuffer value) {
+                firstText.append(value.toString(StandardCharsets.UTF_8));
+                value.close();
+            }
+
+            @Override
+            protected void hookOnError(Throwable throwable) {
+                first.completeExceptionally(throwable);
+            }
+
+            @Override
+            protected void hookOnComplete() {
+                first.complete(firstText.toString());
+            }
+        };
+        body.rootBody().toReadBufferPublisher().subscribe(stalled);
+        body.sharedBuffer().add(buf("more than "));
+        body.sharedBuffer().add(buf("8 bytes!"));
+        body.sharedBuffer().complete();
+        stalled.request(Long.MAX_VALUE);
+        ExecutionException failure = Assertions.assertThrows(ExecutionException.class, () -> first.get(5, TimeUnit.SECONDS));
+        Assertions.assertInstanceOf(BufferLengthExceededException.class, failure.getCause());
+        Assertions.assertFalse(firstText.toString().contains("8 bytes!"), firstText::toString);
+    }
+
+    /**
+     * Once the chunk over the limit is delivered, the reader takes the next chunks up to the
+     * limit again.
+     */
+    @Test
+    void aReaderTakesFurtherChunksOnceTheChunkOverTheLimitIsDelivered() {
+        try (ReplayableByteBody replayable = FACTORY.replayable(streamed("more than ", "8 bytes!", "eight"), 8)) {
+            Assertions.assertEquals("more than 8 bytes!eight", read(replayable.next()));
             Assertions.assertFalse(replayable.isReplayable());
         }
     }
