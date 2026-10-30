@@ -124,14 +124,7 @@ public final class ClosestTypeArgumentQualifier<T> implements Qualifier<T> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        ClosestTypeArgumentQualifier<?> that = (ClosestTypeArgumentQualifier<?>) o;
-        return Arrays.equals(typeArguments, that.typeArguments);
+        return o instanceof ClosestTypeArgumentQualifier<?> that && Arrays.equals(typeArguments, that.typeArguments);
     }
 
     @Override
