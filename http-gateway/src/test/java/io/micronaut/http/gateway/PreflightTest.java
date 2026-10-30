@@ -73,6 +73,16 @@ class PreflightTest extends GatewayTestBase {
         assertEquals(before, counters().get("inspect"), "the preflight reached the upstream");
     }
 
+    @Test
+    void thePreflightOfADisallowedOriginIsRefusedAndNeverRelayed() throws IOException {
+        for (String path : List.of("/exact-cors/1", "/prefix-cors/a/b")) {
+            int before = counters().get("inspect");
+            RawHttp.Response preflight = preflight(path, "https://evil.example");
+            assertEquals(403, preflight.status(), path + ": " + preflight);
+            assertEquals(before, counters().get("inspect"), path + ": the preflight reached the upstream");
+        }
+    }
+
     @Singleton
     @Requires(property = "spec.name", value = SPEC)
     static class Routes implements GatewayRoutes {
@@ -85,6 +95,7 @@ class PreflightTest extends GatewayTestBase {
         @Override
         public void routes(GatewayRouteBuilder gateway) {
             gateway.route("exact-cors").path("/exact-cors/{id}").filters(GatewayFilters.prefixPath("/inspect")).uri(upstream);
+            gateway.route("prefix-cors").path("/prefix-cors/**").filters(GatewayFilters.prefixPath("/inspect")).uri(upstream);
             gateway.route("own-cors").path("/own-cors/**")
                 .filters(GatewayFilters.cors(List.of("https://own.example"), List.of(), List.of(), List.of(), false, -1), GatewayFilters.prefixPath("/inspect"))
                 .uri(upstream);
