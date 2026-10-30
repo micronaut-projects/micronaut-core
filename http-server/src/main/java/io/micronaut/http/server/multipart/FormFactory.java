@@ -43,7 +43,6 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import java.io.Closeable;
 import java.io.File;
@@ -71,6 +70,8 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class FormFactory {
     private static final String COMPLETER = FormRouteCompleter.class.getName();
     private static final Logger LOG = LoggerFactory.getLogger(FormFactory.class);
+    private static final Object CLOSED_SENTINEL = new Object();
+    private static final String CONCURRENT_CLOSE_MESSAGE = "Request terminated with upload in progress";
 
     private final Executor diskWriteExecutor;
     private final HttpServerConfiguration configuration;
@@ -154,10 +155,21 @@ public final class FormFactory {
      * @return A flow that completes when the full field has been buffered
      */
     public ExecutionFlow<CompletedAttribute> completeAttribute(FormCapableHttpRequest<?> request, RawFormField formField) {
-        return InternalByteBody.bufferFlow(formField.byteBody()).map(av -> {
+        // register the disposal up front: the attribute may only finish buffering after the
+        // request lifecycle has already ended, and must then be released right away
+        AtomicReference<@Nullable Object> closeResource = new AtomicReference<>();
+        request.addDisposalResource(() -> {
+            if (closeResource.getAndSet(CLOSED_SENTINEL) instanceof CompletedAttribute attr) {
+                attr.close();
+            }
+        });
+        return InternalByteBody.bufferFlow(formField.byteBody()).flatMap(av -> {
             CompletedAttribute attr = CompletedAttribute.create(formField.metadata(), av.toReadBuffer());
-            request.addDisposalResource(attr::close);
-            return attr;
+            if (closeResource.compareAndSet(null, attr)) {
+                return ExecutionFlow.just(attr);
+            }
+            attr.close();
+            return ExecutionFlow.error(new IllegalStateException(CONCURRENT_CLOSE_MESSAGE));
         });
     }
 
@@ -175,8 +187,10 @@ public final class FormFactory {
             return ExecutionFlow.error(new HttpStatusException(HttpStatus.BAD_REQUEST, "Field [" + formField.metadata().name() + "] was expected to be a file upload, but is missing a file name"));
         }
         ToDiskSubscriber tds = new ToDiskSubscriber(formField.metadata(), request.byteBodyFactory().readBufferFactory());
-        Flux.from(formField.byteBody().toReadBufferPublisher()).subscribe(tds);
+        // register the cleanup before subscribing: the upload may complete synchronously, and
+        // a cleanup registered after the request was released runs right away
         request.addDisposalResource(tds::cleanup);
+        formField.byteBody().toReadBufferPublisher().subscribe(tds);
         return tds.result;
     }
 
@@ -240,8 +254,6 @@ public final class FormFactory {
      * This subscriber collects form data and saves it to disk when necessary.
      */
     private final class ToDiskSubscriber implements Subscriber<ReadBuffer> {
-        private static final Object CLOSED_SENTINEL = new Object();
-
         private final FormFieldMetadata metadata;
         private final ReadBufferFactory bufferFactory;
 
@@ -283,7 +295,7 @@ public final class FormFactory {
         }
 
         private RuntimeException concurrentClose(@org.jspecify.annotations.Nullable Closeable cl) {
-            RuntimeException e = new IllegalStateException("Request terminated with upload in progress");
+            RuntimeException e = new IllegalStateException(CONCURRENT_CLOSE_MESSAGE);
             if (cl != null) {
                 try {
                     cl.close();
@@ -406,9 +418,10 @@ public final class FormFactory {
                 // all in-memory
                 CompletedFileUpload cfu = CompletedFileUpload.ofMemory(metadata, bufferFactory.compose(Objects.requireNonNull(memory)));
                 if (closeResource.compareAndSet(null, cfu)) {
-                    result.complete(cfu);
+                    completeResult(cfu);
                 } else {
-                    result.completeExceptionally(concurrentClose(null));
+                    // The request ended while the part was arriving: release its content.
+                    result.completeExceptionally(concurrentClose(cfu));
                 }
             } else {
                 // wait for last piece to be written
@@ -435,14 +448,30 @@ public final class FormFactory {
                     CompletedFileUpload cfu = CompletedFileUpload.ofFile(metadata, ps.path, total);
                     if (!closeResource.compareAndSet(ps.path, cfu)) {
                         result.tryCompleteExceptionally(concurrentClose(cfu));
-                    } else if (!result.tryComplete(cfu)) {
-                        try {
-                            cfu.close();
-                        } catch (IOException e) {
-                            LOG.debug("Failed to close cancelled CompletedFileUpload", e);
-                        }
+                    } else {
+                        completeResult(cfu);
                     }
                 }, diskWriteExecutor);
+            }
+        }
+
+        /**
+         * Complete the result with the upload. When the result was cancelled, nobody waits for
+         * the upload anymore: it is released now, not when the request ends.
+         *
+         * @param cfu The upload, the close resource
+         */
+        private void completeResult(CompletedFileUpload cfu) {
+            if (!result.isCancelled() && result.tryComplete(cfu)) {
+                return;
+            }
+            // released once: the end of the request no longer closes it
+            if (closeResource.compareAndSet(cfu, CLOSED_SENTINEL)) {
+                try {
+                    cfu.close();
+                } catch (IOException e) {
+                    LOG.debug("Failed to close cancelled CompletedFileUpload", e);
+                }
             }
         }
 

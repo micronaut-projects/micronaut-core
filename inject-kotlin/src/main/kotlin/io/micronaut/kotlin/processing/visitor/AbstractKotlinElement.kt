@@ -26,7 +26,6 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSModifierListOwner
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
-import com.google.devtools.ksp.symbol.KSTypeAlias
 import com.google.devtools.ksp.symbol.KSTypeArgument
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.Modifier
@@ -46,6 +45,8 @@ import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import io.micronaut.kotlin.processing.annotation.KotlinAnnotations
 import java.util.*
 
 internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
@@ -64,11 +65,25 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         false
     }
 
-    override fun isStatic() = if (annotatedInfo is KSDeclaration) {
-        annotatedInfo.modifiers.contains(Modifier.JAVA_STATIC)
-    } else {
-        false
+    @OptIn(KspExperimental::class)
+    private val javaModifiers: Set<Modifier> by lazy {
+        if (annotatedInfo is KSDeclaration) {
+            val modifiers = visitorContext.resolver.effectiveJavaModifiers(annotatedInfo).toMutableSet()
+            if (annotatedInfo is KSClassDeclaration && annotatedInfo.isCompanionObject) {
+                // a companion object compiles to a static nested class
+                modifiers.add(Modifier.JAVA_STATIC)
+            } else if ((annotatedInfo.parentDeclaration as? KSClassDeclaration)?.isCompanionObject == true) {
+                // a @JvmStatic member of a companion object is an instance member of the companion class,
+                // the static copy is generated on the enclosing class
+                modifiers.remove(Modifier.JAVA_STATIC)
+            }
+            modifiers
+        } else {
+            emptySet()
+        }
     }
+
+    override fun isStatic() = javaModifiers.contains(Modifier.JAVA_STATIC)
 
     private fun makeCopy(): AbstractKotlinElement<T> {
         val element: AbstractKotlinElement<T> = copyThis()
@@ -159,10 +174,8 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         }
     }
 
-    @OptIn(KspExperimental::class)
     override fun getModifiers(): MutableSet<ElementModifier> {
         if (annotatedInfo is KSDeclaration) {
-            val javaModifiers = visitorContext.resolver.effectiveJavaModifiers(annotatedInfo)
             return javaModifiers.mapNotNull {
                 when (it) {
                     Modifier.ABSTRACT -> ElementModifier.ABSTRACT
@@ -276,6 +289,12 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         }.ifEmpty {
             mutableListOf(getJavaObjectClassElement()).asSequence()
         }.toList()
+        if (!stripTypeArguments) {
+            // The parameter is visited while its own bounds are resolved, which is what stops at the T within the
+            // bounds of T : Comparable<T>. It is not visited for what is resolved after it, so that the T within the
+            // bounds of a sibling V : List<out T> keeps its own bounds
+            visitedTypes.remove(typeParameter)
+        }
 
         return KotlinGenericPlaceholderElement(
             KotlinTypeParameterNativeElement(typeParameter, owner),
@@ -296,14 +315,8 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         parentTypeArguments: Map<String, ClassElement>,
         visitedTypes: MutableSet<Any> = HashSet()
     ): Map<String, ClassElement> {
-        // A non-generic typealias (e.g. typealias BarList = List<Bar>) has no typeParameters
-        // on the alias itself, so KSType.arguments is empty and the concrete type arguments
-        // (Bar) would be lost. Expand to the underlying type to recover them.
-        val effectiveType = if (type.declaration is KSTypeAlias && type.declaration.typeParameters.isEmpty()) {
-            (type.declaration as KSTypeAlias).type.resolve()
-        } else {
-            type
-        }
+        // The arguments of an alias (e.g. typealias BarList = List<Bar>) are those of the type it expands to
+        val effectiveType = visitorContext.expandTypeAlias(type)
         val typeArguments = mutableMapOf<String, ClassElement>()
         val typeParameters = effectiveType.declaration.typeParameters
         if (effectiveType.arguments.isEmpty() || effectiveType.arguments.size != typeParameters.size) {
@@ -351,9 +364,11 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                 throw IllegalStateException("This method doesn't support STAR")
             Variance.COVARIANT, Variance.CONTRAVARIANT -> {
                 // example List<*>, IN, OUT
+                // the bound is resolved below, which is what adds it to the visited types: adding it here as well made the
+                // resolution strip the arguments of every projected type, List<out Map<K, V>> reading as List<? extends Map>
                 val stripTypeArguments = when (typeArgument.type) {
                     null -> false
-                    else -> !visitedTypes.add(typeArgument.type!!)
+                    else -> visitedTypes.contains(typeArgument.type!!)
                 }
                 val upperBound =
                     resolveUpperBound(
@@ -363,7 +378,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                         visitedTypes,
                         stripTypeArguments
                     )
-                if (upperBound is PrimitiveElement) {
+                if (upperBound is PrimitiveElement && !upperBound.isArray) {
                     return upperBound
                 }
                 val lowerBound = resolveLowerBound(
@@ -373,8 +388,12 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                     visitedTypes,
                     stripTypeArguments
                 )
-                if (lowerBound is PrimitiveElement) {
+                if (lowerBound is PrimitiveElement && !lowerBound.isArray) {
                     return upperBound
+                }
+                if (upperBound is PrimitiveElement || lowerBound is PrimitiveElement) {
+                    // A primitive array bound, such as out CharArray, has no Kotlin class element to build the wildcard on
+                    return WildcardElement.of(listOf(upperBound), listOfNotNull(lowerBound))
                 }
                 val upperBounds = listOf(upperBound as KotlinClassElement)
                 val lowerBounds = if (lowerBound == null) listOf() else  listOf(lowerBound as KotlinClassElement)
@@ -407,7 +426,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
 
         val stripTypeArguments = when (typeArgument.type) {
             null -> false
-            else -> !visitedTypes.add(typeArgument.type!!)
+            else -> visitedTypes.contains(typeArgument.type!!)
         }
         val upperBound =
             resolveUpperBound(
@@ -549,15 +568,23 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             return visitorContext.getClassElement("kotlin.Any").get()
         }
         val resolvedType = type.resolve()
-        val stripTypeArguments2 = stripTypeArguments || !visitedTypes.add(type)
+        val added = visitedTypes.add(type)
+        val stripTypeArguments2 = stripTypeArguments || !added
 
-        val resolved = newTypeArgument(
-            owner,
-            resolvedType,
-            parentTypeArguments,
-            visitedTypes,
-            stripTypeArguments2
-        )
+        val resolved = try {
+            newTypeArgument(
+                owner,
+                resolvedType,
+                parentTypeArguments,
+                visitedTypes,
+                stripTypeArguments2
+            )
+        } finally {
+            if (added) {
+                // Visited only while the argument itself is resolved, as the type parameters are
+                visitedTypes.remove(type)
+            }
+        }
         if (resolved is KotlinGenericPlaceholderElement) {
             // Keep the occurrence separate from the declaration and the type it resolves to.
             resolved.typeArgument = typeArgument
@@ -606,91 +633,196 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
 
     private fun newClassElement(
         owner: KotlinNativeElement?,
-        type: KSType?,
+        useType: KSType?,
         declaration: KSClassDeclaration,
         parentTypeArguments: Map<String, ClassElement>,
         visitedTypes: MutableSet<Any>,
         allowPrimitive: Boolean = true,
         stripTypeArguments: Boolean = false
     ): ClassElement {
-        if (type != null) {
-            val typeDeclaration = type.declaration
-            if (typeDeclaration is KSTypeParameter) {
-                val placeholder = resolveTypeParameter(
-                    owner!!,
-                    typeDeclaration,
-                    parentTypeArguments,
-                    visitedTypes
-                )
-                if (placeholder is KotlinGenericPlaceholderElement) {
-                    // A use of the type parameter reports its own annotations, not the declaration's
-                    placeholder.useType = type
-                }
-                return placeholder
-            }
+        // The declaration is the class an alias stands for, so the arguments and the nullability are read from the
+        // type the alias expands to. The annotations are those written at the use, which only the use type reports.
+        val type = useType?.let { visitorContext.expandTypeAlias(it) }
+        val typeDeclaration = type?.declaration
+        if (typeDeclaration is KSTypeParameter) {
+            return newTypeParameterElement(owner!!, typeDeclaration, useType, parentTypeArguments, visitedTypes)
         }
         val qualifiedName = declaration.qualifiedName
         if (qualifiedName != null) {
-            val qualifiedNameString = qualifiedName.asString()
-            val primitiveArray = primitiveArrays[qualifiedNameString]
-            if (primitiveArray != null) {
-                return primitiveArray
-            }
-            val canBePrimitive =
-                type == null || type.annotations.toList().isEmpty() && !type.isMarkedNullable
-            if (allowPrimitive && canBePrimitive && type?.nullability != Nullability.PLATFORM) {
-                val element = primitives[qualifiedNameString]
-                if (element != null) {
-                    return element
-                }
-            }
-            if (type != null && qualifiedNameString == "kotlin.Array") {
-                val arrayType = type.arguments[0].type
-                if (arrayType == null) {
-                    return visitorContext.getClassElement(Object::class.java.name).get().toArray()
-                }
-                val component = arrayType.resolve()
-                return newTypeArgument(
-                    owner,
-                    component,
-                    parentTypeArguments,
-                    visitedTypes,
-                    false
-                ).toArray()
-            }
-        }
-        val typeArguments = if (stripTypeArguments) {
-            resolveEmptyTypeArguments(declaration)
-        } else if (type == null) {
-            resolveTypeArguments(
-                nativeType,
-                declaration,
-                parentTypeArguments,
-                visitedTypes
-            )
-        } else {
-            resolveTypeArguments(
-                nativeType,
+            val builtIn = newBuiltInElement(
+                owner,
+                qualifiedName.asString(),
+                useType,
                 type,
                 parentTypeArguments,
-                visitedTypes
+                visitedTypes,
+                allowPrimitive
             )
+            if (builtIn != null) {
+                return builtIn
+            }
         }
-        return if (declaration.classKind == ClassKind.ENUM_CLASS) {
-            KotlinEnumElement(
-                KotlinClassNativeElement(declaration, type, owner),
-                elementAnnotationMetadataFactory,
-                visitorContext,
-                typeArguments
-            )
-        } else {
-            KotlinClassElement(
-                KotlinClassNativeElement(declaration, type, owner),
-                elementAnnotationMetadataFactory,
-                typeArguments,
-                visitorContext
-            )
+        val typeArguments = resolveUseTypeArguments(declaration, type, parentTypeArguments, visitedTypes, stripTypeArguments)
+        return newDeclaredElement(owner, useType, type, declaration, typeArguments)
+    }
+
+    private fun newTypeParameterElement(
+        owner: KotlinNativeElement,
+        typeParameter: KSTypeParameter,
+        useType: KSType?,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>
+    ): ClassElement {
+        val placeholder = resolveTypeParameter(
+            owner,
+            typeParameter,
+            parentTypeArguments,
+            visitedTypes
+        )
+        if (placeholder is KotlinGenericPlaceholderElement) {
+            // A use of the type parameter reports its own annotations, not the declaration's
+            placeholder.useType = useType
         }
+        return placeholder
+    }
+
+    /**
+     * The element of a primitive, a primitive array or a `kotlin.Array`, or null when the class is none of those.
+     */
+    private fun newBuiltInElement(
+        owner: KotlinNativeElement?,
+        qualifiedName: String,
+        useType: KSType?,
+        type: KSType?,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>,
+        allowPrimitive: Boolean
+    ): ClassElement? {
+        val primitiveArray = primitiveArrays[qualifiedName]
+        if (primitiveArray != null) {
+            return if (type == null) primitiveArray else withDimensionAnnotations(primitiveArray, primitiveArray.fromArray(), useType!!)
+        }
+        if (allowPrimitive && canBePrimitive(useType, type)) {
+            val element = primitives[qualifiedName]
+            if (element != null) {
+                return element
+            }
+        }
+        if (type != null && qualifiedName == "kotlin.Array") {
+            return newArrayElement(owner, useType!!, type, parentTypeArguments, visitedTypes)
+        }
+        return null
+    }
+
+    private fun canBePrimitive(useType: KSType?, type: KSType?) =
+        type == null || useType!!.annotations.toList().isEmpty() && !type.isMarkedNullable &&
+            type.nullability != Nullability.PLATFORM
+
+    private fun newArrayElement(
+        owner: KotlinNativeElement?,
+        useType: KSType,
+        type: KSType,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>
+    ): ClassElement {
+        val arrayType = type.arguments[0].type
+        if (arrayType == null) {
+            return visitorContext.getClassElement(Object::class.java.name).get().toArray()
+        }
+        val component = newTypeArgument(
+            owner,
+            arrayType.resolve(),
+            parentTypeArguments,
+            visitedTypes,
+            false
+        )
+        if (component is KotlinGenericPlaceholderElement) {
+            // Keep the occurrence, and its annotations, apart from the declaration of the variable
+            component.typeArgument = type.arguments[0]
+        }
+        return withDimensionAnnotations(component.toArray(), component, useType)
+    }
+
+    private fun resolveUseTypeArguments(
+        declaration: KSClassDeclaration,
+        type: KSType?,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>,
+        stripTypeArguments: Boolean
+    ): Map<String, ClassElement> = when {
+        stripTypeArguments -> resolveEmptyTypeArguments(declaration)
+        type == null -> resolveTypeArguments(
+            nativeType,
+            declaration,
+            parentTypeArguments,
+            visitedTypes
+        )
+        else -> resolveTypeArguments(
+            nativeType,
+            type,
+            parentTypeArguments,
+            visitedTypes
+        )
+    }
+
+    private fun newDeclaredElement(
+        owner: KotlinNativeElement?,
+        useType: KSType?,
+        type: KSType?,
+        declaration: KSClassDeclaration,
+        typeArguments: Map<String, ClassElement>
+    ): ClassElement = when (declaration.classKind) {
+        ClassKind.ENUM_CLASS -> KotlinEnumElement(
+            KotlinClassNativeElement(declaration, useType, owner),
+            elementAnnotationMetadataFactory,
+            visitorContext,
+            typeArguments
+        )
+        // an annotation class cannot be generic
+        ClassKind.ANNOTATION_CLASS -> KotlinAnnotationElement(
+            KotlinClassNativeElement(declaration, type, owner),
+            elementAnnotationMetadataFactory,
+            visitorContext
+        )
+        else -> KotlinClassElement(
+            KotlinClassNativeElement(declaration, useType, owner),
+            elementAnnotationMetadataFactory,
+            typeArguments,
+            visitorContext
+        )
+    }
+
+    /**
+     * Keeps every dimension of an array use separately from the legacy metadata of its component, innermost
+     * first: those of the component, and then that of the array type itself.
+     */
+    private fun withDimensionAnnotations(array: ClassElement, component: ClassElement, type: KSType): ClassElement {
+        val annotations = ArrayList<MutableAnnotationMetadataDelegate<AnnotationMetadata>>()
+        var dimension = component
+        while (dimension.isArray) {
+            annotations.add(dimension.typeAnnotationMetadata)
+            dimension = dimension.fromArray()
+        }
+        annotations.reverse()
+        annotations.add(
+            elementAnnotationMetadataFactory.buildTypeAnnotations(
+                visitorContext.annotationMetadataBuilder.lookupOrBuild(TypeUseKey(type), KotlinAnnotations(type.annotations)),
+                type
+            )
+        )
+        return when (array) {
+            is KotlinClassElement -> array.withArrayTypeAnnotations(annotations)
+            is PrimitiveElement -> array.withArrayTypeAnnotations(annotations)
+            else -> array
+        }
+    }
+
+    /**
+     * The cache key of the annotations of one use of a type, which a type equal to it used elsewhere does not share.
+     */
+    private class TypeUseKey(private val type: KSType) {
+        override fun equals(other: Any?) = other is TypeUseKey && other.type === type
+        override fun hashCode() = System.identityHashCode(type)
     }
 
     override fun toString(): String {

@@ -50,9 +50,11 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -86,14 +88,14 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
     private static final String FILE_SEPARATOR = ",";
-    private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList("classpath:/", "file:config/");
+    private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList(ClassPathResourceLoader.PREFIX + "/", FileSystemResourceLoader.PREFIX + "config/");
     private static final String ENV_PROPERTY_SOURCES_KEY = "MICRONAUT_CONFIG_FILES";
+    private static final String CLASSPATH_ALL_PREFIX = "classpath*:";
     private static final List<PropertySourceLoader> DEFAULT_PROPERTY_SOURCE_LOADERS = List.of(
         new YamlPropertySourceLoader(),
         new PropertiesPropertySourceLoader(),
         new ConstantPropertySourceLoader()
     );
-    private static final String FILE_PREFIX = "file:";
 
     private final ClassPathResourceLoader resourceLoader;
     private final MutableConversionService mutableConversionService;
@@ -120,6 +122,21 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean reading = new AtomicBoolean(false);
+    /**
+     * The configuration files the last read of the property sources looked for, published when the read ends.
+     */
+    private volatile Set<String> configurationFiles = Set.of(); // NOSONAR java:S3077 published whole; the set is immutable
+    /**
+     * The configuration files the read in progress has looked for so far.
+     */
+    private Set<String> readingFiles = new LinkedHashSet<>();
+    /**
+     * While a refresh runs, what {@link #addPropertySource(PropertySource)} and
+     * {@link #removePropertySource(PropertySource)} have changed since it started. A refresh that
+     * fails puts back the property sources it started with, and then these changes. Guarded by
+     * the monitor of {@link #propertySources}.
+     */
+    private @Nullable RefreshChanges changedWhileRefreshing;
 
     // For configuration maps, sets with low access - it's enough to use Collections.synchronized
 
@@ -206,7 +223,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
-        internalAddPropertySource(propertySource);
+        synchronized (propertySources) {
+            internalAddPropertySource(propertySource);
+            noteChangeWhileRefreshing(propertySource.getName(), propertySource);
+        }
         if (isRunning() && !reading.get()) {
             propertyPlaceholderResolver.resetCaches();
             internalProcessPropertySource(propertySource);
@@ -216,11 +236,28 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public Environment removePropertySource(PropertySource propertySource) {
-        propertySources.remove(propertySource.getName());
+        synchronized (propertySources) {
+            propertySources.remove(propertySource.getName());
+            noteChangeWhileRefreshing(propertySource.getName(), null);
+        }
         if (isRunning() && !reading.get()) {
             propertyPlaceholderResolver.resetCaches();
         }
         return this;
+    }
+
+    /**
+     * Notes, while a refresh runs, what a name is registered with after a change. Called with the
+     * monitor of {@link #propertySources} held.
+     *
+     * @param name   The name of the property source
+     * @param source The property source registered by that name, {@code null} when it was removed
+     */
+    private void noteChangeWhileRefreshing(String name, @Nullable PropertySource source) {
+        RefreshChanges changes = changedWhileRefreshing;
+        if (changes != null) {
+            changes.note(name, source);
+        }
     }
 
     @Override
@@ -259,7 +296,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public Collection<PropertySource> getPropertySources() {
-        return Collections.unmodifiableCollection(propertySources.values());
+        // A copy taken under the monitor of the map: property sources are added and removed while
+        // the environment runs, and iterating a view of the map would then fail
+        synchronized (propertySources) {
+            return List.copyOf(propertySources.values());
+        }
     }
 
     @Override
@@ -273,8 +314,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private void readProperties() {
         if (reading.compareAndSet(false, true)) {
-            loadProperties();
-            reading.set(false);
+            try {
+                loadProperties();
+            } finally {
+                reading.set(false);
+            }
         }
     }
 
@@ -289,8 +333,37 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         // Rebuild into a replacement catalog and publish it in one step, so a concurrent lookup
         // sees the properties either as they were before the refresh or as they are after it.
         propertyPlaceholderResolver.refresh(() -> {
-            dropProperties();
-            readProperties();
+            Map<String, PropertySource> previousSources;
+            RefreshChanges changes;
+            synchronized (propertySources) {
+                previousSources = new LinkedHashMap<>(propertySources);
+                changes = new RefreshChanges(previousSources);
+                changedWhileRefreshing = changes;
+            }
+            List<PropertySource> previousRefreshable = new ArrayList<>(refreshablePropertySources);
+            boolean completed = false;
+            try {
+                dropProperties();
+                readProperties();
+                completed = true;
+            } finally {
+                synchronized (propertySources) {
+                    changedWhileRefreshing = null;
+                    if (!completed) {
+                        // The resolver keeps the catalog it published when the rebuild fails. Put back the
+                        // property sources that catalog was built from, so the next refresh drops and reads
+                        // the same sources again, and then what addPropertySource and removePropertySource
+                        // changed while the failed refresh ran, so that those changes are not undone.
+                        propertySources.clear();
+                        propertySources.putAll(previousSources);
+                        changes.applyTo(propertySources);
+                    }
+                }
+                if (!completed) {
+                    refreshablePropertySources.clear();
+                    refreshablePropertySources.addAll(previousRefreshable);
+                }
+            }
         });
     }
 
@@ -348,8 +421,14 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private void loadProperties() {
         refreshablePropertySources.clear();
+        Set<String> locations = new LinkedHashSet<>();
+        readingFiles = locations;
         List<PropertySource> propertySources = new ArrayList<>(configLocations.size());
-        Set<String> preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
+        Set<String> preExistingSourceNames;
+        synchronized (this.propertySources) {
+            // copied under the monitor: another thread can add or remove a property source meanwhile
+            preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
+        }
         if (configuration.isEnableDefaultPropertySources()) {
             propertySources.addAll(readPropertySourceList(applicationName));
             List<PropertySource> defaultPropertySources = new ArrayList<>(4);
@@ -367,7 +446,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         } else {
             propertySources = new ArrayList<>(this.propertySources.size());
         }
-        for (PropertySource propertySource : this.propertySources.values()) {
+        for (PropertySource propertySource : getPropertySources()) {
             if (!propertySources.contains(propertySource)) {
                 propertySources.add(propertySource);
             }
@@ -379,10 +458,20 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
         if (!propertySourcesLocators.isEmpty()) {
             for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
-                boolean isBootstrapLocator = propertySourcesLocator instanceof BootstrapLocatorMarker;
                 Collection<PropertySource> sources = propertySourcesLocator.load(this);
                 propertySources.addAll(sources);
-                if (isBootstrapLocator) {
+                for (PropertySource source : sources) {
+                    // a located source read from a file, such as one a locator of the application reads, or an import
+                    String location = source.getOrigin().location();
+                    if (location.startsWith(ClassPathResourceLoader.PREFIX) || location.startsWith(CLASSPATH_ALL_PREFIX)
+                        || location.startsWith(FileSystemResourceLoader.PREFIX)) {
+                        recordConfigurationFile(location);
+                    }
+                }
+                if (propertySourcesLocator instanceof BootstrapLocatorMarker bootstrapLocator) {
+                    for (String location : bootstrapLocator.getConfigurationFiles()) {
+                        recordConfigurationFile(location);
+                    }
                     for (PropertySource source : sources) {
                         internalAddPropertySource(source);
                     }
@@ -400,6 +489,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         for (PropertySource propertySource : propertySources) {
             internalProcessPropertySource(propertySource);
         }
+        configurationFiles = Set.copyOf(locations);
+        readingFiles = new LinkedHashSet<>();
     }
 
     private void internalAddPropertySource(PropertySource propertySource) {
@@ -434,14 +525,15 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             PropertySourceLoader propertySourceLoader = loaderByFormatMap.get(extension);
             if (propertySourceLoader != null) {
                 LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
+                PropertySource.Origin sourceOrigin;
+                if (filePath.startsWith(ClassPathResourceLoader.PREFIX) || filePath.startsWith(FileSystemResourceLoader.PREFIX)) {
+                    sourceOrigin = PropertySource.Origin.of(filePath);
+                } else {
+                    sourceOrigin = PropertySource.Origin.of(FileSystemResourceLoader.PREFIX + filePath);
+                }
+                recordConfigurationFile(sourceOrigin.location());
                 Optional<Map<String, Object>> properties = readPropertiesFromLoader(fileName, filePath, propertySourceLoader);
                 if (properties.isPresent()) {
-                    PropertySource.Origin sourceOrigin;
-                    if (filePath.startsWith("classpath:") || filePath.startsWith(FILE_PREFIX)) {
-                        sourceOrigin = PropertySource.Origin.of(filePath);
-                    } else {
-                        sourceOrigin = PropertySource.Origin.of(FILE_PREFIX + filePath);
-                    }
                     propertySources.add(PropertySource.of(filePath, properties.get(), sourceOrigin, order));
                 }
                 order++;
@@ -459,13 +551,14 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private List<PropertySource> readPropertySourceList(String name) {
         List<PropertySource> propertySources = new ArrayList<>(configLocations.size());
         for (String configLocation : configLocations) {
+            recordConfigurationFiles(configLocation, name);
             ResourceLoader resourceLoader;
-            if (configLocation.equals("classpath:/")) {
+            if (configLocation.equals(ClassPathResourceLoader.PREFIX + "/")) {
                 resourceLoader = this;
-            } else if (configLocation.startsWith("classpath:")) {
+            } else if (configLocation.startsWith(ClassPathResourceLoader.PREFIX)) {
                 resourceLoader = this.forBase(configLocation);
-            } else  if (configLocation.startsWith(FILE_PREFIX)) {
-                configLocation = configLocation.substring(FILE_PREFIX.length());
+            } else  if (configLocation.startsWith(FileSystemResourceLoader.PREFIX)) {
+                configLocation = configLocation.substring(FileSystemResourceLoader.PREFIX.length());
                 Path configLocationPath = Paths.get(configLocation);
                 if (Files.exists(configLocationPath) && Files.isDirectory(configLocationPath) && Files.isReadable(configLocationPath)) {
                     resourceLoader = new DefaultFileSystemResourceLoader(configLocationPath);
@@ -478,6 +571,73 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             readPropertySourceList(name, resourceLoader, propertySources);
         }
         return propertySources;
+    }
+
+    /**
+     * Records the files a configuration location is looked in for: the file of the name and of each active
+     * environment, in each format a loader reads, whether the location has them or not.
+     *
+     * @param configLocation The configuration location, such as {@code classpath:/} or {@code file:config/}
+     * @param name The name of the files
+     */
+    private void recordConfigurationFiles(String configLocation, String name) {
+        String directory = configLocation.endsWith("/") ? configLocation : configLocation + "/";
+        Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
+        if (propertySourceLoaders.isEmpty()) {
+            propertySourceLoaders = List.of(new PropertiesPropertySourceLoader());
+        }
+        Set<String> activeNames = getActiveNames();
+        for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
+            for (String extension : propertySourceLoader.getExtensions()) {
+                recordConfigurationFile(directory + name + "." + extension);
+                for (String activeName : activeNames) {
+                    recordConfigurationFile(directory + name + "-" + activeName + "." + extension);
+                }
+            }
+        }
+    }
+
+    private void recordConfigurationFile(String location) {
+        readingFiles.add(normalizeConfigurationFile(location));
+    }
+
+    /**
+     * The form {@link #getConfigurationFiles()} gives a location in: {@code classpath:} and the path of the
+     * resource from the root of the class path, or {@code file:} and the absolute path of the file, with forward
+     * slashes. A {@code classpath*:} location is a {@code classpath:} one, and a location without either prefix a
+     * file, relative to the working directory.
+     *
+     * @param location The location
+     * @return The normalized location
+     */
+    static String normalizeConfigurationFile(String location) {
+        boolean classpath = location.startsWith(ClassPathResourceLoader.PREFIX);
+        if (classpath || location.startsWith(CLASSPATH_ALL_PREFIX)) {
+            String path = location.substring(classpath ? ClassPathResourceLoader.PREFIX.length() : CLASSPATH_ALL_PREFIX.length());
+            try {
+                path = Paths.get(path.replace('\\', '/')).normalize().toString();
+            } catch (InvalidPathException e) {
+                // compared as it is
+            }
+            path = path.replace('\\', '/');
+            int start = 0;
+            while (start < path.length() && path.charAt(start) == '/') {
+                start++;
+            }
+            return ClassPathResourceLoader.PREFIX + path.substring(start);
+        }
+        String file = location.startsWith(FileSystemResourceLoader.PREFIX) ? location.substring(FileSystemResourceLoader.PREFIX.length()) : location;
+        try {
+            file = Paths.get(file).toAbsolutePath().normalize().toString();
+        } catch (InvalidPathException e) {
+            // compared as it is
+        }
+        return FileSystemResourceLoader.PREFIX + file.replace('\\', '/');
+    }
+
+    @Override
+    public Set<String> getConfigurationFiles() {
+        return configurationFiles;
     }
 
     private void readPropertySourceList(String name, ResourceLoader resourceLoader, List<PropertySource> propertySources) {
@@ -544,6 +704,20 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             }
         }
         return currentPropertySourceLoaders;
+    }
+
+    /**
+     * Drops the property source loaders, so that the next read of the property sources creates new
+     * instances. The bootstrap context, which refreshes its environment rather than being created
+     * again, calls this before each refresh: a loader then sees a refresh as it did when every read
+     * of the bootstrap configuration had a new environment, and one that returns its property source
+     * only once keeps returning it.
+     */
+    void resetPropertySourceLoaders() {
+        synchronized (this) {
+            propertySourceLoaderList = null;
+            loaderByFormatMap.clear();
+        }
     }
 
     private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
@@ -656,6 +830,22 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                                                                 String sourceName,
                                                                 PropertySource.Origin origin,
                                                                 PropertySourceLoader propertySourceLoader) {
+        if (resourceLoader instanceof FileSystemResourceLoader) {
+            // a file the loader finds is where it is, below the base of the loader if it has one; a file not created
+            // yet is where the default loader looks for it
+            Optional<URL> resource = resourceLoader.getResource(resourcePath);
+            String location = FileSystemResourceLoader.PREFIX + resourcePath;
+            if (resource.isPresent()) {
+                try {
+                    location = FileSystemResourceLoader.PREFIX + Paths.get(resource.get().toURI());
+                } catch (URISyntaxException | IllegalArgumentException e) {
+                    // the path as given
+                }
+            }
+            recordConfigurationFile(location);
+        } else if (resourceLoader == this) {
+            recordConfigurationFile(ClassPathResourceLoader.PREFIX + resourcePath);
+        }
         try {
             Optional<InputStream> inputStream = resourceLoader.getResourceAsStream(resourcePath);
             if (inputStream.isEmpty()) {
@@ -678,6 +868,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                                                                          PropertySource.Origin origin,
                                                                          PropertySourceLoader propertySourceLoader,
                                                                          boolean allowMultiple) {
+        recordConfigurationFile(ClassPathResourceLoader.PREFIX + resourcePath);
         ResourceLoadStrategy strategy = ResourceLoadStrategy.builder()
             .type(allowMultiple ? ResourceLoadStrategyType.MERGE_ALL : ResourceLoadStrategyType.FAIL_ON_DUPLICATE)
             .build();
@@ -932,8 +1123,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         if (withoutEntry.startsWith("jar:")) {
             withoutEntry = withoutEntry.substring(4);
         }
-        if (withoutEntry.startsWith(FILE_PREFIX)) {
-            withoutEntry = withoutEntry.substring(FILE_PREFIX.length());
+        if (withoutEntry.startsWith(FileSystemResourceLoader.PREFIX)) {
+            withoutEntry = withoutEntry.substring(FileSystemResourceLoader.PREFIX.length());
         }
 
         int slashIndex = withoutEntry.lastIndexOf('/');
@@ -968,25 +1159,114 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public void close() {
+        // Everything is closed and the environment is stopped even when something fails to close:
+        // the first failure is thrown at the end, with the later ones suppressed by it.
+        RuntimeException failure = null;
         try {
             propertyPlaceholderResolver.close();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to close property placeholder resolver: " + e.getMessage(), e);
+            failure = new RuntimeException("Failed to close property placeholder resolver: " + e.getMessage(), e);
         }
         for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
             if (propertySourcesLocator instanceof Closeable closeable) {
                 try {
                     closeable.close();
                 } catch (Exception e) {
-                    throw new RuntimeException("Failed to close property sources locator " + propertySourcesLocator.getClass() + ": " + e.getMessage(), e);
+                    failure = addFailure(failure, new RuntimeException("Failed to close property sources locator " + propertySourcesLocator.getClass() + ": " + e.getMessage(), e));
                 }
             }
         }
-        stop();
+        try {
+            stop();
+        } catch (RuntimeException e) {
+            failure = addFailure(failure, e);
+        }
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    private static RuntimeException addFailure(@Nullable RuntimeException failure, RuntimeException next) {
+        if (failure == null) {
+            return next;
+        }
+        failure.addSuppressed(next);
+        return failure;
     }
 
     @Override
     public MutableConversionService getConversionService() {
         return mutableConversionService;
+    }
+
+    /**
+     * The property sources added and removed while a refresh runs, which a refresh that fails
+     * applies to the property sources it puts back. They end as if each call had been made on
+     * those property sources, in the order the calls were made: a property source that replaces
+     * one still registered by its name takes its place, and one added under a name that is not
+     * registered goes last. It holds one entry per name.
+     */
+    private static final class RefreshChanges {
+        /**
+         * The property sources registered when the refresh started.
+         */
+        private final Map<String, PropertySource> before;
+        /**
+         * By name, the property source registered after the last change, {@code null} once it was
+         * removed. A name added while it was not registered is moved last, so those names are in
+         * the order in which they go last.
+         */
+        private final Map<String, @Nullable PropertySource> changes = new LinkedHashMap<>();
+        /**
+         * The names added while they were not registered, which go last rather than where they were.
+         */
+        private final Set<String> appended = new HashSet<>();
+
+        RefreshChanges(Map<String, PropertySource> before) {
+            this.before = before;
+        }
+
+        /**
+         * Notes a change.
+         *
+         * @param name   The name of the property source
+         * @param source The property source registered by that name, {@code null} when it was removed
+         */
+        void note(String name, @Nullable PropertySource source) {
+            boolean registered = changes.containsKey(name) ? changes.get(name) != null : before.containsKey(name);
+            if (source == null) {
+                changes.put(name, null);
+                appended.remove(name);
+            } else if (registered) {
+                // takes the place of the property source it replaces
+                changes.put(name, source);
+            } else {
+                // goes last
+                changes.remove(name);
+                changes.put(name, source);
+                appended.add(name);
+            }
+        }
+
+        /**
+         * Applies the changes to the property sources the refresh started with.
+         *
+         * @param propertySources The property sources, as they were when the refresh started
+         */
+        void applyTo(Map<String, PropertySource> propertySources) {
+            changes.forEach((name, source) -> {
+                if (source == null) {
+                    propertySources.remove(name);
+                } else if (!appended.contains(name)) {
+                    propertySources.put(name, source);
+                }
+            });
+            changes.forEach((name, source) -> {
+                if (source != null && appended.contains(name)) {
+                    propertySources.remove(name);
+                    propertySources.put(name, source);
+                }
+            });
+        }
     }
 }

@@ -25,6 +25,8 @@ import io.micronaut.context.env.SystemPropertiesPropertySource;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -73,7 +75,9 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Boolean deduceEnvironments = null;
     private boolean deducePackage = true;
     private boolean deduceCloudEnvironment = false;
-    private ClassLoader classLoader = getClass().getClassLoader();
+    private final ClassLoader defaultClassLoader = getClass().getClassLoader();
+    private ClassLoader classLoader = defaultClassLoader;
+    private boolean explicitClassLoader = false;
     private boolean envPropertySource = true;
     private final List<String> envVarIncludes = new ArrayList<>();
     private final List<String> envVarExcludes = new ArrayList<>();
@@ -88,11 +92,21 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Nullable
     private Boolean bootstrapEnvironment = null;
     private boolean enableDefaultPropertySources = true;
-    private BeanResolutionTraceConfiguration traceConfiguration = new BeanResolutionTraceConfiguration();
+    // The default is created when the context asks for it: it reads a logger, and creating the builder must not
+    // configure logging, so that Micronaut.start() can begin a bean definition prefetch first
+    @Nullable
+    private BeanResolutionTraceConfiguration traceConfiguration;
+    private final List<BeanResolutionTracer> beanResolutionTracers = new ArrayList<>(2);
+    // Also resolved when the context asks for it, as reading the default loads the trace mode, which reads a logger
+    @Nullable
+    private Boolean beanResolutionTracerDiscovery;
     private ResourceLoadStrategy configurationLoadStrategy = ResourceLoadStrategy.defaultStrategy();
     private BeanDefinitionsProvider beanDefinitionsProvider = new DefaultBeanDefinitionsProvider();
     private boolean eagerBeansEnabled = true;
     private boolean eventsEnabled = true;
+    @Nullable
+    private Boolean beanDependencyTracking;
+    private final List<BeanRegistration<?>> retainedRegistrations = new ArrayList<>();
     @Nullable
     private Predicate<QualifiedBeanType<?>> beansPredicate;
     @Nullable
@@ -116,6 +130,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         applicationContextConfigurer.configure(this);
         this.contextConfigurer = applicationContextConfigurer;
         this.classLoader = classLoader;
+        this.explicitClassLoader = true;
     }
 
     @Override
@@ -128,7 +143,29 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
 
     @Override
     public BeanResolutionTraceConfiguration getTraceConfiguration() {
-        return this.traceConfiguration;
+        return traceConfiguration != null ? traceConfiguration : new BeanResolutionTraceConfiguration();
+    }
+
+    @Override
+    public ApplicationContextBuilder beanResolutionTracer(BeanResolutionTracer tracer) {
+        beanResolutionTracers.add(Objects.requireNonNull(tracer, "Tracer cannot be null"));
+        return this;
+    }
+
+    @Override
+    public List<BeanResolutionTracer> getBeanResolutionTracers() {
+        return Collections.unmodifiableList(beanResolutionTracers);
+    }
+
+    @Override
+    public ApplicationContextBuilder beanResolutionTracerDiscovery(boolean enabled) {
+        this.beanResolutionTracerDiscovery = enabled;
+        return this;
+    }
+
+    @Override
+    public boolean isBeanResolutionTracerDiscoveryEnabled() {
+        return beanResolutionTracerDiscovery != null ? beanResolutionTracerDiscovery : BeanResolutionTraceMode.isTracerDiscoveryEnabledByDefault();
     }
 
     @Override
@@ -219,6 +256,46 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public boolean eventsEnabled() {
         return eventsEnabled;
+    }
+
+    @Override
+    public boolean beanDependencyTrackingEnabled() {
+        return beanDependencyTracking != null ? beanDependencyTracking : ApplicationContextConfiguration.super.beanDependencyTrackingEnabled();
+    }
+
+    @Override
+    public ApplicationContextBuilder beanDependencyTrackingEnabled(boolean enabled) {
+        this.beanDependencyTracking = enabled;
+        return this;
+    }
+
+    /**
+     * @return Whether {@link #beanDependencyTrackingEnabled(boolean)} switched tracking off, which development mode
+     * switched on by configuration does not override
+     */
+    boolean isBeanDependencyTrackingSwitchedOff() {
+        return Boolean.FALSE.equals(beanDependencyTracking);
+    }
+
+    @Override
+    @Internal
+    @Experimental
+    public Collection<BeanRegistration<?>> getRetainedRegistrations() {
+        // handed over once: the context that is built adopts them, and the builder must not keep the
+        // previous context reachable through them afterwards
+        List<BeanRegistration<?>> handedOver = List.copyOf(retainedRegistrations);
+        retainedRegistrations.clear();
+        return handedOver;
+    }
+
+    @Override
+    @Internal
+    @Experimental
+    public ApplicationContextBuilder retainedRegistrations(Collection<BeanRegistration<?>> registrations) {
+        if (registrations != null) {
+            retainedRegistrations.addAll(registrations);
+        }
+        return this;
     }
 
     @Override
@@ -420,8 +497,17 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public ApplicationContextBuilder mainClass(@Nullable Class<?> mainClass) {
         if (mainClass != null) {
-            if (this.classLoader == null) {
-                this.classLoader = mainClass.getClassLoader();
+            // the loader of the main class is the application's loader unless one was chosen explicitly, by the
+            // caller or by an ApplicationContextConfigurer; the builder's own loader is only the default.
+            // The configurers were service-loaded when the builder was made, from the thread context loader:
+            // a launcher whose main class lives in a loader of its own sets that loader as the context loader
+            // before it builds, so the configurers of that loader are found as well
+            // Only a loader that sees the default one's classes is adopted: the default loader itself or one of its
+            // descendants, never a parent, which would lose the classes only the default loader sees
+            // The default loader, not the one an earlier mainClass(...) call adopted, decides: the last main class wins
+            ClassLoader mainClassLoader = mainClass.getClassLoader();
+            if (!explicitClassLoader) {
+                this.classLoader = mainClassLoader != null && delegatesTo(mainClassLoader, defaultClassLoader) ? mainClassLoader : defaultClassLoader;
             }
             String name = mainClass.getPackage().getName();
             if (StringUtils.isNotEmpty(name)) {
@@ -431,10 +517,23 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         return this;
     }
 
+    private static boolean delegatesTo(ClassLoader loader, @Nullable ClassLoader ancestor) {
+        if (ancestor == null) {
+            return true;
+        }
+        for (ClassLoader current = loader; current != null; current = current.getParent()) {
+            if (current == ancestor) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public ApplicationContextBuilder classLoader(@Nullable ClassLoader classLoader) {
         if (classLoader != null) {
             this.classLoader = classLoader;
+            this.explicitClassLoader = true;
         }
         return this;
     }

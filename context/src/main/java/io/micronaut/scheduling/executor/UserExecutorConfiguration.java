@@ -48,6 +48,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     private Integer parallelism;
     private Integer corePoolSize;
     private boolean virtual;
+    private boolean propagateContext = true;
     @Nullable
     private Class<? extends ThreadFactory> threadFactoryClass;
 
@@ -127,6 +128,22 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      */
     public void setVirtual(boolean virtual) {
         this.virtual = virtual;
+    }
+
+    @Override
+    public boolean isPropagateContext() {
+        return propagateContext;
+    }
+
+    /**
+     * Sets whether tasks submitted to the executor run with the
+     * {@link io.micronaut.core.propagation.PropagatedContext} of the submitting thread. Default value ({@code true}).
+     *
+     * @param propagateContext Whether to propagate the context
+     * @since 5.3.0
+     */
+    public void setPropagateContext(boolean propagateContext) {
+        this.propagateContext = propagateContext;
     }
 
     @Override

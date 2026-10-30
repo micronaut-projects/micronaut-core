@@ -16,12 +16,19 @@
 package io.micronaut.inject.configuration;
 
 import io.micronaut.context.annotation.BeanProperties;
+import io.micronaut.context.annotation.ConfigurationInject;
+import io.micronaut.core.annotation.AllowedValues;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.PropertyElementQuery;
@@ -35,10 +42,12 @@ import java.io.IOException;
 import java.io.Writer;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -75,6 +84,8 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private static final String JV_MIN = "jakarta.validation.constraints.Min";
     private static final String JV_MAX = "jakarta.validation.constraints.Max";
     private static final String JV_DIGITS = "jakarta.validation.constraints.Digits";
+    private static final String JV_DIGITS_INTEGER = "integer";
+    private static final String JV_DIGITS_FRACTION = "fraction";
     private static final String JV_NEGATIVE = "jakarta.validation.constraints.Negative";
     private static final String JV_NEGATIVE_OR_ZERO = "jakarta.validation.constraints.NegativeOrZero";
     private static final String ATTR_EXCLUSIVE_MINIMUM = "exclusiveMinimum";
@@ -88,8 +99,33 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private static final String URL_JSON_SCHEMA = "https://json-schema.org/draft/2020-12/schema";
     private static final String STRING = "string";
     private static final String DURATION = "duration";
+    private static final String READABLE_BYTES = "readable-bytes";
+    /**
+     * The values {@link io.micronaut.core.convert.format.ReadableBytesTypeConverter} accepts:
+     * a whole number with an optional, case-insensitive KB, MB or GB suffix.
+     */
+    private static final String READABLE_BYTES_PATTERN = "^[+-]?[0-9]+([kKmMgG][bB])?$";
     private static final String ATTR_ADDITIONAL_PROPERTIES = "additionalProperties";
     private static final String BOOLEAN = "boolean";
+    private static final String INTEGER = "integer";
+    private static final String NUMBER = "number";
+    private static final String BYTE = "byte";
+    private static final String SHORT = "short";
+    private static final String INT = "int";
+    private static final String LONG = "long";
+    private static final String FLOAT = "float";
+    private static final String DOUBLE = "double";
+    private static final String BYTE_WRAPPER = "java.lang.Byte";
+    private static final String SHORT_WRAPPER = "java.lang.Short";
+    private static final String INTEGER_WRAPPER = "java.lang.Integer";
+    private static final String LONG_WRAPPER = "java.lang.Long";
+    private static final String FLOAT_WRAPPER = "java.lang.Float";
+    private static final String DOUBLE_WRAPPER = "java.lang.Double";
+    private static final String BIG_INTEGER = "java.math.BigInteger";
+    private static final String BIG_DECIMAL = "java.math.BigDecimal";
+    private static final Set<String> INTEGRAL_TYPES = Set.of(
+        BYTE, SHORT, INT, LONG, BYTE_WRAPPER, SHORT_WRAPPER, INTEGER_WRAPPER, LONG_WRAPPER, BIG_INTEGER
+    );
 
     @Override
     public void write(ConfigurationMetadataBuilder metadataBuilder, ClassWriterOutputVisitor outputVisitor) throws IOException {
@@ -372,6 +408,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             pe = findProperty(vc, ce, null, pm);
         }
         if (pe != null) {
+            AllowedValuesSchema allowed = AllowedValuesSchema.of(pe, vc);
             // Optional
             ClassElement t = pe.getGenericType();
             if (t.isOptional()) {
@@ -382,17 +419,19 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 out.name(ATTR_TYPE).value(ARRAY);
                 out.name("items");
                 if (t.isArray()) {
-                    String n = t.getName();
-                    while (n.endsWith("[]")) {
-                        n = n.substring(0, n.length() - 2);
+                    ClassElement item = t.fromArray();
+                    while (item.isArray()) {
+                        item = item.fromArray();
                     }
-                    writeChildTypeName(out, n);
+                    writeChildTypeSchema(out, item, allowed);
                 } else {
                     ClassElement item = t.getFirstTypeArgument().orElse(null);
                     if (item != null) {
-                        writeChildTypeSchema(out, item);
+                        writeChildTypeSchema(out, item, allowed);
                     } else {
-                        writeChildTypeName(out, "java.lang.String");
+                        out.beginObject();
+                        writeSimpleTypeName(out, "java.lang.String", allowed);
+                        out.endObject();
                     }
                 }
                 return;
@@ -405,35 +444,99 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 if (v == null) {
                     v = t;
                 }
-                writeChildTypeSchema(out, v);
+                writeChildTypeSchema(out, v, allowed);
                 return;
             }
             // Plain type
-            writeSimpleTypeSchema(out, t);
+            if (isReadableBytesProperty(pe)) {
+                writeReadableBytesType(out);
+                return;
+            }
+            writeSimpleTypeSchema(out, t, allowed);
             return;
         }
         // Fallback: map simple by name
-        writeSimpleTypeName(out, fqcn);
+        writeSimpleTypeName(out, fqcn, null);
     }
 
-    private void writeChildTypeSchema(JsonWriter out, ClassElement t) {
+    /**
+     * A {@link ReadableBytes} property also accepts a size such as {@code 10MB}, so it is an
+     * integer or a string in that format.
+     */
+    private void writeReadableBytesType(JsonWriter out) {
+        out.name(ATTR_TYPE).beginArray().value(INTEGER).value(STRING).endArray();
+        out.name(ATTR_FORMAT).value(READABLE_BYTES);
+        out.name(ATTR_PATTERN).value(READABLE_BYTES_PATTERN);
+    }
+
+    /**
+     * @param pe The property
+     * @return Whether the property is an integral type bound through {@link ReadableBytes}
+     */
+    private static boolean isReadableBytesProperty(PropertyElement pe) {
+        ClassElement type = pe.getGenericType();
+        if (type.isOptional()) {
+            type = type.getOptionalValueType().orElse(type);
+        }
+        return isIntegral(type.getName()) && isReadableBytes(pe);
+    }
+
+    private static boolean isReadableBytes(PropertyElement pe) {
+        if (pe.hasStereotype(ReadableBytes.class) || isReadableBytesConstructorParameter(pe)) {
+            return true;
+        }
+        MethodElement setter = pe.getWriteMethod().orElse(null);
+        if (setter != null) {
+            ParameterElement[] parameters = setter.getParameters();
+            if (setter.hasStereotype(ReadableBytes.class)
+                || (parameters.length == 1 && parameters[0].hasStereotype(ReadableBytes.class))) {
+                return true;
+            }
+        }
+        return pe.getField().map(field -> field.hasStereotype(ReadableBytes.class)).orElse(false);
+    }
+
+    /**
+     * Immutable configurations bind properties through the parameters of their
+     * {@link ConfigurationInject} or primary constructor.
+     */
+    private static boolean isReadableBytesConstructorParameter(PropertyElement pe) {
+        ClassElement owner = pe.getOwningType();
+        List<MethodElement> constructors = new ArrayList<>();
+        owner.getAccessibleConstructors().stream()
+            .filter(constructor -> constructor.hasStereotype(ConfigurationInject.class))
+            .forEach(constructors::add);
+        owner.getPrimaryConstructor().ifPresent(constructors::add);
+        for (MethodElement constructor : constructors) {
+            for (ParameterElement parameter : constructor.getParameters()) {
+                if (parameter.getName().equals(pe.getName()) && parameter.hasStereotype(ReadableBytes.class)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isIntegral(String typeName) {
+        return INTEGRAL_TYPES.contains(typeName);
+    }
+
+    private void writeChildTypeSchema(JsonWriter out, ClassElement t, @Nullable AllowedValuesSchema allowed) {
         out.beginObject();
-        writeSimpleTypeSchema(out, t);
+        writeSimpleTypeSchema(out, t, allowed);
         out.endObject();
     }
 
-    private void writeChildTypeName(JsonWriter out, String fqcn) {
-        out.beginObject();
-        writeSimpleTypeName(out, fqcn);
-        out.endObject();
-    }
-
-    private void writeSimpleTypeSchema(JsonWriter out, ClassElement t) {
+    private void writeSimpleTypeSchema(JsonWriter out, ClassElement t, @Nullable AllowedValuesSchema allowed) {
         // Enum
         if (t.isEnum()) {
             out.name(ATTR_TYPE).value(STRING);
             List<String> values = t instanceof io.micronaut.inject.ast.EnumElement ee ? ee.values() : Collections.emptyList();
-            out.name(ATTR_ENUM).beginArray().values(values).endArray();
+            if (allowed != null) {
+                allowed.writeEnumConstants(out, values);
+            } else {
+                out.name(ATTR_ENUM).beginArray().values(values).endArray();
+            }
             return;
         }
         // URI/URL
@@ -441,38 +544,45 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         if ("java.net.URI".equals(n) || "java.net.URL".equals(n)) {
             out.name(ATTR_TYPE).value(STRING);
             out.name(ATTR_FORMAT).value("uri");
+            if (allowed != null) {
+                allowed.write(out, STRING, n);
+            }
             return;
         }
         if ("java.time.Duration".equals(n)) {
             out.name(ATTR_TYPE).value(STRING);
             out.name(ATTR_FORMAT).value(DURATION);
+            if (allowed != null) {
+                allowed.write(out, STRING, n);
+            }
             return;
         }
         // Basic primitives/wrappers/strings
-        writeSimpleTypeName(out, n);
+        writeSimpleTypeName(out, n, allowed);
     }
 
-    private void writeSimpleTypeName(JsonWriter out, String fqcn) {
-        String type = switch (fqcn) {
+    private void writeSimpleTypeName(JsonWriter out, String fqcn, @Nullable AllowedValuesSchema allowed) {
+        String type = isIntegral(fqcn) ? INTEGER : switch (fqcn) {
             case BOOLEAN, "java.lang.Boolean" -> BOOLEAN;
-            case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
-                 "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" -> "integer";
-            case "float", "double", "java.lang.Float", "java.lang.Double", "java.math.BigDecimal" ->
-                "number";
+            case FLOAT, DOUBLE, FLOAT_WRAPPER, DOUBLE_WRAPPER, BIG_DECIMAL ->
+                NUMBER;
             default -> STRING;
         };
         out.name(ATTR_TYPE).value(type);
+        if (allowed != null) {
+            allowed.write(out, type, fqcn);
+        }
     }
 
     private @Nullable Object coerceDefault(String value, String typeName) {
         try {
+            if (isIntegral(typeName)) {
+                return Long.parseLong(value);
+            }
             return switch (typeName) {
                 case BOOLEAN, "java.lang.Boolean" -> Boolean.parseBoolean(value);
-                case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
-                     "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" ->
-                    Long.parseLong(value);
-                case "float", "double", "java.lang.Float", "java.lang.Double",
-                     "java.math.BigDecimal" -> Double.parseDouble(value);
+                case FLOAT, DOUBLE, FLOAT_WRAPPER, DOUBLE_WRAPPER,
+                     BIG_DECIMAL -> Double.parseDouble(value);
                 default -> value; // string/enum/uri fall back to string
             };
         } catch (Exception e) {
@@ -617,9 +727,13 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         if (hasValidationAnnotation(pe, JV_NEGATIVE_OR_ZERO)) {
             out.name(ATTR_MAX).value(0);
         }
-        // Digits -> regex
-        Integer intDigits = intValue(pe, JV_DIGITS, "integer");
-        Integer fracDigits = intValue(pe, JV_DIGITS, "fraction");
+        // Digits -> regex. A readable-bytes value is matched by the byte size grammar instead, and a
+        // second pattern would reject sizes such as 1KB.
+        if (isReadableBytesProperty(pe)) {
+            return;
+        }
+        Integer intDigits = intValue(pe, JV_DIGITS, JV_DIGITS_INTEGER);
+        Integer fracDigits = intValue(pe, JV_DIGITS, JV_DIGITS_FRACTION);
         if (intDigits != null || fracDigits != null) {
             StringBuilder re = new StringBuilder("^");
             int id = intDigits != null ? intDigits : 0;
@@ -706,6 +820,12 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             return visitorContext != null;
         }
 
+        void fail(String message, Element element) {
+            if (visitorContext != null) {
+                visitorContext.fail(message, element);
+            }
+        }
+
         @Nullable
         ClassElement resolve(String name) {
             if (visitorContext == null) {
@@ -717,6 +837,85 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         List<PropertyElement> beanProperties(ClassElement classElement) {
             return properties.computeIfAbsent(classElement.getName(), n -> classElement.getBeanProperties(
                 PropertyElementQuery.of(classElement).visibility(BeanProperties.Visibility.ANY)));
+        }
+    }
+
+    /**
+     * The values of {@link AllowedValues} on a property, written as the {@code enum} keyword with the JSON type of
+     * the property.
+     *
+     * @param values   The declared values
+     * @param property The annotated property, for errors
+     * @param vc       The type resolver, for errors
+     */
+    private record AllowedValuesSchema(List<String> values, PropertyElement property, TypeResolver vc) {
+
+        @Nullable
+        static AllowedValuesSchema of(PropertyElement property, TypeResolver vc) {
+            String[] values = property.stringValues(AllowedValues.class);
+            if (values.length == 0) {
+                return null;
+            }
+            // the metadata of a property merges its field, accessors and record component, which may all declare the values
+            return new AllowedValuesSchema(List.copyOf(new LinkedHashSet<>(Arrays.asList(values))), property, vc);
+        }
+
+        void write(JsonWriter out, String type, String javaType) {
+            out.name(ATTR_ENUM).beginArray();
+            for (String value : values) {
+                Object coerced = coerce(value, type, javaType);
+                if (coerced == null) {
+                    vc.fail("@AllowedValues value '" + value + "' of property '" + property.getName() + "' is not a valid " + javaType, property);
+                    coerced = value;
+                }
+                out.value(coerced);
+            }
+            out.endArray();
+        }
+
+        void writeEnumConstants(JsonWriter out, List<String> constants) {
+            for (String value : values) {
+                if (!constants.isEmpty() && !constants.contains(value)) {
+                    vc.fail("@AllowedValues value '" + value + "' of property '" + property.getName() + "' is not a constant of the enum: " + constants, property);
+                }
+            }
+            out.name(ATTR_ENUM).beginArray().values(values).endArray();
+        }
+
+        /**
+         * Converts a value to the Java type of the property, so that a value out of the range of the type fails.
+         */
+        @Nullable
+        private static Object coerce(String value, String type, String javaType) {
+            String v = value.trim();
+            try {
+                return switch (javaType) {
+                    case BYTE, BYTE_WRAPPER -> Byte.parseByte(v);
+                    case SHORT, SHORT_WRAPPER -> Short.parseShort(v);
+                    case INT, INTEGER_WRAPPER -> Integer.parseInt(v);
+                    case LONG, LONG_WRAPPER -> Long.parseLong(v);
+                    case BIG_INTEGER -> new java.math.BigInteger(v);
+                    case FLOAT, FLOAT_WRAPPER -> finite(Float.valueOf(v));
+                    case DOUBLE, DOUBLE_WRAPPER -> finite(Double.valueOf(v));
+                    case BIG_DECIMAL -> new java.math.BigDecimal(v);
+                    default -> BOOLEAN.equals(type) ? parseBoolean(value) : value;
+                };
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+
+        @Nullable
+        private static Boolean parseBoolean(String value) {
+            if (StringUtils.TRUE.equals(value) || StringUtils.FALSE.equals(value)) {
+                return Boolean.valueOf(value);
+            }
+            return null;
+        }
+
+        @Nullable
+        private static Number finite(Number value) {
+            return Double.isFinite(value.doubleValue()) ? value : null;
         }
     }
 }

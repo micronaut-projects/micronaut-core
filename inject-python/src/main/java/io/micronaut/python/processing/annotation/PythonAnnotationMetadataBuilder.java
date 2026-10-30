@@ -820,6 +820,33 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
         return originating.name();
     }
 
+    /**
+     * The member of an annotation a Python decorator declares is a parameter of the decorator here, while the
+     * member element a visitor reads and mutates is a function of the class definition the annotation element
+     * answers, so the metadata is looked up under that function's key. A member of a Java annotation is keyed as
+     * the parent does.
+     */
+    @Override
+    protected AnnotationMetadata getAnnotationMemberMetadata(String annotationName, ElementDef annotationType, ElementDef member) {
+        if (member instanceof AnnotationMemberDef memberDef && getJavaAnnotationType(annotationName) == null) {
+            DecoratorDef decoratorDef = findDecoratorDef(annotationName);
+            if (decoratorDef != null) {
+                ClassDef annotationDef = visitorContext.annotationClassDef(decoratorDef);
+                for (FunctionDef function : annotationDef.functions()) {
+                    if (function.name().equals(memberDef.name())) {
+                        return lookupOrBuildForMethod(annotationDef, PythonElementAnnotationMetadataFactory.methodMetadataKey(function))
+                            .getAnnotationMetadata();
+                    }
+                }
+            }
+        }
+        if (member instanceof AnnotationMemberDef memberDef && memberDef.annotationMetadata() != null) {
+            // a member of a Java annotation carries the metadata javac built for it, @NonBinding included
+            return memberDef.annotationMetadata();
+        }
+        return super.getAnnotationMemberMetadata(annotationName, annotationType, member);
+    }
+
     @Override
     protected ElementDef getAnnotationMember(ElementDef annotationElement, CharSequence member) {
         String memberName = member.toString();

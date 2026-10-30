@@ -17,10 +17,10 @@ package io.micronaut.context.python;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.python.annotation.PythonClass;
+import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
@@ -66,6 +66,8 @@ public final class PythonContextRuntime {
     public static final String PYTHON = "python";
 
     private static final String NEW_UNINITIALIZED_INSTANCE = "__micronaut_new_uninitialized_instance";
+    private static final String ALLOCATE_INSTANCE = "__micronaut_allocate_instance";
+    private static final String INITIALIZE_INSTANCE = "__micronaut_initialize_instance";
     private static final String SET_INSTANCE_PROPERTY = "__micronaut_set_instance_property";
     private static final String SET_INSTANCE_PROPERTIES = "__micronaut_set_instance_properties";
     private static final String PREPARE_INTRODUCTION = "__micronaut_prepare_introduction";
@@ -247,6 +249,21 @@ public final class PythonContextRuntime {
      */
     public static void setReuseContext(boolean reuse) {
         PythonApplicationRuntime.setReuseContext(reuse);
+    }
+
+    /**
+     * A reloader that patches Python modules edited in place into the contexts of the application runtime installed
+     * when it reloads, as development mode's reloader does for a running application: the primary context, and the
+     * pooled and event-loop ones. For tools that keep a runtime alive outside an application context, such as a test
+     * runner that keeps a {@linkplain #setReuseContext reused} context between runs; the resources it takes and refuses
+     * are those of {@link InPlaceResourceReloader#canReload}, as the application's reloader answers.
+     *
+     * @return The reloader
+     * @since 5.3.0
+     */
+    @Experimental
+    public static InPlaceResourceReloader inPlaceReloader() {
+        return PythonInPlaceReloader.ofInstalledRuntime();
     }
 
     /**
@@ -1196,6 +1213,74 @@ public final class PythonContextRuntime {
     }
 
     /**
+     * Allocate an instance of a class as {@link #newInstance(PythonClassReference, Object...)} would,
+     * through the {@code __new__} of the class with the constructor arguments, without running
+     * {@code __init__}, which {@link #initializeInstance(AllocatedInstance)} runs next with the same
+     * arguments. A Python class extending a Java class whose super constructor takes no argument is
+     * created this way: the generated Java instance is constructed and bound to the Python object in
+     * between, so that the inherited Java methods {@code __init__} calls run on it. A class whose
+     * metaclass customizes {@code __call__} is created by calling it, as before.
+     *
+     * @param classReference The Python class reference
+     * @param args The args
+     * @return The allocated instance
+     * @since 5.2.16
+     */
+    @UsedByGeneratedCode
+    public static AllocatedInstance allocateInstance(PythonClassReference classReference, Object... args) {
+        Context context = getContext();
+        return PythonContextRegistry.withExecutionFrame(context, () -> {
+            Value pythonClass = findClass(classReference, context);
+            Object[] arguments = PythonCoercion.coerceArgumentsToContext(context, constructorArguments(context, classReference, pythonClass, args));
+            Object[] helperArguments = new Object[arguments.length + 1];
+            helperArguments[0] = pythonClass;
+            System.arraycopy(arguments, 0, helperArguments, 1, arguments.length);
+            Value allocation = withContextClassLoader(() -> helper(context, ALLOCATE_INSTANCE).execute(helperArguments));
+            return new AllocatedInstance(allocation.getArrayElement(0), pythonClass, arguments, allocation.getArrayElement(1).asBoolean());
+        });
+    }
+
+    /**
+     * Allocate an instance of a class without {@code __init__}, omitting trailing null arguments that
+     * correspond to Python constructor defaults.
+     *
+     * @param classReference The Python class reference
+     * @param requiredArgCount The number of non-defaulted positional constructor arguments
+     * @param args The arguments
+     * @return The allocated instance
+     * @since 5.2.16
+     */
+    @UsedByGeneratedCode
+    public static AllocatedInstance allocateInstanceWithDefaultedTrailingNulls(PythonClassReference classReference,
+                                                                               int requiredArgCount,
+                                                                               Object... args) {
+        return allocateInstance(classReference, trimDefaultedTrailingNulls(requiredArgCount, args));
+    }
+
+    /**
+     * Run {@code __init__} on an instance {@link #allocateInstance} returned, with the arguments
+     * {@code __new__} received, as a call of the class would: only when the instance is one of the
+     * class and was not created by a customized metaclass {@code __call__} already.
+     *
+     * @param allocated The allocated instance
+     * @since 5.2.16
+     */
+    @UsedByGeneratedCode
+    public static void initializeInstance(AllocatedInstance allocated) {
+        if (allocated.initialized) {
+            return;
+        }
+        Context context = allocated.instance.getContext();
+        PythonContextRegistry.withExecutionFrame(context, () -> {
+            Object[] helperArguments = new Object[allocated.arguments.length + 2];
+            helperArguments[0] = allocated.instance;
+            helperArguments[1] = allocated.pythonClass;
+            System.arraycopy(allocated.arguments, 0, helperArguments, 2, allocated.arguments.length);
+            return withContextClassLoader(() -> helper(context, INITIALIZE_INSTANCE).execute(helperArguments));
+        });
+    }
+
+    /**
      * Create a new instance and set properties via member assignment when no constructor exists.
      *
      * @param classReference The Python class reference
@@ -1397,7 +1482,7 @@ public final class PythonContextRuntime {
         if (classReference.packageName() == null || PYTHON.equals(classReference.packageName())) {
             Value value = ctx.getBindings(PYTHON).getMember(classReference.rootName());
             if (value == null) {
-                Value member = importModule(ctx, classReference.rootName()).getMember(classReference.rootName());
+                Value member = PythonPackageImports.importModule(ctx, classReference.rootName()).getMember(classReference.rootName());
                 if (member == null) {
                     throw new InstantiationException("Cannot find Python class: " + classReference.displayName());
                 }
@@ -1407,7 +1492,7 @@ public final class PythonContextRuntime {
         }
 
         try {
-            return nestedMember(importPackageMember(ctx, classReference.packageName(), classReference.rootName()), classReference);
+            return nestedMember(PythonPackageImports.importPackageMember(ctx, classReference.packageName(), classReference.rootName()), classReference);
         } catch (Exception e) {
             throw new InstantiationException("Failed to import Python class [" + qualifiedName(classReference) + "]: " + e.getMessage(), e);
         }
@@ -1460,10 +1545,10 @@ public final class PythonContextRuntime {
                 if ("Unnamed".equals(scriptName)) {
                     return v;
                 } else {
-                    return importModule(ctx, scriptName);
+                    return PythonPackageImports.importModule(ctx, scriptName);
                 }
             } else {
-                return importModule(ctx, packageName + "." + scriptName);
+                return PythonPackageImports.importModule(ctx, packageName + "." + scriptName);
             }
         } else {
             throw new InstantiationException("Cannot find Python module: " + packageName);
@@ -1499,135 +1584,6 @@ public final class PythonContextRuntime {
         Context ctx = getContext();
         return PythonContextRegistry.withExecutionFrame(ctx, () -> findClass(classReference, ctx)
             .invokeMember(methodName, PythonCoercion.coerceArgumentsToContext(ctx, args)));
-    }
-
-    private static Value importPackageMember(Context ctx, String packageName, String importName) {
-        // The package is imported first, unless its import is running already: a package that is
-        // imported serves the class without importing anything, so a submodule that happens to carry
-        // the class name is not executed for a class the package defines, and the import holds the
-        // lock of the package alone. Importing the module named after the class first would take the
-        // lock of the module and then wait for the package, which a second thread resolving another
-        // class of the package the same way waits for while holding the lock of its module; the
-        // initialiser of a generated package imports every module of the package, so the threads
-        // would wait for each other (_DeadlockError). While the import of the package runs, on this
-        // thread or on another one, the module named after the class is imported instead, which the
-        // import system executes without the lock of its package: a class instantiated on another
-        // thread while its package is being imported (a service the parallel service loader creates
-        // for a call made at import time) does not wait for the import lock the importing thread holds
-        // while it waits for the instantiation. Only a missing submodule is tolerated on the way: an
-        // error raised while executing one propagates.
-        Value module = importPackageOfMember(ctx, packageName);
-        if (PythonConversion.isNone(module)) {
-            // The import of the package runs on this thread or on another one.
-            return importMemberWhilePackageImports(ctx, packageName, importName);
-        }
-        Value member = classMember(ctx, module, importName);
-        if (member == null) {
-            member = importPackageSubmoduleMember(ctx, packageName, importName);
-        }
-        if (member == null) {
-            member = findClassInPackageModules(ctx, packageName, importName);
-        }
-        return requireMember(ctx, member, packageName, importName);
-    }
-
-    private static Value importMemberWhilePackageImports(Context ctx, String packageName, String importName) {
-        Value member = importPackageSubmoduleMember(ctx, packageName, importName);
-        if (member == null) {
-            member = classMember(ctx, importModule(ctx, packageName), importName);
-        }
-        if (member == null) {
-            member = findClassInPackageModules(ctx, packageName, importName);
-        }
-        return requireMember(ctx, member, packageName, importName);
-    }
-
-    private static @Nullable Value classMember(Context ctx, Value module, String importName) {
-        Value member = module.getMember(importName);
-        return isPythonClass(ctx, member) ? member : null;
-    }
-
-    private static Value requireMember(Context ctx, @Nullable Value member, String packageName, String importName) {
-        if (member != null && isPythonClass(ctx, member)) {
-            return member;
-        }
-        throw new InstantiationException("Cannot find Python member: " + packageName + "." + importName);
-    }
-
-    private static @Nullable Value importPackageSubmoduleMember(Context ctx, String packageName, String importName) {
-        Value member = importSubmoduleMember(ctx, packageName + "." + importName, importName);
-        if (member != null) {
-            return member;
-        }
-        String pythonModuleName = NameUtils.underscoreSeparate(importName, true);
-        if (!pythonModuleName.equals(importName)) {
-            return importSubmoduleMember(ctx, packageName + "." + pythonModuleName, importName);
-        }
-        return null;
-    }
-
-    /**
-     * A member of a module that may not exist: {@code null} when the module (or its package) is not
-     * found; any other error of the import propagates.
-     */
-    private static @Nullable Value importSubmoduleMember(Context ctx, String moduleName, String memberName) {
-        try {
-            return importModule(ctx, moduleName).getMember(memberName);
-        } catch (PolyglotException e) {
-            if (isModuleNotFound(e, moduleName)) {
-                return null;
-            }
-            throw e;
-        }
-    }
-
-    /**
-     * Whether an import failed because the module itself, or a package on its path, does not exist:
-     * a {@code ModuleNotFoundError} naming that module, not one raised by the code of the module.
-     */
-    private static boolean isModuleNotFound(PolyglotException e, String moduleName) {
-        Value error = e.isGuestException() ? e.getGuestObject() : null;
-        if (error == null) {
-            return false;
-        }
-        Value meta = error.getMetaObject();
-        if (meta == null || !"ModuleNotFoundError".equals(meta.getMetaSimpleName())) {
-            return false;
-        }
-        Value name = error.hasMember("name") ? error.getMember("name") : null;
-        if (name == null || !name.isString()) {
-            return false;
-        }
-        String missing = name.asString();
-        return moduleName.equals(missing) || moduleName.startsWith(missing + ".");
-    }
-
-    /**
-     * The package a class is resolved from, imported unless its import is running already:
-     * {@code None} while this or another thread is still executing it.
-     */
-    private static Value importPackageOfMember(Context ctx, String packageName) {
-        return withContextClassLoader(() -> helper(ctx, "__micronaut_import_package_of_member").execute(packageName));
-    }
-
-    private static @Nullable Value findClassInPackageModules(Context ctx, String packageName, String importName) {
-        Value findClass = helper(ctx, "__micronaut_find_class_in_package_modules");
-        return findClass.execute(packageName, importName);
-    }
-
-    private static boolean isPythonClass(Context ctx, @Nullable Value value) {
-        if (value == null || PythonConversion.isNone(value)) {
-            return false;
-        }
-        Value isClass = helper(ctx, "__micronaut_inspect_isclass");
-        return isClass.execute(value).asBoolean();
-    }
-
-    private static Value importModule(Context ctx, String moduleName) {
-        return withContextClassLoader(() -> {
-            Value importModule = helper(ctx, "__micronaut_import_module");
-            return importModule.execute(moduleName);
-        });
     }
 
     /**
@@ -1890,6 +1846,34 @@ public final class PythonContextRuntime {
                 + ", displayName=" + displayName
                 + ", cacheKey=" + cacheKey
                 + ']';
+        }
+    }
+
+    /**
+     * An instance allocated by {@link #allocateInstance}, with the arguments its {@code __init__}
+     * receives from {@link #initializeInstance(AllocatedInstance)}.
+     *
+     * @since 5.2.16
+     */
+    public static final class AllocatedInstance {
+        private final Value instance;
+        private final Value pythonClass;
+        private final Object[] arguments;
+        private final boolean initialized;
+
+        private AllocatedInstance(Value instance, Value pythonClass, Object[] arguments, boolean initialized) {
+            this.instance = instance;
+            this.pythonClass = pythonClass;
+            this.arguments = arguments;
+            this.initialized = initialized;
+        }
+
+        /**
+         * @return The instance, not initialized yet
+         */
+        @UsedByGeneratedCode
+        public Value instance() {
+            return instance;
         }
     }
 }

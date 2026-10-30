@@ -18,20 +18,25 @@ package io.micronaut.http.body;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.CharBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
+import java.util.ArrayDeque;
 
 /**
  * The body reader for {@link String}.
@@ -56,7 +61,7 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
 
     @Override
     public String read(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
-        return read0(byteBuffer, getCharset(mediaType, httpHeaders));
+        return read0(byteBuffer, getCharset(mediaType));
     }
 
     private String read0(ByteBuffer<?> byteBuffer, Charset charset) {
@@ -70,7 +75,7 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
     @Override
     public String read(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
-            return new String(inputStream.readAllBytes(), getCharset(mediaType, httpHeaders));
+            return new String(inputStream.readAllBytes(), getCharset(mediaType));
         } catch (IOException e) {
             throw new CodecException("Failed to read InputStream", e);
         }
@@ -78,10 +83,134 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
 
     @Override
     public Publisher<String> readChunked(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return Flux.from(input).map(byteBuffer -> read0(byteBuffer, getCharset(mediaType, httpHeaders)));
+        Charset charset;
+        try {
+            charset = getCharset(mediaType);
+        } catch (CodecException e) {
+            // signalled through the publisher, which takes over the input and releases it: the
+            // input has no other owner once it is passed here
+            return PieceReaders.publisherOfBuffers(input, new FailingPieceReader(e), PieceReaders::adapt);
+        }
+        return PieceReaders.publisherOfBuffers(input, new DecodingPieceReader(charset), PieceReaders::adapt);
     }
 
-    private Charset getCharset(@Nullable MediaType mediaType, Headers httpHeaders) {
-        return MessageBodyWriter.findCharset(mediaType, httpHeaders).orElse(defaultCharset);
+    @Override
+    public PieceReader<String> openPieceReader(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
+        return new DecodingPieceReader(getCharset(mediaType));
+    }
+
+    /**
+     * Only the charset of the {@code Content-Type} describes how the body is encoded. The
+     * {@code Accept-Charset} header is a preference for the response and is not consulted.
+     */
+    private Charset getCharset(@Nullable MediaType mediaType) {
+        if (mediaType == null) {
+            return defaultCharset;
+        }
+        try {
+            return mediaType.getCharset().orElse(defaultCharset);
+        } catch (IllegalArgumentException e) {
+            // IllegalCharsetNameException or UnsupportedCharsetException: the client sent a bad charset
+            throw new CodecException("Unsupported charset in content type: " + mediaType, e);
+        }
+    }
+
+    /**
+     * Decodes consecutive pieces with one decoder: a multi-byte character can span pieces, so an
+     * incomplete trailing character is carried over to the next piece.
+     */
+    private static final class DecodingPieceReader implements PieceReader<String> {
+        private static final java.nio.ByteBuffer EMPTY = java.nio.ByteBuffer.allocate(0);
+
+        private final CharsetDecoder decoder;
+        private final ArrayDeque<String> decoded = new ArrayDeque<>(1);
+        private java.nio.ByteBuffer leftover = EMPTY;
+        private boolean closed;
+
+        DecodingPieceReader(Charset charset) {
+            decoder = charset.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPLACE)
+                .onUnmappableCharacter(CodingErrorAction.REPLACE);
+        }
+
+        @Override
+        public void read(ReadBuffer piece) {
+            byte[] bytes;
+            try (piece) {
+                if (closed) {
+                    return;
+                }
+                bytes = piece.toArray();
+            }
+            decode(java.nio.ByteBuffer.wrap(bytes), false);
+        }
+
+        @Override
+        public void complete() {
+            if (!closed) {
+                decode(EMPTY, true);
+            }
+        }
+
+        @Override
+        public @Nullable String poll() {
+            return decoded.poll();
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+            decoded.clear();
+            leftover = EMPTY;
+        }
+
+        private void decode(java.nio.ByteBuffer chunk, boolean endOfInput) {
+            java.nio.ByteBuffer in = chunk;
+            if (leftover.hasRemaining()) {
+                in = java.nio.ByteBuffer.allocate(leftover.remaining() + chunk.remaining()).put(leftover).put(chunk).flip();
+            }
+            CharBuffer out = CharBuffer.allocate((int) Math.ceil(in.remaining() * (double) decoder.maxCharsPerByte()) + 2);
+            decoder.decode(in, out, endOfInput);
+            if (endOfInput) {
+                decoder.flush(out);
+            }
+            leftover = in.hasRemaining() ? java.nio.ByteBuffer.allocate(in.remaining()).put(in).flip() : EMPTY;
+            if (out.position() > 0) {
+                decoded.add(out.flip().toString());
+            }
+        }
+    }
+
+    /**
+     * Fails the read of a body that cannot be decoded, e.g. because of an unsupported charset,
+     * closing the pieces it is given.
+     */
+    private static final class FailingPieceReader implements PieceReader<String> {
+        private final CodecException failure;
+
+        FailingPieceReader(CodecException failure) {
+            this.failure = failure;
+        }
+
+        @Override
+        public void read(ReadBuffer piece) {
+            piece.close();
+            throw failure;
+        }
+
+        @Override
+        public void complete() {
+            throw failure;
+        }
+
+        @Override
+        public @Nullable String poll() {
+            return null;
+        }
+
+        @Override
+        public void close() {
+            // nothing is buffered
+        }
     }
 }

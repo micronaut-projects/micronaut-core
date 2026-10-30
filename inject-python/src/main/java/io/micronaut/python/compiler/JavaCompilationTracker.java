@@ -52,6 +52,9 @@ final class JavaCompilationTracker implements TaskListener {
     // reference, so remember it; a compilation does not move its sources underneath itself
     private final Map<URI, Optional<String>> sourceKeys = new LinkedHashMap<>();
     private CompilationProfiler profiler;
+    // the units javac analyses and generates follow one another, so one open span each suffices
+    private CompilationProfiler.Span analyzing;
+    private CompilationProfiler.Span generating;
 
     JavaCompilationTracker(JavacTask task) {
         this.trees = Trees.instance(task);
@@ -61,11 +64,16 @@ final class JavaCompilationTracker implements TaskListener {
     public void started(TaskEvent event) {
         if (event.getKind() == TaskEvent.Kind.ANNOTATION_PROCESSING_ROUND) {
             CompilationProfiler.increment(profiler, "javac.rounds", 1);
+        } else if (profiler != null && event.getKind() == TaskEvent.Kind.ANALYZE && analyzing == null) {
+            analyzing = profiler.phase("javac.analyze");
+        } else if (profiler != null && event.getKind() == TaskEvent.Kind.GENERATE && generating == null) {
+            generating = profiler.phase("javac.generate");
         }
     }
 
     /**
-     * Sets the profiler counting the rounds and the units javac analyses and generates, or null.
+     * Sets the profiler counting the rounds and the units javac analyses and generates, and timing
+     * the analysis (attribution and flow) and the generation of the class files, or null.
      *
      * @param profiler The profiler
      */
@@ -77,6 +85,13 @@ final class JavaCompilationTracker implements TaskListener {
     public void finished(TaskEvent event) {
         if (event.getKind() == TaskEvent.Kind.GENERATE) {
             CompilationProfiler.increment(profiler, "javac.generated-types", 1);
+            if (generating != null) {
+                generating.close();
+                generating = null;
+            }
+        } else if (event.getKind() == TaskEvent.Kind.ANALYZE && analyzing != null) {
+            analyzing.close();
+            analyzing = null;
         }
         if (event.getKind() != TaskEvent.Kind.ANALYZE || event.getCompilationUnit() == null) {
             return;
@@ -129,16 +144,19 @@ final class JavaCompilationTracker implements TaskListener {
     void recordGeneratedSource(JavaFileObject generatedSource,
                                boolean pythonProcessor,
                                Element... originatingElements) {
-        if (originatingElements.length != 1) {
+        String generated = fileSourceKey(generatedSource);
+        if (generated == null) {
             return;
         }
-        String generated = fileSourceKey(generatedSource);
-        String origin = sourceKey(originatingElements[0]);
-        if (generated != null && origin != null) {
+        String origin = originatingElements.length == 1 ? sourceKey(originatingElements[0]) : null;
+        if (origin != null) {
             generatedSourceOrigins.put(generated, origin);
-            if (pythonProcessor) {
-                pythonGeneratedSources.add(generated);
-            }
+        }
+        // a source Python processing generates without an origin among the sources, such as the
+        // provider of the functional interfaces of all of them, is tracked too: the classes and the
+        // resources derived from it are then Python processing outputs rather than unknown ones
+        if (pythonProcessor) {
+            pythonGeneratedSources.add(generated);
         }
     }
 

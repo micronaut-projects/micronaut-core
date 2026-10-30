@@ -18,6 +18,7 @@ package io.micronaut.expressions.parser.ast.access;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.collection.OneDimensionalArray;
+import io.micronaut.expressions.parser.ast.literal.NullLiteral;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
@@ -90,10 +91,13 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
                                       List<TypeDef> argumentTypes) {
         VisitorContext visitorContext = ctx.visitorContext();
 
-        List<ClassElement> arguments =
-            argumentTypes.stream()
-                .map(type -> getRequiredClassElement(type, visitorContext))
-                .toList();
+        List<ClassElement> arguments = new ArrayList<>(argumentTypes.size());
+        for (int i = 0; i < argumentTypes.size(); i++) {
+            // the null literal is passed as null so that it is compatible with any reference parameter type
+            arguments.add(this.arguments.get(i) instanceof NullLiteral
+                ? null
+                : getRequiredClassElement(argumentTypes.get(i), visitorContext));
+        }
 
         return new CandidateMethod(methodElement, arguments);
     }

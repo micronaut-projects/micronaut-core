@@ -28,6 +28,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
@@ -39,6 +40,8 @@ import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.AsyncHttpClient;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
+import io.micronaut.http.client.AsyncProxyHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
@@ -48,6 +51,7 @@ import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.sse.Event;
+import io.micronaut.websocket.AsyncWebSocketClient;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.ChannelFactory;
@@ -84,7 +88,7 @@ public class DefaultHttpClient implements
     AutoCloseable {
 
     private final NettyHttpClient nettyHttpClient;
-    private final AsyncHttpClient asyncHttpClient;
+    private final AsyncStreamingHttpClient asyncHttpClient;
 
     DefaultHttpClient(DefaultHttpClientBuilder builder) {
         this(builder.nettyBuilder().build());
@@ -98,7 +102,7 @@ public class DefaultHttpClient implements
      */
     DefaultHttpClient(NettyHttpClient nettyHttpClient) {
         this.nettyHttpClient = Objects.requireNonNull(nettyHttpClient, "nettyHttpClient");
-        this.asyncHttpClient = new DefaultAsyncHttpClient(nettyHttpClient);
+        this.asyncHttpClient = nettyHttpClient.toAsyncStreaming();
     }
 
     /**
@@ -350,7 +354,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
-        return nettyHttpClient.getMediaTypeCodecRegistry();
+        return Objects.requireNonNull(nettyHttpClient.getMediaTypeCodecRegistry());
     }
 
     /**
@@ -377,7 +381,7 @@ public class DefaultHttpClient implements
      * Set the handler registry for this client.
      *
      * @param handlerRegistry The handler registry
-     * @deprecated Use builder instead
+     * @deprecated Use {@link DefaultHttpClientBuilder#handlerRegistry(MessageBodyHandlerRegistry)} instead
      */
     @Deprecated(forRemoval = true)
     public final void setHandlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
@@ -480,8 +484,23 @@ public class DefaultHttpClient implements
     }
 
     @Override
+    public AsyncStreamingHttpClient toAsyncStreaming() {
+        return asyncHttpClient;
+    }
+
+    @Override
     public AsyncRawHttpClient toAsyncRaw() {
         return nettyHttpClient.toAsyncRaw();
+    }
+
+    @Override
+    public AsyncProxyHttpClient toAsyncProxy() {
+        return nettyHttpClient.toAsyncProxy();
+    }
+
+    @Override
+    public AsyncWebSocketClient toAsyncWebSocket() {
+        return nettyHttpClient.toAsyncWebSocket();
     }
 
     @Override
@@ -512,7 +531,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated(since = "5.0", forRemoval = true)
     protected final <I> ExecutionFlow<URI> resolveRequestURI(HttpRequest<I> request) {
-        return nettyHttpClient.resolveRequestURI(request).map(NettyHttpClient.ResolvedTarget::releasedUri);
+        return nettyHttpClient.resolveRequestURI(request).map(AbstractHttpClient.ResolvedTarget::releasedUri);
     }
 
     /**
@@ -524,7 +543,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated(since = "5.0", forRemoval = true)
     protected final <I> ExecutionFlow<URI> resolveRequestURI(HttpRequest<I> request, boolean includeContextPath) {
-        return nettyHttpClient.resolveRequestURI(request, includeContextPath).map(NettyHttpClient.ResolvedTarget::releasedUri);
+        return nettyHttpClient.resolveRequestURI(request, includeContextPath).map(AbstractHttpClient.ResolvedTarget::releasedUri);
     }
 
     /**
@@ -536,7 +555,7 @@ public class DefaultHttpClient implements
      */
     @Deprecated(since = "5.0", forRemoval = true)
     protected final <I> ExecutionFlow<URI> resolveRedirectURI(HttpRequest<?> parentRequest, HttpRequest<I> request) {
-        return nettyHttpClient.resolveRedirectURI(parentRequest, request).map(NettyHttpClient.ResolvedTarget::releasedUri);
+        return nettyHttpClient.resolveRedirectURI(parentRequest, request).map(AbstractHttpClient.ResolvedTarget::releasedUri);
     }
 
     /**

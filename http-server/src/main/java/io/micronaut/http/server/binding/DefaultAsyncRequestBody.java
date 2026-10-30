@@ -22,8 +22,6 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.BodyPreservingRequestWrapper;
@@ -32,33 +30,40 @@ import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.LifecycleHttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.ServerHttpRequest;
-import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.FormOptions;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.ByteBodyElements;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormPart;
 import io.micronaut.http.form.FormParts;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.server.exceptions.UnsupportedMediaException;
+import io.micronaut.http.server.multipart.FormFactory;
+import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -99,29 +104,43 @@ import java.util.function.Supplier;
  */
 @Internal
 final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBody {
+    /**
+     * The arguments of the classes the handlers read, created once: a handler reads a body of the same
+     * class at every request.
+     */
+    private static final ClassValue<Argument<?>> ARGUMENTS = new ClassValue<>() {
+        @Override
+        protected Argument<?> computeValue(Class<?> type) {
+            return Argument.of(type);
+        }
+    };
 
+    // every ASCII character, which a raw value of a URL-encoded form keeps
+    private static final byte[] ASCII_BYTES = asciiBytes();
+    private static final String ASCII = new String(ASCII_BYTES, StandardCharsets.US_ASCII);
     private static final Logger LOG = LoggerFactory.getLogger(DefaultAsyncRequestBody.class);
     private static final List<String> ELEMENT_MEDIA_TYPES = List.of(MediaType.APPLICATION_JSON, MediaType.APPLICATION_JSON_STREAM);
     private static final List<String> FORM_MEDIA_TYPES = List.of(MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA);
 
     private final HttpRequest<?> request;
     private final ServerHttpRequest<?> server;
-    private final AsyncRequestBodyArgumentBinder binder;
+    private final AsyncRequestBodyFactory factory;
     /**
      * The empty body of a request whose body a filter set to {@code null}, or {@code null}.
      */
-    private final @Nullable ByteBody cleared;
+    private @Nullable ByteBody cleared;
     /**
      * Whether a filter set the body to an object, which replaces the bytes of the request.
      */
-    private final boolean decoded;
+    private boolean decoded;
+    private boolean resolved;
     /**
      * Whether this is a copy, which reads a split of the bytes of the server request.
      */
     private final boolean copy;
     /**
      * Held while a read of the body or of one of its copies is started, and while it consumes
-     * the bytes of the server request: shared by the body and its copies.
+     * the bytes of the server request: the byte body itself, shared by all reader views.
      */
     private final Object lock;
 
@@ -133,33 +152,38 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
     /**
      * @param request The request of the route
      * @param server  The server request whose bytes are the body of the request, see {@link ServerRequestBody}
-     * @param binder  The binder
+     * @param factory The body services
      */
-    DefaultAsyncRequestBody(HttpRequest<?> request, ServerHttpRequest<?> server, AsyncRequestBodyArgumentBinder binder) {
-        this(request, server, binder, false, new Object());
+    DefaultAsyncRequestBody(HttpRequest<?> request, ServerHttpRequest<?> server, AsyncRequestBodyFactory factory) {
+        this(request, server, factory, false, server.byteBody());
     }
 
     /**
      * @param request The request of the route
      * @param server  The server request whose bytes are the body of the request, see {@link ServerRequestBody}
-     * @param binder  The binder
+     * @param factory The body services
      * @param copy    Whether this is a copy, which reads a split of the bytes
      * @param lock    The lock of the body and its copies
      */
-    private DefaultAsyncRequestBody(HttpRequest<?> request, ServerHttpRequest<?> server, AsyncRequestBodyArgumentBinder binder, boolean copy, Object lock) {
+    private DefaultAsyncRequestBody(HttpRequest<?> request, ServerHttpRequest<?> server, AsyncRequestBodyFactory factory, boolean copy, Object lock) {
         this.lock = lock;
         this.request = request;
         this.server = server;
-        this.binder = binder;
+        this.factory = factory;
         this.copy = copy;
-        if (ServerRequestBody.isBodySet(request)) {
-            // a filter replaced the bytes of the request with the body it set
-            boolean present = request.getBody().isPresent();
-            this.cleared = present ? null : server.byteBodyFactory().createEmpty();
-            this.decoded = present;
-        } else {
-            this.cleared = null;
-            this.decoded = false;
+    }
+
+    /**
+     * Resolve a replacement only when reading starts: an earlier lookup or copy must not freeze
+     * the body before another filter replaces it. Called with the byte-body lock held.
+     */
+    private void resolveBody() {
+        if (!resolved) {
+            if (ServerRequestBody.isBodySet(request)) {
+                decoded = request.getBody().isPresent();
+                cleared = decoded ? null : server.byteBodyFactory().createEmpty();
+            }
+            resolved = true;
         }
     }
 
@@ -170,23 +194,38 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         return cleared == null ? server.byteBody() : cleared;
     }
 
+    @SuppressWarnings("unchecked")
+    private static <T> Argument<T> argumentOf(Class<T> type) {
+        return (Argument<T>) ARGUMENTS.get(type);
+    }
+
     @Override
     public boolean hasBody() {
-        if (decoded) {
-            return true;
+        synchronized (lock) {
+            if (!resolved && ServerRequestBody.isBodySet(request)) {
+                return request.getBody().isPresent();
+            }
+            if (decoded) {
+                return true;
+            }
+            OptionalLong length = byteBody().expectedLength();
+            return length.isEmpty() || length.getAsLong() != 0;
         }
-        OptionalLong length = byteBody().expectedLength();
-        return length.isEmpty() || length.getAsLong() != 0;
     }
 
     @Override
     public OptionalLong expectedBodySize() {
-        return decoded ? OptionalLong.empty() : byteBody().expectedLength();
+        synchronized (lock) {
+            if (!resolved && ServerRequestBody.isBodySet(request)) {
+                return request.getBody().isPresent() ? OptionalLong.empty() : OptionalLong.of(0);
+            }
+            return decoded ? OptionalLong.empty() : byteBody().expectedLength();
+        }
     }
 
     @Override
     public <T> CompletionStage<@Nullable T> body(Class<T> type) {
-        return body(Argument.of(type));
+        return body(argumentOf(type));
     }
 
     @Override
@@ -206,7 +245,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
             Argument<T> argument = BodyArguments.bodyArgument(type);
             CompletableFuture<@Nullable T> result = new CompletableFuture<>();
             try {
-                ArgumentBinder<T, HttpRequest<?>> argumentBinder = binder.binderRegistry().findArgumentBinder(argument)
+                ArgumentBinder<T, HttpRequest<?>> argumentBinder = factory.binderRegistry().findArgumentBinder(argument)
                     .orElseThrow(() -> UnsatisfiedRouteException.create(argument));
                 ArgumentConversionContext<T> context = ConversionContext.of(argument, request.getLocale().orElse(null), request.getCharacterEncoding());
                 // the binder waits for the body: this read waits for it, not the route, which is
@@ -309,7 +348,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     @Override
     public <T> BodyElements<T> elements(Class<T> type) {
-        return elements(Argument.of(type));
+        return elements(argumentOf(type));
     }
 
     @Override
@@ -326,7 +365,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         synchronized (lock) {
             claimBytes("elements");
             CloseableByteBody body = readBytes("elements");
-            PublisherBodyElements<T> elements = new PublisherBodyElements<>(() -> elementPublisher(type, body), body::close);
+            BodyElements<T> elements = bodyElements(type, body);
             owned(elements::closeAsync);
             return elements;
         }
@@ -339,10 +378,76 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         }
     }
 
+    @Override
+    public CompletionStage<FormData> form(FormOptions options) {
+        MediaType contentType = request.getContentType().orElse(null);
+        if (!options.rawValues() || contentType == null || !contentType.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
+            // a multipart form has no percent-encoding
+            return form();
+        }
+        synchronized (lock) {
+            if (decoded) {
+                // a filter set the body to an object: its values are not the ones of the body
+                throw new IllegalStateException("The raw values of the form cannot be read: a filter replaced the body");
+            }
+            claimBytes("form");
+            try {
+                if (cleared != null) {
+                    // no body: a form without fields
+                    return CompletableFuture.completedFuture(new DefaultFormData(Map.of(), Map.of(), factory.conversionService));
+                }
+                FormCapableHttpRequest<?> formRequest = formRequest();
+                // decoded by the decoder of the form, with its limits and its validation, but the
+                // values are kept as they appear: ASCII, unless the client sent other bytes
+                Charset charset = request.getCharacterEncoding();
+                UploadContext context = UploadContext.of(factory.formFactory(), formRequest, isAsciiCompatible(charset) ? charset : StandardCharsets.ISO_8859_1);
+                CloseableByteBody body = readBytes("form");
+                FormDataArgumentBinder.Collection collection = FormDataArgumentBinder.start(context, factory.formFactory(), factory.conversionService, formRequest,
+                    () -> encodedFields(formRequest, body));
+                owned(() -> {
+                    collection.cancel();
+                    return CompletableFuture.completedStage(null);
+                });
+                return collection.result().minimalCompletionStage();
+            } catch (Throwable e) {
+                return CompletableFuture.failedStage(e);
+            }
+        }
+    }
+
+    private static byte[] asciiBytes() {
+        byte[] bytes = new byte[128];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) i;
+        }
+        return bytes;
+    }
+
+    private static Publisher<RawFormField> encodedFields(FormCapableHttpRequest<?> formRequest, CloseableByteBody body) {
+        try {
+            return formRequest.getEncodedFormFields(body);
+        } catch (Throwable e) {
+            // no publisher took the body
+            body.close();
+            throw e;
+        }
+    }
+
+    /**
+     * @param charset A charset
+     * @return Whether it encodes and decodes every ASCII character as its ASCII byte: the raw value
+     * of a field keeps any ASCII character, e.g. {@code ~}, which some charsets map elsewhere
+     */
+    private static boolean isAsciiCompatible(Charset charset) {
+        return charset.equals(StandardCharsets.UTF_8) || charset.equals(StandardCharsets.ISO_8859_1) || charset.equals(StandardCharsets.US_ASCII)
+            || Arrays.equals(ASCII.getBytes(charset), ASCII_BYTES) && new String(ASCII_BYTES, charset).equals(ASCII);
+    }
+
     private CompletionStage<FormData> startForm() {
+        resolveBody();
         if (decoded) {
             // a filter set the body to an object: the form it set, or one it converts to
-            CompletableFuture<@Nullable FormData> replaced = FormBinding.replacedForm(request, binder.conversionService);
+            CompletableFuture<@Nullable FormData> replaced = FormBinding.replacedForm(request, factory.conversionService);
             FormData form = replaced == null ? null : replaced.getNow(null);
             if (form != null) {
                 claim("form");
@@ -354,7 +459,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
             if (cleared != null) {
                 checkForm();
                 // no body: a form without fields
-                return CompletableFuture.completedFuture(new DefaultFormData(Map.of(), Map.of(), binder.conversionService));
+                return CompletableFuture.completedFuture(new DefaultFormData(Map.of(), Map.of(), factory.conversionService));
             }
             FormCapableHttpRequest<?> formRequest = formRequest();
             // the one form of the request, shared with the FormData, FileUpload and text field
@@ -365,12 +470,12 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
                 // starts is decoded from a split of the bytes, so the route can still read the
                 // body in any way, and is the form of the request, which the form arguments
                 // share. It is not cancelled with the handler, the request releases it
-                return binding.form(binder.formFactory(), binder.conversionService, () -> copiedFields(formRequest)).minimalCompletionStage();
+                return binding.form(factory.formFactory(), factory.conversionService, () -> copiedFields(formRequest)).minimalCompletionStage();
             }
             // the form is read by the handler, outside the argument binding of the route, which
             // it does not delay: the route of a filter that read it does not wait for it
-            FormDataArgumentBinder.Collection started = binding.startDetachedForm(binder.formFactory(), binder.conversionService);
-            CompletableFuture<FormData> form = binding.form(binder.formFactory(), binder.conversionService);
+            FormDataArgumentBinder.Collection started = binding.startDetachedForm(factory.formFactory(), factory.conversionService);
+            CompletableFuture<FormData> form = binding.form(factory.formFactory(), factory.conversionService);
             // the form stays the one of the request, but this read consumes the body: the
             // form arguments and the readers of the bytes that come later fail
             describeRead(server.byteBody(), "form");
@@ -400,7 +505,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
                 return NoFormParts.INSTANCE;
             }
             FormCapableHttpRequest<?> formRequest = formRequest();
-            UploadContext context = UploadContext.of(binder.formFactory(), formRequest, request.getCharacterEncoding());
+            UploadContext context = UploadContext.of(factory.formFactory(), formRequest, request.getCharacterEncoding());
             // the fields are decoded when the first part is asked for: a copy decodes a split of the
             // bytes, which leaves the whole body to the other readers of the request
             DefaultFormParts parts = new DefaultFormParts(() -> {
@@ -441,7 +546,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
     @Override
     public AsyncRequestBody copy() {
-        DefaultAsyncRequestBody copy = new DefaultAsyncRequestBody(request, server, binder, true, lock);
+        DefaultAsyncRequestBody copy = new DefaultAsyncRequestBody(request, server, factory, true, lock);
         synchronized (this) {
             if (copies == null) {
                 copies = new ArrayList<>(1);
@@ -505,11 +610,16 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         if (first != null) {
             throw new IllegalStateException("The body of the request was already read with " + first + "(): it can be read once");
         }
+        resolveBody();
         if (!decoded && cleared == null) {
             // another reader of the request consumed the bytes, e.g. a filter
-            String consumed = InternalByteBody.claimDescription(server.byteBody());
+            ByteBody bytes = server.byteBody();
+            String consumed = InternalByteBody.claimDescription(bytes);
             if (consumed != null) {
                 throw new IllegalStateException(consumed);
+            }
+            if (!copy) {
+                InternalByteBody.reservePrimaryRead(bytes, name);
             }
         }
         reader = name;
@@ -521,6 +631,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
      * @param name The method that reads the body
      */
     private void claimBytes(String name) {
+        resolveBody();
         if (decoded) {
             throw new IllegalStateException("The body of the request cannot be read with " + name
                 + "(): a filter replaced the body with a decoded object, read it with body(Type)");
@@ -660,11 +771,15 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
     }
 
     /**
-     * @return The context of the body: the text is in the charset of the request of the route,
-     * like its content type
+     * @return The context of the body: the text is in the charset of the content type of the
+     * request of the route, else the default charset, like a {@code String} body
      */
     private UploadContext uploadContext() {
-        return UploadContext.of(binder.formFactory(), server, request.getCharacterEncoding());
+        FormFactory formFactory = factory.formFactory();
+        Charset charset = request.getContentType()
+            .flatMap(MediaType::getCharset)
+            .orElseGet(() -> formFactory.getConfiguration().getDefaultCharset());
+        return UploadContext.of(formFactory, server, charset);
     }
 
     /**
@@ -692,29 +807,41 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         throw new UnsupportedMediaException(String.valueOf(request.getContentType().orElse(null)), FORM_MEDIA_TYPES);
     }
 
-    private <T> Publisher<? extends T> elementPublisher(Argument<T> type, CloseableByteBody body) {
-        MediaType contentType = request.getContentType().orElse(null);
-        if (!isJson(contentType)) {
+    /**
+     * The elements of the body, read through the piece reader of the chunked reader, without
+     * Reactor. A body that cannot be read as elements fails the first read, like a failure to
+     * decode it.
+     */
+    @SuppressWarnings("java:S2095") // the elements own the piece reader, and close it
+    private <T> BodyElements<T> bodyElements(Argument<T> type, CloseableByteBody body) {
+        PieceReader<T> pieceReader;
+        try {
+            MediaType contentType = request.getContentType().orElse(null);
+            ChunkedMessageBodyReader<T> chunked = chunkedReader(type, contentType);
+            // an element is decoded in memory: it is limited like buffered content. The body is
+            // streamed without being held, so the body is not, nor the bytes that arrived before
+            // it is read
+            pieceReader = PieceReaders.open(chunked, type, contentType, request.getHeaders(), uploadContext().maxBufferSize());
+        } catch (RuntimeException e) {
+            return new PublisherBodyElements<>(() -> {
+                throw e;
+            }, body::close);
+        }
+        return new ByteBodyElements<>(body, pieceReader, Function.identity());
+    }
+
+    private <T> ChunkedMessageBodyReader<T> chunkedReader(Argument<T> type, @Nullable MediaType contentType) {
+        if (contentType == null || !isJson(contentType)) {
             throw new UnsupportedMediaException(String.valueOf(contentType), ELEMENT_MEDIA_TYPES);
         }
-        MessageBodyReader<T> elementReader = binder.bodyHandlerRegistry().findReader(type, List.of(contentType)).orElse(null);
+        MessageBodyReader<T> elementReader = factory.bodyHandlerRegistry().findReader(type, List.of(contentType)).orElse(null);
         if (!(elementReader instanceof ChunkedMessageBodyReader<T> chunked)) {
             // a JSON body: the media type is supported, what is missing is the reader, e.g. on a
-            // server that is not the Netty server, without micronaut-http-netty
+            // server that is not the Netty server, without micronaut-json-core
             throw new UnsupportedOperationException("Reading the elements of a JSON body [" + contentType
-                + "] needs a chunked JSON message body reader, which micronaut-http-netty provides: add it to the runtime classpath");
+                + "] needs a chunked JSON message body reader, which micronaut-json-core provides: add it to the runtime classpath");
         }
-        // an element is decoded in memory: it is limited like buffered content. The body is
-        // streamed without being held, so the body is not, nor the bytes that arrived before it
-        // is read
-        Publisher<ByteBuffer<?>> bytes = Flux.from(InternalByteBody.toUnbufferedReadBufferPublisher(body))
-            .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
-            .map(rb -> {
-                try (rb) {
-                    return rb.toByteBuffer();
-                }
-            });
-        return chunked.readChunked(type, contentType, request.getHeaders(), bytes, uploadContext().maxBufferSize());
+        return chunked;
     }
 
     /**
@@ -746,15 +873,16 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         if (lastError.isPresent()) {
             throw new ConversionErrorException(argument, lastError.get());
         }
-        if (!(result instanceof PendingRequestBindingResult<T> pending && pending.isPending()) && result.isPresentAndSatisfied()) {
-            Object value = result.get();
+        Optional<T> bound = !result.isPending() && result.isSatisfied() ? result.getValue() : Optional.empty();
+        if (bound.isPresent()) {
+            Object value = bound.get();
             if (value instanceof ConversionError error) {
                 throw new ConversionErrorException(argument, error);
             }
             if (argument.getType().isInstance(value)) {
                 return (T) value;
             }
-            return binder.conversionService.convertRequired(value, argument);
+            return factory.conversionService.convertRequired(value, argument);
         }
         if (argument.isOptional()) {
             return (T) Optional.empty();
@@ -808,7 +936,17 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
 
         @Override
         public Optional<MediaType> getContentType() {
-            return getDelegate().getContentType();
+            Optional<MediaType> contentType = getDelegate().getContentType();
+            if (contentType.isPresent()) {
+                return contentType;
+            }
+            // A request without a content type is read as the route consumes, like the body of a
+            // controller route, whose reader the route has resolved for the type of its body: the
+            // type of the body of this route is not known before the handler reads it
+            return RouteAttributes.getRouteInfo(getDelegate())
+                .map(RouteInfo::getConsumes)
+                .filter(consumes -> consumes.size() == 1 && !MediaType.ALL_TYPE.equals(consumes.get(0)))
+                .map(consumes -> consumes.get(0));
         }
 
         @Override

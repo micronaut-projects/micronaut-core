@@ -228,6 +228,7 @@ class AsyncRequestBodyPartsReleaseTest {
             writeChunk(out, first.substring(withheld) + file("d2.txt", DOC2) + end());
             out.write(lastChunk());
             out.flush();
+            awaitBodyDiscarded(socket, out);
             assertEquals("0", probe.files(probe.destinations()));
         }
     }
@@ -393,7 +394,7 @@ class AsyncRequestBodyPartsReleaseTest {
                 String second = rest(file("d2.txt", DOC2));
                 writeChunk(out, second.substring(0, second.length() - DOC2.length() / 2));
                 probe.awaitStaging();
-                assertEquals(PENDING, probe.outcome("read"));
+                assertEquals(PENDING, probe.awaitPending("read"));
             }
             // the client disconnected: the stream is cancelled, the walk and the transfer aborted
             assertEquals(CANCELLED, probe.awaitOutcome("walk"));
@@ -464,7 +465,7 @@ class AsyncRequestBodyPartsReleaseTest {
                 String second = rest(file("d1.txt", DOC1));
                 writeChunk(out, second.substring(0, second.length() - DOC1.length() / 2));
                 probe.awaitStaging();
-                assertEquals(PENDING, probe.outcome("read"));
+                assertEquals(PENDING, probe.awaitPending("read"));
             }
             // the client disconnected: the stream is cancelled, the walk and the transfer aborted
             assertEquals(CANCELLED, probe.awaitOutcome("walk"));
@@ -545,6 +546,7 @@ class AsyncRequestBodyPartsReleaseTest {
             writeChunk(out, first.substring(withheld) + file("d2.txt", DOC2) + end());
             out.write(lastChunk());
             out.flush();
+            awaitBodyDiscarded(socket, out);
             assertEquals("0", probe.files(probe.destinations()));
         }
     }
@@ -651,6 +653,20 @@ class AsyncRequestBodyPartsReleaseTest {
         return Map.of(
             "micronaut.executors.blocking.type", "fixed",
             "micronaut.executors.blocking.number-of-threads", 1);
+    }
+
+    /**
+     * Wait until the server is done with the body of the request that was answered before its end
+     * arrived: the next request on the connection is served once the rest of that body was
+     * discarded, so the test does not end, and close the server, while buffers are in flight.
+     */
+    private static void awaitBodyDiscarded(Socket socket, OutputStream out) throws IOException {
+        out.write(chunkedHead("/parts-release/skip"));
+        writeChunk(out, field("name", "Next") + end());
+        out.write(lastChunk());
+        out.flush();
+        Response next = Response.read(socket.getInputStream());
+        assertEquals(200, next.status(), next.head());
     }
 
     private static ByteBodyHttpResponse<?> exchange(ApplicationContext ctx, String path, Publisher<ReadBuffer> body) throws Exception {
@@ -953,6 +969,17 @@ class AsyncRequestBodyPartsReleaseTest {
 
         String awaitOutcome(String name) {
             return await(() -> !PENDING.equals(outcome(name)) && !"none".equals(outcome(name)), () -> outcome(name));
+        }
+
+        /**
+         * The route tracks a transfer once it started it, so its staging file can exist before
+         * the transfer is tracked: the outcome is still that of an earlier transfer, or none.
+         *
+         * @param name The name of the tracked work
+         * @return The outcome, pending unless the work is not tracked in time
+         */
+        String awaitPending(String name) {
+            return await(() -> PENDING.equals(outcome(name)), () -> outcome(name));
         }
 
         String awaitNoFiles(Path dir) {

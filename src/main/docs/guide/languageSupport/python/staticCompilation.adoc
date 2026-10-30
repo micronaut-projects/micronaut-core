@@ -1,0 +1,301 @@
+Micronaut can compile Python function bodies into Java bytecode. Calls from Java, including HTTP routes and injected services, then run the compiled code instead of executing the body in GraalPy.
+
+Compiled code can still call into Python, for example to access a `@property` or call an uncompiled method. The <<staticCompilationReport, compilation report>> helps you identify these calls and understand which methods were compiled.
+
+WARNING: Static compilation is experimental and off by default. It aims to preserve Python behaviour within the supported subset. Report unexpected differences, and use `@CompileStatic(False)` to keep an affected function in Python. Integer overflow is a known difference described below.
+
+Static compilation builds on <<typeChecking, type checking>>. A method must pass the type checker's analysis before it can be compiled.
+
+== Enabling Static Compilation
+
+The annotation processor option `micronaut.python.compile.static` selects the mode:
+
+[cols="1,3"]
+|===
+|Mode |Effect
+
+|`off`
+|Nothing is compiled unless switched on by a decorator (the default).
+
+|`annotated`
+|The scopes carrying `CompileStatic` are compiled.
+
+|`all`
+|Every eligible method is compiled unless a decorator excludes it.
+|===
+
+[cols="1,3"]
+|===
+|Option |Purpose
+
+|`micronaut.python.compile.static.report`
+|The directory for the <<staticCompilationReport, compilation report>>. No report files are written unless this option is set.
+
+|`micronaut.python.compile.static.strict`
+|`true` reports an error instead of a warning when an explicit `CompileStatic` request cannot be fulfilled.
+
+|`micronaut.python.compile.static.annotations`
+|Comma-separated qualified decorator names recognized as compilation switches. Defaults to `io.micronaut.context.python.annotation.CompileStatic` and `pyronaut.build.CompileStatic`.
+
+|`micronaut.python.compile.static.trace`
+|`true` counts compiled method invocations for diagnostics. Read the count with `PythonStatic.entries(key)`, using a key such as `shop.PricingService#total`.
+|===
+
+Pass the options to `javac` as `-Amicronaut.python.compile.static=all`, or set them on the compiler API:
+
+[source,java]
+----
+PyronautCompiler.builder()
+    .pythonSrc("src/main/python")
+    .typeCheck(TypeCheckMode.WARN)
+    .staticCompilation(StaticCompilationMode.ANNOTATED)
+    .staticCompilationReport(new File("build/reports/pyronaut/static-compilation"))
+    .staticCompilationDecisionCallback(decision -> log.info(decision.toString()))
+    .build()
+    .compile();
+----
+
+== Switching Compilation On or Off for a Scope
+
+Apply `CompileStatic` to a class or function, or use it as a bare statement to configure a module.
+The nearest declaration wins: a function overrides its class, a class overrides its enclosing class or module, and a module overrides the compilation mode.
+
+[source,python]
+.shop/PricingService.py
+----
+import inflect
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
+
+@Singleton
+@CompileStatic                  # <1>
+class PricingService:
+    def __init__(self, rate: float):
+        self.rate = rate
+
+    def total(self, quantity: int, unit_price: float) -> float:
+        return quantity * unit_price * self.rate
+
+    def discounted(self, prices: list[list[float]]) -> list[float]:
+        return [price * self.rate for group in prices for price in group]     # <2>
+
+    @CompileStatic(False)       # <3>
+    def describe(self, sku: str) -> str:
+        return inflect.engine().plural(sku)
+----
+
+<1> Every eligible method of the class is compiled, in every mode
+<2> A comprehension with multiple `for` clauses is unsupported: the method stays in Python and gets a warning
+<3> The method stays in Python: it uses a third-party library
+
+If an explicitly annotated function cannot be compiled, the compiler warns and leaves it in Python. Set `micronaut.python.compile.static.strict=true` to make this an error.
+
+Class and module annotations also warn about skipped methods, except in mode `all`. Methods such as constructors that are never candidates are listed in the report without a warning. Selecting a mode alone does not produce warnings for skipped methods.
+
+You can also import the decorator with `from pyronaut.build import CompileStatic`. Both direct imports and module aliases such as `@pb.CompileStatic` are supported. The annotation is used only at compile time.
+
+== What Is Compiled
+
+Static compilation works best for typed application logic that calls Java APIs or other compiled Python methods.
+A method can be compiled when its parameters have types that map to Java and the compiler supports every operation in its body. Return hints are optional; without one, the generated Java method returns `Object`.
+
+Ordinary instance methods, `@staticmethod` methods and module-level functions can be compiled. Constructors, class methods (`@classmethod`), async functions, generators and property accessors stay in Python. Move expensive logic from these into a regular typed method if you want it compiled.
+
+=== Supported Python Features
+
+The compiler supports common operations on numbers, strings and typed collections:
+
+[cols="1,3"]
+|===
+|Feature |Examples
+
+|Control flow
+|Assignments, `if`/`elif`/`else`, `while`, `for`, `break`, `continue`, `return` and `assert`.
+
+|Numbers and comparisons
+|Arithmetic, numeric comparisons, string equality, `is None`, boolean operators and conditional expressions.
+
+|Strings
+|Simple f-strings, concatenation, `str()`, and methods such as `strip`, `split`, `join`, `upper`, `lower` and `replace`.
+
+|Collections
+|Typed lists, tuples, sets and dictionaries; literals, indexing, membership tests and common methods such as `append`, `add` and `get`.
+
+|Comprehensions
+|List, set and dictionary comprehensions with a single `for` clause; `any` and `all` over a generator expression. Some expression contexts are unsupported.
+
+|Builtins
+|`len`, `int`, `float`, `bool`, `abs`, `min`, `max`, `range`, `list`, `set` and `tuple`.
+
+|Java and application code
+|Java methods and constructors, compiled Python functions, injected services and typed attributes. Some attribute accesses and method calls still enter Python.
+
+|Exceptions
+|`try`/`except`/`finally` with typed catches, Java exceptions and supported <<pythonExceptions, Python exception classes>> from the same compilation.
+|===
+
+Python `int`, `float`, `str`, `bool` and `None` map to Java `long`, `double`, `String`, `boolean` and `null` respectively. Helpers preserve Python behaviour for operations such as floor division, negative indexing and string conversion.
+
+IMPORTANT: Compiled integer arithmetic uses fixed-width Java integers. Overflow raises `ArithmeticException` for Java callers instead of producing Python's arbitrary-precision result. Use Python execution for calculations that need arbitrary-precision integers.
+
+=== When a Method Stays in Python
+
+Unsupported features include lambdas and nested functions, `with`, `match`, slices, starred arguments, comprehensions with multiple `for` clauses, and generator expressions outside `any` and `all`. Signatures using `*args`, `**kwargs` or keyword-only parameters are also unsupported.
+
+The compiler also rejects operations when it cannot preserve their behaviour, such as changing a collection while iterating over it or comparing arbitrary Java objects with Python's `==`.
+
+You do not need to memorize every restriction. Check the <<staticCompilationReport, report>> for the reason a method was skipped and a suggested change. Common fixes are:
+
+* Add missing parameter or attribute hints and resolve type-checking errors.
+* Replace dynamic or third-party Python calls with typed Java APIs, or keep that method in Python.
+* Use `T | None` for nullable types instead of `Optional[T]`.
+* Pass Java method arguments positionally and provide a suitable default for `dict.get` on numeric values.
+
+[[staticCompilationOneImplementation]]
+== One Implementation
+
+Java callers use the compiled body. Python callers can use it too, provided doing so preserves Python behaviour.
+
+For an object created or wrapped by a generated Java class, Micronaut connects its Python methods to the compiled bodies. An object created directly in Python, such as `PricingService(1.0)`, continues to use the Python implementation. Compiled static methods and plain module-level functions can also be called from Python through their generated Java methods.
+
+Before a Python call uses compiled code, Micronaut checks that the argument types and ranges match. For example, a Python `bool` is not accepted for an `int` parameter, and an arbitrary-precision integer must fit the Java parameter's range. Collection parameters and other values whose conversion could change their behaviour keep the call in Python.
+
+Failures are handled according to whether retrying is safe:
+
+* *Without side effects*, a failed compiled call can run again in Python. This preserves Python results and exceptions, including integer promotion on overflow.
+* *With side effects*, such as a Java call or an attribute assignment, the body must run only once. Python callers use compiled code only when the compiler can preserve failure behaviour without retrying.
+
+When these checks cannot establish equivalent behaviour, Python callers keep the original body. This includes bodies with loops or exception handling, and module-level bean methods such as routes. Java callers still use the compiled body. The report's `python callers:` entry shows which behaviour applies to each method.
+
+=== Attribute Access and Performance
+
+In introspected classes, compiled methods read and write Java fields. In ordinary classes, state remains in the Python object, so accessing it can cross into GraalPy. A `@property` still runs its Python getter or setter.
+
+Compiling a method therefore does not guarantee that it avoids Python or runs faster. Use the report's bridge-call count to identify remaining crossings. Attributes assigned only during construction can avoid repeated crossings, as described next.
+
+[[staticCompilationFixedAttributes]]
+=== Attributes Fixed at Construction
+
+For a plain class, Micronaut can cache attributes assigned only in `__init__`. When the stub takes its Python object, it reads those attributes in one call into Python and stores them in Java fields. Compiled calls then use the fields without entering Python, unless a change invalidates the cache.
+
+This is useful for injected services. In this controller, `self.items` can be cached, allowing calls to its compiled methods to stay in Java:
+
+[source,python]
+----
+@Controller("/items")
+class ItemController:
+    def __init__(self, items: ItemService, users: UserService):
+        self.items = items              # <1>
+        self.users = users
+
+    @Get("/{id}")
+    def show(self, id: UUID) -> ItemPublic:
+        return item_public(self.items.by_id(id))   # <2>
+----
+<1> Assigned by `__init__` only: fixed at construction
+<2> `self.items` is read from a Java field; the report counts no bridge call for it
+
+This optimization applies only when the compiler can establish that caching preserves the attribute's value. Inheritance, custom attribute handling, collection values and writes elsewhere in the application can prevent it.
+
+Normal assignments and deletions, including `setattr`, invalidate cached values so subsequent reads see the change. Changes outside the compilation that bypass normal attribute handling, such as writing directly to `+__dict__+` or using `object.__setattr__`, can leave cached values stale. Keep classes that depend on such changes out of static compilation.
+
+[[staticCompilationEventLoop]]
+=== Routes on the Event Loop
+
+WARNING: With static compilation enabled, compiled routes that never enter Python run on the event loop by default instead of the `io` executor. A compiled route that calls blocking Java code then blocks the event loop, as the same Java route would. Annotate such routes with `@ExecuteOn(TaskExecutors.IO)`, or set `micronaut.python.static.event-loop` to `false` (see below).
+
+An interpreted Python route runs on the `io` executor (see <<pythonThreading, Python Threading>>). With the default server thread selection, a compiled route can stay on the Netty event loop when the compiler determines that it and its compiled callees avoid Python execution. Otherwise, it stays on `io`. Recursive call chains also stay on `io`.
+
+Attributes fixed at construction are read when the bean is created; an attribute that code outside the compilation assigns again is read once more, on whichever thread runs next. Calls through Python objects, property accessors and constructors that create Python objects generally prevent event-loop execution.
+
+Only routes of singleton beans stay on the event loop. Such beans are created at startup, so creating them does not run Python on the first request. Routes of other scopes, including a module with routes and no scope, run on `io`; a module whose routes should run on the event loop declares `Singleton()` at module level.
+
+A compiled route can still block if it calls blocking Java code, such as JDBC or a blocking HTTP client. Use `@ExecuteOn(TaskExecutors.IO)` for such routes, including routes whose Java callees or interceptors call back into Python. You can use `TaskExecutors.BLOCKING` when that executor is configured with platform threads as described in <<pythonThreading, Python Threading>>.
+
+With `micronaut.server.thread-selection: AUTO`, compiled Python routes run on `io`, rather than the `blocking` executor whose default virtual threads cannot run Python.
+
+To keep every Python route on `io`, compiled or not, set `micronaut.python.static.event-loop` to `false` (it defaults to `true`); `@ExecuteOn` still names the executor of a route:
+
+[configuration]
+----
+micronaut:
+  python:
+    static:
+      event-loop: false
+----
+
+[[staticCompilationStackTraces]]
+== Stack Traces and Debugging
+
+When you build with `PyronautCompiler`, including through the `pyronaut` CLI, stack traces and debuggers show the Python source file and line for compiled statements:
+
+[source]
+----
+at shop.PricingService.total(PricingService.py:12)
+----
+
+The generated Java also includes source-location comments. If you use the annotation processor directly with `javac`, stack traces keep Java source positions; use those comments to find the corresponding Python code.
+
+[[staticCompilationAssumptions]]
+== Assumptions and Limitations
+
+Keep these constraints in mind when enabling static compilation:
+
+* *Compile applications with their subclasses.* An override defined outside the compilation may be bypassed by Java callers. Use `@CompileStatic(False)` on methods that must remain overridable by external code.
+* *Keep type hints accurate.* Return and attribute hints are trusted. A value of `None` where a primitive is expected fails immediately; use a nullable hint such as `int | None` when needed.
+* *Avoid runtime patching of compiled code.* Compiled callers may use a direct Java call or an inlined constant, so replacing a function or constant at runtime may have no effect. Direct changes to object internals can also leave cached attributes stale.
+* *Test exception handling across Java and Python.* An application exception that passes through Java can have a different representation from one raised directly in Python. Keep code in Python if it depends on that distinction.
+
+Run your application's tests with static compilation enabled before adopting it. Use `@CompileStatic(False)` for code that depends on unsupported dynamic behaviour.
+
+[[staticCompilationReport]]
+== The Report
+
+Set `micronaut.python.compile.static.report` to a directory to generate:
+
+* `summary.txt`: a readable list of decisions, reasons and suggested fixes, followed by totals.
+* `decisions.jsonl`: the same decisions in a machine-readable format for build tools.
+
+The compiler also writes `decisions.properties` for incremental builds. You can receive decisions programmatically through the builder's `staticCompilationDecisionCallback`.
+
+Start with `summary.txt`. Each function has one of these outcomes:
+
+[cols="1,3"]
+|===
+|Outcome |Meaning
+
+|`COMPILED`
+|The body runs as Java for Java callers.
+
+|`SKIPPED`
+|Compilation was requested, but the signature or body contains an unsupported feature. The reason includes a suggested fix.
+
+|`EXCLUDED`
+|The mode or nearest `CompileStatic` declaration leaves the function in Python.
+
+|`NOT_CANDIDATE`
+|The function is not eligible, for example a constructor or async function.
+
+|`CANDIDATE`
+|Planning could not complete because syntax or type information was unavailable. This is uncommon in a normal build.
+|===
+
+For a compiled method, check the call counts as well as the outcome. A bridge call enters Python; a Java call invokes a Java target; a helper call preserves an operation's Python semantics. For example, `PricingService.total` above can read the cached `self.rate` without a bridge call.
+
+The `python callers:` entry describes whether Python calls also use the compiled body:
+
+[cols="1,3"]
+|===
+|Value |Meaning
+
+|`retry` / `static`
+|Python callers use compiled code and retry in Python if it fails. `static` identifies a static method or plain module-level function.
+
+|`once` / `static-once`
+|Python callers use compiled code once, preserving side effects and translating failures to the appropriate Python exceptions.
+
+|`none(<why>)`
+|Python callers keep the original body for the reason shown. Java callers still use the compiled body.
+|===
+
+Use the totals to find the most common blockers, then decide whether to adjust those methods or leave them in Python.

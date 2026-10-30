@@ -30,21 +30,28 @@ import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.AttributeKey;
+import io.netty.util.concurrent.ScheduledFuture;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
 
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Implementation of the {@link WebSocketSession} interface for Netty.
@@ -65,6 +72,18 @@ public class NettyWebSocketSession implements WebSocketSession {
     private final String protocolVersion;
     private final boolean isSecure;
     private volatile boolean closing;
+    /**
+     * Whether the peer sent its close: nothing is sent by {@link #sendAllAsync} after it.
+     */
+    private volatile boolean closeReceived;
+    /**
+     * Whether a close frame was sent: a close frame is sent once (RFC 6455, 5.5.1).
+     */
+    private final AtomicBoolean closeSent = new AtomicBoolean();
+    /**
+     * The {@link #sendAllAsync} calls that send, completed with {@code false} by the close of the peer.
+     */
+    private final Set<CompletableFuture<Boolean>> sendingAll = ConcurrentHashMap.newKeySet();
     private final MutableConvertibleValues<Object> attributes;
     private final WebSocketMessageEncoder messageEncoder;
 
@@ -113,6 +132,26 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     final void markClosing() {
         closing = true;
+    }
+
+    /**
+     * The peer sent its close: an endpoint sends no data after it (RFC 6455, 5.5.1), so the
+     * publishers of {@link #sendAllAsync} stop, and their futures complete with {@code false}.
+     */
+    /**
+     * Marks the close frame as sent.
+     *
+     * @return Whether no close frame was sent before
+     */
+    final boolean markCloseSent() {
+        return closeSent.compareAndSet(false, true);
+    }
+
+    final void markCloseReceived() {
+        closeReceived = true;
+        for (CompletableFuture<Boolean> sent : sendingAll) {
+            sent.complete(false);
+        }
     }
 
     @Override
@@ -172,6 +211,17 @@ public class NettyWebSocketSession implements WebSocketSession {
         }
     }
 
+    /**
+     * Send the message and wait until it is written.
+     *
+     * <p>Do not call it on the event loop of the session, e.g. in a handler that runs on the event
+     * loop: a write that does not complete at once cannot complete while the event loop waits for
+     * it, and the call fails with a {@link io.netty.util.concurrent.BlockingOperationException}.
+     * Use {@link #sendAsync(Object, MediaType)} there.</p>
+     *
+     * @param message   The message
+     * @param mediaType The media type of the message
+     */
     @Override
     public void sendSync(Object message, MediaType mediaType) {
         if (isOpen()) {
@@ -201,29 +251,38 @@ public class NettyWebSocketSession implements WebSocketSession {
         if (message == null) {
             return Flux.empty();
         }
+        // each subscription sends, as before: a closed session fails the publisher, not the call
+        return Mono.fromFuture(() -> sendAsync(message, mediaType), true).flux();
+    }
 
-        return Flux.create(emitter -> {
-            if (!isOpen()) {
-                emitter.error(new WebSocketSessionException("Session closed"));
-            } else {
-                WebSocketFrame frame;
-                if (message instanceof WebSocketFrame socketFrame) {
-                    frame = socketFrame;
-                } else {
-                    frame = messageEncoder.encodeMessage(message, mediaType);
-                }
+    /**
+     * @param message   The message
+     * @param mediaType The media type of the message
+     * @return The frame of the message: the message itself if it is a frame
+     */
+    final WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
+        return message instanceof WebSocketFrame frame ? frame : messageEncoder.encodeMessage(message, mediaType);
+    }
 
-                ChannelFuture channelFuture = channel.writeAndFlush(frame);
-                channelFuture.addListener(future -> {
-                    if (future.isSuccess()) {
-                        emitter.next(message);
-                        emitter.complete();
-                    } else {
-                        emitter.error(new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause()));
-                    }
-                });
-            }
-        }, FluxSink.OverflowStrategy.ERROR);
+    @Override
+    public CompletableFuture<Boolean> sendAllAsync(Publisher<?> messages, MediaType mediaType) {
+        Objects.requireNonNull(messages, "messages");
+        Objects.requireNonNull(mediaType, "mediaType");
+        CompletableFuture<Boolean> sent = new CompletableFuture<>();
+        sendingAll.add(sent);
+        if (closeReceived) {
+            // e.g. from the close handler: the peer closed, nothing is sent after its close
+            sent.complete(false);
+        }
+        // the session closing cancels the publisher at once, e.g. a stream that never completes
+        ChannelFutureListener closed = future -> sent.complete(false);
+        channel.closeFuture().addListener(closed);
+        sent.whenComplete((ignored, error) -> {
+            sendingAll.remove(sent);
+            channel.closeFuture().removeListener(closed);
+        });
+        messages.subscribe(new NettyWebSocketMessagesSubscriber(this, channel, mediaType, sent));
+        return sent;
     }
 
     @Override
@@ -253,9 +312,32 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public void close(CloseReason closeReason) {
-        if (channel.isOpen()) {
-            channel.writeAndFlush(new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason()))
-                    .addListener(future -> channel.close());
+        AbstractNettyWebSocketHandler handler = channel.pipeline().get(AbstractNettyWebSocketHandler.class);
+        ChannelHandlerContext ctx = handler == null ? null : channel.pipeline().context(handler);
+        if (handler != null && ctx != null) {
+            // share the close handling (single close frame, @OnClose, forced close) with the handler
+            handler.writeCloseFrameAndTerminate(ctx, closeReason);
+        } else if (!closing && channel.isOpen()) {
+            // the handler is not (or no longer) in the pipeline
+            CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason());
+            if (!markCloseSent()) {
+                // a close frame was sent already
+                closeFrame.release();
+                channel.close();
+                return;
+            }
+            markClosing();
+            ScheduledFuture<?> closeTimeout = channel.eventLoop().schedule(() -> {
+                channel.close();
+            }, 1, TimeUnit.SECONDS);
+            channel.writeAndFlush(closeFrame)
+                    .addListener(future -> {
+                        closeTimeout.cancel(false);
+                        channel.close();
+                    });
+        } else {
+            // a close frame was sent already, or the connection is gone
+            channel.close();
         }
     }
 

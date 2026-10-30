@@ -17,6 +17,8 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormParts;
 import org.jspecify.annotations.Nullable;
@@ -152,6 +154,20 @@ import java.util.concurrent.CompletionStage;
  * that continues with another {@link io.micronaut.http.ServerHttpRequest} replaces the bytes with
  * its {@link io.micronaut.http.ServerHttpRequest#byteBody() byteBody()}. The body is read once
  * either way.</p>
+ *
+ * <h2>Filters without arguments</h2>
+ * <p>A filter that is not given arguments, an {@link io.micronaut.http.filter.HttpServerFilter}
+ * or a filter of a functional route, e.g. {@code beforeReplacingAsync}, gets the body of its
+ * request with {@link #of(HttpRequest)}, and reads it like a filter method does: it reads a
+ * {@link #copy()} to leave the body for the route.</p>
+ * <pre>{@code
+ * routes.serverFilter("/signed/**").beforeReplacingAsync(request -> AsyncRequestBody.of(request)
+ *     .copy()
+ *     .bytes(64 * 1024)
+ *     .thenApply(bytes -> verifier.verify(request, bytes) ? null : HttpResponse.unauthorized()));
+ * }</pre>
+ * <p>Nothing is read before the body is: a filter that does not read the body leaves it
+ * streamed to the route. What its reads left open is released when the request ends.</p>
  *
  * <h2>{@code 100 Continue}</h2>
  * <p>A request that expects {@code 100 Continue} is answered with {@code 100 Continue} when the
@@ -351,6 +367,37 @@ public interface AsyncRequestBody {
     CompletionStage<FormData> form();
 
     /**
+     * Read the whole submitted form with options, e.g. the values of the fields of an
+     * {@code application/x-www-form-urlencoded} form as they appear in the body, not
+     * percent-decoded, see {@link FormOptions#withRawValues()}. With the
+     * {@link FormOptions#defaults() defaults}, and for a {@code multipart/form-data} form, which
+     * has no percent-encoding, it is {@link #form()}.
+     *
+     * <p>The raw values of a URL-encoded form are not the shared form of the request: the form is
+     * decoded from the bytes of the body, with the limits and the validation of the form, but the
+     * {@code FormData}, {@code FileUpload} and {@code @Part} arguments do not share it, nor does it
+     * reuse a form they already read. It reads the bytes, so it needs them: when another
+     * read consumed them, e.g. a {@code FormData} argument of a filter, or a filter replaced the body
+     * with an object, it fails with an {@link IllegalStateException}. Of a {@link #copy()}, it is
+     * read from a split of the bytes, which leaves the body to the route, like the other reads of
+     * a copy. An implementation that cannot read the raw values rejects them.</p>
+     *
+     * @param options The options
+     * @return Completes with the form, or exceptionally with an
+     * {@link io.micronaut.http.exceptions.HttpStatusException} with the status
+     * {@code 415 Unsupported Media Type} when the request has no form body
+     * @throws IllegalStateException         if the body was already read
+     * @throws UnsupportedOperationException if this implementation cannot read the raw values
+     * @since 5.3.0
+     */
+    default CompletionStage<FormData> form(FormOptions options) {
+        if (options.rawValues()) {
+            throw new UnsupportedOperationException("This body cannot read the raw values of a form");
+        }
+        return form();
+    }
+
+    /**
      * Read the submitted form part by part, as it arrives. The parts are closed when the method
      * completed, or, for a controller method that answers with a streamed response, when its
      * stream ended, see {@link FormParts}.
@@ -399,4 +446,40 @@ public interface AsyncRequestBody {
      * @since 5.3.0
      */
     AsyncRequestBody copy();
+
+    /**
+     * The body of a request received by the server, for a filter that is not given arguments,
+     * e.g. an {@link io.micronaut.http.filter.HttpServerFilter} or a filter of a functional
+     * route: the body of the request as the filters before it left it, like the
+     * {@code AsyncRequestBody} argument of a filter method. Read a {@link #copy()} of it to leave
+     * the body for the route. Each call creates an independent reader; acquiring another reader
+     * does not copy the bytes or allow the same bytes to be consumed twice. Readers of requests that
+     * wrap the same body share its consumption state and synchronize access to its bytes.
+     * The effective body is resolved when a read starts, including a replacement set after this
+     * method was called. Read a {@link #copy()} for each reader that must leave the body intact.
+     *
+     * <p>It is supported by the Netty server. A server that does not support it, e.g. a servlet
+     * server that does not implement it yet, throws an {@link UnsupportedOperationException}.</p>
+     *
+     * <p>What the reads left open is released when the request ends, not when the filter
+     * completed: the work on the body must be part of the stage the filter returns.</p>
+     *
+     * @param request The request: a request received by the server, or a request a filter
+     *                continued with that wraps it
+     * @return The body
+     * @throws UnsupportedOperationException if the request was not received by a server that
+     * supports it
+     * @since 5.3.0
+     */
+    static AsyncRequestBody of(HttpRequest<?> request) {
+        for (HttpRequest<?> current : HttpRequestWrapper.unwrap(request)) {
+            if (current instanceof AsyncRequestBodySource source) {
+                AsyncRequestBody body = source.asyncRequestBody(request);
+                if (body != null) {
+                    return body;
+                }
+            }
+        }
+        throw new UnsupportedOperationException("The request has no AsyncRequestBody, it was not received by a server that supports it: " + request);
+    }
 }

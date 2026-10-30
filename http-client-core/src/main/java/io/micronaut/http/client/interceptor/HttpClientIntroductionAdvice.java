@@ -36,6 +36,7 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.ThreadBoundPropagation;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
@@ -54,14 +55,20 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.CustomHttpMethod;
 import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientRegistry;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
+import io.micronaut.http.client.internal.ElementsResponse;
+import io.micronaut.http.client.internal.ElementsStages;
+import io.micronaut.http.client.MappedBodyElements;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
 import io.micronaut.http.client.bind.HttpClientBinderRegistry;
@@ -71,6 +78,7 @@ import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
+import jakarta.inject.Inject;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,16 +93,17 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -115,28 +124,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * The default Accept-Types.
      */
     private static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
-    /**
-     * Upper bound for {@link #methodCache}. Method metadata is bounded by the number of declarative
-     * client methods; the cap only guards against a caller that passes a new metadata instance on
-     * every call, in which case the method data is no longer cached.
-     */
-    private static final int METHOD_CACHE_MAX_SIZE = 2048;
 
     private final List<ReactiveClientResultTransformer> transformers;
     private final HttpClientBinderRegistry binderRegistry;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
     private final HttpClientRegistry<?> clientFactory;
     private final ConversionService conversionService;
-    /**
-     * Cache of the per-method client call data computed for an annotation metadata instance, keyed
-     * by identity. A declarative client passes the same (generated) metadata instance on every call
-     * of a method, so this avoids repeating the annotation lookups and parsing the URI template on
-     * every call. The map is copy-on-write and never mutated once published: reads are lock-free and
-     * misses publish a new copy under {@link #methodCacheLock}.
-     */
-    @SuppressWarnings("java:S3077") // the published map is never modified, volatile only publishes it
-    private volatile IdentityHashMap<AnnotationMetadata, ClientMethod> methodCache = new IdentityHashMap<>();
-    private final Object methodCacheLock = new Object();
 
     /**
      * Constructor for advice class to set up things like Headers, Cookies, Parameters for Clients.
@@ -147,6 +140,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @param binderRegistry       The client binder registry
      * @param conversionService    The bean conversion context
      */
+    @Inject
     public HttpClientIntroductionAdvice(
             HttpClientRegistry<?> clientFactory,
             JsonMediaTypeCodec jsonMediaTypeCodec,
@@ -170,10 +164,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         final AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
-        ClientMethod clientMethod = methodCache.get(annotationMetadata);
-        if (clientMethod == null && !context.hasStereotype(Client.class)) {
-            throw new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context);
-        }
+        // Kept by the method, and computed again when the properties its placeholders resolve from change
+        ClientMethod clientMethod = context.getCachedValue(ClientMethod.class, ClientMethod::of);
 
         Class<?> declaringType = context.getDeclaringType();
         if (Closeable.class == declaringType || AutoCloseable.class == declaringType) {
@@ -182,7 +174,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
 
         HttpClient httpClient = clientFactory.getClient(annotationMetadata);
-        clientMethod = resolveClientMethod(context, annotationMetadata, clientMethod);
         if (clientMethod.mapped()) {
             HttpMethod httpMethod = clientMethod.httpMethod();
             String httpMethodName = clientMethod.httpMethodName();
@@ -220,46 +211,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
         // try other introduction advice
         return context.proceed();
-    }
-
-    /**
-     * Returns the client call data of the invoked method, computing and caching it on a miss.
-     *
-     * @param context            The invocation context
-     * @param annotationMetadata The annotation metadata of the method, the cache key
-     * @param cached             The cached data or {@code null}
-     * @return The client call data
-     */
-    private ClientMethod resolveClientMethod(MethodInvocationContext<Object, Object> context,
-                                             AnnotationMetadata annotationMetadata,
-                                             @Nullable ClientMethod cached) {
-        MethodValues values = null;
-        if (cached != null) {
-            if (!cached.revalidate()) {
-                return cached;
-            }
-            // Values with property placeholders are resolved by the environment on access and may
-            // change on a refresh, so they are read again and the cached data is reused only when
-            // they are unchanged.
-            values = MethodValues.read(context);
-            if (values.equals(cached.values())) {
-                return cached;
-            }
-        }
-        ClientMethod clientMethod = ClientMethod.of(context, annotationMetadata, values);
-        // Metadata with evaluated expressions (EvaluatedAnnotationMetadata) is re-created for every
-        // invocation and its values may depend on the call arguments, so it is never cached.
-        if (!annotationMetadata.hasEvaluatedExpressions()) {
-            synchronized (methodCacheLock) {
-                IdentityHashMap<AnnotationMetadata, ClientMethod> current = methodCache;
-                if (current.containsKey(annotationMetadata) || current.size() < METHOD_CACHE_MAX_SIZE) {
-                    IdentityHashMap<AnnotationMetadata, ClientMethod> copy = new IdentityHashMap<>(current);
-                    copy.put(annotationMetadata, clientMethod);
-                    methodCache = copy;
-                }
-            }
-        }
-        return clientMethod;
     }
 
     @Nullable
@@ -350,8 +301,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 future.complete(binderResult.errorResult());
             } else {
                 MutableHttpRequest<?> request = Objects.requireNonNull(binderResult.request());
-                AsyncHttpClient asyncHttpClient = httpClient.toAsync();
-                CompletionStage<?> responseStage = httpClientResponseStage(asyncHttpClient, request, returnType, errorType, valueType);
+                boolean bodyElements = isBodyElements(valueType);
+                CompletionStage<?> responseStage = bodyElements
+                    ? httpClientElementsStage(httpClient, request, valueType, errorType)
+                    : httpClientResponseStage(httpClient.toAsync(), request, returnType, errorType, valueType);
+                if (bodyElements) {
+                    // cancelling the future of the method, e.g. a cancelled coroutine, cancels the
+                    // exchange, and the elements of a response that arrives anyway are closed
+                    future.whenComplete((result, throwable) -> {
+                        if (throwable instanceof CancellationException) {
+                            cancel(responseStage);
+                        }
+                    });
+                }
                 responseStage.whenComplete((result, throwable) -> {
                     if (throwable != null) {
                         Throwable cause = (throwable instanceof CompletionException completionException && completionException.getCause() != null)
@@ -361,7 +323,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             LOG.debug(HTTP_ERROR_RESPONSE_LOG_MESSAGE, declaringType.getName(), cause.getMessage(), cause);
                         }
                         if (cause instanceof HttpClientResponseException e && e.code() == HttpStatus.NOT_FOUND.getCode()) {
-                            if (reactiveValueType == Optional.class) {
+                            if (bodyElements) {
+                                // no element, as a streaming publisher emits none
+                                BodyElements<Object> none = BodyElements.of(() -> CompletableFuture.completedStage(Optional.empty()));
+                                future.complete(HttpResponse.class.isAssignableFrom(reactiveValueType) ? ElementsResponse.of(e.getResponse(), none) : none);
+                                return;
+                            } else if (reactiveValueType == Optional.class) {
                                 future.complete(Optional.empty());
                                 return;
                             } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
@@ -373,8 +340,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             }
                         }
                         future.completeExceptionally(cause);
-                    } else {
-                        future.complete(result);
+                    } else if (!future.complete(result) && result != null && bodyElements) {
+                        // cancelled meanwhile: nobody reads the elements
+                        closeElements(result);
                     }
                 });
             }
@@ -677,6 +645,98 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             reactiveValueType + " is registered"));
     }
 
+    private static void cancel(CompletionStage<?> stage) {
+        try {
+            stage.toCompletableFuture().cancel(false);
+        } catch (UnsupportedOperationException ignored) {
+            // a stage that cannot be cancelled: its elements are closed when they arrive
+        }
+    }
+
+    private static void closeElements(Object result) {
+        if (result instanceof BodyElements<?> elements) {
+            elements.close();
+        } else if (result instanceof HttpResponse<?> response) {
+            ElementsStages.closeElements(response);
+        }
+    }
+
+    /**
+     * Whether the value of a stage is the elements of the response body, or the response with
+     * them: the asynchronous counterpart of a streaming publisher.
+     *
+     * @param valueArgument The value of the stage
+     * @return Whether the value is streamed as {@link BodyElements}
+     */
+    private static boolean isBodyElements(Argument<?> valueArgument) {
+        Class<?> type = valueArgument.getType();
+        if (HttpResponse.class.isAssignableFrom(type)) {
+            return valueArgument.getFirstTypeVariable().map(body -> BodyElements.class == body.getType()).orElse(false);
+        }
+        return BodyElements.class == type;
+    }
+
+    /**
+     * The stage of a method that returns {@code CompletionStage<BodyElements<T>>} or
+     * {@code CompletionStage<HttpResponse<BodyElements<T>>>}, read like a streaming publisher:
+     * the events of an event stream, the elements of JSON, or the pieces of the body.
+     *
+     * @param httpClient    The client
+     * @param request       The request
+     * @param valueArgument The value of the stage
+     * @param errorType     The error type
+     * @return The stage of the elements, or of the response with them
+     */
+    @SuppressWarnings("unchecked")
+    private CompletionStage<?> httpClientElementsStage(HttpClient httpClient,
+                                                       MutableHttpRequest<?> request,
+                                                       Argument<?> valueArgument,
+                                                       Argument<?> errorType) {
+        boolean exchange = HttpResponse.class.isAssignableFrom(valueArgument.getType());
+        Argument<?> elementsArgument = exchange ? valueArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) : valueArgument;
+        Argument<?> elementArgument = elementsArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        Collection<MediaType> acceptTypes = request.accept();
+
+        if (!(httpClient instanceof StreamingHttpClient streamingHttpClient)) {
+            return CompletableFuture.failedStage(new ConfigurationException("The HTTP client " + httpClient.getClass().getName()
+                + " does not stream response bodies, which the return type BodyElements needs"));
+        }
+        AsyncStreamingHttpClient asyncStreamingHttpClient = streamingHttpClient.toAsyncStreaming();
+        if (acceptTypes.contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
+            boolean events = elementArgument.getType() == Event.class;
+            Argument<Object> dataArgument = (Argument<Object>) (events ? elementArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) : elementArgument);
+            Function<BodyElements<Event<Object>>, BodyElements<?>> elements = events ? e -> e : e -> MappedBodyElements.map(e, Event::getData);
+            if (exchange) {
+                return ElementsStages.mapResponse(asyncStreamingHttpClient.exchangeEventStream(request, dataArgument, errorType),
+                    response -> ElementsResponse.of(response, elements.apply(Objects.requireNonNull(response.body()))));
+            }
+            return ElementsStages.mapElements(asyncStreamingHttpClient.eventStream(request, dataArgument, errorType), elements);
+        }
+        if (isJsonParsedMediaType(acceptTypes)) {
+            Argument<Object> jsonArgument = (Argument<Object>) elementArgument;
+            if (exchange) {
+                return ElementsStages.mapResponse(asyncStreamingHttpClient.exchangeJsonStream(request, jsonArgument, errorType), Function.identity());
+            }
+            return ElementsStages.mapElements(asyncStreamingHttpClient.jsonStream(request, jsonArgument, errorType), Function.identity());
+        }
+        Class<?> elementType = elementArgument.getType();
+        Function<BodyElements<ByteBuffer<?>>, BodyElements<?>> elements;
+        if (elementType == ByteBuffer.class) {
+            elements = e -> e;
+        } else if (conversionService.canConvert(ByteBuffer.class, elementType)) {
+            elements = e -> MappedBodyElements.map(e, value -> conversionService.convert(value, elementType).orElseThrow());
+        } else {
+            return CompletableFuture.failedStage(new ConfigurationException("Cannot create the generated HTTP client's " +
+                "required return type, since no TypeConverter from ByteBuffer to " +
+                elementType + " is registered"));
+        }
+        if (exchange) {
+            return ElementsStages.mapResponse(asyncStreamingHttpClient.exchangeStream(request, errorType),
+                response -> ElementsResponse.of(response, elements.apply(Objects.requireNonNull(response.body()))));
+        }
+        return ElementsStages.mapElements(asyncStreamingHttpClient.dataStream(request, errorType), elements);
+    }
+
     private CompletionStage<?> httpClientResponseStage(AsyncHttpClient asyncHttpClient,
                                                        MutableHttpRequest<?> request,
                                                        ReturnType<?> returnType,
@@ -813,9 +873,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     /**
-     * The annotation values of a client method that may contain property placeholders. They are
-     * read once to compute the {@link ClientMethod} and again on every call when the metadata has
-     * property expressions, to detect a change after an environment refresh.
+     * The annotation values of a client method that may contain property placeholders, read to
+     * compute the {@link ClientMethod}. The method keeps it, and computes it again when the
+     * properties its placeholders resolve from may have changed.
      *
      * @param mappedUri    The value of the HTTP method mapping annotation
      * @param customMethod The {@link CustomHttpMethod#method()} value
@@ -833,15 +893,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         List<String> produces
     ) {
 
-        static MethodValues read(MethodInvocationContext<Object, Object> context) {
-            AnnotationValue<HttpMethodMapping> mapping = Objects.requireNonNull(context.getAnnotation(HttpMethodMapping.class));
+        static MethodValues read(ExecutableMethod<?, ?> method) {
+            AnnotationValue<HttpMethodMapping> mapping = Objects.requireNonNull(method.getAnnotation(HttpMethodMapping.class));
             return new MethodValues(
                 mapping.getRequiredValue(String.class),
-                context.stringValue(CustomHttpMethod.class, "method").orElse(null),
-                context.stringValue(Client.class, "path").orElse(null),
-                context.stringValue(Client.class).orElse(null),
-                Arrays.asList(context.stringValues(Consumes.class)),
-                Arrays.asList(context.stringValues(Produces.class))
+                method.stringValue(CustomHttpMethod.class, "method").orElse(null),
+                method.stringValue(Client.class, "path").orElse(null),
+                method.stringValue(Client.class).orElse(null),
+                Arrays.asList(method.stringValues(Consumes.class)),
+                Arrays.asList(method.stringValues(Produces.class))
             );
         }
     }
@@ -867,10 +927,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     private static final class ClientMethod {
 
-        private static final ClientMethod NOT_MAPPED = new ClientMethod(false, false, null, HttpMethod.CUSTOM, "", "", HttpClient.DEFAULT_ERROR_TYPE, List.of(), true);
+        private static final ClientMethod NOT_MAPPED = new ClientMethod(false, null, HttpMethod.CUSTOM, "", "", HttpClient.DEFAULT_ERROR_TYPE, List.of(), true);
 
         private final boolean mapped;
-        private final boolean revalidate;
         private final @Nullable MethodValues values;
         private final HttpMethod httpMethod;
         private final String httpMethodName;
@@ -888,7 +947,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         private volatile @Nullable MediaType contentType;
 
         private ClientMethod(boolean mapped,
-                             boolean revalidate,
                              @Nullable MethodValues values,
                              HttpMethod httpMethod,
                              String httpMethodName,
@@ -897,7 +955,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                              List<Class<? extends Annotation>> methodBinderTypes,
                              boolean clientDefinition) {
             this.mapped = mapped;
-            this.revalidate = revalidate;
             this.values = values;
             this.httpMethod = httpMethod;
             this.httpMethodName = httpMethodName;
@@ -910,21 +967,21 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         /**
          * Computes the client method data.
          *
-         * @param context            The invocation context
-         * @param annotationMetadata The annotation metadata of the method
-         * @param values             The values already read for the method or {@code null}
+         * @param method The method
          * @return The client method data
          */
-        static ClientMethod of(MethodInvocationContext<Object, Object> context,
-                               AnnotationMetadata annotationMetadata,
-                               @Nullable MethodValues values) {
-            Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
-            if (httpMethodMapping.isEmpty() || !context.hasStereotype(HttpMethodMapping.class)) {
+        static ClientMethod of(ExecutableMethod<?, ?> method) {
+            if (!method.hasStereotype(Client.class)) {
+                throw new IllegalStateException("Client advice called from type that is not annotated with @Client: " + method);
+            }
+            AnnotationMetadata annotationMetadata = method.getAnnotationMetadata();
+            Optional<Class<? extends Annotation>> httpMethodMapping = method.getAnnotationTypeByStereotype(HttpMethodMapping.class);
+            if (httpMethodMapping.isEmpty() || !method.hasStereotype(HttpMethodMapping.class)) {
                 return NOT_MAPPED;
             }
-            MethodValues methodValues = values != null ? values : MethodValues.read(context);
+            MethodValues methodValues = MethodValues.read(method);
             String mappedUri = methodValues.mappedUri();
-            String uri = StringUtils.isEmpty(mappedUri) ? "/" + context.getMethodName() : mappedUri;
+            String uri = StringUtils.isEmpty(mappedUri) ? "/" + method.getMethodName() : mappedUri;
 
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
             HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase(Locale.ENGLISH));
@@ -934,16 +991,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Argument<?> errorType = annotationMetadata.classValue(Client.class, "errorType")
                 .<Argument<?>>map(Argument::of).orElse(HttpClient.DEFAULT_ERROR_TYPE);
 
-            List<Class<? extends Annotation>> methodBinderTypes = new ArrayList<>(context.getAnnotationTypesByStereotype(Bindable.class));
+            List<Class<? extends Annotation>> methodBinderTypes = new ArrayList<>(method.getAnnotationTypesByStereotype(Bindable.class));
             // @Version is not a bindable, so it needs to looked for separately
-            methodBinderTypes.addAll(context.getAnnotationTypesByStereotype(Version.class));
+            methodBinderTypes.addAll(method.getAnnotationTypesByStereotype(Version.class));
 
             var definitionType = annotationMetadata.enumValue(Client.class, "definitionType", Client.DefinitionType.class)
                 .orElse(Client.DefinitionType.CLIENT);
 
             return new ClientMethod(
                 true,
-                annotationMetadata.hasPropertyExpressions(),
                 methodValues,
                 httpMethod,
                 httpMethodName,
@@ -956,10 +1012,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         boolean mapped() {
             return mapped;
-        }
-
-        boolean revalidate() {
-            return revalidate;
         }
 
         @Nullable
@@ -1052,7 +1104,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (fromCoroutine == null || fromCoroutine.isEmpty() || fromCoroutine.isBound()) {
                 return null;
             }
-            return fromCoroutine.propagate();
+            return ThreadBoundPropagation.bind(fromCoroutine);
         }
     }
 }

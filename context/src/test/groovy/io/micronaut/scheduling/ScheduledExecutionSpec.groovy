@@ -54,7 +54,9 @@ class ScheduledExecutionSpec extends Specification {
         ApplicationContext context = ApplicationContext.run(
             'spec.name': 'ScheduledExecutionSpec.single',
             'micronaut.executors.single.type': 'scheduled',
-            'micronaut.executors.single.core-pool-size': 1)
+            'micronaut.executors.single.core-pool-size': 1,
+            // the call reschedules on the same scheduler to check that nothing leaks, which mustn't capture the context
+            'micronaut.executors.single.propagate-context': false)
         OnSingleThread task = context.getBean(OnSingleThread)
 
         expect:
@@ -102,7 +104,9 @@ class ScheduledExecutionSpec extends Specification {
         ApplicationContext context = ApplicationContext.run(
             'spec.name': 'ScheduledExecutionSpec.throwing',
             'micronaut.executors.single.type': 'scheduled',
-            'micronaut.executors.single.core-pool-size': 1)
+            'micronaut.executors.single.core-pool-size': 1,
+            // the call reschedules on the same scheduler to check that nothing leaks, which mustn't capture the context
+            'micronaut.executors.single.propagate-context': false)
         ThrowsOnSingleThread task = context.getBean(ThrowsOnSingleThread)
 
         expect:

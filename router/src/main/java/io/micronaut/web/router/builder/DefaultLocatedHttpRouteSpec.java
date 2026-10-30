@@ -24,9 +24,12 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.spi.RouteMatchSelector;
+import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -91,7 +94,7 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
     }
 
     @Override
-    public LocatedHttpRouteSpec<T> where(RouteCondition condition) {
+    public LocatedHttpRouteSpec<T> where(RequestCondition condition) {
         route.where(condition);
         return this;
     }
@@ -105,6 +108,12 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
     @Override
     public LocatedHttpRouteSpec<T> order(int order) {
         route.order(order);
+        return this;
+    }
+
+    @Override
+    public LocatedHttpRouteSpec<T> selectedBy(@Nullable RouteMatchSelector selector) {
+        route.selectedBy(selector);
         return this;
     }
 
@@ -239,6 +248,11 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
     }
 
     @Override
+    public void resources(ResourceHandler resources) {
+        route.resources(resources);
+    }
+
+    @Override
     public void handleAsync(AsyncRequestHandler handler) {
         route.handleAsync(handler);
     }
@@ -248,14 +262,16 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
         LocatedRequestHandler<T> checked = route.checked(handler);
         // a local: the handler keeps the reader of the target, not this spec and its builder
         Function<PathVariables, T> located = target;
-        route.handle((request, pathVariables) -> checked.handle(request, pathVariables, located.apply(pathVariables)));
+        RequestHandler adapted = (request, pathVariables) -> checked.handle(request, pathVariables, located.apply(pathVariables));
+        route.handle(ProvidedHandlers.of(adapted, checked));
     }
 
     @Override
     public void handleAsync(LocatedAsyncRequestHandler<T> handler) {
         LocatedAsyncRequestHandler<T> checked = route.checked(handler);
         Function<PathVariables, T> located = target;
-        route.handleAsync((request, pathVariables) -> checked.handle(request, pathVariables, located.apply(pathVariables)));
+        AsyncRequestHandler adapted = (request, pathVariables) -> checked.handle(request, pathVariables, located.apply(pathVariables));
+        route.handleAsync(ProvidedHandlers.of(adapted, checked));
     }
 
     @Override
@@ -271,6 +287,12 @@ final class DefaultLocatedHttpRouteSpec<T> implements LocatedHttpRouteSpec<T> {
     @Override
     public void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response) {
         route.respond(response);
+    }
+
+    @Override
+    public void webSocket(Consumer<WebSocketEndpointSpec> endpoint) {
+        // fails: a located route is not a WebSocket route
+        route.webSocket(endpoint);
     }
 
     @Override

@@ -245,10 +245,11 @@ class Advice implements MethodInterceptor<Object, Object> {
         closedWrapper.close()
 
         then:
-        log.events.count('rejected') == 1
-        !log.events.contains('accepted')
+        // the target's own pre-destroy callback may resolve through its resolver, and what it creates is destroyed with it
+        log.events.count('accepted') == 1
+        !log.events.contains('rejected')
         log.events.count('target') == 1
-        log.events.count('resource') == 1
+        log.events.count('resource') == 2
         log.events.count('advice') == 1
         log.events.indexOf('target') < log.events.indexOf('advice')
         original.dependentBeans().isEmpty()

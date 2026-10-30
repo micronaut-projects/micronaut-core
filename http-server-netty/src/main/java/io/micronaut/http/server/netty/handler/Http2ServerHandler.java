@@ -30,6 +30,7 @@ import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http.HttpVersion;
@@ -187,7 +188,19 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             existing.onTrailersRead(trailers, endOfStream);
             return;
         }
-        stream.onHeadersRead(HttpConversionUtil.toHttpRequest(streamId, headers, true), endOfStream);
+        HttpRequest request;
+        try {
+            request = HttpConversionUtil.toHttpRequest(streamId, headers, true);
+        } catch (Http2Exception e) {
+            str.removeProperty(streamKey);
+            throw e;
+        } catch (RuntimeException e) {
+            // e.g. a missing :method or :path pseudo-header. RFC 9113 §8.1.1: a malformed
+            // request is a stream error, it must not fail the other streams of the connection.
+            str.removeProperty(streamKey);
+            throw Http2Exception.streamError(streamId, Http2Error.PROTOCOL_ERROR, e, "Malformed request headers");
+        }
+        stream.onHeadersRead(request, endOfStream);
         if (!endOfStream) {
             pendingStreams.add(stream);
         }
@@ -553,7 +566,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise = promise.unvoid();
                 promise.addListener(future -> closeInput());
             }
-            Http2Headers http2Headers = HttpConversionUtil.toHttp2Headers(headers, true);
+            Http2Headers http2Headers = toHttp2Headers(headers, promise);
             if (exposeResponseRequest) {
                 Attribute<Object> attribute = requiredCtx().channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST);
                 attribute.set(attachment());
@@ -582,7 +595,29 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise = promise.unvoid();
                 promise.addListener(future -> closeInput());
             }
-            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), HttpConversionUtil.toHttp2Headers(trailers, true), 0, true, promise);
+            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), toHttp2Headers(trailers, promise), 0, true, promise);
+        }
+
+        /**
+         * Convert the headers, failing the promise of the write if they cannot be converted, e.g.
+         * with an invalid {@code te} header: the promise never reaches the connection then.
+         */
+        private static Http2Headers toHttp2Headers(HttpResponse response, ChannelPromise promise) {
+            try {
+                return HttpConversionUtil.toHttp2Headers(response, true);
+            } catch (RuntimeException e) {
+                promise.tryFailure(e);
+                throw e;
+            }
+        }
+
+        private static Http2Headers toHttp2Headers(HttpHeaders trailers, ChannelPromise promise) {
+            try {
+                return HttpConversionUtil.toHttp2Headers(trailers, true);
+            } catch (RuntimeException e) {
+                promise.tryFailure(e);
+                throw e;
+            }
         }
     }
 

@@ -22,6 +22,7 @@ import io.micronaut.core.util.Toggleable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLContext;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
@@ -78,6 +79,7 @@ public class SslConfiguration implements Toggleable {
     private String protocol = DEFAULT_PROTOCOL;
     private Duration handshakeTimeout = Duration.ofSeconds(10);
     private boolean preferOpenssl = true;
+    private @Nullable SSLContext sslContext;
 
     /**
      * @return Whether SSL is enabled.
@@ -194,6 +196,29 @@ public class SslConfiguration implements Toggleable {
      */
     public void setTrustName(@Nullable String trustName) {
         this.trustName = trustName;
+    }
+
+    /**
+     * A ready {@link SSLContext} to use instead of the configured key and trust material. Protocols, ciphers and
+     * client authentication still apply, and ALPN is negotiated as for a built context. Only set programmatically.
+     * Not supported for HTTP/3.
+     *
+     * @return the provided context, or {@code null} to build one from the configuration
+     * @since 5.3.0
+     */
+    public @Nullable SSLContext getSslContext() {
+        return sslContext;
+    }
+
+    /**
+     * A ready {@link SSLContext} to use instead of the configured key and trust material. Protocols, ciphers and
+     * client authentication still apply, and ALPN is negotiated as for a built context. Not supported for HTTP/3.
+     *
+     * @param sslContext the context, or {@code null} to build one from the configuration
+     * @since 5.3.0
+     */
+    public void setSslContext(@Nullable SSLContext sslContext) {
+        this.sslContext = sslContext;
     }
 
     /**

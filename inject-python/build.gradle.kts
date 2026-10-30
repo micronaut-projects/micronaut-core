@@ -72,3 +72,7 @@ noReflection {
     allowIn("io.micronaut.python.processing.visitor.LoadedVisitor", "GENERIC_SIGNATURES")
     allowIn("io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor", "ANNOTATIONS", "CLASS_NAMES", "SERVICE_LOADING")
 }
+tasks.withType<Checkstyle>().configureEach {
+    // a worker of its own: in a shared Checkstyle worker the large stub generator exhausts the default heap
+    maxHeapSize = "1g"
+}

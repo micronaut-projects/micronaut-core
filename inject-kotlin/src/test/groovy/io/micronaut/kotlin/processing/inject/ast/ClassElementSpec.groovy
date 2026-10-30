@@ -48,6 +48,33 @@ record Product2(Double price, String name) {
             properties.get(1).name == "name"
     }
 
+    void "test inherited method reports the interface methods the subclass introduces"() {
+        expect:
+        buildClassElement('test.Child', """
+package test
+
+interface Deep {
+    fun run()
+}
+
+interface Contract {
+    fun run()
+}
+
+open class Parent : Deep {
+    override fun run() {
+    }
+}
+
+open class Child : Parent(), Contract, Runnable
+""") { ClassElement ce ->
+            def method = ce.getEnclosedElements(ElementQuery.ALL_METHODS.named("run"))
+                .find { it.declaringType.name == "test.Parent" }
+            assert method.overriddenMethods*.declaringType*.name == ["test.Deep", "test.Contract", "java.lang.Runnable"]
+            ce
+        }
+    }
+
     void "test sealed class"() {
         expect:
             // getPermittedSubclasses() resolves through KSP, so it has to be read while the resolver session is live

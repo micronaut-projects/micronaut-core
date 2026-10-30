@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.scheduling.io.watch.FileWatchCondition;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 import io.micronaut.scheduling.io.watch.WatchServiceFactory;
 import org.slf4j.Logger;
@@ -40,7 +39,6 @@ import java.nio.file.WatchService;
  * @since 1.1.0
  */
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
-@Requires(condition = FileWatchCondition.class)
 @Requires(classes = {MacOSXListeningWatchService.class, Library.class})
 @Factory
 public class MacOsWatchServiceFactory {
@@ -57,7 +55,6 @@ public class MacOsWatchServiceFactory {
     @Prototype
     @Requires(classes = {MacOSXListeningWatchService.class, Library.class})
     @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
-    @Requires(property = FileWatchConfiguration.PATHS)
     @Primary
     protected WatchService macWatchService() throws IOException {
         try {

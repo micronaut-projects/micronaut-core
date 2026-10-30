@@ -61,6 +61,28 @@ chatClient.send("Hello World!");
 
 NOTE: For illustration purposes we use `blockFirst()` to obtain the client. It is however possible to combine `connect` (which returns a reactor:Flux[]) to perform non-blocking interaction via WebSocket.
 
+==== Connecting without Reactor
+
+api:websocket.AsyncWebSocketClient[] is the counterpart of api:websocket.WebSocketClient[] whose `connect` methods return a `CompletionStage` that completes with the connected client endpoint. Inject it like a `WebSocketClient`, or obtain it from one with `toAsyncWebSocket()`:
+
+[source,java]
+----
+@Inject
+@Client("http://localhost:8080")
+AsyncWebSocketClient webSocketClient;
+
+webSocketClient.connect(ChatClientWebSocket.class, "/chat/football/fred")
+    .thenAccept(chatClient -> chatClient.sendAsync("Hello World!"));
+----
+
+Each call connects once. Cancelling the future of the stage before the connection is established, or completing it otherwise, for example with `orTimeout`, aborts the connect; an endpoint that connects after that is closed. The stage may complete on an event loop thread, so its continuations must not block. They run with the propagated context of the caller of `connect`.
+
+Cancelling or timing out a dependent stage created with `thenApply`, `thenCompose`, or another standard stage method leaves the original connect running. Keep the original future and apply a deadline to it when the deadline should abort the connect. Cancellation is a best-effort hint. Once connected, close the endpoint or its api:websocket.WebSocketSession[] when finished, including when abandoning the session after a later processing timeout. Cancelling the completed connect future does not close an active session.
+
+With the `AsyncWebSocketClient` of the Netty client, a `CompletionStage` returned by an `@OnOpen` or `@OnMessage` method of the endpoint is awaited like a returned `Publisher`: the stage of `connect` completes once the stage of `@OnOpen` completed, and a failed stage reaches the `@OnError` method. The messages are still handled as they are read: the next message does not wait for the stage of the previous one. The stage of an `@OnClose` or `@OnError` method does not hold the close back. The reactive `WebSocketClient` treats such a stage as a plain value, as before.
+
+The injected client, and the one returned by `toAsyncWebSocket()`, are views of the underlying HTTP client: closing them closes that client, which is shared with the other injection points of the same client. Outside of an application use `AsyncWebSocketClient.create(uri)`, and close the client once done.
+
 [TIP]
 .Using the CLI
 ====
@@ -71,3 +93,9 @@ $ mn create-websocket-client MyChat
 | Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java
 ----
 ====
+
+==== Handshake timeout and load balancing
+
+By default a connect waits for the response to its upgrade request without a limit. Set `handshake-timeout` (`micronaut.http.client.handshake-timeout`, or the `handshake-timeout` of a service client) to fail a connect whose server does not answer the upgrade in time with a api:http.client.exceptions.ReadTimeoutException[]; the connection is then closed. Cancelling the subscription to `connect` before the endpoint is emitted closes the connection.
+
+The outcome of the handshake is reported to the load balancer that selected the instance, like the outcome of an HTTP exchange: a success once the instance responded to the upgrade with a status below 500, a server error for a status of 500 or above, a connect failure when the connection could not be opened, a timeout of `handshake-timeout`, and a reset when the instance closed the connection before it responded. A cancelled connect only releases the selection.

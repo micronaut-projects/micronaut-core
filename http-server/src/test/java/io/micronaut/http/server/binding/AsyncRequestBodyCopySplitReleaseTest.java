@@ -24,6 +24,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.FormOptions;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.form.FormCapableHttpRequest;
@@ -31,6 +32,8 @@ import io.micronaut.http.form.FormParts;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.simple.SimpleHttpRequest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.reactivestreams.Publisher;
 
 import java.util.ArrayList;
@@ -60,7 +63,7 @@ class AsyncRequestBodyCopySplitReleaseTest {
             SimpleHttpRequest<Object> delegate = new SimpleHttpRequest<>(HttpMethod.POST, "/form", null);
             delegate.contentType(MediaType.MULTIPART_FORM_DATA_TYPE);
             OtherFormRequest server = new OtherFormRequest(delegate, streaming.rootBody());
-            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
 
             AsyncRequestBody copy = body.copy();
             FormParts parts = copy.parts();
@@ -86,7 +89,7 @@ class AsyncRequestBodyCopySplitReleaseTest {
             SimpleHttpRequest<Object> delegate = new SimpleHttpRequest<>(HttpMethod.POST, "/form", null);
             delegate.contentType(MediaType.MULTIPART_FORM_DATA_TYPE);
             OtherFormRequest server = new OtherFormRequest(delegate, streaming.rootBody());
-            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
 
             // the form of a copy is read from a split of the bytes, never from the bytes of the request
             ExecutionException e = assertThrows(ExecutionException.class,
@@ -98,6 +101,34 @@ class AsyncRequestBodyCopySplitReleaseTest {
             // the last reader of the bytes: they are discarded once no split is left open
             streaming.rootBody().close();
             assertTrue(upstream.discarded, "the split of the copy was closed");
+            streaming.sharedBuffer().complete();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void theBytesOfARawFormAreClosedWhenTheRequestCannotKeepTheRawValues(boolean copy) throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run()) {
+            Upstream upstream = new Upstream();
+            ByteBodyFactory.StreamingBody streaming = BODIES.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+            SimpleHttpRequest<Object> delegate = new SimpleHttpRequest<>(HttpMethod.POST, "/form", null);
+            delegate.contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
+            OtherFormRequest server = new OtherFormRequest(delegate, streaming.rootBody());
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
+
+            // the default getEncodedFormFields rejects the bytes, which the read closes
+            AsyncRequestBody reader = copy ? body.copy() : body;
+            ExecutionException e = assertThrows(ExecutionException.class,
+                () -> reader.form(FormOptions.defaults().withRawValues()).toCompletableFuture().get(10, TimeUnit.SECONDS));
+            assertInstanceOf(UnsupportedOperationException.class, e.getCause());
+
+            body.releaseBody().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            server.disposal.forEach(Runnable::run);
+            if (copy) {
+                // the last reader of the bytes: they are discarded once no split is left open
+                streaming.rootBody().close();
+            }
+            assertTrue(upstream.discarded, "the bytes of the raw form were closed");
             streaming.sharedBuffer().complete();
         }
     }

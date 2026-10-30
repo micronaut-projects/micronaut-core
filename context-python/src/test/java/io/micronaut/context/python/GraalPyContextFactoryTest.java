@@ -16,9 +16,11 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.logging.LoggingSystem;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.graalvm.python.embedding.GraalPyResources;
@@ -27,23 +29,43 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class GraalPyContextFactoryTest {
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void wrapperMetadataDoesNotRediscoverTargetTypeMappings() throws IOException {
+        ClassLoader classLoader = new ClassLoader(getClass().getClassLoader()) {
+            @Override
+            public Enumeration<URL> getResources(String name) throws IOException {
+                assertFalse(name.contains(TargetTypeMapping.class.getName()),
+                    "TargetTypeMapping discovery belongs to host access setup, not wrapper metadata");
+                return super.getResources(name);
+            }
+        };
+        try (Engine engine = GraalPyEngineFactory.buildPythonEngine();
+             Context context = GraalPyContextFactory.buildContext(HostAccess.ALL, engine, classLoader)) {
+            assertEquals(2, context.eval(PYTHON, "1 + 1").asInt());
+        }
+    }
 
     @Test
     void loadsMainFromTheConfiguredVfsMountPoint() throws IOException {
@@ -148,6 +170,39 @@ final class GraalPyContextFactoryTest {
     }
 
     @Test
+    void restrictedHostClassLookupAllowsArraysOfVisibleComponentTypes() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "graalpy.context.host-class-lookup", List.of("com.example", "org.slf4j.Logger")
+        ))) {
+            Context context = applicationContext.getBean(Context.class);
+            // primitive arrays are always visible, for example as a body type token for the HTTP client
+            assertEquals(byte[].class, context.eval(PYTHON, "import java\njava.type('byte[]')").asHostObject());
+            assertEquals(int[][].class, context.eval(PYTHON, "java.type('int[][]')").asHostObject());
+            assertEquals(3, context.eval(PYTHON, "java.type('byte[]')(3)").getArraySize());
+            // an array is visible when its component type is
+            assertEquals(String[].class, context.eval(PYTHON, "java.type('java.lang.String[]')").asHostObject());
+            assertEquals(org.slf4j.Logger[][].class, context.eval(PYTHON, "java.type('org.slf4j.Logger[][]')").asHostObject());
+            PolyglotException blocked = assertThrows(PolyglotException.class,
+                () -> context.eval(PYTHON, "java.type('org.slf4j.LoggerFactory[]')"));
+            assertTrue(blocked.getMessage().contains("org.slf4j.LoggerFactory"), blocked.getMessage());
+        }
+    }
+
+    @Test
+    void hostClassFilterMatchesArrayNames() {
+        GraalPyContextConfiguration configuration = new GraalPyContextConfiguration();
+        configuration.setHostClassLookup(List.of("com.example"));
+        Predicate<String> filter = configuration.hostClassFilter();
+        // Truffle checks "byte[]" and then its component "byte"; JVM descriptors match the same way
+        for (String allowed : List.of("byte", "byte[]", "boolean[][]", "[B", "[[I", "com.example.Foo[]", "[Lcom.example.Foo;", "[Ljava.lang.String;", "java.lang.String[]")) {
+            assertTrue(filter.test(allowed), allowed);
+        }
+        for (String denied : List.of("org.other.Foo[]", "[Lorg.other.Foo;", "bytes", "byte[", "[", "[X", "[L;", "[Lcom.example.Foo", "com.examples.Foo[]")) {
+            assertFalse(filter.test(denied), denied);
+        }
+    }
+
+    @Test
     void javaObjectsAnswerToKeywordSafeMemberAliases() {
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "micronaut.python.pool.enabled", true,
@@ -180,6 +235,161 @@ final class GraalPyContextFactoryTest {
     }
 
     @Test
+    void interopTypesAreRegisteredAtBootstrapWithoutAJavaImport() {
+        // the dataclass wrapper comes from __micronaut_java_imports_dataclasses_test.py of the test virtual file system
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            Context context = applicationContext.getBean(Context.class);
+            // nothing in this context read the manifests through a Java import; the bootstrap registered them
+            assertTrue(context.eval(PYTHON, """
+                import sys
+                imports = sys.modules['micronaut_java_imports']
+                imports._micronaut_java_imports_cache is None and \\
+                    'io.micronaut.context.python.GraalPyContextFactoryTest$DataclassWrapper' in imports._micronaut_interop_types
+                """).asBoolean());
+        }
+    }
+
+    /**
+     * Stands for the Java wrapper of a Python dataclass in the test manifest.
+     */
+    public static final class DataclassWrapper {
+    }
+
+    @Test
+    void javaInstancesOfferReadOnlyPropertiesAndSnakeCaseMethods() {
+        // the names come from META-INF/pyronaut/java-instance-members.tsv of the test resources, read once
+        // for the class loader; it also names a class the class path lacks, which matches no receiver
+        try (ApplicationContext applicationContext = ApplicationContext.builder().properties(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        )).start()) {
+            Context context = applicationContext.getBean(Context.class);
+            context.getBindings(PYTHON).putMember("members", new InstanceMembers());
+            context.getBindings(PYTHON).putMember("request", HttpRequest.GET("/"));
+            context.getBindings(PYTHON).putMember("original_request", HttpRequest.GET("/"));
+            assertEquals(8080, context.eval(PYTHON, "members.port").asInt());
+            assertEquals("Ada", context.eval(PYTHON, "members.name").asString());
+            assertTrue(context.eval(PYTHON, "members.ready").asBoolean());
+            assertEquals("HTTP", context.eval(PYTHON, "members.http_status").asString());
+            assertEquals("HTTP", context.eval(PYTHON, "members.get_http_status()").asString());
+            assertEquals("text:x", context.eval(PYTHON, "members.with_value('x')").asString());
+            assertEquals("number:7", context.eval(PYTHON, "members.with_value(7)").asString());
+            assertEquals("text:x", context.eval(PYTHON, "members.withValue('x')").asString());
+            assertEquals("Basic dXNlcjpwYXNz", context.eval(PYTHON,
+                "request.basic_auth('user', 'pass').getHeaders().get('Authorization')").asString());
+            assertEquals("Basic dXNlcjpvbGQ=", context.eval(PYTHON,
+                "original_request.basicAuth('user', 'old').getHeaders().get('Authorization')").asString());
+            assertTrue(context.eval(PYTHON, """
+                not any(hasattr(members, name) for name in ('url', 'get_url', 'wrong', 'void', 'static_value', 'get_static_value', 'mixed_value', 'not_boolean', 'class'))
+                """).asBoolean());
+            assertEquals("literal", context.eval(PYTHON, "members.literal_name").asString());
+            assertEquals("literal method", context.eval(PYTHON, "members.literal_value()").asString());
+            assertThrows(PolyglotException.class, () -> context.eval(PYTHON, "members.name = 'Grace'"));
+            assertEquals("Ada", context.eval(PYTHON, "members.getName()").asString());
+            IllegalStateException failure = assertThrows(IllegalStateException.class,
+                () -> context.eval(PYTHON, "members.failure"));
+            assertEquals("getter failed", failure.getMessage());
+            assertThrows(PolyglotException.class, () -> context.eval(PYTHON, "members.with_value()"));
+            // a name a registered subtype blocks is no alias of its implementations; the other names still are
+            assertEquals("GET", context.eval(PYTHON, "request.method_name").asString());
+            assertFalse(context.eval(PYTHON, "hasattr(request, 'path')").asBoolean());
+            // the names are shared by the contexts of the class loader, not held by each one
+            assertSame(PythonJavaInstanceMembers.of(applicationContext.getClassLoader()),
+                PythonJavaInstanceMembers.of(applicationContext.getClassLoader()));
+
+            int pooled = applicationContext.getBean(PythonContextExecutor.class).withContext(pooledContext -> {
+                pooledContext.getBindings(PYTHON).putMember("members", new InstanceMembers());
+                return pooledContext.eval(PYTHON, "members.port").asInt();
+            });
+            assertEquals(8080, pooled);
+        }
+    }
+
+    public static final class InstanceMembers {
+        private String name = "Ada";
+
+        @SuppressWarnings("java:S116")
+        public final String literal_name = "literal";
+
+        public int getPort() {
+            return 8080;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public boolean isReady() {
+            return true;
+        }
+
+        public String isNotBoolean() {
+            return "not a getter";
+        }
+
+        public String getHTTPStatus() {
+            return "HTTP";
+        }
+
+        public String getURL() {
+            return "URL";
+        }
+
+        public String getUrl() {
+            return "Url";
+        }
+
+        public String getLiteralName() {
+            return "getter";
+        }
+
+        @SuppressWarnings("java:S100")
+        public String literal_value() {
+            return "literal method";
+        }
+
+        public String literalValue() {
+            return "camel method";
+        }
+
+        public String withValue(String value) {
+            return "text:" + value;
+        }
+
+        public String withValue(int value) {
+            return "number:" + value;
+        }
+
+        public String getWrong(int value) {
+            return "wrong:" + value;
+        }
+
+        public void getVoid() {
+            // Intentionally empty: a zero-argument void method is not a property getter.
+        }
+
+        public static String getStaticValue() {
+            return "static";
+        }
+
+        public String mixedValue(String value) {
+            return value;
+        }
+
+        public static int mixedValue(int value) {
+            return value;
+        }
+
+        public String getFailure() {
+            throw new IllegalStateException("getter failed");
+        }
+    }
+
+    @Test
     void javaStagesAndPublishersReturnedByAnyJavaCallAreAwaitable() throws Exception {
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "micronaut.python.pool.enabled", true,
@@ -207,6 +417,111 @@ final class GraalPyContextFactoryTest {
 
             CompletionStage<?> stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
             assertEquals("future,mono,publisher,failed", stage.toCompletableFuture().get(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void javaExceptionsAreCaughtByExceptException() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            Context context = applicationContext.getBean(Context.class);
+            context.getBindings(PYTHON).putMember("thrower", new Thrower());
+            context.eval(PYTHON, """
+                import java
+                Integer = java.type("java.lang.Integer")
+                NumberFormatException = java.type("java.lang.NumberFormatException")
+                IOException = java.type("java.io.IOException")
+
+                def outcome(action):
+                    try:
+                        try:
+                            action()
+                        except Exception:
+                            return "Exception"
+                    except BaseException:
+                        return "BaseException"
+                    return "none"
+
+                def raise_(error):
+                    raise error
+
+                def caught(action):
+                    try:
+                        action()
+                    except BaseException as e:
+                        return e
+                """);
+
+            // an unchecked exception of a Java call, a checked one, and one raised by Python code
+            assertEquals("Exception", context.eval(PYTHON, "outcome(lambda: Integer.parseInt('nope'))").asString());
+            assertEquals("Exception", context.eval(PYTHON, "outcome(lambda: thrower.ioException('unreachable'))").asString());
+            assertEquals("Exception", context.eval(PYTHON, "outcome(lambda: raise_(IOException('raised by Python')))").asString());
+            assertTrue(context.eval(PYTHON, "e = caught(lambda: Integer.parseInt('nope')); isinstance(e, Exception) and isinstance(e, BaseException)").asBoolean());
+            assertTrue(context.eval(PYTHON, "isinstance(e, NumberFormatException) and e.getMessage() == 'For input string: \"nope\"'").asBoolean(),
+                "the exception remains the Java exception");
+            assertTrue(context.eval(PYTHON, "'nope' in str(e)").asBoolean());
+            assertTrue(context.eval(PYTHON, "isinstance(IOException('constructed'), Exception)").asBoolean());
+            assertTrue(context.eval(PYTHON, "not isinstance(e, ValueError)").asBoolean(), "only Exception, not a specific Python error");
+
+            // a Java exception type still selects its except clause
+            assertEquals("IOException", context.eval(PYTHON, """
+                try:
+                    thrower.ioException('selected')
+                except NumberFormatException:
+                    selected = 'NumberFormatException'
+                except IOException:
+                    selected = 'IOException'
+                selected
+                """).asString());
+
+            // a java.lang.Error is a BaseException only, like KeyboardInterrupt, SystemExit and GeneratorExit
+            assertEquals("BaseException", context.eval(PYTHON, "outcome(lambda: thrower.error('fatal'))").asString());
+            assertTrue(context.eval(PYTHON, "e = caught(lambda: thrower.error('fatal')); isinstance(e, BaseException) and not isinstance(e, Exception)").asBoolean());
+            assertEquals("BaseException", context.eval(PYTHON, "outcome(lambda: raise_(KeyboardInterrupt()))").asString());
+            assertEquals("BaseException", context.eval(PYTHON, "outcome(lambda: raise_(SystemExit(1)))").asString());
+            assertEquals("BaseException", context.eval(PYTHON, "outcome(lambda: raise_(GeneratorExit()))").asString());
+
+            // the exception chains, and reaches Java as the host exception it is
+            assertTrue(context.eval(PYTHON, """
+                def wrap():
+                    try:
+                        Integer.parseInt('nope')
+                    except Exception as e:
+                        raise RuntimeError('wrapped') from e
+                w = caught(wrap)
+                isinstance(w, RuntimeError) and isinstance(w.__cause__, NumberFormatException)
+                """).asBoolean());
+            NumberFormatException rethrown = assertThrows(NumberFormatException.class, () -> context.eval(PYTHON, """
+                try:
+                    Integer.parseInt('nope')
+                except Exception:
+                    raise
+                """));
+            assertEquals("For input string: \"nope\"", rethrown.getMessage());
+
+            // pooled contexts are bootstrapped the same way
+            boolean pooled = applicationContext.getBean(PythonContextExecutor.class).withContext(pooledContext -> pooledContext.eval(PYTHON, """
+                import java
+                try:
+                    java.type("java.lang.Integer").parseInt("nope")
+                    result = False
+                except Exception:
+                    result = True
+                result
+                """).asBoolean());
+            assertTrue(pooled);
+        }
+    }
+
+    public static final class Thrower {
+        public void ioException(String message) throws IOException {
+            throw new IOException(message);
+        }
+
+        public void error(String message) {
+            throw new AssertionError(message);
         }
     }
 

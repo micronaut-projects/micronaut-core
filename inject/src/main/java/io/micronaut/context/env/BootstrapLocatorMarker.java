@@ -17,6 +17,8 @@ package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.Internal;
 
+import java.util.Set;
+
 /**
  * Internal marker interface for {@link PropertySourcesLocator} implementations that
  * supply bootstrap property sources. Used by {@link DefaultEnvironment} to identify
@@ -26,4 +28,29 @@ import io.micronaut.core.annotation.Internal;
  */
 @Internal
 public interface BootstrapLocatorMarker {
+
+    /**
+     * The configuration files the bootstrap environment looked for when the locator last loaded it, as
+     * {@link Environment#getConfigurationFiles()} gives them.
+     *
+     * @return The locations
+     * @since 5.3.0
+     */
+    default Set<String> getConfigurationFiles() {
+        return Set.of();
+    }
+
+    /**
+     * Refreshes the environment of a bootstrap context that a refresh of the application context's
+     * environment reuses. Its property source loaders are created again first, as they were when
+     * each refresh read the bootstrap configuration with a new environment.
+     *
+     * @param bootstrapEnvironment The environment of the bootstrap context
+     */
+    static void refreshBootstrapEnvironment(Environment bootstrapEnvironment) {
+        if (bootstrapEnvironment instanceof DefaultEnvironment defaultEnvironment) {
+            defaultEnvironment.resetPropertySourceLoaders();
+        }
+        bootstrapEnvironment.refresh();
+    }
 }

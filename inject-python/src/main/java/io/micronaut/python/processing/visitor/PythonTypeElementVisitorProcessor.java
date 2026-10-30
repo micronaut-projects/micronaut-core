@@ -44,6 +44,7 @@ import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.ProcessingException;
@@ -59,6 +60,9 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.PythonStubGenerator;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.python.processing.element.PythonMethodElement;
+import io.micronaut.python.processing.staticcompile.EventLoopSafety;
+import io.micronaut.python.processing.staticcompile.Ir;
+import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
 import io.micronaut.sourcegen.model.ObjectDef;
 
 import java.io.IOException;
@@ -83,6 +87,9 @@ import java.util.stream.Collectors;
 public final class PythonTypeElementVisitorProcessor {
     private static final String ANN_VALIDATED = "io.micronaut.validation.Validated";
     private static final String ANN_CONFIGURATION_READER = "io.micronaut.context.annotation.ConfigurationReader";
+    private static final String ANN_EVENT_LOOP_SAFE = "io.micronaut.context.python.annotation.EventLoopSafe";
+    private static final String ANN_EVENT_LOOP_SAFE_OWNER = "io.micronaut.context.python.annotation.EventLoopSafeOwner";
+    private static final String ANN_HTTP_METHOD_MAPPING = "io.micronaut.http.annotation.HttpMethodMapping";
 
     private final ClassLoader classLoader;
     private final TypeElementVisitor.VisitorKind visitorKind;
@@ -189,6 +196,15 @@ public final class PythonTypeElementVisitorProcessor {
             }
         }
 
+        // A Python compilation is a single round
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            try {
+                loadedVisitor.getVisitor().finishRound(pythonVisitorContext);
+            } catch (Throwable e) {
+                failVisitor(pythonVisitorContext, loadedVisitor, "finishRound", e);
+            }
+        }
+
         // The stubs are written when the stub generator finishes, so it finishes after every other visitor:
         // the producer methods of the associated beans a visitor registers in visitClass or in its own finish
         // are bridged into the stubs before they are written
@@ -207,6 +223,8 @@ public final class PythonTypeElementVisitorProcessor {
         }
         if (stubGeneratorVisitor != null) {
             finishVisitor(stubGeneratorVisitor, pythonVisitorContext);
+            // the stubs tell which generated constructors enter Python; the bean definitions are written afterwards
+            markEventLoopSafeMethods(environment, allClasses, (PythonStubGenerator) stubGeneratorVisitor.getVisitor());
         }
         if (writeAssociatedBeans) {
             associatedBeanBuilders.addAll(takeAssociatedBeanBuilders(pythonVisitorContext));
@@ -363,6 +381,70 @@ public final class PythonTypeElementVisitorProcessor {
         return true;
     }
 
+    /**
+     * Annotates the methods whose compiled body never enters Python ({@link EventLoopSafety}) with
+     * {@code EventLoopSafe}, which the executor selection of the runtime reads from the metadata of the
+     * method: such a route runs where a Java route runs, on the event loop unless it names an executor.
+     * The class declaring a route among them is annotated with {@code EventLoopSafeOwner}: the runtime
+     * creates its singleton bean at startup, since creating it runs Python.
+     *
+     * @param environment   The processing environment, holding the static compilation plan
+     * @param classes       The classes being processed
+     * @param stubGenerator The stub generator, which knows the generated constructors that enter Python
+     */
+    private static void markEventLoopSafeMethods(PythonProcessingEnvironment environment, List<ClassElement> classes, PythonStubGenerator stubGenerator) {
+        StaticCompilationPlan plan = environment.staticCompilationPlan().get();
+        if (plan == null || plan.bodies().isEmpty()) {
+            return;
+        }
+        Set<String> safe = EventLoopSafety.safeBodies(List.copyOf(plan.bodies().values()), stubGenerator::constructsWithoutPython);
+        for (ClassElement element : classes) {
+            boolean owner = false;
+            for (Ir.CompiledBody body : plan.bodiesOf(element.getName())) {
+                if (!safe.contains(body.key())) {
+                    continue;
+                }
+                List<MethodElement> methods = element.getEnclosedElements(
+                    ElementQuery.ALL_METHODS.onlyDeclared().named(body.methodName())
+                );
+                for (MethodElement method : methods) {
+                    // only the bridge of the compiled signature runs the body: another overload of the name calls Python
+                    if (compiledSignature(method, body) && !method.hasDeclaredAnnotation(ANN_EVENT_LOOP_SAFE)) {
+                        method.annotate(ANN_EVENT_LOOP_SAFE);
+                        owner |= method.hasStereotype(ANN_HTTP_METHOD_MAPPING);
+                    }
+                }
+            }
+            if (owner && !element.hasDeclaredAnnotation(ANN_EVENT_LOOP_SAFE_OWNER)) {
+                element.annotate(ANN_EVENT_LOOP_SAFE_OWNER);
+            }
+        }
+    }
+
+    /**
+     * Whether a method has the signature of a compiled body, whose bridge runs the body (see
+     * {@code PythonStubGenerator.sameLayout}): the same erased parameter types, a return type that is
+     * the body's or {@code Object}, and no type variables of its own.
+     */
+    private static boolean compiledSignature(MethodElement method, Ir.CompiledBody body) {
+        ParameterElement[] parameters = method.getParameters();
+        if (!method.getDeclaredTypeVariables().isEmpty() || parameters.length != body.parameterTypes().size()) {
+            return false;
+        }
+        for (int i = 0; i < parameters.length; i++) {
+            if (!parameters[i].getType().getName().equals(erasedName(body.parameterTypes().get(i)))) {
+                return false;
+            }
+        }
+        String returned = method.getReturnType().getName();
+        return returned.equals(erasedName(body.returnType())) || Object.class.getName().equals(returned);
+    }
+
+    private static String erasedName(String type) {
+        int generic = type.indexOf('<');
+        return generic < 0 ? type : type.substring(0, generic);
+    }
+
     private void annotatePythonAopProxy(ClassElement element) {
         if (!(element instanceof AbstractPythonClassElement)) {
             return;
@@ -440,7 +522,7 @@ public final class PythonTypeElementVisitorProcessor {
         Class<?> serviceClass = outputObjectDef.serviceClass();
         OriginatingElements originatingElements = outputObjectDef.originatingElements();
         if (serviceClass != null) {
-            pythonVisitorContext.visitServiceDescriptor(serviceClass.getName(), objectDef.getName(), originatingElements.getOriginatingElements()[0], outputObjectDef.serviceContent());
+            pythonVisitorContext.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
         }
         try (OutputStream outputStream = pythonVisitorContext.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
             outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, pythonVisitorContext));

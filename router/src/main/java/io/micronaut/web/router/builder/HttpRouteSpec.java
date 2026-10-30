@@ -21,8 +21,10 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.web.router.websocket.WebSocketEndpointSpec;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
@@ -245,6 +247,73 @@ public sealed interface HttpRouteSpec extends RouteSpec<HttpRouteSpec> permits D
      * @since 5.3.0
      */
     void respond(Function<? super PathVariables, ? extends @Nullable HttpResponse<?>> response);
+
+    /**
+     * End a {@code GET} route with a handler of the resources under its URI, the URI prefix, e.g.
+     * the static resources of the HTTP server:
+     * {@code routes.GET("/assets").resources(StaticResources.classpath("public"))} serves
+     * {@code GET /assets/css/site.css} from {@code public/css/site.css} on the classpath, and
+     * {@code GET /assets} from the index file.
+     *
+     * <p>It routes {@code GET prefix/{+path}}, where {@code path} is the
+     * {@link ResourceHandler#pathVariable()}, the path of the resource relative to the prefix, and
+     * {@code GET prefix}, without the variable, to the handler. The trailing slashes of the prefix
+     * are ignored. The routes have implicit {@code HEAD} routes, like any {@code GET} route, and
+     * are ordinary routes: the more specific routes of controllers and handlers under the prefix
+     * take precedence. The settings of the route, e.g. its filters, conditions, order and
+     * attributes, apply to both. In a group, the prefix follows the prefix of the group, e.g.
+     * {@code group.GET("").resources(...)} at the prefix of the group, and the filters and the
+     * executor of the group apply, not its media types: the handler decides the media type of
+     * each resource.</p>
+     *
+     * <p>A handler whose reading blocks, see {@link ResourceHandler#blocking()}, e.g. the static
+     * resources of the HTTP server, runs on the blocking executor, unless the route or its groups
+     * declare an executor. A route of resources is a route of an {@code HttpRoutes} bean, not of
+     * located routes, and its prefix does not have the path variable of the handler.</p>
+     *
+     * @param resources The handler of the resources
+     * @throws IllegalStateException    if the route was already ended, is not a route of
+     *                                  {@code GET} only, is a located route, has a template of
+     *                                  another language, or its prefix has the path variable of
+     *                                  the handler
+     * @throws IllegalArgumentException if the path variable of the handler is not a plain name, or
+     *                                  the URI has a query or a fragment
+     * @since 5.3.0
+     */
+    void resources(ResourceHandler resources);
+
+    /**
+     * End a {@code GET} route with WebSocket handler functions, the functional counterpart of a
+     * {@link io.micronaut.websocket.annotation.ServerWebSocket} bean: the server upgrades a
+     * {@code GET} request to the URI template to a WebSocket connection, and calls the handlers
+     * the lambda declares, see {@link WebSocketEndpointSpec}. Requires {@code micronaut-websocket}.
+     *
+     * <pre>{@code
+     * routes.GET("/chat/{room}")
+     *     .beforeReplacing(request -> authorized(request) ? null : HttpResponse.forbidden()).and()
+     *     .webSocket(ws -> ws
+     *         .onOpen((session, request) -> session.sendAsync("joined " + session.getUriVariables().get("room", String.class).orElseThrow()))
+     *         .onMessage(Argument.of(ChatMessage.class), (session, message) -> session.sendAsync(reply(message))));
+     * }</pre>
+     *
+     * <p>The route is a route of the upgrade request: its conditions, filters, groups, order, port
+     * and attributes apply to the upgrade request, e.g. a filter that answers with a response
+     * rejects the upgrade, and a request that is not an upgrade is answered with an error. Of the
+     * WebSocket routes that match an upgrade, the closest one is upgraded, then the one of the
+     * lowest order, like the route of any other request. Its executor, see
+     * {@link RouteSpec#executeOn(String)}, or the executor of its group, runs the handlers of the
+     * connections: by default the event loop, so a handler that blocks, e.g. on I/O, needs another
+     * executor, e.g. {@code executeOn(TaskExecutors.BLOCKING)}. A WebSocket route has no media
+     * types and no response type: the media types of its group do not apply to it, and its own,
+     * e.g. {@link RouteSpec#produces(io.micronaut.http.MediaType...)}, are an error.</p>
+     *
+     * @param endpoint Declares the handlers of the WebSocket connections
+     * @throws IllegalStateException if the route was already ended, is not a route of {@code GET}
+     *                               only, has media types or a response type, or
+     *                               {@code micronaut-websocket} is missing
+     * @since 5.3.0
+     */
+    void webSocket(Consumer<WebSocketEndpointSpec> endpoint);
 
     /**
      * End the route with a server-sent events handler: the response is a

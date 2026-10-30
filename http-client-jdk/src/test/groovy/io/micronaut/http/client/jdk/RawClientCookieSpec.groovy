@@ -64,6 +64,21 @@ class RawClientCookieSpec extends Specification {
         second?.close()
     }
 
+    def 'a raw exchange leaves the callers request reusable'() {
+        given:
+        def request = HttpRequest.GET(server.URL.toString() + '/raw-cookie/set-cookie')
+
+        when:
+        def response = exchange(request)
+
+        then:
+        !request.getAttribute(AbstractJdkHttpClient.RAW_ATTRIBUTE).present
+        request.uri.toString() == server.URL.toString() + '/raw-cookie/set-cookie'
+
+        cleanup:
+        response?.close()
+    }
+
     private ByteBodyHttpResponse<?> exchange(HttpRequest<?> request) {
         Mono.from(client.exchange(request, null, null)).cast(ByteBodyHttpResponse).block()
     }

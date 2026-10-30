@@ -1,6 +1,7 @@
 package io.micronaut.inject.annotation
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import spock.lang.Unroll
 
@@ -99,6 +100,126 @@ class Test {
 
         and: "the flat index agrees"
         annotationMetadata.getAnnotation(Limit.name).getValues() == [min: 3]
+    }
+
+    @Unroll
+    void "annotations nested in members and repeatable containers retain what they compose (#kind)"() {
+        given:
+        def source = """
+package nestedretention
+
+import io.micronaut.inject.annotation.RetainedBounded
+import io.micronaut.inject.annotation.RetainedGroup
+import io.micronaut.inject.annotation.RetainedHolder
+import io.micronaut.inject.annotation.RetainedRange
+import io.micronaut.inject.annotation.RetainedRangeList
+
+class Test {
+    @RetainedRange(from = 3)
+    @RetainedRange(from = 3)
+    @RetainedRange(from = 7)
+    void repeated() {
+    }
+
+    @RetainedHolder(
+        ranges = [@RetainedRange(from = 4), @RetainedRange(from = 4)],
+        single = @RetainedBounded(min = 5),
+        groups = @RetainedGroup([@RetainedRange(from = 6), @RetainedRange]),
+        list = @RetainedRangeList(@RetainedRange(from = 8))
+    )
+    void members() {
+    }
+}
+"""
+        AnnotationMetadata repeated = buildMethodAnnotationMetadata('nestedretention.Test', source, 'repeated')
+        AnnotationMetadata members = buildMethodAnnotationMetadata('nestedretention.Test', source, 'members')
+        if (kind == 'written') {
+            repeated = writeAndLoadMetadata('nestedretention.Test', repeated)
+            members = writeAndLoadMetadata('nestedretention.Test', members)
+        }
+        AnnotationValue<?> holder = members.getAnnotation(RetainedHolder.name)
+
+        expect: 'each occurrence in a repeatable container retains two levels of composition, aliases applied'
+        repeated.getAnnotationValuesByName(RetainedRange.name).collect { tree(it) } ==
+                [range(3), range(7)]
+
+        and: 'annotations in member arrays, single members, nested arrays and nested containers retain the same tree, defaults included'
+        holder.getAnnotations('ranges').collect { tree(it) } == [range(4), range(4)]
+        tree(holder.getAnnotation('single').get()) == bounded(5)
+        holder.getAnnotations('groups').collect { group -> group.getAnnotations('value').collect { tree(it) } } ==
+                [[range(6), defaultRange()]]
+        holder.getAnnotation('list').get().getAnnotations('value').collect { tree(it) } == [range(8)]
+
+        and: 'the reserved member is not an attribute of a nested annotation'
+        holder.getAnnotation('single').get().values == [min: 5]
+        holder.getAnnotations('ranges')*.values == [[from: 4], [from: 4]]
+
+        and: 'the flat view is unchanged'
+        !members.hasStereotype(RetainedRange.name)
+        !members.hasStereotype(Limit.name)
+
+        where:
+        kind << ['compiled', 'written']
+    }
+
+    @Unroll
+    void "annotations in a container that is not repeatable retain what they compose (#kind)"() {
+        given:
+        AnnotationMetadata metadata = buildMethodAnnotationMetadata('legacycontainer.Test', """
+package legacycontainer
+
+import io.micronaut.inject.annotation.RetainedBundle
+
+class Test {
+    @RetainedBundle.List([@RetainedBundle(min = 3), @RetainedBundle(min = 7)])
+    void bundled() {
+    }
+}
+""", 'bundled')
+        if (kind == 'written') {
+            metadata = writeAndLoadMetadata('legacycontainer.Test', metadata)
+        }
+        List<AnnotationValue<?>> bundled = metadata.getAnnotation(RetainedBundle.List.name).getAnnotations('value')
+
+        expect: 'each occurrence retains what it composes, aliases applied'
+        bundled*.values == [[min: 3], [min: 7]]
+        bundled.collect { limitOf(it) } == [[[min: 3]], [[min: 7]]]
+        bundled.collect { it.getStereotypes()*.annotationName } == [[Limit.name]] * 2
+
+        where:
+        kind << ['compiled', 'written']
+    }
+
+    private static Map<String, Object> range(int from) {
+        return [name: 'RetainedRange', values: [from: from], stereotypes: [bounded(from)]]
+    }
+
+    private static Map<String, Object> defaultRange() {
+        // the default carried down by the alias, the occurrence itself declares no value
+        return [name: 'RetainedRange', values: [:], stereotypes: [bounded(2)]]
+    }
+
+    private static Map<String, Object> bounded(int min) {
+        return [name: 'RetainedBounded', values: [min: min], stereotypes: [[name: 'Limit', values: [min: min], stereotypes: []]]]
+    }
+
+    /**
+     * The composition each fixture annotation declares. An alias also introduces the annotations it reaches through
+     * the composition as occurrences of their own, as it does for an annotation declared on an element; the tree
+     * compared is the declared composition.
+     */
+    private static final Map<String, List<String>> COMPOSED = [RetainedRange: ['RetainedBounded'], RetainedBounded: ['Limit']]
+
+    private static Map<String, Object> tree(AnnotationValue<?> annotation) {
+        String name = annotation.annotationName.substring(annotation.annotationName.lastIndexOf('.') + 1)
+        List<String> composed = COMPOSED[name] ?: []
+        return [
+                name       : name,
+                values     : annotation.values,
+                stereotypes: (annotation.getStereotypes() ?: [])
+                        .findAll { composed.contains(it.annotationName.substring(it.annotationName.lastIndexOf('.') + 1)) }
+                        .collect { tree(it) }
+        ]
     }
 
     private static List<Map> limitOf(AnnotationValue<?> annotationValue) {

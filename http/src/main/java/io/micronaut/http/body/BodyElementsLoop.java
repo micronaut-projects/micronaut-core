@@ -16,6 +16,7 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,24 +36,29 @@ import java.util.function.Supplier;
  * step second continues: the loop itself when the stages completed at once, so that elements that
  * are available at once do not deepen the stack, else the thread that completed the stage. The
  * stages are never asked whether they are done, nor converted with
- * {@link CompletionStage#toCompletableFuture()}, which a stage may refuse.
+ * {@link CompletionStage#toCompletableFuture()}, which a stage may refuse. An element that
+ * {@link BodyElements#poll()} returns is consumed without a stage.
+ * <b>Internal API.</b>
  *
  * @param <T> The type of an element
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-final class BodyElementsLoop<T> {
+public final class BodyElementsLoop<T> {
 
     private static final Logger LOG = LoggerFactory.getLogger(BodyElementsLoop.class);
 
+    private final @Nullable Supplier<? extends @Nullable T> poll;
     private final Supplier<? extends CompletionStage<Optional<T>>> next;
     private final Function<? super T, ? extends CompletionStage<?>> consumer;
     private final CompletableFuture<@Nullable Void> result;
 
-    private BodyElementsLoop(Supplier<? extends CompletionStage<Optional<T>>> next,
+    private BodyElementsLoop(@Nullable Supplier<? extends @Nullable T> poll,
+                             Supplier<? extends CompletionStage<Optional<T>>> next,
                              Function<? super T, ? extends CompletionStage<?>> consumer,
                              CompletableFuture<@Nullable Void> result) {
+        this.poll = poll;
         this.next = next;
         this.consumer = consumer;
         this.result = result;
@@ -70,7 +76,42 @@ final class BodyElementsLoop<T> {
     static <T> void run(Supplier<? extends CompletionStage<Optional<T>>> next,
                         Function<? super T, ? extends CompletionStage<?>> consumer,
                         CompletableFuture<@Nullable Void> result) {
-        new BodyElementsLoop<>(next, consumer, result).loop();
+        new BodyElementsLoop<>(null, next, consumer, result).loop();
+    }
+
+    /**
+     * Consume the elements like {@link #run(Supplier, Function, CompletableFuture)}, taking an
+     * element that is available at once without a stage.
+     *
+     * @param poll     Takes the next element if it is available at once, else {@code null}
+     * @param next     Reads the next element
+     * @param consumer Consumes an element
+     * @param result   Completes when the elements were consumed
+     * @param <T>      The type of an element
+     */
+    static <T> void run(Supplier<? extends @Nullable T> poll,
+                        Supplier<? extends CompletionStage<Optional<T>>> next,
+                        Function<? super T, ? extends CompletionStage<?>> consumer,
+                        CompletableFuture<@Nullable Void> result) {
+        new BodyElementsLoop<>(poll, next, consumer, result).loop();
+    }
+
+    /**
+     * Close the elements once the result of their {@link BodyElements#forEach} failed.
+     *
+     * @param elements The elements
+     * @param result   The result of the loop
+     */
+    static void closeOnFailure(BodyElements<?> elements, CompletableFuture<?> result) {
+        result.whenComplete((ignored, error) -> {
+            if (error != null) {
+                try {
+                    elements.close();
+                } catch (Throwable e) {
+                    LOG.debug("Failed to close the elements after a failure to consume them", e);
+                }
+            }
+        });
     }
 
     private void loop() {
@@ -90,6 +131,11 @@ final class BodyElementsLoop<T> {
     private void step(StepDone done) {
         CompletionStage<Optional<T>> element;
         try {
+            T available = poll == null ? null : poll.get();
+            if (available != null) {
+                consume(available, done);
+                return;
+            }
             element = Objects.requireNonNull(next.get(), "The elements returned no stage");
         } catch (Throwable e) {
             finish(e);
@@ -109,39 +155,45 @@ final class BodyElementsLoop<T> {
                 done.accept(false);
                 return;
             }
-            if (result.isDone()) {
-                // the elements were closed meanwhile: nobody takes the element
-                discard(present.get());
+            consume(present.get(), done);
+        });
+    }
+
+    private void consume(T element, StepDone done) {
+        if (result.isDone()) {
+            // the elements were closed meanwhile: nobody takes the element
+            discard(element);
+            done.accept(false);
+            return;
+        }
+        CompletionStage<?> consumed;
+        try {
+            consumed = Objects.requireNonNull(consumer.apply(element), "The consumer returned no stage");
+        } catch (Throwable e) {
+            finish(e);
+            done.accept(false);
+            return;
+        }
+        consumed.whenComplete((ignored, consumerError) -> {
+            if (consumerError != null) {
+                finish(consumerError);
                 done.accept(false);
-                return;
+            } else {
+                done.accept(true);
             }
-            CompletionStage<?> consumed;
-            try {
-                consumed = Objects.requireNonNull(consumer.apply(present.get()), "The consumer returned no stage");
-            } catch (Throwable e) {
-                finish(e);
-                done.accept(false);
-                return;
-            }
-            consumed.whenComplete((ignored, consumerError) -> {
-                if (consumerError != null) {
-                    finish(consumerError);
-                    done.accept(false);
-                } else {
-                    done.accept(true);
-                }
-            });
         });
     }
 
     /**
      * Release an element that is produced after the elements were closed, if it holds
-     * resources, e.g. a {@link ByteBody}.
+     * resources, e.g. a {@link ByteBody} or a reference counted buffer.
      *
      * @param element The element
      */
-    static void discard(Object element) {
-        if (element instanceof AutoCloseable closeable) {
+    public static void discard(Object element) {
+        if (element instanceof ReferenceCounted counted) {
+            counted.release();
+        } else if (element instanceof AutoCloseable closeable) {
             try {
                 closeable.close();
             } catch (Exception e) {

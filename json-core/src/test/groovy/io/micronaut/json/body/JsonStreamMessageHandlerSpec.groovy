@@ -1,0 +1,69 @@
+package io.micronaut.json.body
+
+import io.micronaut.buffer.netty.NettyByteBufferFactory
+import io.micronaut.context.ApplicationContext
+import io.micronaut.core.type.Argument
+import io.micronaut.http.body.ChunkedMessageBodyReader
+import io.micronaut.http.codec.CodecException
+import reactor.core.publisher.Flux
+import spock.lang.Specification
+
+import java.nio.charset.StandardCharsets
+
+class JsonStreamMessageHandlerSpec extends Specification {
+    def parse(Class<? extends ChunkedMessageBodyReader<?>> readerType, Argument<?> type, String input, Object expected) {
+        given:
+        def ctx = ApplicationContext.run()
+        def reader = ctx.getBean(readerType)
+
+        when:
+        def buf = NettyByteBufferFactory.DEFAULT.wrap(input.getBytes(StandardCharsets.UTF_8))
+        def actual = Flux.from(reader.readChunked(type, null, null, Flux.just(buf)))
+                .collectList()
+                .block()
+        then:
+        actual == expected
+
+        cleanup:
+        ctx.close()
+
+        where:
+        readerType             | type                    | input              | expected
+        JsonMessageHandler       | Argument.STRING         | '["foo","bar"]'    | ["foo", "bar"]
+        JsonMessageHandler       | Argument.listOf(String) | '["foo","bar"]'    | [["foo", "bar"]]
+        JsonStreamMessageHandler | Argument.STRING         | '"foo"\n"bar"'     | ["foo", "bar"]
+        JsonStreamMessageHandler | Argument.listOf(String) | '["foo"]\n["bar"]' | [["foo"], ["bar"]]
+    }
+
+    def "a JSON null in a JSON stream read as a list is not an element"() {
+        given:
+        def ctx = ApplicationContext.run()
+        def reader = ctx.getBean(JsonStreamMessageHandler)
+
+        when:
+        def buf = NettyByteBufferFactory.DEFAULT.wrap('1 null 2'.getBytes(StandardCharsets.UTF_8))
+        reader.read(Argument.listOf(Integer), null, null, buf)
+
+        then:
+        thrown(CodecException)
+
+        cleanup:
+        ctx.close()
+    }
+
+    def "a JSON stream without a null is read as a list"() {
+        given:
+        def ctx = ApplicationContext.run()
+        def reader = ctx.getBean(JsonStreamMessageHandler)
+
+        when:
+        def buf = NettyByteBufferFactory.DEFAULT.wrap('1 2 3'.getBytes(StandardCharsets.UTF_8))
+        def list = reader.read(Argument.listOf(Integer), null, null, buf)
+
+        then:
+        list == [1, 2, 3]
+
+        cleanup:
+        ctx.close()
+    }
+}

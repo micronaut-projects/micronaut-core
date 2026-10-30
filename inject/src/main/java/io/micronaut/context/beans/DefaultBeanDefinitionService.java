@@ -23,6 +23,7 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DisabledBean;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.RuntimeBeanDefinition;
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.event.BeanDestroyedEventListener;
@@ -121,17 +122,31 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     @SuppressWarnings("java:S3077")
     private volatile ProducersByDefinitionName producersByDefinitionName;
 
+    /**
+     * The producers of {@link #beans} whose reference declares {@link Replaces}, found on the first lookup that
+     * needs them, with the number of producers they were found among: a {@link io.micronaut.context.RuntimeBeanDefinition}
+     * added since is appended to the producers, which the count detects.
+     */
+    @Nullable
+    @SuppressWarnings("java:S3077")
+    private volatile ReplacingProducers replacingProducers;
+    /**
+     * Guards the publication of {@link #producersByDefinitionName} and {@link #replacingProducers} against {@link #reset()}.
+     */
+    private final Object lookupCachesLock = new Object();
+
     private final BeanResolutionCustomizer beanResolutionCustomizer;
 
     private final List<BeanDefinitionProducer> additionalBeanDefinitions = new ArrayList<>();
     private final List<BeanConfiguration> additionalBeanConfigurations = new ArrayList<>();
 
     /**
-     * Creates a new bean context with the given configuration.
+     * Creates a new bean definition service with the given configuration and the customizer serving the context.
      *
      * @param contextConfiguration The context configuration
+     * @param beanResolutionCustomizer The bean resolution customizer of the context
      */
-    public DefaultBeanDefinitionService(BeanContextConfiguration contextConfiguration) {
+    public DefaultBeanDefinitionService(BeanContextConfiguration contextConfiguration, BeanResolutionCustomizer beanResolutionCustomizer) {
         Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
         List<String> configuredEagerSingletonAnnotations = new ArrayList<>(eagerInitAnnotated.size());
         for (Class<? extends Annotation> ann : eagerInitAnnotated) {
@@ -143,10 +158,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         this.beansPredicate = contextConfiguration.beansPredicate();
         this.beanConfigurationsPredicate = contextConfiguration.beanConfiguraionsPredicate();
         this.beanDefinitionReferencesProvider = contextConfiguration.getBeanDefinitionsProvider();
-        this.beanResolutionCustomizer = Objects.requireNonNull(
-            contextConfiguration.beanResolutionCustomizer(),
-            "Bean resolution customizer cannot be null"
-        );
+        this.beanResolutionCustomizer = Objects.requireNonNull(beanResolutionCustomizer, "Bean resolution customizer cannot be null");
         this.classLoader = contextConfiguration.getClassLoader();
         if (beans == null) {
             beans = createBeans(resolveBeanDefinitionReferences(), List.of());
@@ -188,7 +200,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         if (reference == null) {
             return;
         }
-        Objects.requireNonNull(beans).all.add(producer);
+        requireBeans().all.add(producer);
         Class<?> beanType = reference.getBeanType();
         boolean beanTypeIndexAdded = false;
         Set<Class<?>> exposedTypes = reference.getExposedTypes();
@@ -268,7 +280,12 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         indexByDefinitionName(index, current.all);
         // A proxied bean is disabled in the main list and its target is kept apart, see createBeans
         indexByDefinitionName(index, current.proxyTargetBeans);
-        producersByDefinitionName = new ProducersByDefinitionName(current, index);
+        synchronized (lookupCachesLock) {
+            // not after a reset dropped the beans read, see reset
+            if (beans == current) {
+                producersByDefinitionName = new ProducersByDefinitionName(current, index);
+            }
+        }
         return index;
     }
 
@@ -355,7 +372,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
             @Override
             public Iterator<BeanDefinitionReference<Object>> iterator() {
-                Iterator<BeanDefinitionProducer> iterator = Objects.requireNonNull(beans).all.iterator();
+                Iterator<BeanDefinitionProducer> iterator = requireBeans().all.iterator();
                 return new Iterator<>() {
 
                     @Nullable
@@ -390,7 +407,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
     private List<BeanDefinitionProducer> resolveProducersForBeanType(Argument<?> beanType) {
         Class<?> type = beanType.getType();
-        Beans beansNotNull = Objects.requireNonNull(beans);
+        Beans beansNotNull = requireBeans();
         if (type == Object.class) {
             return beansNotNull.all;
         }
@@ -401,9 +418,27 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         return producers;
     }
 
+    /**
+     * The loaded definitions, which a {@link #reset()} drops when the context stops: a lookup that races the
+     * stop, such as a request still in flight, gets the same lifecycle error as a bean lookup, not a null pointer.
+     */
+    private Beans requireBeans() {
+        Beans current = beans;
+        if (current == null) {
+            throw new IllegalStateException("Cannot resolve bean definitions until the context is running");
+        }
+        return current;
+    }
+
     @Override
     public void reset() {
         beans = null;
+        // the lookup caches hold the definitions of the beans dropped above, and so the beans they supply;
+        // under the lock, a lookup that read those beans before cannot publish a cache of them after
+        synchronized (lookupCachesLock) {
+            producersByDefinitionName = null;
+            replacingProducers = null;
+        }
         disabledBeans.clear();
         additionalBeanDefinitions.clear();
         additionalBeanConfigurations.clear();
@@ -418,13 +453,14 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     @Override
     public void removeBeanDefinition(RuntimeBeanDefinition<?> definition) {
         Class<?> beanType = definition.getBeanType();
-        for (Class<?> indexedType : Objects.requireNonNull(beans).beanIndex.keySet()) {
+        Beans loaded = requireBeans();
+        for (Class<?> indexedType : loaded.beanIndex.keySet()) {
             if (indexedType == beanType || indexedType.isAssignableFrom(beanType)) {
                 resolveTypeIndex(indexedType).forEach(p -> p.disableIfMatch(definition));
                 break;
             }
         }
-        beans.all.forEach(p -> p.disableIfMatch(definition));
+        loaded.all.forEach(p -> p.disableIfMatch(definition));
     }
 
     @Override
@@ -447,22 +483,58 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
     @Override
     public Iterable<BeanDefinition<Object>> getEagerInitBeans(BeanContext beanContext) {
-        return getBeanDefinitions(Objects.requireNonNull(beans).eagerInitBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+        return getBeanDefinitions(requireBeans().eagerInitBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
     }
 
     @Override
     public Iterable<BeanDefinition<Object>> getProcessedBeans(BeanContext beanContext) {
-        return getBeanDefinitions(Objects.requireNonNull(beans).processedBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+        return getBeanDefinitions(requireBeans().processedBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
     }
 
     @Override
     public Iterable<BeanDefinition<Object>> getParallelBeans(BeanContext beanContext) {
-        return getBeanDefinitions(Objects.requireNonNull(beans).parallelBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+        return getBeanDefinitions(requireBeans().parallelBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
     }
 
     @Override
     public Iterable<BeanDefinition<Object>> getTargetProxyBeans(BeanContext beanContext) {
-        return getBeanDefinitions(Objects.requireNonNull(beans).proxyTargetBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+        return getBeanDefinitions(requireBeans().proxyTargetBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+    }
+
+    @Override
+    public Iterable<BeanDefinition<Object>> getReplacingBeans(BeanContext beanContext) {
+        Beans current = beans;
+        if (current == null) {
+            return List.of();
+        }
+        List<BeanDefinitionProducer> producers = replacingProducers(current);
+        if (producers.isEmpty()) {
+            return List.of();
+        }
+        return getBeanDefinitions(producers, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+    }
+
+    private List<BeanDefinitionProducer> replacingProducers(Beans current) {
+        // read before the producers are, so that one added meanwhile has the next lookup find them again
+        int count = current.all.size();
+        ReplacingProducers cached = replacingProducers;
+        if (cached != null && cached.beans == current && cached.count == count) {
+            return cached.producers;
+        }
+        List<BeanDefinitionProducer> producers = new ArrayList<>(2);
+        for (BeanDefinitionProducer producer : current.all) {
+            BeanDefinitionReference<?> reference = producer.reference;
+            if (reference != null && reference.hasAnnotation(Replaces.class)) {
+                producers.add(producer);
+            }
+        }
+        synchronized (lookupCachesLock) {
+            // not after a reset dropped the beans read, see reset
+            if (beans == current) {
+                replacingProducers = new ReplacingProducers(current, count, producers);
+            }
+        }
+        return producers;
     }
 
     @Override
@@ -474,7 +546,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     private Collection<BeanDefinitionProducer> resolveTypeIndex(Class<?> indexedType) {
-        return Objects.requireNonNull(beans).beanIndex.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
+        return requireBeans().beanIndex.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
     }
 
     @Override
@@ -661,6 +733,9 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     private record ProducersByDefinitionName(Beans beans, Map<String, List<BeanDefinitionProducer>> index) {
+    }
+
+    private record ReplacingProducers(Beans beans, int count, List<BeanDefinitionProducer> producers) {
     }
 
     private record Beans(

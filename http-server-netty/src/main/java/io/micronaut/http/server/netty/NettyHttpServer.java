@@ -50,8 +50,12 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.context.WatchableBeanContext;
+import io.micronaut.context.watch.BeanWatch;
+import io.micronaut.context.watch.ReloadingConfigurationWatcher;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
+import io.micronaut.runtime.graceful.GracefulShutdownListener;
 import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskExecutors;
@@ -91,6 +95,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.InetSocketAddress;
@@ -121,6 +126,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.IntPredicate;
 import java.util.function.Predicate;
@@ -165,6 +171,27 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         || System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("bsd");
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
+    /**
+     * The properties a bound socket cannot follow: a change to them needs a restart.
+     */
+    private static final String[] BOUND_ADDRESS_PROPERTIES = {
+        HttpServerConfiguration.PREFIX + ".port",
+        HttpServerConfiguration.PREFIX + ".host",
+        HttpServerConfiguration.PREFIX + ".dual-protocol",
+        HttpServerConfiguration.PREFIX + ".ssl.port",
+        HttpServerConfiguration.PREFIX + ".ssl.enabled",
+        // the explicit listeners and the event loops are set up when the sockets are bound
+        HttpServerConfiguration.PREFIX + ".netty.listeners",
+        HttpServerConfiguration.PREFIX + ".netty.parent",
+        HttpServerConfiguration.PREFIX + ".netty.worker",
+        // the bootstrap options are set when the bootstraps are built, and a bound bootstrap keeps them
+        HttpServerConfiguration.PREFIX + ".netty.options",
+        HttpServerConfiguration.PREFIX + ".netty.child-options",
+        // the QUIC codec of an HTTP/3 listener is set up on its bound channel, with these settings
+        NettyHttpServerConfiguration.PREFIX + ".http3",
+        SslConfiguration.PREFIX + ".port",
+        SslConfiguration.PREFIX + ".enabled"
+    };
     private final NettyEmbeddedServices nettyEmbeddedServices;
     private final NettyHttpServerConfiguration serverConfiguration;
     @Nullable
@@ -172,6 +199,13 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private final Environment environment;
     private final RoutingInBoundHandler routingHandler;
     private final boolean isDefault;
+    /**
+     * Completes once a stop of the application context that {@link #stop()} or a failed
+     * {@link #start()} runs after releasing the server's lock has finished. Only replaced while
+     * holding the server's lock.
+     */
+    private final AtomicReference<CompletableFuture<Void>> applicationContextStopped =
+        new AtomicReference<>(CompletableFuture.completedFuture(null));
     private final ApplicationContext applicationContext;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
@@ -185,6 +219,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
     @Nullable
     private volatile List<Listener> activeListeners = null;
+    /**
+     * The configuration watch: a change under the server's prefixes rebuilds the pipelines, and a change to
+     * what the sockets are bound to, the port or the host, answers that only a restart applies it.
+     */
+    private volatile @Nullable BeanWatch configurationWatch; // NOSONAR java:S3077 only the handle is published; the watch is thread-safe
     private final List<NettyHttpServerConfiguration.NettyListenerConfiguration> listenerConfigurations;
     private final CompositeNettyServerCustomizer rootCustomizer = new CompositeNettyServerCustomizer();
 
@@ -312,7 +351,42 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
-    public synchronized NettyEmbeddedServer start() {
+    public NettyEmbeddedServer start() {
+        ServerStartupException failure = null;
+        CompletableFuture<Void> contextStopped = null;
+        boolean started = false;
+        while (!started && failure == null) {
+            CompletableFuture<Void> previousStop = currentApplicationContextStop();
+            // let a stop of the application context by this server finish first, so that it does
+            // not undo this start. Wait without the server's lock, the context stop stops this
+            // server, which takes it
+            awaitApplicationContextStop(previousStop);
+            synchronized (this) {
+                // if another stop started in the meantime, wait for that one too
+                if (currentApplicationContextStop() == previousStop) {
+                    try {
+                        startInternal();
+                        started = true;
+                    } catch (ServerStartupException e) {
+                        failure = e;
+                        contextStopped = new CompletableFuture<>();
+                        applicationContextStopped.set(contextStopped);
+                    }
+                }
+            }
+        }
+        if (failure == null) {
+            return this;
+        }
+        // a listener failed to bind and the server has stopped itself. The application context
+        // is stopped only now that the server's lock is released: stopping the context stops
+        // this server, so a concurrent context stop would otherwise wait for the server's lock
+        // while holding the context's, and this thread for the context's while holding the server's
+        stopApplicationContext(Objects.requireNonNull(contextStopped));
+        throw failure;
+    }
+
+    private void startInternal() {
         if (!isRunning()) {
             if (isDefault && !applicationContext.isRunning()) {
                 applicationContext.start();
@@ -347,6 +421,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 listeners.add(bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig));
             }
             this.activeListeners = Collections.unmodifiableList(listeners);
+            watchConfiguration();
 
             if (isDefault) {
                 final Router router = this.nettyEmbeddedServices.getRouter();
@@ -363,8 +438,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             fireStartupEvents();
             running.set(true);
         }
-
-        return this;
     }
 
     @Nullable
@@ -384,22 +457,61 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
-    public synchronized NettyEmbeddedServer stop() {
-        return stop(false);
+    public NettyEmbeddedServer stop() {
+        shutdownGracefullyBeforeStop();
+        CompletableFuture<Void> contextStopped = null;
+        synchronized (this) {
+            if (stop(false)) {
+                // only replaced here: the context stop calls stop() again, which stops nothing
+                contextStopped = new CompletableFuture<>();
+                applicationContextStopped.set(contextStopped);
+            }
+        }
+        if (contextStopped != null) {
+            // outside the server's lock, see start()
+            stopApplicationContext(contextStopped);
+        } else {
+            // another thread is stopping the server, return once it has stopped the context too
+            awaitApplicationContextStop(currentApplicationContextStop());
+        }
+        return this;
     }
 
     @Override
     public NettyEmbeddedServer stopServerOnly() {
-        return stop(true);
+        stop(true);
+        return this;
     }
 
-    private NettyEmbeddedServer stop(boolean stopServerOnly) {
+    /**
+     * Stopping the server closes the connections it has accepted, cutting the requests in flight
+     * on them. If graceful shutdown is enabled and stopping this server stops the application
+     * context, run the graceful shutdown that the context stop would run first, so that those
+     * requests can complete within the grace period. This is the path of the shutdown hook
+     * registered by {@code Micronaut.run}. It must not hold the server's lock, see
+     * {@link #start()}.
+     */
+    private void shutdownGracefullyBeforeStop() {
+        // When the current thread holds the context's lock, this is the context stop calling
+        // back into this server, after its ShutdownEvent has already run the graceful shutdown
+        if (isDefault && isRunning() && applicationContext.isRunning() && !Thread.holdsLock(applicationContext)) {
+            try {
+                applicationContext.findBean(GracefulShutdownListener.class)
+                    .ifPresent(GracefulShutdownListener::shutdownGracefully);
+            } catch (RuntimeException e) {
+                LOG.warn("Error in graceful shutdown before stopping the server: {}", e.getMessage(), e);
+            }
+        }
+    }
+
+    private boolean stop(boolean stopServerOnly) {
         if (isRunning() && workerGroup != null) {
             if (running.compareAndSet(true, false)) {
                 stopInternal(stopServerOnly);
+                return true;
             }
         }
-        return this;
+        return false;
     }
 
     @Override
@@ -540,7 +652,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return nettyEmbeddedServices.getEventLoopGroupRegistry()
                 .getEventLoopGroup(parent != null ? parent.getName() : NettyHttpServerConfiguration.Parent.NAME)
                 .orElseGet(() -> {
-                    final EventLoopGroup newGroup = newEventLoopGroup(acceptorConfiguration(parent));
+                    final EventLoopGroup newGroup = newEventLoopGroup(acceptorConfiguration(parent, resolveWorkerConfiguration()));
                     shutdownParent = true;
                     return newGroup;
                 });
@@ -553,24 +665,28 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * {@value #DEFAULT_PARENT_THREADS} thread rather than to the worker group default of
      * {@link EventLoopGroupConfiguration#getThreadCoreRatio()} threads per core.
      *
+     * <p>The acceptor group must use the same transport as the worker group: the server channel type is
+     * derived from the worker configuration, and a native channel (for example epoll) cannot be
+     * registered on a NIO event loop. The transport of the worker configuration is therefore used.</p>
+     *
      * @param parent The configured parent event loop group settings, if any
+     * @param workerConfig The resolved worker event loop group configuration, if any
      * @return The configuration to create the acceptor group from
      */
-    private static EventLoopGroupConfiguration acceptorConfiguration(NettyHttpServerConfiguration.@Nullable Parent parent) {
+    private static EventLoopGroupConfiguration acceptorConfiguration(NettyHttpServerConfiguration.@Nullable Parent parent,
+                                                                     @Nullable EventLoopGroupConfiguration workerConfig) {
         EventLoopGroupConfiguration source = parent == null ? new DefaultEventLoopGroupConfiguration() : parent;
-        if (source.getNumThreads() != 0) {
-            // explicitly configured, honour it as-is
-            return source;
-        }
+        // an explicitly configured thread count is honoured as-is
+        int threads = source.getNumThreads() != 0 ? source.getNumThreads() : DEFAULT_PARENT_THREADS;
         return new DefaultEventLoopGroupConfiguration(
             // keep a name the user configured; only the implicit acceptor group is called "parent"
             parent == null ? NettyHttpServerConfiguration.Parent.NAME : source.getName(),
-            DEFAULT_PARENT_THREADS,
+            threads,
             source.getThreadCoreRatio(),
             source.getIoRatio().orElse(null),
             // the transport list below already reflects the (deprecated) native preference
             false,
-            source.getTransport(),
+            workerConfig != null ? workerConfig.getTransport() : source.getTransport(),
             source.getExecutorName().orElse(null),
             source.getShutdownQuietPeriod(),
             source.getShutdownTimeout(),
@@ -600,6 +716,18 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @SuppressWarnings("WeakerAccess")
     protected ServerBootstrap createServerBootstrap() {
         return new ServerBootstrap();
+    }
+
+    /**
+     * The provider of sockets that outlive this server, when there is one and the listener's transport is NIO, the
+     * only one whose server channel can be built over a socket it does not own.
+     */
+    @Nullable
+    private RetainedServerSockets retainedServerSockets(ServerBootstrap bootstrap) {
+        if (!(bootstrap.config().group() instanceof IoEventLoopGroup group) || !group.isIoType(NioIoHandler.class)) {
+            return null;
+        }
+        return applicationContext.findBean(RetainedServerSockets.class).orElse(null);
     }
 
     private Listener bind(Supplier<ServerBootstrap> serverBootstrap, Supplier<Bootstrap> udpBootstrap, Supplier<Bootstrap> acceptedBootstrap, NettyHttpServerConfiguration.NettyListenerConfiguration cfg, @Nullable EventLoopGroupConfiguration workerConfig) {
@@ -651,18 +779,26 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                         .childHandler(listener);
                     switch (cfg.getFamily()) {
                         case TCP:
+                            int port = cfg.getPort();
+                            if (port == -1) {
+                                port = 0;
+                            }
+                            RetainedServerSockets retainedSockets = fd == null && cfg.isBind() ? retainedServerSockets(listenerBootstrap) : null;
+                            java.nio.channels.ServerSocketChannel retained = retainedSockets == null ? null : retainedSockets.serverSocket(cfg.getHost(), port);
                             listenerBootstrap.channelFactory(() -> {
-                                if (fd != null) {
+                                if (retained != null) {
+                                    // a socket that outlives this server: accept on it, and leave it bound when this server stops
+                                    return new RetainedNioServerSocketChannel(retained);
+                                } else if (fd != null) {
                                     return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig, null, fd);
                                 } else {
                                     return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig);
                                 }
                             });
-                            int port = cfg.getPort();
-                            if (port == -1) {
-                                port = 0;
-                            }
-                            if (cfg.isBind()) {
+                            if (retained != null) {
+                                future = listenerBootstrap.register().syncUninterruptibly();
+                                Objects.requireNonNull(retainedSockets).accepting(retained, future.channel());
+                            } else if (cfg.isBind()) {
                                 if (cfg.getHost() == null) {
                                     future = port == 0 && fd == null ? bindRandomWildcardPort(listenerBootstrap, CHECK_LOOPBACK_PORT_SHADOWING ? NettyHttpServer::isLoopbackPortTaken : p -> false) : listenerBootstrap.bind(port);
                                 } else {
@@ -909,15 +1045,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             }
             webSocketSessions.close();
             applicationContext.getEventPublisher(ServerShutdownEvent.class).publishEvent(new ServerShutdownEvent(this));
-            if (isDefault && applicationContext.isRunning() && !stopServerOnly) {
-                applicationContext.stop();
-            }
             List<Listener> activeListeners = this.activeListeners;
             if (activeListeners != null) {
                 for (Listener listener : activeListeners) {
                     listener.clean();
                 }
                 this.activeListeners = null;
+                BeanWatch watch = configurationWatch;
+                if (watch != null) {
+                    watch.close();
+                    configurationWatch = null;
+                }
             }
 
             // If we are only stopping the server, we need to wait for the futures to complete otherwise
@@ -937,6 +1075,49 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error stopping Micronaut server: {}", e.getMessage(), e);
             }
+        }
+    }
+
+    /**
+     * Stop the application context if this is the default server, then let a waiting
+     * {@link #start()} proceed. This must not be called while holding the server's lock: stopping
+     * the context stops this server, which takes that lock.
+     *
+     * @param contextStopped Completed once the context is stopped
+     */
+    private void stopApplicationContext(CompletableFuture<Void> contextStopped) {
+        try {
+            if (isDefault && applicationContext.isRunning()) {
+                applicationContext.stop();
+            }
+        } catch (Throwable e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error stopping Micronaut server: {}", e.getMessage(), e);
+            }
+        } finally {
+            contextStopped.complete(null);
+        }
+    }
+
+    private CompletableFuture<Void> currentApplicationContextStop() {
+        return Objects.requireNonNull(applicationContextStopped.get());
+    }
+
+    /**
+     * Wait for a stop of the application context run by {@link #stopApplicationContext}, unless
+     * the current thread holds the context's lock: it is then either that stop calling back into
+     * this server, from a shutdown listener or by destroying it, or a stop of the context that
+     * the stop we would wait for is itself waiting on.
+     *
+     * @param contextStopped Completed once the context is stopped
+     */
+    private void awaitApplicationContextStop(CompletableFuture<Void> contextStopped) {
+        // This relies on DefaultBeanContext.start()/stop() (and DefaultApplicationContext.stop())
+        // being synchronized on the context instance. If they move to a private lock, or another
+        // ApplicationContext implementation is used, holdsLock is false here, and a stop calling
+        // back into this server would join its own pending future and hang.
+        if (!Thread.holdsLock(applicationContext)) {
+            contextStopped.join();
         }
     }
 
@@ -1025,10 +1206,54 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public void onApplicationEvent(RefreshEvent event) {
-        // if anything under HttpServerConfiguration.PREFIX changes re-build
-        // the NettyHttpServerInitializer in the server bootstrap to apply changes
-        // this will ensure re-configuration to HTTPS settings, read-timeouts, logging etc. apply
-        // configuration properties are auto-refreshed so will be visible automatically
+        if (configurationWatch != null) {
+            // the configuration watch, which the refresh runs before this event, did the work
+            return;
+        }
+        refreshListeners();
+    }
+
+    /**
+     * Watches the server's configuration prefixes: anything under them rebuilds the pipelines, so that
+     * SSL settings, timeouts and logging apply; the port and the host cannot change under bound sockets.
+     */
+    private void watchConfiguration() {
+        if (!(applicationContext instanceof WatchableBeanContext watchable)) {
+            return;
+        }
+        ReloadingConfigurationWatcher watcher = change -> {
+            if (!change.all() && change.touchesAny(BOUND_ADDRESS_PROPERTIES)) {
+                // a refresh of everything names no key: it rebuilds the pipelines, as the refresh endpoint always has
+                return ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART;
+            }
+            ServerSslBuilder sslBuilder = nettyEmbeddedServices.getServerSslBuilder();
+            if (sslBuilder != null && (change.all() || change.touches(SslConfiguration.PREFIX) || change.touches(ServerSslConfiguration.PREFIX))) {
+                // before the pipelines are rebuilt, and not after, as the legacy listener used to: a store file
+                // replaced in place keeps its path, and must be read again
+                sslBuilder.invalidate();
+            }
+            refreshListeners();
+            return ReloadingConfigurationWatcher.Outcome.APPLIED;
+        };
+        BeanWatch serverWatch = watchable.configuration(HttpServerConfiguration.PREFIX).watchReloading(watcher);
+        BeanWatch sslWatch = watchable.configuration(SslConfiguration.PREFIX).watchReloading(watcher);
+        configurationWatch = new BeanWatch() {
+            @Override
+            public void close() {
+                serverWatch.close();
+                sslWatch.close();
+            }
+
+            @Override
+            public boolean isActive() {
+                return serverWatch.isActive() || sslWatch.isActive();
+            }
+        };
+    }
+
+    private void refreshListeners() {
+        // rebuild the NettyHttpServerInitializer in the server bootstrap to apply changes: re-configuration
+        // to HTTPS settings, read-timeouts, logging etc.; configuration properties are refreshed already
         List<Listener> listeners = activeListeners;
         if (listeners != null) {
             for (Listener listener : listeners) {
@@ -1144,6 +1369,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             @Override
             protected SslContextHolder createLegacy() {
                 return createLegacySslContextHolder(quic());
+            }
+
+            @Override
+            protected @Nullable SSLContext providedSslContext() {
+                ServerSslConfiguration ssl = Objects.requireNonNull(sslConfiguration);
+                SSLContext provided = ssl.getSslContext();
+                String contextName = ssl.getContextName();
+                if (provided == null && contextName != null) {
+                    provided = applicationContext.getBean(SSLContext.class, Qualifiers.byName(contextName));
+                }
+                return provided;
             }
 
             @Override

@@ -19,17 +19,19 @@ import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.watch.BeanExecutableMethod;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.AnnotationValue;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.CircuitBreakerPolicy;
 import io.micronaut.retry.CircuitBreakerWindow;
 import io.micronaut.retry.RetryPolicy;
 import io.micronaut.retry.RetryRegistry;
-import io.micronaut.retry.RetryState;
 import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.Retryable;
 import io.micronaut.retry.event.RetryEvent;
@@ -43,7 +45,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -60,7 +61,6 @@ import java.util.function.Supplier;
 public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
-    private static final String NAME = "name";
     private final ConversionService conversionService;
     @Nullable
     private final ApplicationEventPublisher eventPublisher;
@@ -94,7 +94,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                                    @Nullable
                                    ApplicationEventPublisher eventPublisher,
                                    @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
-        this(conversionService, eventPublisher, executorService, null, null);
+        this(conversionService, eventPublisher, executorService, null, null, null);
     }
 
     /**
@@ -110,19 +110,59 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      * @param namedCircuits The circuits of the named circuit breakers
      * @since 5.3.0
      */
-    @Inject
     public DefaultRetryInterceptor(ConversionService conversionService,
                                    @Nullable
                                    ApplicationEventPublisher eventPublisher,
                                    @Named(TaskExecutors.SCHEDULED) ExecutorService executorService,
                                    @Nullable RetryRegistry retryRegistry,
                                    @Nullable NamedCircuits namedCircuits) {
+        this(conversionService, eventPublisher, executorService, retryRegistry, namedCircuits, null);
+    }
+
+    /**
+     * Construct a default retry method interceptor with the event publisher, the registry of the
+     * named retry policies and the named circuit breakers, in a context whose circuit breaker methods
+     * are watched: the circuit of a method that went, or came back in a new generation, is dropped.
+     *
+     * @param conversionService The conversion service
+     * @param eventPublisher The event publisher to publish retry events
+     * @param executorService The executor service to use for completable futures
+     * @param retryRegistry The registry of the named retry policies
+     * @param namedCircuits The circuits of the named circuit breakers
+     * @param beanContext The bean context
+     * @since 5.3.0
+     */
+    @Inject
+    public DefaultRetryInterceptor(ConversionService conversionService,
+                                   @Nullable
+                                   ApplicationEventPublisher eventPublisher,
+                                   @Named(TaskExecutors.SCHEDULED) ExecutorService executorService,
+                                   @Nullable RetryRegistry retryRegistry,
+                                   @Nullable NamedCircuits namedCircuits,
+                                   @Nullable BeanContext beanContext) {
         this.retryRegistry = retryRegistry;
         this.conversionService = conversionService;
         this.eventPublisher = eventPublisher;
         this.executorService = (ScheduledExecutorService) executorService;
         this.retryRunner = new DefaultRetryRunner(this.executorService, this::sleep);
         this.namedCircuits = namedCircuits == null ? new NamedCircuits() : namedCircuits;
+        if (beanContext instanceof WatchableBeanContext watchable) {
+            watchable.methods(CircuitBreaker.class).watch(change -> {
+                // a circuit belongs to the method it guards: a method that went, or came back changed, starts closed;
+                // a named circuit is shared by name and outlives any one method
+                for (BeanExecutableMethod<CircuitBreaker> gone : change.removed()) {
+                    circuitContexts.keySet().removeIf(key -> key.method().equals(gone.method()));
+                }
+            });
+        }
+    }
+
+    /**
+     * @return How many circuit breaker methods hold a circuit
+     */
+    @Internal
+    public int circuitContexts() {
+        return circuitContexts.size();
     }
 
     @Override
@@ -133,20 +173,21 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        Optional<AnnotationValue<Retryable>> opt = context.findAnnotation(Retryable.class);
-        if (opt.isEmpty()) {
+        // What the annotations say is kept by the method: only the retry state is created per call
+        RetryPlan plan = context.getCachedValue(RetryPlan.class, RetryPlan::of);
+        AnnotationValue<Retryable> retry = plan.retry();
+        if (retry == null) {
             return context.proceed();
         }
 
-        AnnotationValue<Retryable> retry = opt.get();
-        boolean isCircuitBreaker = context.hasStereotype(CircuitBreaker.class);
+        boolean isCircuitBreaker = plan.isCircuitBreaker();
         MutableRetryState retryState;
         AnnotationRetryStateBuilder annotationRetryStateBuilder = new AnnotationRetryStateBuilder(
             context
         );
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
 
-        String name = retry.stringValue(NAME).orElse("");
+        String name = plan.name();
         RetryPolicy namedPolicy = null;
         if (!name.isEmpty()) {
             try {
@@ -163,7 +204,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         CircuitBreakerRetry windowedCircuit = null;
         if (isCircuitBreaker) {
             RetryPolicy retryPolicy = namedPolicy;
-            AnnotationValue<CircuitBreaker> circuitBreaker = context.findAnnotation(CircuitBreaker.class).orElse(null);
+            AnnotationValue<CircuitBreaker> circuitBreaker = plan.circuitBreaker();
             CircuitBreakerRetry circuitBreakerRetry;
             try {
                 circuitBreakerRetry = circuitContexts.computeIfAbsent(
@@ -177,14 +218,13 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             if (circuitBreakerRetry.circuit().getWindow() != null) {
                 windowedCircuit = circuitBreakerRetry;
             }
+        } else if (plan.policy() != null) {
+            retryState = (MutableRetryState) new PolicyRetryStateBuilder(plan.policy()).build();
         } else if (namedPolicy == null) {
             retryState = (MutableRetryState) annotationRetryStateBuilder.build();
         } else {
             retryState = (MutableRetryState) new PolicyRetryStateBuilder(namedPolicy).build();
         }
-
-        MutableConvertibleValues<Object> attrs = context.getAttributes();
-        attrs.put(RetryState.class.getName(), retry);
 
         try {
             if (windowedCircuit == null || interceptedMethod.resultType() != InterceptedMethod.ResultType.PUBLISHER) {
@@ -196,13 +236,13 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                     RetryEventEmitter retryEventEmitter = (state, exception) -> publishRetryEvent(context, state, exception);
                     Publisher<Object> publisher;
                     if (windowedCircuit == null) {
-                        publisher = retryRunner.executePublisher(supplier, retryState, context.toString(), retryEventEmitter);
+                        publisher = retryRunner.executePublisher(supplier, retryState, context, retryEventEmitter);
                     } else {
                         CircuitBreakerRetry circuit = windowedCircuit;
                         publisher = Flux.defer(() -> {
                             MutableRetryState invocation = circuit.newInvocation();
                             invocation.open();
-                            return retryRunner.executePublisher(supplier, invocation, context.toString(), retryEventEmitter);
+                            return retryRunner.executePublisher(supplier, invocation, context, retryEventEmitter);
                         });
                     }
                     return interceptedMethod.handleResult(publisher);
@@ -212,7 +252,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                         retryRunner.executeCompletionStage(
                             () -> interceptedMethod.interceptResultAsCompletionStage(this),
                             retryState,
-                            context.toString(),
+                            context,
                             (state, exception) -> publishRetryEvent(context, state, exception)
                         )
                     );
@@ -221,7 +261,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                     return retryRunner.executeSync(
                         () -> (Object) interceptedMethod.interceptResult(this),
                         retryState,
-                        context.toString(),
+                        context,
                         (state, exception) -> publishRetryEvent(context, state, exception)
                     );
                 }

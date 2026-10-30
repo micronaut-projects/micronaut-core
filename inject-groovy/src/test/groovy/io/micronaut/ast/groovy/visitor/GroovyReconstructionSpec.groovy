@@ -56,7 +56,7 @@ class GroovyReconstructionSpec extends AbstractBeanDefinitionSpec {
             def typeArguments = classElement.getTypeArguments().values()
             if (typeArguments.isEmpty()) {
                 return classElement.getSimpleName()
-            } else if (typeArguments.stream().allMatch { it.isRawType() }) {
+            } else if (typeArguments.stream().allMatch { it.isRawType() && it.isGenericPlaceholder() }) {
                 return classElement.getSimpleName()
             } else {
                 return classElement.getSimpleName() +
@@ -118,8 +118,7 @@ class Test<T> {
         def field = element.getFields()[0]
 
         expect:
-        // Wildcards with arrays not supported yet
-        reconstructTypeSignature(field.genericType) == 'List<byte[]>'
+        reconstructTypeSignature(field.genericType) == 'List<? extends byte[]>'
     }
 
     @Unroll("super type is #superType")

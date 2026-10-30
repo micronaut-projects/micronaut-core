@@ -229,6 +229,21 @@ public @interface Introspected {
     IntrospectionBuilder builder() default @IntrospectionBuilder();
 
     /**
+     * Whether fields and methods that are injection points, annotated with {@code jakarta.inject.Inject},
+     * {@code io.micronaut.context.annotation.Value} or {@code io.micronaut.context.annotation.Property},
+     * should be included as bean properties of the introspection.
+     *
+     * <p>By default, injection points are excluded since they are populated by the bean context. Including them
+     * allows an instance that isn't a bean, for example one registered by the application, to have its injection
+     * points populated through the introspection.</p>
+     *
+     * @return True if injection points should be included as bean properties
+     * @since 5.3.0
+     */
+    @Experimental
+    boolean includeInjected() default false;
+
+    /**
      * Whether every declared constructor of the type should be described by the introspection and
      * exposed via {@link io.micronaut.core.beans.BeanIntrospection#getConstructors()}, including
      * each constructor's annotation metadata and the annotation metadata of its parameters.
@@ -241,6 +256,28 @@ public @interface Introspected {
      * @since 5.2.0
      */
     boolean constructors() default false;
+
+    /**
+     * Whether the introspection describes the hierarchy of the type, exposed via
+     * {@link io.micronaut.core.beans.BeanIntrospection#getTypeHierarchy()}: every super class and interface the
+     * type has, with the super class and the interfaces each of them declares, and which of the bean methods the
+     * type declares itself rather than inherits.
+     *
+     * <p>This is required by specifications such as Jakarta Bean Validation that apply what a super type or an
+     * interface declares on its own terms, and need to know whether a type declares a method or inherits it,
+     * without reading the classes reflectively.</p>
+     *
+     * <p>Defaults to {@code false} since the generated introspection grows by the code describing the
+     * hierarchy. The hierarchy is built when it is first asked for.</p>
+     *
+     * <p>As with {@link #constructors()}, a type introspected through {@link #classes()} or {@link #packages()} that
+     * carries its own {@code @Introspected} annotation follows that annotation, not the one importing it.</p>
+     *
+     * @return True if the hierarchy of the type should be described
+     * @since 5.3.0
+     */
+    @Experimental
+    boolean hierarchy() default false;
 
     /**
      * Configuration for an introspection builder.

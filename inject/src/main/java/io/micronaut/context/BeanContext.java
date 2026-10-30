@@ -65,6 +65,7 @@ public interface BeanContext extends
      * Creates a fresh instance of the exact definition, bypassing its scope, and retains its complete
      * dependency tree in the returned registration. Dependencies still obey their own scope rules.
      * For a contextual target behind a proxy, supply the target definition. The caller owns the result.
+     * The same shutdown rule as {@link #createDependencyGroup()} applies.
      * @param definition The definition to instantiate
      * @param <T> The bean type
      * @return The created instance and its lifecycle
@@ -77,8 +78,18 @@ public interface BeanContext extends
 
     /**
      * Creates an independent dependency group. The caller must close it; context shutdown does not take ownership.
-     * New lookups are rejected during shutdown. A destruction listener that needs temporary dependencies uses
-     * {@link io.micronaut.context.event.BeanPreDestroyEvent#withDependencies(Function)}.
+     *
+     * <p>Once shutdown begins, groups can still be created, and resolved through, while {@link #stop()} runs its
+     * callbacks: the {@link io.micronaut.context.event.ShutdownEvent} listeners and the destruction callbacks of the
+     * beans, such as a {@code @PreDestroy} method of a singleton destroyed after the event. This includes work on
+     * another thread that such a callback starts and waits for, such as an asynchronous event it fires. What a
+     * lookup made during shutdown creates is destroyed before the shutdown completes, even when the group is never
+     * closed, so a group used then is meant to be temporary and released by the callback that opened it. Once the
+     * last callback has returned, creation and lookups are rejected with an {@link IllegalStateException}, on any
+     * thread; work that a callback started without waiting for it may therefore fail. A destruction listener can
+     * also use {@link io.micronaut.context.event.BeanPreDestroyEvent#withDependencies(Function)}, whose dependents
+     * are destroyed when it returns. Groups are also rejected before the context is configured.</p>
+     *
      * @return The group
      * @since 5.3.0
      */
@@ -89,8 +100,8 @@ public interface BeanContext extends
 
     /**
      * Resolves dependencies for a synchronous invocation and always releases them afterwards. Cleanup failures
-     * are suppressed on an invocation failure. New groups and lookups are rejected once shutdown begins;
-     * a destruction listener uses {@link io.micronaut.context.event.BeanPreDestroyEvent#withDependencies(Function)}.
+     * are suppressed on an invocation failure. Once shutdown begins, it is available while the shutdown callbacks
+     * run, see {@link #createDependencyGroup()}.
      * @param action The invocation
      * @param <R> The result type
      * @return The result (which must not retain an owned dependency)

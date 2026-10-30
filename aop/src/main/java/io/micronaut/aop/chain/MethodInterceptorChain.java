@@ -187,6 +187,11 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     @Override
+    public boolean hasTargetMethod() {
+        return executionHandle.hasTargetMethod();
+    }
+
+    @Override
     public ReturnType<R> getReturnType() {
         return executionHandle.getReturnType();
     }

@@ -37,6 +37,9 @@ tasks.withType(PublishGuideTask).configureEach {
     inputs.files(languageSnippetSources)
             .withPropertyName("languageSnippetSources")
             .withPathSensitivity(PathSensitivity.RELATIVE)
+    // versions the guide shows in build examples, from the version catalog
+    properties.put("kotlinVersion", libs.versions.managed.kotlin.asProvider())
+    properties.put("kspVersion", libs.versions.managed.ksp)
 }
 
 tasks.named("updateVersionCatalogs") {
@@ -55,10 +58,16 @@ def pythonTestProjects = [
         ":micronaut-inject-python",
         ":micronaut-inject-python-test",
         ":micronaut-context-python",
-        ":micronaut-context-python-netty"
+        ":micronaut-context-python-netty",
+        ":test-suite-dev-python",
+        ":test-suite-python-corpus"
 ]
-// Projects whose tests all run in the first Python CI job instead of being split across the jobs
-def pythonUnshardedProjects = []
+// Projects whose tests all run in the first Python CI job instead of being split across the jobs: the
+// corpus is one test class
+def pythonUnshardedProjects = [
+        ":test-suite-dev-python",
+        ":test-suite-python-corpus"
+]
 def pythonProjects = pythonTestProjects + [":test-suite-python"]
 
 if (System.getenv("SONAR_TOKEN") != null) {
@@ -90,6 +99,9 @@ if (System.getenv("SONAR_TOKEN") != null) {
         properties {
             property "sonar.exclusions", analysisExcludes.join(",")
             property "sonar.coverage.exclusions", coverageExcludes.join(",")
+            // Test sources are not analysed for issues. Coverage of the main sources still comes
+            // from the JaCoCo reports, which do not need the test files to be indexed.
+            property "sonar.test.exclusions", "**/*"
         }
     }
 }
