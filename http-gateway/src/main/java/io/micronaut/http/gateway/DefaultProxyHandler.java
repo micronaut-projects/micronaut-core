@@ -92,6 +92,8 @@ final class DefaultProxyHandler implements ProxyHandler {
         "X-Real-IP"
     );
 
+    private static final String UPSTREAM_OF_ROUTE = "The upstream of the gateway route ";
+
     private final GatewayRoute route;
     private final ProxyHandlerFactory factory;
     private final RawRequestOptions options;
@@ -397,8 +399,9 @@ final class DefaultProxyHandler implements ProxyHandler {
         String id = route.getId();
         if (cause instanceof UpstreamStatusFailure statusFailure) {
             // a retried status whose retries the total delay stopped: its status, the response is gone
-            HttpStatus status = HttpStatus.valueOf(statusFailure.getStatus());
-            return new UpstreamException(status, id, "The upstream of the gateway route " + id + " answered " + status.getCode(), cause);
+            // a status that HttpStatus does not name, e.g. 599, is a bad gateway
+            HttpStatus status = knownStatus(statusFailure.getStatus());
+            return new UpstreamException(status, id, UPSTREAM_OF_ROUTE + id + " answered " + statusFailure.getStatus(), cause);
         }
         if (cause instanceof CircuitOpenException) {
             return new UpstreamException(HttpStatus.SERVICE_UNAVAILABLE, id, "The circuit breaker of the gateway route " + id + " is open", cause);
@@ -408,11 +411,23 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
         if (cause instanceof ReadTimeoutException || cause instanceof TimeoutException
             || cause instanceof UnprocessedRequestException unprocessed && unprocessed.getReason() == UnprocessedRequestException.Reason.CONNECT_TIMEOUT) {
-            return new UpstreamException(HttpStatus.GATEWAY_TIMEOUT, id, "The upstream of the gateway route " + id + " did not answer in time", cause);
+            return new UpstreamException(HttpStatus.GATEWAY_TIMEOUT, id, UPSTREAM_OF_ROUTE + id + " did not answer in time", cause);
         }
         // the cause names internal hosts and addresses: it is logged and kept, not sent to the client
         LOG.debug("The upstream of the gateway route {} failed", id, cause);
-        return new UpstreamException(HttpStatus.BAD_GATEWAY, id, "The upstream of the gateway route " + id + " failed", cause);
+        return new UpstreamException(HttpStatus.BAD_GATEWAY, id, UPSTREAM_OF_ROUTE + id + " failed", cause);
+    }
+
+    /**
+     * @param code A status code
+     * @return Its status, or {@code 502} for a code that {@link HttpStatus} does not name
+     */
+    private static HttpStatus knownStatus(int code) {
+        try {
+            return HttpStatus.valueOf(code);
+        } catch (IllegalArgumentException e) {
+            return HttpStatus.BAD_GATEWAY;
+        }
     }
 
     /**
@@ -667,7 +682,22 @@ final class DefaultProxyHandler implements ProxyHandler {
                 return null;
             }
             if (replay != null) {
-                return replay.isReplayable() ? replay.next() : null;
+                if (!replay.isReplayable()) {
+                    return null;
+                }
+                // the replay may keep more bytes than the fallback, e.g. for the retries
+                CloseableByteBody replayed = replay.next();
+                long length = replayed.expectedLength().orElse(-1);
+                if (length > limit) {
+                    replayed.close();
+                    return null;
+                }
+                if (length < 0) {
+                    ByteBodyFactory factory = request instanceof ServerHttpRequest<?> server
+                        ? server.byteBodyFactory() : ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+                    return factory.limit(replayed, limit);
+                }
+                return replayed;
             }
             if (body instanceof AvailableByteBody available && available.length() <= limit) {
                 return body.split();
@@ -755,6 +785,9 @@ final class DefaultProxyHandler implements ProxyHandler {
                     // the fallback takes its copy of the body before the kept bytes go
                     try {
                         fail(failure);
+                    } catch (RuntimeException e) {
+                        // never leave the request without a response
+                        result.completeExceptionally(e);
                     } finally {
                         body.release();
                     }
@@ -782,6 +815,12 @@ final class DefaultProxyHandler implements ProxyHandler {
                 return;
             }
             CloseableByteBody kept = body.forFallback(Objects.requireNonNull(circuitBreaker).maxFallbackBodyBytes());
+            if (kept == null && !body.canResend() && (fallback.handler() instanceof ProxyHandler || fallback.handler() instanceof FailoverHandler)) {
+                // a failover relays the body, which an attempt sent and nothing kept: the failure of
+                // the upstream is the answer, not a failure to read the body
+                result.completeExceptionally(cause);
+                return;
+            }
             FallbackRequest fallbackRequest = kept == null ? null : new FallbackRequest(request, kept);
             fallback.handle(fallbackRequest == null ? request : fallbackRequest, pathVariables).whenComplete((response, error) -> {
                 if (fallbackRequest != null) {
