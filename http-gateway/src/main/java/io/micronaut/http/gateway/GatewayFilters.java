@@ -25,6 +25,7 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.PathVariables;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.util.ForwardedHeaders;
 import io.micronaut.http.uri.UriTemplate;
@@ -41,6 +42,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -61,6 +64,7 @@ public final class GatewayFilters {
 
     private static final String MASK = "******";
     private static final List<String> SENSITIVE_NAMES = List.of("auth", "cookie", "token", "secret", "password", "key", "credential", "session");
+    private static final String ERROR_MESSAGE = "errorMessage";
 
     private static final Pattern VARIABLE = Pattern.compile("\\{([A-Za-z0-9_.-]+)}");
     private static final Pattern PATH_VARIABLE = Pattern.compile("\\{(\\+)?([A-Za-z0-9_.-]+)}");
@@ -936,7 +940,11 @@ public final class GatewayFilters {
     static final class Bulkhead implements GatewayFilter {
         private final int maxConcurrent;
         private final KeyResolver keyResolver;
-        private final Map<String, java.util.concurrent.atomic.AtomicInteger> inFlight = new java.util.concurrent.ConcurrentHashMap<>();
+        /**
+         * The requests in flight of a route and a key; a key without requests in flight is
+         * removed, so that the keys not seen any more do not stay in memory.
+         */
+        private final Map<PermitKey, Integer> inFlight = new ConcurrentHashMap<>();
 
         Bulkhead(int maxConcurrent, KeyResolver keyResolver) {
             this.maxConcurrent = maxConcurrent;
@@ -945,41 +953,81 @@ public final class GatewayFilters {
 
         @Override
         public void configure(RouteFilterSpec<?> route) {
-            route.beforeReplacingAsync(request -> keyResolver.resolve(request).thenApply(key -> {
+            route.beforeReplacing(request -> {
+                String key = keyResolver.resolve(request);
                 if (key == null || key.isEmpty()) {
                     return null;
                 }
-                java.util.concurrent.atomic.AtomicInteger count = inFlight.computeIfAbsent(key, k -> new java.util.concurrent.atomic.AtomicInteger());
-                if (count.incrementAndGet() > maxConcurrent) {
-                    count.decrementAndGet();
+                // a bulkhead of the default filters is shared by the routes: the limit is per route
+                PermitKey permit = new PermitKey(GatewayRequestContext.routeId(request), key);
+                if (!acquire(permit)) {
                     return HttpResponse.status(HttpStatus.TOO_MANY_REQUESTS);
                 }
-                GatewayRequestContext.forFilters(request).state(this, key);
-                return null;
-            }));
-            route.after((request, response) -> {
-                Object key = GatewayRequestContext.forFilters(request).state(this, null);
-                if (key != null) {
-                    java.util.concurrent.atomic.AtomicInteger count = inFlight.get(key.toString());
-                    if (count != null) {
-                        count.decrementAndGet();
+                // in flight until the response is done: its body streamed, or the tunnel of a
+                // switched connection closed; on a server that cannot tell, until its headers
+                AtomicBoolean released = new AtomicBoolean();
+                Runnable release = () -> {
+                    if (released.compareAndSet(false, true)) {
+                        release(permit);
                     }
+                };
+                if (!(request instanceof ServerHttpRequest<?> server) || !server.whenResponseCompleted(failure -> release.run())) {
+                    GatewayRequestContext.forFilters(request).state(this, release);
+                }
+                return null;
+            });
+            route.after((request, response) -> {
+                if (GatewayRequestContext.forFilters(request).removeState(this) instanceof Runnable release) {
+                    release.run();
                 }
             });
         }
 
+        private boolean acquire(PermitKey key) {
+            boolean[] acquired = new boolean[1];
+            inFlight.compute(key, (k, count) -> {
+                int current = count == null ? 0 : count;
+                if (current >= maxConcurrent) {
+                    return count;
+                }
+                acquired[0] = true;
+                return current + 1;
+            });
+            return acquired[0];
+        }
+
+        private void release(PermitKey key) {
+            inFlight.computeIfPresent(key, (k, count) -> count <= 1 ? null : count - 1);
+        }
+
         /**
-         * @param key A key
+         * @param routeId A route
+         * @param key     A key
          * @return Its requests in flight
          */
-        int inFlight(String key) {
-            java.util.concurrent.atomic.AtomicInteger count = inFlight.get(key);
-            return count == null ? 0 : count.get();
+        int inFlight(String routeId, String key) {
+            return inFlight.getOrDefault(new PermitKey(routeId, key), 0);
+        }
+
+        /**
+         * @return The number of keys with requests in flight
+         */
+        int keys() {
+            return inFlight.size();
         }
 
         @Override
         public String toString() {
             return "Bulkhead=" + maxConcurrent;
+        }
+
+        /**
+         * The permit of a request: its route and its key.
+         *
+         * @param routeId The route
+         * @param key     The key
+         */
+        private record PermitKey(String routeId, String key) {
         }
     }
 
@@ -1021,7 +1069,7 @@ public final class GatewayFilters {
                 long length = request.getContentLength();
                 if (length > maxBytes) {
                     return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE)
-                        .header("errorMessage", "Request size is larger than permissible limit. Request size is " + length
+                        .header(ERROR_MESSAGE, "Request size is larger than permissible limit. Request size is " + length
                             + " bytes where permissible limit is " + maxBytes + " bytes");
                 }
                 return null;
@@ -1057,12 +1105,12 @@ public final class GatewayFilters {
                 }
                 if (size > maxBytes) {
                     return HttpResponse.status(HttpStatus.REQUEST_HEADER_FIELDS_TOO_LARGE)
-                        .header("errorMessage", "Request Header/s size is larger than permissible limit (" + maxBytes
+                        .header(ERROR_MESSAGE, "Request Header/s size is larger than permissible limit (" + maxBytes
                             + " bytes). Request Header/s size is " + size + " bytes, the largest is '" + largest + "' with " + largestSize + " bytes");
                 }
                 if (maxCount > 0 && count > maxCount) {
                     return HttpResponse.status(HttpStatus.REQUEST_HEADER_FIELDS_TOO_LARGE)
-                        .header("errorMessage", "The request has " + count + " headers, more than the permissible " + maxCount);
+                        .header(ERROR_MESSAGE, "The request has " + count + " headers, more than the permissible " + maxCount);
                 }
                 return null;
             });

@@ -32,13 +32,43 @@ import java.util.concurrent.CompletionStage;
 public interface GatewayRateLimiter {
 
     /**
-     * Take the requested tokens of a request from the bucket of its key.
+     * Take the requested tokens of a request from the bucket of its route and key. A store keyed
+     * by strings uses {@link BucketKey#id()}.
      *
-     * @param id    The id of the bucket: the route and the key of the request
-     * @param limit The limit
+     * @param key   The bucket: the route and the key of the request
+     * @param limit The limit of the bucket
      * @return The decision
      */
-    CompletionStage<Decision> tryAcquire(String id, GatewayRateLimit limit);
+    CompletionStage<Decision> tryAcquire(BucketKey key, Limit limit);
+
+    /**
+     * The bucket of a request: a key of one route never shares the bucket of another route,
+     * whatever the ids of the routes and the keys, e.g. the route {@code a.b} and the key
+     * {@code c}, and the route {@code a} and the key {@code b.c}.
+     *
+     * @param routeId The id of the route
+     * @param key     The key of the request, see {@link KeyResolver}
+     */
+    record BucketKey(String routeId, String key) {
+
+        /**
+         * @return The id of the bucket as a string, for a store keyed by strings: the length of
+         * the route id comes first, so that no two buckets have the same id
+         */
+        public String id() {
+            return routeId.length() + ":" + routeId + ":" + key;
+        }
+    }
+
+    /**
+     * The limit of a bucket, see {@link GatewayRateLimit}.
+     *
+     * @param replenishRate   The tokens added per second
+     * @param burstCapacity   The tokens a bucket holds; {@code 0} denies every request
+     * @param requestedTokens The tokens a request takes
+     */
+    record Limit(long replenishRate, long burstCapacity, long requestedTokens) {
+    }
 
     /**
      * The decision for a request.

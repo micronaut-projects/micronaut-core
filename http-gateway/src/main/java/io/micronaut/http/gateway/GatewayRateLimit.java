@@ -20,6 +20,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.web.router.builder.RouteFilterSpec;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,55 +42,47 @@ import java.util.concurrent.CompletionStage;
  * the {@link GatewayRateLimiter limiter} fails, e.g. its store is down, the request is let
  * through (fail open), with the headers. A route filter.
  *
- * @param replenishRate   The tokens added per second
- * @param burstCapacity   The tokens a bucket holds, at least the replenish rate; {@code 0}
- *                        denies every request
- * @param requestedTokens The tokens a request takes, default 1
- * @param keyResolver     The key of a request
- * @param denyEmptyKey    Whether a request without a key is denied
- * @param emptyKeyStatus  The status of a request denied for its empty key
- * @param includeHeaders  Whether the responses carry the rate limit headers
- * @param limiter         The store of the buckets
+ * <p>Create one with {@link #of(long, long)} or {@link #builder(long, long)}.
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
-public record GatewayRateLimit(long replenishRate,
-                               long burstCapacity,
-                               long requestedTokens,
-                               KeyResolver keyResolver,
-                               boolean denyEmptyKey,
-                               int emptyKeyStatus,
-                               boolean includeHeaders,
-                               GatewayRateLimiter limiter) implements GatewayFilter {
+public final class GatewayRateLimit implements GatewayFilter {
 
+    /**
+     * The tokens left in the bucket.
+     */
     public static final String REMAINING_HEADER = "X-RateLimit-Remaining";
+    /**
+     * The replenish rate.
+     */
     public static final String REPLENISH_RATE_HEADER = "X-RateLimit-Replenish-Rate";
+    /**
+     * The burst capacity.
+     */
     public static final String BURST_CAPACITY_HEADER = "X-RateLimit-Burst-Capacity";
+    /**
+     * The tokens a request takes.
+     */
     public static final String REQUESTED_TOKENS_HEADER = "X-RateLimit-Requested-Tokens";
 
     private static final Logger LOG = LoggerFactory.getLogger(GatewayRateLimit.class);
 
-    /**
-     * @param replenishRate   The tokens added per second
-     * @param burstCapacity   The tokens a bucket holds
-     * @param requestedTokens The tokens a request takes
-     * @param keyResolver     The key of a request
-     * @param denyEmptyKey    Whether a request without a key is denied
-     * @param emptyKeyStatus  The status of a request denied for its empty key
-     * @param includeHeaders  Whether the responses carry the rate limit headers
-     * @param limiter         The store of the buckets
-     */
-    public GatewayRateLimit {
-        Objects.requireNonNull(keyResolver, "keyResolver");
-        Objects.requireNonNull(limiter, "limiter");
-        if (replenishRate < 0 || burstCapacity < 0 || requestedTokens < 1) {
-            throw new IllegalArgumentException("A rate limit needs a replenish rate and a burst capacity of at least 0 and requested tokens of at least 1");
-        }
-        if (burstCapacity > 0 && burstCapacity < replenishRate) {
-            throw new IllegalArgumentException("The burst capacity " + burstCapacity + " of a rate limit is lower than its replenish rate " + replenishRate);
-        }
-        HttpStatus.valueOf(emptyKeyStatus);
+    private final GatewayRateLimiter.Limit limit;
+    private final KeyResolver keyResolver;
+    private final boolean denyEmptyKey;
+    private final int emptyKeyStatus;
+    private final boolean includeHeaders;
+    private final GatewayRateLimiter limiter;
+
+    private GatewayRateLimit(Builder builder) {
+        this.limit = new GatewayRateLimiter.Limit(builder.replenishRate, builder.burstCapacity, builder.requestedTokens);
+        this.keyResolver = builder.keyResolver;
+        this.denyEmptyKey = builder.denyEmptyKey;
+        this.emptyKeyStatus = builder.emptyKeyStatus;
+        this.includeHeaders = builder.includeHeaders;
+        this.limiter = builder.limiter == null ? new InMemoryRateLimiter() : builder.limiter;
     }
 
     /**
@@ -100,7 +93,93 @@ public record GatewayRateLimit(long replenishRate,
      * @return The rate limit
      */
     public static GatewayRateLimit of(long replenishRate, long burstCapacity) {
-        return new GatewayRateLimit(replenishRate, burstCapacity, 1, KeyResolver.remoteAddress(List.of()), true, 403, true, new InMemoryRateLimiter());
+        return builder(replenishRate, burstCapacity).build();
+    }
+
+    /**
+     * @param replenishRate The tokens added per second
+     * @param burstCapacity The tokens a bucket holds, at least the replenish rate; {@code 0}
+     *                      denies every request
+     * @return A builder, by the address of the client, in the memory of this gateway, with the
+     * headers
+     */
+    public static Builder builder(long replenishRate, long burstCapacity) {
+        return new Builder(replenishRate, burstCapacity);
+    }
+
+    /**
+     * @return A builder with the settings of this rate limit, and its limiter
+     */
+    public Builder toBuilder() {
+        return new Builder(limit.replenishRate(), limit.burstCapacity())
+            .requestedTokens(limit.requestedTokens())
+            .keyResolver(keyResolver)
+            .emptyKey(denyEmptyKey, emptyKeyStatus)
+            .includeHeaders(includeHeaders)
+            .limiter(limiter);
+    }
+
+    /**
+     * @return The tokens added per second
+     */
+    public long replenishRate() {
+        return limit.replenishRate();
+    }
+
+    /**
+     * @return The tokens a bucket holds; {@code 0} denies every request
+     */
+    public long burstCapacity() {
+        return limit.burstCapacity();
+    }
+
+    /**
+     * @return The tokens a request takes, default 1
+     */
+    public long requestedTokens() {
+        return limit.requestedTokens();
+    }
+
+    /**
+     * @return The limit of a bucket, as the {@link GatewayRateLimiter} takes it
+     */
+    public GatewayRateLimiter.Limit limit() {
+        return limit;
+    }
+
+    /**
+     * @return The key of a request
+     */
+    public KeyResolver keyResolver() {
+        return keyResolver;
+    }
+
+    /**
+     * @return Whether a request without a key is denied
+     */
+    public boolean denyEmptyKey() {
+        return denyEmptyKey;
+    }
+
+    /**
+     * @return The status of a request denied for its empty key
+     */
+    public int emptyKeyStatus() {
+        return emptyKeyStatus;
+    }
+
+    /**
+     * @return Whether the responses carry the rate limit headers
+     */
+    public boolean includeHeaders() {
+        return includeHeaders;
+    }
+
+    /**
+     * @return The store of the buckets
+     */
+    public GatewayRateLimiter limiter() {
+        return limiter;
     }
 
     /**
@@ -108,7 +187,7 @@ public record GatewayRateLimit(long replenishRate,
      * @return A copy with the key resolver
      */
     public GatewayRateLimit withKeyResolver(KeyResolver keyResolver) {
-        return new GatewayRateLimit(replenishRate, burstCapacity, requestedTokens, keyResolver, denyEmptyKey, emptyKeyStatus, includeHeaders, limiter);
+        return toBuilder().keyResolver(keyResolver).build();
     }
 
     /**
@@ -116,7 +195,7 @@ public record GatewayRateLimit(long replenishRate,
      * @return A copy with the requested tokens
      */
     public GatewayRateLimit withRequestedTokens(long requestedTokens) {
-        return new GatewayRateLimit(replenishRate, burstCapacity, requestedTokens, keyResolver, denyEmptyKey, emptyKeyStatus, includeHeaders, limiter);
+        return toBuilder().requestedTokens(requestedTokens).build();
     }
 
     /**
@@ -125,7 +204,7 @@ public record GatewayRateLimit(long replenishRate,
      * @return A copy
      */
     public GatewayRateLimit withEmptyKey(boolean denyEmptyKey, int emptyKeyStatus) {
-        return new GatewayRateLimit(replenishRate, burstCapacity, requestedTokens, keyResolver, denyEmptyKey, emptyKeyStatus, includeHeaders, limiter);
+        return toBuilder().emptyKey(denyEmptyKey, emptyKeyStatus).build();
     }
 
     /**
@@ -133,7 +212,7 @@ public record GatewayRateLimit(long replenishRate,
      * @return A copy
      */
     public GatewayRateLimit withHeaders(boolean includeHeaders) {
-        return new GatewayRateLimit(replenishRate, burstCapacity, requestedTokens, keyResolver, denyEmptyKey, emptyKeyStatus, includeHeaders, limiter);
+        return toBuilder().includeHeaders(includeHeaders).build();
     }
 
     /**
@@ -141,29 +220,30 @@ public record GatewayRateLimit(long replenishRate,
      * @return A copy
      */
     public GatewayRateLimit withLimiter(GatewayRateLimiter limiter) {
-        return new GatewayRateLimit(replenishRate, burstCapacity, requestedTokens, keyResolver, denyEmptyKey, emptyKeyStatus, includeHeaders, limiter);
+        return toBuilder().limiter(limiter).build();
     }
 
     @Override
     public void configure(RouteFilterSpec<?> route) {
         route.beforeReplacingAsync(request -> {
-            CompletionStage<GatewayRateLimiter.Decision> decided = keyResolver.resolve(request).thenCompose(key -> {
-                if (key == null || key.isEmpty()) {
-                    return CompletableFuture.completedFuture(null);
-                }
+            String key = keyResolver.resolve(request);
+            CompletionStage<GatewayRateLimiter.@Nullable Decision> decided;
+            if (key == null || key.isEmpty()) {
+                decided = CompletableFuture.completedFuture(null);
+            } else {
                 String routeId = GatewayRequestContext.routeId(request);
                 CompletionStage<GatewayRateLimiter.Decision> decision;
                 try {
-                    decision = limiter.tryAcquire(routeId + "." + key, this);
+                    decision = limiter.tryAcquire(new GatewayRateLimiter.BucketKey(routeId, key), limit);
                 } catch (RuntimeException e) {
                     decision = CompletableFuture.failedFuture(e);
                 }
-                return decision.exceptionally(failure -> {
+                decided = decision.exceptionally(failure -> {
                     // fail open: an unavailable store does not stop the traffic
                     LOG.warn("The rate limiter of the gateway route {} failed, the request is let through: {}", routeId, failure.toString());
                     return new GatewayRateLimiter.Decision(true, -1);
                 });
-            });
+            }
             return decided.thenApply(decision -> {
                 if (decision == null) {
                     if (denyEmptyKey) {
@@ -195,13 +275,96 @@ public record GatewayRateLimit(long replenishRate,
             return;
         }
         response.header(REMAINING_HEADER, String.valueOf(decision.remaining()));
-        response.header(REPLENISH_RATE_HEADER, String.valueOf(replenishRate));
-        response.header(BURST_CAPACITY_HEADER, String.valueOf(burstCapacity));
-        response.header(REQUESTED_TOKENS_HEADER, String.valueOf(requestedTokens));
+        response.header(REPLENISH_RATE_HEADER, String.valueOf(limit.replenishRate()));
+        response.header(BURST_CAPACITY_HEADER, String.valueOf(limit.burstCapacity()));
+        response.header(REQUESTED_TOKENS_HEADER, String.valueOf(limit.requestedTokens()));
     }
 
     @Override
     public String toString() {
-        return "RequestRateLimiter=" + replenishRate + ", " + burstCapacity + ", " + requestedTokens;
+        return "RequestRateLimiter=" + limit.replenishRate() + ", " + limit.burstCapacity() + ", " + limit.requestedTokens();
+    }
+
+    /**
+     * The builder of {@link GatewayRateLimit}.
+     */
+    public static final class Builder {
+        private final long replenishRate;
+        private final long burstCapacity;
+        private long requestedTokens = 1;
+        private KeyResolver keyResolver = KeyResolver.remoteAddress(List.of());
+        private boolean denyEmptyKey = true;
+        private int emptyKeyStatus = HttpStatus.FORBIDDEN.getCode();
+        private boolean includeHeaders = true;
+        private @Nullable GatewayRateLimiter limiter;
+
+        private Builder(long replenishRate, long burstCapacity) {
+            if (replenishRate < 0 || burstCapacity < 0) {
+                throw new IllegalArgumentException("A rate limit needs a replenish rate and a burst capacity of at least 0");
+            }
+            if (burstCapacity > 0 && burstCapacity < replenishRate) {
+                throw new IllegalArgumentException("The burst capacity " + burstCapacity + " of a rate limit is lower than its replenish rate " + replenishRate);
+            }
+            this.replenishRate = replenishRate;
+            this.burstCapacity = burstCapacity;
+        }
+
+        /**
+         * @param requestedTokens The tokens a request takes, at least 1
+         * @return This builder
+         */
+        public Builder requestedTokens(long requestedTokens) {
+            if (requestedTokens < 1) {
+                throw new IllegalArgumentException("A rate limit needs requested tokens of at least 1");
+            }
+            this.requestedTokens = requestedTokens;
+            return this;
+        }
+
+        /**
+         * @param keyResolver The key of a request
+         * @return This builder
+         */
+        public Builder keyResolver(KeyResolver keyResolver) {
+            this.keyResolver = Objects.requireNonNull(keyResolver, "keyResolver");
+            return this;
+        }
+
+        /**
+         * @param denyEmptyKey   Whether a request without a key is denied
+         * @param emptyKeyStatus The status it is answered with
+         * @return This builder
+         */
+        public Builder emptyKey(boolean denyEmptyKey, int emptyKeyStatus) {
+            HttpStatus.valueOf(emptyKeyStatus);
+            this.denyEmptyKey = denyEmptyKey;
+            this.emptyKeyStatus = emptyKeyStatus;
+            return this;
+        }
+
+        /**
+         * @param includeHeaders Whether the responses carry the rate limit headers
+         * @return This builder
+         */
+        public Builder includeHeaders(boolean includeHeaders) {
+            this.includeHeaders = includeHeaders;
+            return this;
+        }
+
+        /**
+         * @param limiter The store of the buckets, {@link InMemoryRateLimiter} by default
+         * @return This builder
+         */
+        public Builder limiter(GatewayRateLimiter limiter) {
+            this.limiter = Objects.requireNonNull(limiter, "limiter");
+            return this;
+        }
+
+        /**
+         * @return The rate limit
+         */
+        public GatewayRateLimit build() {
+            return new GatewayRateLimit(this);
+        }
     }
 }

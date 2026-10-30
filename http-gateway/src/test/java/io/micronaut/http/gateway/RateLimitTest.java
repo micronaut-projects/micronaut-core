@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,6 +42,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The rate limits (RL-01 to RL-07) and the in-flight limit of gateway routes.
  */
 class RateLimitTest extends GatewayTestBase {
+
+    private static final GatewayRateLimiter.BucketKey K = new GatewayRateLimiter.BucketKey("r", "k");
 
     static final String SPEC = "RateLimitTest";
 
@@ -100,20 +103,20 @@ class RateLimitTest extends GatewayTestBase {
         InMemoryRateLimiter limiter = new InMemoryRateLimiter(now::get);
         GatewayRateLimit limit = GatewayRateLimit.of(2, 4).withLimiter(limiter);
         for (int i = 0; i < 4; i++) {
-            assertTrue(limiter.tryAcquire("k", limit).toCompletableFuture().get().allowed(), "token " + i);
+            assertTrue(limiter.tryAcquire(K, limit.limit()).toCompletableFuture().get().allowed(), "token " + i);
         }
-        assertFalse(limiter.tryAcquire("k", limit).toCompletableFuture().get().allowed(), "the bucket is empty");
+        assertFalse(limiter.tryAcquire(K, limit.limit()).toCompletableFuture().get().allowed(), "the bucket is empty");
         // half a second: one token
         now.addAndGet(TimeUnit.MILLISECONDS.toNanos(500));
-        GatewayRateLimiter.Decision refilled = limiter.tryAcquire("k", limit).toCompletableFuture().get();
+        GatewayRateLimiter.Decision refilled = limiter.tryAcquire(K, limit.limit()).toCompletableFuture().get();
         assertTrue(refilled.allowed());
         assertEquals(0, refilled.remaining());
         // never more than the burst capacity
         now.addAndGet(TimeUnit.SECONDS.toNanos(60));
-        assertEquals(3, limiter.tryAcquire("k", limit).toCompletableFuture().get().remaining());
+        assertEquals(3, limiter.tryAcquire(K, limit.limit()).toCompletableFuture().get().remaining());
         // a request that takes more tokens than there are is denied
         GatewayRateLimit expensive = limit.withRequestedTokens(4);
-        assertFalse(limiter.tryAcquire("k", expensive).toCompletableFuture().get().allowed());
+        assertFalse(limiter.tryAcquire(K, expensive.limit()).toCompletableFuture().get().allowed());
     }
 
     @Test
@@ -124,10 +127,10 @@ class RateLimitTest extends GatewayTestBase {
         assertEquals(200, get("/rl-ip/inspect/x", "X-Forwarded-For: 192.0.2.2").status());
         // the principal
         HttpRequest<?> request = HttpRequest.GET("/x").setAttribute(HttpAttributes.PRINCIPAL, (Principal) () -> "alice");
-        assertEquals("alice", KeyResolver.principalName().resolve(request).toCompletableFuture().get());
-        assertNull(KeyResolver.principalName().resolve(HttpRequest.GET("/x")).toCompletableFuture().get());
+        assertEquals("alice", KeyResolver.principalName().resolve(request));
+        assertNull(KeyResolver.principalName().resolve(HttpRequest.GET("/x")));
         // a header
-        assertEquals("t1", KeyResolver.header("X-Tenant").resolve(HttpRequest.GET("/x").header("X-Tenant", "t1")).toCompletableFuture().get());
+        assertEquals("t1", KeyResolver.header("X-Tenant").resolve(HttpRequest.GET("/x").header("X-Tenant", "t1")));
     }
 
     @Test
@@ -156,9 +159,97 @@ class RateLimitTest extends GatewayTestBase {
         assertEquals(200, get("/bulkhead/up/slow?ms=0", "X-User: a").status(), "the request in flight ended");
     }
 
+    @Test
+    void theBucketsAreCappedAndAnIpv6ClientIsKeyedByItsNetwork() throws Exception {
+        InMemoryRateLimiter limiter = new InMemoryRateLimiter(new AtomicLong()::get, 2);
+        GatewayRateLimiter.Limit limit = GatewayRateLimit.of(1, 1).limit();
+        assertTrue(limiter.tryAcquire(new GatewayRateLimiter.BucketKey("r", "a"), limit).toCompletableFuture().get().allowed());
+        assertTrue(limiter.tryAcquire(new GatewayRateLimiter.BucketKey("r", "b"), limit).toCompletableFuture().get().allowed());
+        assertFalse(limiter.tryAcquire(new GatewayRateLimiter.BucketKey("r", "c"), limit).toCompletableFuture().get().allowed(), "no bucket is left");
+        assertEquals(2, limiter.size());
+        HttpRequest<?> one = new io.micronaut.http.HttpRequestWrapper<Object>(HttpRequest.GET("/x")) {
+            @Override
+            public java.net.InetSocketAddress getRemoteAddress() {
+                return new java.net.InetSocketAddress("2001:db8:1:2:aaaa::1", 1);
+            }
+        };
+        HttpRequest<?> two = new io.micronaut.http.HttpRequestWrapper<Object>(HttpRequest.GET("/x")) {
+            @Override
+            public java.net.InetSocketAddress getRemoteAddress() {
+                return new java.net.InetSocketAddress("2001:db8:1:2:bbbb::2", 1);
+            }
+        };
+        KeyResolver byAddress = KeyResolver.remoteAddress(List.of());
+        assertEquals(byAddress.resolve(one), byAddress.resolve(two));
+        assertEquals("2001:db8:1:2:0:0:0:0/64", byAddress.resolve(one));
+    }
+
+    @Test
+    void rl08TheBucketsOfTwoRoutesNeverCollide() throws Exception {
+        InMemoryRateLimiter limiter = new InMemoryRateLimiter();
+        GatewayRateLimit limit = GatewayRateLimit.of(1, 1).withLimiter(limiter);
+        GatewayRateLimiter.BucketKey first = new GatewayRateLimiter.BucketKey("a.b", "c");
+        GatewayRateLimiter.BucketKey second = new GatewayRateLimiter.BucketKey("a", "b.c");
+        assertNotEquals(first.id(), second.id());
+        assertTrue(limiter.tryAcquire(first, limit.limit()).toCompletableFuture().get().allowed());
+        assertTrue(limiter.tryAcquire(second, limit.limit()).toCompletableFuture().get().allowed(), "another bucket");
+        assertFalse(limiter.tryAcquire(first, limit.limit()).toCompletableFuture().get().allowed());
+        // a limiter keyed by strings is given the id
+        List<String> ids = new java.util.concurrent.CopyOnWriteArrayList<>();
+        GatewayRateLimiter byId = (key, l) -> {
+            ids.add(key.id());
+            return CompletableFuture.completedFuture(new GatewayRateLimiter.Decision(true, 0));
+        };
+        byId.tryAcquire(first, limit.limit()).toCompletableFuture().get();
+        byId.tryAcquire(second, limit.limit()).toCompletableFuture().get();
+        assertEquals(List.of("3:a.b:c", "1:a:b.c"), ids);
+    }
+
+    @Test
+    void rl09TheBucketsThatRefilledAreRemoved() throws Exception {
+        AtomicLong now = new AtomicLong();
+        InMemoryRateLimiter limiter = new InMemoryRateLimiter(now::get);
+        GatewayRateLimit limit = GatewayRateLimit.of(10, 10).withLimiter(limiter);
+        for (int i = 0; i < 100; i++) {
+            limiter.tryAcquire(new GatewayRateLimiter.BucketKey("r", "k" + i), limit.limit()).toCompletableFuture().get();
+        }
+        assertEquals(100, limiter.size());
+        // a bucket that took a token refills in a tenth of a second
+        now.addAndGet(TimeUnit.SECONDS.toNanos(2));
+        GatewayRateLimiter.Decision decision = limiter.tryAcquire(new GatewayRateLimiter.BucketKey("r", "k0"), limit.limit()).toCompletableFuture().get();
+        assertEquals(1, limiter.size(), "only the bucket just taken from is left");
+        assertEquals(9, decision.remaining(), "a removed bucket is full again");
+    }
+
+    @Test
+    void aRequestTakesThePermitsOfTwoBulkheadsOfARoute() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            assertEquals(200, get("/bulkhead2/up/slow?ms=0", "X-User: a", "X-Tenant: t").status(), "request " + i);
+        }
+        assertEquals(0, ((GatewayFilters.Bulkhead) Routes.USER_BULKHEAD).keys(), "every permit was released");
+    }
+
+    @Test
+    void aBulkheadSharedByTwoRoutesLimitsEachRoute() throws Exception {
+        CompletableFuture<RawHttp.Response> slow = CompletableFuture.supplyAsync(() -> {
+            try {
+                return get("/shared-a/up/slow?ms=1000", "X-User: s");
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        Thread.sleep(300);
+        assertEquals(429, get("/shared-a/up/slow?ms=0", "X-User: s").status(), "the key has a request in flight on the route");
+        assertEquals(200, get("/shared-b/up/slow?ms=0", "X-User: s").status(), "the other route has its own limit");
+        assertEquals(200, slow.get(10, TimeUnit.SECONDS).status());
+        assertEquals(0, ((GatewayFilters.Bulkhead) Routes.SHARED_BULKHEAD).keys(), "a key without requests in flight is removed");
+    }
+
     @Singleton
     @Requires(property = "spec.name", value = SPEC)
     static class Routes implements GatewayRoutes {
+        static final GatewayFilter USER_BULKHEAD = GatewayFilters.bulkhead(1, KeyResolver.header("X-User"));
+        static final GatewayFilter SHARED_BULKHEAD = GatewayFilters.bulkhead(1, KeyResolver.header("X-User"));
         private final String upstream;
 
         Routes(@Value("${test.upstream}") String upstream) {
@@ -180,6 +271,13 @@ class RateLimitTest extends GatewayTestBase {
             gateway.route("rl-no-headers").path("/rl-no-headers/**")
                 .filters(GatewayFilters.stripPrefix(1), GatewayRateLimit.of(1, 60).withRequestedTokens(60).withKeyResolver(user).withHeaders(false)).uri(upstream);
             gateway.route("bulkhead").path("/bulkhead/**").filters(GatewayFilters.stripPrefix(1), GatewayFilters.bulkhead(1, user))
+                .responseTimeout(Duration.ofSeconds(5)).uri(upstream);
+            gateway.route("bulkhead2").path("/bulkhead2/**")
+                .filters(GatewayFilters.stripPrefix(1), USER_BULKHEAD, GatewayFilters.bulkhead(1, KeyResolver.header("X-Tenant")))
+                .responseTimeout(Duration.ofSeconds(5)).uri(upstream);
+            gateway.route("shared-a").path("/shared-a/**").filters(GatewayFilters.stripPrefix(1), SHARED_BULKHEAD)
+                .responseTimeout(Duration.ofSeconds(5)).uri(upstream);
+            gateway.route("shared-b").path("/shared-b/**").filters(GatewayFilters.stripPrefix(1), SHARED_BULKHEAD)
                 .responseTimeout(Duration.ofSeconds(5)).uri(upstream);
         }
     }
