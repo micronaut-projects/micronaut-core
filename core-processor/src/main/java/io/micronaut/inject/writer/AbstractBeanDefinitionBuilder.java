@@ -519,26 +519,55 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     @Override
     public <E extends MemberElement> BeanElementBuilder produceBeans(ElementQuery<E> methodsOrFields,
                                                                      Consumer<BeanElementBuilder> childBeanBuilder) {
-        methodsOrFields = methodsOrFields
-            .onlyConcrete()
-            .modifiers(modifiers -> modifiers.contains(ElementModifier.PUBLIC));
-        final List<E> enclosedElements = this.beanType.getEnclosedElements(methodsOrFields);
+        final List<E> enclosedElements = this.beanType.getEnclosedElements(methodsOrFields.onlyConcrete());
         for (E enclosedElement : enclosedElements) {
             if (enclosedElement instanceof FieldElement fe) {
-                final ClassElement type = fe.getGenericField().getType();
-                if (type.isPublic() && !type.isPrimitive()) {
+                if (isProducer(fe, fe.getGenericField().getType())) {
                     addChildBean(fe, childBeanBuilder);
                 }
-            }
-
-            if (enclosedElement instanceof MethodElement me && !(enclosedElement instanceof ConstructorElement)) {
-                final ClassElement type = me.getGenericReturnType().getType();
-                if (type.isPublic() && !type.isPrimitive()) {
+            } else if (enclosedElement instanceof MethodElement me && !(enclosedElement instanceof ConstructorElement)) {
+                if (isProducer(me, me.getGenericReturnType().getType())) {
                     addChildBean(me, childBeanBuilder);
                 }
             }
         }
         return this;
+    }
+
+    /**
+     * Whether a member the query selected can produce a bean, as a factory method or field of a factory can: the
+     * definition of the product is written in the package of the type declaring the member, and calls the member
+     * directly when it can, and otherwise through reflection when the member is annotated with
+     * {@link io.micronaut.core.annotation.ReflectiveAccess}. A member that cannot is reported, rather than left out
+     * without a word.
+     *
+     * @param producer The producing member
+     * @param product  The type it produces
+     * @return Whether it produces a bean
+     */
+    private boolean isProducer(MemberElement producer, ClassElement product) {
+        String unsupported = null;
+        if (!producer.isAccessible(producer.getOwningType(), true)) {
+            unsupported = "it cannot be called from the package of " + producer.getOwningType().getName() + ", and is not annotated with @ReflectiveAccess";
+        } else if (product.isVoid()) {
+            unsupported = "it returns no value";
+        } else if (!isAccessibleType(product, producer.getOwningType())) {
+            unsupported = "the type it produces [" + product.getName() + "] is not accessible from the package of " + producer.getOwningType().getName();
+        }
+        if (unsupported != null) {
+            visitorContext.warn("Bean [" + beanType.getName() + "] produces no bean from [" + producer.getOwningType().getName()
+                + "." + producer.getName() + "]: " + unsupported, producer);
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean isAccessibleType(ClassElement type, ClassElement callingType) {
+        ClassElement component = type;
+        while (component.isArray()) {
+            component = component.fromArray();
+        }
+        return component.isPrimitive() || component.isPublic() || component.getPackageName().equals(callingType.getPackageName());
     }
 
     /**

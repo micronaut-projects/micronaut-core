@@ -80,7 +80,14 @@ internal open class KotlinBeanDefinitionBuilder(
             override fun <R : Any> createBeanDefinitionBuilder(elementBeanDefinitionBuilderFactory: ElementBeanDefinitionBuilderFactory<R>): ElementBeanDefinitionBuilder<R> {
                 val newParent = parentType.withAnnotationMetadata(parentType.copyAnnotationMetadata()) // Just a copy
                 return elementBeanDefinitionBuilderFactory.factoryField(
-                    BeanInjectionUtils.createFieldDefinition(newParent, producerField, !producerField.isPublic, visitorContext)
+                    BeanInjectionUtils.createFieldDefinition(
+                        newParent,
+                        producerField.withAnnotationMetadata(
+                            AnnotationMetadataHierarchy(newParent.declaredMetadata, producerField.declaredMetadata, getAnnotationMetadata())
+                        ),
+                        producerField.isReflectionRequired(),
+                        visitorContext
+                    )
                 ) as ElementBeanDefinitionBuilder<R>
             }
         }
@@ -113,7 +120,7 @@ internal open class KotlinBeanDefinitionBuilder(
                         newParent,
                         producerMethod.withParameters(*parameters).withAnnotationMetadata(annotationMetadata),
                         annotationMetadata,
-                        !producerMethod.isPublic,
+                        producerMethod.isReflectionRequired(),
                         visitorContext
                     )
                 ) as ElementBeanDefinitionBuilder<R>
