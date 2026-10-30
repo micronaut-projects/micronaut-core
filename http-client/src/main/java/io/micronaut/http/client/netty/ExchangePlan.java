@@ -53,7 +53,7 @@ import java.util.OptionalLong;
  *                          {@code Upgrade} field lines, or {@code null} if it may not switch
  * @param skipDecompression Whether the response body is passed on compressed
  * @param uploadListener    Notified when the body upload starts and ends, or {@code null}
- * @param readIdleTimeout   The read idle timeout of this exchange, or {@code null}
+ * @param readIdleTimeout   The read timeout of this exchange instead of the one of the client, or {@code null}
  * @param activityTimeout   The activity timeout of a switched connection, or {@code null}
  * @author Denis Stepanov
  * @since 5.3.0
@@ -109,7 +109,7 @@ record ExchangePlan(
             request.getAttribute(NettyHttpClient.ALLOW_UPGRADE).isPresent() ? joinedValues(nettyRequest.headers(), HttpHeaderNames.UPGRADE) : null,
             request.getAttribute(AbstractHttpClient.NO_DECOMPRESSION).isPresent(),
             request.getAttribute(NettyHttpClient.UPLOAD_LISTENER, NettyHttpClient.UploadListener.class).orElse(null),
-            request.getAttribute(AbstractHttpClient.READ_IDLE_TIMEOUT, Duration.class).orElse(null),
+            AbstractHttpClient.readTimeoutOverride(request),
             request.getAttribute(NettyHttpClient.ACTIVITY_TIMEOUT, Duration.class).orElse(null)
         );
     }
