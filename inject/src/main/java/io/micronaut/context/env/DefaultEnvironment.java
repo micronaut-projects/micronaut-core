@@ -500,11 +500,16 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         // what this read processes from the registry, which an add that waited for it does not process again
         PropertySourcePropertyResolver.RegistrySnapshot registrySnapshot = new PropertySourcePropertyResolver.RegistrySnapshot(snapshotNumber, registered);
         propertyPlaceholderResolver.startProcessing(registrySnapshot);
-        for (PropertySource propertySource : propertySources) {
-            internalProcessPropertySource(propertySource);
+        try {
+            for (PropertySource propertySource : propertySources) {
+                internalProcessPropertySource(propertySource);
+            }
+            // not in the finally: a read that fails leaves no processed snapshot, so an add that waited for it processes its property source
+            propertyPlaceholderResolver.finishProcessing(registrySnapshot);
+        } finally {
+            // what a start has processed is published in one step, also if it fails
+            propertyPlaceholderResolver.publishStartCopy();
         }
-        // not in a finally: a read that fails leaves no processed snapshot, so an add that waited for it processes its property source
-        propertyPlaceholderResolver.finishProcessing(registrySnapshot);
     }
 
     private void internalAddPropertySource(PropertySource propertySource) {
@@ -513,7 +518,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private void internalProcessPropertySource(PropertySource propertySource) {
         LOG.debug("Processing property source: {} convention: {}", propertySource.getName(), propertySource.getConvention());
-        propertyPlaceholderResolver.processPropertySource(propertySource, propertySource.getConvention());
+        // within a start into a copy of the published catalogs, which lookups on other threads keep reading until it is published
+        propertyPlaceholderResolver.processReadPropertySource(propertySource, propertySource.getConvention());
     }
 
     /**

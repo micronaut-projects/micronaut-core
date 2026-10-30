@@ -94,22 +94,33 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private volatile ResolverState state = new ResolverState();
     /**
      * The state that catalog writes go into. The same instance as {@link #state}, except while a
-     * refresh builds a replacement, or {@link #addToCopy(Runnable)} writes into a copy, that is not
-     * published yet. Guarded by {@link #catalogLock}.
+     * refresh builds a replacement, or {@link #addToCopy(Runnable)} writes into a copy, or a start
+     * processes its property sources into a copy, see
+     * {@link #processReadPropertySource(PropertySource, PropertySource.PropertyConvention)}, that is
+     * not published yet. Guarded by {@link #catalogLock}.
      */
     private ResolverState writeState = state;
     /**
      * The thread {@link #refresh(Runnable)} is building a replacement state on, or
-     * {@link #addToCopy(Runnable)} is writing a copy on, or {@code null} otherwise. Written under
-     * {@link #catalogLock}, read without it by every lookup.
+     * {@link #addToCopy(Runnable)} is writing a copy on, or a start is processing a property source
+     * into its copy on, or {@code null} otherwise. Written under {@link #catalogLock}, read without it
+     * by every lookup.
      */
     @SuppressWarnings("java:S3077") // a thread reference, not a mutable object
     private volatile Thread refreshingThread;
     /**
-     * Whether {@link #refreshingThread} is writing a copy in {@link #addToCopy(Runnable)} rather
-     * than building a replacement in {@link #refresh(Runnable)}. Guarded by {@link #catalogLock}.
+     * Whether {@link #refreshingThread} is writing a copy, in {@link #addToCopy(Runnable)} or for a
+     * start, rather than building a replacement in {@link #refresh(Runnable)}. Guarded by
+     * {@link #catalogLock}.
      */
     private boolean adding;
+    /**
+     * The thread whose start has processed property sources into {@link #writeState}, a copy of the
+     * published state that is not published yet, see
+     * {@link #processReadPropertySource(PropertySource, PropertySource.PropertyConvention)}, or
+     * {@code null}. Guarded by {@link #catalogLock}.
+     */
+    private Thread startingThread;
     /**
      * The state that the lookups of the current thread are kept on while
      * {@link #onState(ResolverState, Supplier)} runs them a second time. The outermost second run
@@ -180,6 +191,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     void reset() {
         synchronized (catalogLock) {
+            publishStartCopy();
             ResolverState empty = new ResolverState();
             writeState = empty;
             if (refreshingThread == null) {
@@ -281,6 +293,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     void refresh(Runnable rebuild) {
         synchronized (catalogLock) {
+            publishStartCopy();
             if (refreshingThread != null && !adding) {
                 // Already inside a refresh, its outermost call publishes.
                 rebuild.run();
@@ -325,6 +338,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     void addToCopy(Runnable add) {
         synchronized (catalogLock) {
+            publishStartCopy();
             if (refreshingThread != null) {
                 // the refresh or the add that this thread runs publishes what is written
                 add.run();
@@ -352,9 +366,68 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private static ResolverState copyForAdd(ResolverState published) {
         // Odd from now on, as while a property source is processed into a state: a lookup that
         // reads the published state no longer caches what it reads, nor replaces what is
-        // remembered for the copy, which shares those remembered values.
-        published.revision.getAndUpdate(revision -> revision | 1);
+        // remembered for the copy, which shares those remembered values. A loop rather than
+        // getAndUpdate, whose lambda would be one more class for every start to load.
+        long revision = published.revision.get();
+        while (!published.revision.compareAndSet(revision, revision | 1)) {
+            revision = published.revision.get();
+        }
         return new ResolverState(published);
+    }
+
+    /**
+     * Processes a property source that a start or a refresh reads. Within a refresh, or an add on
+     * this thread, it is processed into what they write, as before. Otherwise it is one of a start's
+     * property sources, which are all processed into one copy of the published state, as an add's
+     * are, see {@link #addToCopy(Runnable)}. {@link #publishStartCopy()} publishes that copy in a
+     * single step: once the start has processed them, also if it fails, or before anything else uses
+     * the catalogs between two of them, so that it finds them as the start has left them. A lookup on
+     * another thread therefore sees the properties from before the start until then, and never a
+     * first-letter map that is being written.
+     *
+     * @param propertySource The property source
+     * @param convention     The property convention
+     */
+    void processReadPropertySource(PropertySource propertySource, PropertySource.PropertyConvention convention) {
+        synchronized (catalogLock) {
+            if (refreshingThread != null) {
+                // the refresh or the add that this thread runs publishes what is written
+                processPropertySource(propertySource, convention);
+                return;
+            }
+            Thread current = Thread.currentThread();
+            if (startingThread != current) {
+                // the first property source of this start, or the first after its copy was published
+                publishStartCopy();
+                writeState = copyForAdd(state);
+                startingThread = current;
+            }
+            adding = true;
+            refreshingThread = current;
+            try {
+                processPropertySource(propertySource, convention);
+            } finally {
+                refreshingThread = null;
+                adding = false;
+            }
+        }
+    }
+
+    /**
+     * Publishes the copy that a start processes its property sources into, see
+     * {@link #processReadPropertySource(PropertySource, PropertySource.PropertyConvention)}, if there
+     * is one. Called when the start has processed its property sources, also if it fails, and by
+     * everything else that uses the catalogs, first: between two of the start's property sources
+     * they are then as the start has left them. Does nothing within a refresh, or within a property
+     * source that this thread processes.
+     */
+    void publishStartCopy() {
+        synchronized (catalogLock) {
+            if (startingThread != null && refreshingThread == null) {
+                state = writeState;
+                startingThread = null;
+            }
+        }
     }
 
     /**
@@ -366,6 +439,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     void startProcessing(RegistrySnapshot snapshot) {
         synchronized (catalogLock) {
+            publishStartCopy();
             writeState.pendingSnapshot = snapshot;
             writeState.processedSnapshot = null;
         }
@@ -397,6 +471,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     void processAddedPropertySource(PropertySource propertySource, PropertySource.PropertyConvention convention, long snapshotsWhenRegistered) {
         synchronized (catalogLock) {
+            publishStartCopy();
             RegistrySnapshot snapshot = writeState.processedSnapshot;
             if (snapshot == null || snapshot.number() <= snapshotsWhenRegistered || !snapshot.propertySources().contains(propertySource)) {
                 log.debug("Processing property source: {} convention: {}", propertySource.getName(), convention);
@@ -421,6 +496,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         // lock is taken before the change runs, as a refresh takes it before the environment locks
         // its property sources, so the two locks are always taken in the same order.
         synchronized (catalogLock) {
+            publishStartCopy();
             // inside an add, with what it has written so far, as before
             Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog((adding ? writeState : state).catalog);
             change.run();
@@ -1077,6 +1153,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     @SuppressWarnings("MagicNumber")
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
         synchronized (catalogLock) {
+            publishStartCopy();
             // The state the writes go into: the published one, or the replacement a refresh publishes
             ResolverState target = writeState;
             // odd while its catalogs change
@@ -1442,8 +1519,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 if (allowCreate && entries == null) {
                     entries = new LinkedHashMap<>(5);
                     catalog[index] = entries;
-                } else if (allowCreate && resolverState.sharedMaps != null && resolverState.sharedMaps.remove(entries)) {
-                    // a map that a copy shares with the published state is copied before the copy writes into it
+                } else if (allowCreate && resolverState.sharedMaps != null && !resolverState.sharedMaps.isEmpty() && resolverState.sharedMaps.remove(entries)) {
+                    // A map that a copy shares with the published state is copied before the copy writes into it. A start's
+                    // copy usually shares none, as it starts from nothing, and skips the lookup for each of its writes.
                     entries = new LinkedHashMap<>(entries);
                     catalog[index] = entries;
                 }
