@@ -1,16 +1,22 @@
 package io.micronaut.context.env
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContextConfiguration
+import io.micronaut.context.env.RefreshTestSupport.NeedsLock
+import io.micronaut.context.env.RefreshTestSupport.Parking
+import io.micronaut.context.env.RefreshTestSupport.ParkingEnvironment
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Timeout
 
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
+
+import static io.micronaut.context.env.RefreshTestSupport.WAIT_SECONDS
+import static io.micronaut.context.env.RefreshTestSupport.daemon
+import static io.micronaut.context.env.RefreshTestSupport.parkIn
+import static io.micronaut.context.env.RefreshTestSupport.release
+import static io.micronaut.context.env.RefreshTestSupport.withoutDefaultPropertySources
 
 /**
  * A property source that another thread adds while the environment refreshes does not wait for the
@@ -22,8 +28,6 @@ import java.util.concurrent.locks.ReentrantLock
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/14158")
 @Timeout(60)
 class AddDuringRefreshSpec extends Specification {
-
-    private static final int WAIT_SECONDS = 10
 
     void "a thread that holds a lock the refresh needs, and adds a property source before the refresh reads, does not wait for it, and the refresh reads the property source in its order"() {
         given: "a property source that, once armed, needs a lock of the application, and one of a higher order"
@@ -318,7 +322,7 @@ class AddDuringRefreshSpec extends Specification {
         how << ['on a running environment', 'during a refresh']
     }
 
-    void "a property source added during the turn of the next refresh is left to that refresh, not to the one whose turn just ended"() {
+    void "a property source added while the next refresh is active is left to that refresh, not to the one that has just stopped being active"() {
         given:
         PublishParkingEnvironment env = new PublishParkingEnvironment()
         env.addPropertySource(PropertySource.of('data', ['app.value': 'data']))
@@ -328,7 +332,7 @@ class AddDuringRefreshSpec extends Specification {
         PropertySource added = PropertySource.of('added', ['added.key': 'added'])
         Throwable secondFailure = null
 
-        when: "the first refresh is stopped while it reads, and parked once its turn has ended, before it publishes"
+        when: "the first refresh is stopped while it reads, and parked once it is no longer active, before it publishes"
         Thread first = parkIn(reading) { env.refresh() }
         Thread stopper = daemon('stopper') { env.stop() }
         stopper.join(WAIT_SECONDS * 1000L)
@@ -336,7 +340,7 @@ class AddDuringRefreshSpec extends Specification {
         reading.release.countDown()
         assert env.publishing.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
 
-        and: "a second refresh, which then fails, takes the turn, and a property source is added during it"
+        and: "a second refresh, which then fails, becomes active, and a property source is added meanwhile"
         env.failing.set(true)
         Thread second = daemon('second-refresh') {
             try {
@@ -395,54 +399,6 @@ class AddDuringRefreshSpec extends Specification {
         cleanup:
         env.started.release.countDown()
         env.stop()
-    }
-
-    private static ApplicationContextConfiguration withoutDefaultPropertySources() {
-        ApplicationContext.builder()
-                .environments('test')
-                .deduceEnvironment(false)
-                .enableDefaultPropertySources(false) as ApplicationContextConfiguration
-    }
-
-    private static Thread parkIn(Parking parking, Closure<?> work) {
-        parking.arm()
-        Thread thread = daemon('refresher', work)
-        assert parking.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        return thread
-    }
-
-    private static void release(Parking parking, Thread thread) {
-        parking.release.countDown()
-        thread.join(3 * WAIT_SECONDS * 1000L)
-        assert !thread.alive
-    }
-
-    private static Thread daemon(String name, Closure<?> work) {
-        Thread thread = new Thread(work, name)
-        thread.daemon = true
-        thread.start()
-        return thread
-    }
-
-    /**
-     * Parks, once armed, the thread that passes it.
-     */
-    static class Parking {
-        final CountDownLatch reached = new CountDownLatch(1)
-        final CountDownLatch release = new CountDownLatch(1)
-        private final AtomicBoolean armed = new AtomicBoolean()
-
-        void arm() {
-            armed.set(true)
-        }
-
-        void pass() {
-            if (armed.compareAndSet(true, false)) {
-                reached.countDown()
-                // qualified: unqualified, Groovy resolves the name through get(String) of a property source
-                release.await(3 * AddDuringRefreshSpec.WAIT_SECONDS, TimeUnit.SECONDS)
-            }
-        }
     }
 
     /**
@@ -510,9 +466,9 @@ class AddDuringRefreshSpec extends Specification {
         String getName() {
             if (names.incrementAndGet() > 1) {
                 starts.incrementAndGet()
-                Thread other = AddDuringRefreshSpec.daemon('starter') { env.start() }
+                Thread other = RefreshTestSupport.daemon('starter') { env.start() }
                 // qualified: unqualified, Groovy resolves the name through get(String) of this property source
-                other.join(AddDuringRefreshSpec.WAIT_SECONDS * 1000L)
+                other.join(RefreshTestSupport.WAIT_SECONDS * 1000L)
                 if (other.alive) {
                     allReturned.set(false)
                 }
@@ -557,75 +513,8 @@ class AddDuringRefreshSpec extends Specification {
     }
 
     /**
-     * A property source without properties that, once armed, waits for a lock of the application
-     * when it is iterated.
-     */
-    static class NeedsLock implements PropertySource {
-        final AtomicBoolean gotLock = new AtomicBoolean()
-        private final ReentrantLock lock
-        private final AtomicBoolean armed = new AtomicBoolean()
-
-        NeedsLock(ReentrantLock lock) {
-            this.lock = lock
-        }
-
-        void arm() {
-            armed.set(true)
-        }
-
-        @Override
-        String getName() { 'needs-lock' }
-
-        @Override
-        Object get(String key) { null }
-
-        @Override
-        Iterator<String> iterator() {
-            if (armed.compareAndSet(true, false)) {
-                // qualified: unqualified, Groovy resolves the name through get(String) of this property source
-                if (lock.tryLock(AddDuringRefreshSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
-                    gotLock.set(true)
-                    lock.unlock()
-                }
-            }
-            return Collections.emptyIterator()
-        }
-    }
-
-    /**
-     * An environment without default property sources whose refresh, once armed, parks before it
-     * stops the environment or once it has read the property sources, with the lock of the catalogs
-     * held either way, and whose start, once armed, fails once it has read them.
-     */
-    static class ParkingEnvironment extends DefaultEnvironment {
-        final Parking stopping = new Parking()
-        final Parking started = new Parking()
-        final AtomicBoolean failing = new AtomicBoolean()
-
-        ParkingEnvironment() {
-            super(AddDuringRefreshSpec.withoutDefaultPropertySources())
-        }
-
-        @Override
-        Environment stop() {
-            stopping.pass()
-            return super.stop()
-        }
-
-        @Override
-        Environment start() {
-            Environment environment = super.start()
-            started.pass()
-            if (failing.compareAndSet(true, false)) {
-                throw new IllegalStateException('failed once the property sources were read')
-            }
-            return environment
-        }
-    }
-
-    /**
      * A parking environment whose refresh, once armed, also parks when it decides whether to publish
-     * what it read, after its turn has ended, with the lock of the catalogs held.
+     * what it read, once it is no longer active, with the lock of the catalogs held.
      */
     static class PublishParkingEnvironment extends ParkingEnvironment {
         final Parking publishing = new Parking()

@@ -1,16 +1,20 @@
 package io.micronaut.context.env
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContextConfiguration
-import io.micronaut.core.order.Ordered
+import io.micronaut.context.env.RefreshTestSupport.Gate
+import io.micronaut.context.env.RefreshTestSupport.NeedsLock
+import io.micronaut.context.env.RefreshTestSupport.ParkingEnvironment
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Timeout
 
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
+
+import static io.micronaut.context.env.RefreshTestSupport.WAIT_SECONDS
+import static io.micronaut.context.env.RefreshTestSupport.daemon
+import static io.micronaut.context.env.RefreshTestSupport.parkIn
+import static io.micronaut.context.env.RefreshTestSupport.release
+import static io.micronaut.context.env.RefreshTestSupport.withoutDefaultPropertySources
 
 /**
  * A stop or a start from another thread while the environment refreshes does not wait for the
@@ -22,8 +26,6 @@ import java.util.concurrent.locks.ReentrantLock
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/14141")
 @Timeout(60)
 class StopOrStartDuringRefreshSpec extends Specification {
-
-    private static final int WAIT_SECONDS = 10
 
     void "a stop from a thread that holds a lock the refresh needs returns at once, and the refresh publishes nothing and stops the environment: #how"() {
         given: "a refresh that parks before it stops the environment, and a property source that, once armed, needs a lock of the application"
@@ -190,129 +192,6 @@ class StopOrStartDuringRefreshSpec extends Specification {
             env.stop()
         } else {
             env.start()
-        }
-    }
-
-    private static ApplicationContextConfiguration withoutDefaultPropertySources() {
-        ApplicationContext.builder()
-                .environments('test')
-                .deduceEnvironment(false)
-                .enableDefaultPropertySources(false) as ApplicationContextConfiguration
-    }
-
-    private static Thread parkIn(Parking parking, Closure<?> work) {
-        parking.arm()
-        Thread thread = daemon('refresher', work)
-        assert parking.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        return thread
-    }
-
-    private static void release(Parking parking, Thread thread) {
-        parking.release.countDown()
-        thread.join(3 * WAIT_SECONDS * 1000L)
-        assert !thread.alive
-    }
-
-    private static Thread daemon(String name, Closure<?> work) {
-        Thread thread = new Thread(work, name)
-        thread.daemon = true
-        thread.start()
-        return thread
-    }
-
-    /**
-     * Parks, once armed, the thread that passes it.
-     */
-    static class Parking {
-        final CountDownLatch reached = new CountDownLatch(1)
-        final CountDownLatch release = new CountDownLatch(1)
-        private final AtomicBoolean armed = new AtomicBoolean()
-
-        void arm() {
-            armed.set(true)
-        }
-
-        void pass() {
-            if (armed.compareAndSet(true, false)) {
-                reached.countDown()
-                // qualified: unqualified, Groovy resolves the name through get(String) of a property source
-                release.await(3 * StopOrStartDuringRefreshSpec.WAIT_SECONDS, TimeUnit.SECONDS)
-            }
-        }
-    }
-
-    /**
-     * A property source without properties, processed after the others, that once armed parks the
-     * thread that iterates it.
-     */
-    static class Gate extends Parking implements PropertySource {
-        @Override
-        String getName() { 'gate' }
-
-        @Override
-        int getOrder() { Ordered.LOWEST_PRECEDENCE }
-
-        @Override
-        Object get(String key) { null }
-
-        @Override
-        Iterator<String> iterator() {
-            pass()
-            return Collections.emptyIterator()
-        }
-    }
-
-    /**
-     * A property source without properties that, once armed, waits for a lock of the application
-     * when it is iterated.
-     */
-    static class NeedsLock implements PropertySource {
-        final AtomicBoolean gotLock = new AtomicBoolean()
-        private final ReentrantLock lock
-        private final AtomicBoolean armed = new AtomicBoolean()
-
-        NeedsLock(ReentrantLock lock) {
-            this.lock = lock
-        }
-
-        void arm() {
-            armed.set(true)
-        }
-
-        @Override
-        String getName() { 'needs-lock' }
-
-        @Override
-        Object get(String key) { null }
-
-        @Override
-        Iterator<String> iterator() {
-            if (armed.compareAndSet(true, false)) {
-                // qualified: unqualified, Groovy resolves the name through get(String) of this property source
-                if (lock.tryLock(StopOrStartDuringRefreshSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
-                    gotLock.set(true)
-                    lock.unlock()
-                }
-            }
-            return Collections.emptyIterator()
-        }
-    }
-
-    /**
-     * An environment without default property sources whose refresh, once armed, parks before it
-     * stops the environment, with the lock of the catalogs held.
-     */
-    static class ParkingEnvironment extends DefaultEnvironment {
-        final Parking stopping = new Parking()
-
-        ParkingEnvironment() {
-            super(StopOrStartDuringRefreshSpec.withoutDefaultPropertySources())
-        }
-
-        @Override
-        Environment stop() {
-            stopping.pass()
-            return super.stop()
         }
     }
 }

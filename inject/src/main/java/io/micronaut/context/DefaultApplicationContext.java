@@ -963,9 +963,10 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
 
         @Override
         public Environment stop() {
-            // The lock of the property catalogs, which a refresh holds while it stops and starts this
-            // environment: the bootstrap environment is only ever replaced under that lock. A stop
-            // from another thread during a refresh is left to the refresh, without the lock.
+            // The bootstrap environment is only ever replaced with the lock of the property catalogs
+            // held, which a refresh holds while it stops and starts this environment. If another
+            // thread is refreshing, return at once, without that lock: the refresh then stops this
+            // environment itself, see DefaultEnvironment#beginStartOrStop.
             if (!beginStartOrStop(true)) {
                 return this;
             }
@@ -984,6 +985,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
 
         @Override
         public Environment start() {
+            // if another thread is refreshing, return at once: the refresh starts this environment
             if (!beginStartOrStop(false)) {
                 return this;
             }

@@ -1,8 +1,7 @@
 package io.micronaut.context.env
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContextConfiguration
-import io.micronaut.core.order.Ordered
+import io.micronaut.context.env.RefreshTestSupport.Gate
+import io.micronaut.context.env.RefreshTestSupport.NeedsLock
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Timeout
@@ -13,6 +12,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 
+import static io.micronaut.context.env.RefreshTestSupport.WAIT_SECONDS
+import static io.micronaut.context.env.RefreshTestSupport.daemon
+import static io.micronaut.context.env.RefreshTestSupport.parkIn
+import static io.micronaut.context.env.RefreshTestSupport.release
+import static io.micronaut.context.env.RefreshTestSupport.withoutDefaultPropertySources
+
 /**
  * A refresh from another thread while the environment refreshes waits for that refresh at most two
  * seconds. If it ends in time, the second refresh reads the property sources itself; otherwise the
@@ -22,8 +27,6 @@ import java.util.concurrent.locks.ReentrantLock
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/14160")
 @Timeout(60)
 class RefreshDuringRefreshSpec extends Specification {
-
-    private static final int WAIT_SECONDS = 10
 
     void "a #method from a thread that holds a lock the refresh in progress needs returns after about two seconds without its change, and the refresh in progress then reads once more and applies it"() {
         given: "a property source, read after 'data', that once armed waits for a lock of the application"
@@ -260,107 +263,6 @@ class RefreshDuringRefreshSpec extends Specification {
         env.stop()
     }
 
-    private static ApplicationContextConfiguration withoutDefaultPropertySources() {
-        ApplicationContext.builder()
-                .environments('test')
-                .deduceEnvironment(false)
-                .enableDefaultPropertySources(false) as ApplicationContextConfiguration
-    }
-
-    private static Thread parkIn(Gate gate, Closure<?> work) {
-        gate.arm()
-        Thread thread = daemon('refresher', work)
-        assert gate.reached.await(WAIT_SECONDS, TimeUnit.SECONDS)
-        return thread
-    }
-
-    private static void release(Gate gate, Thread thread) {
-        gate.release.countDown()
-        thread.join(3 * WAIT_SECONDS * 1000L)
-        assert !thread.alive
-    }
-
-    private static Thread daemon(String name, Closure<?> work) {
-        Thread thread = new Thread(work, name)
-        thread.daemon = true
-        thread.start()
-        return thread
-    }
-
-    /**
-     * A property source without properties, processed after the others, that once armed parks the
-     * thread that iterates it.
-     */
-    static class Gate implements PropertySource {
-        final CountDownLatch reached = new CountDownLatch(1)
-        final CountDownLatch release = new CountDownLatch(1)
-        private final AtomicBoolean armed = new AtomicBoolean()
-
-        void arm() {
-            armed.set(true)
-        }
-
-        @Override
-        String getName() { 'gate' }
-
-        @Override
-        int getOrder() { Ordered.LOWEST_PRECEDENCE }
-
-        @Override
-        Object get(String key) { null }
-
-        @Override
-        Iterator<String> iterator() {
-            if (armed.compareAndSet(true, false)) {
-                reached.countDown()
-                // qualified: unqualified, Groovy resolves the name through get(String) of this property source
-                release.await(3 * RefreshDuringRefreshSpec.WAIT_SECONDS, TimeUnit.SECONDS)
-            }
-            return Collections.emptyIterator()
-        }
-    }
-
-    /**
-     * A property source without properties, processed after the others, that once armed waits for
-     * the given lock when it is iterated.
-     */
-    static class NeedsLock implements PropertySource {
-        final CountDownLatch entered = new CountDownLatch(1)
-        final AtomicBoolean gotLock = new AtomicBoolean()
-        private final ReentrantLock lock
-        private final AtomicBoolean armed = new AtomicBoolean()
-
-        NeedsLock(ReentrantLock lock) {
-            this.lock = lock
-        }
-
-        void arm() {
-            armed.set(true)
-        }
-
-        @Override
-        String getName() { 'needs-lock' }
-
-        @Override
-        int getOrder() { Ordered.LOWEST_PRECEDENCE }
-
-        @Override
-        Object get(String key) { null }
-
-        @Override
-        Iterator<String> iterator() {
-            if (armed.compareAndSet(true, false)) {
-                entered.countDown()
-                // qualified: unqualified, Groovy resolves the name through get(String) of this property source
-                if (lock.tryLock(RefreshDuringRefreshSpec.WAIT_SECONDS, TimeUnit.SECONDS)) {
-                    gotLock.set(true)
-                    lock.unlock()
-                }
-            }
-            return Collections.emptyIterator()
-        }
-    }
-
     /**
      * A property source without properties that, once armed or every time while asked to, refreshes
      * the environment on another thread when it is iterated and waits a bounded time for that
@@ -391,12 +293,12 @@ class RefreshDuringRefreshSpec extends Specification {
         Iterator<String> iterator() {
             reads.incrementAndGet()
             if (armed.compareAndSet(true, false) || everyTime) {
-                Thread other = RefreshDuringRefreshSpec.daemon('other-refresh') {
+                Thread other = RefreshTestSupport.daemon('other-refresh') {
                     env.refresh()
                     otherReturned.set(true)
                 }
                 // qualified: unqualified, Groovy resolves the name through get(String) of this property source
-                other.join(RefreshDuringRefreshSpec.WAIT_SECONDS * 1000L)
+                other.join(RefreshTestSupport.WAIT_SECONDS * 1000L)
             }
             return Collections.emptyIterator()
         }
