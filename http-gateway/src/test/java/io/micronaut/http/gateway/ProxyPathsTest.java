@@ -85,6 +85,18 @@ class ProxyPathsTest {
     }
 
     @Test
+    void anUpstreamPathWithAnEmptyLeadingSegmentIsRejected() {
+        assertNotNull(ProxyPaths.upstreamRejection("//attacker.example/x"));
+        assertNotNull(ProxyPaths.upstreamRejection("//"));
+        assertNotNull(ProxyPaths.upstreamRejection("/a/../b"));
+        assertNull(ProxyPaths.upstreamRejection("/a//b"));
+        assertNull(ProxyPaths.upstreamRejection("/"));
+        assertThrows(ProxyPaths.UpstreamPathException.class, () -> ProxyPaths.uri("//attacker.example/x", null));
+        assertEquals("/a//b?q", ProxyPaths.uri("/a//b", "q").toString());
+        assertNull(ProxyPaths.uri("/a//b", null).getRawAuthority());
+    }
+
+    @Test
     void hostHeaders() {
         assertNull(DefaultProxyHandler.hostRejection(io.micronaut.http.HttpRequest.GET("/").header("Host", "api.example.com:8443")));
         assertNull(DefaultProxyHandler.hostRejection(io.micronaut.http.HttpRequest.GET("/").header("Host", "[::1]:80")));

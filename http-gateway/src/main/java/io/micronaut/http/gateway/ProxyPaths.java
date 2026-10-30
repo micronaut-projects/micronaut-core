@@ -18,6 +18,7 @@ package io.micronaut.http.gateway;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -33,6 +34,8 @@ import java.util.List;
  */
 @Internal
 final class ProxyPaths {
+
+    private static final String EMPTY_LEADING_SEGMENT = "An empty leading segment in the path";
 
     private ProxyPaths() {
     }
@@ -50,6 +53,8 @@ final class ProxyPaths {
      *     malformed percent-encoding;</li>
      *     <li>a path that does not start with a slash.</li>
      * </ul>
+     * An upstream path is checked with {@link #upstreamRejection(String)}, which also rejects an
+     * empty leading segment.
      *
      * @param rawPath The raw path
      * @return The reason it is rejected, or {@code null} if it is relayed
@@ -70,6 +75,22 @@ final class ProxyPaths {
             }
         }
         return null;
+    }
+
+    /**
+     * Whether a raw path is one the gateway sends to an upstream, see {@link #rejection(String)}:
+     * a path with an empty leading segment, one that starts with {@code //}, is also rejected,
+     * since a URI reads it as a network-path reference whose first segment is an authority, e.g.
+     * {@code //attacker.example/x}. Empty segments after the first are relayed as sent.
+     *
+     * @param rawPath The raw path
+     * @return The reason it is rejected, or {@code null} if it is relayed
+     */
+    static @Nullable String upstreamRejection(String rawPath) {
+        if (rawPath.startsWith("//")) {
+            return EMPTY_LEADING_SEGMENT;
+        }
+        return rejection(rawPath);
     }
 
     private static @Nullable String segmentRejection(String path, int start, int end) {
@@ -180,6 +201,27 @@ final class ProxyPaths {
     }
 
     /**
+     * The URI of an upstream request, a path and a query only: a path that starts with
+     * {@code //} would make the URI a network-path reference, whose first segment is the
+     * authority the client sends the request to.
+     *
+     * @param path  The raw path
+     * @param query The raw query, or {@code null}
+     * @return The URI
+     * @throws UpstreamPathException if the path has an empty leading segment
+     */
+    static URI uri(String path, @Nullable String query) {
+        if (path.startsWith("//")) {
+            throw new UpstreamPathException(EMPTY_LEADING_SEGMENT);
+        }
+        URI uri = URI.create(pathAndQuery(path, query));
+        if (uri.getScheme() != null || uri.getRawAuthority() != null) {
+            throw new UpstreamPathException("The upstream path is not a path");
+        }
+        return uri;
+    }
+
+    /**
      * @param path  The raw path
      * @param query The raw query, or {@code null}
      * @return The path and the query, as the URI of a request; an empty query keeps its {@code ?}
@@ -237,5 +279,14 @@ final class ProxyPaths {
     static String addQueryParameter(@Nullable String rawQuery, String name, String value) {
         String pair = encodeQueryComponent(name) + '=' + encodeQueryComponent(value);
         return rawQuery == null || rawQuery.isEmpty() ? pair : rawQuery + '&' + pair;
+    }
+
+    /**
+     * An upstream path that is not relayed, see {@link #uri(String, String)}.
+     */
+    static final class UpstreamPathException extends IllegalArgumentException {
+        UpstreamPathException(String message) {
+            super(message);
+        }
     }
 }

@@ -58,10 +58,31 @@ import java.util.regex.Pattern;
 @Experimental
 public final class GatewayFilters {
 
+    private static final String MASK = "******";
+    private static final List<String> SENSITIVE_NAMES = List.of("auth", "cookie", "token", "secret", "password", "key", "credential", "session");
+
     private static final Pattern VARIABLE = Pattern.compile("\\{([A-Za-z0-9_.-]+)}");
     private static final Pattern PATH_VARIABLE = Pattern.compile("\\{(\\+)?([A-Za-z0-9_.-]+)}");
 
     private GatewayFilters() {
+    }
+
+    /**
+     * The value of a header or a parameter in the description of a filter, e.g. in the gateway
+     * endpoint or a log: masked for a name that carries credentials.
+     *
+     * @param name  The name
+     * @param value The value
+     * @return The value to show
+     */
+    static String shown(String name, String value) {
+        String lower = name.toLowerCase(Locale.ROOT);
+        for (String sensitive : SENSITIVE_NAMES) {
+            if (lower.contains(sensitive)) {
+                return MASK;
+            }
+        }
+        return value;
     }
 
     // ---- path
@@ -415,11 +436,11 @@ public final class GatewayFilters {
     }
 
     private static MutableHttpRequest<?> withPath(MutableHttpRequest<?> request, String rawPath) {
-        return request.uri(URI.create(ProxyPaths.pathAndQuery(rawPath, request.getUri().getRawQuery())));
+        return request.uri(ProxyPaths.uri(rawPath, request.getUri().getRawQuery()));
     }
 
     private static MutableHttpRequest<?> withQuery(MutableHttpRequest<?> request, @Nullable String rawQuery) {
-        return request.uri(URI.create(ProxyPaths.pathAndQuery(request.getUri().getRawPath(), rawQuery)));
+        return request.uri(ProxyPaths.uri(request.getUri().getRawPath(), rawQuery));
     }
 
     /**
@@ -530,9 +551,9 @@ public final class GatewayFilters {
         @Override
         public String toString() {
             return switch (edit) {
-                case ADD -> "AddRequestHeader=" + name + ", " + value;
-                case ADD_IF_ABSENT -> "AddRequestHeadersIfNotPresent=" + name + ":" + value;
-                case SET -> "SetRequestHeader=" + name + ", " + value;
+                case ADD -> "AddRequestHeader=" + name + ", " + shown(name, value);
+                case ADD_IF_ABSENT -> "AddRequestHeadersIfNotPresent=" + name + ":" + shown(name, value);
+                case SET -> "SetRequestHeader=" + name + ", " + shown(name, value);
                 case REMOVE -> "RemoveRequestHeader=" + name;
             };
         }
@@ -562,7 +583,7 @@ public final class GatewayFilters {
 
         @Override
         public String toString() {
-            return "AddRequestParameter=" + name + ", " + value;
+            return "AddRequestParameter=" + name + ", " + shown(name, value);
         }
     }
 
@@ -624,8 +645,8 @@ public final class GatewayFilters {
         @Override
         public String toString() {
             return switch (edit) {
-                case ADD -> "AddResponseHeader=" + name + ", " + value;
-                case SET -> "SetResponseHeader=" + name + ", " + value;
+                case ADD -> "AddResponseHeader=" + name + ", " + shown(name, value);
+                case SET -> "SetResponseHeader=" + name + ", " + shown(name, value);
                 case REMOVE -> "RemoveResponseHeader=" + name;
                 default -> edit + "ResponseHeader=" + name;
             };

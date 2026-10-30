@@ -188,6 +188,18 @@ class SecurityTest extends GatewayTestBase {
     }
 
     @Test
+    void sec11bAStrippedPathNeverBecomesAnAuthority() throws IOException {
+        // without the check, the stripped path //127.0.0.1:port/inspect/x is a network-path
+        // reference, and the client sends the request to the authority in the path
+        String authority = "127.0.0.1:" + upstream.getPort();
+        assertRejected("GET /strip//" + authority + "/inspect/x HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n", 400, 502);
+        assertRejected("GET //" + authority + "/inspect/x HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n", 400, 404);
+        // empty segments that are not leading are still relayed as sent
+        RawHttp.Response inner = get("/strip/inspect//x");
+        assertEquals("/inspect//x", inner.inspected("path"), inner.toString());
+    }
+
+    @Test
     void sec12AFragmentIsRejectedOrStripped() throws IOException {
         int before = counters().get("inspect");
         RawHttp.Response response = raw("GET /inspect/x#frag HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
@@ -277,6 +289,7 @@ class SecurityTest extends GatewayTestBase {
         public void routes(GatewayRouteBuilder gateway) {
             gateway.route("inspect").path("/inspect/**").uri(upstream);
             gateway.route("raw").path("/raw/**").filters(GatewayFilters.stripPrefix(1)).uri(scripted);
+            gateway.route("strip").path("/strip/**").filters(GatewayFilters.stripPrefix(1)).uri(upstream);
             gateway.route("tmpl").path("/tmpl/{segment}")
                 .filters(GatewayFilters.setPath("/inspect/tmpl"), GatewayFilters.addRequestHeader("X-Segment", "{segment}"))
                 .uri(upstream);

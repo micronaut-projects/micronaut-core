@@ -128,7 +128,7 @@ final class DefaultProxyHandler implements ProxyHandler {
         request.setAttribute(GatewayAttributes.ROUTE_ID, route.getId());
         String rejected = hostRejection(request);
         if (rejected == null) {
-            rejected = ProxyPaths.rejection(request.getPath());
+            rejected = ProxyPaths.upstreamRejection(request.getPath());
         }
         if (rejected != null) {
             return CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.BAD_REQUEST, rejected));
@@ -140,10 +140,13 @@ final class DefaultProxyHandler implements ProxyHandler {
             for (GatewayFilter filter : route.getFilters()) {
                 filter.filterRequest(exchange, upstream);
             }
+            rejected = upstreamPathRejection(upstream.getUri());
+        } catch (ProxyPaths.UpstreamPathException e) {
+            return CompletableFuture.failedFuture(new UpstreamException(HttpStatus.BAD_GATEWAY, route.getId(),
+                "The filters of the route made an upstream path that is not relayed: " + e.getMessage(), null));
         } catch (Exception e) {
             return CompletableFuture.failedFuture(e);
         }
-        rejected = ProxyPaths.rejection(upstream.getUri().getRawPath());
         if (rejected != null) {
             return CompletableFuture.failedFuture(new UpstreamException(HttpStatus.BAD_GATEWAY, route.getId(),
                 "The filters of the route made an upstream path that is not relayed: " + rejected, null));
@@ -156,6 +159,22 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
         Relay relay = new Relay(request, pathVariables, exchange, upstream, body);
         return relay.start();
+    }
+
+    /**
+     * The URI of an upstream request is a path and a query: a URI with a scheme or an authority,
+     * e.g. a path that a filter left with an empty leading segment, {@code //attacker.example/x},
+     * would send the request to another server.
+     *
+     * @param uri The URI of the upstream request
+     * @return The reason it is rejected, or {@code null}
+     */
+    private static @Nullable String upstreamPathRejection(URI uri) {
+        if (uri.getScheme() != null || uri.getRawAuthority() != null) {
+            return "The upstream path is not a path";
+        }
+        String rawPath = uri.getRawPath();
+        return rawPath == null ? "The path must start with a slash" : ProxyPaths.upstreamRejection(rawPath);
     }
 
     /**
@@ -196,7 +215,7 @@ final class DefaultProxyHandler implements ProxyHandler {
     private MutableHttpRequest<Object> upstreamRequest(HttpRequest<?> request) {
         URI uri = request.getUri();
         MutableHttpRequest<Object> upstream = HttpRequest.create(request.getMethod(),
-            ProxyPaths.pathAndQuery(request.getPath(), uri.getRawQuery()), request.getMethodName());
+            ProxyPaths.uri(request.getPath(), uri.getRawQuery()).toString(), request.getMethodName());
         MutableHttpHeaders headers = upstream.getHeaders();
         request.getHeaders().forEach((name, values) -> {
             for (String value : values) {
