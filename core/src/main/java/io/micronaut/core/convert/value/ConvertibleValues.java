@@ -20,6 +20,8 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceProvider;
+import io.micronaut.core.convert.TypeConverter;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
@@ -283,6 +285,25 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     @SuppressWarnings("unchecked")
     static <V> ConvertibleValues<V> empty() {
         return ConvertibleValues.EMPTY;
+    }
+
+    /**
+     * Gets the value of the name converted to the argument of the context, as
+     * {@link #get(CharSequence, ArgumentConversionContext)} does. The converter is one
+     * {@link #getConversionService()} resolved for strings and the argument of the context, with
+     * {@link ConversionService#resolveConverter(Class, Argument)}: values that convert a single string
+     * value with their conversion service can convert it with the converter instead.
+     *
+     * @param name              The name
+     * @param conversionContext The conversion context
+     * @param converter         The converter of a string value to the argument of the context
+     * @param <T>               The target type
+     * @return The converted value
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext, TypeConverter<String, T> converter) {
+        return get(name, conversionContext);
     }
 
     @Override

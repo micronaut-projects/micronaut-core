@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpDates;
 import io.micronaut.http.HttpHeaderValues;
@@ -111,9 +112,26 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+        return getValue(name, conversionContext, null);
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext, TypeConverter<String, T> converter) {
+        if (getClass() != NettyHttpHeaders.class) {
+            // a subclass may override the lookup of a value
+            return get(name, conversionContext);
+        }
+        return getValue(name, conversionContext, converter);
+    }
+
+    private <T> Optional<T> getValue(CharSequence name, ArgumentConversionContext<T> conversionContext, @Nullable TypeConverter<String, T> converter) {
         List<String> values = nettyHeaders.getAll(name);
         if (!values.isEmpty()) {
-            if (values.size() == 1 || !isCollectionOrArray(conversionContext.getArgument().getType())) {
+            Class<T> type = conversionContext.getArgument().getType();
+            if (values.size() == 1 || !isCollectionOrArray(type)) {
+                if (converter != null) {
+                    return converter.convert(values.get(0), type, conversionContext);
+                }
                 return conversionService.convert(values.get(0), conversionContext);
             } else {
                 return conversionService.convert(values, conversionContext);
