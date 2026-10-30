@@ -15,18 +15,21 @@
  */
 package io.micronaut.dev;
 
+import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.dev.change.ChangeSet;
 import io.micronaut.dev.compile.ClassDependencyIndex;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
+import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.manifest.TestSettings;
 import io.micronaut.dev.test.Cancellation;
 import io.micronaut.dev.test.JUnitXmlReportWriter;
 import io.micronaut.dev.test.TestEventListener;
 import io.micronaut.dev.test.TestEventListeners;
+import io.micronaut.dev.test.TestFileNames;
 import io.micronaut.dev.test.TestId;
 import io.micronaut.dev.test.TestOutcome;
 import io.micronaut.dev.test.TestReportListener;
@@ -39,16 +42,19 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
@@ -65,6 +71,13 @@ import java.util.concurrent.TimeoutException;
  * run happens on a new generation of the reloadable loader, so the tests and the classes under test are the
  * ones just compiled, and its events go to the JUnit XML reports and to the report listeners registered as
  * services.</p>
+ *
+ * <p>Except when the runner can patch the change in: a change of the class output that holds no class and only
+ * changes resources the last run's generation holds, as a Python edit that changed only bodies, is offered to the
+ * runner's {@link TestRunner#inPlaceReloader in-place reloader} for that generation. When it takes the change, the
+ * generation's snapshot gets the new contents, the reloader applies them to what the runner keeps alive, and the
+ * tests the change owes run on the same generation; so does a run that no change preceded, while the runner keeps state
+ * built over the generation. Anything else, before the next run, gets a new generation.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -99,12 +112,17 @@ final class TestSession {
     private boolean compileFailed;
     private volatile boolean watching = true;
     private volatile @Nullable Cancellation current; // NOSONAR java:S3077 only the handle of the running tests is published; cancelling it is thread-safe
+    // on the reload thread: the loader of the last run, whether every change since it was made is in it, patched in,
+    // and whether one was patched in, which makes the next run use it again
+    private @Nullable ClassLoader runLoader;
+    private boolean runLoaderCurrent;
+    private boolean patchedSinceRun;
 
     TestSession(DevRuntime runtime, DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
         this.runtime = runtime;
         this.manifest = manifest;
         this.tests = manifest.testView();
-        this.testJoint = DevRuntime.jointOwners(tests, compilers);
+        this.testJoint = Compilations.jointOwners(tests, compilers);
         this.settings = manifest.testSettings();
         this.runner = runner(settings.runner());
         this.xml = new JUnitXmlReportWriter(settings.reports());
@@ -193,18 +211,35 @@ final class TestSession {
         if (!removedTests.isEmpty()) {
             testClassesRemoved(removedTests);
         }
+        // a file of tests discovered from their files, deleted, or failed and deleted since: its results go, and its failure
+        Set<String> goneFiles;
+        synchronized (this) {
+            goneFiles = goneTestFiles(tests.sourceRoots(), allTestSources, failedClasses);
+        }
+        if (!goneFiles.isEmpty()) {
+            testClassesRemoved(goneFiles);
+        }
+        Set<String> resourcesBefore = runtime.outputResources();
         ChangeSet changes = runtime.takeOutputChanges();
+        if (resources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty())) {
+            // a configuration or other resource file read live changed: what the runner built from it is out of date,
+            // and nothing is patched into it
+            runLoaderCurrent = false;
+        } else if (!changes.isEmpty()) {
+            patchOrRetire(changes, resourcesBefore);
+        }
         Set<String> changed = new LinkedHashSet<>(application.affectedClasses());
         changed.addAll(testRound.affectedClasses());
         for (String className : changes.classNames()) {
             changed.add(ClassDependencyIndex.topLevelOf(className));
         }
         changed.removeAll(removedTests);
+        boolean fileTestsChanged = fileTestsChanged(tests.sourceRoots(), allSources, allTestSources, changed);
         boolean resourcesChanged = resources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty())
             || !changes.changedResources().isEmpty() || !changes.removedResources().isEmpty();
         synchronized (this) {
             owedChanges.addAll(changed);
-            owedAll |= full || resourcesChanged || constants || !settings.affectedOnly() && !changed.isEmpty();
+            owedAll |= full || resourcesChanged || fileTestsChanged || constants || !settings.affectedOnly() && !changed.isEmpty();
         }
         if (requested != null) {
             run(requested(requested), requested != TestRequest.FAILED);
@@ -371,12 +406,149 @@ final class TestSession {
         }
         synchronized (this) {
             for (String failed : failedClasses) {
-                if (testClasses.contains(failed)) {
+                // a class of the outputs, or a file of tests an engine discovers from their source files, as pytest's
+                if (testClasses.contains(failed) || isTestFile(tests.sourceRoots(), failed)) {
                     selected.add(failed);
                 }
             }
         }
         return selected.isEmpty() ? null : TestSelection.ofClasses(selected, description);
+    }
+
+    /**
+     * The names of results of files of tests discovered from their files, as pytest's, that are gone: those of the
+     * files a batch deleted, and the failed ones whose files are no longer there.
+     *
+     * @param roots The test source roots
+     * @param testSources The batch's changes of the test sources
+     * @param failed The names of the failed results
+     * @return The names whose results go
+     */
+    static Set<String> goneTestFiles(List<SourceRoot> roots, Map<SourceKind, DevRuntime.SourceChanges> testSources, Collection<String> failed) {
+        Set<String> gone = new LinkedHashSet<>();
+        testSources.forEach((kind, change) -> {
+            if (!isJvmKind(kind)) {
+                for (Path deleted : change.deleted()) {
+                    gone.addAll(resultNamesOf(roots, deleted));
+                }
+            }
+        });
+        for (String name : failed) {
+            if (isTestFileName(roots, name) && !isTestFile(roots, name)) {
+                gone.add(name);
+            }
+        }
+        return gone;
+    }
+
+    /**
+     * Whether a batch runs every test for tests discovered from their files, as pytest's: such a test has no class
+     * whose change can be followed, nor can a change of the application be followed to it, so a change of one of
+     * them, or with any of them, of the application, runs every test.
+     *
+     * @param roots The test source roots
+     * @param sources The batch's changes of the application's sources
+     * @param testSources The batch's changes of the test sources
+     * @param changed The classes the batch changed
+     * @return Whether every test runs
+     */
+    static boolean fileTestsChanged(List<SourceRoot> roots, Map<SourceKind, DevRuntime.SourceChanges> sources,
+                                    Map<SourceKind, DevRuntime.SourceChanges> testSources, Set<String> changed) {
+        boolean testFileChanged = testSources.entrySet().stream()
+            .anyMatch(entry -> !isJvmKind(entry.getKey()) && (!entry.getValue().changed().isEmpty() || !entry.getValue().deleted().isEmpty()));
+        if (testFileChanged) {
+            return true;
+        }
+        boolean fileTests = roots.stream().anyMatch(root -> !isJvmKind(root.kind()));
+        return fileTests && (!changed.isEmpty() || sources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty()));
+    }
+
+    /**
+     * Whether results are grouped under a file of a test source root whose tests are discovered from their files, as
+     * pytest's, rather than under a class: the file is selected again by that name.
+     */
+    static boolean isTestFile(List<SourceRoot> roots, String name) {
+        for (SourceRoot root : roots) {
+            SourceKind kind = root.kind();
+            if (isJvmKind(kind)) {
+                continue;
+            }
+            Path rootPath = root.path().toAbsolutePath().normalize();
+            // a file another root holds at the same relative path is named relative to the directory the roots share
+            Path shared = TestFileNames.base(roots, rootPath, false);
+            for (String extension : kind.extensions()) {
+                if (name.endsWith("." + extension) && isFileOfRoot(root, rootPath, shared, name)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a name of results names a file of a test source root: relative to the root, to its parent, or to the
+     * directory the roots share, when the file it names there is within the root.
+     *
+     * @param root     The test source root
+     * @param rootPath Its absolute, normalized path
+     * @param shared   The directory the roots share, or null
+     * @param name     The name
+     * @return Whether the file is there
+     */
+    private static boolean isFileOfRoot(SourceRoot root, Path rootPath, @Nullable Path shared, String name) {
+        if (Files.isRegularFile(root.path().resolve(name).normalize()) || Files.isRegularFile(root.path().resolveSibling(name).normalize())) {
+            return true;
+        }
+        if (shared == null) {
+            return false;
+        }
+        Path inShared = shared.resolve(name).normalize();
+        return inShared.startsWith(rootPath) && Files.isRegularFile(inShared);
+    }
+
+    /**
+     * Whether a name of results names a file of tests discovered from their files, whether or not it is there.
+     */
+    static boolean isTestFileName(List<SourceRoot> roots, String name) {
+        for (SourceRoot root : roots) {
+            if (!isJvmKind(root.kind())) {
+                for (String extension : root.kind().extensions()) {
+                    if (name.endsWith("." + extension)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The names the results of a file of tests discovered from their files may be grouped under: its path relative to
+     * its test source root, or to the directory holding the root.
+     */
+    static Set<String> resultNamesOf(List<SourceRoot> roots, Path file) {
+        Set<String> names = new LinkedHashSet<>();
+        Path absolute = file.toAbsolutePath().normalize();
+        for (SourceRoot root : roots) {
+            Path base = root.path().toAbsolutePath().normalize();
+            if (!isJvmKind(root.kind()) && absolute.startsWith(base)) {
+                names.add(base.relativize(absolute).toString().replace('\\', '/'));
+                if (base.getParent() != null) {
+                    names.add(base.getParent().relativize(absolute).toString().replace('\\', '/'));
+                }
+                Path shared = TestFileNames.base(roots, base, false);
+                if (shared != null) {
+                    // the name of a file another root holds at the same relative path
+                    names.add(TestFileNames.slashed(shared.relativize(absolute)));
+                }
+                names.add(TestFileNames.slashed(base) + "/" + TestFileNames.slashed(base.relativize(absolute)));
+            }
+        }
+        return names;
+    }
+
+    private static boolean isJvmKind(SourceKind kind) {
+        return kind == SourceKind.JAVA || kind == SourceKind.KOTLIN || kind == SourceKind.GROOVY;
     }
 
     private static List<Path> outputs(DevManifest target, List<SourceRoot> roots) {
@@ -403,7 +575,18 @@ final class TestSession {
         synchronized (this) {
             runId = "run-" + (runs + 1);
         }
-        ClassLoader generation = runtime.newGeneration();
+        ClassLoader generation;
+        ClassLoader lastLoader = runLoader;
+        if (runLoaderCurrent && lastLoader != null && lastLoader == runtime.currentGeneration() && (patchedSinceRun || keepsState(lastLoader))) {
+            // every change since the last run was patched into its generation, or nothing changed and the runner keeps
+            // state built over it: that state lives on
+            generation = lastLoader;
+        } else {
+            generation = runtime.newGeneration();
+        }
+        runLoader = generation;
+        runLoaderCurrent = true;
+        patchedSinceRun = false;
         Cancellation cancellation = new Cancellation();
         current = cancellation;
         List<TestEventListener> listeners = new ArrayList<>();
@@ -428,10 +611,62 @@ final class TestSession {
             }
             notifyAll();
         }
-        LOG.info("{} {}: {} passed, {} failed, {} errored, {} skipped in {} ms{}", selection.everything() ? "All tests" : "Tests " + selection.description(),
+        LOG.info("{} {}: {} passed, {} failed, {} errored, {} skipped in {} ms on generation {}{}", selection.everything() ? "All tests" : "Tests " + selection.description(),
             summary.isSuccess() ? "passed" : FAILED_LABEL, summary.passed(), summary.failed(), summary.errored(), summary.skipped(), summary.duration().toMillis(),
-            summary.cancelled() ? " (cancelled)" : "");
+            generation instanceof GenerationClassLoader g ? g.generation() : runtime.generation(), summary.cancelled() ? " (cancelled)" : "");
+        if (!settings.once() && runtime.isGenerationBudgetSpent()) {
+            // the run that spent the budget completed: the next one is the relaunched process's. Checked after a run,
+            // not before, so that what a change owes is tested before the process goes
+            runtime.requestRelaunch();
+            return;
+        }
         runtime.detectLeaks();
+    }
+
+    /**
+     * Whether the runner keeps state built over a loader, which it would patch a change into.
+     */
+    private boolean keepsState(ClassLoader loader) {
+        try {
+            return runner.inPlaceReloader(loader).isPresent();
+        } catch (RuntimeException | LinkageError e) {
+            LOG.debug("The test runner {} failed to offer an in-place reloader", runner.id(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Patches a change of the class output into the last run's generation, when the runner keeps state built over it
+     * that can take the change, so that the next run uses that generation again; otherwise the next run gets a new one.
+     *
+     * @param changes The change
+     * @param before The resources the output held before it
+     */
+    private void patchOrRetire(ChangeSet changes, Set<String> before) {
+        ClassLoader lastLoader = runLoader;
+        InPlaceResourceReloader.Result result = null;
+        if (runLoaderCurrent && lastLoader != null && lastLoader == runtime.currentGeneration() && runtime.inPlaceUpdates().isPatchable(changes, before)) {
+            long start = System.nanoTime();
+            Optional<InPlaceResourceReloader> reloader;
+            try {
+                reloader = runner.inPlaceReloader(lastLoader);
+            } catch (RuntimeException | LinkageError e) {
+                LOG.debug("The test runner {} failed to offer an in-place reloader", runner.id(), e);
+                reloader = Optional.empty();
+            }
+            if (reloader.isPresent()) {
+                result = runtime.inPlaceUpdates().patchGeneration(changes, List.of(reloader.get()), "the tests run on a new generation");
+            }
+            if (result != null) {
+                LOG.info("Patched {} {} in place in {} ms: the tests run on generation {} again", result.count(), result.unit(),
+                    Duration.ofNanos(System.nanoTime() - start).toMillis(), runtime.generation());
+            }
+        }
+        if (result == null) {
+            runLoaderCurrent = false;
+        } else {
+            patchedSinceRun = true;
+        }
     }
 
     private void compilationFailed(CompileFailure failure, Map<SourceKind, DevRuntime.SourceChanges> sources, Map<SourceKind, DevRuntime.SourceChanges> testSources) {

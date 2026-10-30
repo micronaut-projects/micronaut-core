@@ -32,6 +32,7 @@ import io.micronaut.web.router.RouteLocator;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -183,7 +184,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         return pending(names.toString(), uri, get, (template, handler) -> {
             List<RouteSettings> routes = new ArrayList<>(declared.size());
             for (HttpMethod method : declared) {
-                routes.add(add(method.name(), method, template, handler.get()));
+                RouteSettings route = add(method.name(), method, template, handler.get());
+                if (declared.contains(HttpMethod.HEAD)) {
+                    route.declaresHead();
+                }
+                routes.add(route);
             }
             return routes;
         });
@@ -422,13 +427,16 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
             return;
         }
         StringJoiner routes = new StringJoiner(", ");
+        // the terminals of routes, of locator routes, or of both
+        Set<String> terminals = new LinkedHashSet<>(2);
         for (PendingRoute route : pending) {
             routes.add(route.description());
+            terminals.add(route.terminals());
         }
         boolean one = pending.size() == 1;
         pending.clear();
         throw new IllegalStateException((one ? "The route " : "The routes ") + routes
-            + (one ? " has no handler: end it" : " have no handler: end each") + " with handle, handleAsync or respond");
+            + (one ? " has no handler: end it" : " have no handler: end each") + " with " + String.join(", or ", terminals));
     }
 
     private static String beanName(Class<?> bean) {
@@ -471,6 +479,24 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         locate(prefixUri, new RouteLocator(locator, routesOf, assembly.locatedTables(), locatorGroupSettings()));
     }
 
+    @Override
+    public final LocatorSpec locator(String prefixUri) {
+        checkOpen();
+        Objects.requireNonNull(prefixUri, "prefixUri");
+        Class<?> bean = declaringBean;
+        // ended by the terminal of its body stage: a declaration without one fails the startup
+        PendingRoute declaration = new PendingRoute(this, handler -> List.of(),
+            "locator " + prefixUri + (bean == null ? "" : " declared by " + beanName(bean))).locator();
+        pending.add(declaration);
+        return new DefaultLocatorSpec(this, prefixUri, declaration, assembly.routeConditionContext(), DEFAULT_CONSUMES);
+    }
+
+    @Override
+    public final <T> void locateOn(String executorName, String prefixUri, LocatorHandler<? extends T> locator,
+                                   Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locateAsync(prefixUri, RouteLocator.onExecutor(assembly, executorName, locator), routesOf);
+    }
+
     /**
      * The media types and the executor of the groups of a locator route, which the routes it
      * locates inherit: they are given to the settings when the outermost group is closed, like
@@ -506,7 +532,10 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
                 if (method != HttpMethod.CUSTOM) {
                     // the routes of the target decide which media types they consume and produce, inheriting
                     // the ones of the groups; the located route carries the filters of the groups of the locator route
-                    grouped(assembly.addMountedRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
+                    RouteSettings settings = assembly.addMountedRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings();
+                    // the locator has its own HEAD route
+                    settings.declaresHead();
+                    grouped(settings).consumesAll();
                 }
             }
             // a request with a custom method is located too, and matched against the located

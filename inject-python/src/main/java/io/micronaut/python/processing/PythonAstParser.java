@@ -27,6 +27,10 @@ import io.micronaut.python.imports.PythonImportMappingException;
 import io.micronaut.python.imports.PythonImportMappings;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
+import io.micronaut.python.processing.staticcompile.Ir;
+import io.micronaut.python.processing.staticcompile.StaticCompilationConfiguration;
+import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
+import io.micronaut.python.processing.staticcompile.StaticDelegation;
 import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
 import io.micronaut.python.processing.util.PythonJavaTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
@@ -35,9 +39,12 @@ import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.model.DecoratorDef;
 import io.micronaut.python.processing.model.ScriptDef;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.PolyglotAccess;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.io.IOAccess;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.intellij.lang.annotations.Language;
@@ -60,6 +67,13 @@ import java.util.function.Supplier;
  */
 @Experimental
 public final class PythonAstParser {
+    /**
+     * A system property naming a file: when set, the Truffle CPU sampler profiles the Python side
+     * of the pipeline and writes a histogram of the Python functions to the file when the context
+     * closes. A development aid for the benchmarks; off otherwise, and ignored with a warning when
+     * the Truffle tools ({@code org.graalvm.polyglot:tools}) are not on the class path.
+     */
+    public static final String CPU_SAMPLER_PROPERTY = "micronaut.python.cpusampler";
 
     public static final String PYTHON = "python";
     public static final String INJECT_RESOURCES = "GRAALPY-VFS/io.micronaut/micronaut-inject-python";
@@ -93,16 +107,38 @@ public final class PythonAstParser {
      * name as well, for any library and not only {@code io.micronaut}.
      */
     private static final String JAVA_IO_PACKAGE_PREFIX = "io.";
+    // the caches the modules of one compilation share: made afresh per transform and per parse, since
+    // the class elements they hold belong to one javac task
+    private static final Source TRANSFORM_CACHES_SOURCE = Source.newBuilder(PYTHON, "_mn_transform_caches = {}", "micronaut-transform-caches.py").cached(true).buildLiteral();
+    private static final Source PROCESSOR_CACHES_SOURCE = Source.newBuilder(PYTHON, "_mn_processor_caches = {}", "micronaut-processor-caches.py").cached(true).buildLiteral();
+    private static final String VISITOR_CONTEXT_MEMBER = "visitor_context";
     private static final Source TYPE_CHECKER_SOURCE = Source.newBuilder(PYTHON, """
         if type_check_enabled:
             from micronaut_typecheck import TypeChecker
             type_checker = TypeChecker(type_check_mode, list(type_check_annotations))
         else:
             type_checker = None
+        if static_compile_enabled:
+            from micronaut_static import StaticPlanner
+            static_planner = StaticPlanner(static_compile_mode, list(static_compile_annotations), static_compile_strict)
+        else:
+            static_planner = None
         """, "micronaut-typecheck-init.py").cached(true).buildLiteral();
     private static final Source TYPE_CHECK_SOURCE = Source.newBuilder(PYTHON, """
         diagnostics = [] if type_checker is None else type_checker.check(visitor_context)
+        java_instance_alias_types = [] if type_checker is None else sorted(type_checker._java_alias_types)
         """, "micronaut-typecheck-driver.py").cached(true).buildLiteral();
+    private static final Source DELEGATION_SOURCE = Source.newBuilder(PYTHON, """
+        from micronaut_static import apply_delegation
+        delegated = apply_delegation(runtime_tree, list(delegation_targets))
+        """, "micronaut-static-delegation-driver.py").cached(true).buildLiteral();
+    private static final Source STATIC_PLAN_SOURCE = Source.newBuilder(PYTHON, """
+        static_decisions = [] if static_planner is None else static_planner.plan(type_checker, visitor_context)
+        static_bodies = [] if static_planner is None else list(static_planner.bodies)
+        static_diagnostics = [] if static_planner is None else list(static_planner.diagnostics)
+        static_scripts = [] if static_planner is None else list(static_planner.scripts)
+        """, "micronaut-static-plan-driver.py").cached(true).buildLiteral();
+    private final VirtualFileSystem fileSystem;
     private final Context context;
     private final Value runtimeAstCompiler;
     private PythonImportMappings importMappings;
@@ -125,7 +161,14 @@ public final class PythonAstParser {
         // suite, which creates hundreds of parsers in one JVM, ran out of heap on GraalVM CE.
         ClassLoader effectiveClassLoader = classLoader != null ? classLoader : PythonAstParser.class.getClassLoader();
         this.importMappings = PythonImportMappings.load(effectiveClassLoader);
-        this.context = buildTolerantly(effectiveClassLoader, incremental);
+        long started = PipelineTimings.start();
+        this.fileSystem = buildFileSystem();
+        try {
+            this.context = buildWithParserLoader(effectiveClassLoader, fileSystem, incremental);
+        } catch (RuntimeException e) {
+            closeFileSystem(fileSystem);
+            throw e;
+        }
         context.initialize(PYTHON);
         context.eval(COMPILE_RUNTIME_AST_SOURCE);
         Value bindings = context.getBindings(PYTHON);
@@ -136,6 +179,7 @@ public final class PythonAstParser {
                 || effectiveClassLoader.getResource(resource + "/__init__.py") != null;
         });
         runtimeAstCompiler = bindings.getMember("_mn_compile_runtime_ast");
+        PipelineTimings.stop(PipelineTimings.CONTEXT, started);
     }
 
     /**
@@ -166,15 +210,79 @@ public final class PythonAstParser {
         return context;
     }
 
-    private static Context.Builder newContextBuilder(ClassLoader classLoader) {
-        return GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+    /**
+     * Builds the file system of the parser with no context class loader on the calling thread. A file system that
+     * extracts files registers a JVM shutdown hook to delete them, a thread created here that would otherwise
+     * inherit the caller's context class loader, which during a compilation is the annotation processor loader,
+     * and keep it, every processor class and their static caches reachable until the JVM exits;
+     * {@link VirtualFileSystem#close()} deletes the files but leaves the hook.
+     *
+     * @return The file system
+     */
+    private static VirtualFileSystem buildFileSystem() {
+        Thread thread = Thread.currentThread();
+        ClassLoader previous = thread.getContextClassLoader();
+        thread.setContextClassLoader(null);
+        try {
+            return VirtualFileSystem.newBuilder()
                 .resourceDirectory(INJECT_RESOURCES)
                 .resourceLoadingClass(PythonAstParser.class)
-                .build())
+                .build();
+        } finally {
+            thread.setContextClassLoader(previous);
+        }
+    }
+
+    /**
+     * Builds the context with the parser's own loader as the context class loader. The first context of the JVM
+     * initializes the polyglot runtime, which registers JVM-wide shutdown hooks on this thread, and during a
+     * compilation the context class loader is the annotation processor loader of that compilation alone.
+     *
+     * @param classLoader The host class loader
+     * @param fileSystem The file system of the parser
+     * @param incremental Whether to tune the context for incremental processing
+     * @return The context
+     */
+    private static Context buildWithParserLoader(ClassLoader classLoader, VirtualFileSystem fileSystem, boolean incremental) {
+        Thread thread = Thread.currentThread();
+        ClassLoader previous = thread.getContextClassLoader();
+        thread.setContextClassLoader(PythonAstParser.class.getClassLoader());
+        try {
+            return buildTolerantly(classLoader, fileSystem, incremental);
+        } finally {
+            thread.setContextClassLoader(previous);
+        }
+    }
+
+    private static void closeFileSystem(VirtualFileSystem fileSystem) {
+        try {
+            fileSystem.close();
+        } catch (IOException e) {
+            // only the extracted files are left behind, and the shutdown hook deletes them
+        }
+    }
+
+    private static Context.Builder newContextBuilder(ClassLoader classLoader, VirtualFileSystem fileSystem) {
+        // The settings GraalPyResources.contextBuilder(vfs) applied before it was deprecated
+        Context.Builder builder = Context.newBuilder()
+            .allowExperimentalOptions(false)
+            .allowAllAccess(false)
+            .allowCreateThread(true)
+            .allowNativeAccess(true)
+            .allowPolyglotAccess(PolyglotAccess.ALL)
+            .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
+            .extendIO(IOAccess.NONE, io -> io.allowHostSocketAccess(true))
             // Future hardening should constrain host access to the required Micronaut API surface.
             .allowHostAccess(HostAccess.ALL)
             .hostClassLoader(classLoader)
             .allowHostClassLookup(name -> name.startsWith("io.micronaut"));
+        String samplerOutput = System.getProperty(CPU_SAMPLER_PROPERTY);
+        if (samplerOutput != null && !samplerOutput.isEmpty() && CpuSampler.AVAILABLE) {
+            builder.option("cpusampler", "true")
+                .option("cpusampler.Output", "histogram")
+                .option("cpusampler.OutputFile", samplerOutput);
+        }
+        return builder;
     }
 
     /**
@@ -184,10 +292,11 @@ public final class PythonAstParser {
      * @param contextBuilder The builder, already carrying the tuning options when incremental
      * @param incremental    Whether the tuning options were applied
      * @param classLoader    The host class loader, needed to rebuild from scratch
+     * @param fileSystem     The file system of the parser
      * @return The context
      */
-    private static Context buildTolerantly(ClassLoader classLoader, boolean incremental) {
-        Context.Builder contextBuilder = newContextBuilder(classLoader);
+    private static Context buildTolerantly(ClassLoader classLoader, VirtualFileSystem fileSystem, boolean incremental) {
+        Context.Builder contextBuilder = newContextBuilder(classLoader, fileSystem);
         if (incremental) {
             // Incremental processing is a short-lived workload. Tune GraalPy for startup latency
             // and avoid paying for a core-count-based compiler thread pool.
@@ -205,7 +314,7 @@ public final class PythonAstParser {
             if (!incremental) {
                 throw e;
             }
-            return newContextBuilder(classLoader).build();
+            return newContextBuilder(classLoader, fileSystem).build();
         }
     }
 
@@ -245,6 +354,7 @@ public final class PythonAstParser {
     }
 
     private PythonEnvironment parse(CharSequence sources, @Nullable Value tree, String packageName, VisitorContext visitorContext) {
+        context.eval(PROCESSOR_CACHES_SOURCE);
         Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
         Map<String, ClassDef> classes = new LinkedHashMap<>();
         Map<String, ScriptDef> scripts = new LinkedHashMap<>();
@@ -262,7 +372,7 @@ public final class PythonAstParser {
             }
             return o;
         });
-        initializeTypeChecker(null);
+        initializeTypeChecker(null, null);
         List<PythonDiagnostic> diagnostics = evaluateProcessor(bindings, sources, tree, packageName != null ? packageName : "", "Unknown", "Unknown", "", visitorContext);
         return new PythonEnvironment(
             classes,
@@ -294,7 +404,7 @@ public final class PythonAstParser {
         bindings.putMember("has_parsed_tree", tree != null);
         bindings.putMember("parsed_tree", tree != null ? tree : "");
         bindings.putMember("package_name", packageName);
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
         bindings.putMember("file_name", fileName);
         bindings.putMember("source_path", sourcePath);
         bindings.putMember("src_root", srcRoot);
@@ -354,7 +464,7 @@ public final class PythonAstParser {
      * @throws IllegalArgumentException When a source has an error, which the message renders
      */
     public PythonEnvironment parse(List<Source> sources, List<String> srcDirs, VisitorContext visitorContext) {
-        initializeTypeChecker(null);
+        initializeTypeChecker(null, null);
         return requireNoErrors(parseSources(sources.stream().map(source -> new ParsedSource(source, null)).toList(), srcDirs, visitorContext));
     }
 
@@ -390,25 +500,67 @@ public final class PythonAstParser {
                                               List<String> srcDirs,
                                               VisitorContext visitorContext,
                                               TypeCheckConfiguration typeCheck) {
+        return parseTransformed(transformed, srcDirs, visitorContext, typeCheck, StaticCompilationConfiguration.OFF);
+    }
+
+    /**
+     * Parse the transformed sources located within the given source directories, collecting the
+     * definitions for the type checker and the static compilation planner as configured. The check
+     * runs once every source is modelled, see {@link #typeCheck(VisitorContext)}, and the plan after
+     * it, see {@link #staticPlan(VisitorContext)}.
+     *
+     * @param transformed       The transformed sources, as returned by this parser
+     * @param srcDirs           The source directories
+     * @param visitorContext    The visitor context for constant resolution
+     * @param typeCheck         The type checking requested for the compilation
+     * @param staticCompilation The static compilation requested for the compilation
+     * @return The parsed environment
+     * @since 5.3.0
+     */
+    public PythonEnvironment parseTransformed(List<TransformResult> transformed,
+                                              List<String> srcDirs,
+                                              VisitorContext visitorContext,
+                                              TypeCheckConfiguration typeCheck,
+                                              StaticCompilationConfiguration staticCompilation) {
+        long started = PipelineTimings.start();
+        try {
+            return parseTransformedTimed(transformed, srcDirs, visitorContext, typeCheck, staticCompilation);
+        } finally {
+            PipelineTimings.stop(PipelineTimings.PARSE, started);
+        }
+    }
+
+    private PythonEnvironment parseTransformedTimed(List<TransformResult> transformed,
+                                                    List<String> srcDirs,
+                                                    VisitorContext visitorContext,
+                                                    TypeCheckConfiguration typeCheck,
+                                                    StaticCompilationConfiguration staticCompilation) {
         List<ParsedSource> sources = new ArrayList<>(transformed.size());
         List<Source> originals = new ArrayList<>(transformed.size());
         for (TransformResult result : transformed) {
             sources.add(new ParsedSource(result.originalSource(), artifacts(result).tree()));
             originals.add(result.originalSource());
         }
-        initializeTypeChecker(typeCheck.isEnabledFor(originals) ? typeCheck : null);
+        // the planner decides over the checker's records, so compiling anything needs the checker
+        boolean planning = staticCompilation.isEnabledFor(originals);
+        boolean checking = planning || typeCheck.isEnabledFor(originals);
+        initializeTypeChecker(checking ? typeCheck : null, planning ? staticCompilation : null);
         return parseSources(sources, srcDirs, visitorContext);
     }
 
     /**
-     * Creates the type checker the processor hands its definitions to, or removes it when nothing
-     * is checked so an unchecked compilation costs nothing.
+     * Creates the type checker the processor hands its definitions to and the planner deciding over
+     * them, or removes them when nothing is checked or compiled so such a compilation costs nothing.
      */
-    private void initializeTypeChecker(@Nullable TypeCheckConfiguration typeCheck) {
+    private void initializeTypeChecker(@Nullable TypeCheckConfiguration typeCheck, @Nullable StaticCompilationConfiguration staticCompilation) {
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("type_check_enabled", typeCheck != null);
         bindings.putMember("type_check_mode", typeCheck != null ? typeCheck.mode().optionValue() : "off");
         bindings.putMember("type_check_annotations", typeCheck != null ? typeCheck.annotationNames().toArray(String[]::new) : new String[0]);
+        bindings.putMember("static_compile_enabled", staticCompilation != null);
+        bindings.putMember("static_compile_mode", staticCompilation != null ? staticCompilation.mode().optionValue() : "off");
+        bindings.putMember("static_compile_strict", staticCompilation != null && staticCompilation.strict());
+        bindings.putMember("static_compile_annotations", staticCompilation != null ? staticCompilation.annotationNames().toArray(String[]::new) : new String[0]);
         context.eval(TYPE_CHECKER_SOURCE);
     }
 
@@ -428,10 +580,69 @@ public final class PythonAstParser {
         if (checker == null || checker.isNull()) {
             return List.of();
         }
-        bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
+        long started = PipelineTimings.start();
         context.eval(TYPE_CHECK_SOURCE);
+        PipelineTimings.stop(PipelineTimings.TYPE_CHECK, started);
         Value diagnostics = bindings.getMember("diagnostics");
         return diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class));
+    }
+
+    /**
+     * Runs the static compilation planner over the definitions collected by the last
+     * {@link #parseTransformed(List, List, VisitorContext, TypeCheckConfiguration, StaticCompilationConfiguration)},
+     * after {@link #typeCheck(VisitorContext)}, whose inference the planner decides on.
+     *
+     * @param visitorContext The visitor context resolving the Java and Python classes of the compilation
+     * @return The plan: one decision per function, and the diagnostics for explicit switches not honoured
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    public StaticCompilationPlan staticPlan(VisitorContext visitorContext) {
+        Value bindings = context.getBindings(PYTHON);
+        Value planner = bindings.getMember("static_planner");
+        if (planner == null || planner.isNull()) {
+            return StaticCompilationPlan.EMPTY;
+        }
+        bindings.putMember(VISITOR_CONTEXT_MEMBER, visitorContext);
+        long started = PipelineTimings.start();
+        context.eval(STATIC_PLAN_SOURCE);
+        PipelineTimings.stop(PipelineTimings.PLAN, started);
+        Value decisions = bindings.getMember("static_decisions");
+        Value bodies = bindings.getMember("static_bodies");
+        Value diagnostics = bindings.getMember("static_diagnostics");
+        return new StaticCompilationPlan(
+            decisions == null ? List.of() : List.copyOf(decisions.as(List.class)),
+            bodies == null ? Map.of() : StaticCompilationPlan.byKey(List.copyOf(bodies.as(List.class))),
+            diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class))
+        );
+    }
+
+    /**
+     * The scripts the static plan adds: a module without a generated class of its own gets one for
+     * the plain functions it compiles into static methods. Valid after {@link #staticPlan(VisitorContext)}.
+     *
+     * @return The script definitions, in module order
+     */
+    public List<ScriptDef> staticScripts() {
+        Value scripts = context.getBindings(PYTHON).getMember("static_scripts");
+        if (scripts == null || scripts.isNull()) {
+            return List.of();
+        }
+        List<ScriptDef> result = new ArrayList<>();
+        for (long i = 0; i < scripts.getArraySize(); i++) {
+            result.add(scripts.getArrayElement(i).as(ScriptDef.class));
+        }
+        return result;
+    }
+
+    /** The Java receiver types whose aliases the checker accepted, including deeper call chains. */
+    @SuppressWarnings("unchecked")
+    List<String> javaInstanceAliasTypes() {
+        Value bindings = context.getBindings(PYTHON);
+        Value checker = bindings.getMember("type_checker");
+        Value types = bindings.getMember("java_instance_alias_types");
+        return checker == null || checker.isNull() || types == null ? List.of() : List.copyOf(types.as(List.class));
     }
 
     private TransformArtifacts artifacts(TransformResult transformResult) {
@@ -443,6 +654,7 @@ public final class PythonAstParser {
     }
 
     private PythonEnvironment parseSources(List<ParsedSource> sources, List<String> srcDirs, VisitorContext visitorContext) {
+        context.eval(PROCESSOR_CACHES_SOURCE);
         Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
         Map<String, ClassDef> classes = new LinkedHashMap<>();
         Map<String, ScriptDef> scripts = new LinkedHashMap<>();
@@ -557,6 +769,9 @@ public final class PythonAstParser {
     }
 
     static boolean isWithinSourceDir(String srcDir, String path) {
+        if (srcDir == null || path == null) {
+            return false;
+        }
         String normalizedSrcDir = normalizePath(srcDir);
         String normalizedPath = normalizePath(path);
         return normalizedPath.startsWith(normalizedSrcDir) || normalizedPath.startsWith("/private" + normalizedSrcDir);
@@ -659,6 +874,7 @@ public final class PythonAstParser {
     public @NotNull List<TransformResult> transform(VisitorContext visitorContext, List<String> srcDirs, Source... pythonSource) {
         transformArtifacts.clear();
         Value bindings = context.getBindings(PYTHON);
+        context.eval(TRANSFORM_CACHES_SOURCE);
         bindings.putMember("python_source_dirs", srcDirs.toArray(String[]::new));
         Map<String, ClassElement> classElementCache = new LinkedHashMap<>();
         Set<String> missingClassElements = new java.util.HashSet<>();
@@ -730,12 +946,17 @@ public final class PythonAstParser {
             bindings.putMember("package_name", sourceRoot.isEmpty() ? "" : getPackageNameOfSource(sourceRoot, source));
 
             Value result;
+            long started = PipelineTimings.start();
             try {
                 result = context.eval(TRANSFORM_SOURCE);
             } catch (Exception e) {
                 StringWriter stack = new StringWriter();
-                e.printStackTrace(new PrintWriter(stack));
+                try (PrintWriter writer = new PrintWriter(stack)) {
+                    e.printStackTrace(writer);
+                }
                 throw new ProcessingException(null, "Error processing Python source [" + source.getName() + "]: " + e.getMessage() + System.lineSeparator() + stack, e);
+            } finally {
+                PipelineTimings.stop(PipelineTimings.TRANSFORM, started);
             }
             Map map = result.as(Map.class);
             // The transformed source is only read by tests and error reports; the processor visits the
@@ -775,6 +996,59 @@ public final class PythonAstParser {
             );
         }
         return results;
+    }
+
+    /**
+     * Rewrites the compiled functions of the runtime tree of a source to delegate to their Java
+     * bodies when the Python object is bound to its stub, keeping the original body as the
+     * fallback for objects created in Python, and for the calls whose Python result the Java body
+     * would not give (see {@link StaticDelegation}). Only the bodies declared in this source are
+     * delegated to: a body without a location is not, since nothing ties it to a source. A
+     * rewritten tree needs runtime bytecode.
+     *
+     * @param transformResult The transformed source
+     * @param plan            The static compilation plan
+     * @return How many functions were rewritten
+     * @since 5.3.0
+     */
+    public int applyStaticDelegation(TransformResult transformResult, StaticCompilationPlan plan) {
+        TransformArtifacts artifacts = artifacts(transformResult);
+        String sourcePath = sourcePathOf(transformResult.originalSource());
+        List<String> targets = new ArrayList<>();
+        for (Ir.CompiledBody body : plan.bodies().values()) {
+            String target = delegationTarget(body, sourcePath);
+            if (target != null) {
+                targets.add(target);
+            }
+        }
+        if (targets.isEmpty()) {
+            return 0;
+        }
+        Value bindings = context.getBindings(PYTHON);
+        bindings.putMember("runtime_tree", artifacts.runtimeTree());
+        bindings.putMember("delegation_targets", targets.toArray(String[]::new));
+        context.eval(DELEGATION_SOURCE);
+        Value delegated = bindings.getMember("delegated");
+        int count = delegated == null ? 0 : delegated.asInt();
+        if (count > 0 && !artifacts.runtimeRequired()) {
+            transformArtifacts.put(transformResult, new TransformArtifacts(artifacts.tree(), artifacts.runtimeTree(), true));
+        }
+        return count;
+    }
+
+    /**
+     * The delegation target of a compiled body declared in the source, with the conversion of the
+     * collection it returns for a Python caller, or null when Python callers keep the Python body.
+     */
+    private static @Nullable String delegationTarget(Ir.CompiledBody body, String sourcePath) {
+        // the bodies declared in this source: a class of the same simple name in another source has its own
+        if (body.span() == null || !body.span().path().equals(sourcePath)) {
+            return null;
+        }
+        String target = StaticDelegation.target(body);
+        // a collection the Java body builds becomes a Python one for a Python caller
+        String conversion = target == null ? null : StaticDelegation.returnConversion(body);
+        return conversion == null ? null : target + conversion;
     }
 
     PythonBytecodeCompiler.Result compileRuntimeBytecode(TransformResult transformResult,
@@ -821,7 +1095,7 @@ public final class PythonAstParser {
             tree = parsed_tree if has_parsed_tree else ast.parse(src)
             visitor = MicronautAstVisitor(
                 callback, package_name, file_name, visitor_context, src_root,
-                source_path=source_path, source_text=src, type_checker=type_checker
+                source_path=source_path, source_text=src, type_checker=type_checker, caches=_mn_processor_caches
             )
             visitor.visit(tree)
             diagnostics = visitor.diagnostics
@@ -844,6 +1118,7 @@ public final class PythonAstParser {
             transformer = MicronautTransformer(
                 callback_get_class_element, callback_get_class_elements, False, package_name, source_root,
                 python_source_dirs=python_source_dirs, source_path=source_path, source_text=src,
+                caches=_mn_transform_caches,
                 callback_is_dependency_python_module=callback_is_dependency_python_module
             )
             transformed_tree = transformer.visit(tree)
@@ -912,7 +1187,11 @@ public final class PythonAstParser {
 
     public void close() {
         transformArtifacts.clear();
-        this.context.close();
+        try {
+            this.context.close();
+        } finally {
+            closeFileSystem(fileSystem);
+        }
     }
 
     /**
@@ -1097,6 +1376,28 @@ public final class PythonAstParser {
             } catch (IOException e) {
                 throw new ProcessingException(null, "Unable to create transformed source for " + originalSource, e);
             }
+        }
+    }
+
+    /**
+     * Whether the Truffle CPU sampler can be enabled: its options are unknown to a context built
+     * without the Truffle tools on the class path, which would fail the compilation. Asked once,
+     * and only when {@link #CPU_SAMPLER_PROPERTY} is set.
+     */
+    private static final class CpuSampler {
+        static final boolean AVAILABLE = isAvailable();
+
+        private static boolean isAvailable() {
+            boolean available;
+            try (Engine engine = Engine.newBuilder().option("engine.WarnInterpreterOnly", "false").build()) {
+                available = engine.getInstruments().containsKey("cpusampler");
+            }
+            if (!available) {
+                System.getLogger(PythonAstParser.class.getName()).log(System.Logger.Level.WARNING,
+                    "The system property " + CPU_SAMPLER_PROPERTY + " is ignored: the Truffle CPU sampler "
+                        + "(org.graalvm.polyglot:tools) is not on the class path");
+            }
+            return available;
         }
     }
 }

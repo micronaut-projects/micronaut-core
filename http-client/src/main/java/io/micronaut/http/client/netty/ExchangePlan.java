@@ -107,7 +107,7 @@ record ExchangePlan(
             // connection fails, so it is never sent again
             allowRetry && !expectContinue,
             request.getAttribute(NettyHttpClient.ALLOW_UPGRADE).isPresent() ? joinedValues(nettyRequest.headers(), HttpHeaderNames.UPGRADE) : null,
-            request.getAttribute(NettyHttpClient.NO_DECOMPRESSION).isPresent(),
+            request.getAttribute(AbstractHttpClient.NO_DECOMPRESSION).isPresent(),
             request.getAttribute(NettyHttpClient.UPLOAD_LISTENER, NettyHttpClient.UploadListener.class).orElse(null),
             AbstractHttpClient.readTimeoutOverride(request),
             request.getAttribute(NettyHttpClient.ACTIVITY_TIMEOUT, Duration.class).orElse(null)

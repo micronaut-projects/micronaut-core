@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.convert;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
@@ -76,6 +77,34 @@ public interface ConversionService {
      * @return True if it can be converted
      */
     <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType);
+
+    /**
+     * Resolves the converter of values of the source type to the argument once, for a call site that
+     * converts to the same argument repeatedly, such as an argument binder. The converter converts as
+     * {@link #convert(Object, ArgumentConversionContext)} does with a context of the argument, or
+     * {@link #convert(Object, Class, ConversionContext)} with another context, including with the converters
+     * added later, without looking up the converter for every value. It is meant to be called with the type
+     * of the argument and a context with its annotation metadata: another target type or annotation metadata
+     * is converted by this service as is.
+     *
+     * @param sourceType The type of the values the converter is used for
+     * @param argument   The target argument
+     * @param <S>        The source type
+     * @param <T>        The target type
+     * @return The converter
+     * @since 5.3.0
+     */
+    @Experimental
+    @SuppressWarnings("unchecked")
+    default <S, T> TypeConverter<S, T> resolveConverter(Class<S> sourceType, Argument<T> argument) {
+        return (value, targetType, context) -> {
+            if (context instanceof ArgumentConversionContext<?> argumentContext && argumentContext.getArgument().getType() == targetType) {
+                // converted as a call site with the context of the argument converts it
+                return convert(value, (ArgumentConversionContext<T>) argumentContext);
+            }
+            return convert(value, targetType, context);
+        };
+    }
 
     /**
      * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned.

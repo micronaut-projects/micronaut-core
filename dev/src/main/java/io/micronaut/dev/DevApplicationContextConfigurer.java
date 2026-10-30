@@ -80,7 +80,7 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
         }
         runtime.contextCreated(applicationContext);
         DirectoryWatcher watcher = runtime.fileWatcher();
-        if (watcher != null) {
+        if (watcher != null && runtime.manifest().mode() != DevMode.TEST) {
             // the context's own watch thread is off: modules register with the engine's one watcher instead, through a
             // view that closes their registrations when this context stops
             applicationContext.registerSingleton(FileWatcher.class, new DevFileWatcher(watcher, runtime.pinnedWatches(), DevFileWatcher.runtimeTrees(runtime), applicationContext.getClassLoader()));

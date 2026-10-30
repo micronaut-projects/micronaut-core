@@ -20,6 +20,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Optional;
+
 /**
  * Resolves dependencies owned by the bean into which this resolver is injected.
  *
@@ -33,10 +35,11 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Once destruction of the consumer begins, only its own destruction callbacks, such as a {@code @PreDestroy}
  * method, may still look up, on the destroying thread and until they return; what they create is destroyed with
- * the consumer, after them. Once context shutdown begins, lookups are only accepted on the thread running the
- * shutdown, where they are made on behalf of a {@link io.micronaut.context.event.ShutdownEvent} listener or a
- * destruction callback; what they create is destroyed before the shutdown completes, with its owner or after it.
- * Any other lookup is rejected.</p>
+ * the consumer, after them. Once context shutdown begins, lookups are accepted while the shutdown runs its callbacks,
+ * the {@link io.micronaut.context.event.ShutdownEvent} listeners and the destruction callbacks, on any thread, so
+ * that work a callback starts and waits for on another thread can still resolve; what they create is destroyed
+ * before the shutdown completes, with its owner or after it. Once the last callback has returned, lookups are
+ * rejected.</p>
  *
  * <p>Obtain this resolver by injection into a managed bean. It is not available as a standalone context lookup.
  * It does not retain a construction path and must not be used to resolve the consumer recursively while it is
@@ -73,8 +76,8 @@ public interface BeanDependencyResolver {
      * @param qualifier The qualifier, or {@code null}
      * @param <T> The bean type
      * @return The dependency
-     * @throws IllegalStateException if destruction or context shutdown has begun and the lookup is not made on behalf
-     * of a destruction callback or a shutdown event listener
+     * @throws IllegalStateException if destruction of the consumer has begun and the lookup is not made by its
+     * destruction callbacks, or the callbacks of the context shutdown have completed
      */
     <T> T getBean(Argument<T> type, @Nullable Qualifier<T> qualifier);
 
@@ -189,7 +192,32 @@ public interface BeanDependencyResolver {
     boolean destroy(BeanRegistration<?> registration);
 
     /**
-     * Creates a child group. The consumer closes it automatically, but the caller may close it earlier.
+     * Finds the registration of a bean this resolver created and still holds, as one of its registration lookups
+     * returned it, so that a caller holding only the bean can {@link #destroy(BeanRegistration) destroy} it early.
+     * Bean identity, rather than equality, selects the registration. A shared bean, a bean created by another resolver
+     * or group, including a child group of this one, and a bean already destroyed or released by closing are not
+     * found. A registration whose bean is {@code null} cannot be found by its bean: a {@code null} bean finds nothing.
+     * @param bean The bean instance
+     * @param <T> The bean type
+     * @return The registration, or empty when this resolver does not hold the bean
+     * @since 5.3.0
+     */
+    <T> Optional<BeanRegistration<T>> findRegistration(@Nullable T bean);
+
+    /**
+     * Returns whether this resolver created and still holds the given bean, by identity, see
+     * {@link #findRegistration(Object)}.
+     * @param bean The bean instance
+     * @return Whether this resolver holds the bean; false for {@code null}
+     * @since 5.3.0
+     */
+    default boolean owns(@Nullable Object bean) {
+        return findRegistration(bean).isPresent();
+    }
+
+    /**
+     * Creates a child group. The consumer closes it automatically, but the caller may close it earlier; closing it
+     * detaches it from the consumer, which then no longer retains it.
      * @return The child group
      */
     BeanDependencyGroup createGroup();

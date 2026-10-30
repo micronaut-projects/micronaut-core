@@ -52,6 +52,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 
@@ -89,11 +90,20 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             spec.loader.exec_module(module)
         """, "micronaut-load-vfs-module.py").cached(true).buildLiteral();
     /**
+     * Registers the interop types of the Java imports manifests in a context whose bootstrap made no Java import
+     * (see {@code micronaut_java_imports}).
+     */
+    private static final Source REGISTER_INTEROP_TYPES_SOURCE = Source.newBuilder(PYTHON,
+        "__import__('micronaut_java_imports').__micronaut_register_interop_types()", "micronaut-register-interop-types.py")
+        .cached(true).buildLiteral();
+    /**
      * Python code that completes the members of every Java object with what GraalPy host interop does not
      * resolve: the trailing-underscore aliases of members named after a Python keyword
      * ({@code builder.from_(...)} for {@code Builder.from(...)}, {@code spec.and_(other)} for
-     * {@code Specification.and(other)}), and the public methods a class inherits from a non-public
-     * superclass (see {@link PythonHostMembers}).
+     * {@code Specification.and(other)}), the public methods a class inherits from a non-public
+     * superclass (see {@link PythonHostMembers}), and the snake_case methods and read-only getter
+     * properties the compiler computed for the Java types the sources reference
+     * ({@code request.basic_auth(...)}, {@code server.port}).
      * <p>
      * The compiler rewrites keyword aliases only on names it can resolve statically (imported Java
      * classes and {@code java.type(...)} aliases). Objects that Java returns at runtime are plain GraalPy
@@ -101,7 +111,11 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * {@code polyglot.register_interop_type} for {@code java.lang.Object} enters the type of every host
      * object instance and its {@code __getattr__} runs only after the regular foreign member lookup has
      * failed, retrying with the underscore stripped (the rule the compiler applies, {@code keyword.iskeyword},
-     * so the same spelling works everywhere) and then asking the runtime for an inherited member.
+     * so the same spelling works everywhere), then asking the runtime for an inherited member, then for
+     * the snake_case method or getter property the compiler recorded for the object's class or one of its
+     * supertypes ({@link PythonJavaInstanceMembers}). The names are read once per class loader and shared
+     * by all contexts, no Java member is inspected at run time, and a real member of the object always
+     * comes first.
      * <p>
      * It makes every {@link Exception} an instance of the Python {@code Exception} class, so that
      * {@code except Exception} catches the exceptions of Java calls ({@link Error}s remain only a
@@ -111,7 +125,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * awaitable, whichever Java call returned it (see {@link PythonAsyncioRuntime#awaitJava}).
      */
     private static final Source JAVA_OBJECT_MEMBERS_SOURCE = Source.newBuilder(PYTHON, """
-        def __micronaut_register_java_object_members():
+        def __micronaut_register_java_object_members(instance_members):
             import keyword
             import java
             from polyglot import register_interop_type
@@ -130,6 +144,12 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                         member = host_members.inheritedMember(self, name)
                         if member is not None:
                             return member
+                        alias = instance_members.methodAlias(self, name)
+                        if alias is not None:
+                            return getattr(self, alias)
+                        getter = instance_members.propertyGetter(self, name)
+                        if getter is not None:
+                            return getattr(self, getter)()
                     raise AttributeError(f"foreign object has no attribute '{name}'")
 
             register_interop_type(java.type('java.lang.Object'), MicronautJavaObject)
@@ -158,8 +178,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 except (KeyError, ImportError, TypeError):
                     pass  # absent, or excluded by graalpy.context.host-class-lookup
 
-        __micronaut_register_java_object_members()
-        del __micronaut_register_java_object_members
+        # the value of the source: the function, no longer bound in __main__
+        globals().pop('__micronaut_register_java_object_members')
         """, "micronaut-java-object-members.py").cached(true).buildLiteral();
     /**
      * Installs the Python view of the generated Java wrappers ({@link ValueCoercible}). A wrapper a
@@ -242,12 +262,14 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     /**
      * Complete the members of the Java objects of a context: keyword-safe aliases, inherited public
-     * methods, {@code await} on stages and publishers, and Java exceptions caught by {@code except Exception}.
+     * methods, snake_case methods and getter properties, {@code await} on stages and publishers, and Java
+     * exceptions caught by {@code except Exception}.
      *
      * @param context The context
+     * @param classLoader The class loader of the application, whose compilations recorded the names
      */
-    static void registerJavaObjectMembers(Context context) {
-        context.eval(JAVA_OBJECT_MEMBERS_SOURCE);
+    static void registerJavaObjectMembers(Context context, ClassLoader classLoader) {
+        context.eval(JAVA_OBJECT_MEMBERS_SOURCE).executeVoid(PythonJavaInstanceMembers.of(classLoader));
     }
 
     /**
@@ -364,6 +386,48 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         }
     }
 
+    private static void closeQuietly(VirtualFileSystem fileSystem) {
+        try {
+            fileSystem.close();
+        } catch (IOException | RuntimeException e) {
+            LOG.debug("Failed to close the file system of a context that was not built", e);
+        }
+    }
+
+    /**
+     * Builds a virtual file system with no context class loader on the calling thread. A file system that
+     * extracts files registers a JVM shutdown hook to delete them, a thread created here that would otherwise
+     * inherit the caller's context class loader, the application's, and keep it and every class it defined
+     * reachable until the JVM exits; {@link VirtualFileSystem#close()} deletes the files but leaves the hook.
+     *
+     * @param builder The configured builder
+     * @return The file system
+     */
+    static VirtualFileSystem buildVirtualFileSystem(VirtualFileSystem.Builder builder) {
+        return withContextClassLoader(null, builder::build);
+    }
+
+    /**
+     * Runs an action with the given context class loader on the calling thread. GraalVM and GraalPy create
+     * threads that live as long as the JVM, such as shutdown hooks, on the thread that first needs them, and
+     * a thread inherits the context class loader of the thread that created it.
+     *
+     * @param classLoader The context class loader for the action
+     * @param action The action
+     * @param <T> The result type
+     * @return The result of the action
+     */
+    static <T> T withContextClassLoader(@Nullable ClassLoader classLoader, Supplier<T> action) {
+        Thread thread = Thread.currentThread();
+        ClassLoader previous = thread.getContextClassLoader();
+        thread.setContextClassLoader(classLoader);
+        try {
+            return action.get();
+        } finally {
+            thread.setContextClassLoader(previous);
+        }
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     static HostAccess bootstrapHostAccess(ClassLoader classLoader) {
         List<TargetTypeMapping<?>> mappings = (List) SoftServiceLoader.load(TargetTypeMapping.class, classLoader).collectAll();
@@ -391,16 +455,16 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         long now = System.currentTimeMillis();
 
 
-        VirtualFileSystem vfs = VirtualFileSystem.newBuilder()
+        VirtualFileSystem fileSystem = buildVirtualFileSystem(VirtualFileSystem.newBuilder()
             .resourceDirectory(APPLICATION_PATH)
-            .resourceClassLoader(classLoader).build();
+            .resourceClassLoader(classLoader));
         // the engine must not close under a context it does not know of yet, such as one a pool
         // warm-up builds while the application shuts down
         PythonContextRegistry.beginContextBuild(engine);
         Context context;
         try {
             Context.Builder builder = contextConfiguration.getBuilder()
-                .apply(GraalPyResources.forVirtualFileSystem(vfs))
+                .apply(GraalPyResources.forVirtualFileSystem(fileSystem))
                 .logHandler(new GraalPySlf4jLogHandler())
                 .allowExperimentalOptions(true)
                 .allowCreateProcess(true)
@@ -428,8 +492,13 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             LOG.debug("Configured GraalPy Context.Builder in {}ms", System.currentTimeMillis() - now);
 
             now = System.currentTimeMillis();
-            context = builder.build();
-            PythonContextRegistry.registerContext(context);
+            try {
+                context = builder.build();
+            } catch (RuntimeException e) {
+                closeQuietly(fileSystem);
+                throw e;
+            }
+            PythonContextRegistry.registerContext(context, fileSystem);
         } finally {
             PythonContextRegistry.endContextBuild(engine);
         }
@@ -450,7 +519,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             // the public methods GraalPy does not expose because a non-public superclass declares them, and
             // their exceptions to `except Exception`
             now = System.currentTimeMillis();
-            registerJavaObjectMembers(context);
+            registerJavaObjectMembers(context, classLoader);
             LOG.debug("GraalPy Java object members registered in {}ms", System.currentTimeMillis() - now);
             // Before the application modules import: the Java packages, types and annotations they import
             // are served by the finder of the runtime module, from the manifests the compiler wrote
@@ -459,17 +528,20 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             LOG.debug("GraalPy Java import finder installed in {}ms", System.currentTimeMillis() - now);
             // Try to load the generated pyronaut_application.py from META-INF
             now = System.currentTimeMillis();
-            evaluateMain(classLoader, INTERNAL_MAIN, context, vfs);
-            evaluateMain(classLoader, applicationMain, context, vfs);
+            evaluateMain(classLoader, INTERNAL_MAIN, context, fileSystem);
+            evaluateMain(classLoader, applicationMain, context, fileSystem);
             LOG.debug("GraalPy main.py evaluated in {}ms", System.currentTimeMillis() - now);
+            // the dataclass wrappers the manifests record are registered by the first Java import, which
+            // sources declaring only dataclasses may not make
+            context.eval(REGISTER_INTEROP_TYPES_SOURCE);
             bootstrapped = true;
             return context;
         } finally {
             if (!bootstrapped) {
-                // a context that failed to bootstrap has no bean to destroy it: unregister and close it
-                // here; the bootstrap failure propagates whatever the close does
-                PythonContextRegistry.unregisterContext(context);
+                // a context that failed to bootstrap has no bean to destroy it: close and unregister it
+                // here, which closes its file system too; the bootstrap failure propagates whatever the close does
                 closeQuietly(context);
+                PythonContextRegistry.unregisterContext(context);
             }
         }
     }

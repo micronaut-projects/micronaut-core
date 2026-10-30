@@ -111,7 +111,7 @@ class RequestPredicatesTest {
 
     @Test
     void theConditionsSelectAHandlerRoute() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder routes = new DefaultHttpRouteBuilder(assembly);
         routes.GET("/reports")
             .where(accept(MediaType.TEXT_CSV_TYPE).and(header("X-Export")))

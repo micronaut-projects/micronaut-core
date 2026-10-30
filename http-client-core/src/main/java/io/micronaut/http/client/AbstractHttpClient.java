@@ -71,6 +71,7 @@ import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
+import io.micronaut.http.client.sse.EventStreamState;
 import io.micronaut.http.client.sse.EventStreams;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecException;
@@ -923,6 +924,8 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirect.setAttribute(NO_DECOMPRESSION, noDecompression));
         request.getAttribute(READ_IDLE_TIMEOUT).ifPresent(timeout -> redirect.setAttribute(READ_IDLE_TIMEOUT, timeout));
         request.getAttribute(TIMEOUTS).ifPresent(timeouts -> redirect.setAttribute(TIMEOUTS, timeouts));
+        // the state of an event stream follows the redirected stream
+        request.getAttribute(EventStreamState.ATTRIBUTE).ifPresent(state -> redirect.setAttribute(EventStreamState.ATTRIBUTE, state));
     }
 
     private void setRedirectHeaders(@Nullable HttpRequest<?> request,
@@ -1339,7 +1342,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     private <B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, Argument<B> eventType, Argument<?> errorType) {
         EventStreams.acceptEvents(request);
         return exchangeElementsFlow(propagatedContext, request, errorType, true,
-            (req, response) -> EventStreams.response(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate));
+            (req, response) -> EventStreams.response(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate, EventStreams.state(req)));
     }
 
     /**
@@ -1664,7 +1667,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         return afterSubscribe(() -> {
             PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
             return toMono(exchangeElementsFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType, shouldBufferErrorBody(errorType),
-                (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate)), propagatedContext)
+                (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate, EventStreams.state(req))), propagatedContext)
                 .onErrorMap(t -> t instanceof HttpClientException ? t : decorate(new HttpClientException("Error consuming Server Sent Events: " + t.getMessage(), t)))
                 .flatMapMany(AbstractHttpClient::elements);
         });

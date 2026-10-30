@@ -15,6 +15,8 @@
  */
 package io.micronaut.dev.test;
 
+import io.micronaut.dev.compile.SourceKind;
+import io.micronaut.dev.compile.SourceRoot;
 import org.jspecify.annotations.Nullable;
 import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.FilterResult;
@@ -34,6 +36,8 @@ import org.junit.platform.launcher.TestPlan;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -62,6 +66,8 @@ final class JUnitPlatformExecution {
     private static final String STDOUT_KEY = "stdout";
     private static final String STDERR_KEY = "stderr";
     private static final String CLASS_ERROR = "initializationError";
+    // the languages whose tests are classes of the test class output, which the class path roots select
+    private static final Set<SourceKind> JVM_KINDS = Set.of(SourceKind.JAVA, SourceKind.KOTLIN, SourceKind.GROOVY);
 
     private final TestRunRequest request;
     private final TestEventListener listener;
@@ -127,8 +133,23 @@ final class JUnitPlatformExecution {
         List<DiscoverySelector> selectors = new ArrayList<>();
         if (selection.everything()) {
             selectors.addAll(DiscoverySelectors.selectClasspathRoots(new LinkedHashSet<>(request.testClassOutputs())));
+            // the tests an engine discovers from their source files, as pytest's, are in no class output
+            for (SourceRoot root : request.testSources()) {
+                if (!JVM_KINDS.contains(root.kind()) && Files.isDirectory(root.path())) {
+                    selectors.add(DiscoverySelectors.selectDirectory(root.path().toFile()));
+                }
+            }
         } else {
             for (String className : selection.classes()) {
+                // a test without a class, as a pytest function, is grouped under its file: the file is selected
+                if (isFileName(className)) {
+                    // a file that is gone runs nothing: the run, complete, clears its results
+                    Path file = sourceFile(className);
+                    if (file != null) {
+                        selectors.add(DiscoverySelectors.selectFile(file.toFile()));
+                    }
+                    continue;
+                }
                 Class<?> type = load(className);
                 if (type != null) {
                     selectors.add(DiscoverySelectors.selectClass(type));
@@ -158,6 +179,68 @@ final class JUnitPlatformExecution {
         parameters.putAll(request.parameters());
         builder.configurationParameters(parameters);
         return builder.build();
+    }
+
+    /**
+     * Whether a name of results is a file's rather than a class's: a binary name holds no separator and does not
+     * end with a source file's extension.
+     */
+    private boolean isFileName(String name) {
+        if (name.contains("/") || name.contains("\\")) {
+            return true;
+        }
+        for (SourceRoot root : request.testSources()) {
+            if (!JVM_KINDS.contains(root.kind())) {
+                for (String extension : root.kind().extensions()) {
+                    if (name.endsWith("." + extension)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The test source file a name of results stands for: a path to a file of a test source root of a language whose
+     * tests are discovered from their files, rather than a class name.
+     */
+    @Nullable
+    private Path sourceFile(String name) {
+        Path given;
+        try {
+            given = Path.of(name);
+        } catch (InvalidPathException e) {
+            return null;
+        }
+        for (SourceRoot root : request.testSources()) {
+            if (JVM_KINDS.contains(root.kind())) {
+                continue;
+            }
+            Path base = root.path().toAbsolutePath().normalize();
+            // relative to the root, to the directory holding it, or, for a file whose relative path another root holds
+            // too, to the directory the roots share, as a file's results are named
+            List<Path> candidates = new ArrayList<>();
+            if (given.isAbsolute()) {
+                candidates.add(given);
+            } else {
+                candidates.add(base.resolve(given));
+                if (base.getParent() != null) {
+                    candidates.add(base.getParent().resolve(given));
+                }
+                Path common = TestFileNames.base(request.testSources(), base, false);
+                if (common != null) {
+                    candidates.add(common.resolve(given));
+                }
+            }
+            for (Path candidate : candidates) {
+                Path file = candidate.normalize();
+                if (file.startsWith(base) && Files.isRegularFile(file)) {
+                    return file;
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -205,10 +288,10 @@ final class JUnitPlatformExecution {
             if (source.isPresent()) {
                 TestSource testSource = source.get();
                 if (testSource instanceof MethodSource method) {
-                    return method.getClassName();
+                    return fileOrClass(method.getClassName());
                 }
                 if (testSource instanceof ClassSource type) {
-                    return type.getClassName();
+                    return fileOrClass(type.getClassName());
                 }
                 if (testSource instanceof FileSource file) {
                     return relativeFile(file.getFile().toPath());
@@ -226,17 +309,77 @@ final class JUnitPlatformExecution {
     }
 
     /**
+     * A class name as it is, or, when an engine names a test's class by its file's absolute path, as pytest's does, that
+     * file relative to its test source root, as a test declared in a file is named.
+     */
+    private String fileOrClass(String className) {
+        // a binary name is never an absolute path, on any platform
+        try {
+            Path file = Path.of(className);
+            if (file.isAbsolute()) {
+                return relativeFile(file);
+            }
+        } catch (InvalidPathException e) {
+            // not a path: a class name
+        }
+        return className;
+    }
+
+    /**
      * A test file's path relative to the test source root that holds it, so reports read the same on every machine.
+     * When another test source root holds a file at the same relative path, as two Python roots each with a
+     * {@code test_app.py}, the name is prefixed with the root's path relative to the directory the roots share, so the
+     * two files' results do not merge under one name.
      */
     private String relativeFile(Path file) {
         Path absolute = file.toAbsolutePath().normalize();
         for (var root : request.testSources()) {
             Path rootPath = root.path().toAbsolutePath().normalize();
             if (absolute.startsWith(rootPath)) {
-                return rootPath.relativize(absolute).toString().replace('\\', '/');
+                return disambiguated(rootPath, rootPath.relativize(absolute), false);
+            }
+        }
+        // an engine may name the file by its real path, through the links the root's path goes through, as /var on macOS
+        Path real = realPath(absolute);
+        for (var root : request.testSources()) {
+            Path rootPath = realPath(root.path().toAbsolutePath().normalize());
+            if (real.startsWith(rootPath)) {
+                return disambiguated(rootPath, rootPath.relativize(real), true);
             }
         }
         return absolute.toString();
+    }
+
+    /**
+     * The relative name of a file of a root, or, when another root of a language whose tests are discovered from their
+     * files holds a file at the same relative path, that name under the root's path relative to the directory the
+     * roots share.
+     */
+    private String disambiguated(Path rootPath, Path relative, boolean real) {
+        String name = TestFileNames.slashed(relative);
+        boolean collides = false;
+        for (SourceRoot other : request.testSources()) {
+            if (!TestFileNames.isFileKind(other.kind())) {
+                continue;
+            }
+            Path otherPath = other.path().toAbsolutePath().normalize();
+            if (real) {
+                otherPath = TestFileNames.realPath(otherPath);
+            }
+            if (!otherPath.equals(rootPath) && Files.isRegularFile(otherPath.resolve(relative.toString()))) {
+                collides = true;
+                break;
+            }
+        }
+        if (!collides) {
+            return name;
+        }
+        Path base = TestFileNames.base(request.testSources(), rootPath, real);
+        return (base == null ? TestFileNames.slashed(rootPath) : TestFileNames.slashed(base.relativize(rootPath))) + "/" + name;
+    }
+
+    private static Path realPath(Path path) {
+        return TestFileNames.realPath(path);
     }
 
     private static TestOutcome outcome(TestExecutionResult result, Duration duration) {

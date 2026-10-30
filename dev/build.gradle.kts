@@ -10,6 +10,8 @@ dependencies {
     // the gate filter and the compile-error page exist only when an HTTP server is present
     compileOnly(projects.micronautHttp)
     compileOnly(projects.micronautHttpServer)
+    // the listening sockets kept across generations exist only when the Netty server is present
+    compileOnly(projects.micronautHttpServerNetty)
     // the /dev endpoint exists only when the management module is present
     compileOnly(projects.micronautManagement)
     // the embedded Groovy compiler exists when the project's own Groovy is on the launch classpath
@@ -28,6 +30,8 @@ dependencies {
     compileOnly(libs.bytebuddy.agent)
     // the native macOS watch service, when micronaut-runtime-osx is on the development runtime classpath
     compileOnly(libs.managed.methvin.directoryWatcher)
+    // the threads of Reactor's schedulers get the parent tier's loader when Reactor is on the classpath
+    compileOnly(libs.managed.reactor)
 
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautHttp)
@@ -35,6 +39,19 @@ dependencies {
     // classpath, whose endpoints would start with every application the tests launch
     testImplementation(projects.micronautRouter)
     testCompileOnly(projects.micronautManagement)
+    // a Netty application in development mode, run in a JVM of its own, to see what Netty keeps from its first use
+    testImplementation(projects.micronautHttpServerNetty)
+    testImplementation(projects.micronautJacksonDatabind)
+    // a declarative client of a development mode application, on the event loops retained across generations
+    testImplementation(projects.micronautHttpClient)
+    // a Reactor application in development mode, run in a JVM of its own, to see what the shared schedulers' threads keep
+    testImplementation(libs.managed.reactor)
+    // an H2 data source retained across generations, in a JVM of its own, to see what H2 keeps from its first use
+    testImplementation(libs.h2)
+    // a UCP pool of H2 retained across generations, in a JVM of its own, to see what UCP's JVM-wide threads keep
+    testImplementation(libs.ucp)
+    testImplementation(libs.ojdbc)
+    testImplementation(libs.logback.classic)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)
     testImplementation(libs.junit.platform.launcher)
@@ -82,6 +99,8 @@ noReflection {
     allowIn("io.micronaut.dev.compile.CompileMode", "ENUM_CONSTANTS")
     // MicronautDevMain.launchApplication, which looks up and invokes the application's main, suppresses the check itself
     allowIn("io.micronaut.dev.DevRuntime", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.dev.Compilations", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.dev.Pending", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.DevRuntime", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.DevRuntime", "CLASS_LOADING")
     allowIn("io.micronaut.dev.ManifestRetentionPolicy", "CLASS_LOADING")
@@ -103,8 +122,16 @@ noReflection {
     allowIn("io.micronaut.dev.test.JUnitPlatformExecution", "CLASS_LOADING")
     allowIn("io.micronaut.dev.test.TestEventListeners", "SERVICE_LOADING")
     allowIn("io.micronaut.dev.TestSession", "SERVICE_LOADING")
+    // the parent tier statics are initialized, and the compiled languages listed, for the runtime
+    allowIn("io.micronaut.dev.GenerationMemory", "CLASS_LOADING")
     allowIn("io.micronaut.dev.agent.DynamicAttach", "CLASS_LOADING")
     // the fast path redefines method bodies through the agent
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
+    allowIn("io.micronaut.dev.InPlaceUpdates", "INSTRUMENTATION")
     allowIn("io.micronaut.dev.DevWatchService", "CLASS_LOADING")
+    // the route-declaring classes include the superclasses and interfaces of a route bean
+    allowIn("io.micronaut.dev.http.DevRouter", "INTERFACES")
+    // a class redefined in place is checked for being, or declaring, located routes, whose tables the router keeps per instance
+    allowIn("io.micronaut.dev.http.DevRouter", "CLASS_LOADING")
+    allowIn("io.micronaut.dev.http.DevRouter", "CLASS_MEMBERS")
 }

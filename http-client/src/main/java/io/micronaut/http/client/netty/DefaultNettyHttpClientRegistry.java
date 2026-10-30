@@ -15,13 +15,16 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.PropertyResolverDelegate;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.env.PropertySourcePropertyResolver;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
@@ -133,15 +136,26 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * passes a new metadata instance on every call, in which case keys are no longer cached.
      */
     private static final int CLIENT_KEY_CACHE_MAX_SIZE = 2048;
+    /**
+     * The revision of a cached client key computed from metadata without property placeholders.
+     */
+    private static final long NO_REVISION = -1;
     private final Map<ClientKey, DefaultHttpClient> unbalancedClients = new ConcurrentHashMap<>(10);
     /**
      * Cache of the client key computed for an annotation metadata instance, keyed by identity. A
      * declarative client passes the same (generated) metadata instance on every call, so this
-     * avoids repeating the annotation lookups. The map is copy-on-write and never mutated once
-     * published: reads are lock-free and misses publish a new copy under {@link #clientKeyCacheLock}.
+     * avoids repeating the annotation lookups. A key computed from metadata with property
+     * placeholders records the revision of the properties it was computed at, and is computed again
+     * once they may have changed. The map is copy-on-write and never mutated once published: reads
+     * are lock-free and misses publish a new copy under {@link #clientKeyCacheLock}.
      */
     @SuppressWarnings("java:S3077") // the published map is never modified, volatile only publishes it
-    private volatile IdentityHashMap<AnnotationMetadata, ClientKey> clientKeyCache = new IdentityHashMap<>();
+    private volatile IdentityHashMap<AnnotationMetadata, CachedClientKey> clientKeyCache = new IdentityHashMap<>();
+    /**
+     * The properties the placeholders of the client annotations are resolved from, or {@code null}
+     * if their changes cannot be known, in which case keys of metadata with placeholders are not cached.
+     */
+    private final @Nullable PropertySourcePropertyResolver properties;
     private final Object clientKeyCacheLock = new Object();
     /**
      * The running clients created for a {@link LoadBalancer}, e.g. by
@@ -223,6 +237,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.codecRegistry = codecRegistry;
         this.handlerRegistry = handlerRegistry;
         this.beanContext = beanContext;
+        this.properties = beanContext instanceof ApplicationContext applicationContext
+            && applicationContext.getEnvironment() instanceof PropertyResolverDelegate delegate
+            && delegate.delegate() instanceof PropertySourcePropertyResolver resolver ? resolver : null;
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
         this.jsonMapper = jsonMapper;
@@ -303,6 +320,17 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     @Override
     public void disposeClient(AnnotationMetadata annotationMetadata) {
         final ClientKey key = getClientKey(annotationMetadata);
+        disposeClient(key);
+        // The keys the metadata had before the properties changed name the clients it was given until then
+        CachedClientKey cached = clientKeyCache.get(annotationMetadata);
+        if (cached != null) {
+            for (ClientKey previous : cached.previousKeys()) {
+                disposeClient(previous);
+            }
+        }
+    }
+
+    private void disposeClient(ClientKey key) {
         final StreamingHttpClient streamingHttpClient = unbalancedClients.get(key);
         if (streamingHttpClient != null && streamingHttpClient.isRunning()) {
             streamingHttpClient.close();
@@ -663,21 +691,33 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     private ClientKey getClientKey(AnnotationMetadata metadata) {
-        ClientKey key = clientKeyCache.get(metadata);
-        if (key != null) {
-            return key;
+        CachedClientKey cached = clientKeyCache.get(metadata);
+        if (cached != null
+            && (cached.revision() == NO_REVISION || properties != null && cached.revision() == properties.getRevision())) {
+            return cached.key();
         }
-        key = computeClientKey(metadata);
         // Metadata with evaluated expressions (EvaluatedAnnotationMetadata) is re-created for every
         // invocation and its values may depend on the call arguments, so its key is never cached.
-        if (!metadata.hasEvaluatedExpressions()) {
-            synchronized (clientKeyCacheLock) {
-                IdentityHashMap<AnnotationMetadata, ClientKey> current = clientKeyCache;
-                if (!current.containsKey(metadata) && current.size() < CLIENT_KEY_CACHE_MAX_SIZE) {
-                    IdentityHashMap<AnnotationMetadata, ClientKey> copy = new IdentityHashMap<>(current);
-                    copy.put(metadata, key);
-                    clientKeyCache = copy;
-                }
+        if (metadata.hasEvaluatedExpressions()) {
+            return computeClientKey(metadata);
+        }
+        // Read before the key is computed, so that a change made meanwhile leaves another revision
+        long revision;
+        if (metadata.hasPropertyExpressions()) {
+            if (properties == null) {
+                return computeClientKey(metadata);
+            }
+            revision = properties.getRevision();
+        } else {
+            revision = NO_REVISION;
+        }
+        ClientKey key = computeClientKey(metadata);
+        synchronized (clientKeyCacheLock) {
+            IdentityHashMap<AnnotationMetadata, CachedClientKey> current = clientKeyCache;
+            if (current.containsKey(metadata) || current.size() < CLIENT_KEY_CACHE_MAX_SIZE) {
+                IdentityHashMap<AnnotationMetadata, CachedClientKey> copy = new IdentityHashMap<>(current);
+                copy.put(metadata, new CachedClientKey(key, revision, previousKeys(current.get(metadata), key)));
+                clientKeyCache = copy;
             }
         }
         return key;
@@ -719,6 +759,27 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 client.connectionManager().refresh();
             }
         }
+    }
+
+    /**
+     * The keys a metadata had before the given one, so that disposing its client also disposes the clients it
+     * was given before the properties changed.
+     *
+     * @param replaced The entry replaced, if any
+     * @param key      The new key
+     * @return The previous keys
+     */
+    private static List<ClientKey> previousKeys(@Nullable CachedClientKey replaced, ClientKey key) {
+        if (replaced == null) {
+            return List.of();
+        }
+        if (replaced.key().equals(key)) {
+            return replaced.previousKeys();
+        }
+        List<ClientKey> keys = new ArrayList<>(replaced.previousKeys().size() + 1);
+        keys.addAll(replaced.previousKeys());
+        keys.add(replaced.key());
+        return List.copyOf(keys);
     }
 
     /**
@@ -784,4 +845,15 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             return hashCode;
         }
     }
+
+    /**
+     * A cached client key.
+     *
+     * @param key      The key
+     * @param revision     The revision of the properties it was computed at, or {@link #NO_REVISION}
+     * @param previousKeys The keys the metadata had before
+     */
+    private record CachedClientKey(ClientKey key, long revision, List<ClientKey> previousKeys) {
+    }
+
 }

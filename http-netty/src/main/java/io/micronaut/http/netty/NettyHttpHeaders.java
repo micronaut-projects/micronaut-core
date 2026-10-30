@@ -19,7 +19,9 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.HttpDates;
 import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -35,7 +37,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
@@ -111,9 +112,26 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+        return getValue(name, conversionContext, null);
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext, TypeConverter<String, T> converter) {
+        if (getClass() != NettyHttpHeaders.class) {
+            // a subclass may override the lookup of a value
+            return get(name, conversionContext);
+        }
+        return getValue(name, conversionContext, converter);
+    }
+
+    private <T> Optional<T> getValue(CharSequence name, ArgumentConversionContext<T> conversionContext, @Nullable TypeConverter<String, T> converter) {
         List<String> values = nettyHeaders.getAll(name);
         if (!values.isEmpty()) {
-            if (values.size() == 1 || !isCollectionOrArray(conversionContext.getArgument().getType())) {
+            Class<T> type = conversionContext.getArgument().getType();
+            if (values.size() == 1 || !isCollectionOrArray(type)) {
+                if (converter != null) {
+                    return converter.convert(values.get(0), type, conversionContext);
+                }
                 return conversionService.convert(values.get(0), conversionContext);
             } else {
                 return conversionService.convert(values, conversionContext);
@@ -265,7 +283,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     }
 
     private void setUnsafe(CharSequence header, ZonedDateTime value) {
-        setUnsafe(header, value.withZoneSameInstant(GMT).format(DateTimeFormatter.RFC_1123_DATE_TIME));
+        setUnsafe(header, HttpDates.format(value));
     }
 
     @Override

@@ -118,6 +118,16 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      */
     private final @Nullable UriMatchTemplate uriMatchTemplate;
     /**
+     * The path variable segments of the Micronaut template, which resolve the ambiguous
+     * requests, read once, see {@link UriMatchTemplate#getPathVariableSegmentCount()}.
+     */
+    private final long ambiguityVariableSegments;
+    /**
+     * The length of the raw segments of the Micronaut template, read once, see
+     * {@link UriMatchTemplate#getRawSegmentLength()}.
+     */
+    private final int ambiguityRawSegmentLength;
+    /**
      * The matcher of a route with a URI template, otherwise {@code null}: such routes match
      * with it directly.
      */
@@ -138,6 +148,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final int pathVariableCount;
     private final int patternVariableCount;
     private final Charset defaultCharset;
+    private final boolean plusAsSpace;
     private final @Nullable Integer port;
     private final ConversionService conversionService;
     private final ExecutorSelector executorSelector;
@@ -154,6 +165,11 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * The order of the route selector, read once, or {@code null}, see {@link RouteMatchSelector#order()}.
      */
     private final @Nullable Comparator<UriRouteInfo<?, ?>> routeMatchSelectorOrder;
+    /**
+     * Whether the route selector selects by the media types itself, read once, see
+     * {@link RouteMatchSelector#selectsMediaTypes()}.
+     */
+    private final boolean routeMatchSelectorSelectsMediaTypes;
 
     @Nullable
     private ExecutorService executorService;
@@ -300,7 +316,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                boolean implicitHead) {
         this(httpMethod, httpMethodName, template, defaultCharset, targetMethod, bodyArgumentName, bodyArgument,
             consumesMediaTypes, producesMediaTypes, predicates, port, conversionService, executorSelector,
-            messageBodyHandlerRegistry, implicitHead, List.of(), 0, Map.of(), null, false, List.of(), 0, null, null);
+            messageBodyHandlerRegistry, implicitHead, List.of(), 0, Map.of(), null, false, List.of(), 0, null, null, false);
     }
 
     /**
@@ -332,6 +348,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      *                                   at a location: {@link #DECLARED_CONSUMES}, {@link #DECLARED_PRODUCES}, {@link #DECLARED_EXECUTOR}
      * @param inherited                  What the route inherits at a location, see {@link #inheriting(LocationInheritance)}, or {@code null}
      * @param routeMatchSelector         The route selector of the route, see {@code RouteSpec#selectedBy}, or {@code null}
+     * @param plusAsSpace                Whether a {@code +} in a path variable is decoded as a space, see {@link RouteAssembly#PATH_VARIABLE_PLUS_AS_SPACE}
      */
     @SuppressWarnings("ParameterNumber")
     DefaultUrlRouteInfo(HttpMethod httpMethod,
@@ -357,7 +374,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                         List<Predicate<? super PathVariables>> constraints,
                         int declaredSettings,
                         @Nullable LocationInheritance inherited,
-                        @Nullable RouteMatchSelector routeMatchSelector) {
+                        @Nullable RouteMatchSelector routeMatchSelector,
+                        boolean plusAsSpace) {
         super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates, messageBodyHandlerRegistry);
         this.implicitHead = implicitHead;
         this.httpMethod = httpMethod;
@@ -366,9 +384,19 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         if (template instanceof UriRouteTemplate uriTemplate) {
             this.uriTemplateMatcher = uriTemplate.matcher();
             this.uriMatchTemplate = uriTemplate.getUriMatchTemplate();
+            if (uriTemplateMatcher != null) {
+                // a Micronaut template: a subclass of the template keeps computing them, see DefaultRouter
+                this.ambiguityVariableSegments = uriMatchTemplate.getPathVariableSegmentCount();
+                this.ambiguityRawSegmentLength = uriMatchTemplate.getRawSegmentLength();
+            } else {
+                this.ambiguityVariableSegments = 0;
+                this.ambiguityRawSegmentLength = 0;
+            }
         } else {
             this.uriTemplateMatcher = null;
             this.uriMatchTemplate = null;
+            this.ambiguityVariableSegments = 0;
+            this.ambiguityRawSegmentLength = 0;
         }
         if (uriTemplateMatcher == null) {
             // read once: they order the routes and resolve the ambiguous requests
@@ -389,6 +417,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
             this.patternVariableCount = 0;
         }
         this.defaultCharset = defaultCharset;
+        this.plusAsSpace = plusAsSpace;
         this.port = port;
         this.conversionService = conversionService;
         this.executorSelector = executorSelector;
@@ -406,6 +435,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         }
         this.routeMatchSelector = routeMatchSelector;
         this.routeMatchSelectorOrder = routeMatchSelector == null ? null : routeMatchSelector.order().orElse(null);
+        this.routeMatchSelectorSelectsMediaTypes = routeMatchSelector != null && routeMatchSelector.selectsMediaTypes();
         this.dynamicTarget = targetMethod instanceof HandlerMethod<?> handler && handler.getTarget() instanceof DynamicRouteTarget;
         this.inherited = inherited;
         if (targetMethod instanceof HandlerMethod<?>) {
@@ -417,7 +447,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                 predicates, port, conversionService, inheritedExecutor(declaredSettings, inheritance, executorSelector, method),
                 messageBodyHandlerRegistry, implicitHead, routeFilters, order, inheritedAttributes(inheritance.attributes(), attributes),
                 errorScope, anyMethod, this.constraints, declaredSettings, inheritance,
-                (declaredSettings & DECLARED_SELECTOR) != 0 ? routeMatchSelector : inheritance.selector());
+                (declaredSettings & DECLARED_SELECTOR) != 0 ? routeMatchSelector : inheritance.selector(), plusAsSpace);
         } else {
             this.rebuild = null;
         }
@@ -618,6 +648,20 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     /**
+     * @return The path variable segments of the Micronaut template of the route
+     */
+    long getAmbiguityVariableSegments() {
+        return ambiguityVariableSegments;
+    }
+
+    /**
+     * @return The length of the raw segments of the Micronaut template of the route
+     */
+    int getAmbiguityRawSegmentLength() {
+        return ambiguityRawSegmentLength;
+    }
+
+    /**
      * @return Whether the template of the route is a Micronaut template
      */
     boolean isMicronautTemplate() {
@@ -642,6 +686,14 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
 
     @Nullable RouteMatchSelector routeMatchSelector() {
         return routeMatchSelector;
+    }
+
+    /**
+     * @return Whether the route selector of the route selects by the media types itself, read
+     * once when the route was built, see {@link RouteMatchSelector#selectsMediaTypes()}
+     */
+    boolean routeMatchSelectorSelectsMediaTypes() {
+        return routeMatchSelectorSelectsMediaTypes;
     }
 
     /**
@@ -786,7 +838,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
             }
         }
         if (matchInfo != null) {
-            return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
+            return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, plusAsSpace, conversionService);
         }
         return null;
     }
@@ -806,11 +858,11 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * @return The match
      */
     UriRouteMatch<T, R> resolvedMatch(UriMatchInfo matchInfo, @Nullable MediaType selectedMediaType) {
-        return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService, selectedMediaType);
+        return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, plusAsSpace, conversionService, selectedMediaType);
     }
 
     UriRouteMatch<T, R> resolvedMatch(UriMatchInfo matchInfo) {
-        return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
+        return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, plusAsSpace, conversionService);
     }
 
     @Override

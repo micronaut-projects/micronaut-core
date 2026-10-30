@@ -652,7 +652,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return nettyEmbeddedServices.getEventLoopGroupRegistry()
                 .getEventLoopGroup(parent != null ? parent.getName() : NettyHttpServerConfiguration.Parent.NAME)
                 .orElseGet(() -> {
-                    final EventLoopGroup newGroup = newEventLoopGroup(acceptorConfiguration(parent));
+                    final EventLoopGroup newGroup = newEventLoopGroup(acceptorConfiguration(parent, resolveWorkerConfiguration()));
                     shutdownParent = true;
                     return newGroup;
                 });
@@ -665,24 +665,28 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * {@value #DEFAULT_PARENT_THREADS} thread rather than to the worker group default of
      * {@link EventLoopGroupConfiguration#getThreadCoreRatio()} threads per core.
      *
+     * <p>The acceptor group must use the same transport as the worker group: the server channel type is
+     * derived from the worker configuration, and a native channel (for example epoll) cannot be
+     * registered on a NIO event loop. The transport of the worker configuration is therefore used.</p>
+     *
      * @param parent The configured parent event loop group settings, if any
+     * @param workerConfig The resolved worker event loop group configuration, if any
      * @return The configuration to create the acceptor group from
      */
-    private static EventLoopGroupConfiguration acceptorConfiguration(NettyHttpServerConfiguration.@Nullable Parent parent) {
+    private static EventLoopGroupConfiguration acceptorConfiguration(NettyHttpServerConfiguration.@Nullable Parent parent,
+                                                                     @Nullable EventLoopGroupConfiguration workerConfig) {
         EventLoopGroupConfiguration source = parent == null ? new DefaultEventLoopGroupConfiguration() : parent;
-        if (source.getNumThreads() != 0) {
-            // explicitly configured, honour it as-is
-            return source;
-        }
+        // an explicitly configured thread count is honoured as-is
+        int threads = source.getNumThreads() != 0 ? source.getNumThreads() : DEFAULT_PARENT_THREADS;
         return new DefaultEventLoopGroupConfiguration(
             // keep a name the user configured; only the implicit acceptor group is called "parent"
             parent == null ? NettyHttpServerConfiguration.Parent.NAME : source.getName(),
-            DEFAULT_PARENT_THREADS,
+            threads,
             source.getThreadCoreRatio(),
             source.getIoRatio().orElse(null),
             // the transport list below already reflects the (deprecated) native preference
             false,
-            source.getTransport(),
+            workerConfig != null ? workerConfig.getTransport() : source.getTransport(),
             source.getExecutorName().orElse(null),
             source.getShutdownQuietPeriod(),
             source.getShutdownTimeout(),
@@ -712,6 +716,18 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @SuppressWarnings("WeakerAccess")
     protected ServerBootstrap createServerBootstrap() {
         return new ServerBootstrap();
+    }
+
+    /**
+     * The provider of sockets that outlive this server, when there is one and the listener's transport is NIO, the
+     * only one whose server channel can be built over a socket it does not own.
+     */
+    @Nullable
+    private RetainedServerSockets retainedServerSockets(ServerBootstrap bootstrap) {
+        if (!(bootstrap.config().group() instanceof IoEventLoopGroup group) || !group.isIoType(NioIoHandler.class)) {
+            return null;
+        }
+        return applicationContext.findBean(RetainedServerSockets.class).orElse(null);
     }
 
     private Listener bind(Supplier<ServerBootstrap> serverBootstrap, Supplier<Bootstrap> udpBootstrap, Supplier<Bootstrap> acceptedBootstrap, NettyHttpServerConfiguration.NettyListenerConfiguration cfg, @Nullable EventLoopGroupConfiguration workerConfig) {
@@ -763,18 +779,26 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                         .childHandler(listener);
                     switch (cfg.getFamily()) {
                         case TCP:
+                            int port = cfg.getPort();
+                            if (port == -1) {
+                                port = 0;
+                            }
+                            RetainedServerSockets retainedSockets = fd == null && cfg.isBind() ? retainedServerSockets(listenerBootstrap) : null;
+                            java.nio.channels.ServerSocketChannel retained = retainedSockets == null ? null : retainedSockets.serverSocket(cfg.getHost(), port);
                             listenerBootstrap.channelFactory(() -> {
-                                if (fd != null) {
+                                if (retained != null) {
+                                    // a socket that outlives this server: accept on it, and leave it bound when this server stops
+                                    return new RetainedNioServerSocketChannel(retained);
+                                } else if (fd != null) {
                                     return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig, null, fd);
                                 } else {
                                     return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig);
                                 }
                             });
-                            int port = cfg.getPort();
-                            if (port == -1) {
-                                port = 0;
-                            }
-                            if (cfg.isBind()) {
+                            if (retained != null) {
+                                future = listenerBootstrap.register().syncUninterruptibly();
+                                Objects.requireNonNull(retainedSockets).accepting(retained, future.channel());
+                            } else if (cfg.isBind()) {
                                 if (cfg.getHost() == null) {
                                     future = port == 0 && fd == null ? bindRandomWildcardPort(listenerBootstrap, CHECK_LOOPBACK_PORT_SHADOWING ? NettyHttpServer::isLoopbackPortTaken : p -> false) : listenerBootstrap.bind(port);
                                 } else {

@@ -80,7 +80,8 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
                             source
                     );
 
-                    if (!bindingResult.isPresentAndSatisfied()) {
+                    Optional<?> value = bindingResult.isSatisfied() ? bindingResult.getValue() : Optional.empty();
+                    if (value.isEmpty()) {
                         if (argument.isNullable()) {
                             boundArguments[i] = null;
                         } else {
@@ -92,7 +93,7 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
                             }
                         }
                     } else {
-                        boundArguments[i] = bindingResult.get();
+                        boundArguments[i] = value.get();
                     }
 
                 } else {
@@ -144,7 +145,8 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
                             source
                     );
 
-                    if (!bindingResult.isPresentAndSatisfied()) {
+                    Optional<?> value = bindingResult.isSatisfied() ? bindingResult.getValue() : Optional.empty();
+                    if (value.isEmpty()) {
                         if (argument.isNullable()) {
                             boundArguments[i] = null;
                         } else {
@@ -152,7 +154,7 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
                             unbound.add(argument);
                         }
                     } else {
-                        boundArguments[i] = bindingResult.get();
+                        boundArguments[i] = value.get();
                     }
 
                 } else {
