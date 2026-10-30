@@ -301,6 +301,68 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
+     * Completes an annotation value built independently of an element, such as one a visitor creates with
+     * {@link AnnotationValue#builder(String)}, the way an occurrence added to an element is completed: the defaults
+     * of its type are attached unless it carries defaults already, and its non-binding members are recorded under
+     * {@link AnnotationUtil#NON_BINDING_ATTRIBUTE} unless it records them already. The values held by its members,
+     * directly or in an array, are completed in turn. The explicit member values are kept. A value whose type
+     * cannot be resolved is not completed itself, though the values held by its members are.
+     *
+     * @param annotationValue The annotation value
+     * @param <A>             The annotation type
+     * @return The completed annotation value, or the given one if there was nothing to complete
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    public final <A extends Annotation> AnnotationValue<A> completeAnnotationValue(AnnotationValue<A> annotationValue) {
+        ProcessedAnnotation processed = toProcessedAnnotation(annotationValue);
+        if (processed.annotationType != null) {
+            // as addDefaults does for an occurrence, except that no defaults is left as no defaults rather than
+            // replaced by an empty map, so that a value with nothing to complete is returned as it is
+            processed = addNonBindingMembers(processed);
+            if (processed.getAnnotationValue().getDefaultValues() == null) {
+                Map<CharSequence, Object> defaults = getCachedAnnotationDefaults(annotationValue.getAnnotationName(), processed.annotationType);
+                if (!defaults.isEmpty()) {
+                    processed = processed.mutateAnnotationValue(builder -> builder.defaultValues(defaults));
+                }
+            }
+        }
+        Map<CharSequence, Object> completedMembers = null;
+        for (Map.Entry<CharSequence, Object> entry : processed.getAnnotationValue().getValues().entrySet()) {
+            Object value = entry.getValue();
+            Object completed = value;
+            if (value instanceof AnnotationValue<?> nested) {
+                completed = completeAnnotationValue(nested);
+            } else if (value instanceof AnnotationValue<?>[] nestedValues) {
+                AnnotationValue<?>[] completedValues = null;
+                for (int i = 0; i < nestedValues.length; i++) {
+                    AnnotationValue<?> completedValue = completeAnnotationValue(nestedValues[i]);
+                    if (completedValue != nestedValues[i]) {
+                        if (completedValues == null) {
+                            completedValues = nestedValues.clone();
+                        }
+                        completedValues[i] = completedValue;
+                    }
+                }
+                if (completedValues != null) {
+                    completed = completedValues;
+                }
+            }
+            if (completed != value) {
+                if (completedMembers == null) {
+                    completedMembers = new LinkedHashMap<>(4);
+                }
+                completedMembers.put(entry.getKey(), completed);
+            }
+        }
+        if (completedMembers != null) {
+            Map<CharSequence, Object> members = completedMembers;
+            processed = processed.mutateAnnotationValue(builder -> builder.members(members));
+        }
+        return (AnnotationValue<A>) processed.getAnnotationValue();
+    }
+
+    /**
      * Build only metadata for declared annotations.
      *
      * @param element The element

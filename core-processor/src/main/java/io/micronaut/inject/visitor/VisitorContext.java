@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.visitor;
 
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
@@ -32,6 +33,7 @@ import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 import io.micronaut.inject.writer.TypeHierarchyWriter;
 
+import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.net.URI;
 import java.net.URL;
@@ -140,6 +142,34 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     default RetentionPolicy getAnnotationRetentionPolicy(String annotationName) {
         return getAnnotationMetadataBuilder().getRetentionPolicy(annotationName);
+    }
+
+    /**
+     * Completes an annotation value built independently of an element, the way an annotation added to an element
+     * is completed.
+     *
+     * <p>An annotation read from the sources, or added to an element with {@code annotate}, carries the defaults of
+     * its type and records the members annotated {@link io.micronaut.context.annotation.NonBinding} under
+     * {@link io.micronaut.core.annotation.AnnotationUtil#NON_BINDING_ATTRIBUTE}. A value a visitor builds itself
+     * with {@link AnnotationValue#builder(String)} carries neither, and neither does a value nested in a member of
+     * one, even once the outer value is added to an element. This attaches the defaults of the type unless the
+     * value carries defaults already, and records its non-binding members unless it records them already, to the
+     * value and to the values held by its members, directly or in an array. The explicit member values are kept.</p>
+     *
+     * <p>The defaults are the ones the written annotation metadata carries, which leave out the empty string defaults
+     * (see {@link #getAnnotationDefaultValues(String)}), and are only as complete as the compilation can resolve
+     * them: under KSP an annotation type that does not annotate a declaration in the compilation round, directly
+     * rather than nested in another annotation, reports none, nor the non-binding members that have a default. A
+     * value whose type cannot be resolved is not completed itself, though the values held by its members are.</p>
+     *
+     * @param annotationValue The annotation value
+     * @param <A>             The annotation type
+     * @return The completed annotation value, or the given one if there was nothing to complete
+     * @since 5.3.0
+     */
+    @Experimental
+    default <A extends Annotation> AnnotationValue<A> completeAnnotationValue(AnnotationValue<A> annotationValue) {
+        return getAnnotationMetadataBuilder().completeAnnotationValue(annotationValue);
     }
 
     /**
