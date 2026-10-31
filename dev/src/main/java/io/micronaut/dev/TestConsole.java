@@ -34,8 +34,11 @@ import java.util.function.IntConsumer;
  */
 final class TestConsole {
 
+    // as Pyronaut's continuous testing shows its keys, under a separator after every run
+    static final String KEY_HINTS = "Continuous Testing Active. Press SPACE to run again, \"a\" to run every test, \"f\" to run the failures, "
+        + "\"w\" to stop or start watching, or \"q\" to exit.";
+
     private static final Logger LOG = LoggerFactory.getLogger(TestConsole.class);
-    private static final String BANNER = "Continuous testing: SPACE runs the last tests again, 'a' every test, 'f' the failures, 'w' turns watching on or off, 'q' exits.";
 
     private final DevRuntime runtime;
     private final InputStream input;
@@ -72,7 +75,8 @@ final class TestConsole {
         if (characterMode) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> characterMode(false), "micronaut-dev-terminal"));
         }
-        System.out.println(BANNER + (characterMode ? "" : " Press Enter after the key."));
+        // shown now, after the first run, and after every run and change that did not compile
+        runtime.testConsole().keyHints(KEY_HINTS + (characterMode ? "" : " Press Enter after the key."));
         Thread thread = new Thread(() -> new TestConsole(runtime, System.in, characterMode, System::exit).read(), "micronaut-dev-test-console");
         thread.setDaemon(true);
         thread.start();
@@ -107,7 +111,7 @@ final class TestConsole {
             case 'a' -> runtime.requestTests(TestRequest.ALL);
             case 'f' -> {
                 if (runtime.failedTestClasses().isEmpty()) {
-                    System.out.println("No test failed in its last run.");
+                    runtime.testConsole().note("No test failed in its last run.");
                 } else {
                     runtime.requestTests(TestRequest.FAILED);
                 }
@@ -115,7 +119,7 @@ final class TestConsole {
             case 'w' -> {
                 boolean watching = !runtime.isWatchingTests();
                 runtime.watchTests(watching);
-                System.out.println(watching ? "Watching: a change runs the tests it affects." : "Not watching: changes compile, and no test runs until asked.");
+                runtime.testConsole().note(watching ? "Watching: a change runs the tests it affects." : "Not watching: changes compile, and no test runs until asked.");
             }
             case 'q' -> {
                 return false;
