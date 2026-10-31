@@ -234,6 +234,11 @@ public final class DefaultHttpClientBuilder {
         return this;
     }
 
+    DefaultHttpClientBuilder retainedConnections(@Nullable RetainedClientConnections retainedConnections) {
+        delegate.retainedConnections(retainedConnections);
+        return this;
+    }
+
     DefaultHttpClientBuilder lifecycleListener(NettyHttpClient.@Nullable LifecycleListener lifecycleListener) {
         delegate.lifecycleListener(lifecycleListener);
         return this;
