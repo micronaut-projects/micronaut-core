@@ -67,6 +67,49 @@ class DevRequestAdmissionTest {
     }
 
     @Test
+    void theApplicationConfigurationSetsTheTimeoutsTheManifestLeavesOutAndARefreshCounts() throws Exception {
+        // the manifest sets the hold timeout only: the drain timeout comes from application.properties, and the hold
+        // timeout the application sets too is the manifest's
+        DevRuntime runtime = launch("micronaut.dev.requests.hold-timeout=45s\n", """
+            micronaut.dev.requests.hold-timeout=12s
+            micronaut.dev.requests.drain-timeout=3s
+            """);
+        try {
+            RequestAdmission admission = RequestAdmission.current();
+            assertNotNull(admission);
+            assertEquals(Duration.ofSeconds(45), admission.holdTimeout());
+            assertEquals(Duration.ofSeconds(3), admission.drainTimeout());
+
+            // the configuration refreshed in place, without a restart: the batch that refreshed it takes the new value
+            Path properties = project.resolve("src/main/resources/application.properties");
+            Files.writeString(properties, "micronaut.dev.requests.drain-timeout=750ms\n");
+            runtime.changed(List.of(properties), List.of());
+            assertEquals(Duration.ofMillis(750), admission.drainTimeout());
+            assertEquals(Duration.ofSeconds(45), admission.holdTimeout());
+
+            // a value that is not a duration is ignored: the default holds
+            Files.writeString(properties, "micronaut.dev.requests.drain-timeout=soon\n");
+            runtime.changed(List.of(properties), List.of());
+            assertEquals(Duration.ofSeconds(10), admission.drainTimeout());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void withoutTheManifestOrTheApplicationTheTimeoutsAreTheDefaults() throws Exception {
+        DevRuntime runtime = launch("", "");
+        try {
+            RequestAdmission admission = RequestAdmission.current();
+            assertNotNull(admission);
+            assertEquals(Duration.ofSeconds(30), admission.holdTimeout());
+            assertEquals(Duration.ofSeconds(10), admission.drainTimeout());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
     void aRequestHeldThroughTheAdmissionWaitsForTheCompilationAndReachesTheNextGeneration() throws Exception {
         DevRuntime runtime = launch();
         Thread reload = null;
@@ -117,6 +160,14 @@ class DevRequestAdmissionTest {
     }
 
     private DevRuntime launch() throws IOException {
+        return launch("micronaut.dev.requests.hold-timeout=45s\nmicronaut.dev.requests.drain-timeout=4500ms\n", null);
+    }
+
+    /**
+     * @param timeouts The manifest's timeout entries
+     * @param configuration The application.properties of the configuration root, or null for none
+     */
+    private DevRuntime launch(String timeouts, String configuration) throws IOException {
         try (ServerSocket socket = new ServerSocket(0)) {
             port = socket.getLocalPort();
         }
@@ -143,6 +194,10 @@ class DevRequestAdmissionTest {
             }
             """);
         Files.writeString(src.resolve("Greeter.java"), greeter(0));
+        Path resources = Files.createDirectories(project.resolve("src/main/resources"));
+        if (configuration != null) {
+            Files.writeString(resources.resolve("application.properties"), configuration);
+        }
         Path manifestFile = project.resolve("dev.properties");
         List<String> classpath = List.of(System.getProperty("java.class.path").split(File.pathSeparator));
         Files.write(project.resolve("cp.argfile"), classpath);
@@ -155,9 +210,8 @@ class DevRequestAdmissionTest {
             micronaut.dev.sources.java=src/main/java
             micronaut.dev.compile.java.output=build/classes
             micronaut.dev.patch-in-place=false
-            micronaut.dev.requests.hold-timeout=45s
-            micronaut.dev.requests.drain-timeout=4500ms
-            """);
+            micronaut.dev.resources.config=src/main/resources
+            """ + timeouts);
         MicronautDevMain main = new MicronautDevMain() {
             @Override
             protected Map<SourceKind, SourceCompiler> createCompilers(DevManifest manifest) {
