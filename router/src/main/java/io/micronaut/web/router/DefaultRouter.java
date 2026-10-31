@@ -42,8 +42,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -122,8 +122,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     public DefaultRouter(Collection<RouteBuilder> builders, List<AssembledRoutes> assembled) {
         Set<Integer> exposedPorts = new HashSet<>(5);
         UriRouteSet.Builder uriRoutes = new UriRouteSet.Builder();
-        Set<StatusRouteInfo<Object, Object>> statusRoutes = new LinkedHashSet<>();
-        Set<ErrorRouteInfo<Object, Object>> errorRoutes = new LinkedHashSet<>();
+        List<StatusRouteInfo<Object, Object>> statusRoutes = new ArrayList<>();
+        List<ErrorRouteInfo<Object, Object>> errorRoutes = new ArrayList<>();
+        // the routes by what they answer, to reject duplicates
+        Map<ErrorRouteKey, StatusRouteInfo<Object, Object>> statusRouteKeys = new HashMap<>();
+        Map<ErrorRouteKey, ErrorRouteInfo<Object, Object>> errorRouteKeys = new HashMap<>();
         alwaysMatchesFilterRoutes = new ArrayList<>(20);
         preconditionFilterRoutes = new ArrayList<>(20);
         preMatchingAlwaysMatchesFilterRoutes = new ArrayList<>(10);
@@ -145,17 +148,23 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
             for (StatusRoute statusRoute : routeSet.statusRoutes()) {
                 StatusRouteInfo<Object, Object> routeInfo = statusRoute.toRouteInfo();
-                if (statusRoutes.contains(routeInfo)) {
-                    final StatusRouteInfo<Object, Object> existing = statusRoutes.stream().filter(r -> r.equals(routeInfo)).findFirst().orElse(null);
-                    throw new RoutingException("Attempted to register multiple local routes for http status [" + statusRoute.statusCode() + "]. New route: " + statusRoute + ". Existing: " + existing);
+                ErrorRouteKey key = ErrorRouteKey.of(routeInfo);
+                if (key != null) {
+                    StatusRouteInfo<Object, Object> existing = statusRouteKeys.putIfAbsent(key, routeInfo);
+                    if (existing != null) {
+                        throw new RoutingException("Attempted to register multiple local routes for http status [" + statusRoute.statusCode() + "]. New route: " + routeInfo + ". Existing: " + existing);
+                    }
                 }
                 statusRoutes.add(routeInfo);
             }
             for (ErrorRoute errorRoute : routeSet.errorRoutes()) {
                 ErrorRouteInfo<Object, Object> routeInfo = errorRoute.toRouteInfo();
-                if (errorRoutes.contains(routeInfo)) {
-                    final ErrorRouteInfo<Object, Object> existing = errorRoutes.stream().filter(r -> r.equals(routeInfo)).findFirst().orElse(null);
-                    throw new RoutingException("Attempted to register multiple local routes for error [" + errorRoute.exceptionType().getSimpleName() + "]. New route: " + errorRoute + ". Existing: " + existing);
+                ErrorRouteKey key = ErrorRouteKey.of(routeInfo);
+                if (key != null) {
+                    ErrorRouteInfo<Object, Object> existing = errorRouteKeys.putIfAbsent(key, routeInfo);
+                    if (existing != null) {
+                        throw new RoutingException("Attempted to register multiple local routes for error [" + errorRoute.exceptionType().getSimpleName() + "]. New route: " + routeInfo + ". Existing: " + existing);
+                    }
                 }
                 errorRoutes.add(routeInfo);
             }
