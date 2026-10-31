@@ -474,7 +474,8 @@ public final class QueryStringDecoder {
                     result.throwException();
                 }
             } catch (CharacterCodingException ex) {
-                throw new IllegalStateException(ex);
+                // the documented failure of a malformed escape sequence, without the raw input
+                throw new IllegalArgumentException("malformed " + charset.name() + " escape sequence", ex);
             }
             strBuf.append(charBuf.flip());
         }
