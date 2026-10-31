@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -67,7 +68,7 @@ class GraalPyExceptionHandlerTest {
             context.getBindings(PYTHON).putMember("original", original);
             context.getBindings(PYTHON).putMember("fixed", wrap.execute(context.eval(PYTHON, "lambda self, key='email': None"), fail));
             context.getBindings(PYTHON).putMember("variadic", wrap.execute(context.eval(PYTHON, "lambda self, *args: None"), fail));
-            context.eval(PYTHON, """
+            assertDoesNotThrow(() -> context.eval(PYTHON, """
                 for call in (fixed, variadic):
                     try:
                         call()
@@ -78,7 +79,7 @@ class GraalPyExceptionHandlerTest {
                         assert not error.__suppress_context__
                     else:
                         raise AssertionError('original exception was not raised')
-                """);
+                """));
         }
     }
 
