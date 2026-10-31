@@ -125,7 +125,12 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     private EventLoopGroupFactory nativeFactory() {
+        EventLoopGroupFactory legacy = factories.get(NATIVE);
+        if (legacy != null) {
+            return legacy;
+        }
         return factories.entrySet().stream()
+            .filter(e -> FACTORY_PRIORITY.contains(e.getKey()))
             .min(Comparator.comparingInt(e -> FACTORY_PRIORITY.indexOf(e.getKey())))
             .orElseThrow()
             .getValue();

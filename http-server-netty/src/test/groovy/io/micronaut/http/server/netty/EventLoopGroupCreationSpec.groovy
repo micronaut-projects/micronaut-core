@@ -38,6 +38,29 @@ class EventLoopGroupCreationSpec extends Specification {
         new DefaultEventLoopGroupConfiguration(name, numThreads, threadCoreRatio, null, false, null, null, null, null, false)
     }
 
+    def 'configured transport survives a custom executor'() {
+        given:
+        def transport = Mock(io.micronaut.http.netty.channel.EventLoopGroupFactory)
+        def executor = java.util.concurrent.Executors.newThreadPerTaskExecutor(new io.netty.util.concurrent.DefaultThreadFactory('custom-executor'))
+        def context = ApplicationContext.builder().build()
+        context.registerSingleton(io.micronaut.http.netty.channel.EventLoopGroupFactory, transport, io.micronaut.inject.qualifiers.Qualifiers.byName('external'))
+        context.start()
+        def configuration = new DefaultEventLoopGroupConfiguration('external', 1, 1, null, false, ['external'], null, null, null, false)
+        EventLoopGroup group
+
+        when:
+        group = context.getBean(DefaultNettyEmbeddedServerFactory).createEventLoopGroup(configuration, executor)
+
+        then:
+        1 * transport.createIoHandlerFactory(configuration) >> io.netty.channel.nio.NioIoHandler.newFactory()
+        threadName(group).startsWith('custom-executor-')
+
+        cleanup:
+        group?.shutdownGracefully(0, 1, TimeUnit.SECONDS)?.sync()
+        executor.close()
+        context.close()
+    }
+
     def 'a non-default group is named after its configuration'() {
         given:
         EventLoopGroup group = ctx.getBean(DefaultNettyEmbeddedServerFactory).createEventLoopGroup(config('custom', 2, 1.0d))
