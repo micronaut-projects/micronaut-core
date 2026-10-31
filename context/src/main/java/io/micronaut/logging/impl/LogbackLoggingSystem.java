@@ -19,10 +19,12 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.LoggingSystem;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +41,7 @@ public final class LogbackLoggingSystem implements LoggingSystem {
 
     private final @Nullable String logbackExternalConfigLocation;
     private final @Nullable String logbackXmlLocation;
+    private final @Nullable ClassLoader developmentResources;
 
     /**
      * @param logbackExternalConfigLocation The location of the logback configuration file set via logback properties
@@ -49,8 +52,33 @@ public final class LogbackLoggingSystem implements LoggingSystem {
         @Nullable @Property(name = "logback.configurationFile") String logbackExternalConfigLocation,
         @Nullable @Property(name = "logger.config") String logbackXmlLocation
     ) {
+        this(logbackExternalConfigLocation, logbackXmlLocation, (ClassLoader) null);
+    }
+
+    /**
+     * In development mode the application's resources are on the environment's class loader only, which Logback's
+     * own lookup does not search: the refresh looks the configuration up among them.
+     *
+     * @param logbackExternalConfigLocation The location of the logback configuration file set via logback properties
+     * @param logbackXmlLocation The location of the logback configuration file set via micronaut properties
+     * @param environment The environment, whose class loader holds the application's resources in development mode
+     * @since 5.3.0
+     */
+    @Inject
+    public LogbackLoggingSystem(
+        @Nullable @Property(name = "logback.configurationFile") String logbackExternalConfigLocation,
+        @Nullable @Property(name = "logger.config") String logbackXmlLocation,
+        Environment environment
+    ) {
+        this(logbackExternalConfigLocation, logbackXmlLocation, environment.isDevelopmentMode() ? environment.getClassLoader() : null);
+    }
+
+    private LogbackLoggingSystem(@Nullable String logbackExternalConfigLocation,
+                                 @Nullable String logbackXmlLocation,
+                                 @Nullable ClassLoader developmentResources) {
         this.logbackExternalConfigLocation = logbackExternalConfigLocation;
         this.logbackXmlLocation = logbackXmlLocation;
+        this.developmentResources = developmentResources;
     }
 
     @Override
@@ -62,7 +90,7 @@ public final class LogbackLoggingSystem implements LoggingSystem {
     public void refresh() {
         LoggerContext context = getLoggerContext();
         context.reset();
-        LogbackUtils.configure(getClass().getClassLoader(), context, logbackExternalConfigLocation, logbackXmlLocation);
+        LogbackUtils.configure(getClass().getClassLoader(), developmentResources, context, logbackExternalConfigLocation, logbackXmlLocation);
     }
 
     /**
