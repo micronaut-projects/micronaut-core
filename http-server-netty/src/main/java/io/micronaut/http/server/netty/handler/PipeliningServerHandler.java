@@ -284,6 +284,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
+     * Convert a response status code to a {@link HttpStatus}, or {@code null} if the code is not
+     * one of the registered statuses.
+     *
+     * @param code The status code
+     * @return The status, or {@code null}
+     */
+    private static @Nullable HttpStatus safeStatusOf(int code) {
+        try {
+            return HttpStatus.valueOf(code);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
      * Pass a request to the {@link RequestHandler}. If the handler fails to accept it, the request
      * would never be answered, and any requests pipelined after it would wait for it forever, so
      * it is answered with an empty 500 response and the connection is closed after that.
@@ -1622,6 +1637,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
                 preprocess(response);
                 oh = new FullOutboundHandler(this, response);
+                oh.capturedStatus = safeStatusOf(response.status().code());
                 if (response.content().isReadable()) {
                     prepareCompression(response, oh, response.content().readableBytes());
                 }
@@ -1669,6 +1685,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
                 preprocess(response);
                 StreamingOutboundHandler oh = new StreamingOutboundHandler(this, response);
+                oh.capturedStatus = safeStatusOf(response.status().code());
                 prepareCompression(response, oh, expectedLength.orElse(-1));
                 StreamingNettyByteBody streaming = byteBodyFactory().toStreaming(body);
                 oh.body = streaming;
@@ -1709,6 +1726,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         Compressor. @Nullable Session compressionSession;
 
         /**
+         * The response status captured when the response is written, for the
+         * {@link io.micronaut.http.context.event.HttpResponseWrittenEvent}.
+         */
+        @Nullable HttpStatus capturedStatus;
+
+        /**
+         * Accumulated response body bytes (post-compression), for the
+         * {@link io.micronaut.http.context.event.HttpResponseWrittenEvent}.
+         */
+        long bytesWritten;
+
+        /**
          * {@code true} iff {@link RequestHandler#responseWritten} has been called for this
          * response already.
          */
@@ -1726,7 +1755,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         final void markResponseWritten() {
             if (!responseWritten) {
                 responseWritten = true;
-                requestHandler.responseWritten(outboundAccess.attachment);
+                requestHandler.responseWritten(outboundAccess.attachment, capturedStatus, bytesWritten);
             }
         }
 
@@ -1736,6 +1765,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         protected final void writeCompressing(HttpContent content, @SuppressWarnings("SameParameterValue") boolean flush, boolean last) {
             if (this.compressionSession == null) {
+                bytesWritten += content.content().readableBytes();
                 writePotentialEnd(content, flush, shouldCloseAfterContent(last));
             } else {
                 // slow path
@@ -1811,6 +1841,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
             boolean close = shouldCloseAfterContent(last);
             ByteBuf toSend = compressionSession.poll();
+            if (toSend != null) {
+                bytesWritten += toSend.readableBytes();
+            }
             // send the compressed buffer with the flags.
             if (toSend == null) {
                 if (last) {
