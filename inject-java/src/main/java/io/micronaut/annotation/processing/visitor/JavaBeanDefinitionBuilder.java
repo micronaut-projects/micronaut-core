@@ -95,7 +95,14 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             protected ElementBeanDefinitionBuilder createBeanDefinitionBuilder(ElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory) {
                 ClassElement newParent = parentType.withAnnotationMetadata(parentType.copyAnnotationMetadata()); // Just a copy
                 return beanDefinitionBuilderFactory.factoryField(
-                    BeanInjectionUtils.createFieldDefinition(newParent, producerField, !producerField.isPublic(), visitorContext)
+                    BeanInjectionUtils.createFieldDefinition(
+                        newParent,
+                        producerField.withAnnotationMetadata(
+                            new AnnotationMetadataHierarchy(newParent.getDeclaredMetadata(), producerField.getDeclaredMetadata(), getAnnotationMetadata())
+                        ),
+                        producerField.isReflectionRequired(),
+                        visitorContext
+                    )
                 );
             }
 
@@ -140,7 +147,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
                         newParent,
                         producerMethod.withParameters(getParameters()).withAnnotationMetadata(annotationMetadata),
                         annotationMetadata,
-                        !producerMethod.isPublic(),
+                        producerMethod.isReflectionRequired(),
                         visitorContext
                     ));
             }

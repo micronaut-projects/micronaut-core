@@ -33,3 +33,4 @@ io.micronaut.kotlin.processing.annotations.RemapperStereotypesSpec$ExtraStereoty
 io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
 io.micronaut.kotlin.processing.qualifiers.NonBindingMarkingVisitor
 io.micronaut.inject.test.hierarchy.IntrospectEveryClassVisitor
+io.micronaut.inject.visitor.producebeans.ProduceBeansVisitor

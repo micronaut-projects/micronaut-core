@@ -30,3 +30,4 @@ io.micronaut.python.annotation.processing.test.annotate.SubclassMemberAnnotation
 io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
 io.micronaut.python.annotation.processing.test.qualifiers.NonBindingMemberAnnotatedByVisitorSpec$NonBindingMarkingVisitor
 io.micronaut.inject.test.hierarchy.IntrospectEveryClassVisitor
+io.micronaut.python.annotation.processing.test.ProduceBeansAccessSpec$PythonProduceBeansVisitor
