@@ -53,6 +53,8 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
     private static final byte[] ID_PREFIX = "id: ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] RETRY_PREFIX = "retry: ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] COMMENT_PREFIX = ": ".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] EMPTY_DATA = "data:".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] EMPTY_COMMENT = ":".getBytes(StandardCharsets.UTF_8);
     private static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
     private static final List<MediaType> JSON_TYPE_LIST = List.of(MediaType.APPLICATION_JSON_TYPE);
 
@@ -126,45 +128,80 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
             body = baos.toByteArray();
         }
 
-        writeAttribute(output, COMMENT_PREFIX, event.getComment());
-        writeAttribute(output, ID_PREFIX, event.getId());
-        writeAttribute(output, EVENT_PREFIX, event.getName());
+        writeComment(output, event.getComment());
+        writeAttribute(output, ID_PREFIX, "id", event.getId());
+        writeAttribute(output, EVENT_PREFIX, "event", event.getName());
         Duration retry = event.getRetry();
         if (retry != null) {
-            writeAttribute(output, RETRY_PREFIX, String.valueOf(retry.toMillis()));
+            writeAttribute(output, RETRY_PREFIX, "retry", String.valueOf(retry.toMillis()));
         }
 
-        // Write the data
-        int start = 0;
-        while (start < body.length) {
-            int end = indexOf(body, (byte) '\n', start);
-            if (end == -1) {
-                end = body.length - 1;
-            }
-            output.write(DATA_PREFIX).write(body, start, end - start + 1);
-            start = end + 1;
-        }
+        // Write each line of the data as its own field, including an empty last line
+        writeLines(output, DATA_PREFIX, EMPTY_DATA, body);
 
-        // Write new lines for event separation
-        output.write(NEWLINE).write(NEWLINE);
+        // Write a new line for event separation
+        output.write(NEWLINE);
     }
 
-    private static int indexOf(byte[] haystack, @SuppressWarnings("SameParameterValue") byte needle, int start) {
-        for (int i = start; i < haystack.length; i++) {
-            if (haystack[i] == needle) {
+    /**
+     * Writes each line of the value as its own field. Lines end with a carriage return, a line
+     * feed or both, and an empty last line is kept, so that a value ending in a line break, or an
+     * empty value, is read back unchanged.
+     *
+     * @param output      The output
+     * @param prefix      The prefix of a line with content
+     * @param emptyPrefix The prefix of an empty line
+     * @param value       The value
+     */
+    private static void writeLines(Output output, byte[] prefix, byte[] emptyPrefix, byte[] value) {
+        int start = 0;
+        while (true) {
+            int end = lineEnd(value, start);
+            int lineEnd = end == -1 ? value.length : end;
+            if (lineEnd == start) {
+                output.write(emptyPrefix);
+            } else {
+                output.write(prefix).write(value, start, lineEnd - start);
+            }
+            output.write(NEWLINE);
+            if (end == -1) {
+                return;
+            }
+            start = end + 1;
+            if (value[end] == '\r' && start < value.length && value[start] == '\n') {
+                start++;
+            }
+        }
+    }
+
+    private static int lineEnd(byte[] value, int start) {
+        for (int i = start; i < value.length; i++) {
+            byte b = value[i];
+            if (b == '\n' || b == '\r') {
                 return i;
             }
         }
         return -1;
     }
 
+    private static void writeComment(Output output, @Nullable String comment) {
+        if (comment != null) {
+            writeLines(output, COMMENT_PREFIX, EMPTY_COMMENT, comment.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
     /**
      * @param eventData The byte buffer
      * @param attribute The attribute
+     * @param field     The name of the field
      * @param value     The value
      */
-    private static void writeAttribute(Output eventData, byte[] attribute, @Nullable String value) {
+    private static void writeAttribute(Output eventData, byte[] attribute, String field, @Nullable String value) {
         if (value != null) {
+            if (value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
+                // a line break would end the field and let the value start another field or event
+                throw new CodecException("The " + field + " of a server-sent event must not contain a line break");
+            }
             eventData.write(attribute)
                 .write(value, StandardCharsets.UTF_8)
                 .write(NEWLINE);
