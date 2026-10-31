@@ -1633,6 +1633,21 @@ public abstract class HttpClientConfiguration {
         @SuppressWarnings("WeakerAccess")
         public static final int DEFAULT_MAX_HEADER_LIST_SIZE = 8192;
 
+        /**
+         * The default initial flow-control window size of a stream, in bytes.
+         *
+         * @since 5.3.0
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final int DEFAULT_INITIAL_WINDOW_SIZE = 1024 * 1024;
+
+        /**
+         * The flow-control window size every HTTP/2 endpoint starts with, as fixed by the
+         * protocol. Kept as a literal because this module does not depend on netty, where it is
+         * {@code Http2CodecUtil.DEFAULT_WINDOW_SIZE}.
+         */
+        private static final int PROTOCOL_DEFAULT_WINDOW_SIZE = 65535;
+
         @Nullable
         private Duration pingIntervalRead = null;
 
@@ -1643,6 +1658,12 @@ public abstract class HttpClientConfiguration {
         private Duration pingIntervalIdle = null;
 
         private int maxHeaderListSize = DEFAULT_MAX_HEADER_LIST_SIZE;
+
+        @Nullable
+        private Integer initialWindowSize = DEFAULT_INITIAL_WINDOW_SIZE;
+
+        @Nullable
+        private Integer initialConnectionWindowSize;
 
         /**
          * Default constructor.
@@ -1661,6 +1682,8 @@ public abstract class HttpClientConfiguration {
                 this.pingIntervalWrite = copy.pingIntervalWrite;
                 this.pingIntervalIdle = copy.pingIntervalIdle;
                 this.maxHeaderListSize = copy.maxHeaderListSize;
+                this.initialWindowSize = copy.initialWindowSize;
+                this.initialConnectionWindowSize = copy.initialConnectionWindowSize;
             }
         }
 
@@ -1744,6 +1767,84 @@ public abstract class HttpClientConfiguration {
          */
         public void setMaxHeaderListSize(@ReadableBytes int maxHeaderListSize) {
             this.maxHeaderListSize = maxHeaderListSize;
+        }
+
+        /**
+         * [available in the Netty HTTP client].
+         *
+         * @return The {@code SETTINGS_INITIAL_WINDOW_SIZE} the client advertises, or {@code null}
+         * to leave it unset and keep netty's default.
+         * @see #setInitialWindowSize(Integer)
+         * @since 5.3.0
+         */
+        @Nullable
+        public Integer getInitialWindowSize() {
+            return initialWindowSize;
+        }
+
+        /**
+         * Sets the {@code SETTINGS_INITIAL_WINDOW_SIZE} the client advertises, i.e. how many
+         * response body bytes a server may send on one stream before the client has to
+         * acknowledge them with a {@code WINDOW_UPDATE}. Default value
+         * ({@value io.micronaut.http.client.HttpClientConfiguration.Http2ClientConfiguration#DEFAULT_INITIAL_WINDOW_SIZE}),
+         * {@code null} to leave the setting unset and keep netty's default.
+         * <p>
+         * The receive window of the connection as a whole follows: it is raised by twice the
+         * amount by which this value exceeds the protocol default of 65535 bytes, so that a single
+         * stream cannot use up the whole connection window, and
+         * {@link #setInitialConnectionWindowSize(Integer)} raises it further. Both windows are
+         * only refilled as the response body is consumed, so a client that holds on to unread
+         * response data can buffer that much per connection. The protocol default is restored by
+         * setting this to 65535.
+         *
+         * @param initialWindowSize The initial flow-control window size of a stream, in bytes
+         * @throws IllegalArgumentException if the value is negative
+         * @since 5.3.0
+         */
+        public void setInitialWindowSize(@ReadableBytes @Nullable Integer initialWindowSize) {
+            if (initialWindowSize != null && initialWindowSize < 0) {
+                throw new IllegalArgumentException("initial-window-size must not be negative but was " + initialWindowSize);
+            }
+            this.initialWindowSize = initialWindowSize;
+        }
+
+        /**
+         * [available in the Netty HTTP client].
+         *
+         * @return The initial flow-control window size of the connection as a whole, or
+         * {@code null} to derive it from {@link #setInitialWindowSize(Integer)}.
+         * @see #setInitialConnectionWindowSize(Integer)
+         * @since 5.3.0
+         */
+        @Nullable
+        public Integer getInitialConnectionWindowSize() {
+            return initialConnectionWindowSize;
+        }
+
+        /**
+         * Sets the initial flow-control window size of the connection as a whole (HTTP/2 stream
+         * 0), i.e. how many response body bytes a server may send across all streams of one
+         * connection before the client has to acknowledge them with a {@code WINDOW_UPDATE}.
+         * <p>
+         * {@code SETTINGS_INITIAL_WINDOW_SIZE} ({@link #setInitialWindowSize(Integer)}) only
+         * applies to individual streams. The connection window always starts at the protocol
+         * default of 65535 bytes. By default it is raised by twice the amount by which
+         * {@code initial-window-size} exceeds 65535 — by that amount once doubling it would
+         * exceed 2^31-1 — so that a single stream cannot use up the whole connection window.
+         * This property raises the connection window further, to the given number of bytes; it
+         * has no effect when the default derived from the stream window is already larger. The
+         * value must be at least 65535 and at most 2^31-1; the connection window can only be
+         * raised above the protocol default, never lowered.
+         *
+         * @param initialConnectionWindowSize The connection window size in bytes
+         * @throws IllegalArgumentException if the value is out of range
+         * @since 5.3.0
+         */
+        public void setInitialConnectionWindowSize(@ReadableBytes @Nullable Integer initialConnectionWindowSize) {
+            if (initialConnectionWindowSize != null && initialConnectionWindowSize < PROTOCOL_DEFAULT_WINDOW_SIZE) {
+                throw new IllegalArgumentException("initial-connection-window-size must be at least " + PROTOCOL_DEFAULT_WINDOW_SIZE + " but was " + initialConnectionWindowSize);
+            }
+            this.initialConnectionWindowSize = initialConnectionWindowSize;
         }
     }
 
