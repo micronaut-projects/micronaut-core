@@ -1100,6 +1100,15 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                 getBooleanMethod(HAS_CONSTRUCTOR_METHOD, true)
             );
         }
+        boolean singletonObject = beanClassElement.isSingletonObject() && constructor == null && defaultConstructor == null;
+        if (singletonObject) {
+            // an object has no accessible constructor: the bean is the static INSTANCE field of its type
+            classDefBuilder.addMethod(getBooleanMethod(HAS_CONSTRUCTOR_METHOD, true));
+            classDefBuilder.addMethod(getBooleanMethod(IS_STATIC_CREATOR_METHOD, true));
+            classDefBuilder.addMethod(getSingletonInstanceMethod(INSTANTIATE_METHOD));
+            classDefBuilder.addMethod(getSingletonInstanceMethod(INSTANTIATE_INTERNAL_METHOD));
+            classDefBuilder.addMethod(getBooleanMethod(IS_BUILDABLE_METHOD, true));
+        }
         MethodElement instantiatingConstructor = constructor != null ? constructor : defaultConstructor;
         if (beanClassElement.isEnum() || (instantiatingConstructor != null && instantiatingConstructor.isStatic())) {
             // an enum valueOf or a static @Creator: the bean is not created through a constructor of its type
@@ -1145,7 +1154,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             classDefBuilder.addMethod(
                 getBooleanMethod(IS_BUILDABLE_METHOD, true)
             );
-        } else if (defaultConstructor == null) {
+        } else if (defaultConstructor == null && !singletonObject) {
             classDefBuilder.addMethod(
                 getBooleanMethod(IS_BUILDABLE_METHOD, hasBuilder)
             );
@@ -1458,6 +1467,11 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                     aThis.invoke(UNKNOWN_DISPATCH_AT_INDEX_METHOD, methodParameters.get(0)).doThrow()
                 );
             });
+    }
+
+    private MethodDef getSingletonInstanceMethod(Method method) {
+        return MethodDef.override(method)
+            .build((aThis, methodParameters) -> beanType.getStaticField("INSTANCE", beanType).returning());
     }
 
     private MethodDef getInstantiateMethod(MethodElement constructor, Method method) {

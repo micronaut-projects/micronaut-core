@@ -321,7 +321,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         }
 
         private fun visitInnerClasses(classElement: ClassElement, processed: MutableSet<String> = HashSet()) {
-            val innerClassQuery = ElementQuery.ALL_INNER_CLASSES.modifiers { it.contains(ElementModifier.PUBLIC) }
+            val innerClassQuery = ElementQuery.ALL_INNER_CLASSES.onlyDeclared().modifiers { it.contains(ElementModifier.PUBLIC) }
             classElement.getEnclosedElements(innerClassQuery).forEach {
                 val visitor = loadedVisitor.visitor
                 val kspClassElement: KotlinClassElement = it as KotlinClassElement
