@@ -53,6 +53,7 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.core.convert.format.MapFormat;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import java.util.Map;
 
 @Singleton
@@ -60,7 +61,12 @@ class Test {
     @Inject
     @Property(name = "my.nulls")
     @MapFormat(transformation = MapFormat.MapTransformation.FLAT)
-    public Map<String, Object> objects;
+    public Map<String, @Nullable Object> objects;
+
+    @Inject
+    @Property(name = "my.nulls")
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT)
+    public Map<String, Object> nonNullableObjects;
 
     @Inject
     @Property(name = "my.nulls")
@@ -75,6 +81,7 @@ class Test {
         bean.objects.containsKey('absent')
         bean.objects.get('absent') == null
         bean.objects.get('present') == 'one'
+        bean.nonNullableObjects == [present: 'one']
         // a String converts from nothing: the entry without a value is left out
         bean.strings == [present: 'one']
 
