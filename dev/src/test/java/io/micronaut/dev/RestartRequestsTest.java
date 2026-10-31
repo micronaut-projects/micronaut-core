@@ -84,7 +84,7 @@ class RestartRequestsTest {
         StubServer stuck = new StubServer(true, CompletableFuture::new);
         try (ApplicationContext generation = ApplicationContext.builder().singletons(stuck).start()) {
             CompletableFuture<Void> admission = requests.batchStarted();
-            assertFalse(requests.whenAdmitted().isDone());
+            assertFalse(requests.isAdmitted());
 
             long started = System.nanoTime();
             requests.beforeStop(generation, 3);
