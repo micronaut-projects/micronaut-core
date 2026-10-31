@@ -19,6 +19,7 @@ import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.dev.change.ChangeSet;
 import io.micronaut.dev.compile.ClassDependencyIndex;
+import io.micronaut.dev.compile.OutputLock;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
@@ -176,91 +177,107 @@ final class TestSession {
             allTestSources = merge(retryTestSources, testSources);
             previousConstants = constantDeclarers;
         }
-        DevRuntime.CompileRound application = runtime.compileRound(manifest, runtime.jointOwners(), allSources, full, Set.of());
-        if (application.failure() != null) {
-            compilationFailed(application.failure(), allSources, allTestSources);
-            return;
+        // the application's outputs stay as compiled, by this process or another, until the tests compiled against them
+        // and what changed was read
+        OutputLock.Hold hold = runtime.outputLock().lock();
+        try {
+            DevRuntime.CompileRound application = runtime.compileRound(manifest, runtime.jointOwners(), allSources, full, Set.of());
+            if (application.failure() != null) {
+                compilationFailed(application.failure(), allSources, allTestSources);
+                return;
+            }
+            List<ClassDependencyIndex> applicationIndexes = scan(outputs(manifest, manifest.sourceRoots()));
+            Set<String> applicationConstants = constantDeclarers(applicationIndexes);
+            Set<String> seed = new LinkedHashSet<>(application.affectedClasses());
+            // development mode of the project, compiling into the same output, may have compiled a change first, or
+            // removed a deleted source's classes and their mapping: what the output holds since the last batch counts
+            for (String className : runtime.peekOutputChanges().classNames()) {
+                seed.add(ClassDependencyIndex.topLevelOf(className));
+            }
+            // javac inlined the constants of a changed class into the tests that read them, without a reference to follow,
+            // whether the class declares them now or declared them before the change: every test compiles and runs again
+            boolean constants = seed.stream().anyMatch(name -> previousConstants.contains(name) || applicationConstants.contains(name));
+            DevRuntime.CompileRound testRound = runtime.compileRound(tests, testJoint, allTestSources, full || constants, seed);
+            if (testRound.failure() != null) {
+                compilationFailed(testRound.failure(), allSources, allTestSources);
+                return;
+            }
+            synchronized (this) {
+                retrySources.clear();
+                retryTestSources.clear();
+            }
+            compilationRecovered();
+            List<ClassDependencyIndex> testIndexes = scan(outputs(tests, tests.sourceRoots()));
+            List<ClassDependencyIndex> indexes = new ArrayList<>(applicationIndexes);
+            indexes.addAll(testIndexes);
+            Set<String> testClasses = new HashSet<>();
+            for (ClassDependencyIndex index : testIndexes) {
+                testClasses.addAll(index.classes());
+            }
+            Set<String> removedTests;
+            Set<String> currentConstants = constantDeclarers(indexes);
+            // a test helper's constants: its compiler recompiled the tests that inlined them, and they all run
+            constants |= testRound.affectedClasses().stream().anyMatch(name -> previousConstants.contains(name) || currentConstants.contains(name));
+            synchronized (this) {
+                removedTests = new LinkedHashSet<>(knownTestClasses);
+                removedTests.removeAll(testClasses);
+                knownTestClasses = Set.copyOf(testClasses);
+                constantDeclarers = currentConstants;
+                this.indexes = List.copyOf(indexes);
+            }
+            if (!removedTests.isEmpty()) {
+                testClassesRemoved(removedTests);
+            }
+            // a file of tests discovered from their files, deleted, or failed and deleted since: its results go, and its failure
+            Set<String> goneFiles;
+            synchronized (this) {
+                goneFiles = goneTestFiles(tests.sourceRoots(), allTestSources, failedClasses);
+            }
+            if (!goneFiles.isEmpty()) {
+                testClassesRemoved(goneFiles);
+            }
+            Set<String> resourcesBefore = runtime.outputResources();
+            ChangeSet changes = runtime.takeOutputChanges();
+            // the outputs are read: the tests run, or the next generation is made, without holding them
+            hold.close();
+            hold = () -> { };
+            if (resources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty())) {
+                // a configuration or other resource file read live changed: what the runner built from it is out of date,
+                // and nothing is patched into it
+                runLoaderCurrent = false;
+            } else if (!changes.isEmpty()) {
+                patchOrRetire(changes, resourcesBefore);
+            }
+            Set<String> changed = new LinkedHashSet<>(application.affectedClasses());
+            changed.addAll(testRound.affectedClasses());
+            for (String className : changes.classNames()) {
+                changed.add(ClassDependencyIndex.topLevelOf(className));
+            }
+            changed.removeAll(removedTests);
+            boolean fileTestsChanged = fileTestsChanged(tests.sourceRoots(), allSources, allTestSources, changed);
+            boolean resourcesChanged = resources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty())
+                || !changes.changedResources().isEmpty() || !changes.removedResources().isEmpty();
+            synchronized (this) {
+                owedChanges.addAll(changed);
+                owedAll |= full || resourcesChanged || fileTestsChanged || constants || !settings.affectedOnly() && !changed.isEmpty();
+            }
+            if (requested != null) {
+                run(requested(requested), requested != TestRequest.FAILED);
+                return;
+            }
+            if (!watching) {
+                LOG.info("Compiled; watching is off, so no test runs until one is asked for");
+                return;
+            }
+            TestSelection selection = owed("affected");
+            if (selection == null) {
+                LOG.info("Nothing to test: no test depends on what changed");
+                return;
+            }
+            run(selection, true);
+        } finally {
+            hold.close();
         }
-        List<ClassDependencyIndex> applicationIndexes = scan(outputs(manifest, manifest.sourceRoots()));
-        Set<String> applicationConstants = constantDeclarers(applicationIndexes);
-        // javac inlined the constants of a changed class into the tests that read them, without a reference to follow,
-        // whether the class declares them now or declared them before the change: every test compiles and runs again
-        boolean constants = application.affectedClasses().stream().anyMatch(name -> previousConstants.contains(name) || applicationConstants.contains(name));
-        DevRuntime.CompileRound testRound = runtime.compileRound(tests, testJoint, allTestSources, full || constants, application.affectedClasses());
-        if (testRound.failure() != null) {
-            compilationFailed(testRound.failure(), allSources, allTestSources);
-            return;
-        }
-        synchronized (this) {
-            retrySources.clear();
-            retryTestSources.clear();
-        }
-        compilationRecovered();
-        List<ClassDependencyIndex> testIndexes = scan(outputs(tests, tests.sourceRoots()));
-        List<ClassDependencyIndex> indexes = new ArrayList<>(applicationIndexes);
-        indexes.addAll(testIndexes);
-        Set<String> testClasses = new HashSet<>();
-        for (ClassDependencyIndex index : testIndexes) {
-            testClasses.addAll(index.classes());
-        }
-        Set<String> removedTests;
-        Set<String> currentConstants = constantDeclarers(indexes);
-        // a test helper's constants: its compiler recompiled the tests that inlined them, and they all run
-        constants |= testRound.affectedClasses().stream().anyMatch(name -> previousConstants.contains(name) || currentConstants.contains(name));
-        synchronized (this) {
-            removedTests = new LinkedHashSet<>(knownTestClasses);
-            removedTests.removeAll(testClasses);
-            knownTestClasses = Set.copyOf(testClasses);
-            constantDeclarers = currentConstants;
-            this.indexes = List.copyOf(indexes);
-        }
-        if (!removedTests.isEmpty()) {
-            testClassesRemoved(removedTests);
-        }
-        // a file of tests discovered from their files, deleted, or failed and deleted since: its results go, and its failure
-        Set<String> goneFiles;
-        synchronized (this) {
-            goneFiles = goneTestFiles(tests.sourceRoots(), allTestSources, failedClasses);
-        }
-        if (!goneFiles.isEmpty()) {
-            testClassesRemoved(goneFiles);
-        }
-        Set<String> resourcesBefore = runtime.outputResources();
-        ChangeSet changes = runtime.takeOutputChanges();
-        if (resources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty())) {
-            // a configuration or other resource file read live changed: what the runner built from it is out of date,
-            // and nothing is patched into it
-            runLoaderCurrent = false;
-        } else if (!changes.isEmpty()) {
-            patchOrRetire(changes, resourcesBefore);
-        }
-        Set<String> changed = new LinkedHashSet<>(application.affectedClasses());
-        changed.addAll(testRound.affectedClasses());
-        for (String className : changes.classNames()) {
-            changed.add(ClassDependencyIndex.topLevelOf(className));
-        }
-        changed.removeAll(removedTests);
-        boolean fileTestsChanged = fileTestsChanged(tests.sourceRoots(), allSources, allTestSources, changed);
-        boolean resourcesChanged = resources.values().stream().anyMatch(change -> !change.changed().isEmpty() || !change.deleted().isEmpty())
-            || !changes.changedResources().isEmpty() || !changes.removedResources().isEmpty();
-        synchronized (this) {
-            owedChanges.addAll(changed);
-            owedAll |= full || resourcesChanged || fileTestsChanged || constants || !settings.affectedOnly() && !changed.isEmpty();
-        }
-        if (requested != null) {
-            run(requested(requested), requested != TestRequest.FAILED);
-            return;
-        }
-        if (!watching) {
-            LOG.info("Compiled; watching is off, so no test runs until one is asked for");
-            return;
-        }
-        TestSelection selection = owed("affected");
-        if (selection == null) {
-            LOG.info("Nothing to test: no test depends on what changed");
-            return;
-        }
-        run(selection, true);
     }
 
     private static Map<SourceKind, SourceChanges> merge(Map<SourceKind, SourceChanges> first, Map<SourceKind, SourceChanges> second) {
@@ -270,10 +287,13 @@ final class TestSession {
         return merged;
     }
 
-    private static List<ClassDependencyIndex> scan(List<Path> outputs) {
+    private List<ClassDependencyIndex> scan(List<Path> outputs) {
         List<ClassDependencyIndex> scanned = new ArrayList<>();
-        for (Path output : outputs) {
-            scanned.add(ClassDependencyIndex.scan(output));
+        // another process of the project, development mode, may be compiling into the application's outputs
+        try (OutputLock.Hold hold = runtime.outputLock().lock()) {
+            for (Path output : outputs) {
+                scanned.add(ClassDependencyIndex.scan(output));
+            }
         }
         return scanned;
     }
