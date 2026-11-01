@@ -163,4 +163,19 @@ class IOUtilsSpec extends Specification {
         then:
             theJarUri == "file:/C:/oracle/path/to/micronaut-inject-3.5.7.jar!/"
     }
+
+    void "resolvePath keeps the nested: URI of a jar nested in a Spring Boot executable jar"() {
+        given:
+            URI uri = new URI("jar:nested:/path/to/app.jar/!BOOT-INF/lib/micronaut-inject-5.2.21.jar!/META-INF/micronaut")
+            String theJarUri = null
+
+        when:
+            IOUtils.resolvePath(uri, "META-INF/micronaut", []) { List<Closeable> closeables, String jarUri ->
+                theJarUri = jarUri
+                Paths.get("/")
+            }
+
+        then:
+            theJarUri == "nested:/path/to/app.jar/!BOOT-INF/lib/micronaut-inject-5.2.21.jar!/"
+    }
 }
