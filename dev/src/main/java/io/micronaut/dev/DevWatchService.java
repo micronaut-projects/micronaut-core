@@ -33,11 +33,11 @@ import java.util.Locale;
 
 /**
  * The watch service the launcher watches with. On macOS the JDK's service polls, every ten seconds by default and
- * every two at its highest sensitivity, so the native FSEvents service of {@code micronaut-runtime-osx} is used when
- * that module is on the development runtime classpath, which the build plugins put there on macOS. Without it, and in a
- * native image, which cannot load that module's service at runtime because it uses JNA, the launcher compares the
- * watched directories every {@value #POLL_MILLIS} milliseconds ({@link PollingWatchService}). Elsewhere the JDK's
- * service is native, and is registered at its highest sensitivity.
+ * every two at its highest sensitivity, so FSEvents tells which directories changed ({@link FsEventsWatchService})
+ * when JNA is on the development runtime classpath, as {@code micronaut-runtime-osx} puts it there, which the build
+ * plugins add on macOS. Without it, and in a native image, which cannot load JNA's library at runtime, the launcher
+ * compares the watched directories every {@value #POLL_MILLIS} milliseconds ({@link PollingWatchService}). Elsewhere
+ * the JDK's service is native, and is registered at its highest sensitivity.
  *
  * @param service The service
  * @param registrar How directories are registered with it
@@ -54,14 +54,15 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
     static final int POLL_MILLIS = 250;
 
     /**
-     * How long the native macOS service holds the events that follow a first one before it reports them, in seconds.
-     * Its default, half a second, reported the rest of a save or a checkout after the watcher's quiet period had
-     * delivered the first event alone; under the quiet period, they reach the same batch.
+     * How long FSEvents holds the events that follow a first one before it reports them, in seconds. Half a second,
+     * the default of the service of {@code micronaut-runtime-osx}'s library, reported the rest of a save or a checkout
+     * after the watcher's quiet period had delivered the first event alone; under the quiet period, they reach the
+     * same batch.
      */
     static final double MAC_LATENCY_SECONDS = 0.05;
 
     private static final Logger LOG = LoggerFactory.getLogger(DevWatchService.class);
-    private static final String MAC_SERVICE = "io.methvin.watchservice.MacOSXListeningWatchService";
+    private static final String JNA = "com.sun.jna.Native";
 
     /**
      * @return The best service this JVM offers
@@ -69,7 +70,7 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     static DevWatchService create() throws IOException {
         boolean mac = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
-        return create(mac, NativeImageUtils.inImageRuntimeCode(), ClassUtils.isPresent(MAC_SERVICE, DevWatchService.class.getClassLoader()));
+        return create(mac, NativeImageUtils.inImageRuntimeCode(), ClassUtils.isPresent(JNA, DevWatchService.class.getClassLoader()));
     }
 
     /**
@@ -77,7 +78,7 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      *
      * @param mac Whether the platform is macOS
      * @param nativeImage Whether this runs in a native image, which cannot load the native macOS service
-     * @param macServicePresent Whether the native macOS service is on the classpath
+     * @param macServicePresent Whether JNA, which the native macOS service calls FSEvents through, is on the classpath
      * @return The service
      * @throws IOException if no service can be created
      */
@@ -113,10 +114,10 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     java.time.Duration detectionDelay() {
         if (service instanceof PollingWatchService) {
-            return java.time.Duration.ofMillis(POLL_MILLIS);
+            return Duration.ofMillis(POLL_MILLIS);
         }
-        if (service.getClass().getName().equals(MAC_SERVICE)) {
-            return java.time.Duration.ofMillis(Math.round(MAC_LATENCY_SECONDS * 1000));
+        if (service instanceof FsEventsWatchService fsEvents) {
+            return fsEvents.detectionDelay(Duration.ofMillis(Math.round(MAC_LATENCY_SECONDS * 1000)));
         }
         return java.time.Duration.ZERO;
     }
@@ -130,20 +131,12 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
     }
 
     /**
-     * Loaded only when the native macOS service is present.
+     * Loaded only when JNA is present.
      */
     private static final class MacOs {
         static DevWatchService create() throws IOException {
-            io.methvin.watchservice.MacOSXListeningWatchService service = new io.methvin.watchservice.MacOSXListeningWatchService(new io.methvin.watchservice.MacOSXListeningWatchService.Config() {
-                @Override
-                public double latency() {
-                    return MAC_LATENCY_SECONDS;
-                }
-            });
-            DirectoryWatcher.WatchKeyRegistrar registrar = (directory, watchService) -> new io.methvin.watchservice.WatchablePath(directory).register(
-                watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);
-            // closing the native service has crashed the JVM; micronaut-runtime-osx leaves it open as well
-            return new DevWatchService(service, registrar, false);
+            FsEventsWatchService service = new FsEventsWatchService(MAC_LATENCY_SECONDS, Duration.ofMillis(POLL_MILLIS));
+            return new DevWatchService(service, (directory, watchService) -> service.register(directory), true);
         }
     }
 

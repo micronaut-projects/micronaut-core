@@ -187,11 +187,10 @@ public final class DevRuntime implements Closeable {
     private volatile List<Path> watchedRoots = List.of(); // NOSONAR java:S3077 an immutable list, replaced whole
     private @Nullable DirectoryWatcher watcher;
     /**
-     * How long the worker waits after taking a batch a caller reported, such as an IDE's or a test harness's report of
-     * a file it wrote: the watcher's own report of the same write follows once its service noticed the write and its
-     * quiet period passed.
+     * The service the watcher watches with: after a batch a caller reported, such as an IDE's or a test harness's
+     * report of a file it wrote, the worker waits for the service to notice the same write.
      */
-    private volatile Duration coalesceReported = WATCH_QUIET_PERIOD.plus(COALESCE_REPORTED_MARGIN);
+    private volatile @Nullable DevWatchService watchService; // NOSONAR java:S3077 only the reference is published; the service is thread-safe
     private final Map<Path, FileWatcherRegistration> pinnedWatches = new ConcurrentHashMap<>();
     // read by the request threads of the script filter and the /dev endpoint, set by the launcher
     private volatile @Nullable LiveReloadServer liveReload; // NOSONAR java:S3077 thread-safe server, replaced whole
@@ -1104,7 +1103,7 @@ public final class DevRuntime implements Closeable {
                 .registrar(watchService.registrar())
                 .quietPeriod(WATCH_QUIET_PERIOD)
                 .threadName("micronaut-dev-watcher");
-            coalesceReported = watchService.detectionDelay().plus(WATCH_QUIET_PERIOD).plus(COALESCE_REPORTED_MARGIN);
+            this.watchService = watchService;
             directoryWatcher = builder.closeWatchServiceOnClose(watchService.closeOnClose()).build().start();
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot start the file watcher", e);
@@ -1385,7 +1384,7 @@ public final class DevRuntime implements Closeable {
     private void coalesce(List<Pending> batches) throws InterruptedException {
         long taken = System.nanoTime();
         long deadline = taken + COALESCE_MAX.toNanos();
-        long reported = batches.get(0).reported ? taken + coalesceReported.toNanos() : taken;
+        long reported = batches.get(0).reported ? taken + coalesceReported().toNanos() : taken;
         while (true) {
             long now = System.nanoTime();
             long wait = Math.min(Math.max(COALESCE_IDLE.toNanos(), reported - now), deadline - now);
@@ -1395,10 +1394,20 @@ public final class DevRuntime implements Closeable {
                 return;
             }
             if (next.reported) {
-                reported = Math.max(reported, System.nanoTime() + coalesceReported.toNanos());
+                reported = Math.max(reported, System.nanoTime() + coalesceReported().toNanos());
             }
             batches.add(next);
         }
+    }
+
+    /**
+     * How long the worker waits after taking a batch a caller reported: until the watch service noticed the write,
+     * which may change as it falls back to polling, and the watcher's quiet period passed.
+     */
+    private Duration coalesceReported() {
+        DevWatchService service = watchService;
+        Duration detection = service == null ? Duration.ZERO : service.detectionDelay();
+        return detection.plus(WATCH_QUIET_PERIOD).plus(COALESCE_REPORTED_MARGIN);
     }
 
     /**
