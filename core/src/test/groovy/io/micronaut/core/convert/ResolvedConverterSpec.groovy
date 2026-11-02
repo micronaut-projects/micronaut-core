@@ -93,6 +93,27 @@ class ResolvedConverterSpec extends Specification {
         ((TypeConverter) converter).convert("10", Long, ConversionContext.DEFAULT).get() == 10L
     }
 
+    void "a resolved converter distinguishes target type parameters after registration"() {
+        given:
+        def service = new DefaultMutableConversionService()
+        def integers = Argument.listOf(Integer)
+        def strings = Argument.listOf(String)
+        def converter = service.resolveConverter(StringBuilder, integers)
+
+        expect:
+        converter.convert(new StringBuilder("1,2"), List, ConversionContext.of(integers)).get() == [1, 2]
+
+        when:
+        service.addInternalConverter(CharSequence, integers, { CharSequence value, Class<List<Integer>> type, ConversionContext context ->
+            Optional.of(value.toString().split(';').collect { Integer.valueOf(it) })
+        } as TypeConverter)
+
+        then:
+        converter.convert(new StringBuilder("3;4"), List, ConversionContext.of(integers)).get() == [3, 4]
+        converter.convert(new StringBuilder("a,b"), List, ConversionContext.of(strings)).get() == ['a', 'b']
+        service.convert("5;6", integers).get() == [5, 6]
+    }
+
     void "a resolved converter uses the formatting annotation of the argument"() {
         given:
         def service = new DefaultMutableConversionService()
