@@ -5,18 +5,18 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
 
 /**
- * {@link io.micronaut.inject.visitor.VisitorContext#completeAnnotationValue(AnnotationValue)} completes a value a
- * visitor builds itself, and the values nested in its members, the way an annotation added to an element is
- * completed. The sibling copies of this spec live in the inject-java, inject-groovy and inject-python test suites.
+ * An annotation a visitor builds with {@link AnnotationValue#builder(String)} and nests in another annotation it adds
+ * to an element is completed as the outer annotation is: with the defaults of its type and its non-binding members.
+ * The sibling copies of this spec live in the inject-java, inject-groovy and inject-python test suites.
  *
  * <p>The annotation types annotate declarations in the sources: under KSP an annotation type that only appears
  * nested in another annotation reports no defaults, nor the non-binding members that have one.</p>
  *
  * @see CompletingVisitor
  */
-class CompleteAnnotationValueSpec extends AbstractKotlinCompilerSpec {
+class NestedAnnotationValueDefaultsSpec extends AbstractKotlinCompilerSpec {
 
-    void 'test a value a visitor builds is completed with the defaults and non-binding members of its type'() {
+    void 'test the annotations a visitor nests in an annotation it adds are completed'() {
         given:
         CompletingVisitor.reset()
         def definition = buildBeanDefinition('complete.Test', '''
@@ -50,34 +50,24 @@ annotation class Engine(
 )
 ''')
 
-        expect: 'adding the built value to an element completes the value itself but not the values nested in it'
-        def added = definition.getAnnotationMetadata().getAnnotation('complete.Engine')
+        expect: 'the nested annotation carries the defaults and non-binding members of its type, and its own values'
+        def added = CompletingVisitor.added
         added.getDefaultValues().name == 'v8'
-        def addedNested = added.getAnnotation('cylinders').get()
-        !addedNested.contains(AnnotationUtil.NON_BINDING_ATTRIBUTE)
-        !addedNested.getDefaultValues()
-
-        and: 'the completed value carries the defaults of its type'
-        def completed = CompletingVisitor.completed
-        completed.getDefaultValues().name == 'v8'
-
-        and: 'and so does the value nested in a member, with its non-binding members, keeping its explicit values'
-        def nested = completed.getAnnotation('cylinders').get()
+        def nested = added.getAnnotation('cylinders').get()
         nested.intValue().asInt == 8
         nested.stringValues(AnnotationUtil.NON_BINDING_ATTRIBUTE) as Set == ['description', AnnotationUtil.NON_BINDING_ATTRIBUTE] as Set
         nested.getDefaultValues() == [unit: 'count']
 
-        and: 'and the values nested in an array'
-        def spares = completed.getAnnotations('spares')
+        and: 'so do the annotations nested in an array'
+        def spares = added.getAnnotations('spares')
         spares*.intValue()*.asInt == [8, 2]
         spares*.stringValue('unit')*.orElse(null) == [null, 'pairs']
         spares.every { it.getDefaultValues() == [unit: 'count'] }
         spares.every { it.stringValues(AnnotationUtil.NON_BINDING_ATTRIBUTE).contains('description') }
 
-        and: 'a value whose type cannot be resolved is returned as it is'
-        CompletingVisitor.unresolvedCompleted.is(CompletingVisitor.unresolved)
-
-        and: 'a complete value is returned as it is'
-        CompletingVisitor.completedAgain.is(CompletingVisitor.completed)
+        and: 'the written metadata records the non-binding members'
+        def written = definition.getAnnotationMetadata().getAnnotation('complete.Engine')
+        written.getAnnotation('cylinders').get().stringValues(AnnotationUtil.NON_BINDING_ATTRIBUTE) as Set == ['description', AnnotationUtil.NON_BINDING_ATTRIBUTE] as Set
+        written.getAnnotations('spares').every { it.stringValues(AnnotationUtil.NON_BINDING_ATTRIBUTE).contains('description') }
     }
 }

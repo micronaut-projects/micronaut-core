@@ -6,23 +6,17 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 
 /**
- * Builds an {@code complete.Engine} holding {@code complete.Cylinders} values, completes it and adds it to
- * {@code complete.Test}.
+ * Adds to {@code complete.Test} an {@code complete.Engine} built with {@link AnnotationValue#builder(String)} that
+ * holds {@code complete.Cylinders} values built the same way, and keeps the occurrence the element then holds.
  *
- * @see CompleteAnnotationValueSpec
+ * @see NestedAnnotationValueDefaultsSpec
  */
 class CompletingVisitor implements TypeElementVisitor<Object, Object> {
 
-    static AnnotationValue<?> completed
-    static AnnotationValue<?> completedAgain
-    static AnnotationValue<?> unresolved
-    static AnnotationValue<?> unresolvedCompleted
+    static AnnotationValue<?> added
 
     static void reset() {
-        completed = null
-        completedAgain = null
-        unresolved = null
-        unresolvedCompleted = null
+        added = null
     }
 
     @Override
@@ -36,10 +30,7 @@ class CompletingVisitor implements TypeElementVisitor<Object, Object> {
             .member('cylinders', eight)
             .member('spares', eight, two)
             .build()
-        completed = context.completeAnnotationValue(engine)
-        completedAgain = context.completeAnnotationValue(completed)
-        unresolved = AnnotationValue.builder('complete.Missing').member('value', 1).build()
-        unresolvedCompleted = context.completeAnnotationValue(unresolved)
         element.annotate(engine)
+        added = element.getAnnotation('complete.Engine')
     }
 }
