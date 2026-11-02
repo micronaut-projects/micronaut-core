@@ -29,6 +29,7 @@ tasks.withType(JavaCompile).configureEach {
             check("ClassInitializationDeadlock", CheckSeverity.ERROR)
             check("DoubleCheckedLocking", CheckSeverity.ERROR)
             check("BadInstanceof", CheckSeverity.ERROR)
+            check("DefaultCharset", CheckSeverity.ERROR)
         }
     }
     // Disable NullAway on test code and TCK

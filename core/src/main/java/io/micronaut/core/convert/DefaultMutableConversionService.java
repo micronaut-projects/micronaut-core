@@ -592,7 +592,7 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         // InputStream -> String
         addInternalConverter(InputStream.class, String.class, (object, targetType, context) -> {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(object))) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(object, context.getCharset()))) {
                 return Optional.of(IOUtils.readText(reader));
             } catch (IOException e) {
                 context.reject(e);
