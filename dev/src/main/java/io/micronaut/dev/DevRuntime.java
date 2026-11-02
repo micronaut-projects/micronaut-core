@@ -124,7 +124,23 @@ public final class DevRuntime implements Closeable {
      * The system property that has {@code BeanIntrospector.SHARED} read the introspections of the thread's context class loader.
      */
     private static final String INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
-    private static final Duration COALESCE = Duration.ofMillis(150);
+    /**
+     * How long the worker waits for another batch after the last one it took: the watcher delivers the batches of
+     * one save-all's roots within a few milliseconds of each other, and its quiet period already groups each root's.
+     */
+    private static final Duration COALESCE_IDLE = Duration.ofMillis(25);
+    /**
+     * How long the watcher waits for further events before delivering a batch.
+     */
+    private static final Duration WATCH_QUIET_PERIOD = Duration.ofMillis(120);
+    /**
+     * What the worker waits for beyond the watcher's own delay after taking a batch a caller reported.
+     */
+    private static final Duration COALESCE_REPORTED_MARGIN = Duration.ofMillis(30);
+    /**
+     * How long the worker merges batches that keep arriving at most, from the first.
+     */
+    private static final Duration COALESCE_MAX = Duration.ofMillis(500);
     private static final Duration APP_STOP_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration FAILURE_WAIT = Duration.ofSeconds(2);
     private static final Duration START_TIMEOUT = Duration.ofMinutes(5);
@@ -140,6 +156,7 @@ public final class DevRuntime implements Closeable {
     private final LinkedBlockingQueue<Pending> pending = new LinkedBlockingQueue<>();
     private final AtomicLong submitted = new AtomicLong();
     private final AtomicLong completed = new AtomicLong();
+    private final AtomicLong batchesHandled = new AtomicLong();
     private final Object lifecycle = new Object();
     private final CountDownLatch closedLatch = new CountDownLatch(1);
     private volatile CompletableFuture<ApplicationContext> started = new CompletableFuture<>(); // NOSONAR java:S3077 swapped whole per generation; the future is thread-safe
@@ -169,6 +186,12 @@ public final class DevRuntime implements Closeable {
     private boolean contextClaimed; // guarded by lifecycle: whether the generation adopted its context, the first it created
     private volatile List<Path> watchedRoots = List.of(); // NOSONAR java:S3077 an immutable list, replaced whole
     private @Nullable DirectoryWatcher watcher;
+    /**
+     * How long the worker waits after taking a batch a caller reported, such as an IDE's or a test harness's report of
+     * a file it wrote: the watcher's own report of the same write follows once its service noticed the write and its
+     * quiet period passed.
+     */
+    private volatile Duration coalesceReported = WATCH_QUIET_PERIOD.plus(COALESCE_REPORTED_MARGIN);
     private final Map<Path, FileWatcherRegistration> pinnedWatches = new ConcurrentHashMap<>();
     // read by the request threads of the script filter and the /dev endpoint, set by the launcher
     private volatile @Nullable LiveReloadServer liveReload; // NOSONAR java:S3077 thread-safe server, replaced whole
@@ -369,7 +392,7 @@ public final class DevRuntime implements Closeable {
      * of the application.
      */
     public void requestReload() {
-        enqueue(new Pending(Map.of(), Map.of(), true));
+        enqueueReported(new Pending(Map.of(), Map.of(), true));
     }
 
     /**
@@ -540,7 +563,7 @@ public final class DevRuntime implements Closeable {
      */
     public void reload() {
         RuntimeThreads.refuseOwnThreads(worker, applicationThread);
-        awaitBatch(enqueue(new Pending(Map.of(), Map.of(), true)));
+        awaitBatch(enqueueReported(new Pending(Map.of(), Map.of(), true)));
     }
 
     /**
@@ -560,7 +583,7 @@ public final class DevRuntime implements Closeable {
         sort(changed, false, sources, testSources, resources);
         sort(deleted, true, sources, testSources, resources);
         RuntimeThreads.refuseOwnThreads(worker, applicationThread);
-        awaitBatch(enqueue(new Pending(sources, testSources, resources, false, null)));
+        awaitBatch(enqueueReported(new Pending(sources, testSources, resources, false, null)));
     }
 
     private void sort(Collection<Path> files, boolean deleted, Map<SourceKind, SourceChanges> sources, Map<SourceKind, SourceChanges> testSources,
@@ -619,7 +642,7 @@ public final class DevRuntime implements Closeable {
      */
     void sourcesChanged(SourceKind kind, Set<Path> changed, Set<Path> deleted) {
         RuntimeThreads.refuseOwnThreads(worker, applicationThread);
-        awaitBatch(enqueue(new Pending(Map.of(kind, new SourceChanges(changed, deleted)), Map.of(), false)));
+        awaitBatch(enqueueReported(new Pending(Map.of(kind, new SourceChanges(changed, deleted)), Map.of(), false)));
     }
 
     /**
@@ -1079,7 +1102,9 @@ public final class DevRuntime implements Closeable {
             DevWatchService watchService = DevWatchService.create();
             DirectoryWatcher.Builder builder = DirectoryWatcher.builder(watchService.service())
                 .registrar(watchService.registrar())
+                .quietPeriod(WATCH_QUIET_PERIOD)
                 .threadName("micronaut-dev-watcher");
+            coalesceReported = watchService.detectionDelay().plus(WATCH_QUIET_PERIOD).plus(COALESCE_REPORTED_MARGIN);
             directoryWatcher = builder.closeWatchServiceOnClose(watchService.closeOnClose()).build().start();
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot start the file watcher", e);
@@ -1274,6 +1299,13 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
+     * @return How many merged batches the worker has handled
+     */
+    long batchesHandled() {
+        return batchesHandled.get();
+    }
+
+    /**
      * Waits until the worker has handled the batch with the given sequence number, whichever merge it
      * ended up in.
      */
@@ -1312,9 +1344,13 @@ public final class DevRuntime implements Closeable {
             batches.add(first);
             try {
                 // one save-all touches several roots: their batches arrive within a few milliseconds of each other
-                Thread.sleep(COALESCE.toMillis());
-                pending.drainTo(batches);
+                coalesce(batches);
+                long handling = System.nanoTime();
                 handle(Pending.merge(batches));
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Handled {} batch(es) in {} ms, {} ms after the first was delivered", batches.size(),
+                        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - handling), TimeUnit.NANOSECONDS.toMillis(handling - first.delivered));
+                }
             } catch (InterruptedException e) {
                 admission.complete(null);
                 Thread.currentThread().interrupt();
@@ -1335,9 +1371,43 @@ public final class DevRuntime implements Closeable {
                     last = Math.max(last, batch.sequence);
                 }
                 completed.accumulateAndGet(last, Math::max);
+                batchesHandled.incrementAndGet();
                 gate.complete(null);
             }
         }
+    }
+
+    /**
+     * Takes the batches that follow the first, until none came for {@link #COALESCE_IDLE}, and the watcher's delay
+     * passed since a batch a caller reported, or they kept coming for {@link #COALESCE_MAX}, so that a lone edit is
+     * handled right after the watcher delivers it.
+     */
+    private void coalesce(List<Pending> batches) throws InterruptedException {
+        long taken = System.nanoTime();
+        long deadline = taken + COALESCE_MAX.toNanos();
+        long reported = batches.get(0).reported ? taken + coalesceReported.toNanos() : taken;
+        while (true) {
+            long now = System.nanoTime();
+            long wait = Math.min(Math.max(COALESCE_IDLE.toNanos(), reported - now), deadline - now);
+            Pending next = wait > 0 ? pending.poll(wait, TimeUnit.NANOSECONDS) : null;
+            if (next == null) {
+                pending.drainTo(batches);
+                return;
+            }
+            if (next.reported) {
+                reported = Math.max(reported, System.nanoTime() + coalesceReported.toNanos());
+            }
+            batches.add(next);
+        }
+    }
+
+    /**
+     * Enqueues a batch a caller reported after writing files, or asked to reload for files it wrote: the worker waits
+     * for the watcher's report of the same writes to join it.
+     */
+    private long enqueueReported(Pending batch) {
+        batch.reported = true;
+        return enqueue(batch);
     }
 
     /**
