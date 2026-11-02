@@ -17,6 +17,12 @@ tasks.withType(JavaCompile).configureEach {
         // Every package is @NullMarked or @NullUnmarked, enforced by RequireExplicitNullMarking
         option("NullAway:OnlyNullMarked", "true")
         check("RequireExplicitNullMarking", CheckSeverity.ERROR)
+        // Verify @Contract annotations instead of trusting them
+        option("NullAway:CheckContracts", "true")
+        // Check overrides of library methods against the overridden signature
+        option("NullAway:ExhaustiveOverride", "true")
+        // Honor @Nullable returns and @NonNull parameters declared in library bytecode
+        option("NullAway:AcknowledgeRestrictiveAnnotations", "true")
     }
     // Disable NullAway on test code and TCK
     if (name.toLowerCase().contains("test") || project.name.contains("tck")) {

@@ -958,8 +958,14 @@ public class ConnectionManager {
             path = path.replace("{remoteAddress}", resolveIfNecessary(ch.remoteAddress()));
         }
         if (udpBootstrap != null && ch instanceof QuicStreamChannel qsc) {
-            path = path.replace("{localAddress}", resolveIfNecessary(qsc.parent().localSocketAddress()));
-            path = path.replace("{remoteAddress}", resolveIfNecessary(qsc.parent().remoteSocketAddress()));
+            SocketAddress localAddress = qsc.parent().localSocketAddress();
+            if (localAddress != null) {
+                path = path.replace("{localAddress}", resolveIfNecessary(localAddress));
+            }
+            SocketAddress remoteAddress = qsc.parent().remoteSocketAddress();
+            if (remoteAddress != null) {
+                path = path.replace("{remoteAddress}", resolveIfNecessary(remoteAddress));
+            }
         }
         path = path.replace("{random}", Long.toHexString(ThreadLocalRandom.current().nextLong()));
         path = path.replace("{timestamp}", Instant.now().toString());
