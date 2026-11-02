@@ -48,6 +48,8 @@ import java.util.stream.Collectors;
  */
 public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Iterable<Map.Entry<String, V>>, ConversionServiceProvider {
 
+    // EMPTY must stay a ConvertibleValuesMap, a public class that another thread can initialize first
+    @SuppressWarnings("ClassInitializationDeadlock")
     ConvertibleValues EMPTY = new ConvertibleValuesMap<>(Collections.emptyMap());
 
     /**
