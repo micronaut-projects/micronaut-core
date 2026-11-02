@@ -55,6 +55,8 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
             if (builder instanceof BeanContextConfiguration configuration && configuration.getClassLoader() == runtime.classLoader().getParent()) {
                 builder.classLoader(runtime.classLoader().current());
             }
+            // not development mode, which would change how the tests run, but what modules may keep warm across runs
+            builder.properties(Map.of(DevelopmentMode.TEST_PROPERTY, true));
             return;
         }
         // the generation loader itself, never the facade: the JVM records the loader Class.forName was called
