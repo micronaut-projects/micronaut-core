@@ -490,7 +490,8 @@ final class Pool40 implements Pool {
 
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
-                propagatedContext.wrap(() -> sink.completeExceptionally(t)).run();
+                // a client event loop, not the single JVM-wide GlobalEventExecutor thread
+                WaiterCompletion.complete(propagatedContext, group.next(), () -> sink.completeExceptionally(t));
                 return true;
             } else {
                 return false;
@@ -503,7 +504,7 @@ final class Pool40 implements Pool {
                 if (sink.isCancelled()) {
                     return false;
                 }
-                propagatedContext.wrap(() -> sink.complete(value)).run();
+                WaiterCompletion.complete(propagatedContext, value.channel().eventLoop(), () -> sink.complete(value));
                 return true;
             } else {
                 return false;

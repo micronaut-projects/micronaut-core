@@ -39,7 +39,7 @@ import java.util.function.Function;
  * {@link BasicHttpAttributes#discardUnconsumedBodies}). Without this, the data received so far
  * stays buffered and the connection stops reading.
  *
- * @since 5.2.10
+ * @since 5.2.21
  */
 @Internal
 public final class UnconsumedBodyGuard {

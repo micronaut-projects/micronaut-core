@@ -65,6 +65,6 @@ class AccessLogControlCharacterSpec extends Specification {
         AccessLog.escape(value).is(value)
 
         where:
-        value << ['/hello?a=b&c=%20d', 'Mozilla/5.0 (X11; Linux) "quoted" \\ é', '']
+        value << ['/hello?a=b&c=%20d', 'Mozilla/5.0 (X11; Linux) é', '']
     }
 }

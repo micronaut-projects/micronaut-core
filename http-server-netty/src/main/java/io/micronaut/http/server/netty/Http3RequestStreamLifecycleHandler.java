@@ -16,9 +16,13 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpStatusClass;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.quic.QuicStreamChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,8 +31,9 @@ import org.slf4j.LoggerFactory;
  * Ends the QUIC stream of an HTTP/3 request when the request cannot be processed further. A
  * failure on the stream (e.g. a malformed request head, or a failed write) resets the stream,
  * which tears down the pipeline and so cancels the
- * response. Closing the stream before the request was read completely stops the peer from
- * sending the rest of it, so that the stream releases its slot and flow control credit.
+ * response. Closing the stream, or completing the response, before the request was read
+ * completely stops the peer from sending the rest of it, so that the stream releases its slot
+ * and flow control credit.
  */
 @Internal
 final class Http3RequestStreamLifecycleHandler extends ChannelDuplexHandler {
@@ -58,11 +63,40 @@ final class Http3RequestStreamLifecycleHandler extends ChannelDuplexHandler {
     }
 
     @Override
-    public void close(ChannelHandlerContext ctx, ChannelPromise promise) {
-        QuicStreamChannel stream = (QuicStreamChannel) ctx.channel();
+    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+        if (msg instanceof LastHttpContent && !isInformational(msg)) {
+            // the response is complete. Unless the application still reads the request body, the
+            // rest of it is not needed any more: the request handler discards it, so ask the peer
+            // to stop sending it.
+            promise = promise.unvoid().addListener(future -> {
+                if (future.isSuccess()) {
+                    QuicStreamChannel stream = (QuicStreamChannel) ctx.channel();
+                    PipeliningServerHandler handler = ctx.pipeline().get(PipeliningServerHandler.class);
+                    if (handler != null && handler.isStreamingRequestBody()) {
+                        // like HTTP/2, stop the input only once the application discards the body
+                        handler.onRequestBodyDiscarded(() -> stopInput(stream));
+                    } else {
+                        stopInput(stream);
+                    }
+                }
+            });
+        }
+        ctx.write(msg, promise);
+    }
+
+    private static boolean isInformational(Object msg) {
+        return msg instanceof HttpResponse response && response.status().codeClass() == HttpStatusClass.INFORMATIONAL;
+    }
+
+    private static void stopInput(QuicStreamChannel stream) {
         if (stream.isActive() && !stream.isInputShutdown()) {
             stream.shutdownInput(H3_NO_ERROR);
         }
+    }
+
+    @Override
+    public void close(ChannelHandlerContext ctx, ChannelPromise promise) {
+        stopInput((QuicStreamChannel) ctx.channel());
         ctx.close(promise);
     }
 

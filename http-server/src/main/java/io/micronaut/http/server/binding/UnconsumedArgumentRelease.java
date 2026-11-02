@@ -16,31 +16,38 @@
 package io.micronaut.http.server.binding;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.LifecycleHttpRequest;
+import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteInfo;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 /**
  * Releases bound argument values that are owned by the route (for example a refcounted body)
- * when the request ends before the route was invoked.
+ * when the request ends before the route was invoked. Each value belongs to the route whose
+ * binding produced it, so invoking another route for the same request (an error or status
+ * route) does not take over the values of a route that never ran.
  *
- * @since 5.2.18
+ * @since 5.2.21
  */
 @Internal
 public final class UnconsumedArgumentRelease {
     private static final String ATTRIBUTE = UnconsumedArgumentRelease.class.getName();
 
-    private final List<Runnable> releases = new ArrayList<>(1);
-    private boolean invoked;
+    private final List<Pending> releases = new ArrayList<>(1);
+    private final List<RouteInfo<?>> invoked = new ArrayList<>(1);
     private boolean released;
 
     private UnconsumedArgumentRelease() {
     }
 
     /**
-     * Release a bound argument value with the request, unless the route is invoked first.
+     * Release a bound argument value with the request, unless the route that is currently
+     * matched for the request is invoked first.
      *
      * @param request The request
      * @param release Releases the value
@@ -52,44 +59,63 @@ public final class UnconsumedArgumentRelease {
             request.setAttribute(ATTRIBUTE, pending);
             request.addDisposalResource(pending::release);
         }
-        pending.addRelease(release);
+        pending.addRelease(RouteAttributes.getRouteInfo(request).orElse(null), release);
     }
 
     /**
-     * Called when the route is invoked: the route now owns its argument values.
+     * Called when a route is invoked: the route now owns its argument values.
      *
      * @param request The request
+     * @param routeInfo The invoked route
      */
-    public static void routeInvoked(HttpRequest<?> request) {
-        request.getAttribute(ATTRIBUTE, UnconsumedArgumentRelease.class).ifPresent(UnconsumedArgumentRelease::transfer);
+    public static void routeInvoked(HttpRequest<?> request, RouteInfo<?> routeInfo) {
+        request.getAttribute(ATTRIBUTE, UnconsumedArgumentRelease.class).ifPresent(p -> p.transfer(routeInfo));
     }
 
-    private synchronized void addRelease(Runnable release) {
-        if (released) {
-            // the request is already released, nobody would run this later
-            release.run();
-        } else if (!invoked) {
-            releases.add(release);
+    private void addRelease(@Nullable RouteInfo<?> route, Runnable release) {
+        synchronized (this) {
+            if (!released) {
+                if (!isInvoked(route)) {
+                    releases.add(new Pending(route, release));
+                }
+                return;
+            }
         }
+        // the request is already released, nobody would run this later
+        release.run();
     }
 
-    private synchronized void transfer() {
-        invoked = true;
-        releases.clear();
+    private boolean isInvoked(@Nullable RouteInfo<?> route) {
+        for (RouteInfo<?> r : invoked) {
+            if (r == route) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private synchronized void transfer(RouteInfo<?> route) {
+        invoked.add(route);
+        Iterator<Pending> it = releases.iterator();
+        while (it.hasNext()) {
+            if (it.next().route == route) {
+                it.remove();
+            }
+        }
     }
 
     private void release() {
-        List<Runnable> toRun;
+        List<Pending> toRun;
         synchronized (this) {
             released = true;
-            if (invoked) {
-                return;
-            }
             toRun = new ArrayList<>(releases);
             releases.clear();
         }
-        for (Runnable r : toRun) {
-            r.run();
+        for (Pending p : toRun) {
+            p.release.run();
         }
+    }
+
+    private record Pending(@Nullable RouteInfo<?> route, Runnable release) {
     }
 }

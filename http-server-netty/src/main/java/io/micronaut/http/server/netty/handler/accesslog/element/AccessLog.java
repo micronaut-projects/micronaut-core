@@ -31,6 +31,17 @@ import java.util.List;
  * @since 2.0
  */
 public class AccessLog {
+    private static final char LATIN1_MAX = '\u00FF';
+    private static final char ARABIC_LETTER_MARK = '\u061C';
+    private static final char LEFT_TO_RIGHT_MARK = '\u200E';
+    private static final char RIGHT_TO_LEFT_MARK = '\u200F';
+    // U+2028 LINE SEPARATOR, U+2029 PARAGRAPH SEPARATOR, then the embeddings and overrides U+202A-U+202E
+    private static final char LINE_SEPARATOR = '\u2028';
+    private static final char RIGHT_TO_LEFT_OVERRIDE = '\u202E';
+    // the isolates U+2066-U+2069
+    private static final char LEFT_TO_RIGHT_ISOLATE = '\u2066';
+    private static final char POP_DIRECTIONAL_ISOLATE = '\u2069';
+
     private final List<IndexedLogElement> onRequestHeadersElements;
     private final List<IndexedLogElement> onResponseHeadersElements;
     private final List<IndexedLogElement> onResponseWriteElements;
@@ -143,11 +154,15 @@ public class AccessLog {
     }
 
     /**
-     * Escapes the control characters (C0, DEL and C1) of a request or response derived value,
-     * so that a client cannot inject line breaks or terminal escape sequences into the access log.
+     * Escapes the control characters (C0, DEL and C1), the Unicode line and paragraph separators
+     * and the bidirectional controls of a request or response derived value, so that a client
+     * cannot inject line breaks, terminal escape sequences or reordered text into the access log.
+     * A backslash and a double quote are escaped with a backslash, so that a client cannot forge
+     * an escape sequence or close a quoted field.
      *
      * @param value The value
-     * @return The value with each control character replaced by a {@code \xHH} escape
+     * @return The value with each control character replaced by a {@code \xHH} escape, or a
+     * {@code \\}{@code uHHHH} escape for the separators and bidirectional controls beyond Latin-1
      */
     static @Nullable String escape(@Nullable String value) {
         if (value == null) {
@@ -155,7 +170,7 @@ public class AccessLog {
         }
         int length = value.length();
         int i = 0;
-        while (i < length && !isControl(value.charAt(i))) {
+        while (i < length && !needsEscape(value.charAt(i))) {
             i++;
         }
         if (i == length) {
@@ -165,7 +180,15 @@ public class AccessLog {
         builder.append(value, 0, i);
         for (; i < length; i++) {
             char c = value.charAt(i);
-            if (isControl(c)) {
+            if (c > LATIN1_MAX && isUnicodeFormatControl(c)) {
+                builder.append("\\u")
+                    .append(Character.forDigit(c >> 12, 16))
+                    .append(Character.forDigit((c >> 8) & 0xF, 16))
+                    .append(Character.forDigit((c >> 4) & 0xF, 16))
+                    .append(Character.forDigit(c & 0xF, 16));
+            } else if (c == '\\' || c == '"') {
+                builder.append('\\').append(c);
+            } else if (isControl(c)) {
                 builder.append("\\x").append(Character.forDigit(c >> 4, 16)).append(Character.forDigit(c & 0xF, 16));
             } else {
                 builder.append(c);
@@ -174,8 +197,23 @@ public class AccessLog {
         return builder.toString();
     }
 
+    private static boolean needsEscape(char c) {
+        return c == '\\' || c == '"' || isControl(c);
+    }
+
     private static boolean isControl(char c) {
-        return c < 0x20 || (c >= 0x7F && c <= 0x9F);
+        return c < 0x20 || (c >= 0x7F && c <= 0x9F) || (c > LATIN1_MAX && isUnicodeFormatControl(c));
+    }
+
+    /**
+     * Line and paragraph separators, which some log viewers treat as line breaks, and the
+     * bidirectional controls, which visually reorder the rest of the line.
+     */
+    private static boolean isUnicodeFormatControl(char c) {
+        return c == ARABIC_LETTER_MARK
+            || c == LEFT_TO_RIGHT_MARK || c == RIGHT_TO_LEFT_MARK
+            || (c >= LINE_SEPARATOR && c <= RIGHT_TO_LEFT_OVERRIDE)
+            || (c >= LEFT_TO_RIGHT_ISOLATE && c <= POP_DIRECTIONAL_ISOLATE);
     }
 
     private void resetIndexedLogElement(IndexedLogElement elt) {

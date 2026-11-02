@@ -29,7 +29,7 @@ import java.util.List;
  * copied together, so the number of pieces kept is bounded by the number of bytes, not by the
  * number of pieces the client chose to send.
  *
- * @since 5.2.18
+ * @since 5.2.21
  */
 @Internal
 public final class ReadBufferCoalescing {

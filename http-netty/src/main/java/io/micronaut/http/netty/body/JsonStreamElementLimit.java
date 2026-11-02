@@ -25,7 +25,7 @@ import reactor.util.context.ContextView;
  * {@link NettyJsonHandler#readChunked} or {@link NettyJsonStreamHandler#readChunked}. A node is
  * buffered in memory before it is decoded.
  *
- * @since 5.2.18
+ * @since 5.2.21
  */
 @Internal
 public final class JsonStreamElementLimit {

@@ -29,7 +29,7 @@ import java.util.concurrent.Flow;
  * Body subscriber that fails and cancels the body once it exceeds the maximum content length.
  *
  * @param <T> The body type
- * @since 4.10.0
+ * @since 5.2.21
  */
 @Internal
 final class LimitedBodySubscriber<T> implements HttpResponse.BodySubscriber<T> {

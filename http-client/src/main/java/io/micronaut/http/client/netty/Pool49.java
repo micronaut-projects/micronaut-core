@@ -1168,7 +1168,9 @@ final class Pool49 implements Pool {
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
                 releasePermit();
-                propagatedContext.wrap(() -> sink.completeExceptionally(t)).run();
+                // a client event loop, not the single JVM-wide GlobalEventExecutor thread
+                EventExecutor loop = likelyEventLoop();
+                WaiterCompletion.complete(propagatedContext, loop == null ? localPools.get(0).loop : loop, () -> sink.completeExceptionally(t));
                 return true;
             } else {
                 return false;
@@ -1182,7 +1184,7 @@ final class Pool49 implements Pool {
                 if (sink.isCancelled()) {
                     return false;
                 }
-                propagatedContext.wrap(() -> sink.complete(value)).run();
+                WaiterCompletion.complete(propagatedContext, value.channel().eventLoop(), () -> sink.complete(value));
                 return true;
             } else {
                 return false;

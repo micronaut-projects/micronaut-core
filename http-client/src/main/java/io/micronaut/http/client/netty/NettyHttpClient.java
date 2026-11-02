@@ -1298,9 +1298,11 @@ final class NettyHttpClient implements
                         DelayedExecutionFlow<HttpResponse<?>> delayed = DelayedExecutionFlow.create();
                         final StreamedHttpResponse nettyResponse = streamedResponse.getNettyResponse();
                         nettyResponse.subscribe(new Subscriber<>() {
-                            final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer();
+                            final int maxContentLength = configuration.getMaxContentLength();
+                            final ErrorBodyBuffer buffer = new ErrorBodyBuffer(byteBufferFactory.getNativeAllocator(), maxContentLength);
                             @Nullable
                             Subscription s;
+                            boolean done;
 
                             @Override
                             public void onSubscribe(Subscription s) {
@@ -1310,36 +1312,62 @@ final class NettyHttpClient implements
 
                             @Override
                             public void onNext(HttpContent httpContent) {
-                                buffer.addComponent(true, httpContent.content());
+                                if (done) {
+                                    httpContent.release();
+                                    return;
+                                }
+                                ByteBuf content = httpContent.content();
+                                long newSize = buffer.sizeWith(content);
+                                if (!buffer.add(content)) {
+                                    done = true;
+                                    Objects.requireNonNull(s).cancel();
+                                    buffer.release();
+                                    // keep the upstream status, without the body that is too large
+                                    completeExceptionallySafe(delayed, responseException(Unpooled.EMPTY_BUFFER,
+                                        new ContentLengthExceededException(maxContentLength, newSize)));
+                                    return;
+                                }
                                 Objects.requireNonNull(s).request(1);
                             }
 
                             @Override
                             public void onError(Throwable t) {
+                                if (done) {
+                                    return;
+                                }
+                                done = true;
                                 buffer.release();
                                 completeExceptionallySafe(delayed, t);
                             }
 
                             @Override
                             public void onComplete() {
+                                if (done) {
+                                    return;
+                                }
+                                done = true;
                                 try {
-                                    FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
-                                    boolean hasErrorType = errorType != HttpClient.DEFAULT_ERROR_TYPE;
-                                    final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, hasErrorType ? (Argument<Object>) errorType : null, hasErrorType, conversionService);
-                                    completeExceptionallySafe(delayed, decorate(new HttpClientResponseException(
-                                        fullHttpResponse.status().reasonPhrase(),
-                                        null,
-                                        fullNettyClientHttpResponse,
-                                        hasErrorType ? new HttpClientErrorDecoder() {
-                                            @Override
-                                            public Argument<?> getErrorType(MediaType mediaType) {
-                                                return errorType;
-                                            }
-                                        } : HttpClientErrorDecoder.DEFAULT
-                                    )));
+                                    completeExceptionallySafe(delayed, responseException(buffer.content(), null));
                                 } finally {
                                     buffer.release();
                                 }
+                            }
+
+                            private Throwable responseException(ByteBuf body, @Nullable Throwable cause) {
+                                FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), body, nettyResponse.headers(), new DefaultHttpHeaders(true));
+                                boolean hasErrorType = errorType != HttpClient.DEFAULT_ERROR_TYPE;
+                                final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, hasErrorType ? (Argument<Object>) errorType : null, hasErrorType, conversionService);
+                                return decorate(new HttpClientResponseException(
+                                    fullHttpResponse.status().reasonPhrase(),
+                                    cause,
+                                    fullNettyClientHttpResponse,
+                                    hasErrorType ? new HttpClientErrorDecoder() {
+                                        @Override
+                                        public Argument<?> getErrorType(MediaType mediaType) {
+                                            return errorType;
+                                        }
+                                    } : HttpClientErrorDecoder.DEFAULT
+                                ));
                             }
                         });
                         return delayed;

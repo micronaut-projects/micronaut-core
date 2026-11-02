@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -129,9 +130,10 @@ final class NettyRequestLifecycle extends RequestLifecycle {
 
     @Override
     protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch, HttpRequest<?> request) {
-        // handle decoding failure
+        // handle decoding failure. A status or error route handles that failure, so it still runs,
+        // e.g. a global @Error(status = REQUEST_ENTITY_TOO_LARGE) route for an oversized request
         DecoderResult decoderResult = Objects.requireNonNull(nettyRequest).getNativeRequest().decoderResult();
-        if (decoderResult.isFailure()) {
+        if (decoderResult.isFailure() && !routeMatch.getRouteInfo().isErrorRoute()) {
             return ExecutionFlow.error(decoderResult.cause());
         }
         return super.fulfillArguments(routeMatch, request);
@@ -141,4 +143,13 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         onError(nettyRequest, cause).onComplete((response, throwable) -> rib.writeResponse(outboundAccess, nettyRequest, response, throwable));
     }
 
+    @Override
+    protected void requestContextResolved(HttpRequest<?> request, PropagatedContext propagatedContext) {
+        // the request terminated event is published in it
+        // the filters may have replaced the request with a wrapper
+        NettyHttpRequest<?> netty = nettyRequest;
+        if (netty != null) {
+            netty.responseContext = propagatedContext;
+        }
+    }
 }

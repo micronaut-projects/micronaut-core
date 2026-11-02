@@ -21,6 +21,7 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.type.Argument;
@@ -468,6 +469,43 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         MethodExecutionHandle<Object, Object> executionHandle = (MethodExecutionHandle<Object, Object>) executionHandleLocator
                                                                 .createExecutionHandle(beanDefinition, (ExecutableMethod<Object, Object>) method);
         return buildRoute(httpMethodName, httpMethod, uri, executionHandle);
+    }
+
+    /**
+     * Marks a {@code HEAD} route that runs the handler of a {@code GET} route of the same path, so
+     * the filters scoped to {@code GET} apply to it as well.
+     *
+     * @param route The HEAD route created by this builder
+     * @return The route
+     * @see UriRouteInfo#isImplicitHead()
+     * @since 5.2.21
+     */
+    @Internal
+    /**
+     * The port of the listener that received a request. The server tells it, as the local address
+     * of a connection without a port (UNIX domain sockets, QUIC streams) is not an
+     * {@link java.net.InetSocketAddress}.
+     *
+     * @param request The request
+     * @return The port, {@code -1} if the listener has none
+     */
+    private static int listenerPort(HttpRequest<?> request) {
+        Optional<Integer> port = RouteAttributes.getListenerPort(request);
+        if (port.isPresent()) {
+            return port.get();
+        }
+        try {
+            return request.getServerAddress().getPort();
+        } catch (ClassCastException | UnsupportedOperationException e) {
+            return -1;
+        }
+    }
+
+    protected final UriRoute markImplicitHead(UriRoute route) {
+        if (route instanceof DefaultUriRoute defaultUriRoute) {
+            defaultUriRoute.markImplicitHead();
+        }
+        return route;
     }
 
     /**
@@ -944,7 +982,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public UriRoute exposedPort(int port) {
             this.port = port;
-            where(httpRequest -> httpRequest.getServerAddress().getPort() == port);
+            where(httpRequest -> listenerPort(httpRequest) == port);
             DefaultRouteBuilder.this.exposedPorts.add(port);
             return this;
         }

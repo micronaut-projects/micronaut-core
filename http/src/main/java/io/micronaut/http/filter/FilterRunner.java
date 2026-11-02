@@ -190,7 +190,7 @@ public class FilterRunner {
      * retry the request.
      *
      * @return true if a continuation can only proceed once
-     * @since 5.2.18
+     * @since 5.2.21
      */
     protected boolean isProceedOnce() {
         return false;

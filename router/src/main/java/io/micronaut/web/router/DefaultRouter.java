@@ -61,13 +61,6 @@ import java.util.stream.Stream;
 @Singleton
 public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatch<?>> {
 
-    /**
-     * The request attribute that tells whether the listener of a request exposes the default
-     * routes, set for the listeners that have no port, e.g. UNIX domain sockets.
-     */
-    @Internal
-    public static final String LISTENER_EXPOSES_DEFAULT_ROUTES = "micronaut.router.listener-exposes-default-routes";
-
     private static final UriRouteInfo<Object, Object>[] EMPTY = new UriRouteInfo[0];
 
     private final EnumMap<HttpMethod, UriRouteInfo<Object, Object>[]> methodRoutesByMethod;
@@ -231,8 +224,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         if (defaultPorts == null) {
             return true;
         }
-        // a listener that has no port, e.g. a UNIX domain socket, tells whether it exposes them
-        Optional<Boolean> listenerExposes = request.getAttribute(LISTENER_EXPOSES_DEFAULT_ROUTES, Boolean.class);
+        // the server tells the setting of the listener that received the request. That covers
+        // listeners without a port (UNIX domain sockets, QUIC streams) and listeners that share a
+        // port on different addresses
+        Optional<Boolean> listenerExposes = RouteAttributes.getListenerExposesDefaultRoutes(request);
         if (listenerExposes.isPresent()) {
             return listenerExposes.get();
         }
@@ -656,12 +651,13 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     /**
      * Match the filter route. An implicit {@code HEAD} route runs the {@code GET} handler, so the
-     * filters scoped to {@code GET} apply to it as well.
+     * filters scoped to {@code GET} apply to it as well. Without a route (for example a static
+     * resource) a {@code HEAD} request is answered like a {@code GET}, so the same applies.
      */
     private static Optional<GenericHttpFilter> matchFilter(FilterRoute filterRoute, HttpMethod method, String path, @Nullable RouteMatch<?> routeMatch) {
         Optional<GenericHttpFilter> filter = filterRoute.match(method, path);
-        if (filter.isEmpty() && method == HttpMethod.HEAD && routeMatch != null
-            && routeMatch.getRouteInfo() instanceof UriRouteInfo<?, ?> uriRouteInfo && uriRouteInfo.isImplicitHead()) {
+        if (filter.isEmpty() && method == HttpMethod.HEAD
+            && (routeMatch == null || routeMatch.getRouteInfo() instanceof UriRouteInfo<?, ?> uriRouteInfo && uriRouteInfo.isImplicitHead())) {
             return filterRoute.match(HttpMethod.GET, path);
         }
         return filter;
@@ -680,7 +676,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         HttpMethod method = request.getMethod();
         String path = request.getPath();
         for (FilterRoute filterRoute : preMatchingPreconditionFilterRoutes) {
-            filterRoute.match(method, path).ifPresent(httpFilters::add);
+            // the route is not matched yet, so a HEAD request may reach a GET handler: treat it as
+            // a GET for the filters scoped to GET
+            matchFilter(filterRoute, method, path, null).ifPresent(httpFilters::add);
         }
         FilterRunner.sort(httpFilters);
         return Collections.unmodifiableList(httpFilters);

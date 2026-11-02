@@ -245,8 +245,9 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (hostHeader != null) {
             return isHostNameLocal(extractHostName(hostHeader));
         }
+        // URI.getHost keeps the brackets of an IPv6 literal
         String uriHost = request.getUri().getHost();
-        return uriHost != null && isHostNameLocal(uriHost);
+        return uriHost != null && isHostNameLocal(extractHostName(uriHost));
     }
 
     /*
@@ -295,9 +296,10 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             return true;
         }
         if (host.indexOf(':') != -1) {
-            // an IPv6 literal, InetAddress parses it without a name lookup
+            // an IPv6 literal. The brackets make InetAddress parse a literal only: anything else
+            // fails without a name lookup, which would block the event loop on a client-chosen name
             try {
-                InetAddress address = InetAddress.getByName(host);
+                InetAddress address = InetAddress.getByName("[" + host + "]");
                 return address.isLoopbackAddress() || address.isAnyLocalAddress();
             } catch (UnknownHostException e) {
                 return false;

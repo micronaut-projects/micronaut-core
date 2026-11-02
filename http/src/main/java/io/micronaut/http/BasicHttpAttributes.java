@@ -101,7 +101,7 @@ public final class BasicHttpAttributes {
      *
      * @param request The request
      * @return The condition to wait for
-     * @since 5.2.18
+     * @since 5.2.21
      */
     @Internal
     public static ExecutionFlow<?> takeRouteWaitsFor(HttpRequest<?> request) {

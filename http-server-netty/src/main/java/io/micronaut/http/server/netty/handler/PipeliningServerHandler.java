@@ -123,6 +123,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Current handler for inbound messages.
      */
     private InboundHandler inboundHandler = baseInboundHandler;
+    /**
+     * Runs once the application discards the body of the current request it streamed.
+     */
+    @Nullable
+    private Runnable requestBodyDiscardListener;
 
     /**
      * Queue of outbound messages that can't be written yet.
@@ -194,6 +199,32 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     public void setRequestDecompressionEnabled(boolean requestDecompressionEnabled) {
         this.requestDecompressionEnabled = requestDecompressionEnabled;
+    }
+
+    /**
+     * Whether the body of the current request is streamed to its consumer, which still reads it.
+     * Event loop only.
+     *
+     * @return {@code true} while the request body is read by the application
+     * @since 5.2.21
+     */
+    public boolean isStreamingRequestBody() {
+        InboundHandler handler = inboundHandler;
+        if (handler instanceof DecompressingInboundHandler dec) {
+            handler = dec.delegate;
+        }
+        return handler instanceof StreamingInboundHandler;
+    }
+
+    /**
+     * Run a task once the application discards the body of the current request, instead of
+     * reading it to the end. Event loop only.
+     *
+     * @param listener The task
+     * @since 5.2.21
+     */
+    public void onRequestBodyDiscarded(Runnable listener) {
+        requestBodyDiscardListener = listener;
     }
 
     public static boolean canHaveBody(HttpResponseStatus status) {
@@ -884,6 +915,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (last) {
                 dest.complete();
                 inboundHandler = baseInboundHandler;
+                requestBodyDiscardListener = null;
             }
         }
 
@@ -949,15 +981,23 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
 
             sendContinue = false;
+            boolean discarded = false;
             if (inboundHandler == this) {
                 inboundHandler = droppingInboundHandler;
                 refreshNeedMore();
+                discarded = true;
             } else if (inboundHandler instanceof DecompressingInboundHandler dec && dec.delegate == this) {
                 dec.dispose();
                 inboundHandler = droppingInboundHandler;
                 refreshNeedMore();
+                discarded = true;
             }
             dest.discard();
+            Runnable listener = requestBodyDiscardListener;
+            if (discarded && listener != null) {
+                requestBodyDiscardListener = null;
+                listener.run();
+            }
         }
 
         @Override
