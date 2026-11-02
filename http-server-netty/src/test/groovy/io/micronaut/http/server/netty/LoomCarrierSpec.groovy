@@ -117,7 +117,7 @@ class LoomCarrierSpec extends Specification {
         assert carrier != null
         assert carrier.name.matches("default-nioEventLoopGroup-\\d+-1")
 
-        def conditions = new PollingConditions(timeout: 30, delay: 0.005)
+        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 0.005)
         def lock = new ReentrantLock()
         def held = new CountDownLatch(1)
         def release = new CountDownLatch(1)

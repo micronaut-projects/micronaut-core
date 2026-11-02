@@ -63,6 +63,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -137,6 +138,12 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * the monitor of {@link #propertySources}.
      */
     private @Nullable RefreshChanges changedWhileRefreshing;
+    /**
+     * How many snapshots of the registered property sources starts and refreshes have taken. Guarded by the
+     * monitor of {@link #propertySources}, which an add holds to register a property source and a read holds to
+     * take its snapshot, so one always comes before the other.
+     */
+    private long registrySnapshots;
 
     // For configuration maps, sets with low access - it's enough to use Collections.synchronized
 
@@ -223,13 +230,15 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
+        long snapshotsWhenRegistered;
         synchronized (propertySources) {
             internalAddPropertySource(propertySource);
             noteChangeWhileRefreshing(propertySource.getName(), propertySource);
+            snapshotsWhenRegistered = registrySnapshots;
         }
         if (isRunning() && !reading.get()) {
-            propertyPlaceholderResolver.resetCaches();
-            internalProcessPropertySource(propertySource);
+            propertyPlaceholderResolver.resetCachesAndRememberedValues();
+            propertyPlaceholderResolver.processAddedPropertySource(propertySource, propertySource.getConvention(), snapshotsWhenRegistered);
         }
         return this;
     }
@@ -241,7 +250,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             noteChangeWhileRefreshing(propertySource.getName(), null);
         }
         if (isRunning() && !reading.get()) {
-            propertyPlaceholderResolver.resetCaches();
+            propertyPlaceholderResolver.resetCachesAndRememberedValues();
         }
         return this;
     }
@@ -420,6 +429,9 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     private void loadProperties() {
+        // what the last read loaded itself, which stays refreshable if a configuration watch adds it again during this read
+        Set<PropertySource> loadedBefore = Collections.newSetFromMap(new IdentityHashMap<>());
+        loadedBefore.addAll(refreshablePropertySources);
         refreshablePropertySources.clear();
         Set<String> locations = new LinkedHashSet<>();
         readingFiles = locations;
@@ -446,20 +458,39 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         } else {
             propertySources = new ArrayList<>(this.propertySources.size());
         }
-        for (PropertySource propertySource : getPropertySources()) {
+        // what the read takes from the registry rather than loading itself, such as a property source added meanwhile
+        Set<PropertySource> registered = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<String> registeredNames = new HashSet<>();
+        long snapshotNumber;
+        List<PropertySource> snapshot;
+        synchronized (this.propertySources) {
+            // numbered with the copy: an add that registered a property source before it leaves it to this read
+            snapshotNumber = ++registrySnapshots;
+            snapshot = List.copyOf(this.propertySources.values());
+        }
+        for (PropertySource propertySource : snapshot) {
             if (!propertySources.contains(propertySource)) {
                 propertySources.add(propertySource);
+                registered.add(propertySource);
+                registeredNames.add(propertySource.getName());
             }
         }
 
+        // What the read took from the registry is registered already: registering it again would bring back one that
+        // another thread has removed meanwhile. A registered property source keeps its name over one the read loaded.
         for (PropertySource propertySource : propertySources) {
-            internalAddPropertySource(propertySource);
+            if (!registered.contains(propertySource) && !registeredNames.contains(propertySource.getName())) {
+                internalAddPropertySource(propertySource);
+            }
         }
 
+        // what the locators return to this read, also when the same instance is registered already
+        Set<PropertySource> located = Collections.newSetFromMap(new IdentityHashMap<>());
         if (!propertySourcesLocators.isEmpty()) {
             for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
                 Collection<PropertySource> sources = propertySourcesLocator.load(this);
                 propertySources.addAll(sources);
+                located.addAll(sources);
                 for (PropertySource source : sources) {
                     // a located source read from a file, such as one a locator of the application reads, or an import
                     String location = source.getOrigin().location();
@@ -480,17 +511,24 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         }
 
         for (PropertySource propertySource : propertySources) {
-            if (!PropertySource.CONTEXT.equals(propertySource.getName()) && !preExistingSourceNames.contains(propertySource.getName())) {
+            // only what a read loaded or located itself is refreshable: the next refresh drops it and loads it again
+            boolean loaded = !registered.contains(propertySource) || located.contains(propertySource) || loadedBefore.contains(propertySource);
+            if (loaded && !PropertySource.CONTEXT.equals(propertySource.getName()) && !preExistingSourceNames.contains(propertySource.getName())) {
                 refreshablePropertySources.add(propertySource);
             }
         }
 
         OrderUtil.sortOrdered(propertySources);
+        // what this read processes from the registry, which an add that waited for it does not process again
+        PropertySourcePropertyResolver.RegistrySnapshot registrySnapshot = new PropertySourcePropertyResolver.RegistrySnapshot(snapshotNumber, registered);
+        propertyPlaceholderResolver.startProcessing(registrySnapshot);
         for (PropertySource propertySource : propertySources) {
             internalProcessPropertySource(propertySource);
         }
         configurationFiles = Set.copyOf(locations);
         readingFiles = new LinkedHashSet<>();
+        // not in a finally: a read that fails leaves no processed snapshot, so an add that waited for it processes its property source
+        propertyPlaceholderResolver.finishProcessing(registrySnapshot);
     }
 
     private void internalAddPropertySource(PropertySource propertySource) {
