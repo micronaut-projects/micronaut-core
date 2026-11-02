@@ -77,11 +77,10 @@ public class ModelUtils {
         return annotatedElements
             .stream()
             .flatMap(element -> {
-                if (element instanceof ExecutableElement executableElement) {
-                    return Stream.of(executableElement.getEnclosingElement());
-                }
-                if (element instanceof VariableElement variableElement) {
-                    return Stream.of(variableElement.getEnclosingElement());
+                if (element instanceof ExecutableElement || element instanceof VariableElement) {
+                    // a parameter is enclosed by its method or constructor, so walk up to the declaring type
+                    TypeElement declaringType = classElementFor(element.getEnclosingElement());
+                    return declaringType != null ? Stream.of(declaringType) : Stream.empty();
                 }
                 if (element instanceof PackageElement packageElement) {
                     return packageElement.getEnclosedElements().stream();
