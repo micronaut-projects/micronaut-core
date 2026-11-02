@@ -7077,7 +7077,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         BeanCandidateKey(Argument<T> argument, @Nullable Qualifier<T> qualifier, boolean throwNonUnique) {
             this.beanType = argument;
             this.qualifier = qualifier;
-            this.hashCode = argument.typeHashCode();
+            this.hashCode = 31 * argument.typeHashCode() + Objects.hashCode(qualifier);
             this.throwNonUnique = throwNonUnique;
         }
 

@@ -979,6 +979,84 @@ micronaut:
         env.close()
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "test a property source that reads a random value while the property sources are read gets the value later lookups return: #text"() {
+        given:
+        def env = new DefaultEnvironment({["test"]})
+        env.addPropertySource(PropertySource.of('random', ['app.host': 'localhost', 'app.id': text], 1))
+        env.addPropertySource(new PropertySource() {
+            @Override
+            String getName() { 'derived' }
+
+            @Override
+            int getOrder() { 2 }
+
+            @Override
+            Object get(String key) {
+                key == 'derived.id' ? env.getProperty('app.id', String).orElse(null) : null
+            }
+
+            @Override
+            Iterator<String> iterator() { ['derived.id'].iterator() }
+        })
+        env.start()
+
+        expect:
+        env.getRequiredProperty('derived.id', String) == env.getRequiredProperty('app.id', String)
+
+        when:
+        String started = env.getRequiredProperty('app.id', String)
+        env.refresh()
+
+        then: "the refresh draws a new value, the one the property source read"
+        env.getRequiredProperty('app.id', String) != started
+        env.getRequiredProperty('derived.id', String) == env.getRequiredProperty('app.id', String)
+
+        cleanup:
+        env.close()
+
+        where:
+        text << ['${random.uuid}', 'http://${app.host}/${random.uuid}']
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/13913")
+    void "test a property source added to or removed from a running environment draws new random values"() {
+        given:
+        def env = new DefaultEnvironment({["test"]})
+        env.addPropertySource(PropertySource.of('random', [
+                'app.id'  : '${random.uuid}',
+                'app.host': 'localhost',
+                'app.name': '${app.host}-${random.uuid}',
+                'app.ids' : ['${random.uuid}']
+        ], 1))
+        env.start()
+        String started = env.getRequiredProperty('app.id', String)
+        String name = env.getRequiredProperty('app.name', String)
+        List ids = env.getRequiredProperty('app.ids', List)
+        PropertySource unrelated = PropertySource.of('unrelated', ['other.value': 'x'])
+
+        when:
+        env.addPropertySource(unrelated)
+        String added = env.getRequiredProperty('app.id', String)
+
+        then: "for a text that also names a property, and in a list, too"
+        added != started
+        env.getRequiredProperty('app.name', String) != name
+        env.getRequiredProperty('app.ids', List) != ids
+
+        when:
+        env.removePropertySource(unrelated)
+        String removed = env.getRequiredProperty('app.id', String)
+
+        then: "the value drawn is the one every later lookup gets"
+        removed != added
+        env.getRequiredProperty('app.id', String) == removed
+        env.getRequiredProperty('app.id', UUID).toString() == removed
+
+        cleanup:
+        env.close()
+    }
+
     void "test imported file property source is re-read on refresh"() {
         given:
         File imported = File.createTempFile("config-import-refresh-child", ".properties")
