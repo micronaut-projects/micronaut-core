@@ -1219,6 +1219,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             try {
                 channel.finishAndReleaseAll();
             } catch (DecompressionException ignored) {
+                // the body is disposed of, so a failure while finishing it is irrelevant
             }
         }
 

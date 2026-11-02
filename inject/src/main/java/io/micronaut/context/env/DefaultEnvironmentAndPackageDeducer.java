@@ -382,7 +382,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
             Process process = builder.start();
             return Optional.of(process);
         } catch (IOException ignore) {
-
+            // the command could not be run, the caller treats it as a negative probe
         }
         return Optional.empty();
     }

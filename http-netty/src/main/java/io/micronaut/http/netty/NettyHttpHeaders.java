@@ -357,6 +357,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
             try {
                 return Optional.of(MediaType.of(str));
             } catch (IllegalArgumentException ignored) {
+                // an invalid Content-Type is treated as absent
             }
         }
         return Optional.empty();
@@ -379,6 +380,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
             try {
                 return OptionalLong.of(Long.parseLong(str));
             } catch (NumberFormatException ignored) {
+                // an invalid Content-Length is treated as absent
             }
         }
         return OptionalLong.empty();
@@ -419,6 +421,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
             try {
                 return Optional.of(Charset.forName(text));
             } catch (Exception ignored) {
+                // an unknown or illegal charset falls back to the default
             }
         }
         // default to UTF-8
