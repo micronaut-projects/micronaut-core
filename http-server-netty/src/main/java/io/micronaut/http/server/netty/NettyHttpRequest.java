@@ -211,7 +211,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Nullable
     private volatile String uriTemplate;
     @Nullable
-    private NettyCookies nettyCookies;
+    @SuppressWarnings("java:S3077") // volatile only publishes the double-checked creation
+    private volatile NettyCookies nettyCookies;
     private final CloseableByteBody body;
     @Nullable
     private Object legacyBody;
@@ -237,7 +238,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private ParsedFormType parsedFormType;
 
     @Nullable
-    private BodyConvertor bodyConvertor;
+    @SuppressWarnings("java:S3077") // volatile only publishes the double-checked creation, the convertor synchronizes itself
+    private volatile BodyConvertor bodyConvertor;
     /**
      * The request that the request filters passed downstream, when they replaced this one. It is
      * set before the response is produced, and read when the response is written, after the
@@ -1141,7 +1143,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Nullable
         private URI uri;
         @Nullable
-        private MutableHttpParameters httpParameters;
+        @SuppressWarnings("java:S3077") // volatile only publishes the double-checked creation
+        private volatile MutableHttpParameters httpParameters;
         @Nullable
         private Object body;
         /**
