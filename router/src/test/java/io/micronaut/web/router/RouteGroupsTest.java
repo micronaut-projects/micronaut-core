@@ -402,7 +402,7 @@ class RouteGroupsTest {
     }
 
     private static RouteAssembly assembly() {
-        return new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        return new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes) {

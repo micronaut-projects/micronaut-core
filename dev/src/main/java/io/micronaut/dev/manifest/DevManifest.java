@@ -17,6 +17,7 @@ package io.micronaut.dev.manifest;
 
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.dev.compile.CompileMode;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
@@ -52,6 +53,7 @@ import java.util.Properties;
  * micronaut.dev.main-class=example.Application
  * micronaut.dev.project-dir=.
  * micronaut.dev.strategy=auto
+ * micronaut.dev.patch-in-place=true
  * micronaut.dev.runtime-classpath=@runtime.argfile
  * micronaut.dev.reloadable=build/classes/java/main,build/resources/main
  * micronaut.dev.compile-classpath=@compile.argfile
@@ -67,6 +69,7 @@ import java.util.Properties;
  * micronaut.dev.build-tool=gradle
  * micronaut.dev.build-tool.trigger=build/micronaut-dev/reload
  * micronaut.dev.retain=javax.sql.DataSource
+ * micronaut.dev.max-generations=10
  * </pre>
  *
  * @author graemerocher
@@ -85,6 +88,23 @@ public final class DevManifest {
      */
     public static final String MANIFEST_PROPERTY = PREFIX + "manifest";
 
+    /**
+     * The key of the generation budget: how many generations one process creates before it closes for its launcher to
+     * relaunch it.
+     */
+    public static final String MAX_GENERATIONS = PREFIX + "max-generations";
+
+    /**
+     * The generation budget in a native image, where the classes of a retired generation are never unloaded: GraalVM's
+     * runtime class loading keeps every class it defines, in a metaspace whose size is fixed when the image is built, and
+     * the interpreter's data for them on the heap, for the life of the process.
+     * Measured on a Pyronaut application whose generations each hold a GraalPy context, adding a route per generation:
+     * once a retired generation is released, what stays is its classes and their data, about 1.3 MB of heap a
+     * generation, and the resident memory of 61 generations stayed under 1 GB, with the metaspace not exhausted. Fifty
+     * bounds that growth with room to spare.
+     */
+    public static final int NATIVE_MAX_GENERATIONS = 50;
+
     private static final String TEST = "test.";
     private static final String MAIN_CLASS = "main-class";
     private static final String COMPILE_CLASSPATH = "compile-classpath";
@@ -100,6 +120,7 @@ public final class DevManifest {
     private final String mainClass;
     private final Path projectDir;
     private final DevReloadStrategy strategy;
+    private final boolean patchInPlace;
     private final List<Path> runtimeClasspath;
     private final List<Path> reloadableRoots;
     private final List<Path> compileClasspath;
@@ -116,12 +137,14 @@ public final class DevManifest {
     private final String buildTool;
     @Nullable
     private final Path buildToolTrigger;
+    private final Path generations;
     private final List<String> retain;
     private final boolean retainAnnotated;
     private final LiveReload liveReload;
     private final List<SourceRoot> testSourceRoots;
     private final List<ResourceRoot> testResourceRoots;
     private final TestSettings testSettings;
+    private final int maxGenerations;
 
     private DevManifest(Path directory, Properties properties) {
         this.directory = directory;
@@ -132,6 +155,7 @@ public final class DevManifest {
         this.mainClass = mode == DevMode.TEST ? properties.getProperty(PREFIX + MAIN_CLASS, "").trim() : require(properties, MAIN_CLASS);
         this.projectDir = path(directory, properties.getProperty(PREFIX + "project-dir", "."));
         this.strategy = DevReloadStrategy.valueOf(properties.getProperty(PREFIX + "strategy", "auto").trim().toUpperCase(Locale.ROOT));
+        this.patchInPlace = Boolean.parseBoolean(properties.getProperty(PREFIX + "patch-in-place", "true").trim());
         this.runtimeClasspath = paths(directory, properties.getProperty(PREFIX + "runtime-classpath", ""));
         List<Path> reloadable = paths(directory, require(properties, "reloadable"));
         this.compileClasspath = paths(directory, properties.getProperty(PREFIX + COMPILE_CLASSPATH, ""));
@@ -150,6 +174,9 @@ public final class DevManifest {
         this.buildToolTrigger = trigger == null ? null : path(directory, trigger);
         this.retain = list(directory, properties.getProperty(PREFIX + "retain", ""));
         this.retainAnnotated = Boolean.parseBoolean(properties.getProperty(PREFIX + "retain-annotated", "true").trim());
+        this.maxGenerations = maxGenerations(properties.getProperty(MAX_GENERATIONS));
+        String generationsDir = properties.getProperty(PREFIX + "generations");
+        this.generations = generationsDir == null ? projectDir.resolve("build").resolve("micronaut-dev").resolve("generations") : path(directory, generationsDir);
         this.liveReload = new LiveReload(
             Integer.parseInt(properties.getProperty(PREFIX + "livereload.port", "35729").trim()),
             Boolean.parseBoolean(properties.getProperty(PREFIX + "livereload.inject-script", "true"))
@@ -195,9 +222,21 @@ public final class DevManifest {
             Boolean.parseBoolean(properties.getProperty(PREFIX + TEST + "initial-run", "true")),
             Boolean.parseBoolean(properties.getProperty(PREFIX + TEST + "once", "false")),
             path(directory, properties.getProperty(PREFIX + TEST + "reports", "build/micronaut-dev/test-results")),
+            path(directory, properties.getProperty(PREFIX + TEST + "html-report", "build/micronaut-dev/test-report")),
+            servedPath(properties.getProperty(PREFIX + TEST + "html-report-path", "/tests/")),
             options(directory, properties.getProperty(PREFIX + TEST + "filter", "")),
             parameters
         );
+        if (mode == DevMode.TEST && !testSettings.once() && maxGenerations > 0) {
+            // test mode loads the classes of generation one and runs every test run on a generation of its own, and checks
+            // the budget after a run: the first run takes the second generation, so a budget of two would relaunch after
+            // the first run, and a relaunched process that runs its tests when it starts would do so without end
+            int minimum = testSettings.initialRun() ? 3 : 2;
+            if (maxGenerations < minimum) {
+                throw new IllegalArgumentException("Invalid " + MAX_GENERATIONS + ": " + maxGenerations + ", test mode needs at least " + minimum
+                    + (testSettings.initialRun() ? " when it runs the tests when it starts" : ": its first run takes the second generation"));
+            }
+        }
     }
 
     /**
@@ -261,6 +300,19 @@ public final class DevManifest {
      */
     public DevReloadStrategy strategy() {
         return strategy;
+    }
+
+    /**
+     * Whether a change of resources alone is offered to the running application's
+     * {@link io.micronaut.context.reload.InPlaceResourceReloader}s before a restart, so that, for example, a Python
+     * module whose generated classes did not change is patched into the running interpreters instead of starting a new
+     * generation. On by default, under every strategy: patching defines no class, so it needs no agent and is not what
+     * {@code restart} opts out of. {@code micronaut.dev.patch-in-place=false} turns it off.
+     *
+     * @return Whether resources may be patched in place
+     */
+    public boolean patchInPlace() {
+        return patchInPlace;
     }
 
     /**
@@ -384,6 +436,33 @@ public final class DevManifest {
     @Nullable
     public Path buildToolTrigger() {
         return buildToolTrigger;
+    }
+
+    /**
+     * The directory the class loader snapshots each generation into, {@code micronaut.dev.generations}: by default
+     * {@code build/micronaut-dev/generations} under the project, which a Maven build points into {@code target}. The
+     * launcher owns it and empties it when it starts.
+     *
+     * @return The directory
+     */
+    public Path generations() {
+        return generations;
+    }
+
+    /**
+     * The generation budget, {@code micronaut.dev.max-generations}: how many generations the runtime creates in one
+     * process. When a reload would create one more, the runtime closes and the launcher exits with
+     * {@link io.micronaut.dev.MicronautDevMain#RELAUNCH}, for whoever started it to start it again. Unlimited, zero, on
+     * the JVM, which unloads a retired generation once nothing refers to it; {@link #NATIVE_MAX_GENERATIONS} in a
+     * native image, which never does. {@code unlimited} or {@code 0} lifts it.
+     * Test mode runs its tests on a generation of their own from the second on, and checks the budget after a run, so that
+     * a run is never lost to the relaunch: watching, it takes at least three, or two without a first run, and run once it
+     * takes any.
+     *
+     * @return The budget, zero when unlimited
+     */
+    public int maxGenerations() {
+        return maxGenerations;
     }
 
     /**
@@ -527,6 +606,49 @@ public final class DevManifest {
         return value.trim();
     }
 
+    /**
+     * A path the LiveReload server serves a page at: with a leading and a trailing slash, of plain segments, and
+     * neither the root nor a path of the server's own.
+     */
+    private static String servedPath(String value) {
+        String path = value.trim();
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
+        if (!path.endsWith("/")) {
+            path = path + "/";
+        }
+        if (!isPlainSegments(path) || path.contains("/./") || path.contains("/../")) {
+            throw new IllegalArgumentException("Not a path to serve the test report at: " + value + " (as /tests/, of plain segments)");
+        }
+        if (path.startsWith("/livereload/") || path.startsWith("/livereload.js") || path.startsWith("/micronaut-dev/")) {
+            throw new IllegalArgumentException("The path " + value + " is the LiveReload server's own: choose another for the test report");
+        }
+        return path;
+    }
+
+    /**
+     * Whether a path of a leading and a trailing slash is of one or more non-empty segments of unreserved characters.
+     */
+    private static boolean isPlainSegments(String path) {
+        if (path.length() < 3) {
+            return false;
+        }
+        char previous = '/';
+        for (int i = 1; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (c == '/') {
+                if (previous == '/') {
+                    return false;
+                }
+            } else if (!(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '.' || c == '_' || c == '~' || c == '-')) {
+                return false;
+            }
+            previous = c;
+        }
+        return true;
+    }
+
     private static Path path(Path directory, String value) {
         return directory.resolve(value.trim()).toAbsolutePath().normalize();
     }
@@ -587,6 +709,26 @@ public final class DevManifest {
             }
         }
         return Collections.unmodifiableList(entries);
+    }
+
+    static int maxGenerations(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return NativeImageUtils.inImageRuntimeCode() ? NATIVE_MAX_GENERATIONS : 0;
+        }
+        String trimmed = value.trim();
+        if ("unlimited".equalsIgnoreCase(trimmed)) {
+            return 0;
+        }
+        int budget;
+        try {
+            budget = Integer.parseInt(trimmed);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid " + MAX_GENERATIONS + ": " + trimmed + ", a number of generations or unlimited", e);
+        }
+        if (budget < 0) {
+            throw new IllegalArgumentException("Invalid " + MAX_GENERATIONS + ": " + trimmed + ", a number of generations or unlimited");
+        }
+        return budget;
     }
 
     private static List<SourceRoot> sourceRoots(Path directory, Properties properties) {

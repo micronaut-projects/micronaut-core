@@ -54,6 +54,9 @@ public final class StreamingFileUploadBinder implements TypedRequestArgumentBind
     @Override
     public BindingResult<StreamingFileUpload> bindForFormRequest(ArgumentConversionContext<StreamingFileUpload> context,
                                                                FormCapableHttpRequest<?> request) {
+        if (request.getContentType().isEmpty() || !request.hasFormBody()) {
+            return BindingResult.unsatisfied();
+        }
 
         Argument<StreamingFileUpload> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
@@ -62,6 +65,8 @@ public final class StreamingFileUploadBinder implements TypedRequestArgumentBind
             FormFieldFlows.first(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_START, argument)),
                 raw -> formFactory.get().streamFileUpload(formFactory.get().limitFileSize(request, raw)));
         BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(completableFuture));
+        // the upload is only read once the route consumes it
+        BasicHttpAttributes.addUnconsumedBodyDiscard(request, () -> completableFuture.thenAccept(StreamingFileUpload::close));
 
         return new PendingRequestBindingResult<>() {
 

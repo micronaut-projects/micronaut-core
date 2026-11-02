@@ -360,4 +360,41 @@ data class Data(val numbers: java.util.List<out Number>, val foo: Foo<*>)
         upper(data.constructorArguments[0].typeParameters[0]) == [data.constructorArguments[0].typeParameters[0].type.name] && lower(data.constructorArguments[0].typeParameters[0]) == []
         upper(data.constructorArguments[1].typeParameters[0]) == ['java.lang.Object'] && lower(data.constructorArguments[1].typeParameters[0]) == []
     }
+
+    void "a wildcard bounded by a primitive array is recorded"() {
+        given:
+        BeanIntrospection<?> introspection = buildBeanIntrospection('test.Arrays', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Arrays {
+    var upper: java.util.List<out CharArray>? = null
+    var lower: java.util.Map<*, in Array<DoubleArray>>? = null
+    var objectLower: java.util.List<in Array<Array<Int>>>? = null
+}
+''')
+        Argument<?> upperArgument = introspection.getRequiredProperty('upper', List).asArgument().typeParameters[0]
+        Argument<?> lowerArgument = introspection.getRequiredProperty('lower', Map).asArgument().typeParameters[1]
+        Argument<?> objectLowerArgument = introspection.getRequiredProperty('objectLower', List).asArgument().typeParameters[0]
+
+        expect:
+        upperArgument instanceof WildcardArgument
+        upperArgument.type == char[]
+        wildcard(upperArgument).upperBounds*.type == [char[]]
+        wildcard(upperArgument).lowerBounds.empty
+
+        and:
+        lowerArgument instanceof WildcardArgument
+        lowerArgument.type == double[][]
+        wildcard(lowerArgument).upperBounds*.type == [Object]
+        wildcard(lowerArgument).lowerBounds*.type == [double[][]]
+
+        and: 'an object array bound is recorded the same way'
+        objectLowerArgument instanceof WildcardArgument
+        objectLowerArgument.type == Integer[][]
+        wildcard(objectLowerArgument).upperBounds*.type == [Object]
+        wildcard(objectLowerArgument).lowerBounds*.type == [Integer[][]]
+    }
 }

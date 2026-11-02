@@ -29,3 +29,4 @@ io.micronaut.python.annotation.processing.test.visitorintegration.OptionsRecordi
 io.micronaut.python.annotation.processing.test.annotate.SubclassMemberAnnotationMutationSpec$MarkingVisitor
 io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
 io.micronaut.python.annotation.processing.test.qualifiers.NonBindingMemberAnnotatedByVisitorSpec$NonBindingMarkingVisitor
+io.micronaut.inject.test.hierarchy.IntrospectEveryClassVisitor

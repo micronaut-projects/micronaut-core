@@ -210,7 +210,7 @@ class RouteTemplateEnginesRouterTest {
 
     @Test
     void onlyUriTemplatesAreNested() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, (String) null, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, (String) null);
         UriRoute parent = assembly.addRoute("GET", HttpMethod.GET, ColonRouteTemplateEngine.template("/shelves/:shelf"), List.of(MediaType.APPLICATION_JSON_TYPE), handle());
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> parent.nest(() ->
             assembly.addRoute("GET", HttpMethod.GET, ColonRouteTemplateEngine.template("/books/:book"), List.of(MediaType.APPLICATION_JSON_TYPE), handle())));
@@ -223,7 +223,7 @@ class RouteTemplateEnginesRouterTest {
 
     @Test
     void aTemplateOfASubclassOfUriMatchTemplateIsNotNested() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, (String) null, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, (String) null);
         UriRoute parent = assembly.addRoute("GET", HttpMethod.GET, UriRouteTemplate.of("/parent"), List.of(MediaType.APPLICATION_JSON_TYPE), handle());
         // nested, only its expression would be kept: /parent/items/abc would match
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> parent.nest(() ->
@@ -234,7 +234,7 @@ class RouteTemplateEnginesRouterTest {
 
     @Test
     void nestingAcrossEnginesIsRejected() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, (String) null, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, (String) null);
         UriRoute micronautParent = assembly.addRoute("GET", HttpMethod.GET, "/shelves/{shelf}", List.of(MediaType.APPLICATION_JSON_TYPE), handle());
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> micronautParent.nest(() ->
             assembly.addRoute("GET", HttpMethod.GET, ColonRouteTemplateEngine.template("/books/:book"), List.of(MediaType.APPLICATION_JSON_TYPE), handle())));
@@ -247,7 +247,7 @@ class RouteTemplateEnginesRouterTest {
 
     @Test
     void theLegacyRouteBuilderSupportsMicronautTemplatesOnly() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         assertThrows(IllegalArgumentException.class, () ->
             assembly.addRoute("GET", HttpMethod.GET, COLON_ITEM, List.of(MediaType.APPLICATION_JSON_TYPE), handle()));
     }
@@ -314,7 +314,7 @@ class RouteTemplateEnginesRouterTest {
     }
 
     private static Router router(@Nullable String contextPath, Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, contextPath, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, contextPath);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         return new DefaultRouter(List.of(), List.of(() -> assembly));

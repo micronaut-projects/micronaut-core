@@ -27,7 +27,7 @@ MODE_ERROR = "error"
 MODES = (MODE_OFF, MODE_WARN, MODE_ERROR)
 
 
-def _switch_value(value):
+def switch_value(value):
     """The boolean a ``TypeChecked`` member value denotes; a string spelling of the literal counts too."""
     if isinstance(value, str):
         return value.strip().lower() not in ("false", "0", "")
@@ -59,7 +59,7 @@ class TypeCheckScope:
             if decorator.annotationName() in self.annotation_names:
                 members = decorator.members()
                 value = members.get("value") if members is not None else None
-                return True if value is None else _switch_value(value)
+                return True if value is None else switch_value(value)
         return None
 
     def severity(self, decorators, enclosing):
@@ -102,8 +102,18 @@ class _ModuleRecord:
         self.decorators = []
         self.classes = []      # (class_def, node)
         self.functions = []    # (function_def, node)
+        self.script = None     # the ScriptDef of the module, once modelled: the generated class of its functions and attributes
         self.visitor = None    # the MicronautAstVisitor that modelled the module: locations and name bindings
         self.span_of = lambda node: None
+        self._class_index = None
+        self._class_count = -1
+
+    def class_index(self):
+        """The classes of the module by name, built once the modelling is over and shared by every check."""
+        if self._class_index is None or self._class_count != len(self.classes):
+            self._class_index = {class_def.name(): class_def for class_def, _ in self.classes}
+            self._class_count = len(self.classes)
+        return self._class_index
 
 
 class TypeChecker:
@@ -115,6 +125,7 @@ class TypeChecker:
         self.scope = TypeCheckScope(mode, annotation_names)
         self._modules = {}
         self.diagnostics = []
+        self._java_alias_types = set()
 
     # ---------------------------------------------------------------- pass one
 
@@ -141,6 +152,10 @@ class TypeChecker:
     def add_module(self, source_path, decorators):
         """Record the annotations applied at module level, which switch the whole module."""
         self._module(source_path).decorators = list(decorators or ())
+
+    def set_script(self, source_path, script_def):
+        """Record the script modelled for the module: the generated class its functions become methods of."""
+        self._module(source_path).script = script_def
 
     # ---------------------------------------------------------------- pass two
 
@@ -178,7 +193,7 @@ class TypeChecker:
                 for function_def in members:
                     severity = self.scope.severity(function_def.decorators(), class_severity)
                     qualified_name = f"{class_name}.{function_def.name()}"
-                    units.append(CheckUnit(module.source_path, qualified_name, function_def, _function_node(node, function_def.name(), function_def), class_def, severity, module))
+                    units.append(CheckUnit(module.source_path, qualified_name, function_def, function_node(node, function_def.name(), function_def), class_def, severity, module))
         return units
 
     def check(self, visitor_context):
@@ -186,14 +201,20 @@ class TypeChecker:
         Run the checks over the checked definitions and return the diagnostics found, as Java
         PythonDiagnostic values.
         """
+        self._java_alias_types.clear()
         self.facts = TypeFacts(visitor_context)
         self.python_classes = PythonClasses(self)
+        self.inference = {}
+        self._annotation_views = {}
         for unit in self.units():
             if unit.severity is None or unit.node is None:
                 continue
             DecoratorRules(self, unit).check()
             if unit.function_def is not None:
-                JavaReceiverRules(self, unit).check()
+                rules = JavaReceiverRules(self, unit)
+                rules.check()
+                # what the check inferred, for the static planner: the same inference, not a second run
+                self.inference[id(unit.node)] = rules
         return list(self.diagnostics)
 
     def rules_of(self, model, function_def, function_node):
@@ -249,6 +270,16 @@ class TypeChecker:
         if first.kind in (JAVA, PY, BUILTIN) and first.name != "none":
             return first.as_nullable() if any(typed.nullable for typed in returned) else first
         return None
+
+    def annotation_view(self, name):
+        """The description of an annotation and its targets as a list, asked of the Java facts once per compilation."""
+        views = self.__dict__.setdefault("_annotation_views", {})
+        view = views.get(name)
+        if view is None:
+            description = self.facts.describeAnnotation(name)
+            view = (description, list(description.targets()) if description is not None else [])
+            views[name] = view
+        return view
 
     def report(self, unit, rule, message, span, suggestions=()):
         """Record a finding of a rule at the severity of the unit it was found in."""
@@ -364,12 +395,12 @@ class DecoratorRules:
 
     def check(self):
         definition = self.unit.function_def if self.unit.function_def is not None else self.unit.class_def
-        nodes = list(getattr(self.unit.node, "decorator_list", ()))
+        nodes = self._decorator_nodes_by_position(getattr(self.unit.node, "decorator_list", ()))
         for decorator in definition.decorators():
             node = self._decorator_node(decorator, nodes)
             if node is None:
                 continue
-            description = self.facts.describeAnnotation(self._annotation_name(decorator))
+            description, targets = self.checker.annotation_view(self._annotation_name(decorator))
             if description is None:
                 # a plain Python decorator (dataclass, property, a function of the application)
                 continue
@@ -382,7 +413,6 @@ class DecoratorRules:
                              f"[{description.name()}] is not an annotation and cannot decorate {self.kind} [{self.unit.qualified_name}]",
                              node)
                 continue
-            targets = list(description.targets())
             if targets and not self._targets_allow(targets, description):
                 self._report("decorator-target",
                              f"@{simple_name} cannot be applied to {self.kind} [{self.unit.qualified_name}]; its targets are [{', '.join(targets)}]",
@@ -473,16 +503,20 @@ class DecoratorRules:
             return getattr(visitor, "java_type_assignments", {}).get(name, name)
         return name
 
-    def _decorator_node(self, decorator, nodes):
-        """The AST decorator expression a DecoratorDef came from, matched by its location."""
-        span = decorator.span()
-        if span is None:
-            return None
+    def _decorator_nodes_by_position(self, nodes):
+        """The decorator expressions of the definition by (line, column): each located once."""
+        by_position = {}
         for node in nodes:
             node_span = self.span_of(node)
-            if node_span is not None and node_span.line() == span.line() and node_span.column() == span.column():
-                return node
-        return None
+            if node_span is not None:
+                by_position.setdefault((node_span.line(), node_span.column()), node)
+        return by_position
+
+    @staticmethod
+    def _decorator_node(decorator, nodes):
+        """The AST decorator expression a DecoratorDef came from, matched by its location."""
+        span = decorator.span()
+        return None if span is None else nodes.get((span.line(), span.column()))
 
     def _report(self, rule, message, node, suggestions=()):
         self.checker.report(self.unit, rule, message, self.span_of(node), suggestions)
@@ -510,7 +544,7 @@ def _environment_name(value):
     return "".join(out).upper()
 
 
-def _function_node(class_node, name, function_def=None):
+def function_node(class_node, name, function_def=None):
     """
     The AST node of the method of the given name in a class body, or None. A name defined more than once (a
     property and its setter, @overload stubs and their implementation) is told apart by the line of the
@@ -575,6 +609,8 @@ BUILTIN_JAVA_TYPES = {"java.lang.String": "str", "java.lang.CharSequence": "str"
                       "java.lang.Double": "float", "java.lang.Float": "float", "void": "none",
                       # GraalPy hands a Java char to Python as a one-character str
                       "char": "str", "java.lang.Character": "str"}
+# the Java types the builtin hints are as type arguments (a list[int] is a List<Integer>)
+BOXED_JAVA_NAMES = {"str": "java.lang.String", "int": "java.lang.Integer", "float": "java.lang.Double", "bool": "java.lang.Boolean"}
 # every Java object has these, whether or not the element model lists them
 OBJECT_METHODS = {"equals", "hashCode", "toString", "getClass", "notify", "notifyAll", "wait"}
 # the members GraalPy adds to host objects and classes
@@ -599,16 +635,18 @@ class Typed:
     an interface or an abstract class): a member the type lacks is not reported on it.
     """
 
-    def __init__(self, kind, name, open=False, nullable=False):
+    def __init__(self, kind, name, open=False, args=(), nullable=False):
         self.kind = kind
         self.name = name
         self.open = open
+        # the type arguments when known (a list[int] hint, a List<Order> return type): Typed or None each
+        self.args = tuple(args)
         # whether the value may be None as well: a hint of X | None or Optional[X]
         self.nullable = nullable
 
     def as_nullable(self):
         """This type, marked as possibly None."""
-        return Typed(self.kind, self.name, self.open, nullable=True)
+        return Typed(self.kind, self.name, self.open, self.args, nullable=True)
 
     def __repr__(self):
         return f"{self.kind}:{self.name}"
@@ -633,11 +671,12 @@ class Typed:
         return None
 
 
-def of_java_type(name):
+def of_java_type(name, args=()):
     """
     The type of a value of a Java type: a Python value for the types the runtime converts, unknown
     for Object, which is what an erased type variable (the value of a Map, the element of a List)
-    reads as and says nothing about the actual value.
+    reads as and says nothing about the actual value. The type arguments, when given, are the
+    qualified names of the arguments of a parameterized type.
     """
     if name in BUILTIN_JAVA_TYPES:
         return Typed(BUILTIN, BUILTIN_JAVA_TYPES[name])
@@ -645,7 +684,7 @@ def of_java_type(name):
         return None
     if name in STANDARD_TYPES:
         return Typed(JAVA, name, open=True)
-    return Typed(JAVA, name)
+    return Typed(JAVA, name, args=[of_java_type(argument) for argument in args])
 
 
 class Bindings:
@@ -659,7 +698,9 @@ class Bindings:
         self.facts = checker.facts
         self.unit = unit
         self.visitor = unit.module.visitor
-        self.classes = {class_def.name(): class_def for class_def, _ in unit.module.classes}
+        self.classes = unit.module.class_index()
+        script = getattr(unit.module, "script", None)
+        self.module_attributes = {attribute.name(): attribute for attribute in script.attributes()} if script is not None else {}
         self.locals = {}
         self.unknown_locals = set()
         self._parameters()
@@ -701,8 +742,9 @@ class Bindings:
         if name in ("typing.Optional", "Optional") and type_ref.typeArguments():
             typed = self.of_hint(type_ref.typeArguments()[0])
             return typed.as_nullable() if typed is not None else None
+        args = [self.of_hint(argument) for argument in (type_ref.typeArguments() or [])]
         if name in BUILTIN_HINTS:
-            return Typed(BUILTIN, BUILTIN_HINTS[name])
+            return Typed(BUILTIN, BUILTIN_HINTS[name], args=args)
         typed = self.of_name(name, instance=True)
         if typed is not None and typed.kind == JAVA:
             if typed.name in STANDARD_TYPES:
@@ -710,11 +752,15 @@ class Bindings:
             description = self.checker.facts.describe(typed.name)
             if description is not None and (description.anInterface() or description.isAbstract()):
                 # any implementation may be behind the hint, with members of its own
-                return Typed(JAVA, typed.name, open=True)
+                return Typed(JAVA, typed.name, open=True, args=args)
+            return Typed(JAVA, typed.name, args=args)
         return typed
 
     def of_name(self, name, instance=False):
-        """The type a (possibly qualified) name denotes in the module: a class, or None."""
+        """The type a (possibly qualified) name denotes in the module: a class, a hinted module attribute's value, or None."""
+        if name in self.module_attributes:
+            hint = self.module_attributes[name].typeName()
+            return self.of_hint(hint) if hint is not None else None
         if name in self.classes:
             return Typed(PY if instance else PY_REF, self.classes[name])
         local_class = self.visitor._resolve_local_type_name(name) if self.visitor is not None else None
@@ -852,11 +898,12 @@ class JavaReceiverRules:
         self.facts = checker.facts
         self.bindings = Bindings(checker, unit)
         self.span_of = unit.module.span_of
-        # a silent run records what it infers instead of reporting: the type of every expression, which
-        # the inference of an unhinted return or of an attribute reads, and the problems found
+        # a silent run records what it infers for the static compiler instead of reporting: the
+        # type of every expression, the target of every resolved call, and the problems found
         self.silent = silent
         self.problems = []
         self.node_types = {}
+        self.targets = {}
         # a probe walk of a loop body (see _rebound_in) reports nothing
         self._probing = 0
 
@@ -873,9 +920,12 @@ class JavaReceiverRules:
             self.assignment(node)
             return
         if isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
+            iterated = self.expression(node.iter)
             for name in _bound_names(node.target):
                 self.bindings.forget(name)
-            self.expression(node.iter)
+            element = self._element_type(node.iter, iterated)
+            if isinstance(node.target, ast.Name) and element is not None and not isinstance(node, ast.comprehension):
+                self.bindings.assign(node.target.id, element)
             self._loop_body(getattr(node, "body", []), getattr(node, "orelse", []))
             return
         if isinstance(node, ast.While):
@@ -905,8 +955,14 @@ class JavaReceiverRules:
             return
         if isinstance(node, (ast.Try, ast.TryStar)):
             for handler in node.handlers:
+                caught = self.expression(handler.type) if handler.type is not None else None
                 if handler.name:
-                    self.bindings.forget(handler.name)
+                    if caught is not None and caught.kind == JAVA_REF:
+                        self.bindings.assign(handler.name, Typed(JAVA, caught.name))
+                    elif caught is not None and caught.kind == PY_REF and self._throwable_model(caught) is not None:
+                        self.bindings.assign(handler.name, Typed(PY, caught.name))
+                    else:
+                        self.bindings.forget(handler.name)
             for child in node.body + node.orelse + node.finalbody:
                 self.statement(child)
             for handler in node.handlers:
@@ -988,6 +1044,18 @@ class JavaReceiverRules:
             else:
                 for name in _bound_names(target):
                     self.bindings.forget(name)
+
+    def _element_type(self, iterable_node, iterated):
+        """The type of the elements a for loop yields, when known: range() yields ints, a typed collection its element type, a map its keys, a str its characters."""
+        if isinstance(iterable_node, ast.Call) and isinstance(iterable_node.func, ast.Name) and iterable_node.func.id == "range" and self.bindings.lookup("range") is None:
+            return Typed(BUILTIN, "int")
+        if iterated is None or not iterated.args:
+            return Typed(BUILTIN, "str") if iterated is not None and iterated.kind == BUILTIN and iterated.name == "str" else None
+        if iterated.kind == BUILTIN and iterated.name in ("list", "set", "tuple", "dict"):
+            return iterated.args[0]
+        if iterated.kind == JAVA and (self.facts.isAssignable(iterated.name, "java.lang.Iterable") or self.facts.isAssignable(iterated.name, "java.util.Map")):
+            return iterated.args[0]
+        return None
 
     def _hint_type(self, annotation):
         if self.bindings.visitor is None:
@@ -1096,8 +1164,21 @@ class JavaReceiverRules:
         parts.append(node.id)
         return self.bindings.of_name(".".join(reversed(parts)))
 
-    def _java_member(self, receiver, name, node, calling):
-        description = self.facts.describe(receiver.name)
+    def _described_receiver(self, receiver):
+        """The description of a Java receiver: with its type arguments substituted when all of them are known."""
+        if receiver.args and all(argument is not None for argument in receiver.args):
+            names = []
+            for argument in receiver.args:
+                name = BOXED_JAVA_NAMES.get(argument.name) if argument.kind == BUILTIN else argument.java_name()
+                if name is None:
+                    break
+                names.append(name)
+            if len(names) == len(receiver.args):
+                return self.facts.describe(receiver.name, names)
+        return self.facts.describe(receiver.name)
+
+    def _java_member(self, receiver, name, node, calling, description=None):
+        description = description or self._described_receiver(receiver)
         if description is None:
             return None
         member = name[:-1] if name.endswith("_") and keyword.iskeyword(name[:-1]) else name
@@ -1121,13 +1202,21 @@ class JavaReceiverRules:
                              f"[{description.simpleName()}.{member}] is an instance field; read it on an instance of [{description.name()}]",
                              node)
                 return None
+            self.targets[id(node)] = ("field", description.name(), member, fields.get(member), description.staticFields().contains(member))
             return of_java_type(fields.get(member))
         if nested.containsKey(member):
             return Typed(JAVA_REF, nested.get(member))
         if description.enumConstants().contains(member):
+            self.targets[id(node)] = ("field", description.name(), member, description.name(), True)
             return Typed(JAVA, description.name())
         if receiver.kind == JAVA_REF and self.facts.describe(f"{description.name()}${member}") is not None:
             return Typed(JAVA_REF, f"{description.name()}${member}")
+        alias = self._instance_alias(receiver, description, member)
+        if alias is not None:
+            if not alias.property():
+                return Typed(CALLABLE, alias.target()) if not calling else None
+            return self._return_type([signature for signature in methods.get(alias.target())
+                                      if not signature.isStatic() and len(signature.parameterTypes()) == 0])
         if description.open() or receiver.open:
             return None  # a hidden supertype or the actual implementation may contribute the member
         candidates = list(methods.keySet()) + list(fields.keySet()) + list(nested.keySet())
@@ -1144,6 +1233,24 @@ class JavaReceiverRules:
                          f"Java type [{description.name()}] has no member named [{member}]{_did_you_mean(suggestions)}",
                          node, suggestions)
         return None
+
+    def _instance_alias(self, receiver, description, name):
+        """
+        The snake_case method or getter property a Java instance answers to under ``name``
+        (JavaInstanceAliases, the names the compiler registers for the runtime), or None. A real member
+        of the name comes first, as it does at run time.
+        """
+        if receiver.kind != JAVA or description.pythonDefined():
+            return None
+        if (description.methods().containsKey(name) or description.fields().containsKey(name)
+                or description.nestedTypes().containsKey(name) or description.enumConstants().contains(name)):
+            return None
+        alias = description.instanceAliases().get(name)
+        if alias is None or alias.isBlocked():
+            return None
+        # registered for the runtime as well, so the alias also works on deeper call chains
+        self.checker._java_alias_types.add(description.name())
+        return alias
 
     def call(self, node):
         function = node.func
@@ -1178,12 +1285,17 @@ class JavaReceiverRules:
         self.expression(function)
         return None
 
-    def _java_call(self, receiver, name, node, argument_types, star_args, kwargs):
-        description = self.facts.describe(receiver.name)
+    def _java_call(self, receiver, name, node, argument_types, star_args, kwargs, description=None):
+        description = description or self._described_receiver(receiver)
         if description is None:
             return None
         member = name[:-1] if name.endswith("_") and keyword.iskeyword(name[:-1]) else name
         methods = description.methods()
+        alias = self._instance_alias(receiver, description, member)
+        if alias is not None:
+            if alias.property():
+                return None  # calling the value returned by a getter, rather than the getter itself
+            member = alias.target()
         if member in OBJECT_METHODS and not methods.containsKey(member):
             return None
         if description.anEnum() and not methods.containsKey(member):
@@ -1226,6 +1338,7 @@ class JavaReceiverRules:
                          f"no overload of [{description.simpleName()}.{member}] accepts ({self._render_arguments(argument_types)}); candidates: {rendered}",
                          node)
             return None
+        self.targets[id(node)] = ("method", description.name(), member, matching, receiver.kind == JAVA_REF)
         return self._return_type(matching)
 
     def _java_construction(self, target, node, argument_types, star_args, kwargs):
@@ -1243,11 +1356,15 @@ class JavaReceiverRules:
             if not description.pythonDefined():
                 kind = "an enum" if description.anEnum() else "a type without an accessible constructor"
                 self._report("unknown-constructor", f"[{description.name()}] is {kind} and cannot be instantiated", node)
-        elif not self._matching(constructors, argument_types):
-            rendered = ", ".join(signature.render(description.simpleName()) for signature in constructors)
-            self._report("unknown-constructor",
-                         f"no constructor of [{description.name()}] accepts ({self._render_arguments(argument_types)}); candidates: {rendered}",
-                         node)
+        else:
+            matching = self._matching(constructors, argument_types)
+            if not matching:
+                rendered = ", ".join(signature.render(description.simpleName()) for signature in constructors)
+                self._report("unknown-constructor",
+                             f"no constructor of [{description.name()}] accepts ({self._render_arguments(argument_types)}); candidates: {rendered}",
+                             node)
+            else:
+                self.targets[id(node)] = ("constructor", description.name(), None, matching, False)
         return Typed(JAVA, description.name())
 
     def _matching(self, signatures, argument_types):
@@ -1287,7 +1404,22 @@ class JavaReceiverRules:
             return Typed(BUILTIN, "none")
         if name.endswith("[]"):
             return None  # arrays reach Python as sequences; their members are not judged
-        return of_java_type(name)
+        args = list(signatures[0].returnTypeArguments()) if len(signatures) == 1 else []
+        return self._own_class(of_java_type(name, args))
+
+    def _own_class(self, typed):
+        """A Java type that is the generated class of a Python class of the compilation is that class."""
+        if typed is None:
+            return None
+        classes = getattr(self.checker, "python_classes", None)
+        if classes is None:
+            return typed
+        args = [self._own_class(argument) for argument in typed.args]
+        if typed.kind == JAVA and "." in typed.name:
+            model = classes.by_qualified.get(typed.name)
+            if model is not None:
+                return Typed(PY, model.class_def, args=args, nullable=typed.nullable)
+        return Typed(typed.kind, typed.name, typed.open, args, nullable=typed.nullable) if args != list(typed.args) else typed
 
     @staticmethod
     def _enum_methods(receiver):
@@ -1312,8 +1444,9 @@ class JavaReceiverRules:
     def _report(self, rule, message, node, suggestions=()):
         if self._probing:
             return
+        # the problems are kept in both modes: the static planner reads them off a reporting run too
+        self.problems.append((rule, message, self.span_of(node)))
         if self.silent:
-            self.problems.append((rule, message, self.span_of(node)))
             return
         self.checker.report(self.unit, rule, message, self.span_of(node), suggestions)
 
@@ -1322,6 +1455,24 @@ class JavaReceiverRules:
 
 # Python bases that add no members of their own; any other base the checker cannot see makes a class open
 TRANSPARENT_BASES = {"object", "abc.ABC", "ABC", "typing.Protocol", "Protocol", "typing.Generic", "Generic", "Generic[...]"}
+# the Python exception base whose members are those of BaseException
+PYTHON_EXCEPTION_BASES = {"Exception", "builtins.Exception"}
+# the members every exception inherits from BaseException, of no type the checker knows
+EXCEPTION_ATTRIBUTES = {"args", "__traceback__", "__cause__", "__context__", "__suppress_context__", "__notes__"}
+EXCEPTION_METHODS = {"with_traceback", "add_note"}
+
+
+def _native_exception(base):
+    """
+    Whether a base is a builtin exception class extending Exception (Exception, ValueError, KeyError...),
+    as the processor marks it (TypeRef.nativeException): the generated class of a class extending it
+    first is a RuntimeException, whose Java message is the str() of the Python exception. A local
+    class named like a builtin is none.
+    """
+    native = getattr(base, "nativeException", None)
+    if native is not None:
+        return bool(native())
+    return base.name() in PYTHON_EXCEPTION_BASES
 
 
 def _self_attributes(class_node):
@@ -1443,9 +1594,9 @@ class PythonClassModel:
         self.qualified = class_def.qualifiedName()
         self.methods = {}
         for function_def in class_def.functions():
-            self.methods[function_def.name()] = (function_def, _function_node(node, function_def.name()))
+            self.methods[function_def.name()] = (function_def, function_node(node, function_def.name()))
         constructor = class_def.constructor()
-        self.constructor = (constructor, _function_node(node, "__init__")) if constructor is not None else None
+        self.constructor = (constructor, function_node(node, "__init__")) if constructor is not None else None
         self.properties = {prop.name(): prop for prop in class_def.properties()}
         self.attributes = {attribute.name(): attribute for attribute in class_def.attributes()}
         self.instance_attributes = _self_attributes(node)
@@ -1457,23 +1608,101 @@ class PythonClassModel:
         self.metaclass = any(kw.arg == "metaclass" for kw in getattr(node, "keywords", ()))
         self._bases = None
         self._subclasses = None
+        self._python_exception = False
 
     @property
     def bases(self):
-        """The resolved bases: PythonClassModel, a Java TypeDescription, or None for an unknown base."""
+        """
+        The resolved bases: PythonClassModel, a Java TypeDescription, or None for an unknown base.
+        A builtin exception base is not among them: the class is an exception class (see is_throwable),
+        with the members of BaseException; a builtin exception other than Exception adds members of its
+        own (the errno of an OSError, the value of a StopIteration), which leave the class open (None).
+        """
         if self._bases is None:
             self._bases = []
             for base in self.class_def.bases():
                 name = base.name()
                 if name in TRANSPARENT_BASES:
                     continue
+                if _native_exception(base) and name not in self.classes.by_qualified:
+                    # the generated class extends the first base that resolves, as for a Java base
+                    if not any(base is not None for base in self._bases):
+                        self._python_exception = True
+                    if name not in PYTHON_EXCEPTION_BASES:
+                        self._bases.append(None)
+                    continue
                 model = self.classes.by_qualified.get(name)
                 if model is not None:
                     self._bases.append(model)
                     continue
-                description = self.classes.checker.facts.describe(name) if "." in name else None
+                description = self.classes.describe_base(self.module, base) if "." in name else None
                 self._bases.append(description)
         return self._bases
+
+    def superclass(self):
+        """
+        The base the generated class extends, as the stub generator picks it: the first base that
+        resolves (a PythonClassModel or a Java TypeDescription), or None when that is a builtin
+        exception (the generated class extends RuntimeException) or there is none. For
+        ``class E(Exception, Mixin)`` or ``class E(ValueError, Mixin)`` it is None: Mixin is a
+        Python base of E only.
+        """
+        bases = self.bases
+        if self._python_exception:
+            return None
+        return next((base for base in bases if base is not None), None)
+
+    def extends_python_exception(self, seen=None):
+        """Whether the generated class extends RuntimeException for a builtin exception (Exception, ValueError...), directly or through the generated classes of Python bases."""
+        seen = seen or set()
+        if self.qualified in seen:
+            return False
+        seen.add(self.qualified)
+        superclass = self.superclass()
+        if self._python_exception:
+            return True
+        return isinstance(superclass, PythonClassModel) and superclass.extends_python_exception(seen)
+
+    def is_throwable(self, seen=None):
+        """
+        Whether the generated class of the class is a Throwable: the class extends a builtin
+        exception, a Python class that does, or a Java Throwable. For a builtin exception it is a
+        RuntimeException whose Java message is the str() of the Python exception.
+        """
+        seen = seen or set()
+        if self.qualified in seen:
+            return False
+        seen.add(self.qualified)
+        superclass = self.superclass()
+        if self._python_exception:
+            return True
+        if isinstance(superclass, PythonClassModel):
+            return superclass.is_throwable(seen)
+        return superclass is not None and self.classes.checker.facts.isAssignable(superclass.name(), "java.lang.Throwable")
+
+    def throwable_base(self, seen=None):
+        """The Java class the generated class of an exception class extends, beyond the generated classes of its Python bases."""
+        seen = seen or set()
+        if self.qualified in seen:
+            return None
+        seen.add(self.qualified)
+        superclass = self.superclass()
+        if self._python_exception:
+            return "java.lang.RuntimeException"
+        if isinstance(superclass, PythonClassModel):
+            return superclass.throwable_base(seen)
+        return superclass.name() if superclass is not None else None
+
+    def extends(self, other, seen=None):
+        """Whether the generated class of the class is the other's or extends it."""
+        if self.qualified == other.qualified:
+            return True
+        seen = seen or set()
+        if self.qualified in seen:
+            return False
+        seen.add(self.qualified)
+        superclass = self.superclass()
+        return isinstance(superclass, PythonClassModel) and superclass.extends(other, seen)
 
     def java_bases(self, seen=None):
         """The descriptions of the Java bases of the class, its own before those of its Python bases."""
@@ -1547,6 +1776,11 @@ class PythonClassModel:
                     return ("java", base)
                 if base.protectedMethods().contains(name):
                     return ("inherited", None)  # a protected method of the Java base: not judged further
+        if self._python_exception:
+            if name in EXCEPTION_ATTRIBUTES:
+                return ("instance", None)
+            if name in EXCEPTION_METHODS:
+                return ("inherited", None)
         return None
 
     def constructor_of(self, seen=None):
@@ -1594,6 +1828,23 @@ class PythonClassModel:
 
     def subclass_defines(self, name):
         return any(subclass.find(name) is not None for subclass in self.subclasses)
+
+    def subclass_overrides(self, name):
+        """
+        Whether a subclass of the compilation resolves the member to another definition than this
+        class does: its own, or one of a base this class does not have. A subclass that only
+        inherits the member does not; one whose lookup the checker cannot follow may.
+        """
+        mine = self.find(name)
+        for subclass in self.subclasses:
+            if subclass.is_lookup_dynamic() or subclass.metaclass:
+                return True
+            found = subclass.find(name)
+            if found is None:
+                continue
+            if mine is None or found[0] != mine[0] or (len(found) > 1 and len(mine) > 1 and found[1] is not mine[1]):
+                return True
+        return False
 
     def member_names(self, seen=None):
         seen = seen or set()
@@ -1725,6 +1976,49 @@ class PythonClasses:
     def all(self):
         return self.models
 
+    def describe_base(self, module, base):
+        """
+        The description of a Java base of a class of the module, with its type arguments substituted
+        when every one of them is known (CrudRepository[Owner, int] is a CrudRepository<Owner, Integer>),
+        else the raw type.
+        """
+        facts = self.checker.facts
+        arguments = self.java_type_names(module, base.typeArguments())
+        return facts.describe(base.name(), arguments) if arguments else facts.describe(base.name())
+
+    def java_type_names(self, module, type_refs):
+        """
+        The qualified Java names the hints denote, boxed, as type arguments: a builtin, a class of
+        the compilation (its generated class), or a Java class; None when any of them is unknown.
+        """
+        names = []
+        for type_ref in type_refs or ():
+            if type_ref is None:
+                return None
+            if type_ref.isUnion():
+                members = list(type_ref.nonNoneMembers())
+                if len(members) != 1:
+                    return None
+                type_ref = members[0]
+            name = type_ref.name()
+            if name in BOXED_JAVA_NAMES:
+                names.append(BOXED_JAVA_NAMES[name])
+                continue
+            class_def = module.class_index().get(name)
+            model = self.of(class_def) if class_def is not None else self.by_qualified.get(name)
+            if model is not None:
+                names.append(model.qualified)
+                continue
+            visitor = module.visitor
+            qualified = (visitor.java_type_assignments.get(name) or visitor.imported_types.get(name) or name) if visitor is not None else name
+            if "." not in qualified:
+                return None
+            description = self.checker.facts.describe(qualified)
+            if description is None:
+                return None
+            names.append(description.name())
+        return names
+
     def of(self, class_def):
         model = self.by_def.get(id(class_def))
         if model is None:
@@ -1737,6 +2031,11 @@ class PythonReceiverMixin:
 
     def _python_model(self, receiver):
         return self.checker.python_classes.of(receiver.name)
+
+    def _throwable_model(self, receiver):
+        """The model of a class reference naming an exception class of the compilation, else None."""
+        model = self._python_model(receiver)
+        return model if model is not None and model.is_throwable() else None
 
     def _python_member(self, receiver, name, node, calling):
         model = self._python_model(receiver)
@@ -1765,7 +2064,8 @@ class PythonReceiverMixin:
             return model.instance_attribute_type(name, self.bindings)
         if kind == "java":
             description = found[1]
-            return self._java_member(Typed(JAVA if receiver.kind == PY else JAVA_REF, description.name()), name, node, calling)
+            # the base as the class extends it, with its type arguments
+            return self._java_member(Typed(JAVA if receiver.kind == PY else JAVA_REF, description.name()), name, node, calling, description=description)
         return None
 
     def _hinted_return(self, function_def):
@@ -1782,7 +2082,8 @@ class PythonReceiverMixin:
             self._python_member(receiver, name, node, calling=True)
             return None
         if found[0] == "java":
-            return self._java_call(Typed(JAVA if receiver.kind == PY else JAVA_REF, found[1].name()), name, node, argument_types, star_args, bool(node.keywords))
+            # the base as the class extends it, with its type arguments
+            return self._java_call(Typed(JAVA if receiver.kind == PY else JAVA_REF, found[1].name()), name, node, argument_types, star_args, bool(node.keywords), description=found[1])
         if found[0] == "class":
             nested = self.checker.python_classes.by_node.get(id(found[1]))
             return self._python_construction(Typed(PY_REF, nested.class_def), node, argument_types, star_args, keyword_types) if nested is not None else None
@@ -1825,7 +2126,11 @@ class PythonReceiverMixin:
         constructor = model.constructor_of()
         if constructor is None:
             arguments = len(argument_types) + len(node.keywords)
-            if arguments and not any(kw.arg is None for kw in node.keywords):
+            if model.is_throwable():
+                # Exception(*args): any positional arguments, kept as the args of the exception
+                if node.keywords and not any(kw.arg is None for kw in node.keywords):
+                    self._report("python-arity", f"[{model.name}] takes positional arguments only, as Exception does; got {node.keywords[0].arg}=", node)
+            elif arguments and not any(kw.arg is None for kw in node.keywords):
                 self._report("python-arity", f"[{model.name}] takes no arguments; got {arguments}", node)
         elif constructor is not UNKNOWN:
             function_def, function_node = constructor

@@ -1,0 +1,3107 @@
+"""
+Lowering of a candidate function body to the typed IR the Java side generates code from.
+
+The lowering walks the body with the types and targets the type checker inferred in a silent run
+(:class:`micronaut_typecheck.JavaReceiverRules`), and either produces a ``CompiledBody`` or
+refuses with every reason it found. It never approximates: a construct without a lowering that
+preserves Python semantics for the inferred operand types is a reason, with a stable rule and the
+span of the construct.
+
+Python ``int`` values are ``long`` with exact arithmetic (overflow raises where Python would
+promote), ``float`` values ``double``, ``str`` values ``String``, ``None`` is ``null``.
+"""
+import ast
+
+import os
+
+import java
+
+from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, UNKNOWN, PythonClassModel, Typed
+
+# names Java cannot declare: its keywords and literals, and the methods of Object
+JAVA_RESERVED_NAMES = frozenset((
+    "abstract assert boolean break byte case catch char class const continue default do double else enum "
+    "extends final finally float for goto if implements import instanceof int interface long native new "
+    "package private protected public return short static strictfp super switch synchronized this throw "
+    "throws transient try void volatile while true false null "
+    "equals hashCode toString getClass notify notifyAll wait clone finalize"
+).split())
+
+Ir = java.type("io.micronaut.python.processing.staticcompile.Ir")
+CompiledBody = java.type("io.micronaut.python.processing.staticcompile.Ir$CompiledBody")
+Stats = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision$Stats")
+
+
+def _ir(name):
+    return java.type(f"io.micronaut.python.processing.staticcompile.Ir${name}")
+
+
+Body, Local, Assign, PutSelf, If, Return, Eval = (_ir(n) for n in ("Body", "Local", "Assign", "PutSelf", "If", "Return", "Eval"))
+While, ForRange, ForEach, Break, Continue, Throw, Try, Catch = (_ir(n) for n in ("While", "ForRange", "ForEach", "Break", "Continue", "Throw", "Try", "Catch"))
+Const, Param, LocalRef, SelfProperty = (_ir(n) for n in ("Const", "Param", "LocalRef", "SelfProperty"))
+InvokeJava, NewJava, StaticField, Field, InvokeSibling = (_ir(n) for n in ("InvokeJava", "NewJava", "StaticField", "Field", "InvokeSibling"))
+InvokePython, PythonMember, ModuleAttribute, NewPythonException = (_ir(n) for n in ("InvokePython", "PythonMember", "ModuleAttribute", "NewPythonException"))
+ExceptionCrossing = _ir("ExceptionCrossing")
+Binary, Unary, Compare, And, Or, Conditional, Truthy, StrJoin, Helper, Cast = (
+    _ir(n) for n in ("Binary", "Unary", "Compare", "And", "Or", "Conditional", "Truthy", "StrJoin", "Helper", "Cast"))
+
+LONG, DOUBLE, BOOLEAN, STRING, VOID, NONE = "long", "double", "boolean", "java.lang.String", "void", "none"
+NUMBERS = (LONG, DOUBLE)
+# the Java types a value of a Python builtin kind has inside a compiled body
+BUILTIN_TYPES = {"int": LONG, "float": DOUBLE, "bool": BOOLEAN, "str": STRING, "none": NONE}
+# the Java types the stub declares for a hint of a builtin kind
+STUB_TYPES = {"int": "int", "float": DOUBLE, "bool": BOOLEAN, "str": STRING}
+# the Java types the stub declares, and a compiled body uses, for a number or a boolean that may be None
+BOXED_TYPES = {"int": "java.lang.Integer", "float": "java.lang.Double", "bool": "java.lang.Boolean"}
+# the standard Java values whose toString() spells them as Python's str() does: the others (an Instant, a
+# Duration, a BigDecimal) are a Python datetime, timedelta or Decimal at run time, spelled differently
+STANDARD_STR_TYPES = {"java.util.UUID", "java.time.LocalDate", "java.time.LocalTime"}
+# the Java types a Python collection is in a compiled body
+COLLECTION_TYPES = {"list": "java.util.List", "tuple": "java.util.List", "set": "java.util.Set", "dict": "java.util.Map"}
+LIST, SET, MAP, OBJECT = "java.util.List", "java.util.Set", "java.util.Map", "java.lang.Object"
+MAP_ENTRY = "java.util.Map.Entry"
+# the methods of Python strings with a Java equivalent: name -> (Java method, parameter types, return type)
+STRING_METHODS = {
+    "startswith": ("startsWith", [STRING], BOOLEAN), "endswith": ("endsWith", [STRING], BOOLEAN),
+    "replace": ("replace", ["java.lang.CharSequence", "java.lang.CharSequence"], STRING),
+}
+# Java numeric types and the type a compiled body uses them at
+JAVA_NUMBERS = {"int": LONG, "long": LONG, "short": LONG, "byte": LONG, "float": DOUBLE, "double": DOUBLE,
+                "java.lang.Integer": LONG, "java.lang.Long": LONG, "java.lang.Short": LONG, "java.lang.Byte": LONG,
+                "java.lang.Float": DOUBLE, "java.lang.Double": DOUBLE}
+# the primitive Java numbers, which a compiled body reads at its long or double: a boxed number may be
+# null, which a Python caller sees as None, so a boxed number stays boxed
+JAVA_PRIMITIVE_NUMBERS = {"int": LONG, "long": LONG, "short": LONG, "byte": LONG, "float": DOUBLE, "double": DOUBLE}
+JAVA_BOXED = {"java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte", "java.lang.Float", "java.lang.Double", "java.lang.Boolean"}
+# the boxed values a Python value of the same kind boxes back to when it reaches an Object: an int that fits
+# one is an Integer, a float a Double, a bool a Boolean
+JAVA_BOXED_AS_PYTHON = {"java.lang.Integer", "java.lang.Double", "java.lang.Boolean"}
+# the box a value of a builtin kind takes to be compared with None without being folded away
+BOXES = {LONG: "java.lang.Long", DOUBLE: "java.lang.Double", BOOLEAN: "java.lang.Boolean"}
+# the largest magnitude a long has as a double exactly
+EXACT_DOUBLE_LONG = 2 ** 53
+JAVA_BOOLEANS = {"boolean", "java.lang.Boolean"}
+# the boxed Java numbers a compiled body does not box a Python number as: it boxes an int as an Integer
+# (a Long when it does not fit one) and a float as a Double, as the host boundary does. A Java
+# collection of them keeps its type argument, so that no lookup or store boxes a value it would miss
+UNBOXED_ARGUMENTS = {"java.lang.Long", "java.lang.Short", "java.lang.Byte", "java.lang.Float"}
+JAVA_STRINGS = {"java.lang.String"}  # a CharSequence is a Java value, not a Python str
+BINARY_OPS = {ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/", ast.FloorDiv: "//", ast.Mod: "%", ast.Pow: "**"}
+COMPARE_OPS = {ast.Lt: "<", ast.LtE: "<=", ast.Gt: ">", ast.GtE: ">=", ast.Eq: "==", ast.NotEq: "!="}
+DEFAULTS = {LONG: 0, DOUBLE: 0.0, BOOLEAN: False}
+# the Java exceptions a compiled body throws where Python raises an exception of its own (a ValueError,
+# a TypeError, a ZeroDivisionError, an AttributeError, ...): its runtime checks and helpers, casts,
+# unboxing and calls on None. An except clause that catches one of them would catch, compiled, what the
+# Python body lets pass
+# the Java types of the arguments a compiled raise hands the Python exception class as Python would: the
+# boundary converts them to the str, int, float, bool or None the Python code passes
+EXCEPTION_ARGUMENT_TYPES = {LONG, DOUBLE, BOOLEAN, STRING, NONE, "java.lang.Long", "java.lang.Integer", "java.lang.Double", "java.lang.Boolean"}
+SYNTHESIZED_EXCEPTIONS = ("java.lang.ArithmeticException", "java.lang.ClassCastException", "java.lang.IllegalArgumentException",
+                          "java.lang.IllegalStateException", "java.lang.IndexOutOfBoundsException", "java.lang.NullPointerException",
+                          "java.lang.UnsupportedOperationException", "java.util.NoSuchElementException",
+                          "java.util.ConcurrentModificationException")
+
+
+# how well a parameter type fits an argument type: lower is more specific, as Java ranks overloads
+_RANKS = {
+    LONG: {"long": 0, "int": 1, "short": 2, "byte": 3, "java.lang.Long": 4, "java.lang.Integer": 5, "double": 6, "float": 7,
+           "java.lang.Double": 8, "java.lang.Float": 9, "java.lang.Number": 10, "java.lang.Object": 11},
+    DOUBLE: {"double": 0, "float": 1, "java.lang.Double": 2, "java.lang.Float": 3, "java.lang.Number": 4, "java.lang.Object": 5},
+    STRING: {"java.lang.String": 0, "java.lang.CharSequence": 1, "java.lang.Object": 2},
+    BOOLEAN: {"boolean": 0, "java.lang.Boolean": 1, "java.lang.Object": 2},
+}
+
+
+def _rank(argument_type, parameter_type):
+    table = _RANKS.get(argument_type)
+    if table is not None:
+        return table.get(parameter_type, 20)
+    if argument_type == parameter_type:
+        return 0
+    if parameter_type == "java.lang.Object":
+        return 2
+    return 1
+
+
+def stub_type_name(typed):
+    """The Java type the stub declares for a hinted value, or None when the hint has no static type."""
+    if typed is None:
+        return None
+    if typed.kind == BUILTIN:
+        if typed.name in COLLECTION_TYPES:
+            return COLLECTION_TYPES[typed.name]
+        return STUB_TYPES.get(typed.name)
+    if typed.kind == JAVA:
+        return typed.name
+    if typed.kind == PY:
+        return typed.name.qualifiedName()
+    return None
+
+
+# the types str() spells without running any code
+SPELLED_PLAINLY = frozenset((LONG, DOUBLE, BOOLEAN, STRING, NONE, "java.lang.Long", "java.lang.Double", "java.lang.Boolean"))
+
+# the builtins the builtin table lowers (see Lowering._builtin_call)
+TABLE_BUILTINS = frozenset(("len", "int", "float", "bool", "abs", "list", "tuple", "set", "min", "max"))
+
+CREATOR_ANNOTATIONS = ("io.micronaut.core.annotation.Creator", "com.fasterxml.jackson.annotation.JsonCreator")
+
+
+def _static_creator(class_def):
+    """The name of the static @Creator function of a class, which becomes the primary constructor of its generated class, or None."""
+    for function_def in class_def.functions():
+        if function_def.isStatic() and any(decorator.annotationName() in CREATOR_ANNOTATIONS for decorator in function_def.decorators()):
+            return function_def.name()
+    return None
+
+
+def _abstract_class(class_def):
+    """Whether the class is a protocol or declares an abstract method: its generated type is an interface or abstract."""
+    return (any(base.name() in ("Protocol", "typing.Protocol") for base in class_def.bases())
+            or any(function.isAbstract() for function in class_def.functions()))
+
+
+def _plain_receiver(node):
+    """Whether the receiver is a name or a chain of attributes of a name, whose evaluation a static call can skip."""
+    while isinstance(node, ast.Attribute):
+        node = node.value
+    return isinstance(node, ast.Name)
+
+
+def _declared(hint):
+    """The type a hint declares: the member of a union with None, the hint itself otherwise."""
+    if hint is not None and hint.isUnion():
+        members = list(hint.nonNoneMembers())
+        return members[0] if len(members) == 1 else hint
+    return hint
+
+
+def _erased(type_name):
+    """A Java type name without the type arguments the lowering carries in it."""
+    index = type_name.find("<")
+    return type_name if index < 0 else type_name[:index]
+
+
+def _descriptor_parameter_types(signature):
+    """
+    The parameter types a call of the Java method names in its descriptor: a parameter declared with a type
+    variable is its erasure (Object for the T of an Optional[Foo]), the others as the signature spells them.
+    """
+    resolved = list(signature.parameterTypes())
+    erased = list(signature.erasedParameterTypes())
+    return [declared if declared != _erased(type_name) else type_name for type_name, declared in zip(resolved, erased)]
+
+
+def _descriptor_return_type(signature):
+    """The erasure of the declared return type of the Java method, which a call names in its descriptor."""
+    return signature.erasedReturnType()
+
+
+def _arguments(type_name):
+    """The type arguments carried in a Java type name, as a list of names."""
+    index = type_name.find("<")
+    if index < 0:
+        return []
+    inner = type_name[index + 1:-1]
+    parts, depth, start = [], 0, 0
+    for i, c in enumerate(inner):
+        if c == "<":
+            depth += 1
+        elif c == ">":
+            depth -= 1
+        elif c == "," and depth == 0:
+            parts.append(inner[start:i])
+            start = i + 1
+    parts.append(inner[start:])
+    return [part for part in parts if part]
+
+
+def _completes_abruptly(statements):
+    """Whether a block never runs to its end: its last statement returns or raises, or branches that all do."""
+    if not statements:
+        return False
+    last = statements[-1]
+    if isinstance(last, (ast.Return, ast.Raise)):
+        return True
+    if isinstance(last, ast.If):
+        return bool(last.orelse) and _completes_abruptly(last.body) and _completes_abruptly(last.orelse)
+    return False
+
+
+def _assigned_names(statements):
+    """The names the statements assign, in order of first assignment, nested scopes aside."""
+    names = []
+    for statement in statements:
+        for node in ast.walk(statement):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+                continue
+            if isinstance(node, (ast.Assign, ast.AnnAssign)):
+                for target in (node.targets if isinstance(node, ast.Assign) else [node.target]):
+                    if isinstance(target, ast.Name) and target.id not in names:
+                        names.append(target.id)
+    return names
+
+
+def _default_node(model, name, function_node):
+    """The AST of the default of a parameter: from the __init__ it is declared in, else from the dataclass field of the class body."""
+    if function_node is not None:
+        args = function_node.args
+        positional = list(getattr(args, "posonlyargs", [])) + list(args.args)
+        defaults = list(args.defaults)
+        for argument, default in zip(positional[len(positional) - len(defaults):], defaults):
+            if argument.arg == name:
+                return default
+        for argument, default in zip(args.kwonlyargs, args.kw_defaults):
+            if argument.arg == name:
+                return default
+        return None
+    for statement in getattr(model.node, "body", ()):
+        if isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name) and statement.target.id == name:
+            value = statement.value
+            if isinstance(value, ast.Call) and (getattr(value.func, "id", None) == "field" or getattr(value.func, "attr", None) == "field"):
+                for keyword in value.keywords:
+                    if keyword.arg == "default":
+                        return keyword.value
+                return value
+            return value
+    return None
+
+
+def _default_factory(default):
+    """The builtin a field(default_factory=...) names (list, dict or set), or None."""
+    if not isinstance(default, ast.Call) or not (getattr(default.func, "id", None) == "field" or getattr(default.func, "attr", None) == "field"):
+        return None
+    for keyword in default.keywords:
+        if keyword.arg == "default_factory":
+            factory = keyword.value.id if isinstance(keyword.value, ast.Name) else getattr(keyword.value, "attr", None)
+            return factory if factory in ("list", "dict", "set") else None
+    return None
+def _mangled(class_name, name):
+    """The name Python stores a private attribute of a class under: __name in class C is _C__name."""
+    if not name.startswith("__") or name.endswith("__"):
+        return name
+    stripped = class_name.lstrip("_")
+    return f"_{stripped}{name}" if stripped else name
+
+
+def _decorated_with(function_node, names):
+    for decorator in function_node.decorator_list:
+        target = decorator.func if isinstance(decorator, ast.Call) else decorator
+        if isinstance(target, ast.Name) and target.id in names:
+            return True
+        if isinstance(target, ast.Attribute) and target.attr in names:
+            return True
+    return False
+
+
+def _reads(name, statements):
+    """Whether the statements read the local of the name before binding it again."""
+    for statement in statements:
+        if isinstance(statement, ast.For) and isinstance(statement.target, ast.Name) and statement.target.id == name:
+            # the loop binds the name anew: only its iterable is evaluated before
+            return _reads(name, [statement.iter])
+        if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+            targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
+            if statement.value is not None and _reads(name, [statement.value]):
+                return True
+            if any(isinstance(target, ast.Name) and target.id == name for target in targets):
+                return False
+            continue
+        if any(isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, ast.Load) for node in _outer_nodes(statement, name)):
+            return True
+    return False
+
+
+def _outer_nodes(node, name):
+    """
+    The nodes of a statement outside the comprehensions and lambdas binding the name themselves,
+    whose reads are of their own variable. The first iterable of such a comprehension and the
+    defaults of such a lambda are evaluated outside them: ``[c for c in c]`` reads the outer ``c``.
+    """
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)) and any(name in _bound(generator.target) for generator in current.generators):
+            stack.append(current.generators[0].iter)
+            continue
+        if isinstance(current, ast.Lambda) and name in _parameter_names(current.args):
+            stack.extend(current.args.defaults)
+            stack.extend(default for default in current.args.kw_defaults if default is not None)
+            continue
+        yield current
+        stack.extend(ast.iter_child_nodes(current))
+
+
+def _parameter_names(arguments):
+    """The names the parameters of a function or a lambda bind."""
+    every = list(arguments.posonlyargs) + list(arguments.args) + list(arguments.kwonlyargs)
+    every += [argument for argument in (arguments.vararg, arguments.kwarg) if argument is not None]
+    return {argument.arg for argument in every}
+
+
+def _function_bindings(function_node):
+    """
+    The names a function binds in its body (assignments, loop and with targets, imports, nested
+    definitions, except clauses) and its parameters: each hides a module-level name or a builtin
+    of the same name for the whole body. Nested scopes are included, which only hides more.
+    """
+    names = _parameter_names(function_node.args)
+    for statement in function_node.body:
+        for child in ast.walk(statement):
+            if isinstance(child, ast.Name) and isinstance(child.ctx, (ast.Store, ast.Del)):
+                names.add(child.id)
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                names.add(child.name)
+            elif isinstance(child, ast.alias):
+                names.add(child.asname or child.name.split(".")[0])
+            elif isinstance(child, ast.ExceptHandler) and child.name:
+                names.add(child.name)
+            elif isinstance(child, ast.arg):
+                names.add(child.arg)
+    return names
+
+
+class ModuleScope:
+    """
+    How a module binds its names, from its AST. A compiled body binds a module-level name at compile
+    time (inlines a constant, calls the static Java method of a function) only when the name is
+    stable: the module binds it exactly once, in a statement of its own body (not inside an if, a
+    loop or a try), no function of the module declares it ``global``, and no star import after that
+    statement may rebind it. Anything else may rebind the name while the program runs.
+    """
+
+    def __init__(self, tree):
+        self.counts = {}          # name -> how many times the module scope binds it
+        self.direct = {}          # name -> (index, statement) of the statement of the module body binding it
+        self.declared_global = set()
+        self.last_star = None     # the index of the last statement of the module body holding a star import
+        self.known = tree is not None
+        if tree is None:
+            return
+        for child in ast.walk(tree):
+            if isinstance(child, ast.Global):
+                self.declared_global.update(child.names)
+        for index, statement in enumerate(tree.body):
+            self._scan(statement, index, statement)
+
+    def _bind(self, name, index, statement, direct):
+        self.counts[name] = self.counts.get(name, 0) + 1
+        if direct:
+            self.direct[name] = (index, statement)
+
+    def _scan(self, node, index, top):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            self._bind(node.name, index, top, node is top)
+            return  # the body is a scope of its own
+        if isinstance(node, ast.Lambda):
+            return
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                if alias.name == "*":
+                    self.last_star = index
+                else:
+                    self._bind(alias.asname or alias.name.split(".")[0], index, top, node is top)
+            return
+        if isinstance(node, ast.AnnAssign) and node.value is None:
+            return  # a declaration binds nothing
+        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            targets = top.targets if isinstance(top, ast.Assign) else [top.target] if isinstance(top, ast.AnnAssign) else []
+            self._bind(node.id, index, top, any(target is node for target in targets))
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            self._bind(node.name, index, top, False)
+        elif isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name:
+            self._bind(node.name, index, top, False)
+        elif isinstance(node, ast.MatchMapping) and node.rest:
+            self._bind(node.rest, index, top, False)
+        for child in ast.iter_child_nodes(node):
+            self._scan(child, index, top)
+
+    def binds(self, name):
+        """Whether the module may bind the name at all, hiding a builtin of the same name."""
+        return not self.known or self.last_star is not None or name in self.counts or name in self.declared_global
+
+    def stable(self, name):
+        """The statement of the module body binding the name once and for good, or None when something may rebind it."""
+        if not self.known or self.counts.get(name) != 1 or name in self.declared_global or name not in self.direct:
+            return None
+        index, statement = self.direct[name]
+        if self.last_star is not None and self.last_star > index:
+            return None
+        return statement
+
+
+def module_scope(module):
+    """The ModuleScope of a module of the compilation, built once from the AST its visitor modelled."""
+    visitor = getattr(module, "visitor", None)
+    tree = getattr(visitor, "module_node", None)
+    cached = getattr(module, "_mn_scope", None)
+    if cached is None or cached[0] is not tree:
+        cached = (tree, ModuleScope(tree))
+        module._mn_scope = cached
+    return cached[1]
+
+
+def _bound(target):
+    """The names a loop or comprehension target binds."""
+    return {child.id for child in ast.walk(target) if isinstance(child, ast.Name)}
+
+
+# the kinds a key or element compares as: Python holds 1.0 == 1 == True across them
+_SCALAR_KINDS = (LONG, DOUBLE, BOOLEAN)
+# the kinds that may hold a number of any type
+_LOOSE_KINDS = (OBJECT, "java.lang.Number", "java.io.Serializable", "java.lang.Comparable")
+
+
+def _equality_kind(type_name):
+    """The kind a value of the type compares as in a dict or set: a long, a double, a boolean, or the erased type."""
+    erased = _erased(type_name)
+    if erased in ("boolean", "java.lang.Boolean"):
+        return BOOLEAN
+    return JAVA_NUMBERS.get(erased, erased)
+
+
+def _numbers_mix(first, second):
+    """Whether values of the two kinds may be equal numbers Java tells apart: two kinds of number, or a number and a type that may hold any."""
+    return ((first != second and first in _SCALAR_KINDS and second in _SCALAR_KINDS)
+            or (first in _SCALAR_KINDS and second in _LOOSE_KINDS)
+            or (first in _LOOSE_KINDS and (second in _SCALAR_KINDS or second in _LOOSE_KINDS)))
+
+
+# the methods of a collection that only read it: calling one in a loop over the collection leaves its iterator valid
+_READING_METHODS = frozenset(("get", "size", "isEmpty", "contains", "containsKey", "containsValue", "indexOf",
+                              "lastIndexOf", "index", "count", "copy", "keys", "values", "items", "equals", "hashCode",
+                              "toString"))
+
+
+def _same_collection(node, iterable):
+    """Whether the node names the collection a loop iterates: the same local or parameter, or the same property of self."""
+    if isinstance(iterable, ast.Name):
+        return isinstance(node, ast.Name) and node.id == iterable.id
+    return (isinstance(node, ast.Attribute) and node.attr == iterable.attr
+            and isinstance(node.value, ast.Name) and node.value.id == "self")
+
+
+def _may_change_iterated(iterable, statements):
+    """
+    Whether the loop body may change the collection the loop iterates. Python goes on iterating a list
+    the body appends to, while the Java iterator throws ConcurrentModificationException; so any use of
+    the collection but a read (an item, len(), a membership test, a comparison, a reading method, a
+    nested loop over it) counts as a change: a call it is passed to, an alias, a store or delete of an
+    item, an augmented assignment. For a property of self, a call on self or self passed on may change
+    it too.
+    """
+    parents = {}
+    for statement in statements:
+        for node in ast.walk(statement):
+            for child in ast.iter_child_nodes(node):
+                parents[id(child)] = node
+    for statement in statements:
+        for node in ast.walk(statement):
+            if _same_collection(node, iterable):
+                if not _reads_only(node, parents):
+                    return True
+            elif (isinstance(iterable, ast.Attribute) and isinstance(node, ast.Name) and node.id == "self"
+                  and not _reads_other_property(node, parents)):
+                return True
+    return False
+
+
+def _reads_only(node, parents):
+    """Whether the use of the iterated collection only reads it."""
+    parent = parents.get(id(node))
+    if isinstance(node.ctx, ast.Store):
+        # rebinding the name (or the property) leaves the object the loop iterates as it is
+        return isinstance(parent, ast.Assign) and any(target is node for target in parent.targets)
+    if not isinstance(node.ctx, ast.Load) or parent is None:
+        return False
+    if isinstance(parent, ast.Subscript):
+        return parent.value is node and isinstance(parent.ctx, ast.Load)
+    if isinstance(parent, ast.Compare):
+        return True
+    if isinstance(parent, ast.For):
+        return parent.iter is node
+    if isinstance(parent, ast.Call):
+        return isinstance(parent.func, ast.Name) and parent.func.id == "len" and len(parent.args) == 1 and not parent.keywords
+    if isinstance(parent, ast.Attribute):
+        call = parents.get(id(parent))
+        return parent.attr in _READING_METHODS and isinstance(call, ast.Call) and call.func is parent
+    return False
+
+
+def _reads_other_property(node, parents):
+    """Whether a use of self in a loop over a property of self only reads another property: no call, no store, self not passed on."""
+    parent = parents.get(id(node))
+    if not isinstance(parent, ast.Attribute) or not isinstance(parent.ctx, ast.Load):
+        return False
+    call = parents.get(id(parent))
+    return parent.value is node and not (isinstance(call, ast.Call) and call.func is parent)
+
+
+def _pure_operand(node):
+    """Whether evaluating the expression twice is what Python does once: a name, a literal or an attribute read of one."""
+    if isinstance(node, (ast.Name, ast.Constant)):
+        return True
+    return isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+
+
+def _runs_getter(expression):
+    """Whether the lowered expression reads a @property of self, whose Python getter runs on every read."""
+    while expression.getClass().getSimpleName() == "Cast":
+        expression = expression.operand()
+    return expression.getClass().getSimpleName() == "SelfProperty" and expression.accessor()
+
+
+def _always_returns(statements):
+    """Whether every path through the statements ends in a return (or a raise, which Java accepts as a terminal too)."""
+    for statement in statements:
+        if isinstance(statement, (ast.Return, ast.Raise)):
+            return True
+        if isinstance(statement, ast.If) and statement.orelse and _always_returns(statement.body) and _always_returns(statement.orelse):
+            return True
+        if isinstance(statement, ast.Try) and not statement.orelse and _always_returns(statement.body) and all(_always_returns(handler.body) for handler in statement.handlers):
+            return True
+    return False
+
+
+def _assigned_on_every_path(statements, name):
+    """Whether every path through the statements assigns the local before the statements end."""
+    for statement in statements:
+        if isinstance(statement, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
+            if any(isinstance(target, ast.Name) and target.id == name for target in targets):
+                return True
+        if isinstance(statement, ast.If) and statement.orelse and _assigned_on_every_path(statement.body, name) and _assigned_on_every_path(statement.orelse, name):
+            return True
+        if isinstance(statement, (ast.Return, ast.Raise)):
+            return True  # no path continues past here without the local being needed
+    return False
+
+
+def _side_effect_free(expression):
+    """Whether evaluating the lowered expression has no effect beyond its value: a parameter, a local or a literal."""
+    return expression.getClass().getSimpleName() in ("Param", "LocalRef", "Const")
+
+
+def _calls_sibling(expression):
+    """Whether the lowered expression is the result of a call of a method of the class, converted or not."""
+    while expression.getClass().getSimpleName() == "Cast":
+        expression = expression.operand()
+    return expression.getClass().getSimpleName() == "InvokeSibling"
+
+
+def _never_none(expression):
+    """Whether a lowered str is never None: a literal, a concatenation or a str() of something."""
+    kind = expression.getClass().getSimpleName()
+    if kind == "Const":
+        return expression.value() is not None
+    if kind == "Binary":
+        return expression.op() == "concat"
+    if kind == "Helper":
+        return expression.name() == "concat"
+    return kind == "StrJoin"
+
+
+def _operand_nodes(node):
+    """The operand nodes of a binary operation or an augmented assignment, for what the checker knows of them."""
+    if isinstance(node, ast.BinOp):
+        return node.left, node.right
+    if isinstance(node, ast.AugAssign):
+        return node.target, node.value
+    return ()
+
+
+def _hierarchy(model, seen=None):
+    """The class and its Python bases, each once; None in place of a base the checker cannot see."""
+    seen = seen if seen is not None else set()
+    if model.qualified in seen:
+        return []
+    seen.add(model.qualified)
+    found = [model]
+    for base in model.bases:
+        if base is None or isinstance(base, PythonClassModel):
+            found.extend([None] if base is None else _hierarchy(base, seen))
+    return found
+
+
+def _defines(model, names):
+    """Whether the class or a Python base defines one of the names, as a method or in an assignment of its body."""
+    for candidate in _hierarchy(model):
+        if candidate is None:
+            return True  # an unknown base may define it
+        if any(name in candidate.methods for name in names):
+            return True
+        for statement in getattr(candidate.node, "body", ()):
+            targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target] if isinstance(statement, ast.AnnAssign) else []
+            if any(isinstance(target, ast.Name) and target.id in names for target in targets):
+                return True
+    return False
+
+
+def _plain_truth(model):
+    """
+    Whether an object of the class (or of a subclass of the compilation, which a value of it may
+    be) is true unless None: no __bool__ or __len__ in its hierarchy, no Java base, nothing hidden.
+    """
+    for candidate in [model] + list(model.subclasses):
+        if candidate.is_open() or candidate.java_bases() or _defines(candidate, ("__bool__", "__len__")):
+            return False
+    return True
+
+
+def _bridged_str(model):
+    """
+    Whether the toString() of the generated class is Python's str() of the object, as the stub
+    bridges it: the class or a Python base defines __str__ or __repr__ (an instance method without
+    parameters) in its source, nothing of the hierarchy is hidden from the checker, and neither
+    the class nor a subclass of the compilation defines a Python toString, which the stub would
+    bridge instead.
+    """
+    hierarchy = _hierarchy(model)
+    if None in hierarchy or any(candidate.is_open() for candidate in hierarchy):
+        return False
+    if any(_defines(candidate, ("toString",)) for candidate in [model] + list(model.subclasses)):
+        return False
+    for candidate in hierarchy:
+        for name in ("__str__", "__repr__"):
+            found = candidate.methods.get(name)
+            if found is not None and not found[0].isStatic() and len(found[0].arguments().arguments()) == 0:
+                return True
+    return False
+
+
+class Refused(Exception):
+    """A construct without a lowering; the reason is recorded before it is raised."""
+
+
+class _ComprehensionBody(ast.stmt):
+    """The statement at the heart of the loop a comprehension lowers to: the element appended to the result."""
+    _fields = ()
+
+    def __init__(self, node, kind, result):
+        super().__init__()
+        self.node = node
+        self.kind = kind
+        self.result = result
+        self.container_type = None
+
+
+class Lowering:
+    """Lowers one function body; see the module documentation."""
+
+    def __init__(self, checker, module, class_def, function_def, node, rules, class_model=None, advised=None, advised_method=False, java_layout=None, planner=None, static=False, compiled=None):
+        self.checker = checker
+        self.planner = planner    # the planner, asked for the decisions of the module-level functions the body calls
+        self.static = static      # whether the body compiles into a static Java method: a plain module-level function or a static method
+        self.java_layout = java_layout  # (parameter types, return type) of the Java method this one implements, which fix the stub's signature
+        self.advised = advised or (lambda function_def: False)  # whether a method of the class is advised
+        self.advised_method = advised_method  # whether this method is advised: its Java method runs the interceptor chain first
+        self.compiled = compiled or (lambda function_def, function_node: False)  # whether a method of the class is compiled
+        self.module = module
+        self.class_def = class_def
+        self.function_def = function_def
+        self.node = node
+        self.rules = rules
+        self.bindings = rules.bindings
+        self.class_model = class_model
+        self.reasons = []
+        self.refused = set()      # (rule, span) of the reasons, which are recorded once each
+        self.unbound = set()      # the locals a refused statement assigns, whose reads are not reasons again
+        self.locals = {}          # name -> Java type
+        self.hoisted = []         # Local statements declared at the top of the body
+        self.depth = 0            # nesting of the statement being lowered
+        self.branches = []        # the if statements enclosing the statement being lowered
+        self.branch_depths = []   # the block depth of each of those if statements
+        self.loops = []           # (id, node, following depth, branch depth) of the loops enclosing the statement being lowered
+        self.reassigned = set()   # the parameters the body assigns, kept in a local of their own
+        self.copied = set()       # the collection parameters the body works on a copy of
+        self.identifiers = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)} | {a.arg for a in ast.walk(node) if isinstance(a, ast.arg)}
+        self.loop_exits = {}      # loop id -> {"break", "continue"} used in its body
+        self.following = []       # the statements following the one being lowered, innermost block last
+        self.next_loop = 0
+        self.parameters = {}      # name -> (type used at, stub type)
+        self.java_calls = 0
+        self.bridge_calls = 0
+        self.helper_calls = 0
+        self.checked = False      # a call declares a checked exception
+        self.prelude = []         # per statement being lowered, the statements a comprehension hoists before it
+        self.hoist_barrier = 0    # inside an operand evaluated lazily or repeatedly: nothing is hoisted there
+        self.evaluated = 0        # the evaluations the statement being lowered has completed that may run code or raise
+        self.synthetic = 0        # inside the loop a comprehension lowers to, whose refused statement refuses the comprehension
+        self.comprehensions = {}  # id(comprehension) -> the local it is hoisted into, when an operand is lowered twice
+        self.bound = _function_bindings(node)  # the names the function binds: a module-level name or builtin of the same name is hidden
+        self.thrown = []          # per enclosing try block, the checked exceptions its Java calls declare
+        self.java_code = []       # per enclosing try block, the Java methods and constructors outside the compilation it calls
+        self.calls_java = False   # the body calls a Java method or constructor outside the compilation
+        self.compilation_calls = 0  # the calls of code of the compilation through Java: compiled functions, generated constructors and methods
+        self.handling = []        # the except ("except", variable) and finally ("finally", None) blocks enclosing the statement
+        self.exception_variables = set()  # the variables of the enclosing except clauses for an exception class of the compilation
+
+    # ---------------------------------------------------------------- entry
+
+    def lower(self):
+        """
+        The CompiledBody, or None when the body was refused. A refused statement is a reason and
+        the lowering goes on with the next one, so the reasons are every one the body has, not the
+        first; a refused signature ends it, since the body has nothing to be lowered against.
+        """
+        try:
+            parameter_names, parameter_types = self._parameters()
+            return_type = self._return_type()
+        except Refused:
+            return None
+        if return_type != VOID and not _always_returns(self.node.body):
+            self._record("unknown-type", "the function does not return a value on every path", self.node)
+        try:
+            self._shadow_reassigned_parameters()
+            statements = self._block(self.node.body)
+        except Refused:
+            return None
+        if self.reasons:
+            return None
+        body = Body(self.hoisted + statements)
+        stats = Stats(len(self.node.body), self.java_calls, self.bridge_calls, self.helper_calls)
+        if self.class_def is not None:
+            owner = self.class_def.qualifiedName()
+        elif self.planner is not None:
+            owner = self.planner.script_class_name(self.module)
+        else:
+            owner = self.module.script.qualifiedName()
+        return CompiledBody(owner, self.function_def.name(), parameter_names, parameter_types,
+                            return_type, body, self.function_def.span(), stats, self.checked, self.advised_method,
+                            self.static, self.class_def is None, self._exception_crossing())
+
+    def _exception_crossing(self):
+        """
+        How the Java exception of a Python exception class the body throws reaches a Python caller of
+        the rewritten function (Ir.ExceptionCrossing): one the compilation raises (a compiled raise, the
+        Python code of the compilation the body calls) is the Python exception in Python, one that
+        crossed Java code is the Java exception. A body calling no Java code outside the compilation
+        throws only the former, one calling only Java code the latter; a body calling both, in a
+        compilation with exception classes, may throw either, and its Python callers keep the Python body.
+        """
+        if not self.calls_java:
+            return ExceptionCrossing.TRANSLATED
+        classes = getattr(self.checker, "python_classes", None)
+        exception_classes = classes is not None and any(model.is_throwable() for model in classes.all())
+        if exception_classes and (self.compilation_calls or self.bridge_calls):
+            return ExceptionCrossing.PYTHON_BODY
+        return ExceptionCrossing.UNTRANSLATED
+
+    def _shadow_reassigned_parameters(self):
+        """
+        A parameter the body assigns lives in a local of its own from the start: a Java parameter
+        keeps the type the stub declares, the local the type the body uses.
+        """
+        for node in ast.walk(self.node):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store) and node.id in self.parameters:
+                self.reassigned.add(node.id)
+        self.reassigned |= self.copied
+        for name in sorted(self.reassigned):
+            used, stub = self.parameters[name]
+            self.locals[name] = used
+            initial = Param(name, used, stub)
+            if name in self.copied:
+                self.helper_calls += 1
+                initial = Helper("copy", [initial], used)
+            self.hoisted.append(Local(self._shadow(name), used, initial))
+
+    def _shadow(self, name):
+        """The local a reassigned parameter lives in: the name with underscores until it is one the body does not use."""
+        shadow = name + "_"
+        while shadow in self.identifiers:
+            shadow += "_"
+        return shadow
+
+    def _refuse(self, rule, message, node):
+        self._record(rule, message, node)
+        raise Refused()
+
+    def _record(self, rule, message, node):
+        span = self.module.span_of(node) if node is not None else self.function_def.span()
+        key = (rule, str(span))
+        if key not in self.refused:
+            self.refused.add(key)
+            self.reasons.append((rule, message, span))
+
+    # ---------------------------------------------------------------- signature
+
+    def _parameters(self):
+        names, types = [], []
+        for argument in self.function_def.arguments().arguments():
+            name = argument.name()
+            if name in ("self", "cls") and not self.function_def.isStatic():
+                continue
+            # from the hint itself: the checker's pass forgets a parameter the body reassigns
+            hint = argument.typeAnnotation()
+            typed = self.bindings.of_hint(hint) if hint is not None else None
+            if typed is not None and typed.kind == PY and self._derives_from_python_exception(typed.name):
+                # whatever the Java signature says, a Python exception object cannot become a value of it
+                self._refuse("python-exception", f"parameter [{name}] is a [{typed.name.name()}], a Python exception class; a value of it has no Java layout", self.node)
+            stub_type = self.java_layout[0][len(names)] if self.java_layout is not None else self._stub_type(typed, hint, self.node)
+            used = self._value_type(typed, self.node)
+            if self.java_layout is not None and _erased(used) != _erased(stub_type) and used not in (LONG, DOUBLE, BOOLEAN, STRING):
+                # the Java method takes the layout's type (a Throwable) while the hint names the subtype the
+                # body works on (a ConstraintViolationException): the parameter is cast where it is read
+                if not self.checker.facts.isAssignable(_erased(used), _erased(stub_type)):
+                    self._refuse("unknown-type", f"the hint of [{name}] is a [{_erased(used)}], which is not a [{_erased(stub_type)}] as the Java method declares", self.node)
+            self.parameters[name] = (used, stub_type)
+            if typed is not None and typed.kind == BUILTIN and typed.name in COLLECTION_TYPES:
+                # the bridge hands Python a copy of a Java collection given to a list, set or dict
+                # parameter: the body works on a copy too, so the caller's collection is untouched
+                self.copied.add(name)
+            names.append(name)
+            types.append(stub_type)
+        return names, types
+
+    def _return_type(self):
+        return_def = self.function_def.returnType()
+        hint = return_def.typeAnnotation() if return_def is not None else None
+        if self.java_layout is not None:
+            typed = self.bindings.of_hint(hint) if hint is not None and hint.name() != "None" else None
+            if typed is not None and typed.kind == PY and self._derives_from_python_exception(typed.name):
+                self._refuse("python-exception", f"returning a [{typed.name.name()}], a Python exception class, has no Java layout", self.node)
+            # the Java method fixes the return type: a value is returned at it, boxed when it is an Object
+            return VOID if self.java_layout[1] == "void" else self.java_layout[1]
+        if hint is None:
+            # the stub declares an Object return for an unhinted function that returns a value
+            return OBJECT if self.function_def.hasReturnValue() else VOID
+        if hint.name() == "None":
+            return VOID
+        typed = self.bindings.of_hint(hint)
+        declared = _declared(hint)
+        if typed is not None and typed.kind == PY and declared.typeArguments():
+            # the stub returns X<Y> while the generated class of a subclass extends the raw X: Java takes no Y for it
+            self._refuse("unsupported-expression", f"returning a [{declared.name()}] with type arguments has no static lowering: the generated class of a subclass extends the raw base", self.node)
+        return self._stub_type(typed, hint, self.node)
+
+    def _stub_type(self, typed, hint, node):
+        """The Java type the stub declares for a hinted parameter or return."""
+        if hint is not None and hint.name() in ("typing.Optional", "Optional"):
+            self._refuse("unsupported-expression", "an Optional hint has no static lowering yet", node)
+        if typed is None:
+            self._refuse("unknown-type", f"the hint [{hint.name() if hint is not None else '?'}] resolves to no static type", node)
+        if typed.kind == BUILTIN:
+            if typed.name in COLLECTION_TYPES:
+                return self._collection_stub_type(typed)
+            if typed.name not in STUB_TYPES:
+                self._refuse("unsupported-expression", f"a Python {typed.name} has no static lowering", node)
+            if typed.nullable and typed.name in BOXED_TYPES:
+                # the stub boxes a number or a boolean that may be None, as its hint says
+                return BOXED_TYPES[typed.name]
+            return STUB_TYPES[typed.name]
+        if typed.kind == JAVA:
+            return typed.name
+        if typed.kind == PY:
+            if self._derives_from_python_exception(typed.name):
+                # a Python exception object stays a Python object: the generated class of its class is
+                # no value a Java parameter or return can hold, so the body stays in Python
+                self._refuse("python-exception", f"[{typed.name.name()}] is a Python exception class; a value of it has no Java layout", node)
+            return typed.name.qualifiedName()
+        self._refuse("unknown-type", f"the hint [{hint.name()}] denotes no value type", node)
+
+    def _collection_stub_type(self, typed):
+        """
+        The Java type the stub declares for a collection hint, with the type arguments it spells:
+        Object for a missing one (a bare list is a List<Object>), the boxed type of a builtin, the
+        generated class of a class of the compilation. The arguments matter to a compiled body only
+        where Java's invariant generics would refuse a value of the erased type (see _coerce).
+        """
+        base = COLLECTION_TYPES[typed.name]
+        arity = 2 if typed.name == "dict" else 1
+        arguments = list(typed.args)[:arity] + [None] * max(0, arity - len(typed.args))
+        return f"{base}<{','.join(self._type_argument_stub(argument) for argument in arguments)}>"
+
+    def _type_argument_stub(self, typed):
+        if typed is None:
+            return OBJECT
+        if typed.kind == BUILTIN:
+            if typed.name in COLLECTION_TYPES:
+                return self._collection_stub_type(typed)
+            return "java.lang.String" if typed.name == "str" else BOXED_TYPES.get(typed.name, OBJECT)
+        if typed.kind == JAVA:
+            return typed.name
+        if typed.kind == PY:
+            return typed.name.qualifiedName()
+        return OBJECT
+
+    # ---------------------------------------------------------------- types
+
+    def _value_type(self, typed, node):
+        """The Java type a compiled body uses for a value of the inferred type."""
+        if typed is None:
+            self._refuse("unknown-type", "the expression has no static type", node)
+        if typed.kind == BUILTIN:
+            if typed.name in COLLECTION_TYPES:
+                return self._parameterized(Typed(JAVA, COLLECTION_TYPES[typed.name], args=typed.args), node)
+            if typed.name not in BUILTIN_TYPES:
+                self._refuse("unsupported-expression", f"a Python {typed.name} has no static lowering", node)
+            if typed.nullable and typed.name in BOXED_TYPES:
+                # a number or a boolean that may be None stays boxed: unboxing None is not a Python failure
+                return BOXED_TYPES[typed.name]
+            return BUILTIN_TYPES[typed.name]
+        if typed.kind == JAVA:
+            if typed.name in JAVA_NUMBERS:
+                return JAVA_NUMBERS[typed.name]
+            if typed.name in JAVA_BOOLEANS:
+                return BOOLEAN
+            if typed.name in JAVA_STRINGS:
+                return STRING
+            return self._parameterized(typed, node)
+        if typed.kind == PY:
+            return typed.name.qualifiedName()
+        if typed.kind in (JAVA_REF, PY_REF):
+            self._refuse("unknown-type", "a class is not a value here", node)
+        if typed.kind == MODULE:
+            self._refuse("unknown-type", "a module is not a value here", node)
+        self._refuse("dynamic-call", "a callable used as a value has no static lowering", node)
+
+    def _parameterized(self, typed, node):
+        """A Java type name with the type arguments the checker knows, as the elements are used in a compiled body."""
+        if not typed.args or any(argument is None for argument in typed.args):
+            return typed.name
+        arguments = []
+        for argument in typed.args:
+            if argument.kind == BUILTIN and argument.name in BUILTIN_TYPES and argument.name != "none":
+                arguments.append(BUILTIN_TYPES[argument.name])
+            elif argument.kind == JAVA and argument.name in UNBOXED_ARGUMENTS:
+                arguments.append(argument.name)
+            elif argument.kind == JAVA:
+                arguments.append(self._value_type(argument, node))
+            elif argument.kind == PY:
+                arguments.append(argument.name.qualifiedName())
+            else:
+                return typed.name
+        return f"{typed.name}<{','.join(arguments)}>"
+
+    def _typed(self, node):
+        return self.rules.node_types.get(id(node))
+
+    def _boxed_as(self, argument, node, what):
+        """
+        The type a value given as a key or an element of a collection is coerced to: refused for a
+        Java collection of Longs, Shorts, Bytes or Floats, which would not find, or would mix in, the
+        Integer or Double a compiled body boxes the value as.
+        """
+        if argument in UNBOXED_ARGUMENTS:
+            self._refuse("unsupported-expression", f"{what} of a collection of [{argument}] values has no static lowering: a compiled body boxes a Python number as an Integer or a Double", node)
+        return argument
+
+    def _lowered_type(self, node):
+        """The erased Java type of a local or parameter the lowering declared, of a str() call or an f-string, or None for any other expression."""
+        if isinstance(node, ast.JoinedStr):
+            return STRING
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "str" and len(node.args) == 1 and not node.keywords and self._builtin("str"):
+            return STRING
+        if isinstance(node, ast.Name):
+            if node.id in self.locals:
+                return _erased(self.locals[node.id])
+            if node.id in self.parameters:
+                return _erased(self.parameters[node.id][0])
+        return None
+
+    def _python_class(self, type_name):
+        """The model of the class of the compilation a value of the Java type is an object of, or None."""
+        classes = getattr(self.checker, "python_classes", None)
+        return classes.by_qualified.get(_erased(type_name)) if classes is not None else None
+
+    @staticmethod
+    def _is_number(type_name):
+        return type_name in NUMBERS
+
+    def _coerce(self, expression, to, node):
+        """The expression at the Java type, widening or narrowing numbers and casting references."""
+        declared = to
+        source = _erased(expression.type())
+        to = _erased(to)
+        if source == to:
+            if "<" in declared and "<" in expression.type() and declared != expression.type():
+                # Java generics are invariant: a List<Map<Object,Object>> reaches a List<Object> through the raw type
+                return Cast(expression, declared)
+            return expression
+        if source == NONE:
+            if to in NUMBERS or to in (BOOLEAN, "int", "short", "byte", "float"):
+                self._refuse("unknown-type", f"None is given where a [{to}] is expected", node)
+            return Const(None, to)
+        target = JAVA_NUMBERS.get(to, to)
+        if source in JAVA_BOXED and to in JAVA_BOXED:
+            # null stays None, which a conversion through the primitive would not keep
+            self._refuse("unknown-type", f"a [{source}] that may be None has no static conversion to a [{to}]", node)
+        if source in JAVA_BOXED and source not in JAVA_BOXED_AS_PYTHON and to in ("java.lang.Object", "java.lang.Number", "java.io.Serializable", "java.lang.Comparable"):
+            self._refuse("unknown-type", f"a [{source}] reaches a [{to}] as itself, where the Python value it reads as is boxed as an Integer or a Double", node)
+        if source == LONG and target == DOUBLE:
+            return Cast(expression, to)
+        if source == LONG and to in ("int", "short", "byte", "long", "java.lang.Long", "java.lang.Integer", "java.lang.Short", "java.lang.Byte"):
+            return Cast(expression, to)  # exact narrowing, boxed through the primitive by the generator
+        if source == DOUBLE and to in ("double", "float", "java.lang.Double", "java.lang.Float"):
+            return Cast(expression, to)
+        if source == BOOLEAN and to in JAVA_BOOLEANS:
+            return expression
+        if source == STRING and to in ("java.lang.String", "java.lang.CharSequence", "java.lang.Object"):
+            return expression
+        if to in ("java.lang.Object", "java.lang.Number", "java.io.Serializable", "java.lang.Comparable"):
+            if source == LONG:
+                # a Python int reaches an Object parameter as an Integer when it fits one, else a Long
+                self.helper_calls += 1
+                return Helper("box", [expression], to)
+            if source == DOUBLE:
+                return Cast(expression, "java.lang.Double")
+            if source == BOOLEAN:
+                return Cast(expression, "java.lang.Boolean")
+            return expression
+        if source in JAVA_NUMBERS and target in NUMBERS:
+            return self._coerce(Cast(expression, JAVA_NUMBERS[source]), to, node)
+        if self.checker.facts.isAssignable(source, to):
+            return expression
+        self._refuse("unknown-type", f"a [{source}] is given where a [{to}] is expected", node)
+
+    # ---------------------------------------------------------------- statements
+
+    def _branch_block(self, statements):
+        """A branch of an if statement: a Java scope, whose own locals (the ones not hoisted) are gone after it."""
+        declared_before = set(self.locals)
+        lowered = self._block(statements)
+        hoisted = {local.name() for local in self.hoisted}
+        for name in [name for name in self.locals if name not in declared_before and name not in hoisted]:
+            del self.locals[name]
+        return lowered
+
+    def _block(self, statements):
+        self.depth += 1
+        lowered = []
+        for index, statement in enumerate(statements):
+            self.following.append(statements[index + 1:])
+            try:
+                lowered.extend(self._statement(statement))
+            except Refused:
+                if self.synthetic:
+                    raise  # a statement of a comprehension's loop: the comprehension has no lowering
+                # the reason is recorded; the locals the statement assigns are unknown from here on
+                self.unbound.update(target.id for target in ast.walk(statement)
+                                    if isinstance(target, ast.Name) and isinstance(target.ctx, ast.Store) and target.id not in self.locals)
+            finally:
+                self.following.pop()
+        self.depth -= 1
+        return lowered
+
+    def _statements_after_loop(self):
+        """The statements that follow the innermost loop being lowered, at every enclosing level."""
+        _, _, following_depth, _ = self.loops[-1]
+        after = []
+        for level in self.following[:following_depth]:
+            after.extend(level)
+        return after
+
+    def _statement(self, node):
+        """A statement, preceded by the statements the comprehensions it holds hoist before it."""
+        self.prelude.append([])
+        saved_evaluated, self.evaluated = self.evaluated, 0
+        try:
+            lowered = self._statement_kind(node)
+        finally:
+            prelude = self.prelude.pop()
+            self.evaluated = saved_evaluated
+        return prelude + lowered
+
+    def _statement_kind(self, node):
+        if isinstance(node, _ComprehensionBody):
+            return self._comprehension_body(node)
+        if isinstance(node, ast.Pass):
+            return []
+        if isinstance(node, ast.Assert):
+            # assertions are enabled in the runtime, so a false condition raises as Python raises AssertionError
+            # the message is evaluated only when the condition is false, as Python evaluates it
+            test = self._truthy(node.test)
+            # the message is evaluated only when the assertion fails: a comprehension in it is not hoisted
+            message = self._unhoisted(lambda: StrJoin([self._spelled(self._expression(node.msg), node.msg)])) if node.msg is not None else Const(None, STRING)
+            self.helper_calls += 1
+            failure = Eval(Helper("assertion", [Const(False, BOOLEAN), message], VOID))
+            return [If(Unary("not", test, BOOLEAN), Body([failure]), None)]
+        if isinstance(node, ast.Expr):
+            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                return []  # a docstring
+            return [Eval(self._expression(node.value))]
+        if isinstance(node, ast.Return):
+            return [self._return(node)]
+        if isinstance(node, ast.Assign):
+            return [self._assign(node.targets[0], self._expression(node.value), node)]
+        if isinstance(node, ast.AnnAssign):
+            if node.value is None:
+                self._refuse("unsupported-statement", "a declaration without a value has no static lowering", node)
+            return [self._assign(node.target, self._expression(node.value), node, hinted=node.annotation)]
+        if isinstance(node, ast.AugAssign):
+            return [self._augmented(node)]
+        if isinstance(node, ast.If):
+            test = self._truthy(node.test)
+            self.branches.append(node)
+            self.branch_depths.append(self.depth)
+            try:
+                then = Body(self._branch_block(node.body))
+                or_else = Body(self._branch_block(node.orelse)) if node.orelse else None
+            finally:
+                self.branch_depths.pop()
+                self.branches.pop()
+            return [If(test, then, or_else)]
+        if isinstance(node, ast.While):
+            return self._loop(node, lambda loop: While(loop, self._unhoisted(lambda: self._truthy(node.test)), Body(self._block(node.body)), *self._exits(loop)))
+        if isinstance(node, ast.For):
+            return [self._for(node)]
+        if isinstance(node, ast.Break):
+            return [self._exit(node, Break, "break")]
+        if isinstance(node, ast.Continue):
+            return [self._exit(node, Continue, "continue")]
+        if isinstance(node, ast.Raise):
+            return [self._raise(node)]
+        if isinstance(node, ast.Try):
+            return [self._try(node)]
+        self._refuse("unsupported-statement", f"a {type(node).__name__} statement has no static lowering", node)
+
+    # ---------------------------------------------------------------- loops
+
+    def _loop(self, node, build):
+        """Lower a loop: the body inside the loop's scope, the locals it declares gone after it."""
+        if node.orelse:
+            self._refuse("unsupported-statement", "the else clause of a loop has no static lowering", node.orelse[0])
+        loop = self.next_loop
+        self.next_loop += 1
+        self.loop_exits[loop] = set()
+        self.loops.append((loop, node, len(self.following), len(self.branches)))
+        declared_before = set(self.locals)
+        try:
+            statement = build(loop)
+        finally:
+            self.loops.pop()
+        # a local first assigned in the loop body is declared inside the Java loop: Python code
+        # reading it after the loop would see the last value, which the Java scope cannot offer
+        self._end_scope(node, declared_before, [], "the loop")
+        return [statement]
+
+    def _end_scope(self, node, declared_before, later, what):
+        """
+        End the Java scope of a block: a local first assigned inside it is gone afterwards, and
+        reading it in the later blocks of the statement or after the statement is refused. A local
+        hoisted to the top of the body stays declared.
+        """
+        hoisted = {local.name() for local in self.hoisted}
+        for name in [name for name in self.locals if name not in declared_before]:
+            if _reads(name, later) or _reads(name, self._statements_after(node)):
+                self._refuse("unsupported-statement", f"local [{name}] is assigned in {what} and read after it", node)
+            if name not in hoisted:
+                del self.locals[name]
+
+    def _statements_after(self, node):
+        after = []
+        for level in self.following:
+            after.extend(level)
+        return after
+
+    def _statements_after_branch(self):
+        """The statements after the innermost branch being lowered: those following the if statement, at every enclosing level."""
+        after = []
+        for level in self.following[:-self._branch_depth()] if self._branch_depth() else self.following:
+            after.extend(level)
+        return after
+
+    def _branch_depth(self):
+        """How many block levels the statement being lowered is inside the innermost branch."""
+        return self.depth - self.branch_depths[-1] if self.branch_depths else 0
+
+    def _exits(self, loop):
+        exits = self.loop_exits.get(loop, set())
+        return "break" in exits, "continue" in exits
+
+    def _exit(self, node, factory, kind):
+        if not self.loops:
+            self._refuse("unsupported-statement", f"{kind} outside a loop", node)
+        loop = self.loops[-1][0]
+        self.loop_exits[loop].add(kind)
+        return factory(loop)
+
+    def _for(self, node):
+        if isinstance(node.target, ast.Tuple):
+            return self._for_items(node)
+        if not isinstance(node.target, ast.Name):
+            self._refuse("unsupported-statement", "unpacking the loop variable has no static lowering", node.target)
+        variable = node.target.id
+        self._loop_variable(variable, node)
+        iterable = node.iter
+        if isinstance(iterable, ast.Call) and isinstance(iterable.func, ast.Name) and iterable.func.id == "range" and self._builtin("range"):
+            bounds = [self._coerce(self._expression(argument), LONG, argument) for argument in iterable.args]
+            if iterable.keywords or not 1 <= len(bounds) <= 3:
+                self._refuse("unsupported-expression", "range() takes one to three positional arguments", iterable)
+            start = bounds[0] if len(bounds) > 1 else Const(0, LONG)
+            stop = bounds[1] if len(bounds) > 1 else bounds[0]
+            step = bounds[2] if len(bounds) > 2 else Const(1, LONG)
+
+            def build(loop):
+                self.locals[variable] = LONG
+                return ForRange(loop, variable, start, stop, step, Body(self._block(node.body)), *self._exits(loop))
+            return self._loop(node, build)[0]
+        if ((isinstance(iterable, ast.Name) or (isinstance(iterable, ast.Attribute) and isinstance(iterable.value, ast.Name) and iterable.value.id == "self"))
+                and _may_change_iterated(iterable, node.body)):
+            spelled = iterable.id if isinstance(iterable, ast.Name) else f"self.{iterable.attr}"
+            self._refuse("unsupported-statement", f"the loop body may change the [{spelled}] it iterates, which Python goes on iterating while the Java iterator throws ConcurrentModificationException", node)
+        collection = self._expression(iterable)
+        collection_type = collection.type()
+        if self.checker.facts.isAssignable(_erased(collection_type), "java.util.Map"):
+            # a dict iterates its keys, as in Python
+            arguments = _arguments(collection_type)
+            if len(arguments) != 2:
+                self._refuse("unknown-type", f"the keys of the [{_erased(collection_type)}] have no static type", iterable)
+            self.java_calls += 1
+            collection = InvokeJava(collection, "java.util.Map", "keySet", [], [], f"java.util.Set<{arguments[0]}>")
+            collection_type = collection.type()
+        if not self.checker.facts.isAssignable(_erased(collection_type), "java.lang.Iterable"):
+            self._refuse("unsupported-expression", f"iterating a [{_erased(collection_type)}] has no static lowering yet", iterable)
+        arguments = _arguments(collection_type)
+        if len(arguments) != 1:
+            self._refuse("unknown-type", f"the elements of the [{_erased(collection_type)}] have no static type", iterable)
+        element = arguments[0]
+        used = JAVA_NUMBERS.get(element, element)
+        # the elements of a Python list hinted list[int] are boxed numbers of no fixed class
+        declared = "java.lang.Object" if used in (LONG, DOUBLE, BOOLEAN) else element
+
+        def build(loop):
+            self.locals[variable] = used
+            return ForEach(loop, variable, used, declared, collection, Body(self._block(node.body)), *self._exits(loop))
+        return self._loop(node, build)[0]
+
+    def _loop_variable(self, variable, node):
+        if variable in JAVA_RESERVED_NAMES:
+            self._refuse("java-reserved-name", f"local [{variable}] cannot be declared in Java", node.target)
+        if variable in self.parameters or variable in self.locals or variable in self.reassigned:
+            self._refuse("unsupported-statement", f"the loop variable [{variable}] is already a local or a parameter", node)
+
+    def _for_items(self, node):
+        """
+        for key, value in mapping.items(): the loop runs over the entries of the Java map, and the
+        body starts by binding the key and the value of the entry to the two loop variables.
+        """
+        target, iterable = node.target, node.iter
+        if len(target.elts) != 2 or not all(isinstance(element, ast.Name) for element in target.elts):
+            self._refuse("unsupported-statement", "unpacking the loop variable has no static lowering", target)
+        if not (isinstance(iterable, ast.Call) and isinstance(iterable.func, ast.Attribute) and iterable.func.attr == "items"
+                and not iterable.args and not iterable.keywords):
+            self._refuse("unsupported-statement", "unpacking the loop variable has no static lowering", target)
+        key_name, value_name = (element.id for element in target.elts)
+        if key_name == value_name:
+            self._refuse("unsupported-statement", f"the loop variables [{key_name}] are the same name", target)
+        for variable in (key_name, value_name):
+            self._loop_variable(variable, node)
+        mapping = self._expression(iterable.func.value)
+        mapping_type = mapping.type()
+        if not self.checker.facts.isAssignable(_erased(mapping_type), "java.util.Map"):
+            self._refuse("unsupported-expression", f"items() of a [{_erased(mapping_type)}] has no static lowering", iterable)
+        arguments = _arguments(mapping_type)
+        if len(arguments) != 2:
+            self._refuse("unknown-type", f"the entries of the [{_erased(mapping_type)}] have no static type", iterable)
+        used = [JAVA_NUMBERS.get(argument, argument) for argument in arguments]
+        self.java_calls += 3
+        entries = InvokeJava(mapping, "java.util.Map", "entrySet", [], [], f"java.util.Set<{MAP_ENTRY}>")
+
+        def build(loop):
+            entry = f"entry{loop}"
+            while entry in self.parameters or entry in self.locals or entry in self.reassigned:
+                entry = entry + "_"
+            bindings = []
+            for name, getter, java_type in ((key_name, "getKey", used[0]), (value_name, "getValue", used[1])):
+                self.locals[name] = java_type
+                bindings.append(Local(name, java_type, Cast(InvokeJava(LocalRef(entry, MAP_ENTRY), MAP_ENTRY, getter, [], [], OBJECT), java_type)))
+            return ForEach(loop, entry, MAP_ENTRY, MAP_ENTRY, entries, Body(bindings + self._block(node.body)), *self._exits(loop))
+        return self._loop(node, build)[0]
+
+    # ---------------------------------------------------------------- exceptions
+
+    def _raise(self, node):
+        if node.exc is None or node.cause is not None:
+            self._refuse("unsupported-statement", "a bare raise or a raise ... from has no static lowering", node)
+        raised = self._typed(node.exc)
+        if raised is None and isinstance(node.exc, (ast.Name, ast.Attribute)):
+            raised = self._class_named(node.exc)  # raise Rejected: the class reference
+        if raised is not None and raised.kind in (PY, PY_REF):
+            # an exception class of the compilation: its generated class is a Throwable
+            return Throw(self._python_exception(node.exc, raised, node))
+        if raised is None or raised.kind != JAVA:
+            self._refuse("python-exception", "raising anything but a Java exception or an exception class of the compilation has no static lowering", node)
+        exception = self._expression(node.exc)
+        if not self.checker.facts.isAssignable(_erased(exception.type()), "java.lang.Throwable"):
+            self._refuse("python-exception", f"raising a [{_erased(exception.type())}] is not raising a Java exception", node)
+        if not self._unchecked(_erased(exception.type())):
+            # Java requires a throws clause the stub does not declare
+            self._refuse("unsupported-statement", f"raising the checked exception [{_erased(exception.type())}] has no static lowering", node)
+        return Throw(exception)
+
+    def _python_exception(self, exc, raised, node):
+        """
+        The exception a raise of an exception class of the compilation throws: the Python class called
+        with the arguments of the raise, wrapped in its generated class as the runtime wraps a Python
+        exception reaching Java (NewPythonException), or the exception of the except clause around the
+        raise, raised again. A value of an exception class has no Java layout otherwise.
+        """
+        model = self._throwable_model(raised, node)
+        generated = self._exception_class(model, node)
+        if isinstance(exc, ast.Name) and exc.id in self.exception_variables:
+            if not self.handling or self.handling[-1] != ("except", exc.id):
+                # Python chains the exception handled there as the context of the one raised again
+                self._refuse("python-exception", f"raising [{exc.id}] again outside the except clause that caught it has no static lowering: Python would chain the exception handled there as its context", node)
+            return LocalRef(exc.id, self.locals[exc.id])
+        if raised.kind == PY_REF:
+            arguments = []  # raise Rejected: Python calls the class without arguments
+        elif isinstance(exc, ast.Call) and self._names_class(exc.func, model):
+            if exc.keywords:
+                self._refuse("python-exception", f"constructing [{model.name}] with keyword arguments has no static lowering: a compiled raise calls the Python class with positional arguments", node)
+            arguments = exc.args
+        else:
+            self._refuse("python-exception", f"raising a [{model.name}] that the raise statement does not construct, nor an except clause around it catch, has no static lowering: a value of a Python exception class has no Java layout", node)
+        if self.handling:
+            # Python chains the exception being handled as the context (__context__) of the new one, which
+            # the Java exception does not carry, nor its Java cause for a Java one
+            self._refuse("python-exception", f"raising [{model.name}] inside an except or finally block has no static lowering: Python chains the exception being handled as its context", node)
+        if not self.checker.facts.isAssignable(model.throwable_base() or "java.lang.Throwable", "java.lang.RuntimeException"):
+            # the runtime wraps a Python exception in a generated RuntimeException; javac refuses an undeclared checked one
+            self._refuse("unsupported-statement", f"raising [{model.name}], whose generated class is no RuntimeException, has no static lowering", node)
+        lowered = []
+        for argument in arguments:
+            if isinstance(argument, ast.Starred):
+                self._refuse("python-exception", f"constructing [{model.name}] with a starred argument has no static lowering", argument)
+            value = self._expression(argument)
+            if _erased(value.type()) not in EXCEPTION_ARGUMENT_TYPES:
+                self._refuse("python-exception", f"constructing [{model.name}] with a [{_erased(value.type())}] has no static lowering: only a str, an int, a float, a bool or None reaches the Python class as the value Python passes", argument)
+            lowered.append(self._boxed(value, argument))
+        # the Python class creates the exception as a generated constructor creates its Python object
+        self.java_calls += 1
+        self.compilation_calls += 1
+        return NewPythonException(generated, lowered)
+
+    def _names_class(self, function, model):
+        """Whether the callee of a call is the class reference of the model."""
+        typed = self._class_named(function)
+        return typed is not None and typed.kind == PY_REF and self.checker.python_classes.of(typed.name) is model
+
+    def _class_named(self, node):
+        """The type of a name or an attribute naming a class: the checker types no callee of a construction, the bindings know the class."""
+        if isinstance(node, ast.Name) and node.id not in self.locals and node.id not in self.bound:
+            return self.bindings.lookup(node.id)
+        return self._typed(node) if isinstance(node, (ast.Name, ast.Attribute)) else None
+
+    def _exception_class(self, model, node):
+        """
+        The generated class of an exception class of the compilation raised or caught by a compiled body:
+        the class the runtime wraps a Python exception of the class in when it reaches Java, found by the
+        name of the Python class; a nested class is not found by it.
+        """
+        generated = self._generated_class(model, node)
+        if "$" in generated:
+            self._refuse("python-exception", f"[{model.name}] is a nested class: the runtime does not wrap a Python exception of it in its generated class", node)
+        return generated
+
+    def _throwable_model(self, typed, node):
+        """The model of an exception class of the compilation a class reference or an object is typed with; refused for any other Python class."""
+        model = self.checker.python_classes.of(typed.name)
+        if model is None or not model.is_throwable():
+            name = model.name if model is not None else typed.label()
+            self._refuse("python-exception", f"[{name}] is not an exception class: it extends neither a builtin exception (Exception, ValueError, ...) nor a Java Throwable", node)
+        return model
+
+    def _caught_type(self, handler, earlier, java_code):
+        """
+        The Java type an except clause catches, with the model when it is an exception class of the
+        compilation; refused when the Java catch would catch what the Python clause does not, given
+        the clauses before it and the Java calls of the try block.
+        """
+        caught = self._typed(handler.type)
+        if caught is not None and caught.kind == PY_REF:
+            model = self._throwable_model(caught, handler)
+            # Python catches a subclass through any of its bases, Java through the one its generated class extends
+            missed = [other.name for other in self.checker.python_classes.all()
+                      if other is not model and other.is_throwable() and other.is_subclass_of(model) and not other.extends(model)]
+            if missed:
+                self._refuse("python-exception", f"an except clause for [{model.name}] would not catch [{', '.join(sorted(missed))}] in Java: a Python subclass through a base its generated class does not extend", handler)
+            generated = self._exception_class(model, handler)
+            if java_code:
+                # a Python exception that crossed Java code (a Java method calling back into Python) is the
+                # generated Java class in Python too, which the Python clause does not catch
+                self._refuse("python-exception", f"an except clause for [{model.name}] would catch the [{generated}] the Java call [{java_code[0]}] of the try block throws, which Python lets through: a Python exception that crossed Java code is the Java class in Python", handler)
+            return generated, model
+        if caught is None or caught.kind != JAVA_REF or not self.checker.facts.isAssignable(caught.name, "java.lang.Throwable"):
+            self._refuse("python-exception", "an except clause naming anything but a Java exception type or an exception class of the compilation has no static lowering", handler)
+        reaching = self._python_exceptions_reaching(caught.name, earlier)
+        if reaching:
+            self._refuse("python-exception", f"an except clause for [{caught.name}] would catch [{', '.join(reaching)}] in Java, which Python lets through: the generated class of an exception class extending a builtin exception is a RuntimeException", handler)
+        return caught.name, None
+
+    def _outside_module(self, node):
+        """
+        Refuses a value reached from a Python module outside the compilation (inflect.engine().plural(x),
+        a function imported from one): its members have no static type. Returns for anything else.
+        """
+        root = node
+        while isinstance(root, (ast.Attribute, ast.Call, ast.Subscript)):
+            root = root.func if isinstance(root, ast.Call) else root.value
+        if not isinstance(root, ast.Name) or root.id in self.bound or root.id in self.locals:
+            return
+        typed = self._typed(root)
+        if typed is not None and typed.kind != MODULE:
+            return
+        statement = module_scope(self.module).stable(root.id)
+        if not isinstance(statement, (ast.Import, ast.ImportFrom)):
+            return
+        visitor = getattr(self.module, "visitor", None)
+        if root.id in getattr(visitor, "imported_source_files", {}):
+            return  # a module of the compilation
+        module = next((alias.name for alias in statement.names if (alias.asname or alias.name.split(".")[0]) == root.id), root.id)
+        if isinstance(statement, ast.ImportFrom):
+            module = "." * statement.level + (statement.module or "")
+            if statement.level:
+                return  # a relative import names a module of the application
+        if module.split(".")[0] in ("java", "javax", "jakarta", "io", "micronaut", "org", "com"):
+            return  # a Java package
+        self._refuse("unknown-type", f"[{module}] is a Python module outside the compilation (a third-party library or the standard library); its members have no static type", root)
+
+    def _of_compilation(self, owner):
+        """Whether a Java class is a generated class of the compilation: a Python class's, or a module's holding compiled functions."""
+        classes = getattr(self.checker, "python_classes", None)
+        if classes is not None and _erased(owner) in classes.by_qualified:
+            return True
+        return self.planner is not None and any(body.className() == _erased(owner) for body in self.planner.bodies)
+
+    def _python_exceptions_reaching(self, java_type, earlier):
+        """
+        The exception classes of the compilation extending the Python Exception that a Java catch of
+        the Java type would catch, their generated classes extending RuntimeException, and that no
+        earlier clause catches first. Python does not catch them there: they are no Java objects.
+        """
+        classes = getattr(self.checker, "python_classes", None)
+        if classes is None or not self.checker.facts.isAssignable("java.lang.RuntimeException", java_type):
+            return []
+        caught_before = [model for _, model in earlier if model is not None]
+        return sorted(model.name for model in classes.all()
+                      if model.extends_python_exception() and not any(model.extends(before) for before in caught_before))
+
+    def _already_caught(self, later, earlier):
+        """Whether an except clause for `earlier` catches everything the later clause names, which Java refuses."""
+        later_name, later_model = later
+        earlier_name, earlier_model = earlier
+        if later_model is not None:
+            if earlier_model is not None:
+                return later_model.extends(earlier_model)
+            return self.checker.facts.isAssignable(later_model.throwable_base(), earlier_name)
+        if earlier_model is not None:
+            return False  # a Java exception is never an object of a Python class
+        return self.checker.facts.isAssignable(later_name, earlier_name)
+
+    def _unchecked(self, exception_type):
+        """Whether a Java exception type is unchecked: a RuntimeException or an Error."""
+        return self.checker.facts.isAssignable(exception_type, "java.lang.RuntimeException") or self.checker.facts.isAssignable(exception_type, "java.lang.Error")
+
+    def _try(self, node):
+        if node.orelse:
+            self._refuse("unsupported-statement", "the else clause of a try statement has no static lowering", node.orelse[0])
+        # each block of the statement is a Java scope of its own: a local it declares is not visible
+        # to the handlers, the finally block or the statements after it
+        later = [statement for handler in node.handlers for statement in handler.body] + list(node.finalbody)
+        if not node.finalbody and node.handlers and all(_completes_abruptly(handler.body) for handler in node.handlers):
+            # every handler returns or raises: after the statement the try block ran to its end, so a
+            # local it assigns on every path is definitely assigned there, as Java requires; declared
+            # before the statement, since the try block is a scope of its own
+            for name in _assigned_names(node.body):
+                if name not in self.locals and name not in self.parameters and _assigned_on_every_path(node.body, name) and _reads(name, self._statements_after(node)):
+                    self._declare_before(name, node)
+        declared_before = set(self.locals)
+        self.thrown.append(set())
+        self.java_code.append([])
+        try:
+            body = Body(self._block(node.body))
+        finally:
+            thrown = self.thrown.pop()
+            java_code = self.java_code.pop()
+        if self.java_code:
+            # an enclosing try block's clauses see the Java calls of this one too
+            self.java_code[-1].extend(java_code)
+        self._end_scope(node, declared_before, later, "the try block")
+        uncaught = set(thrown)
+        catches = []
+        caught_types = []
+        for handler in node.handlers:
+            if handler.type is None:
+                self._refuse("python-exception", "a bare except clause catches Python exceptions", handler)
+            if handler.name is not None and handler.name in JAVA_RESERVED_NAMES:
+                self._refuse("java-reserved-name", f"local [{handler.name}] cannot be declared in Java", handler)
+            caught = self._caught_type(handler, caught_types, java_code)
+            if handler.name is not None and (handler.name in self.locals or handler.name in self.parameters):
+                self._refuse("unsupported-statement", f"the exception variable [{handler.name}] is already a local or a parameter", handler)
+            for earlier in caught_types:
+                if self._already_caught(caught, earlier):
+                    self._refuse("unsupported-statement", f"the except clause for [{caught[0]}] follows one for [{earlier[0]}] that already catches it", handler)
+            caught_types.append(caught)
+            caught_name, caught_model = caught
+            if caught_model is None:
+                for synthesized in SYNTHESIZED_EXCEPTIONS:
+                    if self.checker.facts.isAssignable(synthesized, caught_name):
+                        self._refuse("python-exception", f"the except clause for [{caught_name}] catches the [{synthesized}] a compiled body throws where Python raises an exception of its own", handler)
+            # the generated class of an exception class of the compilation is checked when the Java class it extends is
+            checked_type = (caught_model.throwable_base() or "java.lang.Throwable") if caught_model is not None else caught_name
+            if not self._unchecked(checked_type) and not any(self.checker.facts.isAssignable(declared, caught_name) or self.checker.facts.isAssignable(caught_name, declared) for declared in thrown):
+                # javac refuses a catch of a checked exception the try block cannot throw
+                self._refuse("unsupported-statement", f"the except clause for the checked exception [{caught_name}] has no Java call of the try block that declares it", handler)
+            uncaught = {declared for declared in uncaught if not self.checker.facts.isAssignable(declared, caught_name)}
+            if handler.name is not None:
+                self.locals[handler.name] = caught[0]
+                if caught_model is not None:
+                    # an exception of a Python exception class: only raised again by the clause
+                    self.exception_variables.add(handler.name)
+            declared_before = set(self.locals)
+            self.handling.append(("except", handler.name))
+            try:
+                catches.append(Catch(caught[0], handler.name, Body(self._block(handler.body))))
+            finally:
+                self.handling.pop()
+                if handler.name is not None:
+                    del self.locals[handler.name]
+                    self.exception_variables.discard(handler.name)
+            self._end_scope(node, declared_before, list(node.finalbody), "the except block")
+        finally_body = None
+        if node.finalbody:
+            declared_before = set(self.locals)
+            self.handling.append(("finally", None))
+            try:
+                finally_body = Body(self._block(node.finalbody))
+            finally:
+                self.handling.pop()
+            self._end_scope(node, declared_before, [], "the finally block")
+        if self.thrown:
+            # what the handlers do not catch, an enclosing try block's Java calls throw
+            self.thrown[-1].update(uncaught)
+        return Try(body, catches, finally_body)
+
+    def _declare_before(self, name, node):
+        """Declare a local at the top of the body, with the type its first assignment in the statement gives it."""
+        for statement in ast.walk(node):
+            if isinstance(statement, (ast.Assign, ast.AnnAssign)) and statement.value is not None:
+                targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
+                if any(isinstance(target, ast.Name) and target.id == name for target in targets):
+                    if name in JAVA_RESERVED_NAMES:
+                        self._refuse("java-reserved-name", f"local [{name}] cannot be declared in Java", statement)
+                    if isinstance(statement, ast.AnnAssign):
+                        typed = self.rules._hint_type(statement.annotation)
+                        declared = self._value_type(typed, statement) if typed is not None else None
+                    else:
+                        declared = None
+                    if declared is None:
+                        typed = self._typed(statement.value)
+                        declared = self._value_type(typed, statement) if typed is not None else self._lowered_type(statement.value)
+                    if declared is None or declared == NONE:
+                        self._refuse("unknown-type", f"local [{name}] has no static type where it is declared", statement)
+                    self.locals[name] = declared
+                    self.hoisted.append(Local(name, declared, Const(DEFAULTS.get(declared), declared) if declared in DEFAULTS else Const(None, declared)))
+                    return
+        self._refuse("unknown-type", f"local [{name}] is assigned nowhere the lowering can see", node)
+
+    def _return(self, node):
+        return_type = self._return_type()
+        if node.value is None:
+            if return_type != VOID:
+                self._refuse("unknown-type", "a bare return where the hint says a value is returned", node)
+            return Return(None)
+        if return_type == VOID:
+            self._refuse("unknown-type", "a value is returned where the hint says none is", node)
+        return Return(self._coerce(self._expression(node.value), return_type, node))
+
+    def _assign(self, target, value, node, hinted=None):
+        if isinstance(target, ast.Name):
+            name = target.id
+            if name in JAVA_RESERVED_NAMES:
+                self._refuse("java-reserved-name", f"local [{name}] cannot be declared in Java", node)
+            if hinted is not None:
+                typed = self.rules._hint_type(hinted)
+                declared = self._value_type(typed, node) if typed is not None else value.type()
+            else:
+                declared = self.locals.get(name, value.type())
+            if declared == NONE:
+                self._refuse("unknown-type", f"local [{name}] is None where it is declared", node)
+            if declared == DOUBLE and value.type() == LONG:
+                # Python keeps the int, which str() and the integer operators tell from a float
+                self._refuse("unknown-type", f"local [{name}] holds a float and an int, which Python keeps apart", node)
+            if name in self.locals and _erased(value.type()) not in (_erased(declared), NONE):
+                self._refuse("unknown-type", f"local [{name}] is a [{declared}] and then a [{value.type()}]", node)
+            value = self._coerce(value, declared, node)
+            if name not in self.locals:
+                self.locals[name] = declared
+                branches = self.branches[self.loops[-1][3]:] if self.loops else self.branches
+                if branches:
+                    # a local first assigned inside a branch is declared at the top of the body, which
+                    # keeps Python's behaviour only when every path assigns it before it is read
+                    if not all(statement.orelse and _assigned_on_every_path(statement.body, name) and _assigned_on_every_path(statement.orelse, name) for statement in branches):
+                        if _reads(name, self._statements_after_branch()):
+                            self._refuse("unsupported-statement", f"local [{name}] is assigned on some paths only; Python would raise UnboundLocalError on the others", node)
+                        # read inside the branch only: declared by the branch, gone after it
+                        return Local(name, declared, value)
+                    self.hoisted.append(Local(name, declared, Const(DEFAULTS.get(declared), declared) if declared in DEFAULTS else Const(None, declared)))
+                    return Assign(name, value)
+                # inside a loop body the local is declared by the body, once per iteration
+                return Local(name, declared, value)
+            if _erased(self.locals[name]) != _erased(declared):
+                self._refuse("unknown-type", f"local [{name}] is a [{self.locals[name]}] and then a [{declared}]", node)
+            return Assign(self._shadow(name) if name in self.reassigned else name, value)
+        if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+            property_type = self._self_property_type(target.attr, target)
+            self.bridge_calls += 1
+            return PutSelf(target.attr, property_type, self._coerce(value, property_type, node), self._is_accessor(target.attr))
+        if isinstance(target, ast.Subscript):
+            return self._subscript_store(target, value, node)
+        if isinstance(target, ast.Attribute):
+            model = self._python_model_of(target.value)
+            if model is not None:
+                return self._python_attribute_store(model, target, value, node)
+        self._refuse("unsupported-statement", "assigning to anything but a local, a property of self or an element has no static lowering", node)
+
+    def _python_attribute_store(self, model, target, value, node):
+        """An assignment of a hinted attribute of an object of the compilation: the setter its generated class declares."""
+        owner = self._generated_class(model, node)
+        found = model.find(target.attr)
+        if found is None:
+            self._refuse("unknown-type", f"[{model.name}] has no attribute [{target.attr}]", node)
+        if found[0] != "attribute" or not self._declared_by_generated_class(model, target.attr):
+            self._refuse("unsupported-statement", f"assigning [{target.attr}] of [{model.name}], which is not a hinted attribute of its generated class, has no static lowering", node)
+        if model.class_def.frozenDataclass():
+            self._refuse("unsupported-statement", f"[{model.name}] is a frozen dataclass: Python raises FrozenInstanceError on the assignment", node)
+        hint = found[1].typeName()
+        stub_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
+        setter = "set" + target.attr[:1].upper() + target.attr[1:]
+        self.java_calls += 1
+        self.compilation_calls += 1
+        return Eval(InvokeJava(self._expression(target.value), owner, setter, [stub_type], [self._coerce(value, stub_type, node)], VOID))
+
+    def _subscript_store(self, target, value, node):
+        container = self._expression(target.value)
+        kind = _erased(container.type())
+        arguments = _arguments(container.type())
+        self.helper_calls += 1
+        if kind == LIST:
+            if len(arguments) != 1:
+                self._refuse("unknown-type", "the elements of the list have no static type", node)
+            index = self._coerce(self._expression(target.slice), LONG, target.slice)
+            return Eval(Helper("setAt", [container, index, self._boxed(self._coerce(value, self._boxed_as(arguments[0], node, "storing an element"), node), node)], VOID))
+        if kind == MAP:
+            if len(arguments) != 2:
+                self._refuse("unknown-type", "the keys and values of the dict have no static type", node)
+            sought = self._expression(target.slice)
+            self._exact_key(sought.type(), arguments[0], node, "storing a key")
+            key = self._boxed(self._coerce(sought, self._boxed_as(arguments[0], node, "a key"), target.slice), node)
+            self.helper_calls += 1
+            return Eval(Helper("setItem", [container, key, self._boxed(self._coerce(value, self._boxed_as(arguments[1], node, "storing a value"), node), node)], VOID))
+        self._refuse("unsupported-statement", f"assigning an element of a [{kind}] has no static lowering", node)
+
+    def _augmented(self, node):
+        op = BINARY_OPS.get(type(node.op))
+        if op is None:
+            self._refuse("unsupported-expression", "the operator has no static lowering", node)
+        if isinstance(node.target, ast.Name):
+            if node.target.id in self.unbound and node.target.id not in self.locals:
+                raise Refused()  # its assignment was refused, which is the reason
+            if node.target.id not in self.locals:
+                self._refuse("unknown-type", f"local [{node.target.id}] is updated before it is assigned", node)
+            current = self._name(node.target)
+        elif isinstance(node.target, ast.Attribute) and isinstance(node.target.value, ast.Name) and node.target.value.id == "self":
+            property_type = self._self_property_type(node.target.attr, node.target)
+            current = SelfProperty(node.target.attr, property_type, self._is_accessor(node.target.attr))
+            # an int attribute is a long in the body, as a read of it is
+            used = JAVA_PRIMITIVE_NUMBERS.get(property_type, property_type)
+            current = Cast(current, used) if used != property_type else current
+            self.bridge_calls += 1
+            if not self._pure_read(node.target):
+                self.evaluated += 1  # Python reads the property before the value
+        else:
+            self._refuse("unsupported-statement", "updating anything but a local or a property of self has no static lowering", node)
+        value = self._binary(op, current, self._expression(node.value), node)
+        return self._assign(node.target, value, node)
+
+    # ---------------------------------------------------------------- expressions
+
+    def _expression(self, node):
+        before = self.evaluated
+        lowered = self._expression_kind(node)
+        if self.evaluated == before and not self._runs_nothing(node, lowered):
+            # an evaluation that may run code or raise: a comprehension after it in the statement
+            # cannot be hoisted before the statement, Python evaluating it first
+            self.evaluated += 1
+        return lowered
+
+    def _runs_nothing(self, node, lowered):
+        """
+        Whether the operation of an expression whose operands run nothing runs no code and cannot
+        raise either: a literal, a name, the local a comprehension is hoisted into, an attribute of
+        self that is no property, len() of a collection, str() of a number, a bool or a str, or str + str.
+        """
+        if isinstance(node, (ast.Constant, ast.Name, ast.ListComp, ast.SetComp, ast.DictComp)) or self._pure_read(node):
+            return True
+        kind = lowered.getClass().getSimpleName()
+        if kind in ("Const", "LocalRef", "Param"):
+            return True
+        if kind == "Helper" and lowered.name() == "len":
+            return True
+        if kind == "StrJoin":
+            return all(_erased(part.type()) in SPELLED_PLAINLY for part in lowered.parts())
+        return isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add) and lowered.type() == STRING
+
+    def _pure_read(self, node):
+        """Whether reading the expression runs no code and cannot raise: a literal, a name, an attribute of self that is no property."""
+        if isinstance(node, (ast.Constant, ast.Name)):
+            return True
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id == "self" and self.class_model is not None:
+            found = self.class_model.find(node.attr)
+            return found is not None and found[0] in ("attribute", "instance")
+        return False
+
+    def _builtin(self, name):
+        """Whether the name is the Python builtin: neither the function nor its module binds it."""
+        return name not in self.bound and name not in self.locals and not module_scope(self.module).binds(name)
+
+    def _expression_kind(self, node):
+        if isinstance(node, ast.Constant):
+            return self._constant(node)
+        if isinstance(node, ast.Name):
+            return self._name(node)
+        if isinstance(node, ast.Attribute):
+            return self._attribute(node)
+        if isinstance(node, ast.Call):
+            return self._call(node)
+        if isinstance(node, ast.BinOp):
+            op = BINARY_OPS.get(type(node.op))
+            if op is None:
+                self._refuse("unsupported-expression", "the operator has no static lowering", node)
+            return self._binary(op, self._expression(node.left), self._expression(node.right), node)
+        if isinstance(node, ast.UnaryOp):
+            return self._unary(node)
+        if isinstance(node, ast.Compare):
+            return self._compare(node)
+        if isinstance(node, ast.BoolOp):
+            return self._bool_op(node)
+        if isinstance(node, ast.JoinedStr):
+            return self._joined(node)
+        if isinstance(node, ast.IfExp):
+            return self._conditional(node)
+        if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+            return self._sequence(node)
+        if isinstance(node, ast.Dict):
+            return self._dict(node)
+        if isinstance(node, ast.Subscript):
+            return self._subscript(node)
+        if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp)):
+            return self._comprehension(node, "list" if isinstance(node, ast.ListComp) else "set" if isinstance(node, ast.SetComp) else "dict")
+        self._refuse("unsupported-expression", f"a {type(node).__name__} expression has no static lowering", node)
+
+    # ---------------------------------------------------------------- comprehensions
+
+    def _comprehension(self, node, kind):
+        """
+        A list, set or dict comprehension, or the generator of any() or all(): a loop over the
+        iterable filling a fresh local declared before the statement, which the expression then
+        reads. The loop reuses the lowering of a for statement, its body being the marker statement
+        that appends the element; a nested comprehension hoists its own loop into that body.
+        """
+        if id(node) in self.comprehensions:
+            return self.comprehensions[id(node)]  # an operand lowered again: the loop is hoisted once
+        if self.hoist_barrier:
+            self._refuse("unsupported-expression", "a comprehension inside an operand evaluated lazily or repeatedly has no static lowering", node)
+        if self.evaluated:
+            self._refuse("unsupported-expression", "a comprehension after an evaluation of the same statement that may run code or raise has no static lowering: Java would run the comprehension first", node)
+        if len(node.generators) != 1 or node.generators[0].is_async:
+            self._refuse("unsupported-expression", "a comprehension with more than one for clause has no static lowering", node)
+        if any(isinstance(child, ast.NamedExpr) for child in ast.walk(node)):
+            self._refuse("unsupported-expression", "an assignment expression in a comprehension has no static lowering", node)
+        generator = node.generators[0]
+        result = self._fresh("__mn_" + ("flag" if kind in ("any", "all") else kind))
+        marker = _ComprehensionBody(node, kind, result)
+        ast.copy_location(marker, node)
+        body = [marker]
+        for test in reversed(generator.ifs):
+            body = [ast.copy_location(ast.If(test=test, body=body, orelse=[]), test)]
+        loop = ast.copy_location(ast.For(target=generator.target, iter=generator.iter, body=body, orelse=[], type_comment=None), node)
+        ast.fix_missing_locations(loop)
+        if kind in ("any", "all"):
+            declared = Local(result, BOOLEAN, Const(kind == "all", BOOLEAN))
+        else:
+            declared = None
+        self.synthetic += 1
+        try:
+            lowered = self._for(loop)
+        finally:
+            self.synthetic -= 1
+        self.evaluated = 0  # the iterable is evaluated in the hoisted loop, before the rest of the statement as in Python
+        if declared is None:
+            container_type = marker.container_type
+            declared = Local(result, container_type, Helper("map" if kind == "dict" else kind, [], container_type))
+            self.helper_calls += 1
+        self.prelude[-1].extend([declared, lowered])
+        reference = LocalRef(result, declared.type())
+        self.comprehensions[id(node)] = reference
+        return reference
+
+    def _comprehension_body(self, marker):
+        """The statement at the heart of a comprehension's loop: the element appended, or the flag of any()/all() set and the loop left."""
+        node, kind, result = marker.node, marker.kind, marker.result
+        if kind in ("any", "all"):
+            test = self._truthy(node.elt)
+            if kind == "all":
+                test = Unary("not", test, BOOLEAN)
+            exit_loop = self._exit(node, Break, "break")
+            return [If(test, Body([Assign(result, Const(kind == "any", BOOLEAN)), exit_loop]), None)]
+        self.helper_calls += 1
+        if kind == "dict":
+            key, value = self._expression(node.key), self._expression(node.value)
+            key_type, value_type = self._element_type(key.type()), self._element_type(value.type())
+            self._loose_elements(key_type, node, "the keys of a dict comprehension")
+            marker.container_type = f"{MAP}<{key_type},{value_type}>"
+            return [Eval(Helper("setItem", [LocalRef(result, marker.container_type), self._boxed(key, node), self._boxed(value, node)], VOID))]
+        element = self._expression(node.elt)
+        element_type = self._element_type(element.type())
+        if kind == "set":
+            self._loose_elements(element_type, node, "the elements of a set comprehension")
+        marker.container_type = f"{SET if kind == 'set' else LIST}<{element_type}>"
+        return [Eval(Helper("add" if kind == "set" else "append", [LocalRef(result, marker.container_type), self._boxed(element, node)], NONE))]
+
+    def _loose_elements(self, type_name, node, what):
+        """Refuse the keys of a dict or the elements of a set a comprehension builds that may be numbers of any type, which Python's numeric equality may merge."""
+        kind = _equality_kind(type_name)
+        if kind in _LOOSE_KINDS:
+            self._refuse("unsupported-expression", f"{what} of [{kind}] values have no static lowering: Python compares numbers across their types", node)
+
+    @staticmethod
+    def _element_type(type_name):
+        """The type argument a collection built by a comprehension carries for its elements, as a literal carries it; Object for None."""
+        return OBJECT if type_name == NONE else type_name
+
+    def _fresh(self, stem):
+        """A local name the body does not use."""
+        name = stem
+        suffix = 0
+        while name in self.identifiers or name in self.locals:
+            suffix += 1
+            name = f"{stem}_{suffix}"
+        self.identifiers.add(name)
+        return name
+
+    # ---------------------------------------------------------------- collections
+
+    def _boxed(self, expression, node):
+        """The expression as an element of a collection: an Object, boxed as the host boundary boxes it."""
+        return self._coerce(expression, OBJECT, node)
+
+    def _join(self, types, node, what):
+        """The one type of the elements of a literal, or Object when they disagree: each element keeps its own kind, boxed."""
+        distinct = []
+        for type_name in types:
+            if type_name != NONE and type_name not in distinct:
+                distinct.append(type_name)
+        if not distinct:
+            return None
+        if len(distinct) == 1:
+            return distinct[0]
+        # a literal mixing ints and floats, or strings, numbers and objects, holds Objects: Python keeps
+        # each element's type, so [1, 2.5] renders as [1, 2.5], not [1.0, 2.5]
+        return OBJECT
+
+    def _sequence(self, node):
+        if any(isinstance(element, ast.Starred) for element in node.elts):
+            self._refuse("unsupported-expression", "a starred element has no static lowering", node)
+        elements = [self._expression(element) for element in node.elts]
+        element_type = self._join([element.type() for element in elements], node, "elements")
+        if isinstance(node, ast.Tuple) and any(element.type() == NONE for element in elements):
+            self._refuse("unsupported-expression", "a tuple holding None has no static lowering", node)
+        if isinstance(node, ast.Set):
+            self._exact_keys([element.type() for element in elements], node, "a set literal")
+        helper = "list" if isinstance(node, ast.List) else "tuple" if isinstance(node, ast.Tuple) else "set"
+        base = SET if isinstance(node, ast.Set) else LIST
+        result_type = f"{base}<{element_type}>" if element_type is not None else base
+        self.helper_calls += 1
+        boxed = [self._boxed(self._coerce(element, element_type, node) if element_type is not None else element, node) for element in elements]
+        return Helper(helper, boxed, result_type)
+
+    def _dict(self, node):
+        keys = [self._expression(key) if key is not None else None for key in node.keys]
+        values = [self._expression(value) for value in node.values]
+        key_types, value_types = [], []
+        for key, value in zip(keys, values):
+            if key is not None:
+                key_types.append(key.type())
+                value_types.append(value.type())
+            elif _erased(value.type()) == MAP:
+                # {**other}: the entries of the other dict, with its key and value types (Objects for a raw dict)
+                arguments = _arguments(value.type())
+                key_types.append(arguments[0] if len(arguments) == 2 else OBJECT)
+                value_types.append(arguments[1] if len(arguments) == 2 else OBJECT)
+            else:
+                self._refuse("unsupported-expression", f"unpacking a [{_erased(value.type())}] into a dict has no static lowering", node)
+        self._exact_keys(key_types, node, "the keys of a dict literal")
+        key_type = self._join(key_types, node, "keys")
+        value_type = self._join(value_types, node, "values")
+        result_type = f"{MAP}<{key_type},{value_type}>" if key_type is not None and value_type is not None else MAP
+        if any(key is None for key in keys):
+            # built in source order: an unpacked dict's entries land where it stands, later keys winning as in Python
+            result = None
+            for key, value in zip(keys, values):
+                if key is None:
+                    result = Helper("putAll", [result, value], result_type) if result is not None else Helper("copyOfMap", [value], result_type)
+                else:
+                    entry = [self._boxed(self._coerce(key, key_type, node) if key_type else key, node), self._boxed(self._coerce(value, value_type, node) if value_type else value, node)]
+                    result = Helper("put", [result] + entry, result_type) if result is not None else Helper("map", entry, result_type)
+                self.helper_calls += 1
+            return result
+        arguments = []
+        for key, value in zip(keys, values):
+            arguments.append(self._boxed(self._coerce(key, key_type, node) if key_type else key, node))
+            arguments.append(self._boxed(self._coerce(value, value_type, node) if value_type else value, node))
+        self.helper_calls += 1
+        return Helper("map", arguments, result_type)
+
+    def _subscript(self, node):
+        if isinstance(node.slice, ast.Slice):
+            self._refuse("unsupported-expression", "a slice has no static lowering yet", node)
+        container = self._expression(node.value)
+        kind = _erased(container.type())
+        arguments = _arguments(container.type())
+        self.helper_calls += 1
+        if kind == STRING:
+            return Helper("at", [container, self._coerce(self._expression(node.slice), LONG, node.slice)], STRING)
+        if kind == LIST:
+            if len(arguments) != 1:
+                self._refuse("unknown-type", "the elements of the list have no static type", node)
+            element = Helper("at", [container, self._coerce(self._expression(node.slice), LONG, node.slice)], OBJECT)
+            return Cast(element, JAVA_NUMBERS.get(arguments[0], arguments[0]))
+        if kind == MAP:
+            if len(arguments) != 2:
+                self._refuse("unknown-type", "the keys and values of the dict have no static type", node)
+            sought = self._expression(node.slice)
+            self._exact_key(sought.type(), arguments[0], node, "looking up a key")
+            key = self._boxed(self._coerce(sought, self._boxed_as(arguments[0], node, "a key"), node.slice), node)
+            return Cast(Helper("item", [container, key], OBJECT), JAVA_NUMBERS.get(arguments[1], arguments[1]))
+        self._refuse("unsupported-expression", f"indexing a [{kind}] has no static lowering", node)
+
+    def _exact_key(self, sought_type, element_type, node, what):
+        """
+        Refuse a key or element sought in, or stored into, a dict or set where Python's numeric equality
+        decides: Python holds 1.0 == 1 == True, which the boxed Java values do not. A number sought among
+        numbers of another type, or where either side may be a number of any type, is refused.
+        """
+        sought = _equality_kind(sought_type)
+        element = _equality_kind(element_type) if element_type is not None else OBJECT
+        if _numbers_mix(sought, element):
+            self._refuse("unsupported-expression", f"{what} of a [{sought}] among [{element}] values has no static lowering: Python compares numbers across their types", node)
+
+    def _exact_keys(self, types, node, what):
+        """Refuse the keys of a dict literal or the elements of a set literal that Python's numeric equality may merge."""
+        kinds = []
+        for type_name in types:
+            kind = _equality_kind(type_name)
+            if kind != NONE and kind not in kinds:
+                kinds.append(kind)
+        for i, first in enumerate(kinds):
+            for second in kinds[i + 1:]:
+                if _numbers_mix(first, second):
+                    self._refuse("unsupported-expression", f"{what} of [{first}] and [{second}] values have no static lowering: Python compares numbers across their types", node)
+
+    def _membership(self, op, left, right, node):
+        """``x in container`` for strings, lists, sets and dicts."""
+        kind = _erased(right.type())
+        if kind not in (STRING, LIST, SET, MAP):
+            self._refuse("unsupported-expression", f"a membership test on a [{kind}] has no static lowering", node)
+        if kind == STRING and left.type() != STRING:
+            self._refuse("unsupported-expression", "a membership test in a str takes a str: Python raises TypeError for anything else", node)
+        elements = _arguments(right.type())
+        if elements and kind != STRING:
+            self._boxed_as(elements[0], node, "a membership test")
+        if kind != STRING:
+            self._exact_key(left.type(), elements[0] if elements else None, node, "a membership test")
+        self.helper_calls += 1
+        test = Helper("contains", [right, self._boxed(left, node)], BOOLEAN)
+        return Unary("not", test, BOOLEAN) if isinstance(op, ast.NotIn) else test
+
+    def _builtin_call(self, function, node, arguments):
+        """The builtin table: the calls of Python builtins with a Java equivalent, or None when the name is not one."""
+        name = function.id
+        if name == "len" and len(arguments) == 1:
+            kind = _erased(arguments[0].type())
+            if kind not in (STRING, LIST, SET, MAP):
+                self._refuse("unsupported-expression", f"len() of a [{kind}] has no static lowering", node)
+            self.helper_calls += 1
+            return Helper("len", [arguments[0]], LONG)
+        if name in ("int", "float") and len(arguments) == 1:
+            value = arguments[0]
+            target = LONG if name == "int" else DOUBLE
+            if value.type() == target:
+                return value
+            if self._is_number(value.type()):
+                if name == "int":
+                    # the helper raises on a NaN, an infinity or a value no long holds, where a cast would answer a number
+                    self.helper_calls += 1
+                    return Helper("toInt", [value], LONG)
+                return Cast(value, target)
+            if value.type() in (STRING, BOOLEAN):
+                self.helper_calls += 1
+                return Helper("toInt" if name == "int" else "toFloat", [self._boxed(value, node)], target)
+            self._refuse("unsupported-expression", f"{name}() of a [{_erased(value.type())}] has no static lowering", node)
+        if name == "bool" and len(arguments) == 1:
+            return self._truthy(node.args[0])
+        if name == "abs" and len(arguments) == 1:
+            value = arguments[0]
+            if not self._is_number(value.type()):
+                self._refuse("unsupported-expression", "abs() of a value that is not a number has no static lowering", node)
+            self.java_calls += 1
+            return InvokeJava(None, "java.lang.Math", "absExact" if value.type() == LONG else "abs", [value.type()], [value], value.type())
+        if name in ("list", "tuple", "set") and len(arguments) == 1:
+            value = arguments[0]
+            kind = _erased(value.type())
+            if kind == MAP:
+                # a dict iterates its keys
+                element_type = _arguments(value.type())[0] if _arguments(value.type()) else OBJECT
+                value = InvokeJava(value, MAP, "keySet", [], [], f"java.util.Set<{element_type}>")
+                kind = SET
+            if kind not in (LIST, SET, "java.util.Collection", "java.lang.Iterable"):
+                self._refuse("unsupported-expression", f"{name}() of a [{kind}] has no static lowering", node)
+            element_type = _arguments(value.type())[0] if _arguments(value.type()) else OBJECT
+            if name == "set" and _equality_kind(element_type) in _LOOSE_KINDS:
+                self._refuse("unsupported-expression", f"set() of [{_equality_kind(element_type)}] values has no static lowering: Python compares numbers across their types", node)
+            self.helper_calls += 1
+            return Helper("copyOf" + {"set": "Set", "tuple": "Tuple", "list": "List"}[name], [value], f"{SET if name == 'set' else LIST}<{element_type}>")
+        if name in ("min", "max") and len(arguments) >= 2:
+            if not all(self._is_number(argument.type()) for argument in arguments):
+                self._refuse("unsupported-expression", f"{name}() of values that are not numbers has no static lowering", node)
+            if len({argument.type() for argument in arguments}) > 1:
+                # Python answers the winning argument itself: max(3, 2.5) is the int 3, not 3.0
+                self._refuse("unsupported-expression", f"{name}() of an int and a float has no static lowering: Python answers the winning argument with its own type", node)
+            result_type = arguments[0].type()
+            result = arguments[0]
+            for argument in arguments[1:]:
+                if result_type == DOUBLE:
+                    # Python keeps the earlier argument unless a later one is strictly greater (smaller): NaN and -0.0 differ from Math
+                    self.helper_calls += 1
+                    result = Helper(name, [result, argument], DOUBLE)
+                else:
+                    self.java_calls += 1
+                    result = InvokeJava(None, "java.lang.Math", name, [result_type, result_type], [result, argument], result_type)
+            return result
+        return None
+
+    def _collection_method(self, receiver, name, node, arguments):
+        """A method of a Python string, list, set or dict with a Java equivalent, or None."""
+        kind = _erased(receiver.type())
+        type_arguments = _arguments(receiver.type())
+        if kind == STRING:
+            if name in ("upper", "lower") and not arguments:
+                # Python cases by the Unicode rules alone; Java's no-argument methods follow the default locale
+                self.java_calls += 1
+                locale = StaticField("java.util.Locale", "ROOT", "java.util.Locale")
+                return InvokeJava(receiver, STRING, "toUpperCase" if name == "upper" else "toLowerCase", ["java.util.Locale"], [locale], STRING)
+            if name in STRING_METHODS:
+                java_name, parameter_types, return_type = STRING_METHODS[name]
+                if len(arguments) != len(parameter_types):
+                    self._refuse("python-builtin-not-lowered", f"str.{name} with {len(arguments)} arguments has no static lowering", node)
+                self.java_calls += 1
+                return InvokeJava(receiver, STRING, java_name, parameter_types, [self._coerce(argument, parameter_type, node) for argument, parameter_type in zip(arguments, parameter_types)], return_type)
+            if name == "strip" and not arguments:
+                self.helper_calls += 1
+                return Helper("strip", [receiver], STRING)
+            if name == "split" and len(arguments) <= 1:
+                self.helper_calls += 1
+                return Helper("split", [receiver] + [self._coerce(argument, STRING, node) for argument in arguments], f"{LIST}<{STRING}>")
+            if name == "join" and len(arguments) == 1:
+                joined = arguments[0]
+                # a raw Java list (the erased return of a Java call) is joined too: the helper refuses a non-string element as Python does
+                if _erased(joined.type()) not in (LIST, SET) or _arguments(joined.type()) not in ([], [STRING]):
+                    self._refuse("unsupported-expression", "str.join of anything but a list or set of strings has no static lowering", node)
+                self.helper_calls += 1
+                return Helper("join", [receiver, joined], STRING)
+            return None
+        if kind == LIST and len(type_arguments) == 1:
+            if name == "append" and len(arguments) == 1:
+                # the Java method answers a boolean where Python answers None
+                self.helper_calls += 1
+                return Helper("append", [receiver, self._boxed(self._coerce(arguments[0], self._boxed_as(type_arguments[0], node, "appending"), node), node)], NONE)
+            if name == "clear" and not arguments:
+                self.java_calls += 1
+                return InvokeJava(receiver, LIST, "clear", [], [], VOID)
+            return None
+        if kind == SET and len(type_arguments) == 1:
+            if name == "add" and len(arguments) == 1:
+                self._exact_key(arguments[0].type(), type_arguments[0], node, "adding an element")
+                self.helper_calls += 1
+                return Helper("add", [receiver, self._boxed(self._coerce(arguments[0], self._boxed_as(type_arguments[0], node, "adding"), node), node)], NONE)
+            return None
+        if kind == MAP and len(type_arguments) == 2:
+            key_type, value_type = type_arguments
+            if name == "get" and 1 <= len(arguments) <= 2:
+                if len(arguments) == 1 and JAVA_NUMBERS.get(value_type, value_type) in (LONG, DOUBLE, BOOLEAN):
+                    self._refuse("python-builtin-not-lowered", f"dict.get without a default may answer None, which a [{value_type}] cannot hold", node)
+                if len(arguments) == 2 and self._is_number(arguments[1].type()) and self._is_number(JAVA_NUMBERS.get(value_type, value_type)) \
+                        and arguments[1].type() != JAVA_NUMBERS.get(value_type, value_type):
+                    # Python answers the default itself: d.get(k, 0) of a dict of floats is the int 0, not 0.0
+                    self._refuse("unsupported-expression", f"dict.get with a [{arguments[1].type()}] default of a dict of [{value_type}] values has no static lowering: Python answers the default with its own type", node)
+                self._exact_key(arguments[0].type(), key_type, node, "looking up a key")
+                key =self._boxed(self._coerce(arguments[0], self._boxed_as(key_type, node, "a key"), node), node)
+                default = self._boxed(self._coerce(arguments[1], self._boxed_as(value_type, node, "a default"), node), node) if len(arguments) == 2 else Const(None, OBJECT)
+                self.helper_calls += 1
+                return Cast(Helper("get", [receiver, key, default], OBJECT), JAVA_NUMBERS.get(value_type, value_type))
+            if name == "keys" and not arguments:
+                self.java_calls += 1
+                return InvokeJava(receiver, MAP, "keySet", [], [], f"{SET}<{key_type}>")
+            if name == "values" and not arguments:
+                self.java_calls += 1
+                return InvokeJava(receiver, MAP, "values", [], [], f"java.util.Collection<{value_type}>")
+            return None
+        return None
+
+    def _constant(self, node):
+        value = node.value
+        if value is None:
+            return Const(None, NONE)
+        if isinstance(value, bool):
+            return Const(value, BOOLEAN)
+        if isinstance(value, int):
+            if not -2 ** 63 <= value < 2 ** 63:
+                self._refuse("unbounded-integer-op", f"the integer {value} does not fit a long", node)
+            return Const(value, LONG)
+        if isinstance(value, float):
+            return Const(value, DOUBLE)
+        if isinstance(value, str):
+            return Const(value, STRING)
+        self._refuse("unsupported-expression", f"a {type(value).__name__} literal has no static lowering", node)
+
+    def _name(self, node):
+        name = node.id
+        if name in self.exception_variables:
+            self._refuse("python-exception", f"[{name}] holds the exception of a Python exception class an except clause caught, as its generated Java class: a value of it has no Java layout, only raising it again in that clause has a static lowering", node)
+        if name in self.reassigned:
+            return LocalRef(self._shadow(name), self.locals[name])
+        if name in self.parameters:
+            used, stub = self.parameters[name]
+            return Param(name, used, stub)
+        if name in self.locals:
+            return LocalRef(name, self.locals[name])
+        if name in self.unbound:
+            raise Refused()  # its assignment was refused, which is the reason
+        if name == "self":
+            self._refuse("unsupported-expression", "self as a value has no static lowering", node)
+        constant = self._module_constant(name, node)
+        if constant is not None:
+            # a module-level literal (ROLE_USER = "user"), of this module or imported from another: inlined
+            return constant
+        attribute = self._module_attribute(name)
+        if attribute is not None:
+            # an injected bean of the module: a static field of the module's generated class
+            if not any(decorator.annotationName().rsplit(".", 1)[-1] == "Inject" for decorator in attribute.decorators()):
+                self._refuse("unknown-type", f"the module attribute [{name}] is not an injected bean; only the injected beans of a module have a static lowering", node)
+            if self.static and not self.module.decorators:
+                # a pooled module holds its injected beans in the instance Micronaut creates: a static method has none
+                self._refuse("pooled-module", f"the module is served by a context pool, whose instance holds the injected [{name}]; a plain function of the module is a static method without one", node)
+            hint = attribute.typeName()
+            stub_type = self._stub_type(self.bindings.of_hint(hint) if hint is not None else None, hint, node)
+            read = ModuleAttribute(self.module.script.qualifiedName(), name, stub_type)
+            used = JAVA_NUMBERS.get(stub_type, stub_type)
+            return Cast(read, used) if used != stub_type else read
+        typed = self._typed(node)
+        self._value_type(typed, node)  # a class, a module or a callable refuses with its reason
+        self._refuse("unknown-type", f"[{name}] has no static lowering", node)
+
+    def _module_constant(self, name, node):
+        """The Const a module-level assignment of a literal binds the name to, or None: the visitor tracks them, imports included."""
+        visitor = getattr(self.module, "visitor", None)
+        values = getattr(visitor, "local_constant_values", None) or {}
+        if name not in values:
+            return None
+        value = values[name]
+        if not (value is None or isinstance(value, (bool, int, float, str))):
+            return None
+        if not self._stable_constant(name, visitor):
+            self._refuse("unknown-type", f"the module global [{name}] may be rebound (it is bound more than once, inside a compound statement, through a global declaration or a star import); its value is not known statically", node)
+        return self._constant(ast.copy_location(ast.Constant(value=value), node))
+
+    def _stable_constant(self, name, visitor):
+        """Whether the module binds the name once and for good to the literal, assigned in its body or imported from a module doing so."""
+        statement = module_scope(self.module).stable(name)
+        if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+            return True
+        if not isinstance(statement, ast.ImportFrom):
+            return False
+        source = getattr(visitor, "imported_source_files", {}).get(name)
+        original = next((alias.name for alias in statement.names if (alias.asname or alias.name) == name), None)
+        scope = self._file_scope(source) if source is not None and original is not None else None
+        return scope is not None and isinstance(scope.stable(original), (ast.Assign, ast.AnnAssign))
+
+    def _file_scope(self, source):
+        """The ModuleScope of an imported source: its module of the compilation, else the file parsed once per compilation."""
+        module = self._module_of_source(source)
+        if module is not None:
+            return module_scope(module)
+        scopes = self.checker.__dict__.setdefault("_mn_file_scopes", {})
+        if source not in scopes:
+            try:
+                with open(source, "r", encoding="utf-8") as handle:
+                    scopes[source] = ModuleScope(ast.parse(handle.read(), filename=source))
+            except (OSError, SyntaxError, ValueError):
+                scopes[source] = None
+        return scopes[source]
+
+    def _module_attribute(self, name):
+        """The hinted attribute of the module of the name, or None."""
+        script = getattr(self.module, "script", None)
+        if script is None:
+            return None
+        for attribute in script.attributes():
+            if attribute.name() == name:
+                return attribute
+        return None
+
+    def _attribute(self, node):
+        if isinstance(node.value, ast.Name) and node.value.id == "self":
+            self.bridge_calls += 1
+            property_type = self._self_property_type(node.attr, node)
+            read = SelfProperty(node.attr, property_type, self._is_accessor(node.attr))
+            # an int attribute (an instance attribute hinted through __init__) is a long in the body; one
+            # that may be None stays boxed
+            used = JAVA_PRIMITIVE_NUMBERS.get(property_type, property_type)
+            return Cast(read, used) if used != property_type else read
+        model = self._python_model_of(node.value)
+        if model is not None:
+            return self._python_attribute(model, self._expression(node.value), node)
+        target = self.rules.targets.get(id(node))
+        if target is not None and target[0] == "field":
+            _, owner, name, field_type, static = target
+            self.java_calls += 1
+            used = JAVA_PRIMITIVE_NUMBERS.get(field_type, field_type)
+            if static:
+                read = StaticField(owner, name, field_type)
+            else:
+                read = Field(self._expression(node.value), name, field_type)
+            return Cast(read, used) if used != field_type else read
+        typed = self._typed(node)
+        if typed is not None and typed.kind in (JAVA_REF, PY_REF, MODULE):
+            self._refuse("unknown-type", "a class is not a value here", node)
+        classes = getattr(self.checker, "python_classes", None)
+        if classes is not None and target is None and not isinstance(node.value, ast.Name):
+            # owners[0].id: the receiver the checker did not type is an object of the compilation by the lowering's type
+            value = self._expression(node.value)
+            model = classes.by_qualified.get(_erased(value.type()))
+            if model is not None:
+                return self._python_attribute(model, value, node)
+        self._outside_module(node.value)
+        self._refuse("dynamic-call", f"the attribute [{node.attr}] resolves to no Java field or property of self", node)
+
+    def _is_accessor(self, name):
+        """Whether the attribute of self is a @property: its getter and setter run on the Python object."""
+        found = self.class_model.find(name) if self.class_model is not None else None
+        return found is not None and found[0] == "property"
+
+    def _self_property_type(self, name, node):
+        """The Java type of a property of self, from the hint of the attribute or property."""
+        if self.class_model is None:
+            self._refuse("unknown-self-attribute", f"self.{name} has no known type", node)
+        if _mangled(self.class_model.name.split(".")[-1], name) != name:
+            # Python stores self.__name as _Class__name, which the stub's accessors do not know
+            self._refuse("unsupported-expression", f"the private attribute [{name}] is name-mangled; reading or writing it has no static lowering", node)
+        found = self.class_model.find(name)
+        if found is None:
+            self._refuse("unknown-self-attribute", f"[{self.class_model.name}] has no attribute [{name}]", node)
+        kind = found[0]
+        typed = None
+        if kind == "attribute":
+            typed = self.bindings.of_hint(found[1].typeName())
+        elif kind == "property":
+            # a @property runs its Python getter: read through the Python object, whose attribute
+            # access runs it, at the type the getter is hinted with
+            getter = found[1].getter()
+            return_def = getter.returnType() if getter is not None else None
+            hint = return_def.typeAnnotation() if return_def is not None else None
+            if hint is None:
+                self._refuse("unknown-self-attribute", f"the property [{name}] has no return hint", node)
+            typed = self.bindings.of_hint(hint)
+        elif kind == "instance":
+            typed = self.class_model.instance_attribute_type(name, self.bindings)
+        if typed is None:
+            self._refuse("unknown-self-attribute", f"self.{name} has no hinted type", node)
+        return self._stub_type(typed, None, node)
+
+    def _call(self, node):
+        function = node.func
+        if any(keyword.arg is None for keyword in node.keywords):
+            self._refuse("dynamic-call", "spreading keyword arguments has no static lowering", node)
+        if (isinstance(function, ast.Name) and function.id in ("any", "all") and len(node.args) == 1 and not node.keywords
+                and isinstance(node.args[0], ast.GeneratorExp) and self._builtin(function.id)):
+            return self._comprehension(node.args[0], function.id)
+        if any(isinstance(argument, ast.Starred) for argument in node.args):
+            self._refuse("dynamic-call", "spreading arguments has no static lowering", node)
+        if isinstance(function, ast.Name) and function.id == "str" and len(node.args) == 1 and self._builtin("str"):
+            self.helper_calls += 1
+            return StrJoin([self._spelled(self._expression(node.args[0]), node.args[0])])
+        target = self.rules.targets.get(id(node))
+        if target is None and isinstance(function, ast.Name) and function.id in TABLE_BUILTINS and self._builtin(function.id):
+            builtin = self._builtin_call(function, node, [self._expression(argument) for argument in node.args])
+            if builtin is not None:
+                if node.keywords:
+                    self._refuse("kwargs-to-java", f"keyword arguments to [{function.id}] have no static lowering", node)
+                return builtin
+        if target is None and isinstance(function, ast.Attribute) and not (isinstance(function.value, ast.Name) and function.value.id == "self"):
+            model = self._python_model_of(function.value)
+            if model is not None:
+                return self._python_receiver_call(model, function.value, function.attr, node)
+        if target is None and isinstance(function, (ast.Name, ast.Attribute)):
+            # the checker types the arguments of a construction, not the callee: the bindings know the class
+            callee = self.bindings.lookup(function.id) if isinstance(function, ast.Name) and function.id not in self.locals and function.id not in self.bound else self._typed(function)
+            if callee is not None and callee.kind == PY_REF:
+                return self._python_construction(callee.name, node)
+        if target is None and isinstance(function, ast.Attribute):
+            receiver_typed = self._typed(function.value)
+            if receiver_typed is not None:
+                builtin_receiver = receiver_typed.kind == BUILTIN or (receiver_typed.kind == JAVA and _erased(self._value_type(receiver_typed, function.value)) in (LIST, SET, MAP, STRING))
+            else:
+                # the checker did not type the receiver (the result of a str method, an element of a
+                # collection): the type the lowering gave it decides
+                builtin_receiver = self._lowered_type(function.value) in (LIST, SET, MAP, STRING)
+            if builtin_receiver:
+                if node.keywords:
+                    self._refuse("kwargs-to-java", f"keyword arguments to [{function.attr}] have no static lowering", node)
+                receiver = self._expression(function.value)
+                lowered = self._collection_method(receiver, function.attr, node, [self._expression(argument) for argument in node.args])
+                if lowered is not None:
+                    return lowered
+                self._refuse("python-builtin-not-lowered", f"the method [{function.attr}] of a [{_erased(receiver.type())}] has no static lowering yet", node)
+        if target is None:
+            typed = self._typed(function.value) if isinstance(function, ast.Attribute) else None
+            if isinstance(function, ast.Attribute) and isinstance(function.value, ast.Name) and function.value.id == "self":
+                return self._sibling_call(function.attr, node)
+            if typed is not None and typed.kind == PY_REF and isinstance(function, ast.Attribute):
+                # Cart.factory(...): a static method called on the class
+                model = self.checker.python_classes.of(typed.name)
+                found = model.find(function.attr) if model is not None else None
+                if found is not None and found[0] == "method" and found[2] is not None and _decorated_with(found[2], ("staticmethod",)):
+                    return self._python_receiver_call(model, function.value, function.attr, node)
+            if typed is not None and typed.kind in (PY, PY_REF):
+                self._refuse("sibling-call", "calling a Python class of the compilation has no static lowering yet", node)
+            if isinstance(function, ast.Name):
+                module_call = self._module_function_call(function, node)
+                if module_call is not None:
+                    return module_call
+            if isinstance(function, ast.Name) and function.id in ("len", "int", "float", "bool", "abs", "min", "max", "isinstance", "range", "print", "sorted", "reversed", "enumerate", "zip", "sum", "any", "all", "round") and self._builtin(function.id):
+                self._refuse("python-builtin-not-lowered", f"the builtin [{function.id}] has no static lowering yet", node)
+            self._outside_module(function)
+            self._refuse("dynamic-call", "the call resolves to no Java method or constructor", node)
+        kind, owner, name, matching, static = target
+        if not self._of_compilation(owner):
+            # Java code, which may call back into Python: a Python exception raised there crosses it as the Java class
+            self.calls_java = True
+            if self.java_code:
+                self.java_code[-1].append(owner if kind == "constructor" else f"{owner}.{name}")
+        if node.keywords:
+            self._refuse("kwargs-to-java", "keyword arguments to a Java method or constructor have no static lowering", node)
+        lowered_arguments = [self._expression(argument) for argument in node.args]
+        signature = self._most_specific(list(matching), lowered_arguments, owner, name, node)
+        parameter_types = list(signature.parameterTypes())
+        if signature.varargs():
+            self._refuse("unsupported-expression", "a call of a varargs method has no static lowering yet", node)
+        if signature.throwsChecked():
+            self.checked = True
+            if self.thrown:
+                self.thrown[-1].update(signature.checkedExceptions())
+        arguments = [self._coerce(argument, parameter_type, argument_node)
+                     for argument, parameter_type, argument_node in zip(lowered_arguments, parameter_types, node.args)]
+        self.java_calls += 1
+        if kind == "constructor":
+            return NewJava(owner, _descriptor_parameter_types(signature), arguments)
+        receiver = None if static else self._expression(function.value)
+        if receiver is not None and (receiver.type() in (LONG, DOUBLE, BOOLEAN) or receiver.type() in JAVA_BOXED):
+            self._refuse("unsupported-expression", "a call on a Python value has no static lowering", node)
+        return_type = signature.returnType()
+        type_arguments = list(signature.returnTypeArguments())
+        if type_arguments:
+            # the elements of a returned collection keep their static type: for title in repository.titles()
+            return_type = f"{return_type}<{','.join(type_arguments)}>"
+        erased_return = _descriptor_return_type(signature)
+        if erased_return != VOID and erased_return != _erased(return_type):
+            # the declared return type is a type variable (T bean() of a BeanRegistration[Foo]): the
+            # signature carries the type the receiver binds it to, while the method returns the variable's
+            # erasure, which the body casts to that type
+            call = InvokeJava(receiver, owner, name, _descriptor_parameter_types(signature), arguments, erased_return)
+            used = JAVA_PRIMITIVE_NUMBERS.get(return_type, return_type)
+            if erased_return == OBJECT:
+                # from an Object, the cast checks the type the receiver binds the variable to: a boxed number stays boxed, as it may be None
+                return Cast(call, used)
+            resolved = Cast(call, return_type)
+            return Cast(resolved, used) if used != return_type else resolved
+        call = InvokeJava(receiver, owner, name, _descriptor_parameter_types(signature), arguments, return_type)
+        if _erased(return_type) == OBJECT:
+            # a type variable of a raw receiver returns as Object; the checker may still know the type
+            inferred = stub_type_name(self._typed(node))
+            if inferred is not None and inferred != OBJECT:
+                return Cast(call, inferred)
+        # a boxed return may be null, which Python sees as None: it stays boxed, a primitive is widened
+        used = JAVA_PRIMITIVE_NUMBERS.get(return_type, return_type)
+        return Cast(call, used) if used != return_type else call
+
+    def _module_function_call(self, function, node):
+        """
+        A call of a module-level function of the compilation, of this module or imported from
+        another: the static Java method it compiles into, on the module's generated class. None when
+        the name is no module-level function; refused when the function is not compiled.
+        """
+        if self.planner is None:
+            return None
+        name = function.id
+        if name in self.bound or name in self.locals:
+            return None  # a parameter or a local of the same name is called, not the function
+        module, found, imported = self.module, self.planner.module_function(self.module, name), None
+        if found is None:
+            module = self._imported_module(name)
+            found = self.planner.module_function(module, name) if module is not None else None
+            imported = module
+        if found is None:
+            return None
+        function_def, function_node = found
+        rebound = self._rebinding(name, function_def, function_node, imported)
+        if rebound is not None:
+            self._refuse("dynamic-call", f"the module-level function [{name}] {rebound}; the call is not bound at compile time", node)
+        decision = self.planner.decide_function(module, function_def, function_node)
+        if decision is None:
+            self._refuse("dynamic-call", f"the module-level function [{name}] is being compiled: a cycle of calls has no static lowering", node)
+        body = self.planner.body_of(function_node) if decision.outcome().name() == "COMPILED" else None
+        if body is None or not body.staticMethod():
+            reasons = list(decision.reasons())
+            why = f": [{reasons[0].rule()}] {reasons[0].message()}" if reasons else ""
+            self._refuse("dynamic-call", f"the module-level function [{name}] is not compiled{why}", node)
+        parameters = list(function_def.arguments().arguments())
+        bound = self._bind_arguments(None, parameters, function_node, node, name)
+        if bound is None:
+            self._refuse("dynamic-call", f"calling [{name}] with these arguments has no static lowering: the compiled function takes {len(parameters)} parameters", node)
+        parameter_types = list(body.parameterTypes())
+        arguments = [self._coerce(argument, parameter_type, argument_node)
+                     for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
+        self.java_calls += 1
+        self.compilation_calls += 1
+        return_type = body.returnType()
+        call = InvokeJava(None, body.className(), name, parameter_types, arguments, return_type)
+        used = JAVA_NUMBERS.get(return_type, return_type)
+        return Cast(call, used) if used != return_type else call
+
+    def _rebinding(self, name, function_def, function_node, imported):
+        """
+        Why the name of a module-level function may not be bound to it when the program runs, or None:
+        the name is bound more than once (a second def, a later assignment such as f = wrap(f)), inside
+        a compound statement, through a global declaration or a star import, or the function carries a
+        decorator other than the CompileStatic switch, which may wrap it.
+        """
+        why = "may be rebound: it is bound more than once, inside a compound statement, through a global declaration or a star import"
+        statement = module_scope(self.module).stable(name)
+        if imported is None:
+            if statement is not function_node:
+                return why
+        else:
+            if not isinstance(statement, ast.ImportFrom) or module_scope(imported).stable(name) is not function_node:
+                return why
+        switches = self.planner.scope.annotation_names
+        decorators = list(function_def.decorators())
+        if len(decorators) != len(function_node.decorator_list) or any(decorator.annotationName() not in switches for decorator in decorators):
+            return "has a decorator, which may wrap it"
+        return None
+
+    def _imported_module(self, name):
+        """The module of the compilation a name is imported from (from .mappers import user_public), or None."""
+        visitor = getattr(self.module, "visitor", None)
+        source = getattr(visitor, "imported_source_files", {}).get(name) if visitor is not None else None
+        return self._module_of_source(source) if source is not None else None
+
+    def _module_of_source(self, source):
+        """The module of the compilation of a source file, or None."""
+        wanted = os.path.normcase(os.path.normpath(os.path.abspath(source)))
+        for path, module in self.checker._modules.items():
+            if os.path.normcase(os.path.normpath(os.path.abspath(path))) == wanted:
+                return module
+        return None
+
+    def _sibling_call(self, name, node):
+        """
+        A call of a method of the class on self. The stub's Java method is called when the stub
+        declares one for the call (a public method with a hinted signature the call fills, that no
+        advice intercepts and no subclass of the compilation overrides); otherwise the method of the
+        Python object is invoked, which runs the interceptors, the override or the defaults as Python would.
+        A method taking a list, set or dict (see _shares_collection) is called through the shared
+        entry of its compiled body, which works on the caller's collections as Python does, when the
+        class itself defines it and it is compiled; otherwise through the Python object.
+        """
+        if self.class_model is None:
+            self._refuse("sibling-call", f"self.{name}() has no known target", node)
+        found = self.class_model.find(name)
+        if found is None:
+            self._refuse("unknown-self-attribute", f"[{self.class_model.name}] has no method [{name}]", node)
+        if found[0] != "method":
+            self._refuse("sibling-call", f"calling [{name}], which is not a method of the class, has no static lowering", node)
+        function_def, function_node = found[1], found[2]
+        python_name = _mangled(self.class_model.name.split(".")[-1], name)
+        if python_name != name and name not in self.class_model.methods:
+            # Python looks up self.__name as _Class__name of the calling class, which a base's __name is not
+            self._refuse("sibling-call", f"the private method [{name}] is not a method of [{self.class_model.name}]: Python mangles the call to [{python_name}]", node)
+        if function_node is None or _decorated_with(function_node, ("classmethod",)):
+            self._refuse("sibling-call", f"calling the class method [{name}] has no static lowering yet", node)
+        if function_def.isStatic() or _decorated_with(function_node, ("staticmethod",)):
+            if self.class_model.subclass_defines(name):
+                # Python looks the method up on the class of self, which may be a subclass overriding it
+                self._refuse("sibling-call", f"calling the static method [{name}] on self has no static lowering: a subclass of the compilation may override it", node)
+            # self.helper(...) on a static method: the static Java method of the generated class
+            return self._python_receiver_call(self.class_model, ast.copy_location(ast.Name(id=self.class_model.name, ctx=ast.Load()), node), name, node)
+        if function_def.isAsync() or function_def.isGenerator():
+            self._refuse("sibling-call", f"calling the async or generator method [{name}] has no static lowering", node)
+        if self.advised(function_def) and (function_node.args.kwonlyargs or function_node.args.vararg is not None or function_node.args.kwarg is not None):
+            # the self-invocation binder installs no chain for a method without a Java layout, so
+            # Python calls it directly, without its interceptors; a call through the bean's proxy would run them
+            self._refuse("sibling-call", f"the advised method [{name}] has no Java layout: Python calls it on self directly, without its interceptors", node)
+        return_def = function_def.returnType()
+        hint = return_def.typeAnnotation() if return_def is not None else None
+        if hint is None:
+            # the generated method returns an Object for an unhinted method that returns a value
+            return_type = self._inferred_return(self.class_model, function_def, function_node, node) if function_def.hasReturnValue() else VOID
+        elif hint.name() == "None":
+            return_type = VOID
+        else:
+            return_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
+        parameters = [argument for argument in function_def.arguments().arguments() if argument.name() not in ("self", "cls")]
+        bound = self._bind_arguments(self.class_model, parameters, function_node, node, f"{self.class_model.name}.{name}")
+        declares = (not name.startswith("_") and not self.advised(function_def) and not self.class_model.subclass_overrides(name)
+                    and bound is not None
+                    and all(argument.typeAnnotation() is not None and not argument.variadic() for argument in parameters)
+                    and function_node.args.vararg is None and not function_node.args.kwonlyargs and function_node.args.kwarg is None)
+        shares = declares and any(self._shares_collection(argument.typeAnnotation()) for argument in parameters)
+        if shares and not (name in self.class_model.methods and self.class_model.methods[name][0] is function_def and self.compiled(function_def, function_node)):
+            # the stub's Java method copies the collections: only the compiled body's shared entry
+            # gives the callee the caller's own, and a body inherited from a base has none in this stub
+            declares = False
+        if declares:
+            parameter_types = [self._stub_type(self.bindings.of_hint(argument.typeAnnotation()), argument.typeAnnotation(), node) for argument in parameters]
+            arguments = [self._coerce(argument, parameter_type, argument_node)
+                         for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
+            self.java_calls += 1
+            self.compilation_calls += 1
+            declared = OBJECT if hint is None and return_type != VOID else return_type
+            call = InvokeSibling(name, parameter_types, arguments, declared, "shared" if shares else "java")
+            call = Cast(call, return_type) if declared != return_type else call
+        else:
+            if node.keywords:
+                self._refuse("sibling-call", f"calling [{name}] with keyword arguments has no static lowering: the stub declares no Java method the call fills", node)
+            lowered_arguments = [self._expression(argument) for argument in node.args]
+            self.bridge_calls += 1
+            # a private method is invoked by the name Python mangled it to
+            call = InvokeSibling(python_name, [], [self._boxed(argument, node) for argument in lowered_arguments], return_type, "python")
+        # a boxed result may be null, which Python sees as None: it stays boxed, a primitive is widened
+        used = JAVA_PRIMITIVE_NUMBERS.get(return_type, return_type)
+        return Cast(call, used) if used != return_type else call
+
+    def _shares_collection(self, hint):
+        """
+        Whether a parameter hinted so receives the caller's own list, set or dict when Python calls
+        the method, which the stub's Java method cannot give it: the bridge hands the Python body a
+        copy, and a compiled body works on a copy (see _parameters), so the callee would update a
+        copy the caller never sees. Such a call goes to the shared entry of the compiled body, which
+        makes no copy, or through the Python object, which passes the caller's collection itself.
+        """
+        typed = self.bindings.of_hint(hint)
+        return typed is not None and typed.kind == BUILTIN and typed.name in COLLECTION_TYPES and typed.name != "tuple"
+
+    def _inferred_return(self, model, function_def, function_node, node):
+        """
+        The Java type a call of an unhinted method has: the one static type of every value the
+        method returns, when the checker infers one, else the Object its generated method declares.
+        """
+        inferred = self.checker.inferred_return(model, function_def, function_node)
+        if inferred is None:
+            return OBJECT
+        try:
+            value_type = self._value_type(inferred, node)
+        except Refused:
+            self.reasons.pop()
+            return OBJECT
+        # a number or a boolean stays the Object the method declares: its box is Python's choice
+        return OBJECT if value_type in (LONG, DOUBLE, BOOLEAN) else value_type
+
+    # ---------------------------------------------------------------- objects of the classes of the compilation
+
+    def _derives_from_python_exception(self, class_def, seen=None):
+        """Whether the class, or a Python base of it, extends a builtin Python exception."""
+        import builtins
+        seen = seen if seen is not None else set()
+        if class_def.qualifiedName() in seen:
+            return False
+        seen.add(class_def.qualifiedName())
+        classes = getattr(self.checker, "python_classes", None)
+        for base in class_def.bases():
+            name = base.name()
+            model = classes.by_qualified.get(name) if classes is not None else None
+            if model is not None:
+                if self._derives_from_python_exception(model.class_def, seen):
+                    return True
+                continue
+            builtin = getattr(builtins, name.rsplit(".", 1)[-1], None) if "." not in name or name.startswith("builtins.") else None
+            if isinstance(builtin, type) and issubclass(builtin, BaseException):
+                return True
+        return False
+
+    def _python_model_of(self, node):
+        """The class model of a value of a Python class of the compilation, from the checker's type or the lowering's, else None."""
+        classes = getattr(self.checker, "python_classes", None)
+        if classes is None:
+            return None
+        typed = self._typed(node)
+        if typed is not None:
+            return classes.of(typed.name) if typed.kind == PY else None
+        lowered = self._lowered_type(node)
+        return classes.by_qualified.get(lowered) if lowered is not None else None
+
+    def _generated_class(self, model, node):
+        """The name of the generated Java class of a Python class, refusing the classes that generate no ordinary one."""
+        class_def = model.class_def
+        if class_def.isEnum():
+            self._refuse("unsupported-expression", f"[{model.name}] is an enum; its members are constants", node)
+        for decorator in class_def.decorators():
+            if decorator.annotationName().rsplit(".", 1)[-1] == "ContextPooled":
+                self._refuse("unsupported-expression", f"[{model.name}] is served by a context pool; its objects have no Java class of their own", node)
+        return model.qualified
+
+    def _declared_by_generated_class(self, model, name):
+        """
+        Whether the generated Java class of the model declares the member: the class's own, or
+        inherited through its first Python base, the only base a generated class extends. A member
+        of another base is reachable through the Python object only.
+        """
+        seen = set()
+        current = model
+        while current is not None and current.qualified not in seen:
+            seen.add(current.qualified)
+            if name in current.methods or name in current.properties or name in current.attributes or name in current.instance_attributes:
+                return True
+            bases = current.bases  # a Java base is None
+            current = bases[0] if bases and isinstance(bases[0], type(model)) else None
+        return False
+
+    def _python_attribute(self, model, receiver, node):
+        """An attribute of an object of the compilation: the accessor its generated class declares, else the attribute of the Python object."""
+        owner = self._generated_class(model, node)
+        found = model.find(node.attr)
+        if found is None:
+            self._refuse("unknown-type", f"[{model.name}] has no attribute [{node.attr}]", node)
+        kind = found[0]
+        if kind == "attribute":
+            # a hinted class attribute is a bean property of the generated class, read by its accessor
+            hint = found[1].typeName()
+            typed = self.bindings.of_hint(hint)
+            stub_type = self._stub_type(typed, hint, node)
+            if self._declared_by_generated_class(model, node.attr):
+                getter = ("is" if stub_type == BOOLEAN else "get") + node.attr[:1].upper() + node.attr[1:]
+                self.java_calls += 1
+                self.compilation_calls += 1
+                read = InvokeJava(receiver, owner, getter, [], [], stub_type)
+            else:
+                self.bridge_calls += 1
+                read = PythonMember(receiver, node.attr, stub_type)
+        elif kind == "property":
+            getter = found[1].getter()
+            return_def = getter.returnType() if getter is not None else None
+            hint = return_def.typeAnnotation() if return_def is not None else None
+            if hint is None:
+                self._refuse("unknown-type", f"the property [{node.attr}] of [{model.name}] has no return hint", node)
+            stub_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
+            self.bridge_calls += 1
+            read = PythonMember(receiver, node.attr, stub_type)
+        elif kind == "instance":
+            typed = model.instance_attribute_type(node.attr, self.bindings)
+            if typed is None:
+                self._refuse("unknown-type", f"the attribute [{node.attr}] of [{model.name}] has no hinted type", node)
+            stub_type = self._stub_type(typed, None, node)
+            self.bridge_calls += 1
+            read = PythonMember(receiver, node.attr, stub_type)
+        else:
+            self._refuse("unsupported-expression", f"reading [{node.attr}] of [{model.name}], which is not an attribute, has no static lowering", node)
+        # an attribute that may be None stays boxed, a primitive is widened
+        used = JAVA_PRIMITIVE_NUMBERS.get(stub_type, stub_type)
+        return Cast(read, used) if used != stub_type else read
+
+    def _python_receiver_call(self, model, receiver_node, name, node):
+        """
+        A call of a method of an object of the compilation. The generated class's Java method is
+        called when it declares one for the call (a public method with a hinted signature the call
+        fills exactly; the class's own or inherited, Java dispatch resolving an override); otherwise
+        the method of the Python object is invoked, as the Python code would.
+        """
+        owner = self._generated_class(model, node)
+        found = model.find(name)
+        if found is None:
+            self._refuse("unknown-type", f"[{model.name}] has no method [{name}]", node)
+        if found[0] != "method":
+            self._refuse("unsupported-expression", f"calling [{name}] of [{model.name}], which is not a method, has no static lowering", node)
+        function_def, function_node = found[1], found[2]
+        if function_node is None or function_def.isAsync() or function_def.isGenerator():
+            self._refuse("unsupported-expression", f"calling the async or generator method [{name}] of [{model.name}] has no static lowering", node)
+        static = function_def.isStatic() or _decorated_with(function_node, ("staticmethod", "classmethod"))
+        return_def = function_def.returnType()
+        hint = return_def.typeAnnotation() if return_def is not None else None
+        if hint is None:
+            return_type = self._inferred_return(model, function_def, function_node, node) if function_def.hasReturnValue() else VOID
+        elif hint.name() == "None":
+            return_type = VOID
+        else:
+            return_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
+        parameters = [argument for argument in function_def.arguments().arguments() if argument.name() not in ("self", "cls")]
+        bound = self._bind_arguments(model, parameters, function_node, node, f"{model.name}.{name}")
+        declares = (not name.startswith("_") and bound is not None
+                    and self._declared_by_generated_class(model, name)
+                    and all(argument.typeAnnotation() is not None and not argument.variadic() for argument in parameters)
+                    and function_node.args.vararg is None and not function_node.args.kwonlyargs and function_node.args.kwarg is None)
+        if declares:
+            parameter_types = [self._stub_type(self.bindings.of_hint(argument.typeAnnotation()), argument.typeAnnotation(), node) for argument in parameters]
+            arguments = [self._coerce(argument, parameter_type, argument_node)
+                         for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
+            self.java_calls += 1
+            self.compilation_calls += 1
+            if static and not _plain_receiver(receiver_node):
+                # Python evaluates the receiver (Cart(n).factory() constructs the Cart); a static Java call would not
+                self._refuse("unsupported-expression", f"calling the static method [{name}] of [{model.name}] on an expression has no static lowering: the expression would not be evaluated", node)
+            receiver = None if static else self._expression(receiver_node)
+            declared = OBJECT if hint is None and return_type != VOID else return_type
+            call = InvokeJava(receiver, owner, name, parameter_types, arguments, declared)
+            call = Cast(call, return_type) if declared != return_type else call
+        else:
+            if static:
+                self._refuse("unsupported-expression", f"calling the static method [{name}] of [{model.name}] with this signature has no static lowering", node)
+            if node.keywords:
+                self._refuse("unsupported-expression", f"calling [{name}] of [{model.name}] with keyword arguments has no static lowering: the generated class declares no Java method the call fills", node)
+            lowered_arguments = [self._expression(argument) for argument in node.args]
+            self.bridge_calls += 1
+            call = InvokePython(self._expression(receiver_node), name, [self._boxed(argument, node) for argument in lowered_arguments], return_type)
+        # a boxed result may be null, which Python sees as None: it stays boxed, a primitive is widened
+        used = JAVA_PRIMITIVE_NUMBERS.get(return_type, return_type)
+        return Cast(call, used) if used != return_type else call
+
+    def _python_construction(self, class_def, node):
+        """A construction of an object of the compilation: the generated class's constructor, which mirrors the hinted __init__."""
+        model = self.checker.python_classes.of(class_def)
+        owner = self._generated_class(model, node)
+        if self._derives_from_python_exception(class_def):
+            # raise X(...) creates it through the Python class (see _python_exception); elsewhere a value of it has no Java layout
+            self._refuse("python-exception", f"[{model.name}] is a Python exception class; constructing it outside a raise statement has no static lowering", node)
+        if _abstract_class(class_def):
+            self._refuse("unsupported-expression", f"[{model.name}] is a protocol or an abstract class; the generated type cannot be constructed", node)
+        creator = _static_creator(class_def)
+        if creator is not None:
+            # the generated class's constructor then takes the creator's parameters, not those of __init__
+            self._refuse("unsupported-expression", f"[{model.name}] is created through its static creator [{creator}]; its generated constructor mirrors the creator, not __init__", node)
+        constructor = model.constructor_of()
+        if constructor is UNKNOWN:
+            self._refuse("unsupported-expression", f"the constructor of [{model.name}] is not the compilation's own", node)
+        if constructor is None:
+            if node.args or node.keywords:
+                self._refuse("unsupported-expression", f"[{model.name}] takes no constructor arguments", node)
+            self.java_calls += 1
+            self.compilation_calls += 1
+            return NewJava(owner, [], [])
+        function_def, function_node = constructor
+        parameters = [argument for argument in function_def.arguments().arguments() if argument.name() != "self"]
+        if (any(argument.typeAnnotation() is None or argument.variadic() for argument in parameters)
+                or (function_node is not None and (function_node.args.vararg is not None or function_node.args.kwonlyargs or function_node.args.kwarg is not None))):
+            self._refuse("unsupported-expression", f"constructing [{model.name}] with these arguments has no static lowering: the generated constructor takes every hinted parameter", node)
+        bound = self._bind_arguments(model, parameters, function_node, node, model.name)
+        if bound is None:
+            self._refuse("unsupported-expression", f"constructing [{model.name}] with these arguments has no static lowering: the generated constructor takes every hinted parameter", node)
+        parameter_types = [self._stub_type(self.bindings.of_hint(argument.typeAnnotation()), argument.typeAnnotation(), node) for argument in parameters]
+        arguments = [self._coerce(argument, parameter_type, argument_node)
+                     for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
+        self.java_calls += 1
+        self.compilation_calls += 1
+        return NewJava(owner, parameter_types, arguments)
+
+    def _bind_arguments(self, model, parameters, function_node, node, label):
+        """
+        The arguments of a call of a Python function or constructor of the compilation, one per
+        parameter in declaration order, as (expression, node) pairs: the positional arguments, then
+        the keyword arguments by name, then the defaults of the parameters the call omits. None when
+        the call does not fill the parameters (too many positional arguments, an unknown keyword, a
+        parameter given twice); refused when an omitted parameter has a default the body cannot
+        reproduce (anything but a literal, None, or an empty list, dict or set factory).
+        """
+        names = [argument.name() for argument in parameters]
+        if len(node.args) > len(names):
+            return None
+        keywords = {}
+        for keyword in node.keywords:
+            if keyword.arg not in names or keyword.arg in keywords or names.index(keyword.arg) < len(node.args):
+                return None
+            keywords[keyword.arg] = keyword.value
+        bound = []
+        for index, argument in enumerate(parameters):
+            if index < len(node.args):
+                argument_node = node.args[index]
+            elif argument.name() in keywords:
+                argument_node = keywords[argument.name()]
+            else:
+                bound.append((self._default_argument(model, argument, function_node, node, label), node))
+                continue
+            bound.append((self._expression(argument_node), argument_node))
+        return bound
+
+    def _default_argument(self, model, argument, function_node, node, label):
+        """The value of a parameter a call omits: its default, when the body can reproduce it."""
+        if not argument.hasDefaultValue():
+            self._refuse("unsupported-expression", f"calling [{label}] without [{argument.name()}], which has no default, has no static lowering", node)
+        default = _default_node(model, argument.name(), function_node)
+        if isinstance(default, ast.Constant) and (default.value is None or isinstance(default.value, (bool, int, float, str))):
+            return self._constant(ast.copy_location(ast.Constant(value=default.value), node))
+        if isinstance(default, ast.UnaryOp) and isinstance(default.op, ast.USub) and isinstance(default.operand, ast.Constant) and isinstance(default.operand.value, (int, float)) and not isinstance(default.operand.value, bool):
+            return self._constant(ast.copy_location(ast.Constant(value=-default.operand.value), node))
+        factory = _default_factory(default)
+        if factory is not None:
+            # field(default_factory=list): Python calls the factory for every instance, as the helper does here
+            hint = argument.typeAnnotation()
+            typed = self.bindings.of_hint(hint) if hint is not None else None
+            stub_type = self._stub_type(typed, hint, node) if typed is not None and typed.kind == BUILTIN and typed.name in COLLECTION_TYPES else COLLECTION_TYPES[factory]
+            self.helper_calls += 1
+            return Helper({"list": "list", "dict": "map", "set": "set"}[factory], [], stub_type)
+        self._refuse("unsupported-expression", f"the default of [{argument.name()}] of [{label}] is not a literal the body can reproduce", node)
+
+    def _most_specific(self, matching, arguments, owner, name, node):
+        """
+        The overload the compiled call binds to: the one whose parameters are the most specific
+        for the argument types (a long before an int before a double, a String before a
+        CharSequence before an Object), as Java would pick. Two overloads that rank the same are
+        ambiguous, and the call is refused rather than guessed.
+        """
+        if len(matching) == 1:
+            return matching[0]
+        ranked = []
+        for signature in matching:
+            ranks = tuple(_rank(argument.type(), parameter) for argument, parameter in zip(arguments, signature.parameterTypes()))
+            ranked.append((ranks, signature))
+        # the most specific overload fits every argument at least as well as each other overload does;
+        # without one (f(long, double) and f(double, long) for two ints) Java's choice is ambiguous
+        best = [entry for entry in ranked
+                if all(other is entry or all(mine <= theirs for mine, theirs in zip(entry[0], other[0])) for other in ranked)]
+        if len(best) != 1 or any(other is not best[0] and other[0] == best[0][0] for other in ranked):
+            self._refuse("ambiguous-overload", f"{len(matching)} overloads of [{owner.rsplit('.', 1)[-1]}.{name or '<init>'}] accept the arguments equally well", node)
+        return best[0][1]
+
+    def _binary(self, op, left, right, node):
+        left_type, right_type = left.type(), right.type()
+        if left_type == STRING and right_type == STRING and op == "+":
+            for operand in _operand_nodes(node):
+                typed = self._typed(operand)
+                if typed is not None and typed.nullable:
+                    self._refuse("unknown-type", "+ on a str that may be None has no static lowering: Python raises TypeError on None", operand)
+            if _never_none(left) and _never_none(right):
+                return Binary("concat", left, right, STRING)
+            # a str of Java may be null all the same: the helper raises where Python would
+            self.helper_calls += 1
+            return Helper("concat", [left, right], STRING)
+        if not (self._is_number(left_type) and self._is_number(right_type)):
+            self._refuse("unknown-type", f"the operator {op} on a [{left_type}] and a [{right_type}] has no static lowering", node)
+        if op == "/":
+            result = DOUBLE
+        elif op == "**":
+            if left_type == LONG and right_type == LONG:
+                if not (isinstance(node, ast.BinOp) and isinstance(node.right, ast.Constant) and isinstance(node.right.value, int) and node.right.value >= 0):
+                    self._refuse("unbounded-integer-op", "an integer power with a non-literal exponent may not fit a long", node)
+                result = LONG
+            else:
+                # Math.pow returns NaN or an infinity where Python returns a complex or raises
+                self._refuse("unsupported-expression", "a float power has no static lowering: Python raises or returns a complex where Java returns NaN or an infinity", node)
+        else:
+            result = DOUBLE if DOUBLE in (left_type, right_type) else LONG
+        if op in ("/", "//", "%", "**"):
+            self.helper_calls += 1
+        if result == DOUBLE and op != "/":
+            left = self._coerce(left, DOUBLE, node) if left_type == LONG else left
+            right = self._coerce(right, DOUBLE, node) if right_type == LONG else right
+        elif op == "/" and (left_type, right_type) != (LONG, LONG):
+            left = self._coerce(left, DOUBLE, node) if left_type == LONG else left
+            right = self._coerce(right, DOUBLE, node) if right_type == LONG else right
+        return Binary(op, left, right, result)
+
+    def _unary(self, node):
+        if isinstance(node.op, ast.Not):
+            return Unary("not", self._truthy(node.operand), BOOLEAN)
+        operand = self._expression(node.operand)
+        if isinstance(node.op, ast.UAdd) and self._is_number(operand.type()):
+            return operand
+        if isinstance(node.op, ast.USub) and self._is_number(operand.type()):
+            return Unary("-", operand, operand.type())
+        self._refuse("unsupported-expression", "the unary operator has no static lowering for the operand", node)
+
+    def _compare(self, node):
+        if len(node.ops) != 1:
+            self._refuse("unsupported-expression", "a chained comparison has no static lowering yet", node)
+        op = node.ops[0]
+        left = self._expression(node.left)
+        right_node = node.comparators[0]
+        if isinstance(op, (ast.Is, ast.IsNot)):
+            if isinstance(right_node, ast.Constant) and right_node.value is None:
+                return self._none_test(left, isinstance(op, ast.Is), node)
+            self._refuse("unsupported-expression", "identity comparison with anything but None has no static lowering", node)
+        if isinstance(op, (ast.In, ast.NotIn)):
+            return self._membership(op, left, self._expression(right_node), node)
+        symbol = COMPARE_OPS.get(type(op))
+        if symbol is None:
+            self._refuse("unsupported-expression", "the comparison has no static lowering", node)
+        right = self._expression(right_node)
+        left_type, right_type = left.type(), right.type()
+        if self._is_number(left_type) and self._is_number(right_type):
+            if left_type != right_type:
+                return self._mixed_compare(symbol, left, right, node)
+            return Compare(symbol, left, right)
+        if symbol in ("==", "!="):
+            if left_type == BOOLEAN and right_type == BOOLEAN:
+                return Compare(symbol, left, right)
+            if left_type == STRING and right_type == STRING:
+                return Compare("equals" if symbol == "==" else "!equals", left, right)
+            if NONE in (left_type, right_type):
+                return self._none_test(right if left_type == NONE else left, symbol == "==", node)
+            description = self.checker.facts.describe(left_type) if left_type == right_type else None
+            if description is not None and description.anEnum():
+                return Compare("same" if symbol == "==" else "!same", left, right)
+            self._refuse("equality-on-object", f"== between [{left_type}] and [{right_type}] has no static lowering", node)
+        self._refuse("unsupported-expression", f"the comparison {symbol} of a [{left_type}] and a [{right_type}] has no static lowering", node)
+
+    def _unhoisted(self, lower):
+        """Lower an operand evaluated lazily or repeatedly: a comprehension inside it cannot be hoisted before the statement."""
+        self.hoist_barrier += 1
+        try:
+            return lower()
+        finally:
+            self.hoist_barrier -= 1
+
+    def _none_test(self, value, is_none, node):
+        """`value is None` (or `is not None`): a number or a boolean is never None, but is still evaluated."""
+        if value.type() in BOXES:
+            if _calls_sibling(value):
+                # a method of the class may return None despite its hint, which its int, float or bool result cannot hold
+                self._refuse("unsupported-expression", "comparing the int, float or bool result of a call with None has no static lowering", node)
+            if _side_effect_free(value):
+                return Const(not is_none, BOOLEAN)
+            # boxed, so the call or the read on the left still runs, once
+            value = Cast(value, BOXES[value.type()])
+        return Compare("is None" if is_none else "is not None", value, None)
+
+    def _mixed_compare(self, symbol, left, right, node):
+        """
+        An int compared with a float: Python compares the values exactly, where a long above 2**53
+        loses digits as a double. A literal int that a double holds exactly compares as a double.
+        """
+        long_side, double_side = (left, right) if left.type() == LONG else (right, left)
+        if long_side.getClass().getSimpleName() == "Const" and abs(int(long_side.value())) <= EXACT_DOUBLE_LONG:
+            long_side = self._coerce(long_side, DOUBLE, node)
+            return Compare(symbol, long_side, double_side) if left.type() == LONG else Compare(symbol, double_side, long_side)
+        # compare(n, x) is the sign of n - x, NaN when x is NaN, which every comparison with 0.0 then answers as Python does
+        self.helper_calls += 1
+        sign = Helper("compare", [long_side, double_side], DOUBLE)
+        if left.type() != LONG:
+            symbol = {"<": ">", "<=": ">=", ">": "<", ">=": "<="}.get(symbol, symbol)
+        return Compare(symbol, sign, Const(0.0, DOUBLE))
+
+    def _bool_op(self, node):
+        values = [self._expression(node.values[0])] + [self._unhoisted(lambda value=value: self._expression(value)) for value in node.values[1:]]
+        if all(value.type() == BOOLEAN for value in values):
+            result = values[0]
+            for value in values[1:]:
+                result = And(result, value) if isinstance(node.op, ast.And) else Or(result, value)
+            return result
+        if len(values) == 2 and _pure_operand(node.values[0]) and not _runs_getter(values[0]):
+            # `x or default` on values of one type, or of two reference types one of which takes the
+            # other: the left operand is pure (a name, a literal or an attribute of a name that is
+            # no @property, whose getter would run twice), so it may be tested and yielded
+            first, second = values
+            result_type = self._common_type(first.type(), second.type())
+            if result_type is not None:
+                test = self._truthy(node.values[0])
+                first, second = self._coerce(first, result_type, node), self._coerce(second, result_type, node)
+                return Conditional(test, first, second, result_type) if isinstance(node.op, ast.Or) else Conditional(test, second, first, result_type)
+        if len(values) == 2 and _runs_getter(values[0]):
+            self._refuse("unsupported-expression", f"and/or on the @property [{node.values[0].attr}] would run its getter twice: read it into a local first", node)
+        self._refuse("unsupported-expression", "and/or on values that are not booleans of one type has no static lowering", node)
+
+    def _common_type(self, first, second):
+        """The type of both operands of an or: one type, or the reference type that takes the other, else None."""
+        if first == second:
+            return first
+        if NONE in (first, second):
+            other = second if first == NONE else first
+            return None if other in (LONG, DOUBLE, BOOLEAN) else other
+        if first in (LONG, DOUBLE, BOOLEAN, STRING) or second in (LONG, DOUBLE, BOOLEAN, STRING):
+            return None
+        facts = self.checker.facts
+        if facts.isAssignable(_erased(second), _erased(first)):
+            return first
+        if facts.isAssignable(_erased(first), _erased(second)):
+            return second
+        return None
+
+    def _joined(self, node):
+        parts = []
+        for value in node.values:
+            if isinstance(value, ast.Constant):
+                parts.append(Const(str(value.value), STRING))
+            elif isinstance(value, ast.FormattedValue):
+                if value.format_spec is not None or value.conversion not in (-1, 115):
+                    self._refuse("unsupported-expression", "a format specification has no static lowering yet", value)
+                parts.append(self._spelled(self._expression(value.value), value.value))
+            else:
+                self._refuse("unsupported-expression", "the f-string part has no static lowering", value)
+        self.helper_calls += 1
+        return StrJoin(parts)
+
+    def _spelled(self, expression, node):
+        """A value str() spells: refused for a standard Java value whose Python spelling differs from toString()."""
+        kind = _erased(expression.type())
+        if kind in STANDARD_TYPES and kind not in STANDARD_STR_TYPES:
+            self._refuse("unsupported-expression", f"str() of a [{kind}] spells the value as Python does not", node)
+        model = self._python_class(kind)
+        if model is not None and not _bridged_str(model):
+            # the generated class's toString() is Python's str() only where the stub bridges it to __str__
+            self._refuse("unsupported-expression", f"str() of a [{model.name}] without __str__ or __repr__ in its source spells the generated Java class instead", node)
+        return expression
+
+    def _conditional(self, node):
+        test = self._truthy(node.test)
+        then, or_else = self._unhoisted(lambda: self._expression(node.body)), self._unhoisted(lambda: self._expression(node.orelse))
+        if then.type() != or_else.type():
+            if self._is_number(then.type()) and self._is_number(or_else.type()):
+                # Python keeps the int of the int branch, which str() and the integer operators tell from a float
+                self._refuse("unsupported-expression", "a conditional expression of an int and a float has no static lowering: Python keeps the int", node)
+            elif NONE in (then.type(), or_else.type()):
+                other = or_else.type() if then.type() == NONE else then.type()
+                # a number or a boolean on the other branch is boxed, since the value may be None
+                other = BOXED_TYPES.get({LONG: "int", DOUBLE: "float", BOOLEAN: "bool"}.get(other), other)
+                then, or_else = self._coerce(then, other, node), self._coerce(or_else, other, node)
+            else:
+                self._refuse("unsupported-expression", "a conditional expression whose branches differ in type has no static lowering", node)
+        return Conditional(test, then, or_else, then.type())
+
+    def _truthy(self, node):
+        """The boolean a test evaluates to, with Python's truthiness for the value's type."""
+        value = self._expression(node)
+        value_type = value.type()
+        if value_type == BOOLEAN:
+            return value
+        if value_type == NONE:
+            return Const(False, BOOLEAN)
+        if value_type in (LONG, DOUBLE, STRING):
+            if value_type == STRING:
+                self.helper_calls += 1
+            return Truthy(value)
+        if value_type == "java.lang.CharSequence" or value_type in JAVA_BOXED:
+            # a boxed number or boolean may be None, which the helper answers as Python does
+            self.helper_calls += 1
+            return Truthy(value)
+        facts = self.checker.facts
+        if _erased(value_type) in (LIST, SET, MAP) or (value_type not in JAVA_NUMBERS and (facts.isAssignable(_erased(value_type), "java.util.Collection") or facts.isAssignable(_erased(value_type), "java.util.Map"))):
+            self.helper_calls += 1
+            return Truthy(value)
+        model = self._python_class(value_type)
+        if model is not None:
+            if not _plain_truth(model):
+                self._refuse("truthiness-of-java-object", f"the truthiness of a [{model.name}] may come from __bool__, __len__ or a Java base", node)
+            # an object of a class of the compilation that defines neither __bool__ nor __len__ is true unless None
+            return Compare("is not None", value, None)
+        self._refuse("truthiness-of-java-object", f"the truthiness of a [{value_type}] has no static lowering", node)
+
+
+__all__ = ["Lowering"]

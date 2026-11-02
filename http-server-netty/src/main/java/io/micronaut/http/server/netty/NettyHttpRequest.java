@@ -27,6 +27,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -40,6 +41,8 @@ import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.RouteMetadataAttributes;
 import io.micronaut.http.RouteMetadataHolder;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.body.AsyncRequestBodySource;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
@@ -48,6 +51,7 @@ import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.form.FormCapableHttpRequest;
@@ -67,6 +71,7 @@ import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.FormDemuxer;
+import io.micronaut.web.router.RouteAttributes;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
@@ -83,7 +88,6 @@ import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
@@ -94,6 +98,7 @@ import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -127,7 +132,11 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder, ResponseFailureRecorder {
+public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder, AsyncRequestBodySource, ResponseFailureRecorder {
+    /**
+     * Whether a listener exposes the default routes, set on the channel of the listener.
+     */
+    static final AttributeKey<Boolean> LISTENER_EXPOSES_DEFAULT_ROUTES = AttributeKey.valueOf("micronaut.listener.exposes-default-routes");
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
@@ -243,6 +252,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     @Nullable
     private HttpRequest<?> filteredRequest;
+    private @Nullable AsyncRequestBodySource asyncBodies;
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
@@ -266,6 +276,27 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = body;
+        Boolean listenerExposes = listenerExposesDefaultRoutes(ctx.channel());
+        if (listenerExposes != null) {
+            RouteAttributes.setListenerExposesDefaultRoutes(this, listenerExposes);
+        }
+    }
+
+    /**
+     * Whether the listener of a channel exposes the default routes.
+     *
+     * @param channel The connection or a stream of it, {@code null} for a detached context
+     * @return The setting of the listener, or {@code null} if the channel is not of a listener
+     */
+    private static @Nullable Boolean listenerExposesDefaultRoutes(@Nullable Channel channel) {
+        // a stream's parent is its connection (HTTP/2, the QUIC connection of an HTTP/3 stream),
+        // whose parent is the channel of the listener
+        for (Channel c = channel; c != null; c = c.parent()) {
+            if (c.hasAttr(LISTENER_EXPOSES_DEFAULT_ROUTES)) {
+                return c.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
+            }
+        }
+        return null;
     }
 
     @Override
@@ -282,6 +313,24 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             this.byteBodyFactory = factory;
         }
         return factory;
+    }
+
+    /**
+     * Set what gives the {@link AsyncRequestBody} of this request, see
+     * {@link AsyncRequestBody#of(HttpRequest)}.
+     *
+     * @param asyncBodies The source of the bodies
+     * @since 5.3.0
+     */
+    @Internal
+    public void setAsyncRequestBodySource(@Nullable AsyncRequestBodySource asyncBodies) {
+        this.asyncBodies = asyncBodies;
+    }
+
+    @Override
+    public @Nullable AsyncRequestBody asyncRequestBody(HttpRequest<?> request) {
+        AsyncRequestBodySource source = asyncBodies;
+        return source == null ? null : source.asyncRequestBody(request);
     }
 
     public void setLegacyBody(@Nullable Object legacyBody) {
@@ -664,6 +713,13 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             body.close();
         } catch (Throwable t) {
             failure = t;
+        }
+        try {
+            // the response has been written, a streaming body argument the route never subscribed to
+            // would otherwise stay buffered and stall the connection
+            BasicHttpAttributes.discardUnsubscribedBodies(this);
+        } catch (Throwable t) {
+            failure = RequestResourceScope.addFailure(failure, t);
         }
         if (attributes != null) {
             try {
@@ -1115,7 +1171,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     /**
      * Mutable version of the request.
      */
-    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T>, FormCapableHttpRequest<T>, ResponseFailureRecorder {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, RouteMetadataHolder, ServerHttpRequest<T>, FormCapableHttpRequest<T>, AsyncRequestBodySource, ResponseFailureRecorder {
 
         @Nullable
         private URI uri;
@@ -1201,7 +1257,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public MutableHttpRequest<T> cookie(Cookie cookie) {
             if (cookie instanceof NettyCookie nettyCookie) {
-                String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+                // the shared encoder rejects a ';' that would add another cookie pair
+                String value = ClientCookieEncoder.INSTANCE.encode(nettyCookie);
                 headers.add(HttpHeaderNames.COOKIE, value);
             }
             return this;
@@ -1228,6 +1285,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         public ByteBody byteBody() {
             // the bytes of the request, which the route reads unless the body was set
             return NettyHttpRequest.this.byteBody();
+        }
+
+        @Override
+        public @Nullable AsyncRequestBody asyncRequestBody(HttpRequest<?> request) {
+            return NettyHttpRequest.this.asyncRequestBody(request);
         }
 
         @Override

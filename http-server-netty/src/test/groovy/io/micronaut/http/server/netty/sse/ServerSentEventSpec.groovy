@@ -92,6 +92,16 @@ class ServerSentEventSpec extends Specification {
         ex.message == "Client '/sse': Internal Server Error"
     }
 
+    void "test line breaks in event fields are not written as separate fields"() {
+        when:
+        String body = httpClient.toBlocking().retrieve(HttpRequest
+                .GET(server.getURI().toString() + "/sse/line-breaks")
+                .accept(MediaType.TEXT_EVENT_STREAM))
+
+        then:
+        body == ": c1\n: id: c2\nid: 1event: x\nevent: foodata: x\ndata: a\ndata: id: 2\ndata: \ndata: data: b\n\n"
+    }
+
     @Unroll
     void "test Content-Type header is correct"() {
         def httpRequest = HttpRequest
@@ -165,6 +175,15 @@ class ServerSentEventSpec extends Specification {
                         emitter.complete()
                     }
             })
+        }
+
+        @Get('/line-breaks')
+        @Produces(MediaType.TEXT_EVENT_STREAM)
+        Publisher<Event> lineBreaks() {
+            Flux.just(Event.of("a\rid: 2\r\rdata: b")
+                    .id("1\r\nevent: x")
+                    .name("foo\rdata: x")
+                    .comment("c1\nid: c2"))
         }
 
         @Get('/string')

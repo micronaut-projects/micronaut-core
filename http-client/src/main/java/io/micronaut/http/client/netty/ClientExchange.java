@@ -22,6 +22,7 @@ import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
@@ -221,7 +222,7 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
             byteBody.close();
             poolHandle.release();
             // the response handling may have claimed the selection before it failed
-            NettyHttpClient.releaseSelection(plan.selection());
+            AbstractHttpClient.releaseSelection(plan.selection());
         } else {
             // the response listener owns the exchange, even if it already ended (e.g. a
             // customizer failed it): it cancels the stream writer, releases the pool handle and
@@ -281,7 +282,7 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
             closeReplay();
             poolHandle.release();
             // the request is not sent, so the listener never reports the selection
-            NettyHttpClient.releaseSelection(selection);
+            AbstractHttpClient.releaseSelection(selection);
             client.completeExceptionallySafe(sink, client.decorate(new HttpClientException("Failed to send the request on the connection", e)));
             return false;
         } catch (Throwable t) {
@@ -303,6 +304,10 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
             headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
             if (length.getAsLong() != 0 || permitsRequestBody(nettyRequest.method())) {
                 headers.set(HttpHeaderNames.CONTENT_LENGTH, length.getAsLong());
+            } else {
+                // no body is sent, so a length among the request headers is stale, e.g. that of
+                // a relayed body that is not sent again after a redirect
+                headers.remove(HttpHeaderNames.CONTENT_LENGTH);
             }
         } else {
             headers.remove(HttpHeaderNames.CONTENT_LENGTH);
@@ -458,7 +463,11 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
             body.close();
             return;
         }
-        sink.complete(new NettyClientByteBodyResponse(head, body, client.conversionService()));
+        if (!sink.tryComplete(new NettyClientByteBodyResponse(head, body, client.conversionService()))) {
+            // nobody takes the response of an exchange that already failed, e.g. because its
+            // streamed request body failed
+            body.close();
+        }
     }
 
     /**
@@ -593,7 +602,7 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
             if (sink.isCancelled() || !sink.tryCompleteExceptionally(new NettyHttpClient.StaleConnectionException(retry.body()))) {
                 retry.close();
                 // nothing sends the request again
-                NettyHttpClient.releaseSelection(plan.selection());
+                AbstractHttpClient.releaseSelection(plan.selection());
             }
         }
     }
@@ -617,6 +626,9 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
     public void bodyFailed(ChannelHandlerContext ctx, Throwable cause) {
         // the body fails for its consumer, which maps and decorates the cause
         reportOnce(NettyHttpClient.failureOutcome(cause));
+        // the rest of the body was not read, or can no longer be read, e.g. after an invalid
+        // chunk or content that cannot be decompressed: the connection cannot be reused
+        poolHandle.taint();
     }
 
     @Override
@@ -668,9 +680,9 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
         if (!reported) {
             reported = true;
             if (outcome != null) {
-                NettyHttpClient.report(plan.selection(), outcome);
+                AbstractHttpClient.report(plan.selection(), outcome);
             } else {
-                NettyHttpClient.releaseSelection(plan.selection());
+                AbstractHttpClient.releaseSelection(plan.selection());
             }
         }
     }

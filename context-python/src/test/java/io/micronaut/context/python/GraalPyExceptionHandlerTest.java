@@ -253,6 +253,37 @@ class GraalPyExceptionHandlerTest {
         }
     }
 
+    @Test
+    void aCompiledRaiseCreatesTheGeneratedClassItNames() {
+        try (Context context = Context.newBuilder(PYTHON).build()) {
+            Value guest = context.eval(PYTHON, "RuntimeError('compiled')");
+
+            PythonBoom created = assertInstanceOf(PythonBoom.class, GraalPyExceptionHandler.raised(PythonBoom.class, guest));
+            assertSame(guest, created.asPolyglotValue());
+        }
+    }
+
+    /**
+     * A compiled {@code except} catches the generated class the compiled raise names: any other
+     * exception thrown in its place would pass the handlers silently.
+     */
+    @Test
+    void aCompiledRaiseOfAGeneratedClassThatCannotBeCreatedIsRefusedByName() {
+        try (Context context = Context.newBuilder(PYTHON).build()) {
+            Value guest = context.eval(PYTHON, "RuntimeError('compiled')");
+
+            IllegalStateException noConstructor = assertThrows(IllegalStateException.class,
+                () -> GraalPyExceptionHandler.raised(WithoutValueConstructor.class, guest));
+            assertTrue(noConstructor.getMessage().contains("[" + WithoutValueConstructor.class.getName() + "]")
+                && noConstructor.getMessage().contains("no public constructor"), noConstructor.getMessage());
+
+            IllegalStateException notCoercible = assertThrows(IllegalStateException.class,
+                () -> GraalPyExceptionHandler.raised(NotCoercible.class, guest));
+            assertTrue(notCoercible.getMessage().contains("[" + NotCoercible.class.getName() + "]")
+                && notCoercible.getMessage().contains("ValueCoercible"), notCoercible.getMessage());
+        }
+    }
+
     public static final class Thrower {
         public void throwRuntime() {
             throw new IllegalStateException("boom");
@@ -262,6 +293,19 @@ class GraalPyExceptionHandlerTest {
             IllegalStateException exception = new IllegalStateException("boom");
             exception.addSuppressed(new IllegalArgumentException("closed badly"));
             throw exception;
+        }
+    }
+
+    public static final class WithoutValueConstructor extends RuntimeException implements ValueCoercible {
+        @Override
+        public Value asPolyglotValue() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    public static final class NotCoercible extends RuntimeException {
+        public NotCoercible(Value value) {
+            super(value.toString());
         }
     }
 

@@ -840,6 +840,10 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
                 }
             }
         }
+        if (member instanceof AnnotationMemberDef memberDef && memberDef.annotationMetadata() != null) {
+            // a member of a Java annotation carries the metadata javac built for it, @NonBinding included
+            return memberDef.annotationMetadata();
+        }
         return super.getAnnotationMemberMetadata(annotationName, annotationType, member);
     }
 

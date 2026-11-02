@@ -22,6 +22,7 @@ import jakarta.inject.Singleton;
 
 @Singleton
 @LookupAnn(value = "type", count = 3)
+@LookupArray({"first", "second"})
 public class LookupBean {
 
     @Executable

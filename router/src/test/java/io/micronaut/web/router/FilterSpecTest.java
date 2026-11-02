@@ -220,7 +220,7 @@ class FilterSpecTest {
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
         routes.accept(builder);
         builder.close();

@@ -70,14 +70,14 @@ public final class DefaultRetryRunner {
      *
      * @param supplier The supplier to invoke for each attempt
      * @param retryState The retry state
-     * @param logContext The log context
+     * @param logContext The log context, described by its toString when logged
      * @param retryEventEmitter The retry event emitter
      * @param <T> The result type
      * @return The computed result
      */
     public <T> T executeSync(Supplier<T> supplier,
                              MutableRetryState retryState,
-                             String logContext,
+                             Object logContext,
                              RetryEventEmitter retryEventEmitter) {
         while (true) {
             try {
@@ -117,14 +117,14 @@ public final class DefaultRetryRunner {
      *
      * @param supplier The supplier that creates a new completion stage for each attempt
      * @param retryState The retry state
-     * @param logContext The log context
+     * @param logContext The log context, described by its toString when logged
      * @param retryEventEmitter The retry event emitter
      * @param <T> The result type
      * @return A completion stage representing the retried execution
      */
     public <T> CompletionStage<T> executeCompletionStage(Supplier<? extends CompletionStage<T>> supplier,
                                                          MutableRetryState retryState,
-                                                         String logContext,
+                                                         Object logContext,
                                                          RetryEventEmitter retryEventEmitter) {
         CompletionStageExecution<T> execution = new CompletionStageExecution<>(supplier, retryState, logContext, retryEventEmitter);
         execution.attempt();
@@ -136,14 +136,14 @@ public final class DefaultRetryRunner {
      *
      * @param supplier The supplier that creates a new publisher for each attempt
      * @param retryState The retry state
-     * @param logContext The log context
+     * @param logContext The log context, described by its toString when logged
      * @param retryEventEmitter The retry event emitter
      * @param <T> The emitted type
      * @return A publisher representing the retried execution
      */
     public <T> Publisher<T> executePublisher(Supplier<? extends Publisher<T>> supplier,
                                              MutableRetryState retryState,
-                                             String logContext,
+                                             Object logContext,
                                              RetryEventEmitter retryEventEmitter) {
         return Flux.defer(() -> {
             AtomicBoolean emitted = new AtomicBoolean();
@@ -163,7 +163,7 @@ public final class DefaultRetryRunner {
 
     private <T> Flux<T> attemptPublisher(Supplier<? extends Publisher<T>> supplier,
                                          MutableRetryState retryState,
-                                         String logContext,
+                                         Object logContext,
                                          RetryEventEmitter retryEventEmitter) {
         return Flux.<T>defer(() -> {
             try {
@@ -176,7 +176,7 @@ public final class DefaultRetryRunner {
 
     private <T> Function<? super Throwable, ? extends Publisher<? extends T>> retryPublisher(Supplier<? extends Publisher<T>> supplier,
                                                                                                MutableRetryState retryState,
-                                                                                               String logContext,
+                                                                                               Object logContext,
                                                                                                RetryEventEmitter retryEventEmitter) {
         return exception -> {
             if (!isCaptured(retryState, exception)) {
@@ -231,13 +231,13 @@ public final class DefaultRetryRunner {
         private final AtomicBoolean ended = new AtomicBoolean();
         private final Supplier<? extends CompletionStage<T>> supplier;
         private final MutableRetryState retryState;
-        private final String logContext;
+        private final Object logContext;
         private final RetryEventEmitter retryEventEmitter;
         private final AtomicReference<@Nullable Future<?>> pending = new AtomicReference<>();
 
         CompletionStageExecution(Supplier<? extends CompletionStage<T>> supplier,
                                  MutableRetryState retryState,
-                                 String logContext,
+                                 Object logContext,
                                  RetryEventEmitter retryEventEmitter) {
             this.supplier = supplier;
             this.retryState = retryState;

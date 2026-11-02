@@ -542,7 +542,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                         continuationsFifo = false;
                     } else {
                         ScheduledTask last = localLoomQueue.peekLast();
-                        continuationsFifo = last != null && last.scheduleTime > now + factory.configuration.taskFifoThreshold().toNanos();
+                        continuationsFifo = last != null && now - last.scheduleTime > factory.configuration.taskFifoThreshold().toNanos();
                     }
                     continuationTime = 0;
                 }

@@ -24,6 +24,7 @@ import io.micronaut.core.util.CollectionUtils;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -33,19 +34,24 @@ import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Finds the {@link TypeHierarchy} records a compilation wrote.
  *
  * <p>A record is a generated class, registered as a {@code META-INF/micronaut} service of {@link TypeHierarchy},
- * whose name says which type it describes. A lookup reads the names of the service entries of the class loader,
- * which the service index of a packaged application already holds, and loads the record of the type asked for: no
- * record of another type is loaded, and the class asked about is not read reflectively. A type recorded from several
- * packages has a record in each, and a record written outside the package of the type can have left out super types
- * it could not name ({@link TypeHierarchy#getOmittedSuperTypeNames()}): the record in the package of the type is
- * preferred, otherwise the one that left out the fewest, the first by name among those, whatever order the class path
- * lists them in. Each lookup instantiates the record anew, which is a handful of {@link Argument}s; a caller that
- * asks for a hierarchy repeatedly keeps it.</p>
+ * whose name says which type it describes and which top-level class of the compilation recorded it. A lookup reads
+ * the names of the service entries of the class loader, which the service index of a packaged application already
+ * holds, and loads the record of the type asked for: no record of another type is loaded, and the class asked about
+ * is not read reflectively. A type recorded from several classes has a record for each, and a record written outside
+ * the package of the type can have left out super types it could not name
+ * ({@link TypeHierarchy#getOmittedSuperTypeNames()}): a record in the package of the type is preferred, otherwise the
+ * one that left out the fewest, the first by name among those, whatever order the class path lists them in. Each
+ * record found is instantiated once: the lookups that follow in the class loader find the same instance, which does
+ * not keep the class loader of the record from being collected.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -60,10 +66,21 @@ public final class TypeHierarchies {
 
     private static final String SERVICE_NAME = TypeHierarchy.class.getName();
     private static final String RELOCATED_PREFIX = "$$";
+    private static final String ORIGIN_SEPARATOR = "$$";
 
-    // the names of the records of a class loader, by the name of the type each describes, the preferred one first;
-    // strings only, so that the loader stays collectable
-    private static final Map<ClassLoader, Map<String, List<String>>> INDEXES = Collections.synchronizedMap(new WeakHashMap<>());
+    // the names of the records of a class loader, by the name of the type each describes, the preferred one first, and
+    // the records found so far, held weakly: nothing of the index holds a class of the loader, which stays collectable
+    private static final Map<ClassLoader, Index> INDEXES = Collections.synchronizedMap(new WeakHashMap<>());
+    // the record found of a record class, held by the class: a record a disposable class loader defines is collected
+    // with it, which a cache keyed by the loader, or by the class the record describes, would prevent
+    private static final ClassValue<AtomicReference<Found>> FOUND = new ClassValue<>() {
+        @Override
+        protected AtomicReference<Found> computeValue(Class<?> type) {
+            return new AtomicReference<>();
+        }
+    };
+    private static final WeakReference<TypeHierarchy> NOT_FOUND = new WeakReference<>(null);
+    private static final AtomicInteger GENERATION = new AtomicInteger();
 
     private TypeHierarchies() {
     }
@@ -116,20 +133,32 @@ public final class TypeHierarchies {
     public static Optional<TypeHierarchy> find(String typeName, ClassLoader classLoader) {
         ArgumentUtils.requireNonNull("typeName", typeName);
         ArgumentUtils.requireNonNull("classLoader", classLoader);
-        List<String> recordNames = index(classLoader).get(typeName);
+        Index index = index(classLoader);
+        List<String> recordNames = index.recordNames.get(typeName);
         if (recordNames == null) {
             return Optional.empty();
         }
-        String ownRecord = recordClassName(typeName, packageOf(typeName));
+        WeakReference<TypeHierarchy> found = index.found.get(typeName);
+        TypeHierarchy hierarchy = found == null ? null : found.get();
+        if (hierarchy == null && found != NOT_FOUND) {
+            hierarchy = load(typeName, recordNames, classLoader);
+            index.found.put(typeName, hierarchy == null ? NOT_FOUND : new WeakReference<>(hierarchy));
+        }
+        return Optional.ofNullable(hierarchy);
+    }
+
+    private static @Nullable TypeHierarchy load(String typeName, List<String> recordNames, ClassLoader classLoader) {
+        String typePackage = packageOf(typeName);
         TypeHierarchy preferred = null;
         for (String recordName : recordNames) {
             Optional<TypeHierarchy> hierarchy = SoftServiceLoader.load(TypeHierarchy.class, classLoader, recordName::equals).firstAvailable();
             if (hierarchy.isEmpty()) {
                 continue;
             }
-            if (recordName.equals(ownRecord)) {
-                // the record in the package of the type, first in the list, names every class of the package
-                return hierarchy;
+            if (packageOf(recordName).equals(typePackage)) {
+                // a record in the package of the type, first in the list, names every class of the package: the
+                // records of the several classes that recorded the type there are the same
+                return once(hierarchy.get());
             }
             // records written from other packages can each have left out other super types: the one that left out
             // the fewest, the first by name among those, so that the choice does not depend on the class path order
@@ -137,7 +166,22 @@ public final class TypeHierarchies {
                 preferred = hierarchy.get();
             }
         }
-        return Optional.ofNullable(preferred);
+        return preferred == null ? null : once(preferred);
+    }
+
+    // the record of its class found first, unless the records were invalidated since
+    private static TypeHierarchy once(TypeHierarchy hierarchy) {
+        AtomicReference<Found> reference = FOUND.get(hierarchy.getClass());
+        int generation = GENERATION.get();
+        while (true) {
+            Found found = reference.get();
+            if (found != null && found.generation == generation) {
+                return found.hierarchy;
+            }
+            if (reference.compareAndSet(found, new Found(hierarchy, generation))) {
+                return hierarchy;
+            }
+        }
     }
 
     /**
@@ -147,7 +191,21 @@ public final class TypeHierarchies {
     public static void invalidate() {
         // the names of the service entries are cached as well, by the loader utilities
         MicronautMetaServiceLoaderUtils.invalidate();
+        GENERATION.incrementAndGet();
         INDEXES.clear();
+    }
+
+    /**
+     * The name of the record of a type, as written before records were named after the class that recorded them,
+     * see {@link #recordClassName(String, String, String)}. A record of that name is still found.
+     *
+     * @param typeName      The name of the type
+     * @param recordPackage The package the record is written into
+     * @return The name of the record
+     */
+    @Internal
+    public static String recordClassName(String typeName, String recordPackage) {
+        return recordClassName(typeName, recordPackage, null);
     }
 
     /**
@@ -158,12 +216,27 @@ public final class TypeHierarchies {
      * Every segment stays a Java identifier, so no character of a type name is escaped and the type name reads back
      * without ambiguity; a source package whose segment starts with {@code $$} is not expected.
      *
+     * <p>Each top-level class of a compilation that records a type writes a record of its own, named after it with
+     * {@code $$} in front: {@code com.example.$Foo$TypeHierarchy$$Origin}, its dollar signs replaced by underscores.
+     * The record and its service entry then belong to that class alone, and an incremental compilation that
+     * recompiles or deletes the class drops its record only, not one other classes still need.</p>
+     *
      * @param typeName      The name of the type
      * @param recordPackage The package the record is written into
+     * @param originName    The simple name of the top-level class that records the type, or null for a record
+     *                      that belongs to no class
      * @return The name of the record
      */
     @Internal
-    public static String recordClassName(String typeName, String recordPackage) {
+    public static String recordClassName(String typeName, String recordPackage, @Nullable String originName) {
+        String recordName = recordClassNameOf(typeName, recordPackage);
+        if (originName == null || originName.isEmpty()) {
+            return recordName;
+        }
+        return recordName + ORIGIN_SEPARATOR + originName.replace('$', '_');
+    }
+
+    private static String recordClassNameOf(String typeName, String recordPackage) {
         int lastDot = typeName.lastIndexOf('.');
         String typePackage = lastDot < 0 ? "" : typeName.substring(0, lastDot);
         String simpleName = typeName.substring(lastDot + 1);
@@ -177,17 +250,26 @@ public final class TypeHierarchies {
     }
 
     /**
-     * The name of the type a record describes, the inverse of {@link #recordClassName(String, String)}.
+     * The name of the type a record describes, the inverse of {@link #recordClassName(String, String, String)}, for
+     * the names with and without the class that recorded the type.
      *
      * @param recordClassName The name of the record
      * @return The name of the type, or {@code null} if the name is not that of a record
      */
     @Internal
     public static @Nullable String recordedTypeName(String recordClassName) {
-        if (!recordClassName.endsWith(RECORD_SUFFIX)) {
+        String name;
+        int origin = recordClassName.lastIndexOf(RECORD_SUFFIX + ORIGIN_SEPARATOR);
+        int originStart = origin + RECORD_SUFFIX.length() + ORIGIN_SEPARATOR.length();
+        if (origin > 0 && originStart < recordClassName.length() && recordClassName.indexOf('$', originStart) < 0
+            && recordClassName.indexOf('.', originStart) < 0) {
+            // the origin, a class name without dollar signs, follows the suffix
+            name = recordClassName.substring(0, origin);
+        } else if (recordClassName.endsWith(RECORD_SUFFIX)) {
+            name = recordClassName.substring(0, recordClassName.length() - RECORD_SUFFIX.length());
+        } else {
             return null;
         }
-        String name = recordClassName.substring(0, recordClassName.length() - RECORD_SUFFIX.length());
         int lastDot = name.lastIndexOf('.');
         String lastSegment = name.substring(lastDot + 1);
         if (lastSegment.length() < 2 || lastSegment.charAt(0) != '$') {
@@ -206,11 +288,14 @@ public final class TypeHierarchies {
         return typePackage + '.' + simpleName;
     }
 
-    private static Map<String, List<String>> index(ClassLoader classLoader) {
-        Map<String, List<String>> index = INDEXES.get(classLoader);
+    private static Index index(ClassLoader classLoader) {
+        Index index = INDEXES.get(classLoader);
         if (index == null) {
-            index = buildIndex(classLoader);
-            INDEXES.put(classLoader, index);
+            index = new Index(buildIndex(classLoader), new ConcurrentHashMap<>());
+            Index existing = INDEXES.putIfAbsent(classLoader, index);
+            if (existing != null) {
+                index = existing;
+            }
         }
         return index;
     }
@@ -232,11 +317,11 @@ public final class TypeHierarchies {
         if (index.isEmpty()) {
             return Map.of();
         }
-        // a type can be recorded from several packages, which name what they could: the record in the package of the
-        // type first, then the others by name, whatever order the class path lists them in
+        // a type can be recorded from several classes and packages, which name what they could: the records in the
+        // package of the type first, then the others, each by name, whatever order the class path lists them in
         index.replaceAll((typeName, names) -> {
-            String ownRecord = recordClassName(typeName, packageOf(typeName));
-            names.sort(Comparator.comparing((String name) -> !name.equals(ownRecord)).thenComparing(Comparator.naturalOrder()));
+            String typePackage = packageOf(typeName);
+            names.sort(Comparator.comparing((String name) -> !packageOf(name).equals(typePackage)).thenComparing(Comparator.naturalOrder()));
             return List.copyOf(names);
         });
         return Map.copyOf(index);
@@ -245,5 +330,23 @@ public final class TypeHierarchies {
     private static String packageOf(String typeName) {
         int lastDot = typeName.lastIndexOf('.');
         return lastDot < 0 ? "" : typeName.substring(0, lastDot);
+    }
+
+    /**
+     * The records of a class loader.
+     *
+     * @param recordNames The names of the records, by the name of the type each describes, the preferred one first
+     * @param found       The records found, by the name of the type each describes
+     */
+    private record Index(Map<String, List<String>> recordNames, ConcurrentMap<String, WeakReference<TypeHierarchy>> found) {
+    }
+
+    /**
+     * The record of a record class found first.
+     *
+     * @param hierarchy  The record
+     * @param generation The {@link #invalidate() generation} it was found in
+     */
+    private record Found(TypeHierarchy hierarchy, int generation) {
     }
 }

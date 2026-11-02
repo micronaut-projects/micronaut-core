@@ -1005,7 +1005,7 @@ final class NettyPythonEventLoopSemanticsTest {
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         if (javaObjectMembers) {
-            GraalPyContextFactory.registerJavaObjectMembers(context);
+            GraalPyContextFactory.registerJavaObjectMembers(context, NettyPythonEventLoopSemanticsTest.class.getClassLoader());
         }
         PythonAsyncioRuntime.setEventLoopProviders(List.of(provider));
         PythonAsyncioRuntime.setExecutorService(executorService);

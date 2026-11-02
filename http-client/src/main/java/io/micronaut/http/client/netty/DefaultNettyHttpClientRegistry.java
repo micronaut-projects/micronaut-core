@@ -320,6 +320,17 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     @Override
     public void disposeClient(AnnotationMetadata annotationMetadata) {
         final ClientKey key = getClientKey(annotationMetadata);
+        disposeClient(key);
+        // The keys the metadata had before the properties changed name the clients it was given until then
+        CachedClientKey cached = clientKeyCache.get(annotationMetadata);
+        if (cached != null) {
+            for (ClientKey previous : cached.previousKeys()) {
+                disposeClient(previous);
+            }
+        }
+    }
+
+    private void disposeClient(ClientKey key) {
         final StreamingHttpClient streamingHttpClient = unbalancedClients.get(key);
         if (streamingHttpClient != null && streamingHttpClient.isRunning()) {
             streamingHttpClient.close();
@@ -705,7 +716,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             IdentityHashMap<AnnotationMetadata, CachedClientKey> current = clientKeyCache;
             if (current.containsKey(metadata) || current.size() < CLIENT_KEY_CACHE_MAX_SIZE) {
                 IdentityHashMap<AnnotationMetadata, CachedClientKey> copy = new IdentityHashMap<>(current);
-                copy.put(metadata, new CachedClientKey(key, revision));
+                copy.put(metadata, new CachedClientKey(key, revision, previousKeys(current.get(metadata), key)));
                 clientKeyCache = copy;
             }
         }
@@ -818,9 +829,31 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * A cached client key.
      *
      * @param key      The key
-     * @param revision The revision of the properties it was computed at, or {@link #NO_REVISION}
+     * @param revision     The revision of the properties it was computed at, or {@link #NO_REVISION}
+     * @param previousKeys The keys the metadata had before
      */
-    private record CachedClientKey(ClientKey key, long revision) {
+    private record CachedClientKey(ClientKey key, long revision, List<ClientKey> previousKeys) {
+    }
+
+    /**
+     * The keys a metadata had before the given one, so that disposing its client also disposes the clients it
+     * was given before the properties changed.
+     *
+     * @param replaced The entry replaced, if any
+     * @param key      The new key
+     * @return The previous keys
+     */
+    private static List<ClientKey> previousKeys(@Nullable CachedClientKey replaced, ClientKey key) {
+        if (replaced == null) {
+            return List.of();
+        }
+        if (replaced.key().equals(key)) {
+            return replaced.previousKeys();
+        }
+        List<ClientKey> keys = new ArrayList<>(replaced.previousKeys().size() + 1);
+        keys.addAll(replaced.previousKeys());
+        keys.add(replaced.key());
+        return List.copyOf(keys);
     }
 
 }

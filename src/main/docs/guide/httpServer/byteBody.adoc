@@ -8,3 +8,5 @@ all request filters have run, typically an argument binder matching the `@Body` 
 discarding any data if it has not been claimed by the argument binder.
 
 NOTE: The api:http.filter.FilterBodyParser[] API allows you to get a Map representation of a request's body whose content type is either application/x-www-form-urlencoded or application/json.
+
+TIP: To read the body in a filter while the route still reads it, read a `copy()` of its api:http.body.AsyncRequestBody[] instead of splitting `byteBody()` yourself, see <<filterBodyBuffer, Reading the Body in a Filter>>.

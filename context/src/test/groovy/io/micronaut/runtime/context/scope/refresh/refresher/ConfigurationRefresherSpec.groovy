@@ -34,7 +34,7 @@ class ConfigurationRefresherSpec extends Specification {
         def legacy = context.getBean(LegacyListener)
         List<ConfigurationRefreshedEvent> refreshed = []
         context.getEventPublisher(ConfigurationRefreshedEvent)
-        context.registerSingleton(io.micronaut.context.event.ApplicationEventListener, { event -> if (event instanceof ConfigurationRefreshedEvent) refreshed << event } as io.micronaut.context.event.ApplicationEventListener)
+        context.registerSingleton(io.micronaut.context.event.ApplicationEventListener, { event -> if (event instanceof ConfigurationRefreshedEvent) { refreshed << event } } as io.micronaut.context.event.ApplicationEventListener)
 
         expect:
         configuration.url == "one"

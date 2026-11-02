@@ -93,7 +93,7 @@ class RoutePortPropertyTest {
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes, @Nullable PropertyPlaceholderResolver resolver) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         routes.accept(new DefaultHttpRouteBuilder(assembly, resolver));
         assembly.addImplicitHeadRoutes();
         return new DefaultRouter(List.of(), List.of(() -> assembly));

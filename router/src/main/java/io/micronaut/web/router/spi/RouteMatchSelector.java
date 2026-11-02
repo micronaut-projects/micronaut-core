@@ -17,6 +17,7 @@ package io.micronaut.web.router.spi;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.uri.RouteTemplate;
@@ -44,16 +45,29 @@ import java.util.Optional;
  * routes of a selector the types are compatible when one matches the other, without the
  * parameters: {@code Accept: image/*} reaches the routes that produce {@code image/png} and
  * {@code image/*}; when none is compatible the router answers {@code 406} or {@code 415} as for
- * other routes. When the candidates have different selectors, or none, the Micronaut policy
+ * other routes, unless the selector {@link #selectsMediaTypes() selects the media types} itself. When the candidates have different selectors, or none, the Micronaut policy
  * selects, and no selector is called. For example a JAX-RS selector selects by the specificity of
  * JAX-RS (section 3.7.2), then by the content type of the request against {@code @Consumes} and
  * the accepted types, with their quality, against {@code @Produces}, with their {@code qs}.</p>
+ *
+ * <p>A selector that ranks the routes by their path first and by the media types only after
+ * that, as JAX-RS does, returns {@code true} from {@link #selectsMediaTypes()}: the router then
+ * gives it the matches of its routes whatever their content type and accepted types, and the
+ * selector answers a request that the route it chose cannot serve with
+ * {@link Selection#notAcceptable(UriRouteMatch)} ({@code 406}) or
+ * {@link Selection#unsupportedMediaType(UriRouteMatch)} ({@code 415}).</p>
  *
  * <p>A locator route is never given to {@link #select}: its target is located after the
  * selection. When locator routes are among the candidates and they all have the same selector,
  * the router keeps the most specific of them by the {@link #order() order} of the selector, or by
  * the Micronaut policy. The selection is therefore not staged as in JAX-RS: a resource method
- * that the media types exclude does not keep a request from a locator route of the same path.</p>
+ * that the media types exclude does not keep a request from a locator route of the same path.
+ * A locator route is however dropped when its selector has an {@link #order() order} and a route
+ * of the same selector that is not a locator route, of any HTTP method, matches the path and is
+ * more specific: the request is then routed as if the locator route did not match, so the
+ * {@code 405} status, its {@code Allow} header and the automatic {@code OPTIONS} and
+ * {@code HEAD} responses of the more specific route apply, as when JAX-RS matches the path
+ * before the method.</p>
  *
  * <p>When the router finds the routes of the path of every HTTP method
  * ({@link io.micronaut.web.router.Router#findAny(HttpRequest)}), e.g. for the {@code 405} status
@@ -100,6 +114,25 @@ public interface RouteMatchSelector {
      */
     default Optional<Comparator<UriRouteInfo<?, ?>>> order() {
         return Optional.empty();
+    }
+
+    /**
+     * Whether this selector selects by the media types itself. When {@code true}, the router does
+     * not drop the routes of this selector whose consumed and produced types are not compatible
+     * with the content type and the accepted types of the request before {@link #select} runs:
+     * the selector is given every match of the path and the method, and chooses the route by the
+     * path first, e.g. by the most specific template. When the chosen route cannot serve the
+     * media types, the selector returns {@link Selection#notAcceptable(UriRouteMatch)} or
+     * {@link Selection#unsupportedMediaType(UriRouteMatch)} to answer {@code 406} or {@code 415}
+     * with the types of that route, instead of an empty selection, which is answered as when no
+     * route matches. When the candidates of a request do not all have this selector, the matches
+     * of its routes whose types are not compatible are dropped as for other routes.
+     *
+     * @return Whether the selector is given the matches of every media type, {@code false} by default
+     * @since 5.3.0
+     */
+    default boolean selectsMediaTypes() {
+        return false;
     }
 
     /**
@@ -150,7 +183,34 @@ public interface RouteMatchSelector {
          * @return The selection
          */
         static Selection of(UriRouteMatch<?, ?> match, @Nullable MediaType responseMediaType) {
-            return new DefaultSelection(match, responseMediaType);
+            return new DefaultSelection(match, responseMediaType, null);
+        }
+
+        /**
+         * The route the selector chose cannot produce a type the request accepts: the request is
+         * answered with {@code 406}, with the produced types of the route. The selection must be
+         * the only one, and the selector must {@link RouteMatchSelector#selectsMediaTypes() select
+         * the media types}, or the router never gives it a match it would reject.
+         *
+         * @param match The match of the chosen route, one of the matches given to the selector
+         * @return The selection
+         * @since 5.3.0
+         */
+        static Selection notAcceptable(UriRouteMatch<?, ?> match) {
+            return new DefaultSelection(match, null, HttpStatus.NOT_ACCEPTABLE);
+        }
+
+        /**
+         * The route the selector chose cannot consume the content type of the request: the
+         * request is answered with {@code 415}, with the consumed types of the route, see
+         * {@link #notAcceptable(UriRouteMatch)}.
+         *
+         * @param match The match of the chosen route, one of the matches given to the selector
+         * @return The selection
+         * @since 5.3.0
+         */
+        static Selection unsupportedMediaType(UriRouteMatch<?, ?> match) {
+            return new DefaultSelection(match, null, HttpStatus.UNSUPPORTED_MEDIA_TYPE);
         }
 
         /**
@@ -163,5 +223,12 @@ public interface RouteMatchSelector {
          * choose as for other routes
          */
         @Nullable MediaType responseMediaType();
+
+        /**
+         * @return The status the request is answered with instead of being routed to the match:
+         * {@code 406} or {@code 415}, or {@code null} to route it to the match
+         * @since 5.3.0
+         */
+        @Nullable HttpStatus rejectionStatus();
     }
 }

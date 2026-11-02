@@ -334,7 +334,7 @@ class ResourceRoutesTest {
             }
             routes.GET("/", (request, pathVariables) -> HttpResponse.ok());
         });
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
         builder.locate("/orders/{id}", (request, pathVariables) -> "order", target -> located);
         builder.close();
@@ -381,7 +381,7 @@ class ResourceRoutesTest {
             }
             routes.GET("/", (request, pathVariables) -> HttpResponse.ok());
         });
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
         builder.locate("/orders/{id}", (request, pathVariables) -> "order", target -> located);
         builder.close();
@@ -456,7 +456,7 @@ class ResourceRoutesTest {
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         return new DefaultRouter(List.of(), List.of(() -> assembly));

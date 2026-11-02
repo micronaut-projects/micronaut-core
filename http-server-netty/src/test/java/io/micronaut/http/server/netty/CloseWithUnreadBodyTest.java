@@ -82,6 +82,29 @@ class CloseWithUnreadBodyTest {
     }
 
     @Test
+    void aClientThatSendsTheBodyLongerThanTheIdleWaitIsNotReset() throws Exception {
+        int parts = 14;
+        int part = 1000;
+        try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+            socket.setSoTimeout(30_000);
+            socket.setTcpNoDelay(true);
+            OutputStream out = socket.getOutputStream();
+            out.write(head(parts * part));
+            out.flush();
+            // the server answers after the first KB; the rest keeps coming for 7 seconds, longer
+            // than the 5 seconds the server waits for more of the body, but never idle for that long
+            for (int i = 0; i < parts; i++) {
+                out.write("x".repeat(part).getBytes(StandardCharsets.US_ASCII));
+                out.flush();
+                Thread.sleep(500);
+            }
+            String response = new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            assertTrue(response.startsWith("HTTP/1.1 200"), response);
+            assertTrue(response.endsWith("plain"), response);
+        }
+    }
+
+    @Test
     void theServerKeepsServing() throws IOException {
         try (Socket socket = new Socket(server.getHost(), server.getPort())) {
             socket.setSoTimeout(10_000);

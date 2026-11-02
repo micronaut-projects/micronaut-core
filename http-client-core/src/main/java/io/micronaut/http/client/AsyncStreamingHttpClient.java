@@ -284,7 +284,7 @@ public interface AsyncStreamingHttpClient extends AsyncHttpClient {
     default <I, B> CompletionStage<HttpResponse<BodyElements<Event<B>>>> exchangeEventStream(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
         EventStreams.acceptEvents(request);
         return ElementsStages.mapResponse(exchangeStream(request, errorType),
-            response -> EventStreams.response(response, eventType, HttpClientConfiguration.DEFAULT_MAX_CONTENT_LENGTH, JsonMapper::createDefault));
+            response -> EventStreams.response(response, eventType, HttpClientConfiguration.DEFAULT_MAX_CONTENT_LENGTH, JsonMapper::createDefault, EventStreams.state(request)));
     }
 
     /**

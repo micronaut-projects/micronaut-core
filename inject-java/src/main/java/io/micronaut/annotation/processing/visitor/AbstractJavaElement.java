@@ -54,6 +54,7 @@ import javax.lang.model.type.UnionType;
 import javax.lang.model.type.WildcardType;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -61,7 +62,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static javax.lang.model.element.Modifier.PRIVATE;
@@ -144,9 +144,24 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
         if (element == null) {
             return Collections.emptySet();
         }
-        return element.getModifiers().stream()
-            .map(m -> ElementModifier.valueOf(m.name()))
-            .collect(Collectors.toSet());
+        Set<ElementModifier> modifiers = EnumSet.noneOf(ElementModifier.class);
+        for (Modifier modifier : element.getModifiers()) {
+            ElementModifier elementModifier = toElementModifier(modifier);
+            if (elementModifier != null) {
+                modifiers.add(elementModifier);
+            }
+        }
+        return modifiers;
+    }
+
+    @Nullable
+    private static ElementModifier toElementModifier(Modifier modifier) {
+        try {
+            return ElementModifier.valueOf(modifier.name());
+        } catch (IllegalArgumentException e) {
+            // a modifier introduced by a newer JDK
+            return null;
+        }
     }
 
     @Override
@@ -320,8 +335,16 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                     }
                     resolvedTypeArguments = resolved;
                 } else {
+                    // The type is visited while its own arguments are resolved, which is what stops at the
+                    // Comparable<T> within the bounds of T extends Comparable<T>. It is not visited for what is
+                    // resolved after it, so that the T within the bounds of a sibling V extends List<? extends T>
+                    // keeps its own bounds rather than Comparable<Object>
                     visitedTypes.add(dt);
-                    resolvedTypeArguments = resolveTypeArguments(typeElement.getTypeParameters(), typeMirrorArguments, declaredTypeArguments, visitedTypes);
+                    try {
+                        resolvedTypeArguments = resolveTypeArguments(typeElement.getTypeParameters(), typeMirrorArguments, declaredTypeArguments, visitedTypes);
+                    } finally {
+                        visitedTypes.remove(dt);
+                    }
                 }
                 if (type.getKind() == TypeKind.ERROR) {
                     throw new PostponeToNextRoundException(typeElement, getName() + " " + typeElement);
@@ -447,9 +470,10 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                 }
             }
         }
-        if (upperType.isPrimitive()) {
-            // Primitive wildcard bounds are not represented as wildcard elements.
-            return upperType;
+        if (upperBoundsAsElements.stream().anyMatch(ClassElement::isPrimitive)
+            || lowerBoundsAsElements.stream().anyMatch(ClassElement::isPrimitive)) {
+            // A primitive array bound, such as ? extends char[], has no Java class element to build the wildcard on
+            return WildcardElement.of(upperBoundsAsElements, lowerBoundsAsElements);
         }
         if (!(upperType instanceof JavaClassElement javaUpperType)
             || !upperBoundsAsElements.stream().allMatch(JavaClassElement.class::isInstance)

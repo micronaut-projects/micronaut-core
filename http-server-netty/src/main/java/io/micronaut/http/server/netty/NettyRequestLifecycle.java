@@ -184,9 +184,10 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
 
     @Override
     protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch, HttpRequest<?> request) {
-        // handle decoding failure
+        // handle decoding failure. A status or error route answers that failure, see handleNormal,
+        // so it runs with the request as it is
         DecoderResult decoderResult = Objects.requireNonNull(nettyRequest).getNativeRequest().decoderResult();
-        if (decoderResult.isFailure()) {
+        if (decoderResult.isFailure() && !routeMatch.getRouteInfo().isErrorRoute()) {
             return ExecutionFlow.error(decoderResult.cause());
         }
         return super.fulfillArguments(routeMatch, request);

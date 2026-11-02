@@ -86,7 +86,7 @@ noReflection {
     allowIn("io.micronaut.core.naming.conventions.TypeConvention", "CLASS_NAMES")
     allowIn("io.micronaut.core.optim.StaticOptimizations", "SERVICE_LOADING")
     allowIn("io.micronaut.core.reflect.ClassUtils", "CLASS_LOADING", "INTERFACES")
-    allowIn("io.micronaut.core.reflect.GenericTypeUtils", "GENERIC_SIGNATURES")
+    allowIn("io.micronaut.core.reflect.GenericTypeUtils", "ANNOTATIONS", "GENERIC_SIGNATURES")
     allowIn("io.micronaut.core.reflect.InstantiationUtils", "CLASS_LOADING", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.core.reflect.ReflectionUtils", "CLASS_MEMBERS", "CLASS_NAMES", "INTERFACES", "REFLECTION_UTILS", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.core.serialize.JdkSerializer", "CLASS_LOADING", "SERIALIZATION")

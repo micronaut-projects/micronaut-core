@@ -38,11 +38,10 @@ class Service:
 ''')
 
         then:
-        diagnostics*.rule() == ['unknown-method', 'unknown-method']
+        diagnostics*.rule() == ['unknown-method']
         diagnostics[0].message() == 'Java type [java.util.ArrayList] has no method named [ad]; did you mean [add]?'
         diagnostics[0].span().line() == 9
         diagnostics[0].span().column() == 9
-        diagnostics[1].message() == 'Java type [java.util.ArrayList] has no method named [add_all]; did you mean [addAll]?'
     }
 
     void "an overload must accept the arguments the checker can type"() {
@@ -88,10 +87,63 @@ class Service:
 ''')
 
         then:
-        diagnostics*.rule() == ['unknown-attribute', 'unknown-attribute', 'unknown-attribute']
+        diagnostics*.rule() == ['unknown-attribute', 'unknown-attribute']
         diagnostics[0].message() == 'Java type [io.micronaut.http.HttpStatus] has no member named [CREATE]; did you mean [CREATED]?'
         diagnostics[1].message() == 'Java type [java.lang.Integer] has no member named [MAX_VAL]; did you mean [MAX_VALUE]?'
-        diagnostics[2].message() == 'Java type [java.util.Locale] has no member named [language]; did you mean [getLanguage()]?'
+    }
+
+    void "instance aliases retain overload checks and getter return types"() {
+        when:
+        def diagnostics = check('''
+from jakarta.inject import Singleton
+from java.util import Locale
+from micronaut.http import HttpRequest
+
+@Singleton
+class Service:
+    def run(self) -> str:
+        request = HttpRequest.GET("/")
+        request.basic_auth("user", "password")
+        request.basic_auth("user")
+        language = Locale.ROOT.language
+        country = Locale.ROOT.get_country()
+        request.get_uri()
+        return language.upper() + country.lower()
+''')
+
+        then:
+        diagnostics*.rule() == ['no-matching-overload']
+        diagnostics[0].message().startsWith('no overload of [MutableHttpRequest.basicAuth] accepts (str); candidates: ')
+    }
+
+    void "instance aliases preserve real members and reject ambiguous or static names"() {
+        when:
+        def diagnostics = check('''
+from jakarta.inject import Singleton
+from io.micronaut.python.compiler import InstanceAliasFixture
+
+@Singleton
+class Service:
+    def run(self) -> bool:
+        fixture = InstanceAliasFixture()
+        fixture.get_http_status().add("ok")
+        fixture.http_status.addd("wrong")
+        fixture.literal_value(1)
+        fixture.get_url()
+        fixture.url
+        fixture.static_value
+        fixture.get_static_value()
+        fixture.mixed_value("x")
+        InstanceAliasFixture.get_http_status()
+        return fixture.ready
+''')
+
+        then:
+        diagnostics*.rule() == ['unknown-method', 'no-matching-overload', 'unknown-method',
+                               'unknown-attribute', 'unknown-attribute', 'unknown-method',
+                               'unknown-method', 'unknown-method']
+        diagnostics[0].message().startsWith('Java type [java.util.StringJoiner] has no method named [addd]')
+        diagnostics[1].message().startsWith('no overload of [InstanceAliasFixture.literal_value] accepts (int)')
     }
 
     void "constructors are checked and abstract types cannot be instantiated"() {

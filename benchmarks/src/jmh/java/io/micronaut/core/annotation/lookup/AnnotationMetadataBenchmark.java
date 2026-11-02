@@ -17,6 +17,7 @@ package io.micronaut.core.annotation.lookup;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -41,6 +42,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
+import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -60,6 +62,10 @@ public class AnnotationMetadataBenchmark {
     private static final Map<String, Map<CharSequence, Object>> ANNOTATIONS = Map.of(LookupAnn.class.getName(), Map.of("value", "x"));
 
     private ApplicationContext applicationContext;
+    private AnnotationMetadata typeMetadata;
+    private AnnotationMetadata methodMetadata;
+    private AnnotationValue<LookupAnn> value1;
+    private AnnotationValue<LookupAnn> value2;
     private AnnotationMetadata noRepeat;
     private AnnotationMetadata oneRepeat;
     private AnnotationMetadata threeRepeats;
@@ -82,6 +88,11 @@ public class AnnotationMetadataBenchmark {
         queryBinder = new QueryValueArgumentBinder<String>(applicationContext.getBean(ConversionService.class)).createSpecific(argument);
         queryContext = ConversionContext.of(argument);
         request = HttpRequest.GET("/query?other=1");
+        typeMetadata = applicationContext.getBeanDefinition(LookupBean.class).getAnnotationMetadata();
+        methodMetadata = noRepeat;
+        // Two distinct values of the same annotation, as qualifier and binding matching compare them
+        value1 = typeMetadata.getAnnotation(LookupAnn.class);
+        value2 = typeMetadata.getAnnotation(LookupAnn.class);
         if (oneRepeat.getAnnotationValuesByType(LookupRepeat.class).size() != 1 || threeRepeats.getAnnotationValuesByType(LookupRepeat.class).size() != 3) {
             throw new IllegalStateException("Unexpected repeatable setup");
         }
@@ -134,4 +145,53 @@ public class AnnotationMetadataBenchmark {
     public ArgumentBinder.BindingResult<String> queryValueMissing() {
         return queryBinder.bind(queryContext, request);
     }
+
+    @Benchmark
+    public boolean annotationValueEquals() {
+        return value1.equals(value2);
+    }
+
+    @Benchmark
+    public int annotationValueHashCode() {
+        return value1.hashCode();
+    }
+
+    /**
+     * Compares including the defaults, as qualifiers and interceptor bindings do.
+     */
+    @Benchmark
+    public boolean annotationValueMatches() {
+        return value1.matches(value2);
+    }
+
+    @Benchmark
+    public List<String> hierarchyAnnotationNamesByStereotype() {
+        return methodMetadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE);
+    }
+
+    @Benchmark
+    public List<AnnotationValue<Annotation>> hierarchyAnnotationValuesByStereotype() {
+        return methodMetadata.getAnnotationValuesByStereotype(AnnotationUtil.SCOPE);
+    }
+
+    @Benchmark
+    public AnnotationValue<LookupAnn> hierarchyGetAnnotationByName() {
+        return methodMetadata.getAnnotation(LookupAnn.class.getName());
+    }
+
+    @Benchmark
+    public boolean hierarchyHasAnnotationNameMissing() {
+        return methodMetadata.hasAnnotation("io.micronaut.Missing");
+    }
+
+    @Benchmark
+    public boolean typeHasAnnotationNameMissing() {
+        return typeMetadata.hasAnnotation("io.micronaut.Missing");
+    }
+
+    @Benchmark
+    public String typeArrayMemberStringValue() {
+        return typeMetadata.stringValue(LookupArray.class).orElse(null);
+    }
+
 }

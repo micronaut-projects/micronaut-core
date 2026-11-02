@@ -37,6 +37,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.util.LeakPresenceDetector;
+import io.netty.util.ReferenceCountUtil;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
@@ -81,6 +82,15 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
         }
 
         return super.encodeNoBody(response);
+    }
+
+    @Override
+    protected void discardItem(Object item) {
+        if (item instanceof io.netty.util.ReferenceCounted) {
+            ReferenceCountUtil.release(item);
+        } else {
+            super.discardItem(item);
+        }
     }
 
     private NettyByteBodyFactory byteBodyFactory() {

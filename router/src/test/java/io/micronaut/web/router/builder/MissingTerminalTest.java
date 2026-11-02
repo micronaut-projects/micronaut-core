@@ -88,7 +88,7 @@ class MissingTerminalTest {
 
     @Test
     void theBuilderFailsWhenItIsClosedWithARouteWithoutATerminal() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
         builder.GET("/ended", MissingTerminalTest::ok);
         builder.POST("/items").consumes(MediaType.TEXT_PLAIN_TYPE).body(String.class);
@@ -104,7 +104,7 @@ class MissingTerminalTest {
 
     @Test
     void aTerminalEndsTheRouteOnce() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
         HttpRouteSpec route = builder.GET("/once");
         route.handle(MissingTerminalTest::ok);
@@ -120,7 +120,7 @@ class MissingTerminalTest {
 
     @Test
     void aTerminalWithoutAHandlerDropsTheRoute() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
 
         NullPointerException handler = assertThrows(NullPointerException.class, () -> builder.GET("/dropped", null));
@@ -137,7 +137,7 @@ class MissingTerminalTest {
 
     @Test
     void aLocatedRouteWithoutATerminalFailsWhenTheLocatedRoutesAreDeclared() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultLocatedHttpRouteBuilder<String> builder = new DefaultLocatedHttpRouteBuilder<>(assembly, Argument.of(String.class), PetRoutes.class);
         builder.GET("/items", MissingTerminalTest::ok);
         builder.POST("/items").body(String.class);

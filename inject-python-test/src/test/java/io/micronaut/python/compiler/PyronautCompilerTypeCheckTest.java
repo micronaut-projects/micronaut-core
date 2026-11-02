@@ -68,6 +68,47 @@ class PyronautCompilerTypeCheckTest {
     }
 
     @Test
+    void theSwitchImportedFromPyronautBuildPlainOrAliasedChecksTheFunction() {
+        List<PythonDiagnostic> diagnostics = new ArrayList<>();
+        PyronautCompiler compiler = PyronautCompiler.builder()
+            .pythonCode("""
+                from jakarta.inject import Singleton
+                from java.util import ArrayList
+                from pyronaut.build import TypeChecked
+                from pyronaut.build import TypeChecked as Checked
+
+                @Singleton
+                class Service:
+                    @TypeChecked
+                    def plain(self) -> int:
+                        values = ArrayList()
+                        values.plainMissing()
+                        return values.size()
+
+                    @Checked
+                    def aliased(self) -> int:
+                        values = ArrayList()
+                        values.aliasedMissing()
+                        return values.size()
+
+                    def unchecked(self) -> int:
+                        values = ArrayList()
+                        values.uncheckedMissing()
+                        return values.size()
+                """)
+            .typeCheck(TypeCheckMode.OFF)
+            .pythonDiagnosticCallback(diagnostics::add)
+            .build();
+        // a switch under mode off checks at error severity
+        assertThrows(RuntimeException.class, compiler::buildClassLoader);
+
+        String messages = diagnostics.stream().map(PythonDiagnostic::message).toList().toString();
+        assertEquals(2, diagnostics.size(), messages);
+        assertTrue(messages.contains("[plainMissing]"), messages);
+        assertTrue(messages.contains("[aliasedMissing]"), messages);
+    }
+
+    @Test
     void anUnknownModeIsRejectedWithAClearMessage() {
         PyronautCompiler compiler = PyronautCompiler.builder()
             .pythonCode("answer = 42")
