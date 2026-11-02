@@ -78,6 +78,11 @@ class EventStreamDecoderSpec extends Specification {
         decode("event: empty\nid: 1\n\ndata: a\n\n").size() == 1
     }
 
+    void "empty data and a trailing empty data line are read back"() {
+        expect:
+        data(decode("data:\n\ndata: a\ndata:\n\ndata:\ndata:\n\n")) == ["", "a\n", "\n"]
+    }
+
     void "a data field without a value dispatches an event with empty data"() {
         when:
         List<Event<byte[]>> events = decode("event: empty\n\ndata\n\n")
