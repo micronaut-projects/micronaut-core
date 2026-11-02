@@ -227,12 +227,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         this.beanType.getEnclosedElements(baseQuery.modifiers(PUBLIC_FILTER))
             .forEach(fieldElement -> {
                 accessibleFields.add(fieldElement);
-                new InternalBeanElementField(fieldElement, false).inject();
+                new InternalBeanElementField(fieldElement).inject();
             });
         this.beanType.getEnclosedElements(baseQuery.modifiers(NON_PUBLIC_FILTER))
             .forEach(fieldElement -> {
                 if (!accessibleFields.contains(fieldElement)) {
-                    new InternalBeanElementField(fieldElement, true).inject();
+                    new InternalBeanElementField(fieldElement).inject();
                 }
             });
     }
@@ -373,10 +373,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     @Override
     public BeanElementBuilder typeArgumentsForType(ClassElement type, ClassElement... types) {
-        if (type != null) {
-            final Map<String, ClassElement> typeArguments = type.getTypeArguments();
-            Map<String, ClassElement> resolvedTypes = resolveTypeArguments(typeArguments, types);
-        }
+        // Not recorded: the type arguments of the bean's super types are derived from the bean type
         return this;
     }
 
@@ -425,7 +422,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         if (fields != null && beanFields != null) {
             this.beanType.getEnclosedElements(fields.onlyInstance().onlyAccessible(originatingType))
                 .forEach((fieldElement) ->
-                    beanFields.accept(new InternalBeanElementField(fieldElement, false))
+                    beanFields.accept(new InternalBeanElementField(fieldElement))
                 );
         }
         return this;
@@ -1195,7 +1192,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         private final FieldElement fieldElement;
         private ClassElement genericType;
 
-        private InternalBeanElementField(FieldElement element, boolean requiresReflection) {
+        private InternalBeanElementField(FieldElement element) {
             super(element, MutableAnnotationMetadata.of(element.getAnnotationMetadata()));
             this.fieldElement = element;
         }

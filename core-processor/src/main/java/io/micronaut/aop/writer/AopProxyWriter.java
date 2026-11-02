@@ -315,7 +315,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                           VisitorContext visitorContext,
                           AnnotationValue<?>... interceptorBinding) {
         super(
-            createProxyConstructor(targetType, createProxyType(parent), settings, visitorContext),
+            createProxyConstructor(targetType, createProxyType(parent), settings),
 //            null,
             createProxyType(parent),
             targetType,
@@ -344,7 +344,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                           VisitorContext visitorContext,
                           AnnotationValue<?>... interceptorBinding) {
         super(
-            createProxyConstructor(targetType, createProxyType(targetType), visitorContext),
+            createProxyConstructor(targetType, createProxyType(targetType)),
 //            null,
             createProxyType(targetType),
             targetType,
@@ -376,11 +376,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         return ClassElement.of(proxyName, false, annotationMetadata, Map.of(), target, List.of());
     }
 
-    private static MethodElement createProxyConstructor(ClassElement target, ClassElement proxyClass, VisitorContext visitorContext) {
-        return createProxyConstructor(target, proxyClass, OptionalValues.empty(), visitorContext);
+    private static MethodElement createProxyConstructor(ClassElement target, ClassElement proxyClass) {
+        return createProxyConstructor(target, proxyClass, OptionalValues.empty());
     }
 
-    private static MethodElement createProxyConstructor(ClassElement target, ClassElement proxyClass, OptionalValues<Boolean> settings, VisitorContext visitorContext) {
+    private static MethodElement createProxyConstructor(ClassElement target, ClassElement proxyClass, OptionalValues<Boolean> settings) {
         MethodElement constructor = selectProxyConstructor(target, settings);
 
         final ClassElement interceptorList = ClassElement.of(List.class, AnnotationMetadata.EMPTY_METADATA, Collections.singletonMap(
