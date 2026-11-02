@@ -376,7 +376,7 @@ class _MicronautInterceptedCall:
 
     def __init__(self, function, override, parameters):
         self._function = function
-        self._override = override
+        self._override = _micronaut_exception_restoring_call(override)
         self._parameters = parameters
 
     def __call__(self, *args, **kwargs):
@@ -469,15 +469,32 @@ def _micronaut_positional_layout(function):
     return parameters
 
 
+def _micronaut_exception_restoring_call(override):
+    def call(*args, **kwargs):
+        failure = None
+        try:
+            return override(*args, **kwargs)
+        except BaseException as error:
+            failure = error
+        # Raise outside the handler so the Java wrapper does not become __context__.
+        import java
+        if java.is_object(failure):
+            original = java.type("io.micronaut.context.python.PythonExceptions").original(failure)
+            if original is not None:
+                raise original
+        raise failure
+    return call
+
+
 def _micronaut_intercepted_call(function, override):
     """The override of an intercepted method, callable with the keyword and defaulted arguments of the Python function.
 
-    The override itself when the function has no positional layout. The function is the one the class
-    declared: an introduction replaces its abstract methods with stubs, which have no layout.
+    With no positional layout, arguments reach the override as given. The function is the one the
+    class declared: an introduction replaces its abstract methods with stubs, which have no layout.
     """
     parameters = _micronaut_positional_layout(function)
     if parameters is None:
-        return override
+        return _micronaut_exception_restoring_call(override)
     return _MicronautInterceptedCall(function, override, parameters)
 
 
