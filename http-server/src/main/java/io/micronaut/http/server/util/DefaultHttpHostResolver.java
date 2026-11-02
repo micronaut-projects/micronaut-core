@@ -172,7 +172,8 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         }
 
         Integer port;
-        int separatorIndex = host == null ? -1 : host.indexOf(':');
+        // the port of an IPv6 literal, e.g. [::1]:8080, follows its closing bracket
+        int separatorIndex = host == null ? -1 : host.indexOf(':', host.startsWith("[") ? host.indexOf(']') + 1 : 0);
         if (isPortInHost && separatorIndex != -1) {
             try {
                 port = Integer.valueOf(host.substring(separatorIndex + 1).trim());

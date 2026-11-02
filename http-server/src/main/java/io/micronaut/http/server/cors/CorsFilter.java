@@ -54,6 +54,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetAddress;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -264,7 +265,8 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     }
 
     /*
-     * We only need to check host for starting with "localhost" "127." (as there are multiple loopback addresses on linux)
+     * We only need to check host for starting with "localhost" "127." (as there are multiple loopback addresses on linux),
+     * or for an IPv6 loopback literal.
      *
      * This is fine for host, as the request had to get here.
      *
@@ -278,6 +280,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (initialChar != 'h' && initialChar != 'w') {
             return false;
         }
+        int authority = hostString.indexOf("://");
         return hostString.startsWith("http://localhost")
             || hostString.startsWith("https://localhost")
             || hostString.startsWith("http://127.")
@@ -285,7 +288,8 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             || hostString.startsWith("ws://localhost")
             || hostString.startsWith("wss://localhost")
             || hostString.startsWith("ws://127.")
-            || hostString.startsWith("wss://127.");
+            || hostString.startsWith("wss://127.")
+            || authority > 0 && isIpv6Loopback(hostString.substring(authority + 3));
     }
 
     /*
@@ -295,7 +299,26 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         try {
             URI uri = URI.create(hostString);
             String host = uri.getHost();
-            return SocketUtils.LOCALHOST.equals(host) || "127.0.0.1".equals(host);
+            return SocketUtils.LOCALHOST.equals(host) || "127.0.0.1".equals(host) || isIpv6Loopback(host);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    /*
+     * A bracketed IPv6 literal of the loopback address, [::1] or the IPv4-mapped form a browser writes as [::ffff:7f00:1],
+     * reaches a server listening on the wildcard address just like 127.0.0.1. The literal is parsed, never resolved.
+     */
+    private static boolean isIpv6Loopback(@Nullable String host) {
+        if (host == null || !host.startsWith("[")) {
+            return false;
+        }
+        int end = host.indexOf(']');
+        if (end < 0) {
+            return false;
+        }
+        try {
+            return InetAddress.ofLiteral(host.substring(1, end)).isLoopbackAddress();
         } catch (IllegalArgumentException e) {
             return false;
         }
