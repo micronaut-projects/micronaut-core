@@ -56,12 +56,19 @@ import java.util.stream.Stream;
 @Internal
 final class PollingWatchService implements WatchService {
 
+    /**
+     * Wakes the poller to wait for the interval as it is now, comparing nothing.
+     */
+    private static final Path WAKE = Path.of("micronaut-dev-wake");
+
     private final Map<Path, Key> keys = new ConcurrentHashMap<>();
     // the signalled keys, and once closed the marker that wakes every retrieval blocked on the queue
     private final LinkedBlockingQueue<Object> signalled = new LinkedBlockingQueue<>();
     private final Object closedMarker = new Object();
+    // the paths a native service reported changes under, compared before the interval elapses
+    private final LinkedBlockingQueue<Path> requested = new LinkedBlockingQueue<>();
     private final Thread poller;
-    private final long intervalMillis;
+    private volatile long intervalMillis;
     private volatile boolean closed;
 
     /**
@@ -96,6 +103,48 @@ final class PollingWatchService implements WatchService {
         } catch (UncheckedIOException e) {
             throw e.getCause();
         }
+    }
+
+    /**
+     * Compares the registered directories at or under a path soon, rather than once the interval elapsed: a native
+     * service that tells where something changed calls it.
+     *
+     * @param path The path, absolute and normalized as the directories are registered
+     */
+    void compareUnder(Path path) {
+        if (!closed) {
+            requested.add(path);
+        }
+    }
+
+    /**
+     * Compares a registered directory at once, on the calling thread: a native service that starts reporting changes
+     * after the directory was read calls it, so that a change made in between is signalled before registering returns.
+     *
+     * @param key The key of the directory
+     */
+    void compareNow(WatchKey key) {
+        if (!closed && key instanceof Key registered) {
+            registered.compare();
+        }
+    }
+
+    /**
+     * Compares the directories at another interval from the next comparison on.
+     *
+     * @param interval How long to wait between two comparisons
+     */
+    void pollEvery(Duration interval) {
+        intervalMillis = Math.max(1, interval.toMillis());
+        requested.add(WAKE);
+    }
+
+    /**
+     * @param interval An interval
+     * @return Whether the directories are compared at that interval
+     */
+    boolean isPollingEvery(Duration interval) {
+        return intervalMillis == Math.max(1, interval.toMillis());
     }
 
     @Override
@@ -147,15 +196,39 @@ final class PollingWatchService implements WatchService {
     }
 
     private void pollLoop() {
+        long compared = System.nanoTime();
         while (!closed) {
-            try {
-                Thread.sleep(intervalMillis);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
+            // the interval may have changed since the last comparison
+            long due = compared + TimeUnit.MILLISECONDS.toNanos(intervalMillis);
+            Path first = null;
+            long wait = due - System.nanoTime();
+            if (wait > 0) {
+                try {
+                    first = requested.poll(wait, TimeUnit.NANOSECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
             }
+            if (first == null) {
+                // the interval elapsed, whatever the requests that kept coming before
+                for (Key key : keys.values()) {
+                    key.compare();
+                }
+                compared = System.nanoTime();
+                continue;
+            }
+            List<Path> paths = new ArrayList<>();
+            paths.add(first);
+            requested.drainTo(paths);
+            paths.removeIf(path -> path == WAKE);
             for (Key key : keys.values()) {
-                key.compare();
+                for (Path path : paths) {
+                    if (key.directory.startsWith(path)) {
+                        key.compare();
+                        break;
+                    }
+                }
             }
         }
     }
