@@ -23,7 +23,7 @@ class OpenSessionsSpec extends Specification {
         def server = ctx.getBean(EmbeddedServer).start()
         def group = ((WebSocketSessionRepository) server).channelGroup
         def client = ctx.createBean(WebSocketClient, server.URI)
-        def conditions = new PollingConditions(timeout: 10)
+        PollingConditions conditions = new PollingConditions(timeout: 10)
 
         when:
         def first = Mono.from(client.connect(ClientSocket, '/open-sessions')).block()
