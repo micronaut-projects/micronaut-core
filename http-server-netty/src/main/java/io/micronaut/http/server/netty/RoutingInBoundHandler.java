@@ -20,6 +20,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.PropagatedContextElement;
+import io.micronaut.core.propagation.ThreadPropagatedContextElement;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpMethod;
@@ -56,6 +58,7 @@ import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -126,17 +129,61 @@ public final class RoutingInBoundHandler implements RequestHandler {
             request.release();
         } finally {
             if (!terminateEventPublisher.isEmpty()) {
-                // the response may be written while another request of the same connection
-                // is current (pipelining), so do not inherit the current context
-                try (PropagatedContext.Scope ignore = PropagatedContext.empty().plus(new ServerHttpRequestContext(request)).propagate()) {
-                    terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));
-                } catch (Exception e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error publishing request terminated event: {}", e.getMessage(), e);
+                // the response may be written while another request of the same connection is
+                // current (pipelining), so do not inherit the current context: publish in the
+                // context the route of this request ran in, which restores its own
+                // thread-bound state (e.g. MDC). That does not undo a thread-bound element of the
+                // current context the request lacks, in that case publish from a fresh event
+                // loop task instead of inline
+                PropagatedContext requestContext = request.responseContext == null ? PropagatedContext.empty() : request.responseContext;
+                Runnable publish = () -> publishTerminatedEvent(request, requestContext);
+                if (hasForeignThreadElements(PropagatedContext.getOrEmpty(), requestContext)) {
+                    try {
+                        request.getChannelHandlerContext().executor().execute(publish);
+                    } catch (RejectedExecutionException e) {
+                        // shutting down, do not lose the event
+                        publish.run();
                     }
+                } else {
+                    publish.run();
                 }
             }
         }
+    }
+
+    private void publishTerminatedEvent(NettyHttpRequest<?> request, PropagatedContext requestContext) {
+        try (PropagatedContext.Scope ignore = requestContext.plus(new ServerHttpRequestContext(request)).propagate()) {
+            terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));
+        } catch (Exception e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error publishing request terminated event: {}", e.getMessage(), e);
+            }
+        }
+    }
+
+    /**
+     * @return Whether the current context has a thread-bound element of a type the context of the
+     * request does not replace
+     */
+    private static boolean hasForeignThreadElements(PropagatedContext current, PropagatedContext requestContext) {
+        if (current == requestContext) {
+            return false;
+        }
+        for (PropagatedContextElement element : current.getAllElements()) {
+            if (element instanceof ThreadPropagatedContextElement<?> && !hasElementOfType(requestContext, element.getClass())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasElementOfType(PropagatedContext context, Class<?> type) {
+        for (PropagatedContextElement element : context.getAllElements()) {
+            if (element.getClass() == type) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -211,6 +258,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
                               NettyHttpRequest<?> nettyHttpRequest,
                               HttpResponse<?> response,
                               Throwable throwable) {
+        if (nettyHttpRequest.responseContext == null) {
+            // no route ran, e.g. an error before routing
+            nettyHttpRequest.responseContext = PropagatedContext.getOrEmpty();
+        }
         if (throwable != null) {
             response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, throwable);
         }

@@ -3,7 +3,12 @@ package io.micronaut.http.client.netty
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.stream.BodySizeLimits
+import io.micronaut.core.type.Argument
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.StreamingHttpClient
+import io.micronaut.http.client.exceptions.ContentLengthExceededException
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.embedded.EmbeddedChannel
@@ -18,6 +23,7 @@ import spock.lang.Specification
 import spock.lang.Timeout
 
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
@@ -111,6 +117,57 @@ class ClientResponseLimitsSpec extends Specification {
 
         then:
         thrown(Exception)
+
+        when:
+        long t = closedAfter.get(40, TimeUnit.SECONDS)
+
+        then:
+        t != -1
+        t < 15_000
+
+        cleanup:
+        client.close()
+        ctx.close()
+        serverSocket.close()
+    }
+
+    def "a streaming error body buffered for the error type is bounded by max-content-length"() {
+        given:
+        def closedAfter = new CompletableFuture<Long>()
+        byte[] chunk = ("400\r\n" + ("z" * 1024) + "\r\n").getBytes(StandardCharsets.US_ASCII)
+        def serverSocket = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        Thread.start {
+            try (Socket s = serverSocket.accept()) {
+                readHead(s.inputStream)
+                s.outputStream.write("HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n".getBytes(StandardCharsets.US_ASCII))
+                long start = System.currentTimeMillis()
+                try {
+                    while (System.currentTimeMillis() - start < 25_000) {
+                        s.outputStream.write(chunk)
+                        s.outputStream.flush()
+                        Thread.sleep(5)
+                    }
+                    closedAfter.complete(-1L)
+                } catch (IOException ignored) {
+                    closedAfter.complete(System.currentTimeMillis() - start)
+                }
+            } catch (Exception e) {
+                closedAfter.completeExceptionally(e)
+            }
+        }
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.max-content-length': '10000',
+                'micronaut.http.client.read-timeout'      : '60s',
+        ])
+        def client = ctx.createBean(StreamingHttpClient, URI.create("http://127.0.0.1:" + serverSocket.localPort))
+
+        when:
+        Flux.from(client.dataStream(HttpRequest.GET("/err"), Argument.of(String))).blockLast(Duration.ofSeconds(40))
+
+        then: 'the upstream status is kept, the limit is the cause'
+        def responseException = thrown(HttpClientResponseException)
+        responseException.status.code == 500
+        responseException.cause instanceof ContentLengthExceededException
 
         when:
         long t = closedAfter.get(40, TimeUnit.SECONDS)

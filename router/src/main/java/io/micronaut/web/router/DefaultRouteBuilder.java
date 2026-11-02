@@ -21,6 +21,7 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
@@ -454,6 +455,22 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     /**
+     * Marks a {@code HEAD} route that runs the handler of a {@code GET} route of the same path, so
+     * the filters scoped to {@code GET} apply to it as well.
+     *
+     * @param route The HEAD route created by this builder
+     * @return The route
+     * @since 4.10.35
+     */
+    @Internal
+    protected final UriRoute markImplicitHead(UriRoute route) {
+        if (route instanceof DefaultUriRoute defaultUriRoute) {
+            defaultUriRoute.implicitHead = true;
+        }
+        return route;
+    }
+
+    /**
      * Abstract class for base {@link MethodBasedRouteInfo}.
      */
     abstract static class AbstractRoute implements Route {
@@ -775,6 +792,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
         private Integer port;
+        private boolean implicitHead;
         private final RouteExecutorSelector executorSelector = new RouteExecutorSelector();
 
         /**
@@ -869,7 +887,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public UriRouteInfo<Object, Object> toRouteInfo() {
-            return new DefaultUrlRouteInfo<>(
+            DefaultUrlRouteInfo<Object, Object> routeInfo = new DefaultUrlRouteInfo<>(
                 httpMethod,
                 uriMatchTemplate,
                 defaultCharset,
@@ -884,6 +902,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 executorSelector,
                 messageBodyHandlerRegistry
             );
+            if (implicitHead) {
+                routeInfo.markImplicitHead();
+            }
+            return routeInfo;
         }
 
         @Override
@@ -913,7 +935,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public UriRoute exposedPort(int port) {
             this.port = port;
-            where(httpRequest -> httpRequest.getServerAddress().getPort() == port);
+            // the port of the listener, which a UNIX domain socket does not have, and which the
+            // local address of an HTTP/3 stream does not tell
+            where(httpRequest -> RouteAttributes.getListenerPort(httpRequest)
+                .map(listenerPort -> listenerPort == port)
+                .orElseGet(() -> httpRequest.getServerAddress().getPort() == port));
             DefaultRouteBuilder.this.exposedPorts.add(port);
             return this;
         }

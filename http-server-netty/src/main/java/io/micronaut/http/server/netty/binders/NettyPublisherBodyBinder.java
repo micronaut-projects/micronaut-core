@@ -34,6 +34,7 @@ import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.netty.body.JsonStreamElementLimit;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -123,7 +124,8 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
         if (valueType.getAnnotationMetadata().isEmpty()) {
             return valueType.withAnnotationMetadata(context.getAnnotationMetadata());
         }
-        return valueType;
+        // the type argument can carry type-use annotations (e.g. Mono<@Valid T>), keep both
+        return valueType.withAnnotationMetadata(new AnnotationMetadataHierarchy(context.getAnnotationMetadata(), valueType.getAnnotationMetadata()));
     }
 
     static RuntimeException extractError(Object message, ArgumentConversionContext<?> conversionContext) {

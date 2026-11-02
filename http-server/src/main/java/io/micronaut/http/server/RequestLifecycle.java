@@ -184,6 +184,7 @@ public class RequestLifecycle {
                 return ExecutionFlow.error(e);
             });
         }
+        routeContext(propagatedContext);
         ExecutionFlow<HttpResponse<?>> responseFlow = callRoute(routeMatchFlow, request, propagatedContext);
         responseFlow = handleStatusException(responseFlow, request, routeMatch, propagatedContext);
         return onErrorNoFilter(responseFlow, request, propagatedContext);
@@ -661,6 +662,16 @@ public class RequestLifecycle {
     @Nullable
     protected FileCustomizableResponseType findFile(HttpRequest<?> request) {
         return findFile();
+    }
+
+    /**
+     * Called with the propagated context the route runs in, including the state the filters
+     * added to it (e.g. MDC).
+     *
+     * @param propagatedContext The context
+     * @since 4.10.35
+     */
+    protected void routeContext(PropagatedContext propagatedContext) {
     }
 
     /**

@@ -315,9 +315,18 @@ abstract class MultiplexedServerHandler {
                 // the body is streaming and will not receive any more data: fail it, so that its
                 // consumer stops waiting and releases what it holds
                 onRstStreamRead(new ClosedChannelException());
-            } else if (!finished) {
-                // the response will never be written: let its body release what it holds
-                disposeWriteSide();
+            }
+            if (!finished) {
+                if (writerUpstream != null) {
+                    // a streaming response is in progress, and it cannot be completed any more.
+                    // The body may never signal again (e.g. an idle event stream), so finish
+                    // here: that discards the body and cleans up the request.
+                    finish();
+                } else {
+                    // the response will never be written: let its body release what it holds.
+                    // A response that is written later finishes on the closed stream.
+                    disposeWriteSide();
+                }
             }
             if (bufferedContent != null) {
                 for (ByteBuf buf : bufferedContent) {
@@ -390,6 +399,11 @@ abstract class MultiplexedServerHandler {
                     }
 
                     private void add0(ReadBuffer buf) {
+                        if (finished) {
+                            // the stream was closed while the response was streaming
+                            buf.close();
+                            return;
+                        }
                         int n = buf.readable();
                         writeData(NettyReadBufferFactory.toByteBuf(buf), false, ctx.newPromise()
                             .addListener((ChannelFutureListener) future -> {

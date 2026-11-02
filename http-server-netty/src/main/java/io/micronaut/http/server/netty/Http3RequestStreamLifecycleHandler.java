@@ -16,9 +16,13 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpStatusClass;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.quic.QuicStreamChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,8 +31,9 @@ import org.slf4j.LoggerFactory;
  * Ends the QUIC stream of an HTTP/3 request when the request cannot be processed further. A
  * failure on the stream (e.g. a malformed request head, or a failed write) resets the stream,
  * which tears down the pipeline and so cancels the
- * response. Closing the stream before the request was read completely stops the peer from
- * sending the rest of it, so that the stream releases its slot and flow control credit.
+ * response. Closing the stream, or completing the response of a request whose body is
+ * discarded, before the request was read completely stops the peer from sending the rest of it,
+ * so that the stream releases its slot and flow control credit.
  */
 @Internal
 final class Http3RequestStreamLifecycleHandler extends ChannelDuplexHandler {
@@ -44,6 +49,15 @@ final class Http3RequestStreamLifecycleHandler extends ChannelDuplexHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(Http3RequestStreamLifecycleHandler.class);
 
+    /**
+     * Whether the final response was written. Event loop only.
+     */
+    private boolean responseComplete;
+    /**
+     * Whether the rest of the request body is dropped. Event loop only.
+     */
+    private boolean inputDiscarded;
+
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         if (LOG.isDebugEnabled()) {
@@ -58,11 +72,48 @@ final class Http3RequestStreamLifecycleHandler extends ChannelDuplexHandler {
     }
 
     @Override
-    public void close(ChannelHandlerContext ctx, ChannelPromise promise) {
-        QuicStreamChannel stream = (QuicStreamChannel) ctx.channel();
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt == PipeliningServerHandler.QUIC_INPUT_DISCARDED_EVENT) {
+            inputDiscarded = true;
+            if (responseComplete) {
+                stopInput((QuicStreamChannel) ctx.channel());
+            }
+            return;
+        }
+        super.userEventTriggered(ctx, evt);
+    }
+
+    @Override
+    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+        if (msg instanceof LastHttpContent && !isInformational(msg)) {
+            // the response is complete. Once the request handler discards the rest of the
+            // request body, if any, ask the peer to stop sending it. The app may still read it,
+            // e.g. after answering 202, as HTTP/2 does.
+            promise = promise.unvoid().addListener(future -> {
+                if (future.isSuccess()) {
+                    responseComplete = true;
+                    if (inputDiscarded) {
+                        stopInput((QuicStreamChannel) ctx.channel());
+                    }
+                }
+            });
+        }
+        ctx.write(msg, promise);
+    }
+
+    private static boolean isInformational(Object msg) {
+        return msg instanceof HttpResponse response && response.status().codeClass() == HttpStatusClass.INFORMATIONAL;
+    }
+
+    private static void stopInput(QuicStreamChannel stream) {
         if (stream.isActive() && !stream.isInputShutdown()) {
             stream.shutdownInput(H3_NO_ERROR);
         }
+    }
+
+    @Override
+    public void close(ChannelHandlerContext ctx, ChannelPromise promise) {
+        stopInput((QuicStreamChannel) ctx.channel());
         ctx.close(promise);
     }
 

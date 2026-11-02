@@ -46,7 +46,8 @@ class WebSocketCompressedPayloadLimitTest {
     void inflatedFrameIsCappedByMaxPayloadLength() throws Exception {
         try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", SPEC_NAME, "micronaut.server.port", -1))) {
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
-            try (EventLoopGroup group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory())) {
+            EventLoopGroup group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+            try {
                 CompletableFuture<Void> handshake = new CompletableFuture<>();
                 URI uri = URI.create("ws://127.0.0.1:" + server.getPort() + "/compressed-limit");
                 Channel ch = new Bootstrap().group(group).channel(NioSocketChannel.class)
@@ -79,6 +80,8 @@ class WebSocketCompressedPayloadLimitTest {
                 ch.close().sync();
                 assertTrue(MAX_DELIVERED.get() <= 65536,
                     "server delivered an inflated frame of " + MAX_DELIVERED.get() + " bytes, maxPayloadLength is 65536");
+            } finally {
+                group.shutdownGracefully();
             }
         }
     }

@@ -150,7 +150,7 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder
                 if (methodName.equals("get")) {
                     String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
                     routes.add(GET(functionPath, beanDefinition, method));
-                    routes.add(HEAD(functionPath, beanDefinition, method));
+                    routes.add(markImplicitHead(HEAD(functionPath, beanDefinition, method)));
                 }
             }
 
@@ -162,7 +162,7 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder
                     String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
                     if (argCount == 0) {
                         routes.add(GET(functionPath, beanDefinition, method));
-                        routes.add(HEAD(functionPath, beanDefinition, method));
+                        routes.add(markImplicitHead(HEAD(functionPath, beanDefinition, method)));
                     } else {
                         UriRoute route = POST(functionPath, beanDefinition, method);
                         routes.add(route);

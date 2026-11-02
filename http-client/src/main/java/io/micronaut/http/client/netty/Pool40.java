@@ -485,7 +485,7 @@ final class Pool40 implements Pool {
 
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
-                sink.completeExceptionally(t);
+                WaiterCompletion.complete(group.next(), blockHint, () -> sink.completeExceptionally(t));
                 return true;
             } else {
                 return false;
@@ -498,7 +498,7 @@ final class Pool40 implements Pool {
                 if (sink.isCancelled()) {
                     return false;
                 }
-                sink.complete(value);
+                WaiterCompletion.complete(value.channel().eventLoop(), blockHint, () -> sink.complete(value));
                 return true;
             } else {
                 return false;

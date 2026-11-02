@@ -191,4 +191,22 @@ class JsonCounterSpec extends Specification {
                 '[{}] true',
         ]
     }
+
+    def 'a 0x00 that starts a later top-level node'(byte[] input) {
+        when:
+        splitUtf8(input, false, false)
+        then:
+        thrown JsonSyntaxException
+        when:
+        splitUtf8(input, false, true)
+        then:
+        thrown JsonSyntaxException
+
+        where:
+        input << [
+                // the second node [00 35] reads as UTF-16BE "5"
+                new byte[]{0x7b, 0x7d, 0x20, 0x20, 0x20, 0x00, 0x35, 0x20},
+                new byte[]{0x31, 0x32, 0x33, 0x20, 0x20, 0x00, 0x35, 0x20},
+        ]
+    }
 }

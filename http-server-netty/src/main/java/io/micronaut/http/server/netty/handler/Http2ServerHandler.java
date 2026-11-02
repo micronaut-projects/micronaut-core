@@ -25,7 +25,6 @@ import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListe
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOutboundBuffer;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
@@ -67,7 +66,7 @@ import java.util.concurrent.TimeUnit;
 public final class Http2ServerHandler extends MultiplexedServerHandler implements Http2FrameListener {
     private static final Map<Http2Error, Exception> HTTP2_ERRORS = new EnumMap<>(Http2Error.class);
 
-    private Http2ConnectionHandler connectionHandler;
+    private ConnectionHandler connectionHandler;
     private Http2Connection.PropertyKey streamKey;
     private boolean reading = false;
     private boolean upgradedFromHttp1 = false;
@@ -93,7 +92,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         super(requestHandler);
     }
 
-    private void init(Http2ConnectionHandler connectionHandler) {
+    private void init(ConnectionHandler connectionHandler) {
         this.connectionHandler = connectionHandler;
         Http2Connection.PropertyKey key = connectionHandler.connection().newKey();
         streamKey = key;
@@ -238,8 +237,12 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
     @Override
     public void onWindowUpdateRead(ChannelHandlerContext ctx, int streamId, int windowSizeIncrement) {
-        // handled by netty
-        lastStreamActivity = System.nanoTime();
+        // handled by netty. This is not activity by itself: a peer could send a connection
+        // WINDOW_UPDATE every idle period while all stream windows stay at zero. Response data
+        // that the update lets through is seen by the idle check as a smaller send window.
+        if (streamId == Http2CodecUtil.CONNECTION_STREAM_ID && connectionHandler != null) {
+            connectionHandler.outputProgress.onConnectionWindowUpdate(windowSizeIncrement);
+        }
     }
 
     @Override
@@ -255,9 +258,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Nullable
         private final Http2AccessLogManager accessLogManager;
         private long idleTimeoutNanos = -1;
-        private int lastMessageHashCode;
-        private long lastPendingWriteBytes;
-        private long lastProgress;
+        private final Http2OutputProgress outputProgress = new Http2OutputProgress();
 
         private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, Http2ServerHandler handler, Http2AccessLogManager accessLogManager) {
             super(decoder, encoder, initialSettings, decoupleCloseAndGoAway, flushPreface);
@@ -294,7 +295,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             super.channelReadComplete(ctx);
             if (idleTimeoutNanos > 0) {
                 long now = System.nanoTime();
-                if (outputChanged(ctx)) {
+                if (outputProgress.progressed(ctx.channel(), this)) {
                     // a response is still being drained to the peer
                     handler.lastStreamActivity = now;
                 } else if (now - handler.lastStreamActivity >= idleTimeoutNanos) {
@@ -303,27 +304,6 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                     ctx.close();
                 }
             }
-        }
-
-        /**
-         * Whether the channel's outbound buffer made progress since the last call, like
-         * {@link IdleStateHandler} does with {@code observeOutput}.
-         */
-        private boolean outputChanged(ChannelHandlerContext ctx) {
-            ChannelOutboundBuffer buf = ctx.channel().unsafe().outboundBuffer();
-            if (buf == null) {
-                return false;
-            }
-            int messageHashCode = System.identityHashCode(buf.current());
-            long pendingWriteBytes = buf.totalPendingWriteBytes();
-            long progress = buf.currentProgress();
-            boolean changed = messageHashCode != lastMessageHashCode
-                || pendingWriteBytes != lastPendingWriteBytes
-                || progress != lastProgress;
-            lastMessageHashCode = messageHashCode;
-            lastPendingWriteBytes = pendingWriteBytes;
-            lastProgress = progress;
-            return changed;
         }
 
         @Override

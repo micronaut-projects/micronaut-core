@@ -11,6 +11,14 @@ import org . apache . tools . ant . taskdefs . condition . Os
             }
         }
 
+// InetAddressResolverProvider, which records the name lookups of CorsLocalhostNoLookupSpec, is a Java 18 API
+if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_18)) {
+    sourceSets.test {
+        java.srcDir("src/test-jdk18/java")
+        resources.srcDir("src/test-jdk18/resources")
+    }
+}
+
 tasks {
     test {
         systemProperty("io.netty.leakDetection.level", "paranoid")

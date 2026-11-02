@@ -1450,8 +1450,10 @@ public class DefaultHttpClient implements
                         DelayedExecutionFlow<HttpResponse<?>> delayed = DelayedExecutionFlow.create();
                         final StreamedHttpResponse nettyResponse = streamedResponse.getNettyResponse();
                         nettyResponse.subscribe(new Subscriber<>() {
-                            final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer();
+                            final int maxContentLength = configuration.getMaxContentLength();
+                            final ErrorBodyBuffer buffer = new ErrorBodyBuffer(byteBufferFactory.getNativeAllocator(), maxContentLength);
                             Subscription s;
+                            boolean done;
                             @Override
                             public void onSubscribe(Subscription s) {
                                 this.s = s;
@@ -1460,35 +1462,61 @@ public class DefaultHttpClient implements
 
                             @Override
                             public void onNext(HttpContent httpContent) {
-                                buffer.addComponent(true, httpContent.content());
+                                if (done) {
+                                    httpContent.release();
+                                    return;
+                                }
+                                ByteBuf content = httpContent.content();
+                                long newSize = buffer.sizeWith(content);
+                                if (!buffer.add(content)) {
+                                    done = true;
+                                    s.cancel();
+                                    buffer.release();
+                                    // keep the upstream status, without the body that is too large
+                                    completeExceptionallySafe(delayed, responseException(Unpooled.EMPTY_BUFFER,
+                                        new ContentLengthExceededException(maxContentLength, newSize)));
+                                    return;
+                                }
                                 s.request(1);
                             }
 
                             @Override
                             public void onError(Throwable t) {
+                                if (done) {
+                                    return;
+                                }
+                                done = true;
                                 buffer.release();
                                 completeExceptionallySafe(delayed, t);
                             }
 
                             @Override
                             public void onComplete() {
+                                if (done) {
+                                    return;
+                                }
+                                done = true;
                                 try {
-                                    FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
-                                    final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, (Argument<Object>) errorType, true, conversionService);
-                                    completeExceptionallySafe(delayed, decorate(new HttpClientResponseException(
-                                        fullHttpResponse.status().reasonPhrase(),
-                                        null,
-                                        fullNettyClientHttpResponse,
-                                        new HttpClientErrorDecoder() {
-                                            @Override
-                                            public Argument<?> getErrorType(MediaType mediaType) {
-                                                return errorType;
-                                            }
-                                        }
-                                    )));
+                                    completeExceptionallySafe(delayed, responseException(buffer.content(), null));
                                 } finally {
                                     buffer.release();
                                 }
+                            }
+
+                            private Throwable responseException(ByteBuf body, @Nullable Throwable cause) {
+                                FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), body, nettyResponse.headers(), new DefaultHttpHeaders(true));
+                                final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, (Argument<Object>) errorType, true, conversionService);
+                                return decorate(new HttpClientResponseException(
+                                    fullHttpResponse.status().reasonPhrase(),
+                                    cause,
+                                    fullNettyClientHttpResponse,
+                                    new HttpClientErrorDecoder() {
+                                        @Override
+                                        public Argument<?> getErrorType(MediaType mediaType) {
+                                            return errorType;
+                                        }
+                                    }
+                                ));
                             }
                         });
                         return delayed;

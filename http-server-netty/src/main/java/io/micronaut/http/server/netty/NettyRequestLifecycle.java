@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpMethod;
@@ -131,10 +132,17 @@ final class NettyRequestLifecycle extends RequestLifecycle {
     }
 
     @Override
+    protected void routeContext(PropagatedContext propagatedContext) {
+        // for the request terminated event
+        nettyRequest.responseContext = propagatedContext;
+    }
+
+    @Override
     protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch, HttpRequest<?> request) {
-        // handle decoding failure
+        // handle decoding failure. A status or error route handles that failure, so it still runs,
+        // e.g. a global @Error(status = REQUEST_ENTITY_TOO_LARGE) route for an oversized request
         DecoderResult decoderResult = nettyRequest.getNativeRequest().decoderResult();
-        if (decoderResult.isFailure()) {
+        if (decoderResult.isFailure() && !routeMatch.getRouteInfo().isErrorRoute()) {
             return ExecutionFlow.error(decoderResult.cause());
         }
         return super.fulfillArguments(routeMatch, request).flatMap(this::waitForBody);

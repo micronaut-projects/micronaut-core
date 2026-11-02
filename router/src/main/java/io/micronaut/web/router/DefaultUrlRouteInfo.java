@@ -58,6 +58,11 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Nullable
     private ExecutorService executorService;
     private boolean noExecutor;
+    /**
+     * Whether this {@code HEAD} route runs the handler of a {@code GET} route of the same path,
+     * without a {@code @Get} annotation (e.g. a function route).
+     */
+    private boolean implicitHead;
 
     @SuppressWarnings("ParameterNumber")
     public DefaultUrlRouteInfo(HttpMethod httpMethod,
@@ -81,6 +86,20 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         this.port = port;
         this.conversionService = conversionService;
         this.executorSelector = executorSelector;
+    }
+
+    /**
+     * Marks this route as a {@code HEAD} route that runs the handler of a {@code GET} route.
+     */
+    void markImplicitHead() {
+        this.implicitHead = true;
+    }
+
+    /**
+     * @return Whether this {@code HEAD} route runs the handler of a {@code GET} route
+     */
+    boolean isImplicitHead() {
+        return implicitHead;
     }
 
     @Override

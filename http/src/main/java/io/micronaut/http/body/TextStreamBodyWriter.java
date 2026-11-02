@@ -26,6 +26,7 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.sse.Event;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -101,7 +102,8 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
         if (dataType.getAnnotationMetadata().isEmpty()) {
             return dataType.withAnnotationMetadata(eventType.getAnnotationMetadata());
         }
-        return dataType;
+        // the type argument can carry type-use annotations (e.g. Event<@Valid T>), keep both
+        return dataType.withAnnotationMetadata(new AnnotationMetadataHierarchy(eventType.getAnnotationMetadata(), dataType.getAnnotationMetadata()));
     }
 
     @Override

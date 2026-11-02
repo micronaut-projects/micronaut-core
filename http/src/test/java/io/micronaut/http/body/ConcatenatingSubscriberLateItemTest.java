@@ -42,7 +42,8 @@ class ConcatenatingSubscriberLateItemTest {
     @Test
     void pieceArrivingAfterAllowDiscardIsDiscarded() throws Exception {
         ByteBodyFactory bbf = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
-        try (ExecutorService io = Executors.newSingleThreadExecutor()) {
+        ExecutorService io = Executors.newSingleThreadExecutor();
+        try {
             AtomicBoolean closed = new AtomicBoolean();
             AtomicInteger reads = new AtomicInteger();
             FilterInputStream stream = new FilterInputStream(new ByteArrayInputStream(new byte[1024 * 1024])) {
@@ -82,6 +83,8 @@ class ConcatenatingSubscriberLateItemTest {
             io.submit(() -> { }).get(5, TimeUnit.SECONDS);
             assertTrue(closed.get(), "the late piece's source stream was left open after " + reads.get() + " reads");
             assertEquals(0, reads.get());
+        } finally {
+            io.shutdownNow();
         }
     }
 }

@@ -42,15 +42,21 @@ import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * This class handles encoding of the HTTP response in a server-agnostic way. Note that while this
@@ -61,6 +67,7 @@ import java.util.concurrent.Executor;
  */
 @Internal
 public abstract class ResponseLifecycle {
+    private static final Logger LOG = LoggerFactory.getLogger(ResponseLifecycle.class);
     private final RouteExecutor routeExecutor;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private final ConversionService conversionService;
@@ -83,6 +90,21 @@ public abstract class ResponseLifecycle {
      */
     @NonNull
     protected abstract Executor ioExecutor();
+
+    private void closeOnIoExecutor(InputStream stream) {
+        Runnable close = () -> {
+            try {
+                stream.close();
+            } catch (IOException e) {
+                LOG.debug("Failed to close the InputStream body of a HEAD response", e);
+            }
+        };
+        try {
+            ioExecutor().execute(close);
+        } catch (RejectedExecutionException e) {
+            close.run();
+        }
+    }
 
     /**
      * Transform the given writer into a {@link ResponseBodyWriter}.
@@ -130,6 +152,17 @@ public abstract class ResponseLifecycle {
         HttpResponse<?> httpResponse) {
         Object body = httpResponse.body();
         MutableHttpResponse<?> response = httpResponse.toMutableResponse();
+        if (nettyRequest.getMethod() == HttpMethod.HEAD) {
+            Object headBody = body != null ? body : RouteAttributes.getHeadBody(httpResponse).orElse(null);
+            // the body of a HEAD response is not written, but the stream must be closed. Closing
+            // it may block, and this can run on the event loop for an async route
+            if (headBody instanceof InputStream stream) {
+                closeOnIoExecutor(stream);
+            } else if (headBody instanceof StreamedFile streamedFile) {
+                // e.g. a static resource, which opens its stream when created
+                closeOnIoExecutor(streamedFile.getInputStream());
+            }
+        }
         if (nettyRequest.getMethod() != HttpMethod.HEAD && body != null) {
             Object routeInfoO = RouteAttributes.getRouteInfo(response).orElse(null);
             // usually this is a UriRouteInfo, avoid scalability issues here

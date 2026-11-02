@@ -1053,6 +1053,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         void setServerChannel(Channel serverChannel) {
             this.serverChannel = serverChannel;
+            // the requests read it from their connection's listener: the port alone does not tell
+            // the listener (QUIC, UNIX domain sockets, listeners on one port and different addresses)
+            serverChannel.attr(NettyHttpRequest.LISTENER_EXPOSES_DEFAULT_ROUTES).set(config.isExposeDefaultRoutes());
             this.listenerCustomizer = rootCustomizer.specializeForChannel(serverChannel, NettyServerCustomizer.ChannelRole.LISTENER);
             refresh();
         }
@@ -1065,10 +1068,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 LOG.warn("Closing connection on TLS listener {}: SSL context not available", serverChannel);
                 ch.close();
                 return;
-            }
-            if (config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.UNIX) {
-                // the default routes are restricted by port, which this listener does not have
-                ch.attr(NettyHttpRequest.LISTENER_EXPOSES_DEFAULT_ROUTES).set(config.isExposeDefaultRoutes());
             }
             HttpPipelineBuilder.ConnectionPipeline cp = httpPipelineBuilder.new ConnectionPipeline(ch, contextHolder);
             activeConnections.add(cp);

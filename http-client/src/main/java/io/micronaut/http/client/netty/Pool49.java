@@ -1121,7 +1121,7 @@ final class Pool49 implements Pool {
                 if (globalPending != null) {
                     globalPending.decrement();
                 }
-                sink.completeExceptionally(t);
+                WaiterCompletion.complete(likelyEventLoop(), blockHint, () -> sink.completeExceptionally(t));
                 return true;
             } else {
                 return false;
@@ -1137,7 +1137,7 @@ final class Pool49 implements Pool {
                 if (sink.isCancelled()) {
                     return false;
                 }
-                sink.complete(value);
+                WaiterCompletion.complete(value.channel().eventLoop(), blockHint, () -> sink.complete(value));
                 return true;
             } else {
                 return false;

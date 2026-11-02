@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.ArgumentBinder;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -46,6 +47,7 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -62,9 +64,8 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
-import io.micronaut.web.router.DefaultRouter;
-import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -80,7 +81,6 @@ import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
@@ -120,7 +120,7 @@ import java.util.function.Supplier;
 @Internal
 public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T> {
     /**
-     * Whether the connections of a listener that has no port expose the default routes.
+     * Whether a listener exposes the default routes, set on the channel of the listener.
      */
     static final AttributeKey<Boolean> LISTENER_EXPOSES_DEFAULT_ROUTES = AttributeKey.valueOf("micronaut.listener.exposes-default-routes");
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
@@ -176,6 +176,12 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @SuppressWarnings("VisibilityModifier")
     public ArgumentBinder.BindingResult<ConvertibleValues<?>> convertibleBody;
 
+    /**
+     * The propagated context the route ran in, or the response was written in, for the request
+     * terminated event.
+     */
+    @Nullable
+    PropagatedContext responseContext;
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
@@ -211,28 +217,29 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = body;
-        Boolean listenerExposes = listenerExposesDefaultRoutes(ctx.channel());
-        if (listenerExposes != null) {
-            setAttribute(DefaultRouter.LISTENER_EXPOSES_DEFAULT_ROUTES, listenerExposes);
+        Channel listener = listenerChannel(ctx.channel());
+        if (listener != null) {
+            RouteAttributes.setListenerExposesDefaultRoutes(this, listener.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get());
+            RouteAttributes.setListenerPort(this, listener.localAddress() instanceof InetSocketAddress address ? address.getPort() : -1);
         }
     }
 
     /**
-     * Whether the listener of a channel without a port exposes the default routes.
+     * The channel of the listener a connection or stream belongs to.
      *
-     * @param channel The connection, or the HTTP/2 stream
-     * @return The setting of the listener, or {@code null} if it has a port
+     * @param channel The connection or a stream of it, {@code null} for a detached context
+     * @return The channel of the listener, or {@code null} if the channel is not of a listener
      */
     @Nullable
-    private static Boolean listenerExposesDefaultRoutes(Channel channel) {
-        if (channel == null || channel.localAddress() instanceof InetSocketAddress) {
-            return null;
+    private static Channel listenerChannel(@Nullable Channel channel) {
+        // a stream's parent is its connection (HTTP/2, the QUIC connection of an HTTP/3 stream),
+        // whose parent is the channel of the listener
+        for (Channel c = channel; c != null; c = c.parent()) {
+            if (c.hasAttr(LISTENER_EXPOSES_DEFAULT_ROUTES)) {
+                return c;
+            }
         }
-        Boolean exposes = channel.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
-        if (exposes == null && channel.parent() != null) {
-            exposes = channel.parent().attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
-        }
-        return exposes;
+        return null;
     }
 
     @Override
@@ -786,7 +793,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public MutableHttpRequest<T> cookie(Cookie cookie) {
             if (cookie instanceof NettyCookie nettyCookie) {
-                String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+                // the shared encoder rejects a ';' that would add another cookie pair
+                String value = ClientCookieEncoder.INSTANCE.encode(nettyCookie);
                 headers.add(HttpHeaderNames.COOKIE, value);
             }
             return this;

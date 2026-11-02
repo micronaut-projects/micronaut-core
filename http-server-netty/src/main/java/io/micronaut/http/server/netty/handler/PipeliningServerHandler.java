@@ -96,6 +96,18 @@ import java.util.concurrent.CompletionStage;
  */
 @Internal
 public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter implements GracefulShutdownCapable {
+    /**
+     * The user event fired through the pipeline of a QUIC stream once the rest of the request
+     * body is dropped, so that the peer can be asked to stop sending it.
+     *
+     * @since 4.10.35
+     */
+    public static final Object QUIC_INPUT_DISCARDED_EVENT = new Object() {
+        @Override
+        public String toString() {
+            return "QUIC_INPUT_DISCARDED_EVENT";
+        }
+    };
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
     private static final String DECOMPRESSOR_HANDLER = "decompressor";
 
@@ -383,6 +395,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
         } else {
             writeSome();
+        }
+    }
+
+    /**
+     * The rest of the current request body is dropped.
+     */
+    private void inputDiscarded() {
+        if (quic && !removed) {
+            ctx.pipeline().fireUserEventTriggered(QUIC_INPUT_DISCARDED_EVENT);
         }
     }
 
@@ -826,6 +847,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 dih.dispose();
             }
             inboundHandler = droppingInboundHandler;
+            inputDiscarded();
             dest.error(cause);
         }
 
@@ -876,10 +898,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             sendContinue = false;
             if (inboundHandler == this) {
                 inboundHandler = droppingInboundHandler;
+                inputDiscarded();
                 refreshNeedMore();
             } else if (inboundHandler instanceof DecompressingInboundHandler dec && dec.delegate == this) {
                 dec.dispose();
                 inboundHandler = droppingInboundHandler;
+                inputDiscarded();
                 refreshNeedMore();
             }
             dest.discard();

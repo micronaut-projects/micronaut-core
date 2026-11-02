@@ -92,6 +92,15 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     public static final String ID = "websocket-handler";
 
+    /**
+     * The payload bytes held while the open handler runs may add up to this many messages.
+     */
+    private static final int MAX_MESSAGES_WHILE_OPENING = 4;
+    /**
+     * The number of frames held while the open handler runs, e.g. empty ones.
+     */
+    private static final int MAX_FRAMES_WHILE_OPENING = 128;
+
     private final NettyWebSocketSession serverSession;
     private final NettyEmbeddedServices nettyEmbeddedServices;
     @Nullable
@@ -110,6 +119,10 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      * Whether the open handler runs: the frames wait. Event loop only.
      */
     private boolean opening;
+    /**
+     * The payload bytes held in {@link #framesWhileOpening}. Event loop only.
+     */
+    private long bytesWhileOpening;
 
     /**
      * Default constructor.
@@ -426,13 +439,41 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         return opening;
     }
 
+    /**
+     * @return Whether the frames can be read: the open handler completed and did not close the session
+     */
+    boolean readsFrames() {
+        return !opening && serverSession.isOpen();
+    }
+
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
+        if (msg instanceof WebSocketFrame && !serverSession.isOpen()) {
+            // the session was closed (e.g. by the open handler), no frame reaches the handlers
+            return;
+        }
         if (opening && msg instanceof WebSocketFrame frame) {
+            // the frames are already inflated. A client may send a few messages right after the
+            // upgrade, hold no more than a few messages may have, and a bounded number of frames
+            bytesWhileOpening += frame.content().readableBytes();
+            if (bytesWhileOpening > (long) MAX_MESSAGES_WHILE_OPENING * getMaxPayloadLength()
+                || framesWhileOpening.size() >= MAX_FRAMES_WHILE_OPENING) {
+                releaseFramesWhileOpening();
+                rejectTooLargeMessage(ctx);
+                return;
+            }
             framesWhileOpening.add(frame.retain());
         } else {
             super.channelRead0(ctx, msg);
         }
+    }
+
+    private void releaseFramesWhileOpening() {
+        WebSocketFrame frame;
+        while ((frame = framesWhileOpening.poll()) != null) {
+            frame.release();
+        }
+        bytesWhileOpening = 0;
     }
 
     private void openCompleted() {
@@ -448,6 +489,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     private void opened() {
         opening = false;
+        bytesWhileOpening = 0;
         ChannelHandlerContext ctx = channel.pipeline().context(this);
         WebSocketFrame frame;
         while ((frame = framesWhileOpening.poll()) != null) {
@@ -462,17 +504,16 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 frame.release();
             }
         }
-        if (ctx != null && serverSession.isOpen()) {
+        // the replayed frames may have paused reading until a message completes, which then
+        // resumes it
+        if (ctx != null && serverSession.isOpen() && !isReadPaused()) {
             channel.config().setAutoRead(true);
         }
     }
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        WebSocketFrame frame;
-        while ((frame = framesWhileOpening.poll()) != null) {
-            frame.release();
-        }
+        releaseFramesWhileOpening();
         channel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).set(null);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Removing WebSocket Server session: {}", serverSession);
