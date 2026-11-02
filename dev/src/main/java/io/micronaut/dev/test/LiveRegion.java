@@ -59,13 +59,17 @@ final class LiveRegion {
     private @Nullable PrintStream previousErr;
     private @Nullable PrintStream capturedOut;
     private @Nullable PrintStream capturedErr;
+    private @Nullable LineForwarder forwarderOut;
+    private @Nullable LineForwarder forwarderErr;
 
     /**
      * @param output The terminal
      * @param unicode Whether the terminal renders Unicode symbols
      * @param width The terminal's width in columns
      * @param clock The time, in nanoseconds
-     * @param lock The lock of the rows' state, which the region draws under: one lock, so that no order of two can deadlock
+     * @param lock The lock of the rows' state, which the region draws under. A thread printing to a captured standard
+     *             stream holds that {@link PrintStream}'s own lock when it takes this one, so the region never takes a
+     *             captured stream's lock while it holds this one
      */
     LiveRegion(PrintStream output, boolean unicode, int width, LongSupplier clock, Object lock) {
         this.output = output;
@@ -101,7 +105,9 @@ final class LiveRegion {
     }
 
     /**
-     * Clears the rows, and gives the standard streams back.
+     * Clears the rows, and gives the standard streams back. It may be called under the lock: it drains the captured
+     * streams' pending text itself rather than flushing them, since flushing takes the lock of a {@link PrintStream} a
+     * thread printing may hold while it waits for this one.
      */
     void stop() {
         synchronized (lock) {
@@ -198,10 +204,16 @@ final class LiveRegion {
      * it follows, or the console handler of {@code java.util.logging}, prints under the rows until the next repaint.
      */
     private void captureStandardStreams() {
-        previousOut = System.out;
-        previousErr = System.err;
-        PrintStream out = new PrintStream(new LineForwarder(), true, StandardCharsets.UTF_8);
-        PrintStream err = new PrintStream(new LineForwarder(), true, StandardCharsets.UTF_8);
+        PrintStream originalOut = System.out;
+        PrintStream originalErr = System.err;
+        previousOut = originalOut;
+        previousErr = originalErr;
+        LineForwarder outForwarder = new LineForwarder(originalOut);
+        LineForwarder errForwarder = new LineForwarder(originalErr);
+        forwarderOut = outForwarder;
+        forwarderErr = errForwarder;
+        PrintStream out = new PrintStream(outForwarder, true, StandardCharsets.UTF_8);
+        PrintStream err = new PrintStream(errForwarder, true, StandardCharsets.UTF_8);
         capturedOut = out;
         capturedErr = err;
         System.setOut(out);
@@ -211,11 +223,14 @@ final class LiveRegion {
     private void restoreStandardStreams() {
         PrintStream out = previousOut;
         PrintStream err = previousErr;
-        if (out == null || err == null) {
+        LineForwarder outForwarder = forwarderOut;
+        LineForwarder errForwarder = forwarderErr;
+        if (out == null || err == null || outForwarder == null || errForwarder == null) {
             return;
         }
-        System.out.flush();
-        System.err.flush();
+        // drained under the lock, never flushed through the captured streams: see stop()
+        outForwarder.stopForwarding();
+        errForwarder.stopForwarding();
         // a stream another tool set since is left to it
         if (System.out == capturedOut) {
             System.setOut(out);
@@ -227,6 +242,8 @@ final class LiveRegion {
         previousErr = null;
         capturedOut = null;
         capturedErr = null;
+        forwarderOut = null;
+        forwarderErr = null;
     }
 
     /**
@@ -403,38 +420,73 @@ final class LiveRegion {
     }
 
     /**
-     * Prints each complete line written to it above the rows, under the region's lock: the only lock, so that a
-     * thread printing cannot deadlock with one drawing.
+     * Prints each complete line written to it above the rows, under the region's lock. A thread printing holds the
+     * captured {@link PrintStream}'s lock while it waits here, so the region never flushes that stream under the lock;
+     * text without its line separator stays pending until the separator comes or the region stops, so that output
+     * printed piece by piece shows as one line. Once the region stops, what is written passes through to the stream
+     * it replaced: a thread that was waiting for the lock as the region stopped prints there.
      */
     private final class LineForwarder extends OutputStream {
         private final ByteArrayOutputStream pending = new ByteArrayOutputStream();
+        private final PrintStream target;
+        private boolean closed;
+
+        LineForwarder(PrintStream target) {
+            this.target = target;
+        }
 
         @Override
         public void write(int b) {
             synchronized (lock) {
-                if (b == '\n') {
-                    flushLine();
-                } else {
-                    pending.write(b);
+                if (!closed) {
+                    writeLocked(b);
+                    return;
                 }
             }
+            target.write(b);
         }
 
         @Override
         public void write(byte[] bytes, int offset, int length) {
             synchronized (lock) {
-                for (int index = offset; index < offset + length; index++) {
-                    write(bytes[index]);
+                if (!closed) {
+                    for (int index = offset; index < offset + length; index++) {
+                        writeLocked(bytes[index]);
+                    }
+                    return;
                 }
             }
+            target.write(bytes, offset, length);
         }
 
         @Override
         public void flush() {
             synchronized (lock) {
+                if (!closed) {
+                    // a line without its separator stays pending: the stream autoflushes after every print
+                    return;
+                }
+            }
+            target.flush();
+        }
+
+        /**
+         * Prints the line pending, and passes what is written after through. Called under the lock.
+         */
+        void stopForwarding() {
+            if (!closed) {
+                closed = true;
                 if (pending.size() > 0) {
                     flushLine();
                 }
+            }
+        }
+
+        private void writeLocked(int b) {
+            if (b == '\n') {
+                flushLine();
+            } else {
+                pending.write(b);
             }
         }
 
