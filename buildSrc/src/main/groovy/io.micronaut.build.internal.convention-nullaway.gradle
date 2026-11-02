@@ -14,12 +14,14 @@ tasks.withType(JavaCompile).configureEach {
     options.errorprone {
         check("NullAway", CheckSeverity.ERROR)
         check("MissingOverride", CheckSeverity.ERROR)
-        option("NullAway:AnnotatedPackages", "io.micronaut")
+        // Every package is @NullMarked or @NullUnmarked, enforced by RequireExplicitNullMarking
+        option("NullAway:OnlyNullMarked", "true")
+        check("RequireExplicitNullMarking", CheckSeverity.ERROR)
     }
     // Disable NullAway on test code and TCK
     if (name.toLowerCase().contains("test") || project.name.contains("tck")) {
         options.errorprone {
-            disable("NullAway")
+            disable("NullAway", "RequireExplicitNullMarking")
         }
     }
 }
