@@ -521,14 +521,11 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                                                                      Consumer<BeanElementBuilder> childBeanBuilder) {
         final List<E> enclosedElements = this.beanType.getEnclosedElements(methodsOrFields.onlyConcrete());
         for (E enclosedElement : enclosedElements) {
-            if (enclosedElement instanceof FieldElement fe) {
-                if (isProducer(fe, fe.getGenericField().getType())) {
-                    addChildBean(fe, childBeanBuilder);
-                }
-            } else if (enclosedElement instanceof MethodElement me && !(enclosedElement instanceof ConstructorElement)) {
-                if (isProducer(me, me.getGenericReturnType().getType())) {
-                    addChildBean(me, childBeanBuilder);
-                }
+            if (enclosedElement instanceof FieldElement fe && isProducer(fe, fe.getGenericField().getType())) {
+                addChildBean(fe, childBeanBuilder);
+            } else if (enclosedElement instanceof MethodElement me && !(enclosedElement instanceof ConstructorElement)
+                && isProducer(me, me.getGenericReturnType().getType())) {
+                addChildBean(me, childBeanBuilder);
             }
         }
         return this;

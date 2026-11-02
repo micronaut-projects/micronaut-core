@@ -18,7 +18,6 @@ package io.micronaut.inject.visitor.producebeans;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
-import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -47,6 +46,6 @@ public class ProduceBeansVisitor implements TypeElementVisitor<Object, Object> {
     }
 
     private static void named(BeanElementBuilder child) {
-        child.annotate(AnnotationUtil.NAMED, builder -> builder.value(((MemberElement) child.getProducingElement()).getName()));
+        child.annotate(AnnotationUtil.NAMED, builder -> builder.value(child.getProducingElement().getName()));
     }
 }
