@@ -16,6 +16,8 @@
 package io.micronaut.core.util;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Locale;
+
 /**
  * Ansi color coding.
  *
@@ -232,7 +234,7 @@ public enum AnsiColour {
      * @return True if they are
      */
     public static boolean isSupported() {
-        String os = System.getProperty("os.name").toLowerCase();
+        String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
         return !os.contains("win") || System.console() != null;
     }
 }

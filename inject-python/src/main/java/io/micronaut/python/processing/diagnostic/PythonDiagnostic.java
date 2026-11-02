@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.python.processing.model.SourceSpan;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Locale;
 import java.util.List;
 import java.util.Objects;
 
@@ -83,7 +84,7 @@ public record PythonDiagnostic(Kind kind,
 
     @Override
     public String toString() {
-        String prefix = kind.name().toLowerCase() + ": [python:" + rule + "] " + message;
+        String prefix = kind.name().toLowerCase(Locale.ROOT) + ": [python:" + rule + "] " + message;
         return span == null ? prefix : prefix + " (" + span.location() + ")";
     }
 
