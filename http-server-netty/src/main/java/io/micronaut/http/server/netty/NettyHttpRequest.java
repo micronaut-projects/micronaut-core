@@ -202,22 +202,27 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         }
     }
 
+    private static void rejectCookieSeparator(String what, String text) {
+        if (text != null && text.indexOf(';') >= 0) {
+            throw new IllegalArgumentException("Cookie " + what + " contains the invalid character ';'");
+        }
+    }
+
     /**
-     * Whether the listener of a channel without a port exposes the default routes.
+     * Whether the listener of a channel exposes the default routes.
      *
-     * @param channel The connection, or the HTTP/2 stream
-     * @return The setting of the listener, or {@code null} if it has a port
+     * @param channel The connection or a stream of it
+     * @return The setting of the listener, or {@code null} if the channel is not of a listener
      */
     @Nullable
     private static Boolean listenerExposesDefaultRoutes(Channel channel) {
-        if (channel.localAddress() instanceof InetSocketAddress) {
-            return null;
+        // a stream's parent is its connection, whose parent is the channel of the listener
+        for (Channel c = channel; c != null; c = c.parent()) {
+            if (c.hasAttr(LISTENER_EXPOSES_DEFAULT_ROUTES)) {
+                return c.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
+            }
         }
-        Boolean exposes = channel.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
-        if (exposes == null && channel.parent() != null) {
-            exposes = channel.parent().attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
-        }
-        return exposes;
+        return null;
     }
 
     /**
@@ -669,6 +674,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         public MutableHttpRequest<T> cookie(Cookie cookie) {
             if (cookie instanceof NettyCookie) {
                 NettyCookie nettyCookie = (NettyCookie) cookie;
+                // the lax encoder does not validate: a ';' would end the pair and start another cookie
+                rejectCookieSeparator("name", nettyCookie.getName());
+                rejectCookieSeparator("value", nettyCookie.getValue());
                 String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
                 headers.add(HttpHeaderNames.COOKIE, value);
             }

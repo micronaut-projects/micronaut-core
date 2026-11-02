@@ -190,7 +190,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
                 }
                 return text;
             })
-            .map(Locale::forLanguageTag);
+            .map(tag -> BoundedLocales.INSTANCE.resolve(Locale.forLanguageTag(tag)));
     }
 
     /**

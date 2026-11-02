@@ -385,23 +385,28 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 }
 
                 Argument<?> bodyArgument = this.getBodyArgument();
-                Optional<?> converted = ConversionService.SHARED.convert(content, bodyArgument);
-                content.release();
-
-                if (!converted.isPresent()) {
-                    MediaType mediaType;
-                    try {
-                        mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
-                    } catch (IllegalArgumentException e) {
-                        exceptionCaught(ctx, e);
-                        return;
+                Optional<?> converted;
+                try {
+                    converted = ConversionService.SHARED.convert(content, bodyArgument);
+                    if (!converted.isPresent()) {
+                        MediaType mediaType;
+                        try {
+                            mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
+                        } catch (IllegalArgumentException e) {
+                            exceptionCaught(ctx, e);
+                            return;
+                        }
+                        // the whole message: the frame is only its last fragment
+                        ByteBuf message = content;
+                        try {
+                            converted = mediaTypeCodecRegistry.findCodec(mediaType).map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(message)));
+                        } catch (CodecException e) {
+                            messageProcessingException(ctx, e);
+                            return;
+                        }
                     }
-                    try {
-                        converted = mediaTypeCodecRegistry.findCodec(mediaType).map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())));
-                    } catch (CodecException e) {
-                        messageProcessingException(ctx, e);
-                        return;
-                    }
+                } finally {
+                    content.release();
                 }
 
                 if (converted.isPresent()) {
@@ -557,6 +562,18 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             readPaused = false;
             ctx.channel().config().setAutoRead(true);
         }
+    }
+
+    /**
+     * Whether reading is paused because the frames queued behind a message in flight add up to a message.
+     * Reading resumes once they are handled, so a subclass must not turn auto-read on while this is set.
+     *
+     * @return Whether reading is paused
+     * @since 3.10.18
+     */
+    @Internal
+    protected final boolean isReadPaused() {
+        return readPaused;
     }
 
     private void messageProcessingException(ChannelHandlerContext ctx, Throwable e) {

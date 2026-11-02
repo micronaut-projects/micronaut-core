@@ -44,6 +44,7 @@ import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
+import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.ExecutableMethod;
@@ -65,6 +66,7 @@ import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -810,6 +812,8 @@ public final class RouteExecutor {
                     final Object o = r.getBody().orElse(null);
                     if (o instanceof ReferenceCounted) {
                         ((ReferenceCounted) o).release();
+                    } else {
+                        closeStreamBody(o);
                     }
                     r.body(null);
                     return r;
@@ -825,6 +829,27 @@ public final class RouteExecutor {
                     }
                     response.setAttribute(HttpAttributes.ROUTE_INFO, routeInfo);
                 });
+    }
+
+    /**
+     * Close a body holding a stream that a HEAD response never writes, so it does not leak until GC.
+     *
+     * @param body The body
+     */
+    private static void closeStreamBody(@Nullable Object body) {
+        InputStream stream = null;
+        if (body instanceof StreamedFile) {
+            stream = ((StreamedFile) body).getInputStream();
+        } else if (body instanceof InputStream) {
+            stream = (InputStream) body;
+        }
+        if (stream != null) {
+            try {
+                stream.close();
+            } catch (IOException e) {
+                // ignore
+            }
+        }
     }
 
     private Mono<MutableHttpResponse<?>> processPublisherBody(HttpRequest<?> request,

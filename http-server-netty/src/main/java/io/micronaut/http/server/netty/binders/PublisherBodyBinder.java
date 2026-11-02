@@ -20,7 +20,9 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
@@ -172,6 +174,8 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
         if (valueType.getAnnotationMetadata().isEmpty()) {
             return Argument.of(valueType.getType(), valueType.getName(), context.getAnnotationMetadata(), valueType.getTypeParameters());
         }
-        return valueType;
+        // the type argument can carry type-use annotations (e.g. Publisher<@Valid T>), keep both
+        AnnotationMetadata merged = new AnnotationMetadataHierarchy(context.getAnnotationMetadata(), valueType.getAnnotationMetadata());
+        return Argument.of(valueType.getType(), valueType.getName(), merged, valueType.getTypeParameters());
     }
 }

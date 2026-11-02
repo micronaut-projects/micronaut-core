@@ -796,16 +796,15 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         void setServerChannel(Channel serverChannel) {
             this.serverChannel = serverChannel;
+            // the requests read it from their connection's listener: the port alone does not tell
+            // the listener (UNIX domain sockets, listeners on one port and different addresses)
+            serverChannel.attr(NettyHttpRequest.LISTENER_EXPOSES_DEFAULT_ROUTES).set(config.isExposeDefaultRoutes());
             this.listenerCustomizer = rootCustomizer.specializeForChannel(serverChannel, NettyServerCustomizer.ChannelRole.LISTENER);
             refresh();
         }
 
         @Override
         protected void initChannel(@NonNull Channel ch) throws Exception {
-            if (config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.UNIX) {
-                // the default routes are restricted by port, which this listener does not have
-                ch.attr(NettyHttpRequest.LISTENER_EXPOSES_DEFAULT_ROUTES).set(config.isExposeDefaultRoutes());
-            }
             httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl()).initChannel();
         }
     }

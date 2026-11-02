@@ -22,6 +22,7 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
@@ -410,6 +411,22 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         MethodExecutionHandle<?, Object> executionHandle = executionHandleLocator
                                                                 .createExecutionHandle(beanDefinition, (ExecutableMethod<Object, ?>) method);
         return buildRoute(httpMethodName, httpMethod, uri, executionHandle);
+    }
+
+    /**
+     * Marks a {@code HEAD} route that runs the handler of a {@code GET} route of the same path, so
+     * the filters scoped to {@code GET} apply to it as well.
+     *
+     * @param route The HEAD route created by this builder
+     * @return The route
+     * @since 3.10.18
+     */
+    @Internal
+    protected final UriRoute markImplicitHead(UriRoute route) {
+        if (route instanceof DefaultUriRoute) {
+            ((DefaultUriRoute) route).implicitHead = true;
+        }
+        return route;
     }
 
     /**
@@ -874,6 +891,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         final HttpMethod httpMethod;
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
+        /**
+         * Whether this HEAD route runs the handler of a GET route of the same path.
+         */
+        boolean implicitHead;
         private Integer port;
 
         /**

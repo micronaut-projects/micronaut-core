@@ -407,7 +407,8 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 frame.release();
             }
         }
-        if (serverSession.isOpen()) {
+        // a message handled above may have paused reading until the frames queued behind it are handled
+        if (serverSession.isOpen() && !isReadPaused()) {
             channel.config().setAutoRead(true);
         }
     }

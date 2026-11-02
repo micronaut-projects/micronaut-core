@@ -68,7 +68,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     /**
      * The request attribute that tells whether the listener of a request exposes the default
-     * routes, set for the listeners that have no port, e.g. UNIX domain sockets.
+     * routes, set by the server from the listener that received the request.
      */
     @Internal
     public static final String LISTENER_EXPOSES_DEFAULT_ROUTES = "micronaut.router.listener-exposes-default-routes";
@@ -199,7 +199,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         if (defaultPorts == null) {
             return true;
         }
-        // a listener that has no port, e.g. a UNIX domain socket, tells whether it exposes them
+        // the server tells the setting of the listener that received the request. That covers
+        // listeners without a port (UNIX domain sockets) and listeners that share a port on
+        // different addresses
         Optional<Boolean> listenerExposes = request.getAttribute(LISTENER_EXPOSES_DEFAULT_ROUTES, Boolean.class);
         if (listenerExposes.isPresent()) {
             return listenerExposes.get();
@@ -493,15 +495,24 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 }
             }
             Optional<HttpFilter> filter = filterRoute.match(method, uri);
-            if (!filter.isPresent() && method == HttpMethod.HEAD && routeMatch != null
-                    && routeMatch.getAnnotationMetadata().hasDeclaredAnnotation(Get.class)) {
-                // A HEAD route derived from a @Get method runs the GET handler, so the filters scoped to GET apply to it as well
+            if (!filter.isPresent() && method == HttpMethod.HEAD && runsGetHandler(routeMatch)) {
+                // A HEAD route derived from a GET route runs the GET handler, so the filters scoped to GET apply to it as well.
+                // Without a route (for example a static resource) a HEAD request is answered like a GET, so the same applies
                 filter = filterRoute.match(HttpMethod.GET, uri);
             }
             filter.ifPresent(httpFilters::add);
         }
         httpFilters.sort(OrderUtil.COMPARATOR);
         return Collections.unmodifiableList(httpFilters);
+    }
+
+    private static boolean runsGetHandler(@Nullable RouteMatch<?> routeMatch) {
+        if (routeMatch == null || routeMatch.getAnnotationMetadata().hasDeclaredAnnotation(Get.class)) {
+            return true;
+        }
+        return routeMatch instanceof UriRouteMatch
+            && ((UriRouteMatch<?, ?>) routeMatch).getRoute() instanceof DefaultRouteBuilder.DefaultUriRoute
+            && ((DefaultRouteBuilder.DefaultUriRoute) ((UriRouteMatch<?, ?>) routeMatch).getRoute()).implicitHead;
     }
 
     @SuppressWarnings("unchecked")

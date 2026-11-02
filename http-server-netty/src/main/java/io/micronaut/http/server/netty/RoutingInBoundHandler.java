@@ -116,6 +116,7 @@ import reactor.core.publisher.Sinks;
 import javax.net.ssl.SSLException;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.channels.ClosedChannelException;
@@ -1145,12 +1146,30 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 );
             }
         } else {
+            // a HEAD response sends no body: close one holding a stream so it does not leak until GC
+            closeUnwrittenBody(body);
             response.body(null);
             writeFinalNettyResponse(
                     response,
                     nettyRequest,
                     context
             );
+        }
+    }
+
+    private static void closeUnwrittenBody(@Nullable Object body) {
+        InputStream stream = null;
+        if (body instanceof StreamedFile) {
+            stream = ((StreamedFile) body).getInputStream();
+        } else if (body instanceof InputStream) {
+            stream = (InputStream) body;
+        }
+        if (stream != null) {
+            try {
+                stream.close();
+            } catch (IOException e) {
+                // ignore
+            }
         }
     }
 

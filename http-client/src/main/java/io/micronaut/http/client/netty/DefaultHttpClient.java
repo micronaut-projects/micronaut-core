@@ -31,7 +31,6 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
@@ -108,7 +107,6 @@ import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -1383,8 +1381,10 @@ public class DefaultHttpClient implements
                             NettyStreamedHttpResponse<?> streamedResponse = (NettyStreamedHttpResponse<?>) response;
                             final StreamedHttpResponse nettyResponse = streamedResponse.getNettyResponse();
                             nettyResponse.subscribe(new Subscriber<HttpContent>() {
-                                final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer();
+                                final ErrorBodyAccumulator buffer = new ErrorBodyAccumulator(byteBufferFactory.getNativeAllocator());
+                                final int maxContentLength = configuration.getMaxContentLength();
                                 Subscription s;
+                                boolean done;
                                 @Override
                                 public void onSubscribe(Subscription s) {
                                     this.s = s;
@@ -1393,20 +1393,42 @@ public class DefaultHttpClient implements
 
                                 @Override
                                 public void onNext(HttpContent httpContent) {
-                                    buffer.addComponent(true, httpContent.content());
+                                    if (done) {
+                                        httpContent.release();
+                                        return;
+                                    }
+                                    ByteBuf content = httpContent.content();
+                                    long newSize = (long) buffer.readableBytes() + content.readableBytes();
+                                    if (newSize > maxContentLength) {
+                                        done = true;
+                                        content.release();
+                                        s.cancel();
+                                        buffer.release();
+                                        emitter.error(customizeException(new ContentLengthExceededException(maxContentLength, newSize)));
+                                        return;
+                                    }
+                                    buffer.add(content);
                                     s.request(1);
                                 }
 
                                 @Override
                                 public void onError(Throwable t) {
+                                    if (done) {
+                                        return;
+                                    }
+                                    done = true;
                                     buffer.release();
                                     emitter.error(t);
                                 }
 
                                 @Override
                                 public void onComplete() {
+                                    if (done) {
+                                        return;
+                                    }
+                                    done = true;
                                     try {
-                                        FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
+                                        FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer.finish(), nettyResponse.headers(), new DefaultHttpHeaders(true));
                                         final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, response.status(), mediaTypeCodecRegistry, byteBufferFactory, (Argument<Object>) errorType, true);
                                         fullNettyClientHttpResponse.onComplete();
                                         emitter.error(customizeException(new HttpClientResponseException(
