@@ -34,14 +34,14 @@ class LiveRegionTest {
             assertNotSame(out, System.out);
             assertNotSame(err, System.err);
             System.out.println("from the application");
-            System.err.print("no line separator");
-            System.err.flush();
             System.out.write('x');
             System.out.write('\n');
             System.out.print("a carriage return\r\n");
+            System.err.print("no line separator");
+            System.err.flush();
+            // pending until its separator comes or the rows stop
             assertEquals("""
                 from the application
-                no line separator
                 x
                 a carriage return
                 Running tests""", screen());
@@ -52,9 +52,86 @@ class LiveRegionTest {
         assertSame(err, System.err);
         assertEquals("""
             from the application
-            no line separator
             x
-            a carriage return""", screen());
+            a carriage return
+            no line separator""", screen());
+    }
+
+    @Test
+    void textPrintedPieceByPieceShowsAsOneLine() {
+        LiveRegion region = region(40);
+        try {
+            region.start((frame, columns) -> List.of("Running tests"), true);
+            System.out.print("x");
+            System.out.print("y");
+            System.out.flush();
+            System.out.print("z\n");
+            System.out.print("progress: ");
+            System.out.print("50%");
+            assertEquals("""
+                xyz
+                Running tests""", screen());
+            System.out.print(" 100%\n");
+            assertEquals("""
+                xyz
+                progress: 50% 100%
+                Running tests""", screen());
+        } finally {
+            region.stop();
+        }
+    }
+
+    @Test
+    void stoppingUnderTheLockWhileAThreadPrintsDoesNotDeadlock() throws InterruptedException {
+        PrintStream out = System.out;
+        PrintStream err = System.err;
+        ByteArrayOutputStream afterwards = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(afterwards, true, StandardCharsets.UTF_8));
+        try {
+            LiveRegion region = region(40);
+            region.start((frame, columns) -> List.of("Running tests"), true);
+            PrintStream captured = System.out;
+            System.out.print("pending");
+            AtomicReference<Throwable> failure = new AtomicReference<>();
+            Thread stopper = new Thread(() -> {
+                try {
+                    // as the console stops the rows: under the lock
+                    synchronized (lock) {
+                        // holds the captured stream's lock, and waits for the region's
+                        Thread printer = new Thread(() -> captured.println(" late"), "printer");
+                        printer.setDaemon(true);
+                        printer.start();
+                        while (printer.getState() != Thread.State.BLOCKED) {
+                            if (!printer.isAlive()) {
+                                throw new AssertionError("the printer ended without waiting for the lock");
+                            }
+                            Thread.onSpinWait();
+                        }
+                        region.stop();
+                    }
+                } catch (Throwable e) {
+                    failure.set(e);
+                }
+            }, "stopper");
+            stopper.setDaemon(true);
+            stopper.start();
+            stopper.join(TimeUnit.SECONDS.toMillis(10));
+            assertFalse(stopper.isAlive(), "stop() deadlocked with a thread printing");
+            if (failure.get() != null) {
+                throw new AssertionError(failure.get());
+            }
+            // the pending text is printed as the rows stop, and what the printer wrote after passes through
+            assertEquals("pending", screen());
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (!afterwards.toString(StandardCharsets.UTF_8).contains(" late") && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+            }
+            assertEquals(" late" + System.lineSeparator(), afterwards.toString(StandardCharsets.UTF_8));
+        } finally {
+            // given back here too, should the region deadlock
+            System.setOut(out);
+            System.setErr(err);
+        }
     }
 
     @Test
