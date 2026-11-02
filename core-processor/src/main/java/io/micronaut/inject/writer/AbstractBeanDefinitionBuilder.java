@@ -231,12 +231,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         this.beanType.getEnclosedElements(baseQuery.modifiers(PUBLIC_FILTER))
             .forEach(fieldElement -> {
                 accessibleFields.add(fieldElement);
-                new InternalBeanElementField(fieldElement, false).inject();
+                new InternalBeanElementField(fieldElement).inject();
             });
         this.beanType.getEnclosedElements(baseQuery.modifiers(NON_PUBLIC_FILTER))
             .forEach(fieldElement -> {
                 if (!accessibleFields.contains(fieldElement)) {
-                    new InternalBeanElementField(fieldElement, true).inject();
+                    new InternalBeanElementField(fieldElement).inject();
                 }
             });
     }
@@ -435,7 +435,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         if (fields != null && beanFields != null) {
             this.beanType.getEnclosedElements(fields.onlyInstance().onlyAccessible(originatingType))
                 .forEach((fieldElement) ->
-                    beanFields.accept(new InternalBeanElementField(fieldElement, false))
+                    beanFields.accept(new InternalBeanElementField(fieldElement))
                 );
         }
         return this;
@@ -1236,7 +1236,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         private final FieldElement fieldElement;
         private ClassElement genericType;
 
-        private InternalBeanElementField(FieldElement element, boolean requiresReflection) {
+        private InternalBeanElementField(FieldElement element) {
             super(element, MutableAnnotationMetadata.of(element.getAnnotationMetadata()));
             this.fieldElement = element;
         }
