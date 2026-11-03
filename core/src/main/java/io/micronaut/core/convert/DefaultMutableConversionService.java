@@ -95,7 +95,6 @@ import java.util.StringJoiner;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
@@ -153,9 +152,12 @@ public class DefaultMutableConversionService implements MutableConversionService
     private final Map<ConvertiblePair, TypeConverter> customConverters = new ConcurrentHashMap<>();
 
     /**
-     * The additional converters which are variations of different converters.
+     * The converters looked up for pairs, replaced by a new generation after each registration or removal of a
+     * converter: a lookup writes what it found to the generation it started with, so that what it read before a
+     * change does not outlive it.
      */
-    private final Map<ConvertiblePair, TypeConverter> converterCache = new ConcurrentHashMap<>();
+    @SuppressWarnings("java:S3077") // the generation is replaced, not mutated through the field: volatile only publishes it
+    private volatile ConverterCache converterCache = new ConverterCache();
 
     /**
      * The converter each pair was registered for: the pair's own converter, or the one a variation of
@@ -176,9 +178,9 @@ public class DefaultMutableConversionService implements MutableConversionService
     private final CachingResolvedConverter<String, Boolean> stringToBoolean = new CachingResolvedConverter<>(this, String.class, Argument.BOOLEAN);
 
     /**
-     * Changed after each registration or removal of a converter, so that a converter of {@link #resolveConverter(Class, Argument)} resolves again.
+     * Whether this is the default conversion service itself, not a subclass that may override a conversion.
      */
-    private final AtomicInteger converterVersion = new AtomicInteger();
+    private final boolean exactClass = getClass() == DefaultMutableConversionService.class;
 
     /**
      * The mutable conversion service which is adding new converters to the internal collection which is not synchronized.
@@ -264,11 +266,8 @@ public class DefaultMutableConversionService implements MutableConversionService
         if (object == null || targetType == null || context == null) {
             return Optional.empty();
         }
-        if (targetType == Object.class) {
-            return Optional.of((T) object);
-        }
         targetType = targetType.isPrimitive() ? (Class<T>) ReflectionUtils.getWrapperType(targetType) : targetType;
-        if (targetType.isInstance(object) && !(object instanceof Iterable) && !(object instanceof Map)) {
+        if (isUnchanged(object, targetType)) {
             return Optional.of((T) object);
         }
 
@@ -282,7 +281,7 @@ public class DefaultMutableConversionService implements MutableConversionService
     @SuppressWarnings("unchecked")
     @Override
     public <S, T> TypeConverter<S, T> resolveConverter(Class<S> sourceType, Argument<T> argument) {
-        if (getClass() != DefaultMutableConversionService.class) {
+        if (!exactClass) {
             // a subclass may override the conversion: it converts every value
             return MutableConversionService.super.resolveConverter(sourceType, argument);
         }
@@ -310,34 +309,35 @@ public class DefaultMutableConversionService implements MutableConversionService
     }
 
     private <T> TypeConverter<Object, T> resolveTypeConverter(Class<?> sourceType, Class<T> targetType, @Nullable String formattingAnnotation) {
+        return resolveTypeConverter(sourceType, targetType, formattingAnnotation, converterCache);
+    }
+
+    private <T> TypeConverter<Object, T> resolveTypeConverter(Class<?> sourceType, Class<T> targetType, @Nullable String formattingAnnotation, ConverterCache cache) {
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
-        TypeConverter<Object, T> typeConverter = findConverter(pair);
+        TypeConverter<Object, T> typeConverter = findConverter(pair, cache);
         if (typeConverter == null) {
-            typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
-            addToConverterCache(pair, typeConverter);
+            // the exact pair first: the hierarchy of a primitive source type is empty
+            typeConverter = customConverters.get(pair);
+            if (typeConverter == null) {
+                typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
+            }
+            cache.put(pair, typeConverter);
         }
         return typeConverter;
     }
 
     @Override
     public <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType) {
-        ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, null);
-        TypeConverter<Object, T> typeConverter = findConverter(pair);
-        if (typeConverter == null) {
-            typeConverter = findTypeConverter(sourceType, targetType, null);
-            addToConverterCache(pair, typeConverter);
-            return typeConverter != UNCONVERTIBLE;
-        }
-        return typeConverter != UNCONVERTIBLE;
+        return resolveTypeConverter(sourceType, targetType, null) != UNCONVERTIBLE;
     }
 
     @Nullable
-    private <T, S> TypeConverter<T, S> findConverter(ConvertiblePair pair) {
+    private <T, S> TypeConverter<T, S> findConverter(ConvertiblePair pair, ConverterCache cache) {
         TypeConverter typeConverter = internalConverters.get(pair);
         if (typeConverter != null) {
             return typeConverter;
         }
-        return converterCache.get(pair);
+        return cache.converters.get(pair);
     }
 
     @Nullable
@@ -354,6 +354,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         // a registration and a removal of custom converters do not overlap: a removal takes what it read
         synchronized (customConverterOwners) {
             addConverterAnalyzeSource(customConverters, sourceType, targetType, typeConverter, new Registration(typeConverter, sourceType, targetType));
+            invalidateConverterCache();
         }
     }
 
@@ -383,6 +384,7 @@ public class DefaultMutableConversionService implements MutableConversionService
     @Internal
     public <S, T> void addInternalConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
         addConverterAnalyzeSource(internalConverters, sourceType, targetType, typeConverter, new Registration(typeConverter, sourceType, targetType));
+        invalidateConverterCache();
     }
 
     private <S, T> void addConverterAnalyzeSource(Map<ConvertiblePair, TypeConverter> typeConverters,
@@ -470,8 +472,7 @@ public class DefaultMutableConversionService implements MutableConversionService
             typeConverters.remove(entry.getKey());
             return true;
         });
-        converterCache.clear();
-        converterVersion.incrementAndGet();
+        invalidateConverterCache();
         return true;
     }
 
@@ -487,10 +488,6 @@ public class DefaultMutableConversionService implements MutableConversionService
         ConvertiblePair pair = newPair(sourceType, targetType, typeConverter);
         typeConverters.put(pair, typeConverter);
         ownersOf(typeConverters).put(pair, owner);
-        if (typeConverters != internalConverters) {
-            addToConverterCache(pair, typeConverter);
-        }
-        converterVersion.incrementAndGet();
     }
 
     @Override
@@ -512,11 +509,12 @@ public class DefaultMutableConversionService implements MutableConversionService
         addInternalConverter(sourceType, targetType, TypeConverter.of(sourceType, targetType, function));
     }
 
-    private void addToConverterCache(ConvertiblePair pair, TypeConverter<?, ?> typeConverter) {
-        converterCache.put(pair, typeConverter);
-        if (converterCache.size() > CACHE_MAX) {
-            CopyOnWriteMap.evict(converterCache, CACHE_EVICTION_BATCH);
-        }
+    /**
+     * Replaces the converters looked up so far, after the registered converters changed: a lookup that read
+     * them before still writes to the generation it started with.
+     */
+    private void invalidateConverterCache() {
+        converterCache = new ConverterCache();
     }
 
     /**
@@ -1074,13 +1072,21 @@ public class DefaultMutableConversionService implements MutableConversionService
             ConversionContext newContext = context.with(componentType);
 
             Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
-            String[] strings = object.toString().split(",", -1);
-            List<Object> list = new ArrayList<>();
-            for (String string : strings) {
-                Optional<?> converted = convert(string, targetComponentType, newContext);
+            // the tokens of split(",", -1), empty ones included, without the intermediate array
+            String text = object.toString();
+            List<Object> list = new ArrayList<>(countOf(text, ',') + 1);
+            int start = 0;
+            while (true) {
+                int end = text.indexOf(',', start);
+                String token = end < 0 ? text.substring(start) : text.substring(start, end);
+                Optional<?> converted = convert(token, targetComponentType, newContext);
                 if (converted.isPresent()) {
                     list.add(converted.get());
                 }
+                if (end < 0) {
+                    break;
+                }
+                start = end + 1;
             }
             return CollectionUtils.convertCollection((Class) targetType, list);
         });
@@ -1148,9 +1154,14 @@ public class DefaultMutableConversionService implements MutableConversionService
             if (targetType.isInstance(object) && targetComponentType == Object.class) {
                 return Optional.of(object);
             }
-            List<Object> list = new ArrayList<>();
+            List<Object> list = object instanceof Collection<?> collection ? new ArrayList<>(collection.size()) : new ArrayList<>();
             ConversionContext newContext = context.with(componentType);
             for (Object o : object) {
+                if (exactClass && o != null && isUnchanged(o, targetComponentType)) {
+                    // the element as convert returns it, without converting it: a subclass may override convert
+                    list.add(o);
+                    continue;
+                }
                 Optional<?> converted = convert(o, targetComponentType, newContext);
                 if (converted.isPresent()) {
                     list.add(converted.get());
@@ -1320,6 +1331,8 @@ public class DefaultMutableConversionService implements MutableConversionService
      * @return type converter
      */
     protected <T> TypeConverter<Object, T> findTypeConverter(Class<?> sourceType, Class<T> targetType, @Nullable String formattingAnnotation) {
+        // read before the registered converters: what they hold now is not cached past a change to them
+        ConverterCache cache = converterCache;
         List<Class<?>> sourceHierarchy = resolveHierarchy(sourceType);
         List<Class<?>> targetHierarchy = resolveHierarchy(targetType);
         for (Class<?> sourceSuperType : sourceHierarchy) {
@@ -1327,7 +1340,7 @@ public class DefaultMutableConversionService implements MutableConversionService
                 ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation);
                 TypeConverter<Object, T> typeConverter = findRegisteredConverter(pair);
                 if (typeConverter != null) {
-                    addToConverterCache(pair, typeConverter);
+                    cache.put(pair, typeConverter);
                     return typeConverter;
                 }
             }
@@ -1339,13 +1352,31 @@ public class DefaultMutableConversionService implements MutableConversionService
                     ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType);
                     TypeConverter<Object, T> typeConverter = findRegisteredConverter(pair);
                     if (typeConverter != null) {
-                        addToConverterCache(pair, typeConverter);
+                        cache.put(pair, typeConverter);
                         return typeConverter;
                     }
                 }
             }
         }
         return UNCONVERTIBLE;
+    }
+
+    /**
+     * Whether {@link #convert(Object, Class, Class, ConversionContext)} returns the value as it is: the
+     * target is {@link Object}, or the value is an instance of it that is not a collection or a map, since
+     * those convert their elements.
+     */
+    private static boolean isUnchanged(Object value, Class<?> wrappedTargetType) {
+        return wrappedTargetType == Object.class
+            || wrappedTargetType.isInstance(value) && !(value instanceof Iterable) && !(value instanceof Map);
+    }
+
+    private static int countOf(String text, char character) {
+        int count = 0;
+        for (int i = text.indexOf(character); i >= 0; i = text.indexOf(character, i + 1)) {
+            count++;
+        }
+        return count;
     }
 
     private List<Class<?>> resolveHierarchy(Class<?> sourceType) {
@@ -1389,9 +1420,8 @@ public class DefaultMutableConversionService implements MutableConversionService
         customConverters.clear();
         internalConverterOwners.clear();
         customConverterOwners.clear();
-        converterCache.clear();
         registerDefaultConverters();
-        converterVersion.incrementAndGet();
+        invalidateConverterCache();
     }
 
     /**
@@ -1405,6 +1435,24 @@ public class DefaultMutableConversionService implements MutableConversionService
      * @param target The target type it was registered for
      */
     private record Registration(TypeConverter<?, ?> converter, Class<?> source, Class<?> target) {
+    }
+
+    /**
+     * A generation of the converters looked up for pairs.
+     */
+    private static final class ConverterCache {
+        /**
+         * Identifies the generation without holding its converters, for a resolution that outlives it.
+         */
+        private final Object generation = new Object();
+        private final Map<ConvertiblePair, TypeConverter> converters = new ConcurrentHashMap<>();
+
+        void put(ConvertiblePair pair, TypeConverter<?, ?> typeConverter) {
+            converters.put(pair, typeConverter);
+            if (converters.size() > CACHE_MAX) {
+                CopyOnWriteMap.evict(converters, CACHE_EVICTION_BATCH);
+            }
+        }
     }
 
     private static final class ConvertiblePair {
@@ -1608,24 +1656,24 @@ public class DefaultMutableConversionService implements MutableConversionService
         }
 
         private TypeConverter<Object, T> typeConverter() {
-            // the version is read before the lookup: a converter registered during it makes the next conversion look up again
-            int version = conversionService.converterVersion.get();
+            // the generation is read before the lookup: a converter registered during it makes the next conversion look up again
+            ConverterCache cache = conversionService.converterCache;
             Resolution<T> current = resolution;
-            if (current == null || current.version != version) {
-                current = new Resolution<>(version, conversionService.resolveTypeConverter(sourceType, targetType, formattingAnnotation));
+            if (current == null || current.generation != cache.generation) {
+                current = new Resolution<>(cache.generation, conversionService.resolveTypeConverter(sourceType, targetType, formattingAnnotation, cache));
                 resolution = current;
             }
             return current.typeConverter;
         }
 
         /**
-         * The converter, as looked up at the version of the converters.
+         * The converter, as looked up in a generation of the converters.
          *
-         * @param version       The version
+         * @param generation    The generation it was looked up in, not its converters: a resolution keeps no replaced cache alive
          * @param typeConverter The converter
          * @param <T>           The target type
          */
-        private record Resolution<T>(int version, TypeConverter<Object, T> typeConverter) {
+        private record Resolution<T>(Object generation, TypeConverter<Object, T> typeConverter) {
         }
     }
 

@@ -112,13 +112,13 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
     @SuppressWarnings("unchecked")
     default <T> ArgumentConversionContext<T> with(Argument<T> argument) {
 
-        ConversionContext childContext = ConversionContext.of(argument);
+        // the annotations of the argument come first, as a context of the argument would synthesize them
         ConversionContext thisContext = this;
         return new DefaultArgumentConversionContext(argument, thisContext.getLocale(), thisContext.getCharset()) {
             @Override
             @Nullable
             public <T extends Annotation> T synthesize(Class<T> annotationClass) {
-                T annotation = childContext.synthesize(annotationClass);
+                T annotation = argument.getAnnotationMetadata().synthesize(annotationClass);
                 if (annotation == null) {
                     return thisContext.synthesize(annotationClass);
                 }
@@ -127,12 +127,12 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
 
             @Override
             public Annotation[] synthesizeAll() {
-                return ArrayUtils.concat(childContext.synthesizeAll(), thisContext.synthesizeAll());
+                return ArrayUtils.concat(argument.getAnnotationMetadata().synthesizeAll(), thisContext.synthesizeAll());
             }
 
             @Override
             public Annotation[] synthesizeDeclared() {
-                return ArrayUtils.concat(childContext.synthesizeDeclared(), thisContext.synthesizeDeclared());
+                return ArrayUtils.concat(argument.getAnnotationMetadata().synthesizeDeclared(), thisContext.synthesizeDeclared());
             }
 
             @Override
