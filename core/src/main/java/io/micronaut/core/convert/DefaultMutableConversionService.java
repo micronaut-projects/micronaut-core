@@ -1455,7 +1455,7 @@ public class DefaultMutableConversionService implements MutableConversionService
      * values of the source type to the argument, looked up on the first conversion and again after a
      * converter was registered or removed. A value of another type, another target type or a context
      * with other annotation metadata is converted by the service as is. It converts to a primitive
-     * without boxing when the converter it holds does.
+     * without boxing when the converter it holds does, and only to the primitive of its argument.
      *
      * @param <S> The source type
      * @param <T> The target type
@@ -1513,54 +1513,83 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         @Override
         public OptionalInt findInt(S value, ConversionContext context) {
-            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Integer.class, context);
+            if (targetType != Integer.class) {
+                return OptionalInt.empty();
+            }
+            PrimitiveTargetTypeConverter<Object, T> primitive = heldParser(value, Integer.class, context);
             return primitive != null ? primitive.findInt(value, context) : PrimitiveTargetTypeConverter.super.findInt(value, context);
         }
 
         @Override
         public int getInt(S value, ConversionContext context) {
-            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Integer.class, context);
+            if (targetType != Integer.class) {
+                throw notConvertible(Argument.INT, value);
+            }
+            PrimitiveTargetTypeConverter<Object, T> primitive = heldParser(value, Integer.class, context);
             return primitive != null ? primitive.getInt(value, context) : PrimitiveTargetTypeConverter.super.getInt(value, context);
         }
 
         @Override
         public OptionalLong findLong(S value, ConversionContext context) {
-            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Long.class, context);
+            if (targetType != Long.class) {
+                return OptionalLong.empty();
+            }
+            PrimitiveTargetTypeConverter<Object, T> primitive = heldParser(value, Long.class, context);
             return primitive != null ? primitive.findLong(value, context) : PrimitiveTargetTypeConverter.super.findLong(value, context);
         }
 
         @Override
         public long getLong(S value, ConversionContext context) {
-            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Long.class, context);
+            if (targetType != Long.class) {
+                throw notConvertible(Argument.LONG, value);
+            }
+            PrimitiveTargetTypeConverter<Object, T> primitive = heldParser(value, Long.class, context);
             return primitive != null ? primitive.getLong(value, context) : PrimitiveTargetTypeConverter.super.getLong(value, context);
         }
 
         @Override
         public OptionalDouble findDouble(S value, ConversionContext context) {
-            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Double.class, context);
+            if (targetType != Double.class) {
+                return OptionalDouble.empty();
+            }
+            PrimitiveTargetTypeConverter<Object, T> primitive = heldParser(value, Double.class, context);
             return primitive != null ? primitive.findDouble(value, context) : PrimitiveTargetTypeConverter.super.findDouble(value, context);
         }
 
         @Override
         public double getDouble(S value, ConversionContext context) {
-            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Double.class, context);
+            if (targetType != Double.class) {
+                throw notConvertible(Argument.DOUBLE, value);
+            }
+            PrimitiveTargetTypeConverter<Object, T> primitive = heldParser(value, Double.class, context);
             return primitive != null ? primitive.getDouble(value, context) : PrimitiveTargetTypeConverter.super.getDouble(value, context);
         }
 
         @Override
         public boolean getBoolean(S value, ConversionContext context) {
-            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Boolean.class, context);
+            if (targetType != Boolean.class) {
+                throw notConvertible(Argument.BOOLEAN, value);
+            }
+            PrimitiveTargetTypeConverter<Object, T> primitive = heldParser(value, Boolean.class, context);
             return primitive != null ? primitive.getBoolean(value, context) : PrimitiveTargetTypeConverter.super.getBoolean(value, context);
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public @Nullable PrimitiveTargetTypeConverter<S, T> primitiveConverter() {
+        public @Nullable PrimitiveTargetTypeConverter<S, T> primitiveParser() {
             if (unchanged || !(typeConverter() instanceof PrimitiveTargetTypeConverter<?, ?> primitive)) {
                 return null;
             }
             // the converter of the source type: a value of the source type converts with it
-            return (PrimitiveTargetTypeConverter<S, T>) primitive.primitiveConverter();
+            return (PrimitiveTargetTypeConverter<S, T>) primitive.primitiveParser();
+        }
+
+        /**
+         * The exception of a conversion to a primitive of another type than the argument: the converter
+         * does not convert to it.
+         */
+        private static ConversionErrorException notConvertible(Argument<?> primitive, @Nullable Object value) {
+            return new ConversionErrorException(primitive, new IllegalArgumentException("Cannot convert [" + value + "] to " + primitive.getTypeName()));
         }
 
         /**
@@ -1570,7 +1599,7 @@ public class DefaultMutableConversionService implements MutableConversionService
          */
         @SuppressWarnings("unchecked")
         @Nullable
-        private PrimitiveTargetTypeConverter<Object, T> primitiveConverter(@Nullable S value, Class<?> wrapperType, ConversionContext context) {
+        private PrimitiveTargetTypeConverter<Object, T> heldParser(@Nullable S value, Class<?> wrapperType, ConversionContext context) {
             if (value == null || unchanged || targetType != wrapperType || value.getClass() != sourceType
                 || context.getAnnotationMetadata() != annotationMetadata) {
                 return null;
@@ -1607,7 +1636,7 @@ public class DefaultMutableConversionService implements MutableConversionService
     private static final class CharSequenceToIntegerConverter implements PrimitiveTargetTypeConverter<CharSequence, Integer> {
 
         @Override
-        public PrimitiveTargetTypeConverter<CharSequence, Integer> primitiveConverter() {
+        public PrimitiveTargetTypeConverter<CharSequence, Integer> primitiveParser() {
             return this;
         }
 
@@ -1657,7 +1686,7 @@ public class DefaultMutableConversionService implements MutableConversionService
     private static final class CharSequenceToLongConverter implements PrimitiveTargetTypeConverter<CharSequence, Long> {
 
         @Override
-        public PrimitiveTargetTypeConverter<CharSequence, Long> primitiveConverter() {
+        public PrimitiveTargetTypeConverter<CharSequence, Long> primitiveParser() {
             return this;
         }
 
@@ -1707,7 +1736,7 @@ public class DefaultMutableConversionService implements MutableConversionService
     private static final class CharSequenceToDoubleConverter implements PrimitiveTargetTypeConverter<CharSequence, Double> {
 
         @Override
-        public PrimitiveTargetTypeConverter<CharSequence, Double> primitiveConverter() {
+        public PrimitiveTargetTypeConverter<CharSequence, Double> primitiveParser() {
             return this;
         }
 
@@ -1757,7 +1786,7 @@ public class DefaultMutableConversionService implements MutableConversionService
     private static final class CharSequenceToBooleanConverter implements PrimitiveTargetTypeConverter<CharSequence, Boolean> {
 
         @Override
-        public PrimitiveTargetTypeConverter<CharSequence, Boolean> primitiveConverter() {
+        public PrimitiveTargetTypeConverter<CharSequence, Boolean> primitiveParser() {
             return this;
         }
 

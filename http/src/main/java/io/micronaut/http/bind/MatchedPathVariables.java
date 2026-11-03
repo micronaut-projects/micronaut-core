@@ -181,7 +181,8 @@ public class MatchedPathVariables implements PathVariables {
 
     @Override
     public int getInt(String name) {
-        if (values.get(name) instanceof String value && PrimitiveValueConverters.intConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Integer> converter) {
+        if (values.get(name) instanceof String value && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH
+            && PrimitiveValueConverters.intConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Integer> converter) {
             // a value that does not parse converts again below, with the error of the variable
             OptionalInt parsed = converter.findInt(value, ConversionContext.DEFAULT);
             if (parsed.isPresent()) {
@@ -203,7 +204,8 @@ public class MatchedPathVariables implements PathVariables {
 
     @Override
     public long getLong(String name) {
-        if (values.get(name) instanceof String value && PrimitiveValueConverters.longConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Long> converter) {
+        if (values.get(name) instanceof String value && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH
+            && PrimitiveValueConverters.longConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Long> converter) {
             // a value that does not parse converts again below, with the error of the variable
             OptionalLong parsed = converter.findLong(value, ConversionContext.DEFAULT);
             if (parsed.isPresent()) {
@@ -225,7 +227,8 @@ public class MatchedPathVariables implements PathVariables {
 
     @Override
     public double getDouble(String name) {
-        if (values.get(name) instanceof String value && PrimitiveValueConverters.doubleConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Double> converter) {
+        if (values.get(name) instanceof String value && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH
+            && PrimitiveValueConverters.doubleConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Double> converter) {
             // a value that does not parse converts again below, with the error of the variable
             OptionalDouble parsed = converter.findDouble(value, ConversionContext.DEFAULT);
             if (parsed.isPresent()) {

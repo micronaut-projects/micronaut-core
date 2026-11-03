@@ -129,21 +129,21 @@ class PrimitiveTargetTypeConverterSpec extends Specification {
         converter.getInt(new Target(), ConversionContext.DEFAULT) == 42
     }
 
-    void "a resolved converter has a primitive converter only while it holds a parser"() {
+    void "a resolved converter has a primitive parser only while it holds one"() {
         given:
         def service = new DefaultMutableConversionService()
         def converter = PrimitiveTargetTypeConverter.of(service.resolveConverter(String, Argument.INT))
 
         expect:
-        converter.primitiveConverter() != null
-        converter.primitiveConverter().getInt("12", ConversionContext.DEFAULT) == 12
-        PrimitiveTargetTypeConverter.of({ String s, Class<Integer> t, ConversionContext c -> Optional.of(1) } as TypeConverter).primitiveConverter() == null
+        converter.primitiveParser() != null
+        converter.primitiveParser().getInt("12", ConversionContext.DEFAULT) == 12
+        PrimitiveTargetTypeConverter.of({ String s, Class<Integer> t, ConversionContext c -> Optional.of(1) } as TypeConverter).primitiveParser() == null
 
         when: "a registrar replaces the built-in parser"
         service.addInternalConverter(CharSequence, Integer, { CharSequence s, Class<Integer> t, ConversionContext c -> Optional.of(42) } as TypeConverter)
 
         then:
-        converter.primitiveConverter() == null
+        converter.primitiveParser() == null
         converter.getInt("12", ConversionContext.DEFAULT) == 42
     }
 
@@ -158,6 +158,28 @@ class PrimitiveTargetTypeConverterSpec extends Specification {
 
         when:
         adapted.getInt("5", ConversionContext.DEFAULT)
+
+        then:
+        thrown(ConversionErrorException)
+    }
+
+    void "a resolved converter does not convert to the primitive of another type"() {
+        given:
+        def converter = PrimitiveTargetTypeConverter.of(new DefaultMutableConversionService().resolveConverter(String, Argument.LONG))
+
+        expect:
+        converter.getLong("5", ConversionContext.DEFAULT) == 5L
+        converter.findInt("5", ConversionContext.DEFAULT).isEmpty()
+        converter.findDouble("5", ConversionContext.DEFAULT).isEmpty()
+
+        when:
+        converter.getInt("5", ConversionContext.DEFAULT)
+
+        then:
+        thrown(ConversionErrorException)
+
+        when:
+        converter.getBoolean("true", ConversionContext.DEFAULT)
 
         then:
         thrown(ConversionErrorException)

@@ -36,6 +36,13 @@ import org.jspecify.annotations.Nullable;
 @Internal
 public final class PrimitiveValueConverters {
 
+    /**
+     * The length of the longest value a parser is tried with: a longer one, e.g. a malformed one an
+     * attacker chose, converts like any value, so a value that does not parse is parsed once more only
+     * when it is short.
+     */
+    public static final int MAX_PARSED_LENGTH = 32;
+
     private PrimitiveValueConverters() {
     }
 
@@ -48,7 +55,7 @@ public final class PrimitiveValueConverters {
             // another conversion service resolves converters that box: not resolved for every value
             return null;
         }
-        return conversionService.resolveConverter(String.class, Argument.INT) instanceof PrimitiveTargetTypeConverter<String, Integer> primitive ? primitive.primitiveConverter() : null;
+        return conversionService.resolveConverter(String.class, Argument.INT) instanceof PrimitiveTargetTypeConverter<String, Integer> primitive ? primitive.primitiveParser() : null;
     }
 
     /**
@@ -60,7 +67,7 @@ public final class PrimitiveValueConverters {
             // another conversion service resolves converters that box: not resolved for every value
             return null;
         }
-        return conversionService.resolveConverter(String.class, Argument.LONG) instanceof PrimitiveTargetTypeConverter<String, Long> primitive ? primitive.primitiveConverter() : null;
+        return conversionService.resolveConverter(String.class, Argument.LONG) instanceof PrimitiveTargetTypeConverter<String, Long> primitive ? primitive.primitiveParser() : null;
     }
 
     /**
@@ -72,7 +79,7 @@ public final class PrimitiveValueConverters {
             // another conversion service resolves converters that box: not resolved for every value
             return null;
         }
-        return conversionService.resolveConverter(String.class, Argument.DOUBLE) instanceof PrimitiveTargetTypeConverter<String, Double> primitive ? primitive.primitiveConverter() : null;
+        return conversionService.resolveConverter(String.class, Argument.DOUBLE) instanceof PrimitiveTargetTypeConverter<String, Double> primitive ? primitive.primitiveParser() : null;
     }
 
     /**
@@ -84,6 +91,6 @@ public final class PrimitiveValueConverters {
             // another conversion service resolves converters that box: not resolved for every value
             return null;
         }
-        return conversionService.resolveConverter(String.class, Argument.BOOLEAN) instanceof PrimitiveTargetTypeConverter<String, Boolean> primitive ? primitive.primitiveConverter() : null;
+        return conversionService.resolveConverter(String.class, Argument.BOOLEAN) instanceof PrimitiveTargetTypeConverter<String, Boolean> primitive ? primitive.primitiveParser() : null;
     }
 }

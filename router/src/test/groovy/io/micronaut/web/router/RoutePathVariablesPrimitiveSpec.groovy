@@ -6,7 +6,8 @@ import spock.lang.Specification
 
 class RoutePathVariablesPrimitiveSpec extends Specification {
 
-    Map<String, Object> values = [id: "12345", big: "9000000000", ratio: "1.5", flag: "on", bad: "x", empty: "", obj: 7]
+    Map<String, Object> values = [id: "12345", big: "9000000000", ratio: "1.5", flag: "on", bad: "x", empty: "", obj: 7,
+                                  padded: "0000000000000000000000000000000000000042", longBad: "x" * 40]
 
     // a subclass of the conversion service converts by boxing: it does not share primitive converters
     ConversionService boxingService = new DefaultMutableConversionService() {}
@@ -32,6 +33,8 @@ class RoutePathVariablesPrimitiveSpec extends Specification {
         primitive.getBoolean("flag")
         !primitive.getBoolean("missing", false)
         primitive.raw().getInt("id") == 12345
+        primitive.getInt("padded") == plain.getInt("padded")
+        primitive.getInt("padded") == 42
     }
 
     void "a converter that replaces the built-in parser converts with the context of the variable"() {
@@ -85,5 +88,6 @@ class RoutePathVariablesPrimitiveSpec extends Specification {
         "findLong"  | ["empty"]
         "getDouble" | ["bad"]
         "getDouble" | ["missing"]
+        "getInt"    | ["longBad"]
     }
 }

@@ -33,9 +33,10 @@ import java.util.OptionalLong;
  * <p>
  * The default implementations box through {@link #convert(Object, Class, ConversionContext)}, so
  * {@link #of(TypeConverter)} adapts any converter; a converter that parses the primitive itself
- * overrides them. A method converts with the converter of the matching wrapper type: the {@code int}
- * methods of a converter to {@link Integer}, and so on; a converter to another type does not convert
- * to it, like a value that does not convert.
+ * overrides them. The {@code int} methods are meant for a converter to {@link Integer}, the {@code long}
+ * methods for one to {@link Long}, and so on: a converter resolved by a conversion service does not
+ * convert to the primitive of another type, like a value that does not convert; another converter is
+ * called with the wrapper type as its target type, and a result of another type is not converted.
  *
  * @param <S> The source type
  * @param <T> The target type
@@ -135,7 +136,7 @@ public interface PrimitiveTargetTypeConverter<S, T> extends TypeConverter<S, T> 
      *
      * @return The converter, or {@code null}
      */
-    default @Nullable PrimitiveTargetTypeConverter<S, T> primitiveConverter() {
+    default @Nullable PrimitiveTargetTypeConverter<S, T> primitiveParser() {
         return null;
     }
 
