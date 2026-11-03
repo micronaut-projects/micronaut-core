@@ -1553,6 +1553,16 @@ public class DefaultMutableConversionService implements MutableConversionService
             return primitive != null ? primitive.getBoolean(value, context) : PrimitiveTargetTypeConverter.super.getBoolean(value, context);
         }
 
+        @SuppressWarnings("unchecked")
+        @Override
+        public @Nullable PrimitiveTargetTypeConverter<S, T> primitiveConverter() {
+            if (unchanged || !(typeConverter() instanceof PrimitiveTargetTypeConverter<?, ?> primitive)) {
+                return null;
+            }
+            // the converter of the source type: a value of the source type converts with it
+            return (PrimitiveTargetTypeConverter<S, T>) primitive.primitiveConverter();
+        }
+
         /**
          * The converter held for the value when it converts to the primitive of the wrapper type itself,
          * on the same conditions as {@link #convert(Object, Class, ConversionContext)} uses it; otherwise
@@ -1595,6 +1605,11 @@ public class DefaultMutableConversionService implements MutableConversionService
      * A value that does not parse is rejected in the context.
      */
     private static final class CharSequenceToIntegerConverter implements PrimitiveTargetTypeConverter<CharSequence, Integer> {
+
+        @Override
+        public PrimitiveTargetTypeConverter<CharSequence, Integer> primitiveConverter() {
+            return this;
+        }
 
         @Override
         public Optional<Integer> convert(CharSequence object, Class<Integer> targetType, ConversionContext context) {
@@ -1642,6 +1657,11 @@ public class DefaultMutableConversionService implements MutableConversionService
     private static final class CharSequenceToLongConverter implements PrimitiveTargetTypeConverter<CharSequence, Long> {
 
         @Override
+        public PrimitiveTargetTypeConverter<CharSequence, Long> primitiveConverter() {
+            return this;
+        }
+
+        @Override
         public Optional<Long> convert(CharSequence object, Class<Long> targetType, ConversionContext context) {
             if (StringUtils.isEmpty(object)) {
                 return Optional.empty();
@@ -1687,6 +1707,11 @@ public class DefaultMutableConversionService implements MutableConversionService
     private static final class CharSequenceToDoubleConverter implements PrimitiveTargetTypeConverter<CharSequence, Double> {
 
         @Override
+        public PrimitiveTargetTypeConverter<CharSequence, Double> primitiveConverter() {
+            return this;
+        }
+
+        @Override
         public Optional<Double> convert(CharSequence object, Class<Double> targetType, ConversionContext context) {
             if (StringUtils.isEmpty(object)) {
                 return Optional.empty();
@@ -1730,6 +1755,11 @@ public class DefaultMutableConversionService implements MutableConversionService
      * true, in any case, are true, and anything else is false.
      */
     private static final class CharSequenceToBooleanConverter implements PrimitiveTargetTypeConverter<CharSequence, Boolean> {
+
+        @Override
+        public PrimitiveTargetTypeConverter<CharSequence, Boolean> primitiveConverter() {
+            return this;
+        }
 
         @Override
         public Optional<Boolean> convert(CharSequence object, Class<Boolean> targetType, ConversionContext context) {

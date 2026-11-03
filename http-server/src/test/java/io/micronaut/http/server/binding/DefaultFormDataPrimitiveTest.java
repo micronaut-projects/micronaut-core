@@ -1,8 +1,11 @@
 package io.micronaut.http.server.binding;
 
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.DefaultMutableConversionService;
 import io.micronaut.core.convert.PrimitiveTargetTypeConverter;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.form.FileUpload;
 import org.junit.jupiter.api.Test;
@@ -11,6 +14,7 @@ import org.junit.jupiter.api.function.Executable;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
@@ -74,6 +78,25 @@ class DefaultFormDataPrimitiveTest {
         assertSameFailure(() -> boxed.findLong("empty"), () -> primitive.findLong("empty"));
         assertSameFailure(() -> boxed.getDouble("bad"), () -> primitive.getDouble("bad"));
         assertSameFailure(() -> boxed.getDouble("missing"), () -> primitive.getDouble("missing"));
+    }
+
+    @Test
+    void aConverterThatReplacesTheBuiltInParserConvertsWithTheContextOfTheField() {
+        // a converter that reads the argument of its context, and rejects a value it still returns
+        DefaultMutableConversionService service = new DefaultMutableConversionService();
+        service.addInternalConverter(CharSequence.class, Integer.class, (CharSequence value, Class<Integer> targetType, ConversionContext context) -> {
+            if ("x".contentEquals(value)) {
+                context.reject(value, new IllegalArgumentException("rejected"));
+                return Optional.of(-1);
+            }
+            return Optional.of(((ArgumentConversionContext<?>) context).getArgument().getName().length());
+        });
+        DefaultFormData form = form(service);
+
+        assertEquals(3, form.getInt("age"));
+        assertEquals(OptionalInt.of(3), form.findInt("age"));
+        ConversionErrorException e = assertThrows(ConversionErrorException.class, () -> form.getInt("bad"));
+        assertTrue(e.getMessage().contains("rejected"));
     }
 
     private static void assertSameFailure(Executable expected, Executable actual) {

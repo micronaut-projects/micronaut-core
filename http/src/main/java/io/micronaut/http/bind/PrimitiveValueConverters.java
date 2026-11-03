@@ -23,9 +23,11 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The converters of string values to primitives of a conversion service, for the primitive accessors
- * of {@link io.micronaut.http.NamedValues}: those that the conversion service resolves for
- * {@link Argument#INT} and the other constants, when they convert to primitives without boxing. The
- * default conversion service shares them, so asking for them costs nothing per value.
+ * of {@link io.micronaut.http.NamedValues}: the parsers that the converters the conversion service resolves
+ * for {@link Argument#INT} and the other constants hold, which convert without the context of the value.
+ * When the conversion service converts with another converter, e.g. one a registrar replaced the parser
+ * with, there is none: the value converts with its context, which the converter may read and reject it in.
+ * The default conversion service shares the resolved converters, so asking for them costs nothing per value.
  *
  * @since 5.3.0
  */
@@ -37,33 +39,33 @@ public final class PrimitiveValueConverters {
 
     /**
      * @param conversionService The conversion service
-     * @return The converter to {@code int}, or {@code null} if the conversion service does not convert without boxing
+     * @return The converter to {@code int} that parses it itself, or {@code null} if the conversion service converts with another converter, which is given the context of the value
      */
     public static @Nullable PrimitiveTargetTypeConverter<String, Integer> intConverter(ConversionService conversionService) {
-        return conversionService.resolveConverter(String.class, Argument.INT) instanceof PrimitiveTargetTypeConverter<String, Integer> primitive ? primitive : null;
+        return conversionService.resolveConverter(String.class, Argument.INT) instanceof PrimitiveTargetTypeConverter<String, Integer> primitive ? primitive.primitiveConverter() : null;
     }
 
     /**
      * @param conversionService The conversion service
-     * @return The converter to {@code long}, or {@code null} if the conversion service does not convert without boxing
+     * @return The converter to {@code long} that parses it itself, or {@code null} if the conversion service converts with another converter, which is given the context of the value
      */
     public static @Nullable PrimitiveTargetTypeConverter<String, Long> longConverter(ConversionService conversionService) {
-        return conversionService.resolveConverter(String.class, Argument.LONG) instanceof PrimitiveTargetTypeConverter<String, Long> primitive ? primitive : null;
+        return conversionService.resolveConverter(String.class, Argument.LONG) instanceof PrimitiveTargetTypeConverter<String, Long> primitive ? primitive.primitiveConverter() : null;
     }
 
     /**
      * @param conversionService The conversion service
-     * @return The converter to {@code double}, or {@code null} if the conversion service does not convert without boxing
+     * @return The converter to {@code double} that parses it itself, or {@code null} if the conversion service converts with another converter, which is given the context of the value
      */
     public static @Nullable PrimitiveTargetTypeConverter<String, Double> doubleConverter(ConversionService conversionService) {
-        return conversionService.resolveConverter(String.class, Argument.DOUBLE) instanceof PrimitiveTargetTypeConverter<String, Double> primitive ? primitive : null;
+        return conversionService.resolveConverter(String.class, Argument.DOUBLE) instanceof PrimitiveTargetTypeConverter<String, Double> primitive ? primitive.primitiveConverter() : null;
     }
 
     /**
      * @param conversionService The conversion service
-     * @return The converter to {@code boolean}, or {@code null} if the conversion service does not convert without boxing
+     * @return The converter to {@code boolean} that parses it itself, or {@code null} if the conversion service converts with another converter, which is given the context of the value
      */
     public static @Nullable PrimitiveTargetTypeConverter<String, Boolean> booleanConverter(ConversionService conversionService) {
-        return conversionService.resolveConverter(String.class, Argument.BOOLEAN) instanceof PrimitiveTargetTypeConverter<String, Boolean> primitive ? primitive : null;
+        return conversionService.resolveConverter(String.class, Argument.BOOLEAN) instanceof PrimitiveTargetTypeConverter<String, Boolean> primitive ? primitive.primitiveConverter() : null;
     }
 }

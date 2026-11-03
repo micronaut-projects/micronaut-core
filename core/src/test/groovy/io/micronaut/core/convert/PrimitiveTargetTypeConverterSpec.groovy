@@ -129,6 +129,24 @@ class PrimitiveTargetTypeConverterSpec extends Specification {
         converter.getInt(new Target(), ConversionContext.DEFAULT) == 42
     }
 
+    void "a resolved converter has a primitive converter only while it holds a parser"() {
+        given:
+        def service = new DefaultMutableConversionService()
+        def converter = PrimitiveTargetTypeConverter.of(service.resolveConverter(String, Argument.INT))
+
+        expect:
+        converter.primitiveConverter() != null
+        converter.primitiveConverter().getInt("12", ConversionContext.DEFAULT) == 12
+        PrimitiveTargetTypeConverter.of({ String s, Class<Integer> t, ConversionContext c -> Optional.of(1) } as TypeConverter).primitiveConverter() == null
+
+        when: "a registrar replaces the built-in parser"
+        service.addInternalConverter(CharSequence, Integer, { CharSequence s, Class<Integer> t, ConversionContext c -> Optional.of(42) } as TypeConverter)
+
+        then:
+        converter.primitiveConverter() == null
+        converter.getInt("12", ConversionContext.DEFAULT) == 42
+    }
+
     static class Target {
     }
 

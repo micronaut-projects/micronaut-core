@@ -18,6 +18,7 @@ package io.micronaut.core.convert;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -124,6 +125,20 @@ public interface PrimitiveTargetTypeConverter<S, T> extends TypeConverter<S, T> 
      */
     default boolean getBoolean(S value, ConversionContext context) {
         return (Boolean) required(value, Argument.BOOLEAN, context);
+    }
+
+    /**
+     * The converter that converts to primitives itself, without calling
+     * {@link #convert(Object, Class, ConversionContext)}, which a caller may call with a context that does
+     * not record errors, e.g. {@link ConversionContext#DEFAULT}; or {@code null} if the primitive methods
+     * box through {@link #convert(Object, Class, ConversionContext)}, which needs the context of the
+     * argument. A converter that parses the primitive returns itself; a resolved converter returns the
+     * one it holds when that one does.
+     *
+     * @return The converter, or {@code null}
+     */
+    default @Nullable PrimitiveTargetTypeConverter<S, T> primitiveConverter() {
+        return null;
     }
 
     /**

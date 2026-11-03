@@ -34,6 +34,30 @@ class RoutePathVariablesPrimitiveSpec extends Specification {
         primitive.raw().getInt("id") == 12345
     }
 
+    void "a converter that replaces the built-in parser converts with the context of the variable"() {
+        given: "a converter that reads the argument of its context, and rejects a value it still returns"
+        def service = new DefaultMutableConversionService()
+        service.addInternalConverter(CharSequence, Integer, { CharSequence s, Class<Integer> t, io.micronaut.core.convert.ConversionContext c ->
+            if (s == "bad") {
+                c.reject(s, new IllegalArgumentException("rejected"))
+                return Optional.of(-1)
+            }
+            return Optional.of(((io.micronaut.core.convert.ArgumentConversionContext) c).argument.name.length())
+        } as io.micronaut.core.convert.TypeConverter)
+        def variables = new RoutePathVariables([id: "12345", bad: "bad"], [id: "12345", bad: "bad"], service)
+
+        expect:
+        variables.getInt("id") == 2
+        variables.findInt("id") == OptionalInt.of(2)
+
+        when:
+        variables.getInt("bad")
+
+        then:
+        def e = thrown(io.micronaut.core.convert.exceptions.ConversionErrorException)
+        e.message.contains("rejected")
+    }
+
     void "a value that does not convert fails as without the converters"() {
         when:
         plain."$method"(*args)
