@@ -443,13 +443,8 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
     }
 
     private static boolean isEC2Linux() {
-        if (readFile(EC2_LINUX_HYPERVISOR_FILE).startsWith("ec2")) {
-            return true;
-        } else if (readFile(EC2_LINUX_BIOS_VENDOR_FILE).toLowerCase(Locale.ROOT).startsWith("amazon ec2")) {
-            return true;
-        }
-
-        return false;
+        return readFile(EC2_LINUX_HYPERVISOR_FILE).startsWith("ec2")
+            || readFile(EC2_LINUX_BIOS_VENDOR_FILE).toLowerCase(Locale.ROOT).startsWith("amazon ec2");
     }
 
     private static String readFile(String path) {
