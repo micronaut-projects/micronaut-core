@@ -108,6 +108,26 @@ public final class PythonExceptions {
     }
 
     /**
+     * Returns the original Python exception carried by a Java failure when it belongs to the calling
+     * Python context. A proxy must raise this object on the Python side to preserve its type,
+     * identity and traceback. Exceptions from another context retain their Java representation.
+     *
+     * @param failure The failure returning through a Java proxy
+     * @return The original Python exception, or {@code null}
+     * @since 5.2.22
+     */
+    public static @Nullable Value original(Throwable failure) {
+        Value guest = null;
+        if (failure instanceof ValueCoercible coercible) {
+            guest = coercible.asPolyglotValue();
+        } else if (failure instanceof PolyglotException polyglot && polyglot.isGuestException()) {
+            guest = polyglot.getGuestObject();
+        }
+        return guest != null && PythonCoercion.isValueInContext(guest, Context.getCurrent()) && guest.isException()
+            ? guest : null;
+    }
+
+    /**
      * Positional argument {@code index} of the Python exception ({@code exception.args[index]}).
      *
      * @param exception The Python exception

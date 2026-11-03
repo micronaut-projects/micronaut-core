@@ -126,6 +126,10 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     private final List<BeanFieldElement> injectedFields = new ArrayList<>(5);
     private BeanConstructorElement constructorElement;
     private ClassElement[] exposedTypes;
+    /**
+     * The type arguments given with {@link #typeArgumentsForType(ClassElement, ClassElement...)}, by type name.
+     */
+    private @Nullable Map<String, Map<String, ClassElement>> superTypeArguments;
     private boolean intercepted;
 
     /**
@@ -376,6 +380,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         if (type != null) {
             final Map<String, ClassElement> typeArguments = type.getTypeArguments();
             Map<String, ClassElement> resolvedTypes = resolveTypeArguments(typeArguments, types);
+            if (resolvedTypes != null) {
+                if (superTypeArguments == null) {
+                    superTypeArguments = new LinkedHashMap<>();
+                }
+                superTypeArguments.put(type.getName(), resolvedTypes);
+            }
         }
         return this;
     }
@@ -753,7 +763,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     private <R> ElementBeanDefinitionBuilder<R> createBeanDefinitionBuilderInternal(ElementBeanDefinitionBuilderFactory<R> elementBeanDefinitionBuilderFactory) {
         addExposedTypes();
-        return createBeanDefinitionBuilder(elementBeanDefinitionBuilderFactory);
+        ElementBeanDefinitionBuilder<R> beanDefinitionBuilder = createBeanDefinitionBuilder(elementBeanDefinitionBuilderFactory);
+        if (superTypeArguments != null && beanDefinitionBuilder instanceof BeanDefinitionWriter beanDefinitionWriter) {
+            // The arguments given for a super type replace those the bean type resolves for it
+            beanDefinitionWriter.addTypeArguments(superTypeArguments);
+        }
+        return beanDefinitionBuilder;
     }
 
     private void addExposedTypes() {

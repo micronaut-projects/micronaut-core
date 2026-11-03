@@ -12,6 +12,8 @@ dependencies {
     compileOnly(projects.micronautHttpServer)
     // the listening sockets kept across generations exist only when the Netty server is present
     compileOnly(projects.micronautHttpServerNetty)
+    // the client connections kept across generations exist only when the Netty client is present
+    compileOnly(projects.micronautHttpClient)
     // the /dev endpoint exists only when the management module is present
     compileOnly(projects.micronautManagement)
     // the embedded Groovy compiler exists when the project's own Groovy is on the launch classpath
@@ -28,10 +30,12 @@ dependencies {
     compileOnly(libs.junit.platform.launcher)
     // attaches the agent to a JVM launched without -javaagent, when the project puts it on the classpath
     compileOnly(libs.bytebuddy.agent)
-    // the native macOS watch service, when micronaut-runtime-osx is on the development runtime classpath
+    // JNA, through which the native macOS watch service calls FSEvents when micronaut-runtime-osx is on the development runtime classpath
     compileOnly(libs.managed.methvin.directoryWatcher)
     // the threads of Reactor's schedulers get the parent tier's loader when Reactor is on the classpath
     compileOnly(libs.managed.reactor)
+    // Logback, when it is the application's SLF4J provider, is configured from the application's resources
+    compileOnly(libs.logback.classic)
 
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautHttp)
@@ -56,6 +60,8 @@ dependencies {
     testImplementation(libs.bytebuddy.agent)
     testImplementation(libs.junit.platform.launcher)
     testImplementation(projects.micronautRuntimeOsx)
+    // JNA, to call the FSEvents callback with native memory on any platform
+    testCompileOnly(libs.managed.methvin.directoryWatcher)
     testImplementation(libs.managed.kotlin.build.tools.impl)
     testImplementation(libs.managed.kotlin.stdlib)
     testImplementation(libs.ksp.aaEmbeddable)
@@ -129,6 +135,8 @@ noReflection {
     allowIn("io.micronaut.dev.DevRuntime", "INSTRUMENTATION")
     allowIn("io.micronaut.dev.InPlaceUpdates", "INSTRUMENTATION")
     allowIn("io.micronaut.dev.DevWatchService", "CLASS_LOADING")
+    // Logback is configured from the application's resources when it is present
+    allowIn("io.micronaut.dev.DevLogging", "CLASS_LOADING")
     // the route-declaring classes include the superclasses and interfaces of a route bean
     allowIn("io.micronaut.dev.http.DevRouter", "INTERFACES")
     // a class redefined in place is checked for being, or declaring, located routes, whose tables the router keeps per instance

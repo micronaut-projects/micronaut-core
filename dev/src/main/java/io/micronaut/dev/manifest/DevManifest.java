@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -117,6 +118,26 @@ public final class DevManifest {
     public static final String REQUESTS_RETAIN_SOCKETS = PREFIX + "requests.retain-sockets";
 
     /**
+     * The key of the host names, besides {@code localhost}, its subdomains and the loopback addresses, that the
+     * development pages and responses answer: a comma separated list, a name such as {@code dev.example.test} or an
+     * address. A request for any other host is refused, so that a page of another site whose name resolves to this
+     * machine cannot read them.
+     */
+    public static final String ALLOWED_HOSTS = PREFIX + "allowed-hosts";
+
+    /**
+     * The key of whether the development pages need the access token generated for each launch, which the launcher
+     * logs at startup as a link. On by default.
+     */
+    public static final String ACCESS_TOKEN_ENABLED = PREFIX + "access-token.enabled";
+
+    /**
+     * The key of whether the application's HTTP server listens on the loopback address unless its configuration says
+     * otherwise, so that other machines cannot reach it. Written by the build plugins in run mode; on by default.
+     */
+    public static final String BIND_LOOPBACK = PREFIX + "bind-loopback";
+
+    /**
      * The generation budget in a native image, where the classes of a retired generation are never unloaded: GraalVM's
      * runtime class loading keeps every class it defines, in a metaspace whose size is fixed when the image is built, and
      * the interpreter's data for them on the heap, for the life of the process.
@@ -176,6 +197,9 @@ public final class DevManifest {
     private final Duration requestHoldTimeout;
     private final Duration requestDrainTimeout;
     private final boolean retainServerSockets;
+    private final List<String> allowedHosts;
+    private final boolean accessTokenEnabled;
+    private final boolean bindLoopback;
 
     private DevManifest(Path directory, Properties properties) {
         this.directory = directory;
@@ -209,11 +233,18 @@ public final class DevManifest {
         this.requestHoldTimeout = duration(REQUESTS_HOLD_TIMEOUT, properties.getProperty(REQUESTS_HOLD_TIMEOUT), DEFAULT_HOLD_TIMEOUT);
         this.requestDrainTimeout = duration(REQUESTS_DRAIN_TIMEOUT, properties.getProperty(REQUESTS_DRAIN_TIMEOUT), DEFAULT_DRAIN_TIMEOUT);
         this.retainServerSockets = Boolean.parseBoolean(properties.getProperty(REQUESTS_RETAIN_SOCKETS, "true").trim());
+        this.allowedHosts = Arrays.stream(properties.getProperty(ALLOWED_HOSTS, "").split(",")).map(String::trim).filter(host -> !host.isEmpty()).toList();
+        this.accessTokenEnabled = protection(ACCESS_TOKEN_ENABLED, properties.getProperty(ACCESS_TOKEN_ENABLED));
+        this.bindLoopback = protection(BIND_LOOPBACK, properties.getProperty(BIND_LOOPBACK));
         String generationsDir = properties.getProperty(PREFIX + "generations");
-        this.generations = generationsDir == null ? projectDir.resolve("build").resolve("micronaut-dev").resolve("generations") : path(directory, generationsDir);
+        // test mode's apart from development mode's, as mnTest's manifest is from mnDev's: both may run at once
+        Path generationsParent = projectDir.resolve("build").resolve("micronaut-dev");
+        this.generations = generationsDir != null ? path(directory, generationsDir)
+            : (mode == DevMode.TEST ? generationsParent.resolve("test") : generationsParent).resolve("generations");
         this.liveReload = new LiveReload(
             Integer.parseInt(properties.getProperty(PREFIX + "livereload.port", "35729").trim()),
-            Boolean.parseBoolean(properties.getProperty(PREFIX + "livereload.inject-script", "true"))
+            Boolean.parseBoolean(properties.getProperty(PREFIX + "livereload.inject-script", "true")),
+            Arrays.stream(properties.getProperty(PREFIX + "livereload.allowed-origins", "").split(",")).map(String::trim).filter(origin -> !origin.isEmpty()).toList()
         );
         this.testSourceRoots = sourceRoots(directory, properties, TEST + SOURCES);
         this.testResourceRoots = resourceRoots(directory, properties, TEST + RESOURCES);
@@ -271,6 +302,24 @@ public final class DevManifest {
                     + (testSettings.initialRun() ? " when it runs the tests when it starts" : ": its first run takes the second generation"));
             }
         }
+    }
+
+    /**
+     * A setting that protects the development runtime: on unless set to {@code false}, and a value that is neither
+     * {@code true} nor {@code false} is refused rather than read as off.
+     */
+    private static boolean protection(String key, @Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        String trimmed = value.trim();
+        if (trimmed.equalsIgnoreCase("true")) {
+            return true;
+        }
+        if (trimmed.equalsIgnoreCase("false")) {
+            return false;
+        }
+        throw new IllegalArgumentException("Invalid " + key + ": " + trimmed + ", true or false");
     }
 
     /**
@@ -474,8 +523,9 @@ public final class DevManifest {
 
     /**
      * The directory the class loader snapshots each generation into, {@code micronaut.dev.generations}: by default
-     * {@code build/micronaut-dev/generations} under the project, which a Maven build points into {@code target}. The
-     * launcher owns it and empties it when it starts.
+     * {@code build/micronaut-dev/generations} under the project, {@code build/micronaut-dev/test/generations} in test
+     * mode, which a Maven build points into {@code target}. The launcher owns it and empties it when it starts; one
+     * another running process owns already is left to it, and the launcher takes {@code <directory>-2} or the next free.
      *
      * @return The directory
      */
@@ -519,7 +569,8 @@ public final class DevManifest {
     /**
      * How long a request that arrives while a batch is processed is held, {@value #REQUESTS_HOLD_TIMEOUT}: it is
      * served once the batch is done, by the generation that runs then, or answered with a 503 and a {@code Retry-After}
-     * when the batch takes longer. 30 seconds by default.
+     * when the batch takes longer. 30 seconds by default; the application's configuration may set it when the manifest
+     * does not (see {@link #sets(String)}).
      *
      * @return The timeout
      */
@@ -530,12 +581,28 @@ public final class DevManifest {
     /**
      * How long a restart waits for the requests in flight on the stopping generation, {@value #REQUESTS_DRAIN_TIMEOUT}:
      * they finish on the generation they started on. 10 seconds by default: a connection that never finishes, such as a
-     * websocket or an event stream, holds each restart this long.
+     * websocket or an event stream, holds each restart this long. The application's configuration may set it when the
+     * manifest does not (see {@link #sets(String)}).
      *
      * @return The timeout
      */
     public Duration requestDrainTimeout() {
         return requestDrainTimeout;
+    }
+
+    /**
+     * Whether the manifest, or a system property of the same name, sets a key rather than leaving it to its default. A
+     * setting the application's configuration may give as well, such as {@value #REQUESTS_HOLD_TIMEOUT} and
+     * {@value #REQUESTS_DRAIN_TIMEOUT}, is taken from the application only when the manifest leaves it out: what the
+     * launcher was told wins.
+     *
+     * @param key The key, with the {@code micronaut.dev.} prefix
+     * @return True when the manifest gives the key a value
+     * @since 5.3.0
+     */
+    public boolean sets(String key) {
+        String value = properties.getProperty(key);
+        return value != null && !value.isBlank();
     }
 
     /**
@@ -545,6 +612,36 @@ public final class DevManifest {
      */
     public boolean retainServerSockets() {
         return retainServerSockets;
+    }
+
+    /**
+     * The host names the development pages answer besides the loopback ones, {@value #ALLOWED_HOSTS}. The application's
+     * configuration may set them when the manifest does not (see {@link #sets(String)}).
+     *
+     * @return The names, empty by default
+     */
+    public List<String> allowedHosts() {
+        return allowedHosts;
+    }
+
+    /**
+     * Whether the development pages need the access token of the launch, {@value #ACCESS_TOKEN_ENABLED}. The
+     * application's configuration may turn it off when the manifest does not set it (see {@link #sets(String)}).
+     *
+     * @return True unless turned off
+     */
+    public boolean accessTokenEnabled() {
+        return accessTokenEnabled;
+    }
+
+    /**
+     * Whether the application's HTTP server listens on {@code localhost} unless its configuration, an environment
+     * variable or a system property sets {@code micronaut.server.host}, {@value #BIND_LOOPBACK}. Applies in run mode.
+     *
+     * @return True unless turned off
+     */
+    public boolean bindLoopback() {
+        return bindLoopback;
     }
 
     /**
@@ -878,7 +975,29 @@ public final class DevManifest {
      *
      * @param port The port the LiveReload server listens on
      * @param injectScript Whether the client script is added to HTML responses
+     * @param allowedOrigins The origins, or host names, whose pages the LiveReload socket accepts beside those of
+     *                       {@code localhost}, a {@code *.localhost} name and the loopback address, from
+     *                       {@code micronaut.dev.livereload.allowed-origins}; none by default
      */
-    public record LiveReload(int port, boolean injectScript) {
+    public record LiveReload(int port, boolean injectScript, List<String> allowedOrigins) {
+
+        /**
+         * The settings with no other origin allowed.
+         *
+         * @param port The port the LiveReload server listens on
+         * @param injectScript Whether the client script is added to HTML responses
+         */
+        public LiveReload(int port, boolean injectScript) {
+            this(port, injectScript, List.of());
+        }
+
+        /**
+         * @param port The port the LiveReload server listens on
+         * @param injectScript Whether the client script is added to HTML responses
+         * @param allowedOrigins The origins, or host names, the LiveReload socket accepts beside the loopback ones
+         */
+        public LiveReload {
+            allowedOrigins = List.copyOf(allowedOrigins);
+        }
     }
 }
