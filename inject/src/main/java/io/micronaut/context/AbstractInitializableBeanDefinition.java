@@ -2402,7 +2402,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return propertyResolver.containsProperty(value);
     }
 
-    private boolean resolveContainsValue(BeanResolutionContext resolutionContext, AnnotationMetadata parentAnnotationMetadata, Argument argument, boolean isValuePrefix) {
+    private boolean resolveContainsValue(BeanResolutionContext resolutionContext, AnnotationMetadata parentAnnotationMetadata, Argument<?> argument, boolean isValuePrefix) {
         PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
         if (propertyResolver == null) {
             return false;
