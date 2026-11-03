@@ -4,6 +4,7 @@ import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.type.Argument
 import spock.lang.Specification
 
+import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -75,6 +76,51 @@ class ConverterCacheSpec extends Specification {
         converted.get().name == "a"
         service.convert(new StringBuilder("b"), Target).isEmpty()
         !service.canConvert(StringBuilder, Target)
+    }
+
+    void "a converter registered for a primitive source type converts it"() {
+        given:
+        def service = new DefaultMutableConversionService()
+        service.addConverter(int, Target, { Integer i, Class<Target> t, ConversionContext c -> Optional.of(new Target("int:" + i)) } as TypeConverter)
+
+        expect:
+        service.canConvert(int, Target)
+        service.convert(1, int, Target, ConversionContext.DEFAULT).get().name == "int:1"
+    }
+
+    void "a resolved converter does not keep a removed converter of another pair"() {
+        given:
+        def service = new DefaultMutableConversionService()
+        def removed = new WeakReference<TypeConverter>(registerAndUse(service))
+        TypeConverter<String, Integer> converter = service.resolveConverter(String, Argument.of(Integer))
+
+        expect:
+        converter.convert("1", Integer, ConversionContext.of(Integer)).get() == 1
+
+        when:
+        service.removeConverter(StringBuilder, Target)
+        for (int i = 0; i < 20 && removed.get() != null; i++) {
+            System.gc()
+            Thread.sleep(50)
+        }
+
+        then:
+        removed.get() == null
+        converter != null
+    }
+
+    private static TypeConverter registerAndUse(DefaultMutableConversionService service) {
+        TypeConverter typeConverter = new BuilderConverter()
+        service.addConverter(StringBuilder, Target, typeConverter)
+        assert service.convert(new StringBuilder("a"), Target).get().name == "a"
+        return typeConverter
+    }
+
+    static class BuilderConverter implements TypeConverter<StringBuilder, Target> {
+        @Override
+        Optional<Target> convert(StringBuilder object, Class<Target> targetType, ConversionContext context) {
+            return Optional.of(new Target(object.toString()))
+        }
     }
 
     static class PausingConversionService extends DefaultMutableConversionService {
