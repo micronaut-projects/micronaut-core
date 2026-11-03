@@ -165,6 +165,11 @@ public class DefaultMutableConversionService implements MutableConversionService
     private final Map<ConvertiblePair, Registration> customConverterOwners = new ConcurrentHashMap<>();
 
     /**
+     * Whether this is the default conversion service itself, not a subclass that may override a conversion.
+     */
+    private final boolean exactClass = getClass() == DefaultMutableConversionService.class;
+
+    /**
      * Changed after each registration or removal of a converter, so that a converter of {@link #resolveConverter(Class, Argument)} resolves again.
      */
     private final AtomicInteger converterVersion = new AtomicInteger();
@@ -253,11 +258,8 @@ public class DefaultMutableConversionService implements MutableConversionService
         if (object == null || targetType == null || context == null) {
             return Optional.empty();
         }
-        if (targetType == Object.class) {
-            return Optional.of((T) object);
-        }
         targetType = targetType.isPrimitive() ? (Class<T>) ReflectionUtils.getWrapperType(targetType) : targetType;
-        if (targetType.isInstance(object) && !(object instanceof Iterable) && !(object instanceof Map)) {
+        if (isUnchanged(object, targetType)) {
             return Optional.of((T) object);
         }
 
@@ -270,7 +272,7 @@ public class DefaultMutableConversionService implements MutableConversionService
 
     @Override
     public <S, T> TypeConverter<S, T> resolveConverter(Class<S> sourceType, Argument<T> argument) {
-        if (getClass() != DefaultMutableConversionService.class) {
+        if (!exactClass) {
             // a subclass may override the conversion: it converts every value
             return MutableConversionService.super.resolveConverter(sourceType, argument);
         }
@@ -1086,13 +1088,21 @@ public class DefaultMutableConversionService implements MutableConversionService
             ConversionContext newContext = context.with(componentType);
 
             Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
-            String[] strings = object.toString().split(",", -1);
-            List<Object> list = new ArrayList<>();
-            for (String string : strings) {
-                Optional<?> converted = convert(string, targetComponentType, newContext);
+            // the tokens of split(",", -1), empty ones included, without the intermediate array
+            String text = object.toString();
+            List<Object> list = new ArrayList<>(countOf(text, ',') + 1);
+            int start = 0;
+            while (true) {
+                int end = text.indexOf(',', start);
+                String token = end < 0 ? text.substring(start) : text.substring(start, end);
+                Optional<?> converted = convert(token, targetComponentType, newContext);
                 if (converted.isPresent()) {
                     list.add(converted.get());
                 }
+                if (end < 0) {
+                    break;
+                }
+                start = end + 1;
             }
             return CollectionUtils.convertCollection((Class) targetType, list);
         });
@@ -1160,9 +1170,14 @@ public class DefaultMutableConversionService implements MutableConversionService
             if (targetType.isInstance(object) && targetComponentType == Object.class) {
                 return Optional.of(object);
             }
-            List<Object> list = new ArrayList<>();
+            List<Object> list = object instanceof Collection<?> collection ? new ArrayList<>(collection.size()) : new ArrayList<>();
             ConversionContext newContext = context.with(componentType);
             for (Object o : object) {
+                if (exactClass && o != null && isUnchanged(o, targetComponentType)) {
+                    // the element as convert returns it, without converting it: a subclass may override convert
+                    list.add(o);
+                    continue;
+                }
                 Optional<?> converted = convert(o, targetComponentType, newContext);
                 if (converted.isPresent()) {
                     list.add(converted.get());
@@ -1352,6 +1367,24 @@ public class DefaultMutableConversionService implements MutableConversionService
             }
         }
         return UNCONVERTIBLE;
+    }
+
+    /**
+     * Whether {@link #convert(Object, Class, Class, ConversionContext)} returns the value as it is: the
+     * target is {@link Object}, or the value is an instance of it that is not a collection or a map, since
+     * those convert their elements.
+     */
+    private static boolean isUnchanged(Object value, Class<?> wrappedTargetType) {
+        return wrappedTargetType == Object.class
+            || wrappedTargetType.isInstance(value) && !(value instanceof Iterable) && !(value instanceof Map);
+    }
+
+    private static int countOf(String text, char character) {
+        int count = 0;
+        for (int i = text.indexOf(character); i >= 0; i = text.indexOf(character, i + 1)) {
+            count++;
+        }
+        return count;
     }
 
     private List<Class<?>> resolveHierarchy(Class<?> sourceType) {
