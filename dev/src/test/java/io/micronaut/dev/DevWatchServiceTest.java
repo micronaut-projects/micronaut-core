@@ -20,6 +20,26 @@ class DevWatchServiceTest {
     }
 
     @Test
+    void theNativeServiceIsLookedForWithoutInitializingItsClass() {
+        ClassLoader loader = DevWatchServiceTest.class.getClassLoader();
+        // as JNA's Native, whose initializer loads its native library
+        assertTrue(DevWatchService.isPresent(Initialized.class.getName(), loader));
+        // read from another class: reading one of its own would initialize it
+        assertEquals(false, Marker.initialized);
+        assertEquals(false, DevWatchService.isPresent("io.micronaut.dev.Missing", loader));
+    }
+
+    static final class Initialized {
+        static {
+            Marker.initialized = true;
+        }
+    }
+
+    static final class Marker {
+        static boolean initialized;
+    }
+
+    @Test
     void elsewhereTheJdksServiceIsUsed() throws Exception {
         DevWatchService watch = DevWatchService.create(false, false, false);
         try (WatchService jdk = FileSystems.getDefault().newWatchService()) {

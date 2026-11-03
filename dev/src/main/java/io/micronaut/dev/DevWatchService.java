@@ -17,7 +17,6 @@ package io.micronaut.dev;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import org.slf4j.Logger;
@@ -70,7 +69,26 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     static DevWatchService create() throws IOException {
         boolean mac = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
-        return create(mac, NativeImageUtils.inImageRuntimeCode(), ClassUtils.isPresent(JNA, DevWatchService.class.getClassLoader()));
+        boolean nativeImage = NativeImageUtils.inImageRuntimeCode();
+        // looked for only where the native service can run: JNA prints an error to the console when it loads its
+        // library in a native image, whose JNI does not find the classes the library looks up
+        return create(mac, nativeImage, mac && !nativeImage && isPresent(JNA, DevWatchService.class.getClassLoader()));
+    }
+
+    /**
+     * Whether a class exists, without initializing it: initializing JNA's {@code Native} loads its native library.
+     *
+     * @param name The name of the class
+     * @param classLoader The loader to look in
+     * @return Whether the class exists
+     */
+    static boolean isPresent(String name, ClassLoader classLoader) {
+        try {
+            Class.forName(name, false, classLoader);
+            return true;
+        } catch (ClassNotFoundException | LinkageError e) {
+            return false;
+        }
     }
 
     /**
