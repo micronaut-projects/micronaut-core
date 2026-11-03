@@ -1435,7 +1435,7 @@ public final class DevRuntime implements Closeable {
      * processors create kept quiet: see {@link Compilations#round} and {@link DevLogging#quietCompilation()}.
      */
     CompileRound compileRound(DevManifest target, Map<SourceKind, SourceKind> joint, Map<SourceKind, SourceChanges> changes, boolean full, Set<String> seed) {
-        try (OutputLock.Hold hold = outputLock.lock(); DevLogging.Quiet quiet = DevLogging.quietCompilation()) {
+        try (OutputLock.Hold hold = outputLock.lock(); DevLogging.Quiet _ = DevLogging.quietCompilation()) {
             return Compilations.round(compilers, target, joint, changes, full, seed);
         }
     }
