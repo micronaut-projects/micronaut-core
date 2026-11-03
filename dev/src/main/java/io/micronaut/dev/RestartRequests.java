@@ -17,6 +17,7 @@ package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.reload.RequestAdmission;
 import io.micronaut.dev.http.DevServerSockets;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
@@ -31,6 +32,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -42,19 +44,30 @@ import java.util.function.BooleanSupplier;
  * generation to the next, so that a connection made during a restart waits for the next generation instead of being
  * refused.
  *
- * <p>Only the runtime's reload thread starts, finishes and restarts batches; any thread may wait for admission.
+ * <p>Only the runtime's reload thread starts, finishes and restarts batches; any thread may wait for admission. The
+ * runtime installs it as the process's {@link RequestAdmission} while it runs the application, so that a server
+ * runtime holding requests at its own level, below the gate filter, holds them for the same batches: it holds nothing
+ * of a generation, and a server kept across restarts may keep it.
  *
  * @author graemerocher
  * @since 5.3.0
  */
-final class RestartRequests {
+final class RestartRequests implements RequestAdmission {
 
     // the runtime's logger: these are the runtime's messages
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
     private static final Duration SERVER_START_WAIT = Duration.ofSeconds(10);
 
-    private final Duration drainTimeout;
+    private final DevManifest manifest;
+    /**
+     * The timeouts in force: the manifest's when it sets them, otherwise the running generation's configuration's,
+     * otherwise the defaults. Read again when a generation starts and when a batch is done, so that a configuration
+     * refreshed in place counts too; never per request.
+     */
+    private volatile Duration holdTimeout;
+    private volatile Duration drainTimeout;
     private final @Nullable DevServerSockets serverSockets;
+    private final DevAccess access;
     /**
      * Completes when the requests the gate holds may proceed: when the batch is done, or when a restart drains the
      * generation they arrived on, which serves them before it stops.
@@ -65,16 +78,48 @@ final class RestartRequests {
      * @param manifest The manifest
      * @param retainSockets Whether the listening sockets are kept bound across generations
      */
-    RestartRequests(DevManifest manifest, boolean retainSockets) {
+    RestartRequests(DevManifest manifest, boolean retainSockets) { // NOSONAR java:S2637 every field is set below, the timeouts from the manifest's non-null defaults
+        this.manifest = manifest;
+        this.holdTimeout = manifest.requestHoldTimeout();
         this.drainTimeout = manifest.requestDrainTimeout();
-        this.serverSockets = retainSockets ? new DevServerSockets() : null;
+        this.access = DevAccess.of(manifest);
+        // what answers while no generation runs answers the same hosts as the generations do
+        this.serverSockets = retainSockets ? new DevServerSockets(access::allowsHost) : null;
     }
 
     /**
      * @return The future that completes when a request that arrived during a batch may proceed
      */
-    CompletableFuture<Void> whenAdmitted() {
+    CompletableFuture<Void> admission() {
         return admitted;
+    }
+
+    @Override
+    public boolean isAdmitted() {
+        return admitted.isDone();
+    }
+
+    @Override
+    public CompletionStage<Void> whenAdmitted() {
+        // a stage a caller cannot complete: completing it would let requests through in the middle of a batch
+        return admitted.minimalCompletionStage();
+    }
+
+    @Override
+    public Duration holdTimeout() {
+        return holdTimeout;
+    }
+
+    @Override
+    public Duration drainTimeout() {
+        return drainTimeout;
+    }
+
+    /**
+     * @return Who may reach the development pages of this launch
+     */
+    DevAccess access() {
+        return access;
     }
 
     /**
@@ -101,11 +146,14 @@ final class RestartRequests {
     }
 
     /**
-     * The batch is done: the servers accept again, and the requests it held proceed.
+     * The batch is done: the timeouts follow the configuration of the generation that runs now, which the batch may
+     * have refreshed in place, the servers accept again, and the requests it held proceed.
      *
      * @param admission The admission {@link #batchStarted()} returned
+     * @param running The generation running now, if any
      */
-    void batchDone(CompletableFuture<Void> admission) {
+    void batchDone(CompletableFuture<Void> admission, @Nullable ApplicationContext running) {
+        configure(running);
         DevServerSockets sockets = serverSockets;
         if (sockets != null) {
             sockets.resume();
@@ -128,14 +176,12 @@ final class RestartRequests {
 
     /**
      * The next generation failed to start: no generation runs until the next batch, so a request is answered at once
-     * rather than left waiting.
-     *
-     * @param failure Why it failed
+     * rather than left waiting, with a generic 503: why it failed is in the console, not in a response.
      */
-    void startFailed(RuntimeException failure) {
+    void startFailed() {
         DevServerSockets sockets = serverSockets;
         if (sockets != null) {
-            sockets.serveUnavailable(failure.getMessage() == null ? failure.getClass().getName() : failure.getMessage());
+            sockets.serveUnavailable();
         }
     }
 
@@ -156,6 +202,9 @@ final class RestartRequests {
      * @return Whether the generation's context defines an HTTP server, for the runtime to tell whether it runs
      */
     boolean started(ApplicationContext fresh, BooleanSupplier current, BooleanSupplier launching) {
+        if (current.getAsBoolean()) {
+            configure(fresh);
+        }
         // the servers are created after the context starts: the definition says one is coming before any is registered,
         // and a retained socket is bound only once a server claimed it. Looked up first: a context whose server
         // cannot bind stops again, and then no longer tells
@@ -175,6 +224,41 @@ final class RestartRequests {
             }
         }
         return definesServer;
+    }
+
+    /**
+     * Takes the hold and drain timeouts the manifest leaves out from a generation's configuration,
+     * {@value DevManifest#REQUESTS_HOLD_TIMEOUT} and {@value DevManifest#REQUESTS_DRAIN_TIMEOUT} in
+     * {@code application.properties} for instance: the manifest wins, then the application, then the defaults. A value
+     * that is not a duration, or is negative, is ignored with a warning.
+     *
+     * @param generation The generation, or null when none runs, which leaves the timeouts as they are
+     */
+    void configure(@Nullable ApplicationContext generation) {
+        if (generation == null) {
+            return;
+        }
+        access.configure(generation);
+        holdTimeout = configured(generation, DevManifest.REQUESTS_HOLD_TIMEOUT, manifest.requestHoldTimeout());
+        drainTimeout = configured(generation, DevManifest.REQUESTS_DRAIN_TIMEOUT, manifest.requestDrainTimeout());
+    }
+
+    private Duration configured(ApplicationContext generation, String key, Duration fromManifest) {
+        if (manifest.sets(key)) {
+            return fromManifest;
+        }
+        try {
+            Optional<Duration> value = generation.getEnvironment().getProperty(key, Duration.class);
+            if (value.isPresent() && value.get().isNegative()) {
+                LOG.warn("Ignoring the negative {} of the application's configuration: {}", key, value.get());
+                return fromManifest;
+            }
+            return value.orElse(fromManifest);
+        } catch (RuntimeException e) {
+            // not a duration, or a context stopped meanwhile: the default holds
+            LOG.warn("Ignoring the {} of the application's configuration: {}", key, e.getMessage());
+            return fromManifest;
+        }
     }
 
     /**
@@ -202,7 +286,7 @@ final class RestartRequests {
 
     /**
      * Shuts the HTTP servers of a generation down gracefully before the context stops: they stop accepting, close their
-     * idle connections, and let every request in flight finish, within {@link DevManifest#requestDrainTimeout()}. A
+     * idle connections, and let every request in flight finish, within {@link #drainTimeout()}. A
      * request that would otherwise still run while the context destroys its beans fails half way through.
      */
     private void drain(ApplicationContext context, int generation) {

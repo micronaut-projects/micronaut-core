@@ -1254,6 +1254,8 @@ public class DefaultMutableConversionService implements MutableConversionService
             ConversionContext valContext = context.with(valArgument);
 
             Map<Object, Object> newMap = isProperties ? new Properties() : new LinkedHashMap<>();
+            // Only an explicitly nullable value type opts into keeping null entries.
+            boolean keepsNull = !isProperties && valArgument.isNullable();
 
             for (Object o : object.entrySet()) {
                 Map.Entry<?, ?> entry = (Map.Entry) o;
@@ -1267,7 +1269,11 @@ public class DefaultMutableConversionService implements MutableConversionService
                         continue;
                     }
                 }
-                if (!valueType.isInstance(value) || value instanceof Map || value instanceof Collection) {
+                if (value == null) {
+                    if (!keepsNull) {
+                        continue;
+                    }
+                } else if (!valueType.isInstance(value) || value instanceof Map || value instanceof Collection) {
                     Optional<?> converted = convert(value, valueType, valContext);
                     if (converted.isPresent()) {
                         value = converted.get();

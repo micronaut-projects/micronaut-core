@@ -53,6 +53,7 @@ class DevManifestSpec extends Specification {
             micronaut.dev.build-tool.trigger=build/micronaut-dev/reload
             micronaut.dev.retain=javax.sql.DataSource, org.graalvm.polyglot.Engine
             micronaut.dev.livereload.port=36000
+            micronaut.dev.livereload.allowed-origins=http://devbox.lan:8080, app-container ,
         """.stripIndent())
 
         when:
@@ -82,6 +83,7 @@ class DevManifestSpec extends Specification {
         manifest.retain() == ["javax.sql.DataSource", "org.graalvm.polyglot.Engine"]
         manifest.liveReload().port() == 36000
         manifest.liveReload().injectScript()
+        manifest.liveReload().allowedOrigins() == ["http://devbox.lan:8080", "app-container"]
     }
 
     void "the defaults apply"() {
@@ -97,6 +99,7 @@ class DevManifestSpec extends Specification {
         manifest.strategy() == DevReloadStrategy.AUTO
         manifest.compileMode(SourceKind.JAVA) == CompileMode.EMBEDDED
         manifest.liveReload().port() == 35729
+        manifest.liveReload().allowedOrigins().isEmpty()
     }
 
     void "a test manifest reads the test settings, and compiles a test language without an output beside the application's"() {
@@ -186,5 +189,39 @@ class DevManifestSpec extends Specification {
 
         then:
         !DevManifest.of(dir, properties).retainAnnotated()
+    }
+
+    void "the protections are on unless set to false, and a value that is neither true nor false is refused"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes")
+
+        expect:
+        DevManifest.of(dir, properties).accessTokenEnabled()
+        DevManifest.of(dir, properties).bindLoopback()
+        DevManifest.of(dir, properties).allowedHosts().isEmpty()
+
+        when:
+        properties.setProperty(DevManifest.ACCESS_TOKEN_ENABLED, "FALSE")
+        properties.setProperty(DevManifest.BIND_LOOPBACK, " false ")
+        properties.setProperty(DevManifest.ALLOWED_HOSTS, "devbox.lan, app-container")
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then:
+        !manifest.accessTokenEnabled()
+        !manifest.bindLoopback()
+        manifest.allowedHosts() == ["devbox.lan", "app-container"]
+
+        when:
+        properties.setProperty(key, "flase")
+        DevManifest.of(dir, properties)
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message.contains(key)
+
+        where:
+        key << [DevManifest.ACCESS_TOKEN_ENABLED, DevManifest.BIND_LOOPBACK]
     }
 }

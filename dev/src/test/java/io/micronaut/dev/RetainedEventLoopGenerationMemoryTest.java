@@ -1,5 +1,6 @@
 package io.micronaut.dev;
 
+import com.sun.net.httpserver.HttpServer;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.dev.manifest.DevManifest;
 import io.netty.channel.EventLoopGroup;
@@ -8,7 +9,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.ref.WeakReference;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -17,15 +20,18 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The first generation of an application whose HTTP server and declarative client ran on the event loops retained
+ * The first generation of an application whose HTTP server and declarative clients ran on the event loops retained
  * across restarts is collected: what the first generation's channels left on the retained event loop threads, their
- * context class loader, their thread locals and their recyclers, does not keep it.
+ * context class loader, their thread locals and their recyclers, does not keep it, nor does the client connection the
+ * next generations took back, which the remote it is connected to accepted once.
  * <p>The application runs in a JVM of its own: Netty must not have been initialized there by any other test.</p>
  */
 class RetainedEventLoopGenerationMemoryTest {
@@ -95,13 +101,34 @@ class RetainedEventLoopGenerationMemoryTest {
             try (ServerSocket socket = new ServerSocket(0)) {
                 port = socket.getLocalPort();
             }
+            // a remote whose connections the client keeps across the restarts
+            Set<InetSocketAddress> accepted = ConcurrentHashMap.newKeySet();
+            HttpServer upstream = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            upstream.createContext("/echo", exchange -> {
+                accepted.add(exchange.getRemoteAddress());
+                byte[] body = "upstream".getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().add("Content-Type", "text/plain");
+                exchange.sendResponseHeaders(200, body.length);
+                try (OutputStream out = exchange.getResponseBody()) {
+                    out.write(body);
+                }
+            });
+            upstream.start();
+            try {
+                return run(project, port, upstream, accepted);
+            } finally {
+                upstream.stop(0);
+            }
+        }
+
+        private static int run(Path project, int port, HttpServer upstream, Set<InetSocketAddress> accepted) throws Exception {
             Path src = Files.createDirectories(project.resolve("src/main/java/app"));
             Files.writeString(src.resolve("Application.java"), """
                 package app;
                 public class Application {
                     public static void main(String[] args) {
                         io.micronaut.runtime.Micronaut.build(args)
-                            .properties(java.util.Map.of("spec.name", "RetainedEventLoopGenerationMemoryTest", "micronaut.server.port", args[0]))
+                            .properties(java.util.Map.of("spec.name", "RetainedEventLoopGenerationMemoryTest", "micronaut.server.port", args[0], "upstream.url", args[1]))
                             .mainClass(Application.class)
                             .start();
                     }
@@ -113,6 +140,14 @@ class RetainedEventLoopGenerationMemoryTest {
                 public interface HelloClient {
                     @io.micronaut.http.annotation.Get(value = "/hello", consumes = "text/plain")
                     String hello();
+                }
+                """);
+            Files.writeString(src.resolve("UpstreamClient.java"), """
+                package app;
+                @io.micronaut.http.client.annotation.Client("${upstream.url}")
+                public interface UpstreamClient {
+                    @io.micronaut.http.annotation.Get(value = "/echo", consumes = "text/plain")
+                    String echo();
                 }
                 """);
             Files.writeString(src.resolve("HelloController.java"), controller("hello-1"));
@@ -128,7 +163,7 @@ class RetainedEventLoopGenerationMemoryTest {
                 micronaut.dev.compile.java.output=build/classes
                 micronaut.dev.patch-in-place=false
                 """);
-            DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[] {String.valueOf(port)});
+            DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[] {String.valueOf(port), "http://127.0.0.1:" + upstream.getAddress().getPort()});
             try {
                 expect(port, "hello-1");
                 WeakReference<ClassLoader> first = firstLoader(runtime);
@@ -141,6 +176,10 @@ class RetainedEventLoopGenerationMemoryTest {
                 }
                 if (group.get() != defaultGroup(runtime).get()) {
                     System.out.println(PROBE + "the event loop group was not retained");
+                    return 1;
+                }
+                if (accepted.size() != 1) {
+                    System.out.println(PROBE + "the client connection was not kept: the remote accepted " + accepted);
                     return 1;
                 }
                 long deadline = System.nanoTime() + Duration.ofSeconds(60).toNanos();
@@ -169,14 +208,19 @@ class RetainedEventLoopGenerationMemoryTest {
                 @io.micronaut.http.annotation.Controller
                 public class HelloController {
                     private final HelloClient client;
-                    HelloController(HelloClient client) {
+                    private final UpstreamClient upstream;
+                    HelloController(HelloClient client, UpstreamClient upstream) {
                         this.client = client;
+                        this.upstream = upstream;
                     }
                     @io.micronaut.http.annotation.Get(value = "/hello", produces = "text/plain")
                     public String hello() { return "%s"; }
                     @io.micronaut.http.annotation.Get(value = "/client", produces = "text/plain")
                     @io.micronaut.scheduling.annotation.ExecuteOn(io.micronaut.scheduling.TaskExecutors.BLOCKING)
                     public String client() { return client.hello(); }
+                    @io.micronaut.http.annotation.Get(value = "/upstream", produces = "text/plain")
+                    @io.micronaut.scheduling.annotation.ExecuteOn(io.micronaut.scheduling.TaskExecutors.BLOCKING)
+                    public String upstream() { return upstream.echo(); }
                 }
                 """.formatted(hello);
         }
@@ -200,6 +244,10 @@ class RetainedEventLoopGenerationMemoryTest {
             String viaClient = get(port, "/client");
             if (!direct.equals(hello) || !viaClient.equals(hello)) {
                 throw new IllegalStateException("expected " + hello + ", got " + direct + " and " + viaClient + " through the client");
+            }
+            String viaUpstream = get(port, "/upstream");
+            if (!viaUpstream.equals("upstream")) {
+                throw new IllegalStateException("expected the upstream's answer, got " + viaUpstream);
             }
         }
 

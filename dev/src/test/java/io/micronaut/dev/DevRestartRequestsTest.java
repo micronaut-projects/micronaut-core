@@ -144,6 +144,9 @@ class DevRestartRequestsTest {
             String unavailable = get("/hello");
             assertTrue(unavailable.startsWith("503 "), unavailable);
             assertTrue(unavailable.contains("The application is not running"), unavailable);
+            // why it failed is in the console, not in a response a peer on the network can read
+            assertFalse(unavailable.contains("boom"), unavailable);
+            assertFalse(unavailable.contains("IllegalStateException"), unavailable);
             assertTrue(rawGet("/hello").contains("\r\nRetry-After: 1\r\n"));
 
             // the fix: the next generation accepts on the same socket
@@ -217,9 +220,9 @@ class DevRestartRequestsTest {
     void aFirstGenerationWhoseServerCannotBindIsReportedFailedNotStarted() throws Exception {
         DevRuntime runtime;
         // the port is taken before the application starts: its server cannot bind, and its context stops again.
-        // Netty binds the IPv6 wildcard, so the port is held dual stack
+        // The launcher binds the server to localhost, so the port is held on that address
         try (ServerSocket occupied = new ServerSocket()) {
-            occupied.bind(new InetSocketAddress(port));
+            occupied.bind(new InetSocketAddress("localhost", port));
             runtime = launch();
         }
         try {
@@ -238,6 +241,8 @@ class DevRestartRequestsTest {
                 .toList();
             assertEquals(1, failures.size(), messages.toString());
             assertTrue(failures.get(0).getFormattedMessage().contains(String.valueOf(port)), failures.get(0).getFormattedMessage());
+            // the development mode note waits for a generation that runs
+            assertEquals(0, notices());
 
             // once the port is free, the next change starts a generation that serves
             Files.writeString(src.resolve("Greeter.java"), greeter(1));
@@ -245,6 +250,7 @@ class DevRestartRequestsTest {
             assertTrue(runtime.awaitGeneration(2, Duration.ofMinutes(2)).isRunning());
             assertEquals("200 greeting-1", get("/hello"));
             assertFalse(runtime.isStartFailed());
+            assertEquals(1, notices());
         } finally {
             runtime.close();
         }
@@ -270,6 +276,10 @@ class DevRestartRequestsTest {
         } finally {
             runtime.close();
         }
+    }
+
+    private long notices() {
+        return logged.list.stream().filter(event -> event.getFormattedMessage().contains(DevModeNotice.HEADLINE)).count();
     }
 
     private DevRuntime launch() throws IOException {
