@@ -74,6 +74,7 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
     /**
      * Constant for {@code List<String>} argument.
      */
+    @SuppressWarnings("java:S3740") // the raw type is public API
     ArgumentConversionContext<Map> MAP = immutable(Argument.of(Map.class));
 
     /**
