@@ -292,7 +292,11 @@ public class DefaultMutableConversionService implements MutableConversionService
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
         TypeConverter<Object, T> typeConverter = findConverter(pair, cache);
         if (typeConverter == null) {
-            typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
+            // the exact pair first: the hierarchy of a primitive source type is empty
+            typeConverter = customConverters.get(pair);
+            if (typeConverter == null) {
+                typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
+            }
             cache.put(pair, typeConverter);
         }
         return typeConverter;
@@ -1449,6 +1453,10 @@ public class DefaultMutableConversionService implements MutableConversionService
      * A generation of the converters looked up for pairs.
      */
     private static final class ConverterCache {
+        /**
+         * Identifies the generation without holding its converters, for a resolution that outlives it.
+         */
+        private final Object generation = new Object();
         private final Map<ConvertiblePair, TypeConverter> converters = new ConcurrentHashMap<>();
 
         void put(ConvertiblePair pair, TypeConverter<?, ?> typeConverter) {
@@ -1566,8 +1574,8 @@ public class DefaultMutableConversionService implements MutableConversionService
             // the generation is read before the lookup: a converter registered during it makes the next conversion look up again
             ConverterCache cache = conversionService.converterCache;
             Resolution<T> current = resolution;
-            if (current == null || current.cache != cache) {
-                current = new Resolution<>(cache, conversionService.resolveTypeConverter(sourceType, targetType, formattingAnnotation, cache));
+            if (current == null || current.generation != cache.generation) {
+                current = new Resolution<>(cache.generation, conversionService.resolveTypeConverter(sourceType, targetType, formattingAnnotation, cache));
                 resolution = current;
             }
             return current.typeConverter;
@@ -1576,11 +1584,11 @@ public class DefaultMutableConversionService implements MutableConversionService
         /**
          * The converter, as looked up in a generation of the converters.
          *
-         * @param cache         The generation it was looked up in
+         * @param generation    The generation it was looked up in, not its converters: a resolution keeps no replaced cache alive
          * @param typeConverter The converter
          * @param <T>           The target type
          */
-        private record Resolution<T>(ConverterCache cache, TypeConverter<Object, T> typeConverter) {
+        private record Resolution<T>(Object generation, TypeConverter<Object, T> typeConverter) {
         }
     }
 }
