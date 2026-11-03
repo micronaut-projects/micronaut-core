@@ -239,7 +239,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Nullable
     @SuppressWarnings("java:S3077") // volatile only publishes the double-checked creation, the convertor synchronizes itself
-    private volatile BodyConvertor bodyConvertor;
+    private volatile BodyConvertor<?> bodyConvertor;
     /**
      * The request that the request filters passed downstream, when they replaced this one. It is
      * set before the response is produced, and read when the response is written, after the
