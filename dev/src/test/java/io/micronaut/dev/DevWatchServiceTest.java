@@ -29,6 +29,16 @@ class DevWatchServiceTest {
         assertEquals(false, DevWatchService.isPresent("io.micronaut.dev.Missing", loader));
     }
 
+    @Test
+    void theNativeServiceIsLookedForOnlyOnMacOsOutsideANativeImage() {
+        ClassLoader loader = DevWatchServiceTest.class.getClassLoader();
+        // the test classpath has JNA, through micronaut-runtime-osx
+        assertTrue(DevWatchService.macServicePresent(true, false, loader));
+        assertEquals(false, DevWatchService.macServicePresent(false, false, loader));
+        assertEquals(false, DevWatchService.macServicePresent(true, true, loader));
+        assertEquals(false, DevWatchService.macServicePresent(true, false, new java.net.URLClassLoader(new java.net.URL[0], null)));
+    }
+
     static final class Initialized {
         static {
             Marker.initialized = true;

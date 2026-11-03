@@ -212,7 +212,7 @@ final class DevLogging {
     /**
      * What touches Logback's classes, loaded only once Logback is known to be present.
      */
-    private static final class Logback {
+    static final class Logback {
 
         private static final String NONE = "";
         // what Logback was configured with last, JVM-wide as Logback is
@@ -222,23 +222,25 @@ final class DevLogging {
         }
 
         static Quiet quiet(String name) {
-            try {
-                if (LoggerFactory.getILoggerFactory() instanceof LoggerContext context) {
-                    ch.qos.logback.classic.Logger logger = context.getLogger(name);
-                    // a level of the application's configuration applies as it is, the logger's own or a package's
-                    if (!configured(context, name) && logger.getEffectiveLevel().toInt() <= Level.INFO_INT) {
-                        logger.setLevel(Level.WARN);
-                        return () -> {
-                            if (logger.getLevel() == Level.WARN) {
-                                logger.setLevel(null);
-                            }
-                        };
-                    }
-                }
-            } catch (RuntimeException | LinkageError e) {
-                LOG.debug("The environments of a compilation could not be kept quiet", e);
+            if (LoggerFactory.getILoggerFactory() instanceof LoggerContext context) {
+                return quiet(context, name);
             }
             return Quiet.NONE;
+        }
+
+        static Quiet quiet(LoggerContext context, String name) {
+            ch.qos.logback.classic.Logger logger = context.getLogger(name);
+            // a level of the application's configuration applies as it is, the logger's own or a package's
+            if (configured(context, name) || logger.getEffectiveLevel().toInt() > Level.INFO_INT) {
+                return Quiet.NONE;
+            }
+            logger.setLevel(Level.WARN);
+            return () -> {
+                // unless a new configuration set another meanwhile
+                if (logger.getLevel() == Level.WARN) {
+                    logger.setLevel(null);
+                }
+            };
         }
 
         /**

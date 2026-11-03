@@ -70,9 +70,21 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
     static DevWatchService create() throws IOException {
         boolean mac = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
         boolean nativeImage = NativeImageUtils.inImageRuntimeCode();
-        // looked for only where the native service can run: JNA prints an error to the console when it loads its
-        // library in a native image, whose JNI does not find the classes the library looks up
-        return create(mac, nativeImage, mac && !nativeImage && isPresent(JNA, DevWatchService.class.getClassLoader()));
+        return create(mac, nativeImage, macServicePresent(mac, nativeImage, DevWatchService.class.getClassLoader()));
+    }
+
+    /**
+     * Whether JNA, which the native macOS service calls FSEvents through, is on the classpath, looked for only where
+     * the service can run: JNA prints an error to the console when it loads its library in a native image, whose JNI
+     * does not find the classes the library looks up.
+     *
+     * @param mac Whether the platform is macOS
+     * @param nativeImage Whether this runs in a native image
+     * @param classLoader The loader to look in
+     * @return Whether the native service can be created
+     */
+    static boolean macServicePresent(boolean mac, boolean nativeImage, ClassLoader classLoader) {
+        return mac && !nativeImage && isPresent(JNA, classLoader);
     }
 
     /**
