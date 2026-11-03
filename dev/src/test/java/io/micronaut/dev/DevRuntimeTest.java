@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -123,8 +122,8 @@ class DevRuntimeTest {
             assertSame(pool, second.getBean(RetainedPool.class));
             assertEquals(1, RetainedPool.CREATED.get());
             assertEquals(0, RetainedPool.DESTROYED.get());
-            // the pool, and the HTTP server's event loop groups
-            assertEquals(2, runtime.retainedCount());
+            // the pool, the HTTP server's event loop groups and the HTTP clients' kept connections
+            assertEquals(3, runtime.retainedCount());
             assertTrue(runtime.lastFailure().isEmpty());
 
             // a broken edit: the compilation fails, generation two keeps running, the failure is reported
@@ -397,6 +396,170 @@ class DevRuntimeTest {
         }
     }
 
+    @Test
+    void aResourceThatIsNotConfigurationUnderTheConfigurationRootReachesTheResourceWatches() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Path resources = Files.createDirectories(project.resolve("src/main/resources"));
+        Path schema = Files.createDirectories(resources.resolve("graphql")).resolve("schema.graphqls");
+        Files.writeString(schema, "type Query { hello: String }");
+        Path config = resources.resolve("application.properties");
+        Files.writeString(config, "app.label=alpha\n");
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            List<ResourceChange> schemas = new CopyOnWriteArrayList<>();
+            List<ResourceChange> configuration = new CopyOnWriteArrayList<>();
+            ((DefaultBeanContext) first).resources(ResourceKind.CONFIG).include("**/*.graphqls").watch(schemas::add);
+            ((DefaultBeanContext) first).resources(ResourceKind.CONFIG).include("*.properties").watch(configuration::add);
+            assertTrue(schemas.get(0).initial());
+            schemas.clear();
+            configuration.clear();
+
+            // the schema is edited: the watch is told, nothing restarts and the configuration is not what changed
+            Files.writeString(schema, "type Query { hello: String, bye: String }");
+            runtime.changed(List.of(schema), List.of());
+            assertTrue(schemas.stream().anyMatch(change -> !change.initial() && change.changed().contains(schema.toAbsolutePath())), schemas.toString());
+            assertTrue(configuration.isEmpty(), configuration.toString());
+            assertEquals(1, runtime.generation());
+            assertTrue(first.isRunning());
+
+            // a configuration file refreshes the configuration in place, and a watch of the configuration root is told
+            Files.writeString(config, "app.label=beta\n");
+            runtime.changed(List.of(config), List.of());
+            assertEquals("beta", first.getEnvironment().getProperty("app.label", String.class).orElse(null));
+            assertTrue(configuration.stream().anyMatch(change -> change.changed().contains(config.toAbsolutePath())), configuration.toString());
+            assertEquals(1, runtime.generation());
+
+            // a deleted schema is reported removed
+            Files.delete(schema);
+            schemas.clear();
+            runtime.changed(List.of(), List.of(schema));
+            assertTrue(removedIn(schemas).contains(schema.toAbsolutePath()), schemas.toString());
+            assertEquals(1, runtime.generation());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aLateReportOfAWriteOfADeletedStaticFileIsSettledAsADeletion() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Path staticRoot = Files.createDirectories(project.resolve("src/main/resources/static"));
+        Path css = Files.writeString(staticRoot.resolve("app.css"), "body {}").toAbsolutePath();
+        Path kept = Files.writeString(staticRoot.resolve("kept.css"), "p {}").toAbsolutePath();
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.static=src/main/resources/static
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            List<ResourceChange> changes = new CopyOnWriteArrayList<>();
+            ((DefaultBeanContext) first).resources(ResourceKind.STATIC).include("**/*.css").watch(changes::add);
+            changes.clear();
+
+            // the stylesheet is deleted and another written; the watcher's own reports of that are handled first
+            Files.delete(css);
+            Files.writeString(kept, "p { color: red }");
+            long deadline = System.nanoTime() + Duration.ofSeconds(60).toNanos();
+            while (!(removedIn(changes).contains(css) && changes.stream().anyMatch(change -> change.changed().contains(kept))) && System.nanoTime() < deadline) {
+                Thread.sleep(20);
+            }
+            assertTrue(removedIn(changes).contains(css), changes.toString());
+            runtime.awaitBatch(runtime.enqueue(new Pending(Map.of(), Map.of(ResourceKind.STATIC, new SourceChanges(Set.of(), Set.of(css))), false)));
+            changes.clear();
+
+            // then the harness reports the deletion and the write, and a watcher's late reports of the stylesheet's
+            // earlier write and of a deletion before the other was written again arrive after them: the batches merge
+            // in that order, the later winning, as the reload thread merges those that arrive together
+            Pending harness = new Pending(Map.of(), Map.of(ResourceKind.STATIC, new SourceChanges(Set.of(kept), Set.of(css))), false);
+            Pending late = new Pending(Map.of(), Map.of(ResourceKind.STATIC, new SourceChanges(Set.of(css), Set.of(kept))), false);
+            runtime.awaitBatch(runtime.enqueue(Pending.merge(List.of(harness, late))));
+
+            // the file system settles it: the stylesheet is gone, the other is there
+            deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+            while (changes.isEmpty() && System.nanoTime() < deadline) {
+                Thread.sleep(20);
+            }
+            List<ResourceChange> reported = List.copyOf(changes);
+            assertFalse(reported.isEmpty());
+            assertTrue(removedIn(reported).contains(css), reported.toString());
+            assertTrue(reported.stream().noneMatch(change -> change.changed().contains(css)), reported.toString());
+            assertTrue(reported.stream().noneMatch(change -> change.removed().contains(kept)), reported.toString());
+            assertTrue(reported.stream().anyMatch(change -> change.changed().contains(kept)), reported.toString());
+            // and the stylesheet still belongs to the live root, its build copy hidden
+            assertTrue(runtime.classLoader().liveResources().belongs("app.css"));
+            assertEquals(1, runtime.generation());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aLateReportOfAWriteOfADeletedDirectoryRemovesTheFilesKnownUnderIt() throws Exception {
+        Path root = Files.createDirectories(project.resolve("static"));
+        Path nested = Files.createDirectories(root.resolve("css"));
+        Path one = Files.writeString(nested.resolve("one.css"), "a {}").toAbsolutePath();
+        Path two = Files.writeString(nested.resolve("two.css"), "b {}").toAbsolutePath();
+        Path here = Files.writeString(root.resolve("here.css"), "c {}").toAbsolutePath();
+        io.micronaut.dev.loader.LiveResources live = new io.micronaut.dev.loader.LiveResources(List.of(root));
+        Files.delete(one);
+        Files.delete(two);
+        Files.delete(nested);
+        Path absoluteNested = nested.toAbsolutePath();
+        java.util.function.Function<Path, Set<Path>> removed = path -> {
+            Set<Path> files = new java.util.LinkedHashSet<>();
+            files.add(path);
+            files.addAll(live.knownUnder(path));
+            return files;
+        };
+        Map<ResourceKind, SourceChanges> merged = Map.of(ResourceKind.STATIC, new SourceChanges(Set.of(absoluteNested), Set.of(here)));
+        Map<ResourceKind, SourceChanges> settled = ResourceNotifier.settle(merged, removed, path -> ResourceKind.STATIC);
+        assertEquals(Set.of(here), settled.get(ResourceKind.STATIC).changed());
+        assertEquals(Set.of(absoluteNested, one, two), settled.get(ResourceKind.STATIC).deleted());
+        // changes the file system agrees with are kept as they are
+        Map<ResourceKind, SourceChanges> agreed = Map.of(ResourceKind.STATIC, new SourceChanges(Set.of(here), Set.of(one)));
+        assertSame(agreed, ResourceNotifier.settle(agreed, removed, path -> ResourceKind.STATIC));
+    }
+
     private static List<Path> removedIn(List<ResourceChange> changes) {
         return changes.stream().flatMap(change -> change.removed().stream()).toList();
     }
@@ -447,8 +610,16 @@ class DevRuntimeTest {
             runtime.sourcesChanged(SourceKind.JAVA, Set.of(greeter), Set.of());
             assertTrue(runtime.lastFailure().isPresent());
 
-            // a restart compiles nothing: it runs the output that compiled last
-            runtime.restart();
+            // a restart compiles nothing: it runs the output that compiled last, also when the watcher's late report
+            // of the broken edit comes with it and fails to compile again
+            Pending restart = new Pending(Map.of(), Map.of(), false) {
+                @Override
+                boolean forcesRestart() {
+                    return true;
+                }
+            };
+            Pending late = new Pending(Map.of(SourceKind.JAVA, new SourceChanges(Set.of(greeter), Set.of())), Map.of(), false);
+            runtime.awaitBatch(runtime.enqueue(Pending.merge(List.of(restart, late))));
             ApplicationContext restarted = runtime.awaitGeneration(2, Duration.ofMinutes(2));
             assertEquals("one", greet(restarted));
             assertTrue(runtime.lastFailure().isPresent());
@@ -468,69 +639,6 @@ class DevRuntimeTest {
             assertEquals("three", greet(fixed));
             Class<?> otherType = fixed.getClassLoader().loadClass("app.Other");
             assertEquals("two", otherType.getMethod("value").invoke(null));
-        } finally {
-            runtime.close();
-        }
-    }
-
-    @Test
-    void aResourceThatIsNotConfigurationUnderTheConfigurationRootReachesTheResourceWatches() throws Exception {
-        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
-        Files.writeString(src.resolve("Application.java"), """
-            package app;
-            public class Application {
-                public static void main(String[] args) {
-                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
-                }
-            }
-            """);
-        Path resources = Files.createDirectories(project.resolve("src/main/resources"));
-        Path schema = Files.createDirectories(resources.resolve("graphql")).resolve("schema.graphqls");
-        Files.writeString(schema, "type Query { hello: String }");
-        Path config = resources.resolve("application.properties");
-        Files.writeString(config, "app.label=alpha\n");
-        Path manifestFile = project.resolve("dev.properties");
-        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
-        Files.writeString(manifestFile, """
-            micronaut.dev.main-class=app.Application
-            micronaut.dev.strategy=restart
-            micronaut.dev.reloadable=build/classes
-            micronaut.dev.compile-classpath=@cp.argfile
-            micronaut.dev.processor-path=@cp.argfile
-            micronaut.dev.sources.java=src/main/java
-            micronaut.dev.resources.config=src/main/resources
-            micronaut.dev.compile.java.output=build/classes
-            """);
-
-        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
-        try {
-            ApplicationContext first = runtime.context().orElseThrow();
-            List<ResourceChange> schemas = new CopyOnWriteArrayList<>();
-            List<ResourceChange> configuration = new CopyOnWriteArrayList<>();
-            ((DefaultBeanContext) first).resources(ResourceKind.CONFIG).include("**/*.graphqls").watch(schemas::add);
-            ((DefaultBeanContext) first).resources(ResourceKind.CONFIG).include("*.properties").watch(configuration::add);
-            assertTrue(schemas.get(0).initial());
-            schemas.clear();
-            configuration.clear();
-
-            // the schema is edited: the watch is told, nothing restarts and the configuration is not what changed
-            Files.writeString(schema, "type Query { hello: String, bye: String }");
-            awaitTrue(() -> schemas.stream().anyMatch(change -> !change.initial() && change.changed().contains(schema.toAbsolutePath())), schemas);
-            assertTrue(configuration.isEmpty(), configuration.toString());
-            assertEquals(1, runtime.generation());
-            assertTrue(first.isRunning());
-
-            // a configuration file refreshes the configuration in place, and a watch of the configuration root is told
-            Files.writeString(config, "app.label=beta\n");
-            awaitTrue(() -> "beta".equals(first.getEnvironment().getProperty("app.label", String.class).orElse(null)), configuration);
-            awaitTrue(() -> configuration.stream().anyMatch(change -> change.changed().contains(config.toAbsolutePath())), configuration);
-            assertEquals(1, runtime.generation());
-
-            // a deleted schema is reported removed
-            schemas.clear();
-            Files.delete(schema);
-            awaitTrue(() -> schemas.stream().anyMatch(change -> change.removed().contains(schema.toAbsolutePath())), schemas);
-            assertEquals(1, runtime.generation());
         } finally {
             runtime.close();
         }
@@ -613,19 +721,6 @@ class DevRuntimeTest {
             .deduceCloudEnvironment(false)
             .environmentPropertySource(false)
             .banner(false);
-    }
-
-    /**
-     * Waits for the file watcher's batch to be handled, which this branch has no direct way to report.
-     */
-    private static void awaitTrue(BooleanSupplier condition, Object state) throws InterruptedException {
-        long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
-        while (!condition.getAsBoolean()) {
-            if (System.nanoTime() > deadline) {
-                throw new AssertionError("Timed out: " + state);
-            }
-            Thread.sleep(50);
-        }
     }
 
     private static String other(String value) {

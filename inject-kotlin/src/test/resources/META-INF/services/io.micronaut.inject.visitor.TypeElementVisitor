@@ -34,3 +34,4 @@ io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
 io.micronaut.kotlin.processing.qualifiers.NonBindingMarkingVisitor
 io.micronaut.inject.test.hierarchy.IntrospectEveryClassVisitor
 io.micronaut.kotlin.processing.annotations.CompletingVisitor
+io.micronaut.kotlin.processing.beans.builder.TypeArgumentsForTypeSpec$RawSupertypeVisitor

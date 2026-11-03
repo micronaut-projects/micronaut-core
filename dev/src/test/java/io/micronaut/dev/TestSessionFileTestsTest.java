@@ -52,9 +52,9 @@ class TestSessionFileTestsTest {
         Path tests = Files.createDirectories(project.resolve("tests"));
         Files.writeString(tests.resolve("test_kept.py"), "ok");
         List<SourceRoot> roots = roots(tests);
-        Map<SourceKind, DevRuntime.SourceChanges> deleted = Map.of(
-            SourceKind.PYTHON, new DevRuntime.SourceChanges(Set.of(), Set.of(tests.resolve("test_deleted.py"))),
-            SourceKind.JAVA, new DevRuntime.SourceChanges(Set.of(), Set.of(project.resolve("src/test/java/app/GoneTest.java"))));
+        Map<SourceKind, SourceChanges> deleted = Map.of(
+            SourceKind.PYTHON, new SourceChanges(Set.of(), Set.of(tests.resolve("test_deleted.py"))),
+            SourceKind.JAVA, new SourceChanges(Set.of(), Set.of(project.resolve("src/test/java/app/GoneTest.java"))));
 
         Set<String> gone = TestSession.goneTestFiles(roots, deleted, List.of("tests/test_kept.py", "tests/test_failed.py", "app.FailedTest"));
 
@@ -69,10 +69,10 @@ class TestSessionFileTestsTest {
         Path tests = project.resolve("tests");
         List<SourceRoot> roots = roots(tests);
         List<SourceRoot> classesOnly = List.of(new SourceRoot(SourceKind.JAVA, project.resolve("src/test/java")));
-        Map<SourceKind, DevRuntime.SourceChanges> none = Map.of();
-        Map<SourceKind, DevRuntime.SourceChanges> pythonTest = Map.of(SourceKind.PYTHON, new DevRuntime.SourceChanges(Set.of(tests.resolve("test_a.py")), Set.of()));
-        Map<SourceKind, DevRuntime.SourceChanges> javaTest = Map.of(SourceKind.JAVA, new DevRuntime.SourceChanges(Set.of(project.resolve("src/test/java/app/ATest.java")), Set.of()));
-        Map<SourceKind, DevRuntime.SourceChanges> application = Map.of(SourceKind.JAVA, new DevRuntime.SourceChanges(Set.of(), Set.of(project.resolve("src/main/java/app/A.java"))));
+        Map<SourceKind, SourceChanges> none = Map.of();
+        Map<SourceKind, SourceChanges> pythonTest = Map.of(SourceKind.PYTHON, new SourceChanges(Set.of(tests.resolve("test_a.py")), Set.of()));
+        Map<SourceKind, SourceChanges> javaTest = Map.of(SourceKind.JAVA, new SourceChanges(Set.of(project.resolve("src/test/java/app/ATest.java")), Set.of()));
+        Map<SourceKind, SourceChanges> application = Map.of(SourceKind.JAVA, new SourceChanges(Set.of(), Set.of(project.resolve("src/main/java/app/A.java"))));
 
         // a changed file of tests
         assertTrue(TestSession.fileTestsChanged(classesOnly, none, pythonTest, Set.of()));
