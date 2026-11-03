@@ -370,7 +370,24 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
 
     @SuppressWarnings("MagicNumber")
     private static boolean isOracleCloudLinux() {
-        return readFile(ORACLE_CLOUD_ASSET_TAG_FILE).toLowerCase(Locale.ROOT).contains("oraclecloud");
+        return isOracleCloudAssetTag(readFile(ORACLE_CLOUD_ASSET_TAG_FILE));
+    }
+
+    /**
+     * @param assetTag The chassis asset tag
+     * @return Whether the asset tag is the one of Oracle Cloud
+     */
+    static boolean isOracleCloudAssetTag(CharSequence assetTag) {
+        return assetTag.toString().toLowerCase(Locale.ROOT).contains("oraclecloud");
+    }
+
+    /**
+     * @param exitValue The exit value of the command printing the chassis asset tag
+     * @param stdout    The output of the command
+     * @return Whether the command succeeded and printed the asset tag of Oracle Cloud
+     */
+    static boolean isOracleCloudAssetTagOutput(int exitValue, CharSequence stdout) {
+        return exitValue == 0 && isOracleCloudAssetTag(stdout);
     }
 
     private static Optional<Process> runWindowsCmd(String cmd) {
@@ -417,9 +434,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
         //Wait to get exit value
         try {
             int exitValue = process.waitFor();
-            if (exitValue == 0 && stdout.toString().toLowerCase(Locale.ROOT).contains("oraclecloud")) {
-                return true;
-            }
+            return isOracleCloudAssetTagOutput(exitValue, stdout);
         } catch (InterruptedException e) {
             // test negative
             Thread.currentThread().interrupt();
