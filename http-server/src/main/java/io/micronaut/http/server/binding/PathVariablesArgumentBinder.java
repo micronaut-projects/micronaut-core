@@ -23,6 +23,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.PathVariables;
+import io.micronaut.http.bind.PrimitiveValueConverters;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.filter.FilterArgumentBinderPredicate;
 import io.micronaut.web.router.RouteAttributes;
@@ -50,9 +51,11 @@ final class PathVariablesArgumentBinder implements TypedRequestArgumentBinder<Pa
     private static final Argument<PathVariables> ARGUMENT = Argument.of(PathVariables.class);
 
     private final ConversionService conversionService;
+    private final PrimitiveValueConverters primitiveConverters;
 
     PathVariablesArgumentBinder(ConversionService conversionService) {
         this.conversionService = conversionService;
+        this.primitiveConverters = PrimitiveValueConverters.of(conversionService);
     }
 
     @Override
@@ -64,7 +67,7 @@ final class PathVariablesArgumentBinder implements TypedRequestArgumentBinder<Pa
     public BindingResult<PathVariables> bind(ArgumentConversionContext<PathVariables> context, HttpRequest<?> source) {
         Optional<RouteMatch<?>> match = RouteAttributes.getRouteMatch(source);
         if (match.isPresent() && match.get() instanceof UriRouteMatch<?, ?> uriMatch) {
-            PathVariables pathVariables = new RoutePathVariables(uriMatch.getVariableValues(), rawValues(uriMatch), conversionService);
+            PathVariables pathVariables = new RoutePathVariables(uriMatch.getVariableValues(), rawValues(uriMatch), conversionService, primitiveConverters);
             return () -> Optional.of(pathVariables);
         }
         // e.g. a filter of a request that matched no route: a nullable argument is null

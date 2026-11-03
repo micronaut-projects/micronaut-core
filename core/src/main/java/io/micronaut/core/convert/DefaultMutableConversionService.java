@@ -85,6 +85,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Properties;
@@ -383,6 +384,9 @@ public class DefaultMutableConversionService implements MutableConversionService
                         return typeConverter.convert((S) value.toString(), (Class<T>) CharSequence.class, context);
                     }
                 };
+            } else if (typeConverter instanceof PrimitiveTargetTypeConverter<S, T>) {
+                // a String is the CharSequence itself: the converter keeps converting to primitives
+                converter = (TypeConverter) typeConverter;
             } else {
                 converter = (value, theTarget, context) -> typeConverter.convert((S) value.toString(), theTarget, context);
             }
@@ -756,18 +760,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         );
 
         // String -> Integer
-        addInternalConverter(CharSequence.class, Integer.class, (CharSequence object, Class<Integer> targetType, ConversionContext context) -> {
-            if (StringUtils.isEmpty(object)) {
-                return Optional.empty();
-            }
-            try {
-                Integer converted = Integer.valueOf(object.toString());
-                return Optional.of(converted);
-            } catch (NumberFormatException e) {
-                context.reject(object, e);
-                return Optional.empty();
-            }
-        });
+        addInternalConverter(CharSequence.class, Integer.class, new CharSequenceToIntegerConverter());
 
         // String -> BigInteger
         addInternalConverter(CharSequence.class, BigInteger.class, (CharSequence object, Class<BigInteger> targetType, ConversionContext context) -> {
@@ -798,32 +791,10 @@ public class DefaultMutableConversionService implements MutableConversionService
         });
 
         // String -> Double
-        addInternalConverter(CharSequence.class, Double.class, (CharSequence object, Class<Double> targetType, ConversionContext context) -> {
-            if (StringUtils.isEmpty(object)) {
-                return Optional.empty();
-            }
-            try {
-                Double converted = Double.valueOf(object.toString());
-                return Optional.of(converted);
-            } catch (NumberFormatException e) {
-                context.reject(object, e);
-                return Optional.empty();
-            }
-        });
+        addInternalConverter(CharSequence.class, Double.class, new CharSequenceToDoubleConverter());
 
         // String -> Long
-        addInternalConverter(CharSequence.class, Long.class, (CharSequence object, Class<Long> targetType, ConversionContext context) -> {
-            if (StringUtils.isEmpty(object)) {
-                return Optional.empty();
-            }
-            try {
-                Long converted = Long.valueOf(object.toString());
-                return Optional.of(converted);
-            } catch (NumberFormatException e) {
-                context.reject(object, e);
-                return Optional.empty();
-            }
-        });
+        addInternalConverter(CharSequence.class, Long.class, new CharSequenceToLongConverter());
 
         // String -> Short
         addInternalConverter(CharSequence.class, Short.class, (CharSequence object, Class<Short> targetType, ConversionContext context) -> {
@@ -868,13 +839,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         });
 
         // String -> Boolean
-        addInternalConverter(CharSequence.class, Boolean.class, (CharSequence object, Class<Boolean> targetType, ConversionContext context) -> {
-            String booleanString = object.toString().toLowerCase(Locale.ENGLISH);
-            return switch (booleanString) {
-                case "yes", "y", "on", "true" -> Optional.of(Boolean.TRUE);
-                default -> Optional.of(Boolean.FALSE);
-            };
-        });
+        addInternalConverter(CharSequence.class, Boolean.class, new CharSequenceToBooleanConverter());
 
         // String -> URL
         addInternalConverter(CharSequence.class, URL.class, (CharSequence object, Class<URL> targetType, ConversionContext context) -> {
@@ -1466,12 +1431,13 @@ public class DefaultMutableConversionService implements MutableConversionService
      * A converter resolved with {@link #resolveConverter(Class, Argument)}: it holds the converter of the
      * values of the source type to the argument, looked up on the first conversion and again after a
      * converter was registered or removed. A value of another type, another target type or a context
-     * with other annotation metadata is converted by the service as is.
+     * with other annotation metadata is converted by the service as is. It converts to a primitive
+     * without boxing when the converter it holds does.
      *
      * @param <S> The source type
      * @param <T> The target type
      */
-    private static final class CachingResolvedConverter<S, T> implements TypeConverter<S, T> {
+    private static final class CachingResolvedConverter<S, T> implements PrimitiveTargetTypeConverter<S, T> {
 
         private final DefaultMutableConversionService conversionService;
         private final Class<S> sourceType;
@@ -1522,6 +1488,63 @@ public class DefaultMutableConversionService implements MutableConversionService
             return typeConverter.convert(value, targetType, context);
         }
 
+        @Override
+        public OptionalInt findInt(S value, ConversionContext context) {
+            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Integer.class, context);
+            return primitive != null ? primitive.findInt(value, context) : PrimitiveTargetTypeConverter.super.findInt(value, context);
+        }
+
+        @Override
+        public int getInt(S value, ConversionContext context) {
+            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Integer.class, context);
+            return primitive != null ? primitive.getInt(value, context) : PrimitiveTargetTypeConverter.super.getInt(value, context);
+        }
+
+        @Override
+        public OptionalLong findLong(S value, ConversionContext context) {
+            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Long.class, context);
+            return primitive != null ? primitive.findLong(value, context) : PrimitiveTargetTypeConverter.super.findLong(value, context);
+        }
+
+        @Override
+        public long getLong(S value, ConversionContext context) {
+            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Long.class, context);
+            return primitive != null ? primitive.getLong(value, context) : PrimitiveTargetTypeConverter.super.getLong(value, context);
+        }
+
+        @Override
+        public OptionalDouble findDouble(S value, ConversionContext context) {
+            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Double.class, context);
+            return primitive != null ? primitive.findDouble(value, context) : PrimitiveTargetTypeConverter.super.findDouble(value, context);
+        }
+
+        @Override
+        public double getDouble(S value, ConversionContext context) {
+            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Double.class, context);
+            return primitive != null ? primitive.getDouble(value, context) : PrimitiveTargetTypeConverter.super.getDouble(value, context);
+        }
+
+        @Override
+        public boolean getBoolean(S value, ConversionContext context) {
+            PrimitiveTargetTypeConverter<Object, T> primitive = primitiveConverter(value, Boolean.class, context);
+            return primitive != null ? primitive.getBoolean(value, context) : PrimitiveTargetTypeConverter.super.getBoolean(value, context);
+        }
+
+        /**
+         * The converter held for the value when it converts to the primitive of the wrapper type itself,
+         * on the same conditions as {@link #convert(Object, Class, ConversionContext)} uses it; otherwise
+         * the value is converted by boxing through that method.
+         */
+        @SuppressWarnings("unchecked")
+        @Nullable
+        private PrimitiveTargetTypeConverter<Object, T> primitiveConverter(@Nullable S value, Class<?> wrapperType, ConversionContext context) {
+            if (value == null || unchanged || targetType != wrapperType || value.getClass() != sourceType
+                || context.getAnnotationMetadata() != annotationMetadata) {
+                return null;
+            }
+            return typeConverter() instanceof PrimitiveTargetTypeConverter<?, ?> primitive ? (PrimitiveTargetTypeConverter<Object, T>) primitive : null;
+        }
+
         private TypeConverter<Object, T> typeConverter() {
             // the version is read before the lookup: a converter registered during it makes the next conversion look up again
             int version = conversionService.converterVersion.get();
@@ -1541,6 +1564,162 @@ public class DefaultMutableConversionService implements MutableConversionService
          * @param <T>           The target type
          */
         private record Resolution<T>(int version, TypeConverter<Object, T> typeConverter) {
+        }
+    }
+
+    /**
+     * Converts a {@link CharSequence} to an {@link Integer}, or an {@code int} without boxing it.
+     * A value that does not parse is rejected in the context.
+     */
+    private static final class CharSequenceToIntegerConverter implements PrimitiveTargetTypeConverter<CharSequence, Integer> {
+
+        @Override
+        public Optional<Integer> convert(CharSequence object, Class<Integer> targetType, ConversionContext context) {
+            if (StringUtils.isEmpty(object)) {
+                return Optional.empty();
+            }
+            try {
+                return Optional.of(Integer.valueOf(object.toString()));
+            } catch (NumberFormatException e) {
+                context.reject(object, e);
+                return Optional.empty();
+            }
+        }
+
+        @Override
+        public OptionalInt findInt(CharSequence object, ConversionContext context) {
+            if (StringUtils.isEmpty(object)) {
+                return OptionalInt.empty();
+            }
+            try {
+                return OptionalInt.of(Integer.parseInt(object.toString()));
+            } catch (NumberFormatException e) {
+                context.reject(object, e);
+                return OptionalInt.empty();
+            }
+        }
+
+        @Override
+        public int getInt(CharSequence object, ConversionContext context) {
+            if (!StringUtils.isEmpty(object)) {
+                try {
+                    return Integer.parseInt(object.toString());
+                } catch (NumberFormatException e) {
+                    // converted again below, which rejects it and fails as a conversion does
+                }
+            }
+            return PrimitiveTargetTypeConverter.super.getInt(object, context);
+        }
+    }
+
+    /**
+     * Converts a {@link CharSequence} to a {@link Long}, or a {@code long} without boxing it.
+     * A value that does not parse is rejected in the context.
+     */
+    private static final class CharSequenceToLongConverter implements PrimitiveTargetTypeConverter<CharSequence, Long> {
+
+        @Override
+        public Optional<Long> convert(CharSequence object, Class<Long> targetType, ConversionContext context) {
+            if (StringUtils.isEmpty(object)) {
+                return Optional.empty();
+            }
+            try {
+                return Optional.of(Long.valueOf(object.toString()));
+            } catch (NumberFormatException e) {
+                context.reject(object, e);
+                return Optional.empty();
+            }
+        }
+
+        @Override
+        public OptionalLong findLong(CharSequence object, ConversionContext context) {
+            if (StringUtils.isEmpty(object)) {
+                return OptionalLong.empty();
+            }
+            try {
+                return OptionalLong.of(Long.parseLong(object.toString()));
+            } catch (NumberFormatException e) {
+                context.reject(object, e);
+                return OptionalLong.empty();
+            }
+        }
+
+        @Override
+        public long getLong(CharSequence object, ConversionContext context) {
+            if (!StringUtils.isEmpty(object)) {
+                try {
+                    return Long.parseLong(object.toString());
+                } catch (NumberFormatException e) {
+                    // converted again below, which rejects it and fails as a conversion does
+                }
+            }
+            return PrimitiveTargetTypeConverter.super.getLong(object, context);
+        }
+    }
+
+    /**
+     * Converts a {@link CharSequence} to a {@link Double}, or a {@code double} without boxing it.
+     * A value that does not parse is rejected in the context.
+     */
+    private static final class CharSequenceToDoubleConverter implements PrimitiveTargetTypeConverter<CharSequence, Double> {
+
+        @Override
+        public Optional<Double> convert(CharSequence object, Class<Double> targetType, ConversionContext context) {
+            if (StringUtils.isEmpty(object)) {
+                return Optional.empty();
+            }
+            try {
+                return Optional.of(Double.valueOf(object.toString()));
+            } catch (NumberFormatException e) {
+                context.reject(object, e);
+                return Optional.empty();
+            }
+        }
+
+        @Override
+        public OptionalDouble findDouble(CharSequence object, ConversionContext context) {
+            if (StringUtils.isEmpty(object)) {
+                return OptionalDouble.empty();
+            }
+            try {
+                return OptionalDouble.of(Double.parseDouble(object.toString()));
+            } catch (NumberFormatException e) {
+                context.reject(object, e);
+                return OptionalDouble.empty();
+            }
+        }
+
+        @Override
+        public double getDouble(CharSequence object, ConversionContext context) {
+            if (!StringUtils.isEmpty(object)) {
+                try {
+                    return Double.parseDouble(object.toString());
+                } catch (NumberFormatException e) {
+                    // converted again below, which rejects it and fails as a conversion does
+                }
+            }
+            return PrimitiveTargetTypeConverter.super.getDouble(object, context);
+        }
+    }
+
+    /**
+     * Converts a {@link CharSequence} to a {@link Boolean}, or a {@code boolean}: yes, y, on and
+     * true, in any case, are true, and anything else is false.
+     */
+    private static final class CharSequenceToBooleanConverter implements PrimitiveTargetTypeConverter<CharSequence, Boolean> {
+
+        @Override
+        public Optional<Boolean> convert(CharSequence object, Class<Boolean> targetType, ConversionContext context) {
+            return Optional.of(getBoolean(object, context));
+        }
+
+        @Override
+        public boolean getBoolean(CharSequence object, ConversionContext context) {
+            String booleanString = object.toString().toLowerCase(Locale.ENGLISH);
+            return switch (booleanString) {
+                case "yes", "y", "on", "true" -> true;
+                default -> false;
+            };
         }
     }
 }
