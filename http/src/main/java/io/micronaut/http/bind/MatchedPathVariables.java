@@ -20,6 +20,7 @@ import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.PrimitiveTargetTypeConverter;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.PathVariables;
@@ -51,8 +52,6 @@ public class MatchedPathVariables implements PathVariables {
     private final Map<String, Object> values;
     private final @Nullable Map<String, Object> rawValues;
     private final ConversionService conversionService;
-    // the converters of string values to primitives, or null to convert them by boxing
-    private final @Nullable PrimitiveValueConverters primitiveConverters;
     // the decoded variables of the raw view, whose exceptions it fails with
     private final @Nullable MatchedPathVariables decoded;
     private @Nullable MatchedPathVariables raw;
@@ -75,21 +74,6 @@ public class MatchedPathVariables implements PathVariables {
      * @param conversionService The conversion service of the route
      */
     public MatchedPathVariables(Map<String, Object> values, @Nullable Map<String, Object> rawValues, ConversionService conversionService) {
-        this(values, rawValues, conversionService, null);
-    }
-
-    /**
-     * @param values              The decoded variable values, viewed read-only
-     * @param rawValues           The values as they appear in the path, not percent-decoded, viewed read-only,
-     *                            or {@code null} if the source does not have them: {@link #raw()} then fails
-     * @param conversionService   The conversion service of the route
-     * @param primitiveConverters The converters of the conversion service to primitives, resolved once for
-     *                            the route, or {@code null} to convert the values to primitives by boxing
-     */
-    public MatchedPathVariables(Map<String, Object> values,
-                                @Nullable Map<String, Object> rawValues,
-                                ConversionService conversionService,
-                                @Nullable PrimitiveValueConverters primitiveConverters) {
         this.values = Collections.unmodifiableMap(values);
         if (rawValues == null) {
             this.rawValues = null;
@@ -97,7 +81,6 @@ public class MatchedPathVariables implements PathVariables {
             this.rawValues = rawValues == values ? this.values : Collections.unmodifiableMap(rawValues);
         }
         this.conversionService = conversionService;
-        this.primitiveConverters = primitiveConverters;
         this.decoded = null;
     }
 
@@ -112,7 +95,6 @@ public class MatchedPathVariables implements PathVariables {
         this.values = rawValues;
         this.rawValues = rawValues;
         this.conversionService = decoded.conversionService;
-        this.primitiveConverters = decoded.primitiveConverters;
         this.decoded = decoded;
         this.raw = this;
     }
@@ -199,9 +181,9 @@ public class MatchedPathVariables implements PathVariables {
 
     @Override
     public int getInt(String name) {
-        if (primitiveConverters != null && values.get(name) instanceof String value) {
+        if (values.get(name) instanceof String value && PrimitiveValueConverters.intConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Integer> converter) {
             try {
-                return primitiveConverters.intConverter().getInt(value, ConversionContext.DEFAULT);
+                return converter.getInt(value, ConversionContext.DEFAULT);
             } catch (ConversionErrorException e) {
                 // converted again below, with the error of the variable
             }
@@ -211,25 +193,19 @@ public class MatchedPathVariables implements PathVariables {
 
     @Override
     public int getInt(String name, int defaultValue) {
-        if (primitiveConverters != null && !values.containsKey(name)) {
-            return defaultValue;
-        }
-        return primitiveConverters != null && values.get(name) instanceof String ? getInt(name) : PathVariables.super.getInt(name, defaultValue);
+        return values.get(name) instanceof String ? getInt(name) : PathVariables.super.getInt(name, defaultValue);
     }
 
     @Override
     public OptionalInt findInt(String name) {
-        if (primitiveConverters != null && values.get(name) instanceof String) {
-            return OptionalInt.of(getInt(name));
-        }
-        return PathVariables.super.findInt(name);
+        return values.get(name) instanceof String ? OptionalInt.of(getInt(name)) : PathVariables.super.findInt(name);
     }
 
     @Override
     public long getLong(String name) {
-        if (primitiveConverters != null && values.get(name) instanceof String value) {
+        if (values.get(name) instanceof String value && PrimitiveValueConverters.longConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Long> converter) {
             try {
-                return primitiveConverters.longConverter().getLong(value, ConversionContext.DEFAULT);
+                return converter.getLong(value, ConversionContext.DEFAULT);
             } catch (ConversionErrorException e) {
                 // converted again below, with the error of the variable
             }
@@ -239,25 +215,19 @@ public class MatchedPathVariables implements PathVariables {
 
     @Override
     public long getLong(String name, long defaultValue) {
-        if (primitiveConverters != null && !values.containsKey(name)) {
-            return defaultValue;
-        }
-        return primitiveConverters != null && values.get(name) instanceof String ? getLong(name) : PathVariables.super.getLong(name, defaultValue);
+        return values.get(name) instanceof String ? getLong(name) : PathVariables.super.getLong(name, defaultValue);
     }
 
     @Override
     public OptionalLong findLong(String name) {
-        if (primitiveConverters != null && values.get(name) instanceof String) {
-            return OptionalLong.of(getLong(name));
-        }
-        return PathVariables.super.findLong(name);
+        return values.get(name) instanceof String ? OptionalLong.of(getLong(name)) : PathVariables.super.findLong(name);
     }
 
     @Override
     public double getDouble(String name) {
-        if (primitiveConverters != null && values.get(name) instanceof String value) {
+        if (values.get(name) instanceof String value && PrimitiveValueConverters.doubleConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Double> converter) {
             try {
-                return primitiveConverters.doubleConverter().getDouble(value, ConversionContext.DEFAULT);
+                return converter.getDouble(value, ConversionContext.DEFAULT);
             } catch (ConversionErrorException e) {
                 // converted again below, with the error of the variable
             }
@@ -267,25 +237,19 @@ public class MatchedPathVariables implements PathVariables {
 
     @Override
     public double getDouble(String name, double defaultValue) {
-        if (primitiveConverters != null && !values.containsKey(name)) {
-            return defaultValue;
-        }
-        return primitiveConverters != null && values.get(name) instanceof String ? getDouble(name) : PathVariables.super.getDouble(name, defaultValue);
+        return values.get(name) instanceof String ? getDouble(name) : PathVariables.super.getDouble(name, defaultValue);
     }
 
     @Override
     public OptionalDouble findDouble(String name) {
-        if (primitiveConverters != null && values.get(name) instanceof String) {
-            return OptionalDouble.of(getDouble(name));
-        }
-        return PathVariables.super.findDouble(name);
+        return values.get(name) instanceof String ? OptionalDouble.of(getDouble(name)) : PathVariables.super.findDouble(name);
     }
 
     @Override
     public boolean getBoolean(String name) {
-        if (primitiveConverters != null && values.get(name) instanceof String value) {
+        if (values.get(name) instanceof String value && PrimitiveValueConverters.booleanConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Boolean> converter) {
             try {
-                return primitiveConverters.booleanConverter().getBoolean(value, ConversionContext.DEFAULT);
+                return converter.getBoolean(value, ConversionContext.DEFAULT);
             } catch (ConversionErrorException e) {
                 // converted again below, with the error of the variable
             }
@@ -295,10 +259,7 @@ public class MatchedPathVariables implements PathVariables {
 
     @Override
     public boolean getBoolean(String name, boolean defaultValue) {
-        if (primitiveConverters != null && !values.containsKey(name)) {
-            return defaultValue;
-        }
-        return primitiveConverters != null && values.get(name) instanceof String ? getBoolean(name) : PathVariables.super.getBoolean(name, defaultValue);
+        return values.get(name) instanceof String ? getBoolean(name) : PathVariables.super.getBoolean(name, defaultValue);
     }
 
     /**

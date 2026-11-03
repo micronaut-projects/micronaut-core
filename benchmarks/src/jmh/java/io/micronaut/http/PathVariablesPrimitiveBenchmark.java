@@ -17,7 +17,6 @@ package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.DefaultMutableConversionService;
-import io.micronaut.http.bind.PrimitiveValueConverters;
 import io.micronaut.web.router.RoutePathVariables;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -56,10 +55,11 @@ public class PathVariablesPrimitiveBenchmark {
 
     @Setup
     public void setup() {
-        ConversionService conversionService = new DefaultMutableConversionService();
         Map<String, Object> values = Map.of("id", value);
-        boxed = new RoutePathVariables(values, values, conversionService);
-        primitive = new RoutePathVariables(values, values, conversionService, PrimitiveValueConverters.of(conversionService));
+        // a subclass of the conversion service converts by boxing: it does not share primitive converters
+        ConversionService boxingService = new DefaultMutableConversionService() { };
+        boxed = new RoutePathVariables(values, values, boxingService);
+        primitive = new RoutePathVariables(values, values, new DefaultMutableConversionService());
         if (boxed.getInt("id") != primitive.getInt("id") || boxed.getLong("id") != primitive.getLong("id")) {
             throw new IllegalStateException("The path variables convert differently");
         }

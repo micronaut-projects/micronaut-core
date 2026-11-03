@@ -166,6 +166,16 @@ public class DefaultMutableConversionService implements MutableConversionService
     private final Map<ConvertiblePair, Registration> customConverterOwners = new ConcurrentHashMap<>();
 
     /**
+     * The converters of strings to the primitive arguments, which {@link #resolveConverter(Class, Argument)}
+     * returns for {@link Argument#INT} and the other constants: they look up the converter on the first
+     * conversion, like any resolved converter.
+     */
+    private final CachingResolvedConverter<String, Integer> stringToInt = new CachingResolvedConverter<>(this, String.class, Argument.INT);
+    private final CachingResolvedConverter<String, Long> stringToLong = new CachingResolvedConverter<>(this, String.class, Argument.LONG);
+    private final CachingResolvedConverter<String, Double> stringToDouble = new CachingResolvedConverter<>(this, String.class, Argument.DOUBLE);
+    private final CachingResolvedConverter<String, Boolean> stringToBoolean = new CachingResolvedConverter<>(this, String.class, Argument.BOOLEAN);
+
+    /**
      * Changed after each registration or removal of a converter, so that a converter of {@link #resolveConverter(Class, Argument)} resolves again.
      */
     private final AtomicInteger converterVersion = new AtomicInteger();
@@ -269,11 +279,24 @@ public class DefaultMutableConversionService implements MutableConversionService
         return typeConverter.convert(object, targetType, context);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <S, T> TypeConverter<S, T> resolveConverter(Class<S> sourceType, Argument<T> argument) {
         if (getClass() != DefaultMutableConversionService.class) {
             // a subclass may override the conversion: it converts every value
             return MutableConversionService.super.resolveConverter(sourceType, argument);
+        }
+        if (sourceType == String.class) {
+            // shared: the values of requests convert strings to these arguments, e.g. with NamedValues.getInt
+            if (argument == Argument.INT) {
+                return (TypeConverter<S, T>) stringToInt;
+            } else if (argument == Argument.LONG) {
+                return (TypeConverter<S, T>) stringToLong;
+            } else if (argument == Argument.DOUBLE) {
+                return (TypeConverter<S, T>) stringToDouble;
+            } else if (argument == Argument.BOOLEAN) {
+                return (TypeConverter<S, T>) stringToBoolean;
+            }
         }
         return new CachingResolvedConverter<>(this, sourceType, argument);
     }

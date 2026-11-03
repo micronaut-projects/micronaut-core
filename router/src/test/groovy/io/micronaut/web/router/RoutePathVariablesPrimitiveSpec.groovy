@@ -2,19 +2,20 @@ package io.micronaut.web.router
 
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.DefaultMutableConversionService
-import io.micronaut.http.bind.PrimitiveValueConverters
 import spock.lang.Specification
 
 class RoutePathVariablesPrimitiveSpec extends Specification {
 
-    ConversionService service = new DefaultMutableConversionService()
     Map<String, Object> values = [id: "12345", big: "9000000000", ratio: "1.5", flag: "on", bad: "x", empty: "", obj: 7]
 
-    RoutePathVariables plain = new RoutePathVariables(values, values, service)
-    RoutePathVariables primitive = new RoutePathVariables(values, values, service, PrimitiveValueConverters.of(service))
+    // a subclass of the conversion service converts by boxing: it does not share primitive converters
+    ConversionService boxingService = new DefaultMutableConversionService() {}
+    RoutePathVariables plain = new RoutePathVariables(values, values, boxingService)
+    RoutePathVariables primitive = new RoutePathVariables(values, values, new DefaultMutableConversionService())
 
     void "the primitive accessors return what they return without the converters"() {
         expect:
+        !(boxingService.resolveConverter(String, io.micronaut.core.type.Argument.INT) instanceof io.micronaut.core.convert.PrimitiveTargetTypeConverter)
         primitive.getInt("id") == plain.getInt("id")
         primitive.getInt("id") == 12345
         primitive.getInt("obj") == plain.getInt("obj")

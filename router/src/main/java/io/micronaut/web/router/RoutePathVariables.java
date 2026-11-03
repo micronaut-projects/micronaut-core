@@ -20,7 +20,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.bind.MatchedPathVariables;
-import io.micronaut.http.bind.PrimitiveValueConverters;
 import io.micronaut.web.router.exceptions.UnsatisfiedPathVariableRouteException;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
@@ -53,19 +52,6 @@ public class RoutePathVariables extends MatchedPathVariables {
      */
     public RoutePathVariables(Map<String, Object> values, @Nullable Map<String, Object> rawValues, ConversionService conversionService) {
         super(values, rawValues, conversionService);
-    }
-
-    /**
-     * @param values              The decoded variable values, viewed read-only
-     * @param rawValues           The values as they appear in the path, not percent-decoded, viewed read-only
-     * @param conversionService   The conversion service of the route
-     * @param primitiveConverters The converters of the conversion service to primitives, resolved once
-     */
-    public RoutePathVariables(Map<String, Object> values,
-                              @Nullable Map<String, Object> rawValues,
-                              ConversionService conversionService,
-                              PrimitiveValueConverters primitiveConverters) {
-        super(values, rawValues, conversionService, primitiveConverters);
     }
 
     /**
