@@ -20,6 +20,36 @@ class DevWatchServiceTest {
     }
 
     @Test
+    void theNativeServiceIsLookedForWithoutInitializingItsClass() {
+        ClassLoader loader = DevWatchServiceTest.class.getClassLoader();
+        // as JNA's Native, whose initializer loads its native library
+        assertTrue(DevWatchService.isPresent(Initialized.class.getName(), loader));
+        // read from another class: reading one of its own would initialize it
+        assertEquals(false, Marker.initialized);
+        assertEquals(false, DevWatchService.isPresent("io.micronaut.dev.Missing", loader));
+    }
+
+    @Test
+    void theNativeServiceIsLookedForOnlyOnMacOsOutsideANativeImage() {
+        ClassLoader loader = DevWatchServiceTest.class.getClassLoader();
+        // the test classpath has JNA, through micronaut-runtime-osx
+        assertTrue(DevWatchService.macServicePresent(true, false, loader));
+        assertEquals(false, DevWatchService.macServicePresent(false, false, loader));
+        assertEquals(false, DevWatchService.macServicePresent(true, true, loader));
+        assertEquals(false, DevWatchService.macServicePresent(true, false, new java.net.URLClassLoader(new java.net.URL[0], null)));
+    }
+
+    static final class Initialized {
+        static {
+            Marker.initialized = true;
+        }
+    }
+
+    static final class Marker {
+        static boolean initialized;
+    }
+
+    @Test
     void elsewhereTheJdksServiceIsUsed() throws Exception {
         DevWatchService watch = DevWatchService.create(false, false, false);
         try (WatchService jdk = FileSystems.getDefault().newWatchService()) {
