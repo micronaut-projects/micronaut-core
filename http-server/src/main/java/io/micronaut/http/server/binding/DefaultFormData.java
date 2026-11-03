@@ -99,10 +99,10 @@ final class DefaultFormData implements FormData {
     @Override
     public int getInt(String name) {
         if (first(name) instanceof String value && PrimitiveValueConverters.intConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Integer> converter) {
-            try {
-                return converter.getInt(value, ConversionContext.DEFAULT);
-            } catch (ConversionErrorException e) {
-                // converted again below, with the error of the field
+            // a value that does not parse converts again below, with the error of the field
+            OptionalInt parsed = converter.findInt(value, ConversionContext.DEFAULT);
+            if (parsed.isPresent()) {
+                return parsed.getAsInt();
             }
         }
         return FormData.super.getInt(name);
@@ -121,10 +121,10 @@ final class DefaultFormData implements FormData {
     @Override
     public long getLong(String name) {
         if (first(name) instanceof String value && PrimitiveValueConverters.longConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Long> converter) {
-            try {
-                return converter.getLong(value, ConversionContext.DEFAULT);
-            } catch (ConversionErrorException e) {
-                // converted again below, with the error of the field
+            // a value that does not parse converts again below, with the error of the field
+            OptionalLong parsed = converter.findLong(value, ConversionContext.DEFAULT);
+            if (parsed.isPresent()) {
+                return parsed.getAsLong();
             }
         }
         return FormData.super.getLong(name);
@@ -143,10 +143,10 @@ final class DefaultFormData implements FormData {
     @Override
     public double getDouble(String name) {
         if (first(name) instanceof String value && PrimitiveValueConverters.doubleConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Double> converter) {
-            try {
-                return converter.getDouble(value, ConversionContext.DEFAULT);
-            } catch (ConversionErrorException e) {
-                // converted again below, with the error of the field
+            // a value that does not parse converts again below, with the error of the field
+            OptionalDouble parsed = converter.findDouble(value, ConversionContext.DEFAULT);
+            if (parsed.isPresent()) {
+                return parsed.getAsDouble();
             }
         }
         return FormData.super.getDouble(name);

@@ -182,10 +182,10 @@ public class MatchedPathVariables implements PathVariables {
     @Override
     public int getInt(String name) {
         if (values.get(name) instanceof String value && PrimitiveValueConverters.intConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Integer> converter) {
-            try {
-                return converter.getInt(value, ConversionContext.DEFAULT);
-            } catch (ConversionErrorException e) {
-                // converted again below, with the error of the variable
+            // a value that does not parse converts again below, with the error of the variable
+            OptionalInt parsed = converter.findInt(value, ConversionContext.DEFAULT);
+            if (parsed.isPresent()) {
+                return parsed.getAsInt();
             }
         }
         return PathVariables.super.getInt(name);
@@ -204,10 +204,10 @@ public class MatchedPathVariables implements PathVariables {
     @Override
     public long getLong(String name) {
         if (values.get(name) instanceof String value && PrimitiveValueConverters.longConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Long> converter) {
-            try {
-                return converter.getLong(value, ConversionContext.DEFAULT);
-            } catch (ConversionErrorException e) {
-                // converted again below, with the error of the variable
+            // a value that does not parse converts again below, with the error of the variable
+            OptionalLong parsed = converter.findLong(value, ConversionContext.DEFAULT);
+            if (parsed.isPresent()) {
+                return parsed.getAsLong();
             }
         }
         return PathVariables.super.getLong(name);
@@ -226,10 +226,10 @@ public class MatchedPathVariables implements PathVariables {
     @Override
     public double getDouble(String name) {
         if (values.get(name) instanceof String value && PrimitiveValueConverters.doubleConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Double> converter) {
-            try {
-                return converter.getDouble(value, ConversionContext.DEFAULT);
-            } catch (ConversionErrorException e) {
-                // converted again below, with the error of the variable
+            // a value that does not parse converts again below, with the error of the variable
+            OptionalDouble parsed = converter.findDouble(value, ConversionContext.DEFAULT);
+            if (parsed.isPresent()) {
+                return parsed.getAsDouble();
             }
         }
         return PathVariables.super.getDouble(name);

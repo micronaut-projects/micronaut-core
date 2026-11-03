@@ -55,7 +55,7 @@ public class PathVariablesPrimitiveBenchmark {
 
     @Setup
     public void setup() {
-        Map<String, Object> values = Map.of("id", value);
+        Map<String, Object> values = Map.of("id", value, "bad", "abc");
         // a subclass of the conversion service converts by boxing: it does not share primitive converters
         ConversionService boxingService = new DefaultMutableConversionService() { };
         boxed = new RoutePathVariables(values, values, boxingService);
@@ -93,6 +93,24 @@ public class PathVariablesPrimitiveBenchmark {
     @Benchmark
     public long getLongPrimitive() {
         return primitive.getLong("id");
+    }
+
+    @Benchmark
+    public Object getIntInvalidBoxed() {
+        try {
+            return boxed.getInt("bad");
+        } catch (RuntimeException e) {
+            return e;
+        }
+    }
+
+    @Benchmark
+    public Object getIntInvalidPrimitive() {
+        try {
+            return primitive.getInt("bad");
+        } catch (RuntimeException e) {
+            return e;
+        }
     }
 
     @Benchmark

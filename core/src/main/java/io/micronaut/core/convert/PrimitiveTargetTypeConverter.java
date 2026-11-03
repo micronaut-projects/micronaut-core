@@ -33,8 +33,9 @@ import java.util.OptionalLong;
  * <p>
  * The default implementations box through {@link #convert(Object, Class, ConversionContext)}, so
  * {@link #of(TypeConverter)} adapts any converter; a converter that parses the primitive itself
- * overrides them. A method is only meant for the converter of the matching wrapper type: the
- * {@code int} methods of a converter to {@link Integer}, and so on.
+ * overrides them. A method converts with the converter of the matching wrapper type: the {@code int}
+ * methods of a converter to {@link Integer}, and so on; a converter to another type does not convert
+ * to it, like a value that does not convert.
  *
  * @param <S> The source type
  * @param <T> The target type
@@ -51,8 +52,7 @@ public interface PrimitiveTargetTypeConverter<S, T> extends TypeConverter<S, T> 
      * @return The converted value, or empty if it does not convert
      */
     default OptionalInt findInt(S value, ConversionContext context) {
-        Optional<T> converted = convert(value, target(Integer.class), context);
-        return converted.isPresent() ? OptionalInt.of((Integer) converted.get()) : OptionalInt.empty();
+        return convert(value, target(Integer.class), context).orElse(null) instanceof Integer converted ? OptionalInt.of(converted) : OptionalInt.empty();
     }
 
     /**
@@ -75,8 +75,7 @@ public interface PrimitiveTargetTypeConverter<S, T> extends TypeConverter<S, T> 
      * @return The converted value, or empty if it does not convert
      */
     default OptionalLong findLong(S value, ConversionContext context) {
-        Optional<T> converted = convert(value, target(Long.class), context);
-        return converted.isPresent() ? OptionalLong.of((Long) converted.get()) : OptionalLong.empty();
+        return convert(value, target(Long.class), context).orElse(null) instanceof Long converted ? OptionalLong.of(converted) : OptionalLong.empty();
     }
 
     /**
@@ -99,8 +98,7 @@ public interface PrimitiveTargetTypeConverter<S, T> extends TypeConverter<S, T> 
      * @return The converted value, or empty if it does not convert
      */
     default OptionalDouble findDouble(S value, ConversionContext context) {
-        Optional<T> converted = convert(value, target(Double.class), context);
-        return converted.isPresent() ? OptionalDouble.of((Double) converted.get()) : OptionalDouble.empty();
+        return convert(value, target(Double.class), context).orElse(null) instanceof Double converted ? OptionalDouble.of(converted) : OptionalDouble.empty();
     }
 
     /**
@@ -164,7 +162,8 @@ public interface PrimitiveTargetTypeConverter<S, T> extends TypeConverter<S, T> 
 
     private Object required(S value, Argument<?> argument, ConversionContext context) {
         Optional<T> converted = convert(value, target(argument.getWrapperType()), context);
-        if (converted.isPresent()) {
+        // a converter to another type converts to nothing of this primitive
+        if (converted.isPresent() && argument.getWrapperType().isInstance(converted.get())) {
             return converted.get();
         }
         Optional<ConversionError> error = context.getLastError();

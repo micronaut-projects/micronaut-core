@@ -147,6 +147,22 @@ class PrimitiveTargetTypeConverterSpec extends Specification {
         converter.getInt("12", ConversionContext.DEFAULT) == 42
     }
 
+    void "a converter to another type does not convert to the primitive"() {
+        given:
+        TypeConverter<String, Long> toLong = { String s, Class<Long> t, ConversionContext c -> Optional.of(Long.valueOf(s)) } as TypeConverter
+        def adapted = PrimitiveTargetTypeConverter.of(toLong)
+
+        expect:
+        adapted.findInt("5", ConversionContext.DEFAULT).isEmpty()
+        adapted.getLong("5", ConversionContext.DEFAULT) == 5L
+
+        when:
+        adapted.getInt("5", ConversionContext.DEFAULT)
+
+        then:
+        thrown(ConversionErrorException)
+    }
+
     static class Target {
     }
 

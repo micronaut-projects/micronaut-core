@@ -17,6 +17,7 @@ package io.micronaut.http.bind;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultMutableConversionService;
 import io.micronaut.core.convert.PrimitiveTargetTypeConverter;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
@@ -27,7 +28,8 @@ import org.jspecify.annotations.Nullable;
  * for {@link Argument#INT} and the other constants hold, which convert without the context of the value.
  * When the conversion service converts with another converter, e.g. one a registrar replaced the parser
  * with, there is none: the value converts with its context, which the converter may read and reject it in.
- * The default conversion service shares the resolved converters, so asking for them costs nothing per value.
+ * The default conversion service shares the resolved converters, so asking for them costs nothing per value;
+ * another conversion service, a subclass of it included, is not asked: its values convert by boxing.
  *
  * @since 5.3.0
  */
@@ -42,6 +44,10 @@ public final class PrimitiveValueConverters {
      * @return The converter to {@code int} that parses it itself, or {@code null} if the conversion service converts with another converter, which is given the context of the value
      */
     public static @Nullable PrimitiveTargetTypeConverter<String, Integer> intConverter(ConversionService conversionService) {
+        if (conversionService.getClass() != DefaultMutableConversionService.class) {
+            // another conversion service resolves converters that box: not resolved for every value
+            return null;
+        }
         return conversionService.resolveConverter(String.class, Argument.INT) instanceof PrimitiveTargetTypeConverter<String, Integer> primitive ? primitive.primitiveConverter() : null;
     }
 
@@ -50,6 +56,10 @@ public final class PrimitiveValueConverters {
      * @return The converter to {@code long} that parses it itself, or {@code null} if the conversion service converts with another converter, which is given the context of the value
      */
     public static @Nullable PrimitiveTargetTypeConverter<String, Long> longConverter(ConversionService conversionService) {
+        if (conversionService.getClass() != DefaultMutableConversionService.class) {
+            // another conversion service resolves converters that box: not resolved for every value
+            return null;
+        }
         return conversionService.resolveConverter(String.class, Argument.LONG) instanceof PrimitiveTargetTypeConverter<String, Long> primitive ? primitive.primitiveConverter() : null;
     }
 
@@ -58,6 +68,10 @@ public final class PrimitiveValueConverters {
      * @return The converter to {@code double} that parses it itself, or {@code null} if the conversion service converts with another converter, which is given the context of the value
      */
     public static @Nullable PrimitiveTargetTypeConverter<String, Double> doubleConverter(ConversionService conversionService) {
+        if (conversionService.getClass() != DefaultMutableConversionService.class) {
+            // another conversion service resolves converters that box: not resolved for every value
+            return null;
+        }
         return conversionService.resolveConverter(String.class, Argument.DOUBLE) instanceof PrimitiveTargetTypeConverter<String, Double> primitive ? primitive.primitiveConverter() : null;
     }
 
@@ -66,6 +80,10 @@ public final class PrimitiveValueConverters {
      * @return The converter to {@code boolean} that parses it itself, or {@code null} if the conversion service converts with another converter, which is given the context of the value
      */
     public static @Nullable PrimitiveTargetTypeConverter<String, Boolean> booleanConverter(ConversionService conversionService) {
+        if (conversionService.getClass() != DefaultMutableConversionService.class) {
+            // another conversion service resolves converters that box: not resolved for every value
+            return null;
+        }
         return conversionService.resolveConverter(String.class, Argument.BOOLEAN) instanceof PrimitiveTargetTypeConverter<String, Boolean> primitive ? primitive.primitiveConverter() : null;
     }
 }
