@@ -19,8 +19,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.PrimitiveTargetTypeConverter;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.bind.PrimitiveValueConverters;
 import io.micronaut.http.form.FileUpload;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormFieldException;
@@ -31,6 +33,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -85,6 +90,113 @@ final class DefaultFormData implements FormData {
             throw FormFieldException.missingField(name);
         }
         return convert(Argument.of(type, name), values.get(0));
+    }
+
+    // The first value of a field converts to a primitive with the converter of the conversion service,
+    // without boxing it; a value it does not convert and a missing field go through the conversion to
+    // the wrapper type, which fails as it does for any type.
+
+    @Override
+    public int getInt(String name) {
+        if (first(name) instanceof String value && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
+            PrimitiveTargetTypeConverter<String, Integer> converter = PrimitiveValueConverters.intConverter(conversionService);
+            if (converter != null) {
+                // a value that does not parse converts again below, with the error of the field
+                OptionalInt parsed = converter.findInt(value, ConversionContext.DEFAULT);
+                if (parsed.isPresent()) {
+                    return parsed.getAsInt();
+                }
+            }
+        }
+        return FormData.super.getInt(name);
+    }
+
+    @Override
+    public int getInt(String name, int defaultValue) {
+        return first(name) != null ? getInt(name) : FormData.super.getInt(name, defaultValue);
+    }
+
+    @Override
+    public OptionalInt findInt(String name) {
+        return first(name) != null ? OptionalInt.of(getInt(name)) : FormData.super.findInt(name);
+    }
+
+    @Override
+    public long getLong(String name) {
+        if (first(name) instanceof String value && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
+            PrimitiveTargetTypeConverter<String, Long> converter = PrimitiveValueConverters.longConverter(conversionService);
+            if (converter != null) {
+                // a value that does not parse converts again below, with the error of the field
+                OptionalLong parsed = converter.findLong(value, ConversionContext.DEFAULT);
+                if (parsed.isPresent()) {
+                    return parsed.getAsLong();
+                }
+            }
+        }
+        return FormData.super.getLong(name);
+    }
+
+    @Override
+    public long getLong(String name, long defaultValue) {
+        return first(name) != null ? getLong(name) : FormData.super.getLong(name, defaultValue);
+    }
+
+    @Override
+    public OptionalLong findLong(String name) {
+        return first(name) != null ? OptionalLong.of(getLong(name)) : FormData.super.findLong(name);
+    }
+
+    @Override
+    public double getDouble(String name) {
+        if (first(name) instanceof String value && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
+            PrimitiveTargetTypeConverter<String, Double> converter = PrimitiveValueConverters.doubleConverter(conversionService);
+            if (converter != null) {
+                // a value that does not parse converts again below, with the error of the field
+                OptionalDouble parsed = converter.findDouble(value, ConversionContext.DEFAULT);
+                if (parsed.isPresent()) {
+                    return parsed.getAsDouble();
+                }
+            }
+        }
+        return FormData.super.getDouble(name);
+    }
+
+    @Override
+    public double getDouble(String name, double defaultValue) {
+        return first(name) != null ? getDouble(name) : FormData.super.getDouble(name, defaultValue);
+    }
+
+    @Override
+    public OptionalDouble findDouble(String name) {
+        return first(name) != null ? OptionalDouble.of(getDouble(name)) : FormData.super.findDouble(name);
+    }
+
+    @Override
+    public boolean getBoolean(String name) {
+        if (first(name) instanceof String value) {
+            PrimitiveTargetTypeConverter<String, Boolean> converter = PrimitiveValueConverters.booleanConverter(conversionService);
+            if (converter != null) {
+                try {
+                    return converter.getBoolean(value, ConversionContext.DEFAULT);
+                } catch (ConversionErrorException e) {
+                    // converted again below, with the error of the field
+                }
+            }
+        }
+        return FormData.super.getBoolean(name);
+    }
+
+    @Override
+    public boolean getBoolean(String name, boolean defaultValue) {
+        return first(name) != null ? getBoolean(name) : FormData.super.getBoolean(name, defaultValue);
+    }
+
+    /**
+     * The first value of a field, as {@link #get(String, Class)} converts it, or {@code null} if it has none.
+     */
+    private @Nullable String first(String name) {
+        List<String> values = fields.get(name);
+        return values == null || values.isEmpty() ? null : values.get(0);
     }
 
     @Override

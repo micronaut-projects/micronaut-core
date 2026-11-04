@@ -125,19 +125,29 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     }
 
     private <T> Optional<T> getValue(CharSequence name, ArgumentConversionContext<T> conversionContext, @Nullable TypeConverter<String, T> converter) {
+        Class<T> type = conversionContext.getArgument().getType();
+        if (!isCollectionOrArray(type) && nettyHeaders.getClass() == DefaultHttpHeaders.class) {
+            // the first value, as getAll gives it, without building the list; a subclass such as
+            // CombinedHttpHeaders gives another value
+            String value = nettyHeaders.get(name);
+            return value == null ? Optional.empty() : convert(value, type, conversionContext, converter);
+        }
         List<String> values = nettyHeaders.getAll(name);
         if (!values.isEmpty()) {
-            Class<T> type = conversionContext.getArgument().getType();
             if (values.size() == 1 || !isCollectionOrArray(type)) {
-                if (converter != null) {
-                    return converter.convert(values.get(0), type, conversionContext);
-                }
-                return conversionService.convert(values.get(0), conversionContext);
+                return convert(values.get(0), type, conversionContext, converter);
             } else {
                 return conversionService.convert(values, conversionContext);
             }
         }
         return Optional.empty();
+    }
+
+    private <T> Optional<T> convert(String value, Class<T> type, ArgumentConversionContext<T> conversionContext, @Nullable TypeConverter<String, T> converter) {
+        if (converter != null) {
+            return converter.convert(value, type, conversionContext);
+        }
+        return conversionService.convert(value, conversionContext);
     }
 
     private boolean isCollectionOrArray(Class<?> clazz) {
