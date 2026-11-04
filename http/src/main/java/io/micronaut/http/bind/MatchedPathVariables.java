@@ -20,6 +20,7 @@ import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.PrimitiveTargetTypeConverter;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.PathVariables;
@@ -28,6 +29,9 @@ import org.jspecify.annotations.Nullable;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.Set;
 
 /**
@@ -169,6 +173,96 @@ public class MatchedPathVariables implements PathVariables {
             return Optional.empty();
         }
         return Optional.of(convert(named(name, type), value));
+    }
+
+    // A string value converts to a primitive with the converter of the conversion service, without
+    // boxing it; a value it does not convert, a missing value and a value of another type go through
+    // the conversion to the wrapper type, which fails as it does for any type.
+
+    @Override
+    public int getInt(String name) {
+        if (values.get(name) instanceof String value && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH
+            && PrimitiveValueConverters.intConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Integer> converter) {
+            // a value that does not parse converts again below, with the error of the variable
+            OptionalInt parsed = converter.findInt(value, ConversionContext.DEFAULT);
+            if (parsed.isPresent()) {
+                return parsed.getAsInt();
+            }
+        }
+        return PathVariables.super.getInt(name);
+    }
+
+    @Override
+    public int getInt(String name, int defaultValue) {
+        return values.get(name) instanceof String ? getInt(name) : PathVariables.super.getInt(name, defaultValue);
+    }
+
+    @Override
+    public OptionalInt findInt(String name) {
+        return values.get(name) instanceof String ? OptionalInt.of(getInt(name)) : PathVariables.super.findInt(name);
+    }
+
+    @Override
+    public long getLong(String name) {
+        if (values.get(name) instanceof String value && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH
+            && PrimitiveValueConverters.longConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Long> converter) {
+            // a value that does not parse converts again below, with the error of the variable
+            OptionalLong parsed = converter.findLong(value, ConversionContext.DEFAULT);
+            if (parsed.isPresent()) {
+                return parsed.getAsLong();
+            }
+        }
+        return PathVariables.super.getLong(name);
+    }
+
+    @Override
+    public long getLong(String name, long defaultValue) {
+        return values.get(name) instanceof String ? getLong(name) : PathVariables.super.getLong(name, defaultValue);
+    }
+
+    @Override
+    public OptionalLong findLong(String name) {
+        return values.get(name) instanceof String ? OptionalLong.of(getLong(name)) : PathVariables.super.findLong(name);
+    }
+
+    @Override
+    public double getDouble(String name) {
+        if (values.get(name) instanceof String value && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH
+            && PrimitiveValueConverters.doubleConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Double> converter) {
+            // a value that does not parse converts again below, with the error of the variable
+            OptionalDouble parsed = converter.findDouble(value, ConversionContext.DEFAULT);
+            if (parsed.isPresent()) {
+                return parsed.getAsDouble();
+            }
+        }
+        return PathVariables.super.getDouble(name);
+    }
+
+    @Override
+    public double getDouble(String name, double defaultValue) {
+        return values.get(name) instanceof String ? getDouble(name) : PathVariables.super.getDouble(name, defaultValue);
+    }
+
+    @Override
+    public OptionalDouble findDouble(String name) {
+        return values.get(name) instanceof String ? OptionalDouble.of(getDouble(name)) : PathVariables.super.findDouble(name);
+    }
+
+    @Override
+    public boolean getBoolean(String name) {
+        if (values.get(name) instanceof String value && PrimitiveValueConverters.booleanConverter(conversionService) instanceof PrimitiveTargetTypeConverter<String, Boolean> converter) {
+            try {
+                return converter.getBoolean(value, ConversionContext.DEFAULT);
+            } catch (ConversionErrorException e) {
+                // converted again below, with the error of the variable
+            }
+        }
+        return PathVariables.super.getBoolean(name);
+    }
+
+    @Override
+    public boolean getBoolean(String name, boolean defaultValue) {
+        return values.get(name) instanceof String ? getBoolean(name) : PathVariables.super.getBoolean(name, defaultValue);
     }
 
     /**
