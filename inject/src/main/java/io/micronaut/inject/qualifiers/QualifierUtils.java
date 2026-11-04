@@ -109,7 +109,14 @@ final class QualifierUtils {
         return Objects.equals(val1.getKey(), val2.getKey()) && Objects.equals(val1.getValue(), val2.getValue());
     }
 
-    private static Map.@Nullable Entry<String, Map<CharSequence, Object>> extractAnnotationAndBindingValues(Object o) {
+    /**
+     * Extract the annotation name and binding values of an annotation qualifier.
+     *
+     * @param o The annotation object
+     * @return The annotation name with its binding values, which are null when it qualifies by type alone, or null
+     *         when the object is not an annotation qualifier
+     */
+    static Map.@Nullable Entry<String, Map<CharSequence, Object>> extractAnnotationAndBindingValues(Object o) {
         if (o instanceof AnnotationStereotypeQualifier<?> that) {
             return new AbstractMap.SimpleEntry<>(that.stereotype, null);
         } else if (o instanceof AnnotationMetadataQualifier<?> that) {

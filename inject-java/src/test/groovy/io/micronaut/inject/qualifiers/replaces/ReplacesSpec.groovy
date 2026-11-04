@@ -724,4 +724,77 @@ class IntegerFoo implements Foo<Integer> {
         cleanup:
         context.close()
     }
+
+    void "test a lookup selects a replacement the same way it selects the bean being replaced"() {
+        given:
+        ApplicationContext context = buildContext("""
+package test;
+
+import io.micronaut.context.annotation.Replaces;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.inject.Qualifier;
+import jakarta.inject.Singleton;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Qualifier
+@Retention(RetentionPolicy.RUNTIME)
+@interface Kind {
+    String value();
+    int priority() default 1;
+}
+
+interface Handler {
+}
+
+@Singleton
+@Named("plain")
+class NamedHandler implements Handler {
+}
+
+@Singleton
+@Replaces(NamedHandler.class)
+class MockNamedHandler extends NamedHandler {
+}
+
+@Singleton
+@Kind("plain")
+class KindHandler implements Handler {
+}
+
+@Singleton
+@Replaces(KindHandler.class)
+class MockKindHandler extends KindHandler {
+}
+
+@Singleton
+class KindConsumer {
+    @Inject @Kind("plain") Handler implicitDefault;
+    @Inject @Kind(value = "plain", priority = 1) Handler explicitDefault;
+}
+""")
+        def loader = context.classLoader
+        def handler = loader.loadClass("test.Handler")
+        def consumer = context.getBean(loader.loadClass("test.KindConsumer"))
+        def kind = loader.loadClass("test.Kind")
+
+        expect: "a name ignores case"
+        context.getBeansOfType(handler, Qualifiers.byName("plain"))*.class*.simpleName == ["MockNamedHandler"]
+        context.getBeansOfType(handler, Qualifiers.byName("Plain"))*.class*.simpleName == ["MockNamedHandler"]
+        context.getBeansOfType(handler, Qualifiers.byName("other")).isEmpty()
+
+        and: "a member at its default matches whether or not it is written down"
+        consumer.implicitDefault.class.simpleName == "MockKindHandler"
+        consumer.explicitDefault.class.simpleName == "MockKindHandler"
+
+        and: "a member with another value does not match"
+        context.getBeansOfType(handler, Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA,
+                AnnotationValue.builder(kind).value("plain").member("priority", 2).build())).isEmpty()
+        context.getBeansOfType(handler, Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA,
+                AnnotationValue.builder(kind).value("other").build())).isEmpty()
+
+        cleanup:
+        context.close()
+    }
 }
