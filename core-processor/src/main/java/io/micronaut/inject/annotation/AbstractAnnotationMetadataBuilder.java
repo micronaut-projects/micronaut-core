@@ -1652,6 +1652,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     private ProcessedAnnotation addDefaults(ProcessedAnnotation processedAnnotation) {
         processedAnnotation = addNonBindingMembers(processedAnnotation);
+        processedAnnotation = addNestedDefaults(processedAnnotation);
         if (processedAnnotation.getAnnotationValue().getDefaultValues() != null) {
             return processedAnnotation;
         }
@@ -1665,6 +1666,61 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             processedAnnotation = processedAnnotation.mutateAnnotationValue(builder -> builder.defaultValues(Collections.emptyMap()));
         }
         return processedAnnotation;
+    }
+
+    /**
+     * The annotation with the annotations its members hold, directly or in an array, completed as the annotation
+     * itself is: with the defaults of their types and their non-binding members. Only a nested annotation that
+     * carries no defaults is completed, one a visitor built with {@link AnnotationValue#builder(String)} and added
+     * inside another annotation: a nested annotation read from the sources carries them already (see
+     * {@link #readNestedAnnotationValue(Object, Object, Map)}). One whose type is not on the classpath is left as
+     * it is.
+     */
+    private ProcessedAnnotation addNestedDefaults(ProcessedAnnotation processedAnnotation) {
+        Map<CharSequence, Object> completedMembers = null;
+        for (Map.Entry<CharSequence, Object> entry : processedAnnotation.getAnnotationValue().getValues().entrySet()) {
+            Object value = entry.getValue();
+            Object completed = value;
+            if (value instanceof AnnotationValue<?> nested) {
+                completed = addNestedAnnotationDefaults(nested);
+            } else if (value instanceof AnnotationValue<?>[] nestedValues) {
+                AnnotationValue<?>[] completedValues = null;
+                for (int i = 0; i < nestedValues.length; i++) {
+                    AnnotationValue<?> completedValue = addNestedAnnotationDefaults(nestedValues[i]);
+                    if (completedValue != nestedValues[i]) {
+                        if (completedValues == null) {
+                            completedValues = nestedValues.clone();
+                        }
+                        completedValues[i] = completedValue;
+                    }
+                }
+                if (completedValues != null) {
+                    completed = completedValues;
+                }
+            }
+            if (completed != value) {
+                if (completedMembers == null) {
+                    completedMembers = new LinkedHashMap<>(4);
+                }
+                completedMembers.put(entry.getKey(), completed);
+            }
+        }
+        if (completedMembers == null) {
+            return processedAnnotation;
+        }
+        Map<CharSequence, Object> members = completedMembers;
+        return processedAnnotation.mutateAnnotationValue(builder -> builder.members(members));
+    }
+
+    private AnnotationValue<?> addNestedAnnotationDefaults(AnnotationValue<?> nested) {
+        if (nested.getDefaultValues() != null) {
+            return nested;
+        }
+        ProcessedAnnotation processed = toProcessedAnnotation(nested);
+        if (processed.annotationType == null) {
+            return nested;
+        }
+        return addDefaults(processed).getAnnotationValue();
     }
 
     /**
