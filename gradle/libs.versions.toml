@@ -77,7 +77,7 @@ swagger = "2.2.55"
 zacsweers-kotlin-compile-testing = "0.13.0"
 errorprone-gradle-plugin = "5.1.1"
 errorprone-no-reflection = "1.0.1"
-nullaway = "0.13.8"
+nullaway = "0.14.3"
 error_prone_core = "2.50.0"
 jackson2 = "2.22.3"
 

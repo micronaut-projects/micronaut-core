@@ -55,7 +55,7 @@ public final class RandomPropertyExpressionResolver implements RememberingProper
         if (!randomExpression.startsWith(RANDOM_PREFIX)) {
             return Optional.empty();
         }
-        String value = randomExpression.substring(RANDOM_PREFIX.length()).toLowerCase();
+        String value = randomExpression.substring(RANDOM_PREFIX.length()).toLowerCase(Locale.ROOT);
         // The value drawn, not the converted one, so that each lookup converts it to the type it asks for.
         // An expression that cannot be resolved fails here, and nothing is remembered.
         Object random = memory.remember(() -> resolveRandomValue(value, randomExpression));
@@ -88,7 +88,7 @@ public final class RandomPropertyExpressionResolver implements RememberingProper
             default -> {
                 Matcher matcher = LazyInit.RANGE_PATTERN.matcher(value);
                 if (matcher.find()) {
-                    String rangeType = matcher.group(1).trim().toLowerCase();
+                    String rangeType = matcher.group(1).trim().toLowerCase(Locale.ROOT);
                     String range = matcher.group(2);
                     if (range != null) {
                         range = range.substring(1, range.length() - 1);

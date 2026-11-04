@@ -32,6 +32,7 @@ import reactor.core.publisher.Flux;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
 import static io.micronaut.http.HttpHeaders.CONTENT_LENGTH;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -101,7 +102,7 @@ class ContentLengthHeaderTest {
             String contentLength = header(exchange.getRequestHeaders(), CONTENT_LENGTH);
             exchange.sendResponseHeaders(200, 0);
             try (var os = exchange.getResponseBody()) {
-                os.write("%s:%s".formatted(method, contentLength).getBytes());
+                os.write("%s:%s".formatted(method, contentLength).getBytes(StandardCharsets.UTF_8));
             }
             exchange.close();
         }
