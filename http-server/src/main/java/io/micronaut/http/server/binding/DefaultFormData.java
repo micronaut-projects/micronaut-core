@@ -98,7 +98,8 @@ final class DefaultFormData implements FormData {
 
     @Override
     public int getInt(String name) {
-        if (first(name) instanceof String value && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
+        String value = first(name);
+        if (value != null && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
             PrimitiveTargetTypeConverter<String, Integer> converter = PrimitiveValueConverters.intConverter(conversionService);
             if (converter != null) {
                 // a value that does not parse converts again below, with the error of the field
@@ -123,7 +124,8 @@ final class DefaultFormData implements FormData {
 
     @Override
     public long getLong(String name) {
-        if (first(name) instanceof String value && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
+        String value = first(name);
+        if (value != null && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
             PrimitiveTargetTypeConverter<String, Long> converter = PrimitiveValueConverters.longConverter(conversionService);
             if (converter != null) {
                 // a value that does not parse converts again below, with the error of the field
@@ -148,7 +150,8 @@ final class DefaultFormData implements FormData {
 
     @Override
     public double getDouble(String name) {
-        if (first(name) instanceof String value && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
+        String value = first(name);
+        if (value != null && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
             PrimitiveTargetTypeConverter<String, Double> converter = PrimitiveValueConverters.doubleConverter(conversionService);
             if (converter != null) {
                 // a value that does not parse converts again below, with the error of the field
@@ -173,7 +176,8 @@ final class DefaultFormData implements FormData {
 
     @Override
     public boolean getBoolean(String name) {
-        if (first(name) instanceof String value) {
+        String value = first(name);
+        if (value != null) {
             PrimitiveTargetTypeConverter<String, Boolean> converter = PrimitiveValueConverters.booleanConverter(conversionService);
             if (converter != null) {
                 try {
