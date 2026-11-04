@@ -93,7 +93,8 @@ public class MicronautDevMain {
 
     /**
      * Runs the launcher with the given arguments and keeps the JVM alive while the application, or in test mode the
-     * watching, runs. In test mode the call returns once the runtime is closed, with the status the process exits with:
+     * watching, runs, and while an application that failed to start, with its failure reported, waits for the change
+     * that starts it again. In test mode the call returns once the runtime is closed, with the status the process exits with:
      * 0 when the last run passed, 1 otherwise; with {@code micronaut.dev.test.once} the tests run once first. On a terminal, test mode also reads single keys: space
      * runs the last tests again, {@code a} every test, {@code f} the failures, {@code w} turns watching on or off, and
      * {@code q} exits with the last run's status.
