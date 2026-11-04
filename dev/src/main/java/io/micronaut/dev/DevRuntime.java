@@ -307,8 +307,7 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * Runs the application and starts watching, as {@link #start(String[])} does, except that an application that cannot
-     * start at all is reported and watched too, as one whose context stopped is: the next change launches a generation.
+     * As {@link #start(String[])}, except that an application that cannot start at all is reported and watched too.
      *
      * @param args The application's arguments
      * @return The started context, or null when no context started
@@ -350,17 +349,21 @@ public final class DevRuntime implements Closeable {
             thread.setDaemon(true);
             thread.start();
             worker = thread;
+            int generation = classLoader.generation();
             try {
                 first = launch("first start");
-            } catch (IllegalStateException e) {
-                // a start that timed out, or was interrupted, may still have a main running beside the next generation
-                if (!awaitChange || !started.isCompletedExceptionally()) {
+            } catch (StartFailures.Failed e) {
+                if (!awaitChange) {
                     throw e;
                 }
-                startFailures.hold();
-                requests.startFailed();
+                // unless a change launched the next generation meanwhile, which answers for itself
+                boolean current = startFailures.holdIf(() -> classLoader.generation() == generation, requests::startFailed);
                 reconcileOutputs();
-                StartFailures.reportStart(e);
+                if (current) {
+                    StartFailures.reportStart(e);
+                } else {
+                    whenReady().join(); // this non-daemon thread keeps the JVM until that generation has threads of its own
+                }
                 return null;
             }
             // as after a restart: the servers bind a moment after the context starts, and the first generation is
@@ -1790,7 +1793,7 @@ public final class DevRuntime implements Closeable {
             throw new IllegalStateException("Interrupted while the application started (" + reason + ")", e);
         } catch (ExecutionException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
-            throw new IllegalStateException("The application failed to start (" + reason + "): " + cause.getMessage(), cause);
+            throw new StartFailures.Failed("The application failed to start (" + reason + "): " + cause.getMessage(), cause);
         } catch (TimeoutException e) {
             throw new IllegalStateException("The application did not start within " + START_TIMEOUT + " (" + reason + ")", e);
         }
