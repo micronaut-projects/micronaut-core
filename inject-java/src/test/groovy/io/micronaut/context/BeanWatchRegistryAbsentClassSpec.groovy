@@ -32,6 +32,7 @@ class BeanWatchRegistryAbsentClassSpec extends AbstractTypeElementSpec {
     private static final String ABSENT = 'test.$Absent$Definition'
     private static final String BROKEN = 'test.$Broken$Definition'
     private static final String FOUND = 'test.$Found$Definition'
+    private static final String UNINITIALIZED = 'test.$Uninitialized$Definition'
 
     @Shared
     ClassLoader compiled
@@ -69,10 +70,20 @@ class Broken {
     }
 }
 
+@Singleton
+class Uninitialized {
+    @Inject
+    void setErroneous(Erroneous erroneous) {
+    }
+}
+
 class Missing {
 }
 
 class Failing {
+}
+
+class Erroneous {
 }
 ''')
     }
@@ -123,9 +134,9 @@ class Failing {
         context?.close()
     }
 
-    void "a watch of #watched reports a definition that failed for any other reason"() {
+    void "a watch of #watched reports a definition that failed because #reason"() {
         given:
-        ApplicationContext context = start(BROKEN, FOUND)
+        ApplicationContext context = start(definition, FOUND)
         List<Object> batches = []
 
         when:
@@ -133,15 +144,18 @@ class Failing {
 
         then:
         batches.isEmpty()
-        errors().any { it.contains('failed to process a change') && it.contains('the loader failed') }
+        errors().any { it.contains('failed to process a change') && it.contains(message) }
 
         cleanup:
         watch?.close()
         context?.close()
 
         where:
-        register << [BeanWatchRegistryAbsentClassSpec.&watchMethods, BeanWatchRegistryAbsentClassSpec.&watchStereotype]
-        watched << ['methods', 'a stereotype']
+        register                                          | watched        | definition    | reason                        | message
+        BeanWatchRegistryAbsentClassSpec.&watchMethods    | 'methods'      | BROKEN        | 'a class failed to load'       | 'the loader failed'
+        BeanWatchRegistryAbsentClassSpec.&watchStereotype | 'a stereotype' | BROKEN        | 'a class failed to load'       | 'the loader failed'
+        BeanWatchRegistryAbsentClassSpec.&watchMethods    | 'methods'      | UNINITIALIZED | 'a class failed to initialize' | 'Could not initialize class'
+        BeanWatchRegistryAbsentClassSpec.&watchStereotype | 'a stereotype' | UNINITIALIZED | 'a class failed to initialize' | 'Could not initialize class'
     }
 
     private static BeanWatch watchMethods(ApplicationContext context, List<Object> batches) {
@@ -177,7 +191,7 @@ class Failing {
     }
 
     /**
-     * Defines the compiled classes itself, so that one can be missing for them and another can fail to load.
+     * Defines the compiled classes itself, so that one can be missing for them and others can fail.
      */
     private static final class RestrictedLoader extends ClassLoader {
         private final ClassLoader compiled
@@ -194,6 +208,10 @@ class Failing {
             }
             if (name == 'test.Failing') {
                 throw new IllegalStateException('the loader failed')
+            }
+            if (name == 'test.Erroneous') {
+                // what the JVM throws for a class whose static initializer failed earlier
+                throw (NoClassDefFoundError) new NoClassDefFoundError('Could not initialize class test.Erroneous').initCause(new ExceptionInInitializerError('boom'))
             }
             if (!name.startsWith('test.')) {
                 return super.loadClass(name, resolve)
