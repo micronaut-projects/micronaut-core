@@ -78,7 +78,7 @@ final class RestartRequests implements RequestAdmission {
      * @param manifest The manifest
      * @param retainSockets Whether the listening sockets are kept bound across generations
      */
-    RestartRequests(DevManifest manifest, boolean retainSockets) {
+    RestartRequests(DevManifest manifest, boolean retainSockets) { // NOSONAR java:S2637 every field is set below, the timeouts from the manifest's non-null defaults
         this.manifest = manifest;
         this.holdTimeout = manifest.requestHoldTimeout();
         this.drainTimeout = manifest.requestDrainTimeout();
