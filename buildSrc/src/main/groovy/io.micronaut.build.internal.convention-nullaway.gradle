@@ -30,6 +30,7 @@ tasks.withType(JavaCompile).configureEach {
             check("DoubleCheckedLocking", CheckSeverity.ERROR)
             check("BadInstanceof", CheckSeverity.ERROR)
             check("DefaultCharset", CheckSeverity.ERROR)
+            check("StringCaseLocaleUsage", CheckSeverity.ERROR)
         }
     }
     // Disable NullAway on test code and TCK
