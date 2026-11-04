@@ -22,6 +22,7 @@ import io.micronaut.websocket.annotation.OnClose;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
+import io.micronaut.websocket.exceptions.WebSocketSessionException;
 
 import java.util.Set;
 
@@ -38,7 +39,7 @@ public class BinaryChatServerWebSocket {
             if(isValid(topic, session, openSession)) {
                 String msg = "[" + username + "] Joined!";
                 System.out.println("Server sending msg = " + msg);
-                openSession.sendAsync(msg.getBytes());
+                sendIfOpen(openSession, msg.getBytes());
             }
         }
     }
@@ -57,7 +58,7 @@ public class BinaryChatServerWebSocket {
             if(isValid(topic, session, openSession)) {
                 String msg = "[" + username + "] " + new String(message);
                 System.out.println("Server sending msg = " + msg);
-                openSession.sendAsync(msg.getBytes());
+                sendIfOpen(openSession, msg.getBytes());
             }
         }
     }
@@ -74,7 +75,19 @@ public class BinaryChatServerWebSocket {
             if(isValid(topic, session, openSession)) {
                 String msg = "[" + username + "] Disconnected!";
                 System.out.println("Server sending msg = " + msg);
-                openSession.sendAsync(msg.getBytes());
+                sendIfOpen(openSession, msg.getBytes());
+            }
+        }
+    }
+
+    private void sendIfOpen(WebSocketSession session, byte[] message) {
+        if (session.isOpen()) {
+            try {
+                session.sendAsync(message);
+            } catch (WebSocketSessionException e) {
+                if (session.isOpen()) {
+                    throw e;
+                }
             }
         }
     }

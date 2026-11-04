@@ -134,6 +134,7 @@ class BinaryWebSocketSpec extends Specification {
         then:
         conditions.eventually {
             !bob.session.isOpen()
+            fred.replies.contains("[bob] Disconnected!")
         }
 
         when:
@@ -142,8 +143,8 @@ class BinaryWebSocketSpec extends Specification {
         then:
         conditions.eventually {
             fred.replies.contains("[bob] Disconnected!")
-            !bob.replies.contains("[bob] Disconnected!")
         }
+        !bob.replies.contains("[bob] Disconnected!")
 
         cleanup:
         wsClient.close()
