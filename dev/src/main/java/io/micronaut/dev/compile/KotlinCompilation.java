@@ -99,6 +99,19 @@ final class KotlinCompilation {
     }
 
     /**
+     * @return The version of the compiler the implementation of the Build Tools API runs, null without an implementation
+     */
+    @Nullable
+    static String compilerVersion() {
+        try {
+            return toolchains().getCompilerVersion();
+        } catch (NoImplementationFoundException | LinkageError e) {
+            LOG.debug("The Kotlin Build Tools API has no implementation on the classpath: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * @return Whether the KSP implementation is on the classpath, checked here so that {@link KspCompilation} is
      *         never touched without it
      */

@@ -72,6 +72,16 @@ dependencies {
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
+// a Kotlin older than the embedded compiler supports, on the classpath of a JVM of its own in one test
+val unsupportedKotlin: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
+dependencies {
+    unsupportedKotlin("org.jetbrains.kotlin:kotlin-build-tools-impl:2.3.21")
+}
+
 tasks.named<Jar>("jar") {
     manifest {
         attributes(
@@ -86,6 +96,11 @@ tasks.named<Jar>("jar") {
 tasks.withType<Test>().configureEach {
     // the fast path test attaches the agent to the test JVM
     jvmArgs("-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading")
+    val unsupportedKotlinFiles: FileCollection = unsupportedKotlin
+    inputs.files(unsupportedKotlinFiles).withNormalizer(ClasspathNormalizer::class)
+    jvmArgumentProviders.add(CommandLineArgumentProvider {
+        listOf("-Dmicronaut.dev.test.unsupported-kotlin-classpath=" + unsupportedKotlinFiles.asPath)
+    })
 }
 
 micronautBuild {
