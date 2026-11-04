@@ -977,8 +977,10 @@ public class ConnectionManager {
         try {
             PcapWriteHandler.Builder builder = PcapWriteHandler.builder();
 
-            if (udpBootstrap != null && ch instanceof QuicStreamChannel qsc) {
-                builder.forceTcpChannel((InetSocketAddress) qsc.parent().localSocketAddress(), (InetSocketAddress) qsc.parent().remoteSocketAddress(), true);
+            if (udpBootstrap != null && ch instanceof QuicStreamChannel qsc
+                && qsc.parent().localSocketAddress() instanceof InetSocketAddress localAddress
+                && qsc.parent().remoteSocketAddress() instanceof InetSocketAddress remoteAddress) {
+                builder.forceTcpChannel(localAddress, remoteAddress, true);
             }
 
             return builder.build(new FileOutputStream(path));
