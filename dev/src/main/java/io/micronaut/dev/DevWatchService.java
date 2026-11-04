@@ -17,7 +17,6 @@ package io.micronaut.dev;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import org.slf4j.Logger;
@@ -70,7 +69,38 @@ record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar 
      */
     static DevWatchService create() throws IOException {
         boolean mac = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
-        return create(mac, NativeImageUtils.inImageRuntimeCode(), ClassUtils.isPresent(JNA, DevWatchService.class.getClassLoader()));
+        boolean nativeImage = NativeImageUtils.inImageRuntimeCode();
+        return create(mac, nativeImage, macServicePresent(mac, nativeImage, DevWatchService.class.getClassLoader()));
+    }
+
+    /**
+     * Whether JNA, which the native macOS service calls FSEvents through, is on the classpath, looked for only where
+     * the service can run: JNA prints an error to the console when it loads its library in a native image, whose JNI
+     * does not find the classes the library looks up.
+     *
+     * @param mac Whether the platform is macOS
+     * @param nativeImage Whether this runs in a native image
+     * @param classLoader The loader to look in
+     * @return Whether the native service can be created
+     */
+    static boolean macServicePresent(boolean mac, boolean nativeImage, ClassLoader classLoader) {
+        return mac && !nativeImage && isPresent(JNA, classLoader);
+    }
+
+    /**
+     * Whether a class exists, without initializing it: initializing JNA's {@code Native} loads its native library.
+     *
+     * @param name The name of the class
+     * @param classLoader The loader to look in
+     * @return Whether the class exists
+     */
+    static boolean isPresent(String name, ClassLoader classLoader) {
+        try {
+            Class.forName(name, false, classLoader);
+            return true;
+        } catch (ClassNotFoundException | LinkageError e) {
+            return false;
+        }
     }
 
     /**

@@ -1431,11 +1431,11 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * Compiles a batch's changes for the languages of a manifest, holding the output lock: see
-     * {@link Compilations#round}.
+     * Compiles a batch's changes for the languages of a manifest, holding the output lock, the environments its
+     * processors create kept quiet: see {@link Compilations#round} and {@link DevLogging#quietCompilation()}.
      */
     CompileRound compileRound(DevManifest target, Map<SourceKind, SourceKind> joint, Map<SourceKind, SourceChanges> changes, boolean full, Set<String> seed) {
-        try (OutputLock.Hold hold = outputLock.lock()) {
+        try (OutputLock.Hold hold = outputLock.lock(); DevLogging.Quiet quiet = DevLogging.quietCompilation()) {
             return Compilations.round(compilers, target, joint, changes, full, seed);
         }
     }
