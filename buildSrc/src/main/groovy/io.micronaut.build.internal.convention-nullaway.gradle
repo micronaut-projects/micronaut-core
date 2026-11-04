@@ -11,6 +11,7 @@ dependencies {
 }
 
 tasks.withType(JavaCompile).configureEach {
+    boolean testCompile = name.toLowerCase().contains("test")
     options.errorprone {
         check("NullAway", CheckSeverity.ERROR)
         check("MissingOverride", CheckSeverity.ERROR)
@@ -23,9 +24,13 @@ tasks.withType(JavaCompile).configureEach {
         option("NullAway:ExhaustiveOverride", "true")
         // Honor @Nullable returns and @NonNull parameters declared in library bytecode
         option("NullAway:AcknowledgeRestrictiveAnnotations", "true")
+        if (!testCompile) {
+            // Error Prone checks that fail the build of main code, the TCKs included
+            check("ClassInitializationDeadlock", CheckSeverity.ERROR)
+        }
     }
     // Disable NullAway on test code and TCK
-    if (name.toLowerCase().contains("test") || project.name.contains("tck")) {
+    if (testCompile || project.name.contains("tck")) {
         options.errorprone {
             disable("NullAway", "RequireExplicitNullMarking")
         }

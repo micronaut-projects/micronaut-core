@@ -49,32 +49,33 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
     /**
      * Constant for Boolean argument.
      */
-    ArgumentConversionContext<Boolean> BOOLEAN = ImmutableArgumentConversionContext.of(Argument.BOOLEAN);
+    ArgumentConversionContext<Boolean> BOOLEAN = immutable(Argument.BOOLEAN);
 
     /**
      * Constant for Integer argument.
      */
-    ArgumentConversionContext<Integer> INT = ImmutableArgumentConversionContext.of(Argument.INT);
+    ArgumentConversionContext<Integer> INT = immutable(Argument.INT);
 
     /**
      * Constant for Long argument.
      */
-    ArgumentConversionContext<Long> LONG = ImmutableArgumentConversionContext.of(Argument.LONG);
+    ArgumentConversionContext<Long> LONG = immutable(Argument.LONG);
 
     /**
      * Constant for String argument.
      */
-    ArgumentConversionContext<String> STRING = ImmutableArgumentConversionContext.of(Argument.STRING);
+    ArgumentConversionContext<String> STRING = immutable(Argument.STRING);
 
     /**
      * Constant for {@code List<String>} argument.
      */
-    ArgumentConversionContext<List<String>> LIST_OF_STRING = ImmutableArgumentConversionContext.of(Argument.LIST_OF_STRING);
+    ArgumentConversionContext<List<String>> LIST_OF_STRING = immutable(Argument.LIST_OF_STRING);
 
     /**
      * Constant for {@code List<String>} argument.
      */
-    ArgumentConversionContext<Map> MAP = ImmutableArgumentConversionContext.of(Argument.of(Map.class));
+    @SuppressWarnings("java:S3740") // the raw type is public API
+    ArgumentConversionContext<Map> MAP = immutable(Argument.of(Map.class));
 
     /**
      * In the case where the type to be converted contains generic type arguments this map will return
@@ -234,5 +235,19 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
         Charset finalCharset = charset != null ? charset : StandardCharsets.UTF_8;
         Locale finalLocale = locale != null ? locale : Locale.getDefault();
         return new DefaultArgumentConversionContext<>(argument, finalLocale, finalCharset);
+    }
+
+    /**
+     * Creates the immutable context of a constant of this interface. The lambda class of
+     * {@link ImmutableArgumentConversionContext#of(Argument)} can be initialized first by any thread, and initializing it
+     * initializes this interface, so using it here could deadlock; the lambda class here is only reachable from this
+     * interface's own initialization.
+     *
+     * @param argument The argument
+     * @param <T>      The type
+     * @return The conversion context
+     */
+    private static <T> ImmutableArgumentConversionContext<T> immutable(Argument<T> argument) {
+        return () -> argument;
     }
 }
