@@ -9,9 +9,11 @@ public class TaggedService {
 
     @Tagged("${app.tag}")
     public void placeholder() {
+        // only the annotation on this method is under test
     }
 
     @Tagged("#{ env['app.tag'] }")
     public void expression() {
+        // only the annotation on this method is under test
     }
 }
