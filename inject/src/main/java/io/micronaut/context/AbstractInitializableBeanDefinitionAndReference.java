@@ -181,9 +181,17 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
      * @return True if loading this definition would fail for an absent class
      */
     final boolean isClassAbsent() {
-        return failedInitialization instanceof NoClassDefFoundError && !(failedInitialization.getCause() instanceof ExceptionInInitializerError)
-            || failedInitialization instanceof TypeNotPresentException
-            || failedInitialization instanceof ClassNotFoundException;
+        if (failedInitialization == null) {
+            return false;
+        }
+        return switch (BeanInitializationFailure.typeOf(failedInitialization)) {
+            case "java.lang.NoClassDefFoundError" -> {
+                Throwable cause = failedInitialization.getCause();
+                yield cause == null || !"java.lang.ExceptionInInitializerError".equals(BeanInitializationFailure.typeOf(cause));
+            }
+            case "java.lang.TypeNotPresentException", "java.lang.ClassNotFoundException" -> true;
+            default -> false;
+        };
     }
 
     @Override

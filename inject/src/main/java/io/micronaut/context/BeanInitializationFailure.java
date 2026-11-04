@@ -59,6 +59,17 @@ public final class BeanInitializationFailure extends Throwable {
         }
     }
 
+    /**
+     * The type of a failure a definition keeps, or of one of its causes: the type a copy was made from, or the failure's
+     * own type for a definition compiled before definitions kept a copy.
+     *
+     * @param failure The failure
+     * @return The name of its type
+     */
+    static String typeOf(Throwable failure) {
+        return failure instanceof BeanInitializationFailure copy ? copy.type : failure.getClass().getName();
+    }
+
     private static BeanInitializationFailure copy(Throwable failure, Set<Throwable> seen) {
         seen.add(failure);
         Throwable cause = failure.getCause();
