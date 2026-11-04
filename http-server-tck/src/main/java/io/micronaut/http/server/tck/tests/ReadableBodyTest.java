@@ -68,6 +68,28 @@ public class ReadableBodyTest {
                 .build()));
     }
 
+    @Test
+    void readsTheBodyAsCharactersWithTheCharsetOfTheRequest() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/readable/reader", "héllo à börk")
+                .contentType(MediaType.TEXT_PLAIN + ";charset=ISO-8859-1"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body(BodyAssertion.builder().body("héllo à börk").equals())
+                .build()));
+    }
+
+    @Test
+    void bindsAStringBodyWithTheCharsetOfTheRequest() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/readable/string", "héllo à börk")
+                .contentType(MediaType.TEXT_PLAIN + ";charset=ISO-8859-1"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body(BodyAssertion.builder().body("héllo à börk").equals())
+                .build()));
+    }
+
     @Controller("/readable")
     @Requires(property = "spec.name", value = SPEC_NAME)
     @ExecuteOn(TaskExecutors.BLOCKING)
@@ -78,6 +100,11 @@ public class ReadableBodyTest {
             try (InputStream in = body.asInputStream()) {
                 return new String(in.readAllBytes(), StandardCharsets.UTF_8);
             }
+        }
+
+        @Post(value = "/string", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN + ";charset=UTF-8")
+        String string(@Body String body) {
+            return body;
         }
 
         @Post(value = "/reader", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN + ";charset=UTF-8")
