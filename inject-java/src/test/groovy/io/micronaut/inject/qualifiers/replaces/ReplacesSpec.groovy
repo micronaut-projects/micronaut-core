@@ -643,4 +643,85 @@ class IntegerFoo implements Foo<Integer> {
         cleanup:
         context.close()
     }
+
+    void "test a marker qualifier of the replaced bean selects the replacement"() {
+        given:
+        ApplicationContext context = buildContext("""
+package test;
+
+import io.micronaut.context.annotation.Replaces;
+import jakarta.inject.Qualifier;
+import jakarta.inject.Singleton;
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Qualifier
+@Retention(RUNTIME)
+@interface Marker {
+}
+
+@Singleton
+@Marker
+class MarkedBean {
+}
+
+@Singleton
+@Replaces(MarkedBean.class)
+class MockBean extends MarkedBean {
+}
+
+@Singleton
+class MarkedConsumer {
+    final MarkedBean bean;
+
+    MarkedConsumer(@Marker MarkedBean bean) {
+        this.bean = bean;
+    }
+}
+""")
+        def loader = context.classLoader
+        def marker = loader.loadClass("test.Marker")
+        def marked = loader.loadClass("test.MarkedBean")
+
+        expect:
+        context.getBean(loader.loadClass("test.MarkedConsumer")).bean.class.simpleName == "MockBean"
+        context.getBean(marked, Qualifiers.byStereotype(marker)).class.simpleName == "MockBean"
+
+        cleanup:
+        context.close()
+    }
+
+    void "test a replacement does not take on the type arguments of a qualified bean it replaces"() {
+        given:
+        ApplicationContext context = buildContext("""
+package test;
+
+import io.micronaut.context.annotation.Replaces;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
+
+interface Foo<T> {
+}
+
+@Singleton
+@Named("string")
+class StringFoo implements Foo<String> {
+}
+
+@Singleton
+@Replaces(StringFoo.class)
+class IntegerFoo implements Foo<Integer> {
+}
+""")
+        def foo = context.classLoader.loadClass("test.Foo")
+
+        expect: "only the declared qualifier is inherited"
+        context.getBeansOfType(foo, Qualifiers.byName("string"))*.class*.simpleName == ["IntegerFoo"]
+        context.getBeansOfType(foo, Qualifiers.byTypeArguments(Integer))*.class*.simpleName == ["IntegerFoo"]
+        context.getBeansOfType(foo, Qualifiers.byTypeArguments(String)).isEmpty()
+        context.getBeansOfType(foo, Qualifiers.byQualifiers(Qualifiers.byName("string"), Qualifiers.byTypeArguments(String))).isEmpty()
+
+        cleanup:
+        context.close()
+    }
 }

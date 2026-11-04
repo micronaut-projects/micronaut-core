@@ -2852,8 +2852,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     /**
      * Filters the candidates by the qualifier, for which a bean that replaces another also satisfies the qualifiers
-     * declared by the bean it replaces. Candidates have already had replaced beans removed, so those are looked up
-     * again, and only when a candidate that does not qualify could have replaced one.
+     * declared by the bean it replaces. The qualifier is compared with those declared qualifiers rather than with the
+     * replaced bean, so a replacement does not take on anything else about it, such as its type arguments. Candidates
+     * have already had replaced beans removed, so those are looked up again, and only when a candidate that does not
+     * qualify could have replaced one.
      *
      * @param beanType   The bean type
      * @param qualifier  The qualifier
@@ -2880,17 +2882,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         Set<BeanDefinition<T>> definitions = findDefinitionsIncludingReplaced(beanType);
         List<BeanDefinition<T>> replacements = new ArrayList<>(2);
-        List<BeanDefinition<T>> declaringQualifier = new ArrayList<>();
+        Deque<BeanDefinition<T>> replaced = new ArrayDeque<>();
         for (BeanDefinition<T> definition : definitions) {
             if (definition.getReplacesDefinition() != null) {
                 replacements.add(definition);
             }
-            if (!candidates.contains(definition) && definition.getDeclaredQualifier() != null) {
-                declaringQualifier.add(definition);
+            if (!candidates.contains(definition)) {
+                Qualifier<T> declaredQualifier = definition.getDeclaredQualifier();
+                if (declaredQualifier != null && declaredQualifier.contains(qualifier)) {
+                    replaced.add(definition);
+                }
             }
         }
         Set<BeanDefinition<T>> result = new LinkedHashSet<>(qualified);
-        Deque<BeanDefinition<T>> replaced = new ArrayDeque<>(qualifier.filterQualified(beanType.getType(), declaringQualifier));
         Set<BeanDefinition<T>> visited = new HashSet<>(replaced);
         while (!replaced.isEmpty()) {
             BeanDefinition<T> definition = replaced.poll();
@@ -2907,6 +2911,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return result;
     }
 
+    /**
+     * Finds the definitions of a type before replaced beans are removed. These are the raw definitions, without the
+     * expansion of {@link io.micronaut.context.annotation.EachProperty} and
+     * {@link io.micronaut.context.annotation.EachBean} that candidates have, so a qualifier that such a bean only gets
+     * dynamically is not inherited by its replacement.
+     *
+     * @param beanType The bean type
+     * @param <T>      The bean type
+     * @return The definitions
+     */
     private <T> Set<BeanDefinition<T>> findDefinitionsIncludingReplaced(Argument<T> beanType) {
         Set<BeanDefinition<T>> definitions = new LinkedHashSet<>();
         Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
