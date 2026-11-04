@@ -25,6 +25,7 @@ import io.micronaut.aop.beandefinition.ParameterizedProxyBeanDefinition;
 import io.micronaut.context.AbstractInitializableBeanDefinition;
 import io.micronaut.context.AbstractInitializableBeanDefinitionAndReference;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanInitializationFailure;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -244,6 +245,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final String BUILDER_VARIABLE_PREFIX = "builder";
     private static final String ARGUMENT_MEMBER = "argument";
 
+    private static final Method DETACH_FAILURE = ReflectionUtils.getRequiredInternalMethod(
+        BeanInitializationFailure.class, "detach", Throwable.class);
     private static final Method GET_BEAN_BY_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(
         BeanLocator.class, "getBean", Argument.class);
     private static final Method GET_CANDIDATE_RESOLVER = ReflectionUtils.getRequiredInternalMethod(
@@ -2552,7 +2555,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                     initStatements
                 )
             ).doCatch(Throwable.class, exceptionVar -> StatementDef.multi(
-                beanDefinitionTypeDef.getStaticField(failedInitializationField).put(exceptionVar),
+                beanDefinitionTypeDef.getStaticField(failedInitializationField).put(
+                    ClassTypeDef.of(BeanInitializationFailure.class).invokeStatic(DETACH_FAILURE, exceptionVar)
+                ),
                 StatementDef.multi(failStatements)
             ))
         );
