@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.InetAddress;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -391,7 +392,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
         try {
             //Read out dir output
             InputStream is = process.getInputStream();
-            InputStreamReader isr = new InputStreamReader(is);
+            InputStreamReader isr = new InputStreamReader(is, Charset.defaultCharset());
             BufferedReader br = new BufferedReader(isr);
             String line;
             while ((line = br.readLine()) != null) {
@@ -441,7 +442,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
             if (!Files.exists(pathPath)) {
                 return "";
             }
-            return new String(Files.readAllBytes(pathPath)).trim();
+            return new String(Files.readAllBytes(pathPath), Charset.defaultCharset()).trim();
         } catch (IOException e) {
             return "";
         }
