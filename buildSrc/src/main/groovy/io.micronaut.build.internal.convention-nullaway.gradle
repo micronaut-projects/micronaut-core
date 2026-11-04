@@ -28,6 +28,7 @@ tasks.withType(JavaCompile).configureEach {
             // Error Prone checks that fail the build of main code, the TCKs included
             check("ClassInitializationDeadlock", CheckSeverity.ERROR)
             check("DoubleCheckedLocking", CheckSeverity.ERROR)
+            check("BadInstanceof", CheckSeverity.ERROR)
         }
     }
     // Disable NullAway on test code and TCK

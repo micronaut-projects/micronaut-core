@@ -1666,7 +1666,9 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         return afterSubscribe(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType, true), propagatedContext)
             .flatMapMany(response -> {
                 Publisher<ByteBuffer<?>> body;
-                if (response.getBody().orElse(null) instanceof BodyElements<?> elements) {
+                // a response a filter replaced is passed through unchecked: its body need not be elements
+                Object responseBody = response.getBody().orElse(null);
+                if (responseBody instanceof BodyElements<?> elements) {
                     @SuppressWarnings("unchecked")
                     BodyElements<ByteBuffer<?>> pieces = (BodyElements<ByteBuffer<?>>) elements;
                     body = streamPiecesPublisher(pieces);
