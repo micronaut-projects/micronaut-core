@@ -19,6 +19,10 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.exceptions.NonUniqueBeanException
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.inject.qualifiers.Qualifiers
 /**
  * Created by graemerocher on 26/05/2017.
  */
@@ -291,5 +295,352 @@ class A2ConfigProperties extends A1ConfigProperties {
 
         cleanup:
         ctx.close()
+    }
+
+    private static final String GREETER = """
+package test;
+
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Replaces;
+import jakarta.inject.Singleton;
+
+interface Greeter {
+}
+
+@Singleton
+class DefaultGreeter implements Greeter {
+}
+
+@Singleton
+@Replaces(Greeter.class)
+class ReplacingGreeter implements Greeter {
+}
+"""
+
+    void "test a bean that replaces a bean that replaces its interface"() {
+        given:
+        ApplicationContext context = buildContext(GREETER + """
+@Singleton
+@Replaces(ReplacingGreeter.class)
+class MockGreeter implements Greeter {
+}
+""")
+        def greeter = context.classLoader.loadClass("test.Greeter")
+
+        expect:
+        context.getBean(greeter).class.simpleName == "MockGreeter"
+        context.getBeansOfType(greeter)*.class*.simpleName == ["MockGreeter"]
+
+        cleanup:
+        context.close()
+    }
+
+    void "test a factory bean of the interface type that replaces a bean that replaces its interface"() {
+        given:
+        ApplicationContext context = buildContext(GREETER + """
+@io.micronaut.context.annotation.Factory
+class MockFactory {
+    @Singleton
+    @Replaces(ReplacingGreeter.class)
+    Greeter mockGreeter() {
+        return new Greeter() { };
+    }
+}
+""")
+        def greeter = context.classLoader.loadClass("test.Greeter")
+
+        expect:
+        context.getBeansOfType(greeter).size() == 1
+        !["DefaultGreeter", "ReplacingGreeter"].contains(context.getBean(greeter).class.simpleName)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test beans that replace the same interface both remain so primary decides"() {
+        given:
+        ApplicationContext context = buildContext(GREETER + """
+@Singleton
+@Primary
+@Replaces(Greeter.class)
+class MockGreeter implements Greeter {
+}
+""")
+        def greeter = context.classLoader.loadClass("test.Greeter")
+
+        expect:
+        context.getBean(greeter).class.simpleName == "MockGreeter"
+        context.getBeansOfType(greeter)*.class*.simpleName.toSet() == ["MockGreeter", "ReplacingGreeter"].toSet()
+
+        cleanup:
+        context.close()
+    }
+
+    void "test beans that replace the same interface without a preference are not unique"() {
+        given:
+        ApplicationContext context = buildContext(GREETER + """
+@Singleton
+@Replaces(Greeter.class)
+class MockGreeter implements Greeter {
+}
+""")
+
+        when:
+        context.getBean(context.classLoader.loadClass("test.Greeter"))
+
+        then:
+        thrown(NonUniqueBeanException)
+
+        cleanup:
+        context.close()
+    }
+
+    private static final String HANDLER = """
+package test;
+
+import io.micronaut.context.annotation.Replaces;
+import jakarta.inject.Qualifier;
+import jakarta.inject.Singleton;
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Qualifier
+@Retention(RUNTIME)
+@interface Handler {
+    String value();
+}
+
+interface AnyHandler {
+}
+
+@Singleton
+@Handler("plain")
+class PlainHandler implements AnyHandler {
+}
+
+@Singleton
+@Handler("other")
+class OtherHandler implements AnyHandler {
+}
+
+@Singleton
+class PlainConsumer {
+    final PlainHandler handler;
+    final java.util.List<PlainHandler> handlers;
+
+    PlainConsumer(@Handler("plain") PlainHandler handler, @Handler("plain") java.util.List<PlainHandler> handlers) {
+        this.handler = handler;
+        this.handlers = handlers;
+    }
+}
+"""
+
+    void "test a replacement satisfies the qualifier of the bean it replaces"() {
+        given:
+        ApplicationContext context = buildContext(HANDLER + """
+@Singleton
+@Replaces(PlainHandler.class)
+class MockHandler extends PlainHandler {
+}
+""")
+        def loader = context.classLoader
+        def handlerType = loader.loadClass("test.PlainHandler")
+        def mockType = loader.loadClass("test.MockHandler")
+        def annotation = loader.loadClass("test.Handler")
+        def plain = Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, AnnotationValue.builder(annotation).value("plain").build())
+        def other = Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, AnnotationValue.builder(annotation).value("other").build())
+        def consumer = context.getBean(loader.loadClass("test.PlainConsumer"))
+
+        expect: "the qualifier of the replaced bean resolves the one replacement instance"
+        consumer.handler.is(context.getBean(mockType))
+        consumer.handlers*.class == [mockType]
+        context.getBean(handlerType, plain).is(consumer.handler)
+        context.containsBean(handlerType, plain)
+        context.findBean(handlerType, plain).isPresent()
+        context.getBeansOfType(handlerType, plain)*.class == [mockType]
+        context.getBeanDefinitions(handlerType, plain)*.beanType == [mockType]
+
+        and: "a wider type resolves the same way and other qualifiers are unaffected"
+        def anyHandler = loader.loadClass("test.AnyHandler")
+        context.getBean(anyHandler, plain).is(consumer.handler)
+        context.getBean(anyHandler, other).class.simpleName == "OtherHandler"
+        context.getBeansOfType(anyHandler, other).size() == 1
+        context.getBeansOfType(anyHandler).size() == 2
+
+        cleanup:
+        context.close()
+    }
+
+    void "test a replacement keeps its own qualifier alongside the qualifier of the bean it replaces"() {
+        given:
+        ApplicationContext context = buildContext(HANDLER + """
+@Singleton
+@Handler("mock")
+@Replaces(PlainHandler.class)
+class MockHandler extends PlainHandler {
+}
+""")
+        def loader = context.classLoader
+        def handlerType = loader.loadClass("test.PlainHandler")
+        def annotation = loader.loadClass("test.Handler")
+        def plain = Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, AnnotationValue.builder(annotation).value("plain").build())
+        def mock = Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA, AnnotationValue.builder(annotation).value("mock").build())
+
+        expect:
+        context.getBean(handlerType, plain).is(context.getBean(handlerType, mock))
+
+        cleanup:
+        context.close()
+    }
+
+    void "test the end of a replacement chain satisfies the qualifier of the first bean"() {
+        given:
+        ApplicationContext context = buildContext(HANDLER + """
+@Singleton
+@Replaces(PlainHandler.class)
+class MiddleHandler extends PlainHandler {
+}
+
+@Singleton
+@Replaces(MiddleHandler.class)
+class MockHandler extends MiddleHandler {
+}
+""")
+        def loader = context.classLoader
+        def consumer = context.getBean(loader.loadClass("test.PlainConsumer"))
+
+        expect:
+        consumer.handler.class.simpleName == "MockHandler"
+
+        cleanup:
+        context.close()
+    }
+
+    void "test the end of a longer replacement chain is the only bean left"() {
+        given:
+        ApplicationContext context = buildContext(HANDLER + """
+@Singleton
+@Replaces(PlainHandler.class)
+class MiddleHandler extends PlainHandler {
+}
+
+@Singleton
+@Replaces(MiddleHandler.class)
+class MockHandler extends MiddleHandler {
+}
+
+@Singleton
+@Replaces(MockHandler.class)
+class FinalHandler extends MockHandler {
+}
+""")
+        def loader = context.classLoader
+        def handlerType = loader.loadClass("test.PlainHandler")
+        def consumer = context.getBean(loader.loadClass("test.PlainConsumer"))
+
+        expect:
+        context.getBeansOfType(handlerType)*.class*.simpleName == ["FinalHandler"]
+        consumer.handler.class.simpleName == "FinalHandler"
+
+        cleanup:
+        context.close()
+    }
+
+    void "test a bean of a wider type is still replaced by a bean outside of its cycle"() {
+        given:
+        ApplicationContext context = buildContext(GREETER + """
+@Singleton
+@Replaces(MockGreeter.class)
+class FinalGreeter extends MockGreeter {
+}
+
+@Singleton
+@Replaces(ReplacingGreeter.class)
+class MockGreeter implements Greeter {
+}
+""")
+        def greeter = context.classLoader.loadClass("test.Greeter")
+
+        expect:
+        context.getBeansOfType(greeter)*.class*.simpleName == ["FinalGreeter"]
+
+        cleanup:
+        context.close()
+    }
+
+    void "test beans that replace each other without a narrower target all remain"() {
+        given:
+        ApplicationContext context = buildContext("""
+package test;
+
+import io.micronaut.context.annotation.Replaces;
+import jakarta.inject.Singleton;
+
+interface Thing {
+}
+
+@Singleton
+@Replaces(B.class)
+class A implements Thing {
+}
+
+@Singleton
+@Replaces(C.class)
+class B implements Thing {
+}
+
+@Singleton
+@Replaces(A.class)
+class C implements Thing {
+}
+""")
+
+        expect:
+        context.getBeansOfType(context.classLoader.loadClass("test.Thing")).size() == 3
+
+        cleanup:
+        context.close()
+    }
+
+    void "test a bean named by the replaces annotation resolves to its replacement"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesSpec'])
+
+        expect:
+        context.getBean(E, Qualifiers.byName("E1")) instanceof E1Replacement
+        context.getBean(E, Qualifiers.byName("E2")) instanceof E2Replacement
+
+        cleanup:
+        context.close()
+    }
+
+    void "test a replacement does not take on the type arguments of the bean it replaces"() {
+        given:
+        ApplicationContext context = buildContext("""
+package test;
+
+import io.micronaut.context.annotation.Replaces;
+import jakarta.inject.Singleton;
+
+interface Foo<T> {
+}
+
+@Singleton
+class StringFoo implements Foo<String> {
+}
+
+@Singleton
+@Replaces(StringFoo.class)
+class IntegerFoo implements Foo<Integer> {
+}
+""")
+        def foo = context.classLoader.loadClass("test.Foo")
+
+        expect:
+        context.getBeansOfType(foo, Qualifiers.byTypeArguments(String)).isEmpty()
+        context.getBeansOfType(foo, Qualifiers.byTypeArguments(Integer)).size() == 1
+
+        cleanup:
+        context.close()
     }
 }
