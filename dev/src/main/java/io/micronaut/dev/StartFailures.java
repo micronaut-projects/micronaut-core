@@ -53,6 +53,22 @@ final class StartFailures {
     }
 
     /**
+     * @param cause What a generation's main threw
+     * @return Its message, with the message of its root cause when that says more
+     */
+    static String why(Throwable cause) {
+        String why = cause.getMessage() == null ? cause.getClass().getName() : cause.getMessage();
+        Throwable root = cause;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        if (root != cause && root.getMessage() != null && !why.contains(root.getMessage())) {
+            why += " (" + root.getMessage() + ")";
+        }
+        return why;
+    }
+
+    /**
      * Reports a generation that does not run, which a change starts again.
      *
      * @param failure Why it does not run
