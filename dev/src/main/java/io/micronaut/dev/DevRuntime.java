@@ -353,7 +353,8 @@ public final class DevRuntime implements Closeable {
             try {
                 first = launch("first start");
             } catch (IllegalStateException e) {
-                if (!awaitChange || Thread.currentThread().isInterrupted()) {
+                // a start that timed out, or was interrupted, may still have a main running beside the next generation
+                if (!awaitChange || !started.isCompletedExceptionally()) {
                     throw e;
                 }
                 startFailures.hold();
