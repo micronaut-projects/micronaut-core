@@ -61,6 +61,8 @@ final class DevLogging {
     private static final String CONFIG_FILE_PROPERTY = "logback.configurationFile";
     private static final String AUTOCONFIG_FILE = "logback.xml";
     private static final String TEST_AUTOCONFIG_FILE = "logback-test.xml";
+    // the logger of DefaultEnvironment, which is not public
+    static final String ENVIRONMENT_LOGGER = "io.micronaut.context.env.DefaultEnvironment";
     private static final Logger LOG = LoggerFactory.getLogger(DevLogging.class);
 
     private volatile boolean stale = true;
@@ -177,20 +179,81 @@ final class DevLogging {
         return property != null && (property.equals(name) || property.endsWith("/" + name) || property.endsWith("\\" + name));
     }
 
+    /**
+     * Keeps the environments the processors of a compilation create from logging at INFO while it runs, unless the
+     * application configured the level of their logger: the OpenAPI visitors create one for every processor that runs
+     * them, which would report the active environments as though the application started, as many times for every
+     * edit. {@code pyronaut process} and a build's compiler log nothing of them either.
+     *
+     * @return What restores the level when the compilation ends
+     */
+    static Quiet quietCompilation() {
+        return isLogback() ? Logback.quiet(ENVIRONMENT_LOGGER) : Quiet.NONE;
+    }
+
     private static boolean isLogback() {
         return ClassUtils.isPresent(LOGGER_CONTEXT, DevLogging.class.getClassLoader());
     }
 
     /**
+     * Restores what {@link #quietCompilation()} changed.
+     */
+    interface Quiet extends AutoCloseable {
+
+        /**
+         * Changes nothing.
+         */
+        Quiet NONE = () -> { };
+
+        @Override
+        void close();
+    }
+
+    /**
      * What touches Logback's classes, loaded only once Logback is known to be present.
      */
-    private static final class Logback {
+    static final class Logback {
 
         private static final String NONE = "";
         // what Logback was configured with last, JVM-wide as Logback is
         private static volatile @Nullable String configuredFrom;
 
         private Logback() {
+        }
+
+        static Quiet quiet(String name) {
+            if (LoggerFactory.getILoggerFactory() instanceof LoggerContext context) {
+                return quiet(context, name);
+            }
+            return Quiet.NONE;
+        }
+
+        static Quiet quiet(LoggerContext context, String name) {
+            ch.qos.logback.classic.Logger logger = context.getLogger(name);
+            // a level of the application's configuration applies as it is, the logger's own or a package's
+            if (configured(context, name) || logger.getEffectiveLevel().toInt() > Level.INFO_INT) {
+                return Quiet.NONE;
+            }
+            logger.setLevel(Level.WARN);
+            return () -> {
+                // unless a new configuration set another meanwhile
+                if (logger.getLevel() == Level.WARN) {
+                    logger.setLevel(null);
+                }
+            };
+        }
+
+        /**
+         * Whether a level is set for a logger or one of its packages, rather than only for the root logger.
+         */
+        private static boolean configured(LoggerContext context, String name) {
+            for (String current = name; !current.isEmpty(); current = current.substring(0, Math.max(current.lastIndexOf('.'), 0))) {
+                ch.qos.logback.classic.Logger logger = context.exists(current);
+                if (logger != null && logger.getLevel() != null) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         static void configure(ClassLoader resources, boolean launcher, boolean changed) {
