@@ -52,10 +52,12 @@ import java.util.stream.Stream;
  * @since 3.0
  */
 @Internal
-public abstract class AbstractExecutableMethodsDefinition<T> implements ExecutableMethodsDefinition<T>, EnvironmentConfigurable, BeanContextConfigurable {
+public abstract class AbstractExecutableMethodsDefinition<T> implements ExecutableMethodsDefinition<T>, EnvironmentConfigurable, BeanContextConfigurable, Cloneable {
 
     private final MethodReference[] methodsReferences;
-    private final DispatchedExecutableMethod<T, ?>[] executableMethods;
+    private DispatchedExecutableMethod<T, ?>[] executableMethods;
+    @Nullable
+    private Boolean contextDependent;
     @Nullable
     private Environment environment;
     @Nullable
@@ -72,8 +74,62 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         this.executableMethods = new DispatchedExecutableMethod[methodsReferences.length];
     }
 
+    /**
+     * The generated definition holds its instance of this class in a static field, shared by every context in the
+     * JVM. Methods resolving placeholders or expressions depend on the context, so each bean definition gets its
+     * own copy of them. Methods that do not are safe to share and stay shared.
+     *
+     * @return The instance to use for a single bean definition
+     */
+    final AbstractExecutableMethodsDefinition<T> forBeanDefinition() {
+        if (!isContextDependent()) {
+            return this;
+        }
+        try {
+            AbstractExecutableMethodsDefinition<T> copy = (AbstractExecutableMethodsDefinition<T>) clone();
+            copy.executableMethods = new DispatchedExecutableMethod[methodsReferences.length];
+            copy.executableMethodsList = null;
+            copy.postConstructMethodsList = null;
+            copy.preDestroyMethodsList = null;
+            return copy;
+        } catch (CloneNotSupportedException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private boolean isContextDependent() {
+        Boolean dependent = contextDependent;
+        if (dependent == null) {
+            dependent = false;
+            for (MethodReference reference : methodsReferences) {
+                if (isContextDependent(reference)) {
+                    dependent = true;
+                    break;
+                }
+            }
+            contextDependent = dependent;
+        }
+        return dependent;
+    }
+
+    private static boolean isContextDependent(MethodReference reference) {
+        AnnotationMetadata metadata = reference.annotationMetadata;
+        if (metadata.hasPropertyExpressions() || metadata.hasEvaluatedExpressions()) {
+            return true;
+        }
+        for (Argument<?> argument : reference.arguments) {
+            if (argument.getAnnotationMetadata().hasEvaluatedExpressions()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public void configure(Environment environment) {
+        if (!isContextDependent()) {
+            return;
+        }
         this.environment = environment;
         for (DispatchedExecutableMethod<T, ?> executableMethod : executableMethods) {
             if (executableMethod != null) {
@@ -84,6 +140,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
     @Override
     public void configure(BeanContext beanContext) {
+        if (!isContextDependent()) {
+            return;
+        }
         this.beanContext = beanContext;
         for (DispatchedExecutableMethod<T, ?> executableMethod : executableMethods) {
             if (executableMethod != null) {
@@ -448,8 +507,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public void configure(Environment environment) {
-            if (annotationMetadata.hasPropertyExpressions()) {
-                annotationMetadata = new MethodAnnotationMetadata(annotationMetadata, environment);
+            AnnotationMetadata metadata = methodReference.annotationMetadata;
+            if (metadata.hasPropertyExpressions()) {
+                annotationMetadata = new MethodAnnotationMetadata(metadata, environment);
             }
         }
 

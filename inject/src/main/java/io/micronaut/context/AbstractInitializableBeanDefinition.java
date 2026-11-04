@@ -173,7 +173,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         this.methodInjection = methodInjection;
         this.fieldInjection = fieldInjection;
         this.annotationInjection = annotationInjection;
-        this.executableMethodsDefinition = executableMethodsDefinition;
+        this.executableMethodsDefinition = executableMethodsDefinition instanceof AbstractExecutableMethodsDefinition<T> methods
+            ? methods.forBeanDefinition()
+            : executableMethodsDefinition;
         this.typeArgumentsMap = typeArgumentsMap;
         this.precalculatedInfo = precalculatedInfo;
     }
