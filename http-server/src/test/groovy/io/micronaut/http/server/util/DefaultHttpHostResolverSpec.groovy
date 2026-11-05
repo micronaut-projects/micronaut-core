@@ -47,4 +47,22 @@ class DefaultHttpHostResolverSpec extends Specification {
         ':'               | 'http://'
         'example.com:foo' | 'http://example.com'
     }
+
+    void "test host resolver with IPv6 host header"(String header, String result) {
+        ApplicationContext applicationContext = ApplicationContext.run()
+        HttpHostResolver hostResolver = applicationContext.getBean(HttpHostResolver)
+        def request = Stub(HttpRequest) {
+            getHeaders() >> new MockHttpHeaders(['Host': [header]])
+            getUri() >> new URI("/")
+        }
+
+        expect:
+        hostResolver.resolve(request) == result
+
+        where:
+        header               | result
+        '[::1]:8080'         | 'http://[::1]:8080'
+        '[::1]'              | 'http://[::1]'
+        '[2001:db8::1]:8443' | 'http://[2001:db8::1]:8443'
+    }
 }
