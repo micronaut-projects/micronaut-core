@@ -9,23 +9,27 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
 import java.io.File;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Proxy;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DefaultBeanIntrospectorTest {
@@ -191,6 +195,63 @@ class DefaultBeanIntrospectorTest {
         } finally {
             BeanIntrospectionProviders.set(previous);
         }
+    }
+
+    /**
+     * A provider may also list what the context class loader of the resolving thread sees, so the index of a loader can
+     * hold the classes of a loader it does not see: a development launcher retiring that loader would otherwise have
+     * the index keep it for good.
+     */
+    @Test
+    void invalidatingForgetsAnIndexHoldingClassesItsLoaderDoesNotSee() throws Exception {
+        Path classesDir = tempDir.resolve("classes");
+        compileChildLoaderIntrospection(classesDir);
+        writeMicronautServiceEntry(classesDir);
+
+        ClassLoader parentClassLoader = getClass().getClassLoader();
+        BeanIntrospectionsProvider listing = BeanIntrospectionProviders.get();
+        AtomicInteger resolved = new AtomicInteger();
+        BeanIntrospectionsProvider previous = BeanIntrospectionProviders.set(classLoader -> {
+            resolved.incrementAndGet();
+            return listing.provide(Thread.currentThread().getContextClassLoader());
+        });
+        Thread thread = Thread.currentThread();
+        ClassLoader previousContextClassLoader = thread.getContextClassLoader();
+        try {
+            DefaultBeanIntrospector introspector = new DefaultBeanIntrospector(parentClassLoader);
+            WeakReference<ClassLoader> child = resolveWithContextClassLoader(introspector, classesDir, parentClassLoader);
+            assertEquals(1, resolved.get());
+
+            introspector.invalidate(new URLClassLoader(new URL[0], parentClassLoader));
+            awaitCollected(child);
+
+            assertTrue(introspector.findIntrospections(reference -> reference.getName().equals("example.ChildBean")).isEmpty());
+            assertEquals(2, resolved.get());
+        } finally {
+            thread.setContextClassLoader(previousContextClassLoader);
+            BeanIntrospectionProviders.set(previous);
+        }
+    }
+
+    /**
+     * Resolves the index with a child loader as the context class loader, in a frame of its own so that no local keeps it.
+     */
+    private static WeakReference<ClassLoader> resolveWithContextClassLoader(DefaultBeanIntrospector introspector, Path classesDir, ClassLoader parentClassLoader) throws Exception {
+        URLClassLoader childClassLoader = new URLClassLoader(new URL[] { classesDir.toUri().toURL() }, parentClassLoader);
+        Thread.currentThread().setContextClassLoader(childClassLoader);
+        assertFalse(introspector.findIntrospections(reference -> reference.getName().equals("example.ChildBean")).isEmpty());
+        Thread.currentThread().setContextClassLoader(parentClassLoader);
+        childClassLoader.close();
+        return new WeakReference<>(childClassLoader);
+    }
+
+    private static void awaitCollected(WeakReference<?> reference) throws InterruptedException {
+        long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+        while (reference.get() != null && System.nanoTime() < deadline) {
+            System.gc();
+            Thread.sleep(100);
+        }
+        assertNull(reference.get(), "the index keeps the child class loader");
     }
 
     private static final class StubReference implements BeanIntrospectionReference<Object> {

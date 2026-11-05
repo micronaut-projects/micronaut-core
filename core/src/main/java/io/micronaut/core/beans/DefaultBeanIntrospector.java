@@ -200,11 +200,31 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
             if (sees(classLoader, changed)) {
                 introspectionMap = null;
                 fallbacks = null;
+            } else if (holdsClassesItsLoaderDoesNotSee(classLoader, introspectionMap)) {
+                introspectionMap = null;
             }
-            removeSeeing(otherIntrospections, changed);
+            otherIntrospections.entrySet().removeIf(entry -> sees(entry.getKey(), changed)
+                || holdsClassesItsLoaderDoesNotSee(entry.getKey(), entry.getValue().get()));
             removeSeeing(otherFallbacks, changed);
             invalidations++;
         }
+    }
+
+    /**
+     * Whether an index holds a reference of a class its loader does not see: a provider may also list what the context
+     * class loader of the thread that resolved the index sees, and such a thread may have been running a generation
+     * the launcher has since retired.
+     */
+    private static boolean holdsClassesItsLoaderDoesNotSee(@Nullable ClassLoader loader, @Nullable Map<String, BeanIntrospectionReference<Object>> index) {
+        if (index != null) {
+            for (BeanIntrospectionReference<Object> reference : index.values()) {
+                ClassLoader defining = reference.getClass().getClassLoader();
+                if (defining != null && !sees(loader, defining)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
