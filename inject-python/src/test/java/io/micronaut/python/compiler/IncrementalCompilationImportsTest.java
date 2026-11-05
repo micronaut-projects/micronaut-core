@@ -172,6 +172,15 @@ class IncrementalCompilationImportsTest {
     }
 
     @Test
+    void aNameOutsideAsciiIsADependencyLikeAnyOther() {
+        assertTrue(IncrementalCompilation.pythonImports("from . import \u03b1").contains(".\u03b1"));
+        assertTrue(IncrementalCompilation.pythonImports("from .x import \u03b1 as a").contains(".x.\u03b1"));
+        assertTrue(IncrementalCompilation.pythonImports("import pkg.\u03b1").contains("pkg.\u03b1"));
+        // a name the module binds in a way the scan does not read is not taken for resolved
+        assertTrue(unresolved("pkg/consumer.py", "from .models import \u03b1"));
+    }
+
+    @Test
     void anImportAfterTheColonOfACompoundStatementIsADependency() {
         assertTrue(IncrementalCompilation.pythonImports("try: import pkg.models\nexcept ImportError: pass").contains("pkg.models"));
     }

@@ -612,7 +612,7 @@ final class IncrementalCompilation {
         List<String> names = new ArrayList<>();
         for (String clause : fromImportClauses(fromImport)) {
             String name = IMPORT_ALIAS.split(clause.trim())[0].trim();
-            if (!name.isEmpty() && name.matches("\\w+")) {
+            if (!name.isEmpty() && name.matches("(?U)\\w+")) {
                 names.add(name);
             }
         }
@@ -631,7 +631,7 @@ final class IncrementalCompilation {
             for (String clause : statement.split(",")) {
                 String[] parts = IMPORT_ALIAS.split(clause.trim());
                 String module = parts[0].trim();
-                if (module.isEmpty() || !module.matches("[\\w.]+")) {
+                if (module.isEmpty() || !module.matches("(?U)[\\w.]+")) {
                     continue;
                 }
                 String bound = parts.length > 1 ? parts[1].trim() : module;
