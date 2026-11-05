@@ -54,7 +54,6 @@ public class HttpClientException extends HttpException {
         if (!shared) {
             throw new IllegalArgumentException("shared must be true");
         }
-        serviceIdLocked = true;
     }
 
     /**
