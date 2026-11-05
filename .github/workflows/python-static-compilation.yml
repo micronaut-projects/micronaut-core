@@ -86,14 +86,14 @@ jobs:
         with:
           fetch-depth: 0
       - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        uses: graalvm/setup-graalvm@f70bc8032f90a104502824a54bcb94b6f01715bc # v1
         with:
           distribution: 'graalvm'
           java-version: '25'
           version: '25.4'
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: "🔧 Setup Gradle"
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           develocity-access-key: >-
             ${{ (github.event_name == 'push' && secrets.GRADLE_ENTERPRISE_ACCESS_KEY) ||
@@ -113,7 +113,7 @@ jobs:
         run: ./gradlew :test-suite-python-corpus:test -Ppython-ci --no-daemon
       - name: "📊 Publish Test Report"
         if: always()
-        uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6
+        uses: mikepenz/action-junit-report@4a26df3e2ae132254ba12a53f65a388d0961e786 # v6
         with:
           check_name: "Python Static Compilation CI / Test Report (${{ matrix.shard }}/2)"
           report_paths: '**/build/test-results/test/TEST-*.xml'
@@ -149,14 +149,14 @@ jobs:
         with:
           fetch-depth: 0
       - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        uses: graalvm/setup-graalvm@f70bc8032f90a104502824a54bcb94b6f01715bc # v1
         with:
           distribution: 'graalvm'
           java-version: '25'
           version: '25.4'
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: "🔧 Setup Gradle"
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           develocity-access-key: >-
             ${{ (github.event_name == 'push' && secrets.GRADLE_ENTERPRISE_ACCESS_KEY) ||
@@ -172,7 +172,7 @@ jobs:
             --no-daemon
       - name: "📊 Publish the budget"
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: corpus-budget
           path: test-suite-python-corpus/build/corpus-budget/budget.txt

@@ -140,6 +140,19 @@ final class Compilations {
     }
 
     /**
+     * Whether the trigger says when a language's output is whole, so that its sources are not watched: an edit the build
+     * tool has not compiled yet reloads nothing, and reading the output then would find what its last compilation left,
+     * a failed one without its classes. Without a trigger the source watch stays, for an output absent at the start.
+     *
+     * @param manifest The manifest
+     * @param kind The language
+     * @return Whether its changes come from the trigger alone
+     */
+    static boolean toldByTrigger(DevManifest manifest, SourceKind kind) {
+        return manifest.buildToolTrigger() != null && manifest.compileMode(kind) == CompileMode.BUILD_TOOL;
+    }
+
+    /**
      * Compiles in full every language whose class output does not exist yet: see
      * {@link DevRuntime#compileMissingOutputs(DevManifest, Map)}.
      *

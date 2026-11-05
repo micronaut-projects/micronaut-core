@@ -81,6 +81,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -144,6 +145,11 @@ public final class DevRuntime implements Closeable {
     private static final Duration APP_STOP_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration FAILURE_WAIT = Duration.ofSeconds(2);
     private static final Duration START_TIMEOUT = Duration.ofMinutes(5);
+    /**
+     * Stands for what a generation's main threw once the generation was found running: a main that finds it there
+     * reports its failure itself.
+     */
+    private static final Throwable JUDGED_RUNNING = new Throwable("The generation was found running", null, false, false) { };
 
     private final DevManifest manifest;
     private final DevClassLoader classLoader;
@@ -159,6 +165,7 @@ public final class DevRuntime implements Closeable {
     private final AtomicLong batchesHandled = new AtomicLong();
     private final Object lifecycle = new Object();
     private final CountDownLatch closedLatch = new CountDownLatch(1);
+    private final StartFailures startFailures = new StartFailures(closedLatch);
     private volatile CompletableFuture<ApplicationContext> started = new CompletableFuture<>(); // NOSONAR java:S3077 swapped whole per generation; the future is thread-safe
     private volatile CompletableFuture<Void> ready = CompletableFuture.completedFuture(null); // NOSONAR java:S3077 swapped whole per generation; the future is thread-safe
     private volatile @Nullable ApplicationContext context; // NOSONAR java:S3077 only the reference is published; the context is thread-safe
@@ -179,10 +186,6 @@ public final class DevRuntime implements Closeable {
      */
     private volatile boolean relaunchRequested;
     private final Consumer<DevRuntime> relaunch;
-    /**
-     * Whether the last generation failed to start, so that the next batch must launch one whether or not a class changed.
-     */
-    private volatile boolean startFailed;
     private boolean contextClaimed; // guarded by lifecycle: whether the generation adopted its context, the first it created
     private volatile List<Path> watchedRoots = List.of(); // NOSONAR java:S3077 an immutable list, replaced whole
     private @Nullable DirectoryWatcher watcher;
@@ -297,6 +300,21 @@ public final class DevRuntime implements Closeable {
      * @throws IllegalStateException if another runtime runs the process or the application failed to start
      */
     public ApplicationContext start(String[] args) {
+        return Objects.requireNonNull(start(args, false));
+    }
+
+    /**
+     * As {@link #start(String[])}, except that an application that cannot start at all is reported and watched too.
+     *
+     * @param args The application's arguments
+     * @return The started context, or null when no context started
+     * @throws IllegalStateException if another runtime runs the process
+     */
+    @Nullable ApplicationContext startAwaitingChange(String[] args) {
+        return start(args, true);
+    }
+
+    private @Nullable ApplicationContext start(String[] args, boolean awaitChange) {
         if (tests != null) {
             throw new IllegalStateException("The manifest is in test mode: startTests() runs the tests");
         }
@@ -328,7 +346,23 @@ public final class DevRuntime implements Closeable {
             thread.setDaemon(true);
             thread.start();
             worker = thread;
-            first = launch("first start");
+            int generation = classLoader.generation();
+            try {
+                first = launch("first start");
+            } catch (StartFailures.Failed e) {
+                if (!awaitChange) {
+                    throw e;
+                }
+                // unless a change launched the next generation meanwhile, which answers for itself
+                boolean current = startFailures.holdIf(() -> classLoader.generation() == generation, requests::startFailed);
+                reconcileOutputs();
+                if (current) {
+                    StartFailures.reportStart(e);
+                } else {
+                    whenReady().join(); // this non-daemon thread keeps the JVM until that generation has threads of its own
+                }
+                return null;
+            }
             // as after a restart: the servers bind a moment after the context starts, and the first generation is
             // only reported started once they accept, when a retained socket was handed to one
             ApplicationContext launched = first;
@@ -353,7 +387,7 @@ public final class DevRuntime implements Closeable {
         reconcileOutputs();
         if (notRunning != null) {
             // as after a failed reload: the runtime keeps watching, and the next change launches a generation
-            LOG.error("Development mode: {}; a change restarts it", notRunning.getMessage(), notRunning.getCause());
+            StartFailures.reportStart(notRunning);
             return first;
         }
         LOG.info("Development mode: generation {} started with strategy {}, {} compiler(s), watching {} root(s)",
@@ -518,7 +552,7 @@ public final class DevRuntime implements Closeable {
      * @return True when it failed
      */
     public boolean isStartFailed() {
-        return startFailed;
+        return startFailures.failed();
     }
 
     /**
@@ -1118,7 +1152,7 @@ public final class DevRuntime implements Closeable {
         }
         Set<Path> roots = new LinkedHashSet<>();
         for (SourceRoot root : manifest.sourceRoots()) {
-            if (!Files.isDirectory(root.path())) {
+            if (!Files.isDirectory(root.path()) || Compilations.toldByTrigger(manifest, root.kind())) {
                 continue;
             }
             if (manifest.compileMode(root.kind()) == CompileMode.EMBEDDED && !compilers.containsKey(root.kind())) {
@@ -1130,7 +1164,7 @@ public final class DevRuntime implements Closeable {
             roots.add(root.path().toAbsolutePath().normalize());
         }
         for (SourceRoot root : manifest.testSourceRoots()) {
-            if (tests != null && Files.isDirectory(root.path())) {
+            if (tests != null && Files.isDirectory(root.path()) && !Compilations.toldByTrigger(tests.tests(), root.kind())) {
                 String[] globs = root.kind().extensions().stream().flatMap(extension -> Stream.of("*." + extension, "**/*." + extension)).toArray(String[]::new);
                 directoryWatcher.directory(root.path()).include(globs).watch(batch -> {
                     Pending sources = sourceBatch(root, batch);
@@ -1368,7 +1402,7 @@ public final class DevRuntime implements Closeable {
                     // the runtime closing interrupted the reload
                     LOG.debug("Reload ended by the runtime closing: {}", e.getMessage(), e);
                 } else {
-                    LOG.error("Reload failed: {}", e.getMessage(), e);
+                    StartFailures.report("Reload failed: " + e.getMessage(), e);
                 }
             } finally {
                 // the timeouts follow the generation's configuration before whoever awaits the batch sees it done
@@ -1508,7 +1542,7 @@ public final class DevRuntime implements Closeable {
                 String stale = ConfigurationStaleness.afterRefresh(current, refresh.change(), requirements);
                 if (stale != null) {
                     LOG.info("Restarting for the configuration change: {}", stale);
-                } else if (!refresh.requiresRestart() && changeSet.isEmpty() && !batch.forcesRestart() && !startFailed) {
+                } else if (!refresh.requiresRestart() && changeSet.isEmpty() && !batch.forcesRestart() && !startFailures.failed()) {
                     LOG.info("Configuration refreshed in place: {} bean(s) rebound, {} recreated, {} refreshable disposed of, {} watch(es) told",
                         refresh.rebound().size(), refresh.recreated().size(), refresh.disposed(), refresh.outcomes().size());
                     return;
@@ -1520,16 +1554,16 @@ public final class DevRuntime implements Closeable {
         }
         // a generation reads its snapshot: a resource the build wrote under a reloadable root, such as a service
         // descriptor, needs a new generation as a class does; a failed start needs one whatever changed
-        if (changeSet.isEmpty() && configurationChange == null && !batch.forcesRestart() && !startFailed) {
+        if (changeSet.isEmpty() && configurationChange == null && !batch.forcesRestart() && !startFailures.failed()) {
             if (compiled) {
                 LOG.info("Nothing to reload: the classes did not change");
             }
             return;
         }
-        if (configurationChange == null && !batch.forcesRestart() && !startFailed && inPlaceUpdates.patchInPlace(context, changeSet, previous, start)) {
+        if (configurationChange == null && !batch.forcesRestart() && !startFailures.failed() && inPlaceUpdates.patchInPlace(context, changeSet, previous, start)) {
             return;
         }
-        if (configurationChange == null && !batch.forcesRestart() && !startFailed && inPlaceUpdates.redefine(instrumentation, context, changeSet, start)) {
+        if (configurationChange == null && !batch.forcesRestart() && !startFailures.failed() && inPlaceUpdates.redefine(instrumentation, context, changeSet, start)) {
             return;
         }
         restart(changeSet, configurationChange, start);
@@ -1597,7 +1631,7 @@ public final class DevRuntime implements Closeable {
         try {
             fresh = launch("reload");
         } catch (RuntimeException e) {
-            startFailed = true;
+            startFailures.hold();
             requests.startFailed();
             // the retained beans belong to nobody now: the old context, stopped, still knows how to dispose them
             for (BeanRegistration<?> registration : takeRetainedRegistrations()) {
@@ -1619,7 +1653,8 @@ public final class DevRuntime implements Closeable {
             // its context started, and stopped again: as when it cannot start at all, the next batch launches one
             throw notRunning;
         }
-        startFailed = false;
+        // unless its main failed since it was found running, which says so
+        startFailures.released(() -> failure.get() == JUDGED_RUNNING);
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         List<BeanDefinition<?>> added = ConfigurationStaleness.definitionsNamed(fresh, changeSet.classNames());
         fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
@@ -1727,8 +1762,11 @@ public final class DevRuntime implements Closeable {
                     future.completeExceptionally(new IllegalStateException("The application's main returned without starting a context"));
                 }
             } catch (Throwable e) { // NOSONAR an Error from main fails the start at once, rather than when the start times out
-                failure.set(e);
+                boolean unjudged = failure.compareAndSet(null, e);
                 future.completeExceptionally(e);
+                if (!unjudged) {
+                    mainFailedLate(generation, failure, e);
+                }
             }
         }, "micronaut-dev-app");
         thread.setDaemon(false);
@@ -1752,16 +1790,57 @@ public final class DevRuntime implements Closeable {
             throw new IllegalStateException("Interrupted while the application started (" + reason + ")", e);
         } catch (ExecutionException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
-            throw new IllegalStateException("The application failed to start (" + reason + "): " + cause.getMessage(), cause);
+            throw new StartFailures.Failed("The application failed to start (" + reason + "): " + cause.getMessage(), cause);
         } catch (TimeoutException e) {
             throw new IllegalStateException("The application did not start within " + START_TIMEOUT + " (" + reason + ")", e);
         }
     }
 
     /**
+     * Why a generation whose context started does not run, as {@link #whyNotRunning} tells it. Should the generation be
+     * found running, a main that fails from here on reports that itself, in {@link #mainFailedLate}: nothing else looks
+     * at its failure, and with no thread left to keep it alive the JVM would exit with status 0.
+     */
+    private @Nullable RuntimeException notRunning(ApplicationContext generation, @Nullable Thread launching, AtomicReference<@Nullable Throwable> failure,
+                                                  boolean definesServer, String reason) {
+        RuntimeException why = whyNotRunning(generation, launching, failure, definesServer, reason);
+        if (why == null && !failure.compareAndSet(null, JUDGED_RUNNING)) {
+            // main failed: a moment ago, which needs a second look, or with its servers running
+            why = whyNotRunning(generation, launching, failure, definesServer, reason);
+            if (why == null) {
+                StartFailures.reportMain(failure.get());
+                // it runs, as far as anyone asks from here on
+                failure.set(JUDGED_RUNNING);
+            }
+        }
+        return why;
+    }
+
+    /**
+     * Main failed after its generation was found running, on the thread that ran it: a main that goes on after it
+     * started the application, or that takes longer than its servers are waited for. A generation already replaced, by a
+     * restart that stopped the context under its main, did not fail.
+     */
+    private void mainFailedLate(GenerationClassLoader generation, AtomicReference<@Nullable Throwable> failure, Throwable thrown) {
+        failure.set(thrown);
+        ApplicationContext current = context;
+        if (closed || current == null || classLoader.current() != generation) {
+            LOG.debug("The main of a generation no longer running failed: {}", thrown.getMessage(), thrown);
+            return;
+        }
+        RuntimeException why = whyNotRunning(current, null, failure, true, "its main failed after its context started");
+        if (why == null) {
+            StartFailures.reportMain(thrown);
+        } else if (markStartFailed(current, why)) {
+            StartFailures.reportStart(why);
+        }
+    }
+
+    /**
      * Why a generation whose context started does not run, once its servers were waited for: its context stopped
-     * again, as it does when its HTTP server cannot bind its port, or a server it created does not run once its main
-     * returned. A command line application whose main ran its context and stopped it, with no server, did not fail.
+     * again, as it does when its HTTP server cannot bind its port, a server it created does not run once its main
+     * returned, or its main failed before it created one, as it does when a bean of the server cannot be created. A
+     * command line application whose main ran its context and stopped it, with no server, did not fail.
      *
      * @param generation The generation's context
      * @param launching The thread running its main
@@ -1770,14 +1849,17 @@ public final class DevRuntime implements Closeable {
      * @param reason What launched it, for the message
      * @return Why it does not run, or null when it does, or when it is no longer the current generation
      */
-    private @Nullable RuntimeException notRunning(ApplicationContext generation, @Nullable Thread launching, AtomicReference<@Nullable Throwable> failure,
-                                                  boolean definesServer, String reason) {
+    private @Nullable RuntimeException whyNotRunning(ApplicationContext generation, @Nullable Thread launching, AtomicReference<@Nullable Throwable> failure,
+                                                     boolean definesServer, String reason) {
         if (context != generation) {
             return null;
         }
         boolean running = generation.isRunning();
-        boolean mainRunning = launching != null && launching.isAlive();
-        if (running && (mainRunning || RestartRequests.serversRun(generation))) {
+        boolean failed = failure.get() != null;
+        boolean mainRunning = !failed && launching != null && launching.isAlive();
+        // having no server to run is what a main that returned may leave, not one that failed before it created one
+        boolean serving = RestartRequests.serversRun(generation) && (!failed || RestartRequests.anyServer(generation));
+        if (running && (mainRunning || serving)) {
             return null;
         }
         if (launching != null && mainRunning) {
@@ -1800,14 +1882,7 @@ public final class DevRuntime implements Closeable {
         if (cause == null) {
             why = running ? "its HTTP server is not running" : "its context stopped right after it started";
         } else {
-            why = cause.getMessage() == null ? cause.getClass().getName() : cause.getMessage();
-            Throwable root = cause;
-            while (root.getCause() != null && root.getCause() != root) {
-                root = root.getCause();
-            }
-            if (root != cause && root.getMessage() != null && !why.contains(root.getMessage())) {
-                why += " (" + root.getMessage() + ")";
-            }
+            why = StartFailures.why(cause);
         }
         return new IllegalStateException("generation " + classLoader.generation() + " failed to start (" + reason + "): " + why, cause);
     }
@@ -1826,7 +1901,7 @@ public final class DevRuntime implements Closeable {
             return false;
         }
         started = CompletableFuture.failedFuture(failure);
-        startFailed = true;
+        startFailures.hold();
         requests.startFailed();
         return true;
     }
