@@ -134,7 +134,7 @@ The launcher compiles each language with a compiler of its own, all of them incr
 
 * Java compiles through the JDK's own `javac`, with the annotation processors of the processor path.
 * Groovy compiles through the project's own Groovy on the launch classpath, with the Micronaut AST transformations the compile classpath carries.
-* Kotlin compiles through the Kotlin Build Tools API when `kotlin-build-tools-impl` is on the launch classpath at the project's Kotlin version. It runs the symbol processors of the processor path first when `symbol-processing-aa-embeddable` is there at the project's KSP version. The `-A` options of the language pass to the processors, and the other options to `kotlinc`.
+* Kotlin compiles through the Kotlin Build Tools API when `kotlin-build-tools-impl` is on the launch classpath at the project's Kotlin version, which must be 2.4 or later. With an older Kotlin, the launcher logs a warning naming the version it found and the version it needs, and does not compile Kotlin: changes to the Kotlin sources reach the application through the class output the build tool writes. The compiler runs the symbol processors of the processor path first when `symbol-processing-aa-embeddable` is there at the project's KSP version. The `-A` options of the language pass to the processors, and the other options to `kotlinc`.
 
 The build plugins put these artifacts on the launch classpath for the languages the project uses, so `micronaut-dev` itself depends on neither Kotlin nor Groovy.
 
