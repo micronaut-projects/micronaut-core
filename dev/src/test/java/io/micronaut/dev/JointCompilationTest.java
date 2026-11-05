@@ -2,6 +2,7 @@ package io.micronaut.dev;
 
 import io.micronaut.dev.compile.CompilationRequest;
 import io.micronaut.dev.compile.CompilationResult;
+import io.micronaut.dev.compile.IncrementalMode;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
@@ -20,6 +21,7 @@ import java.util.Properties;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JointCompilationTest {
@@ -68,6 +70,41 @@ class JointCompilationTest {
         assertEquals(List.of(new SourceRoot(SourceKind.PYTHON, project.resolve("src/main/python"))), python.requests.getFirst().sourceRoots());
     }
 
+    @Test
+    void everyCompilationOfALanguageTakesItsIncrementalModeFromTheManifest() throws Exception {
+        Files.createDirectories(project.resolve("src/main/python"));
+        Files.createDirectories(project.resolve("src/main/java"));
+        Properties properties = new Properties();
+        properties.setProperty("micronaut.dev.main-class", "app.Application");
+        properties.setProperty("micronaut.dev.reloadable", "build/classes");
+        properties.setProperty("micronaut.dev.sources.python", "src/main/python");
+        properties.setProperty("micronaut.dev.sources.java", "src/main/java");
+        properties.setProperty("micronaut.dev.compile.python.output", "build/classes/python");
+        properties.setProperty("micronaut.dev.compile.java.output", "build/classes/java");
+        properties.setProperty("micronaut.dev.compile.python.incremental-mode", "optimistic");
+        DevManifest manifest = DevManifest.of(project, properties);
+        RecordingCompiler python = new RecordingCompiler(SourceKind.PYTHON, Set.of());
+        // a compilation of Java that changes a class makes the Python compiler look for the dependents of the class
+        RecordingCompiler javac = new RecordingCompiler(SourceKind.JAVA, Set.of(), Set.of("app.Changed"));
+        Map<SourceKind, SourceCompiler> compilers = compilers(python, javac);
+
+        DevRuntime.compileMissingOutputs(manifest, compilers);
+        Compilations.round(compilers, manifest, Map.of(),
+            Map.of(SourceKind.PYTHON, new SourceChanges(Set.of(project.resolve("src/main/python/app.py")), Set.of()),
+                SourceKind.JAVA, new SourceChanges(Set.of(project.resolve("src/main/java/App.java")), Set.of())), false, Set.of());
+
+        assertTrue(python.requests.size() >= 3, python.requests.toString());
+        assertTrue(python.requests.getFirst().isFull());
+        assertFalse(python.requests.get(1).isFull());
+        assertEquals(Set.of("app.Changed"), python.requests.getLast().affectedClasses());
+        for (CompilationRequest request : python.requests) {
+            assertEquals(IncrementalMode.OPTIMISTIC, request.incrementalMode());
+        }
+        for (CompilationRequest request : javac.requests) {
+            assertEquals(IncrementalMode.CONSERVATIVE, request.incrementalMode());
+        }
+    }
+
     private DevManifest manifest(String pythonOutput, String javaOutput) throws Exception {
         Files.createDirectories(project.resolve("src/main/python"));
         Files.createDirectories(project.resolve("src/main/java"));
@@ -96,11 +133,17 @@ class JointCompilationTest {
     private static final class RecordingCompiler implements SourceCompiler {
         private final SourceKind kind;
         private final Set<SourceKind> joint;
+        private final Set<String> classes;
         private final List<CompilationRequest> requests = new ArrayList<>();
 
         RecordingCompiler(SourceKind kind, Set<SourceKind> joint) {
+            this(kind, joint, Set.of());
+        }
+
+        RecordingCompiler(SourceKind kind, Set<SourceKind> joint, Set<String> classes) {
             this.kind = kind;
             this.joint = joint;
+            this.classes = classes;
         }
 
         @Override
@@ -116,7 +159,7 @@ class JointCompilationTest {
         @Override
         public CompilationResult compile(CompilationRequest request) {
             requests.add(request);
-            return new CompilationResult(CompilationResult.Status.SUCCESS, List.of(), Set.of(), Set.of(), Duration.ZERO);
+            return new CompilationResult(CompilationResult.Status.SUCCESS, List.of(), Set.of(), Set.of(), Duration.ZERO, classes);
         }
     }
 }

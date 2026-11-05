@@ -29,6 +29,8 @@ The launcher reads the entries as follows:
 * `@file` reads a list from an argument file.
 * A system property of the same name overrides an entry.
 
+For a Python module, `micronaut.dev.compile.python.incremental-mode` chooses what a compilation after an edit recompiles. With `conservative`, the default, it recompiles every Python source when the static analysis of the sources finds a relationship it cannot prove isolated, such as a star import or an import it cannot resolve. With `optimistic`, it recompiles the sources the analysis relates to the edit, whatever it could not see, and a change to the body of a function does not reach the modules that import it. In test mode, `micronaut.dev.test.compile.python.incremental-mode` chooses the same for the tests.
+
 On macOS, put `micronaut-runtime-osx` on the development runtime classpath as well, which the build plugins do. The launcher then watches through the native file system events, and a save is noticed at once.
 
 Without it, and in a native image, the launcher compares the watched directories every 250 milliseconds, rather than use the JDK's service, which polls every two seconds at best.

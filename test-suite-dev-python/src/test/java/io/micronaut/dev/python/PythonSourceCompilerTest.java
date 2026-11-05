@@ -3,6 +3,7 @@ package io.micronaut.dev.python;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.compile.CompilationRequest;
 import io.micronaut.dev.compile.CompilationResult;
+import io.micronaut.dev.compile.IncrementalMode;
 import io.micronaut.dev.compile.PythonSourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
@@ -15,6 +16,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -208,6 +210,38 @@ class PythonSourceCompilerTest {
         assertTrue(Files.exists(out.resolve("app/PythonGreeter.class")));
         assertArrayEquals(greeting, Files.readAllBytes(out.resolve("base/Greeting.class")));
         assertEquals("Hello one", greet(out));
+    }
+
+    @Test
+    void aConservativeCompilationReachesWhatItCannotProveIsolatedAndAnOptimisticOneDoesNot() throws Exception {
+        assertTrue(recompilesTheDynamicModule(project.resolve("conservative"), IncrementalMode.CONSERVATIVE));
+        assertFalse(recompilesTheDynamicModule(project.resolve("optimistic"), IncrementalMode.OPTIMISTIC));
+    }
+
+    /**
+     * Whether an edit of a module recompiles another that reaches it only through a dynamic import, by the time of the
+     * module in the compiler's own output: the class output only changes where the content does.
+     */
+    private boolean recompilesTheDynamicModule(Path directory, IncrementalMode mode) throws Exception {
+        PythonFixture fixture = PythonFixture.create(directory);
+        fixture.writePython("app/dynamic.py", """
+            import importlib
+
+
+            class Dynamic:
+                value: object = importlib.import_module("app.greeter")
+            """);
+        assertTrue(compiler.compile(fixture.request(Set.of(), Set.of()).asFull().withIncrementalMode(mode)).isSuccess());
+        Path dynamic = vfsFile(directory.resolve("build/classes-python"), "app/dynamic.py").orElseThrow();
+        FileTime unchanged = FileTime.fromMillis(1_000);
+        Files.setLastModifiedTime(dynamic, unchanged);
+
+        fixture.writeGreeter("two");
+        CompilationResult result = compiler.compile(fixture.request(Set.of(fixture.greeter()), Set.of()).withIncrementalMode(mode));
+
+        assertEquals(CompilationResult.Status.SUCCESS, result.status(), result.diagnostics().toString());
+        assertTrue(Files.readString(vfsFile(fixture.classOutput(), "app/greeter.py").orElseThrow()).contains("\"two\""));
+        return !unchanged.equals(Files.getLastModifiedTime(dynamic));
     }
 
     @Test

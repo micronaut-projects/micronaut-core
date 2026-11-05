@@ -19,6 +19,7 @@ import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.dev.compile.CompileMode;
+import io.micronaut.dev.compile.IncrementalMode;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
 import org.jspecify.annotations.Nullable;
@@ -68,6 +69,7 @@ import java.util.Properties;
  * micronaut.dev.compile.java.output=build/classes/java/main
  * micronaut.dev.compile.java.generated-sources=build/generated/sources/annotationProcessor/java/main
  * micronaut.dev.compile.java.options=-parameters,--release,21,-Amicronaut.processing.group=example
+ * micronaut.dev.compile.python.incremental-mode=optimistic
  * micronaut.dev.build-tool=gradle
  * micronaut.dev.build-tool.trigger=build/micronaut-dev/reload
  * micronaut.dev.retain=javax.sql.DataSource
@@ -182,6 +184,7 @@ public final class DevManifest {
     private final Map<SourceKind, Path> classOutputs;
     private final Map<SourceKind, Path> generatedSources;
     private final Map<SourceKind, List<String>> compileOptions;
+    private final Map<SourceKind, IncrementalMode> incrementalModes;
     @Nullable
     private final String buildTool;
     @Nullable
@@ -224,6 +227,7 @@ public final class DevManifest {
         this.classOutputs = perKind(properties, "output", value -> path(directory, value));
         this.generatedSources = perKind(properties, "generated-sources", value -> path(directory, value));
         this.compileOptions = perKind(properties, "options", value -> options(directory, value));
+        this.incrementalModes = perKind(properties, "incremental-mode", value -> IncrementalMode.of(value).orElseThrow(() -> new IllegalArgumentException("Unknown incremental mode " + value + ": conservative or optimistic")));
         this.buildTool = properties.getProperty(PREFIX + "build-tool");
         String trigger = properties.getProperty(PREFIX + "build-tool.trigger");
         this.buildToolTrigger = trigger == null ? null : path(directory, trigger);
@@ -503,6 +507,17 @@ public final class DevManifest {
      */
     public List<String> compileOptions(SourceKind kind) {
         return compileOptions.getOrDefault(kind, List.of());
+    }
+
+    /**
+     * What an incremental compilation of a language recompiles, from {@code micronaut.dev.compile.<language>.incremental-mode},
+     * which only the Python compiler distinguishes: {@code conservative}, the default, or {@code optimistic}.
+     *
+     * @param kind The language
+     * @return The mode
+     */
+    public IncrementalMode incrementalMode(SourceKind kind) {
+        return incrementalModes.getOrDefault(kind, IncrementalMode.CONSERVATIVE);
     }
 
     /**
