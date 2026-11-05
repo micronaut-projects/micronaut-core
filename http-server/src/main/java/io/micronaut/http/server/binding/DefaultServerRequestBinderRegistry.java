@@ -64,7 +64,9 @@ public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRe
         internalRequestBinderRegistry.addArgumentBinder(new MultipartBodyArgumentBinder(
             formFactory
         ));
-        internalRequestBinderRegistry.addArgumentBinder(new InputStreamBodyBinder(bodyBinder));
+        InputStreamBodyBinder inputStreamBodyBinder = new InputStreamBodyBinder(bodyBinder);
+        internalRequestBinderRegistry.addArgumentBinder(inputStreamBodyBinder);
+        internalRequestBinderRegistry.addArgumentBinder(new ReadableBodyBinder(inputStreamBodyBinder));
         StreamingFileUploadBinder streamingFileUploadBinder = new StreamingFileUploadBinder(formFactory);
         internalRequestBinderRegistry.addArgumentBinder(streamingFileUploadBinder);
         CompletedFileUploadBinder completedFileUploadBinder = new CompletedFileUploadBinder(formFactory);
