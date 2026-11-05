@@ -22,6 +22,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -35,6 +36,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -91,8 +93,12 @@ class LauncherReloadAfterFailedStartTest {
     @AfterEach
     void stopLauncher() throws InterruptedException {
         if (process != null) {
-            process.destroyForcibly();
-            process.waitFor();
+            // not forcibly at first: a coverage agent writes what it measured as the JVM shuts down
+            process.destroy();
+            if (!process.waitFor(20, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                process.waitFor();
+            }
         }
     }
 
@@ -242,7 +248,12 @@ class LauncherReloadAfterFailedStartTest {
         Path argfile = project.resolve("jvm.argfile");
         Files.write(argfile, List.of("-cp", "\"" + classpath.replace("\\", "\\\\") + "\""));
         output = project.resolve("output.txt");
-        List<String> command = new ArrayList<>(List.of(java, "@" + argfile, "-Xmx512m", MicronautDevMain.class.getName(), "--manifest", project.resolve("dev.properties").toString()));
+        List<String> command = new ArrayList<>(List.of(java));
+        // a coverage agent measures the launcher too, the one place these paths run
+        ManagementFactory.getRuntimeMXBean().getInputArguments().stream()
+            .filter(argument -> argument.startsWith("-javaagent:") && argument.contains("jacoco"))
+            .forEach(command::add);
+        command.addAll(List.of("@" + argfile, "-Xmx512m", MicronautDevMain.class.getName(), "--manifest", project.resolve("dev.properties").toString()));
         process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(output.toFile()).start();
     }
 
