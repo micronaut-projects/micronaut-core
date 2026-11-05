@@ -146,7 +146,7 @@ class RedefineWithResourcesTest {
         DevRuntime runtime = runtime(manifest(""), new TextReloader());
         try {
             runtime.start(new String[0]);
-            runtime.currentGeneration().loadClass("app.Greeter");
+            Class<?> greeter = runtime.currentGeneration().loadClass("app.Greeter");
 
             writeOutput("two", "");
             Files.writeString(broken, "two");
@@ -155,6 +155,8 @@ class RedefineWithResourcesTest {
             runtime.awaitGeneration(2, Duration.ofMinutes(1));
             assertEquals(0, runtime.redefinitions());
             assertEquals(0, runtime.inPlacePatches());
+            // the requests that finished on the retiring generation ran the body it started with
+            assertEquals("one", greet(greeter));
             assertEquals("two", greet(runtime.currentGeneration().loadClass("app.Greeter")));
         } finally {
             runtime.close();

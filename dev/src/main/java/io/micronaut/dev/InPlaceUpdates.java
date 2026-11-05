@@ -96,7 +96,8 @@ final class InPlaceUpdates {
      * <p>Resources that changed with the classes go to the {@link InPlaceResourceReloader} that takes them all, on the
      * conditions of {@link #isPatchable}: without one the change restarts, before anything is applied. The snapshot
      * takes the classes and the resources together. The classes are redefined first, as the JVM refuses a redefinition
-     * whole, and a reloader that then fails restarts, the new generation discarding both.</p>
+     * whole. A reloader that then fails restarts: the classes get their old bodies back, for the requests that finish
+     * on the retiring generation, and the new generation discards what the reloader applied.</p>
      *
      * @param agent The instrumentation, if attached
      * @param current The running context, if any
@@ -117,7 +118,7 @@ final class InPlaceUpdates {
             }
             try {
                 reloader = firstTaking(new ArrayList<>(current.getBeansOfType(InPlaceResourceReloader.class)), resources, "restarting instead");
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
                 LOG.debug("Cannot look up the in-place reloaders: restarting instead", e);
             }
             if (reloader == null) {
@@ -129,6 +130,8 @@ final class InPlaceUpdates {
         List<ClassDefinition> definitions = new ArrayList<>();
         Map<String, byte[]> originals = new LinkedHashMap<>();
         Map<String, byte[]> replacements = new LinkedHashMap<>();
+        Map<String, byte[]> resourceOriginals = new LinkedHashMap<>();
+        Map<String, byte[]> resourceReplacements = new LinkedHashMap<>();
         for (ClassChange change : changeSet.classes()) {
             String name = change.className();
             String simpleName = name.substring(name.lastIndexOf('.') + 1);
@@ -158,6 +161,8 @@ final class InPlaceUpdates {
                     throw new IOException("Generation " + generation.generation() + " cannot replace " + resource);
                 }
                 snapshotChange.replaceResource(resource, before, after);
+                resourceOriginals.put(resource, before);
+                resourceReplacements.put(resource, after);
             }
             for (Map.Entry<String, byte[]> entry : replacements.entrySet()) {
                 Class<?> loaded = generation.loadedClass(entry.getKey());
@@ -184,6 +189,7 @@ final class InPlaceUpdates {
             } catch (Exception | LinkageError e) {
                 LOG.info("Cannot patch {} resource(s) in place ({}): restarting instead", resources.size(), e.getMessage());
                 LOG.debug("The in-place patch failed", e);
+                revert(agent, generation, originals, replacements, resourceOriginals, resourceReplacements);
                 return false;
             }
             inPlacePatches.incrementAndGet();
@@ -305,6 +311,36 @@ final class InPlaceUpdates {
         }
         inPlacePatches.incrementAndGet();
         return result;
+    }
+
+    /**
+     * Gives a generation back the classes and resources of a change a reloader failed to apply. The restart that
+     * follows runs the whole change, so that what cannot be reverted is only logged.
+     */
+    private static void revert(Instrumentation agent,
+                               GenerationClassLoader generation,
+                               Map<String, byte[]> classes,
+                               Map<String, byte[]> replacedClasses,
+                               Map<String, byte[]> resources,
+                               Map<String, byte[]> replacedResources) {
+        try (ClassFileReplacement revert = new ClassFileReplacement(generation)) {
+            List<ClassDefinition> definitions = new ArrayList<>();
+            for (Map.Entry<String, byte[]> entry : classes.entrySet()) {
+                revert.replace(entry.getKey(), Objects.requireNonNull(replacedClasses.get(entry.getKey())), entry.getValue());
+                Class<?> loaded = generation.loadedClass(entry.getKey());
+                if (loaded != null) {
+                    definitions.add(new ClassDefinition(loaded, entry.getValue()));
+                }
+            }
+            for (Map.Entry<String, byte[]> entry : resources.entrySet()) {
+                revert.replaceResource(entry.getKey(), Objects.requireNonNull(replacedResources.get(entry.getKey())), entry.getValue());
+            }
+            if (!definitions.isEmpty()) {
+                agent.redefineClasses(definitions.toArray(new ClassDefinition[0]));
+            }
+        } catch (Exception | LinkageError e) {
+            LOG.debug("Cannot give generation {} back the classes it ran with", generation.generation(), e);
+        }
     }
 
     private static @Nullable InPlaceResourceReloader firstTaking(List<InPlaceResourceReloader> reloaders, Set<String> changed, String otherwise) {
