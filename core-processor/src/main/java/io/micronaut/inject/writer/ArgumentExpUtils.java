@@ -544,7 +544,6 @@ public final class ArgumentExpUtils {
         Visit visit,
         Function<String, ExpressionDef> loadClassValueExpressionFn) {
         Set<Object> visitedTypes = visit.visitedTypes();
-        boolean inBounds = visit.inBounds();
         if (element == null) {
             if (visitedTypes.contains(declaringType.getName())) {
                 return TYPE_ARGUMENT.getStaticField(ZERO_ARGUMENTS_CONSTANT, TYPE_ARGUMENT_ARRAY);

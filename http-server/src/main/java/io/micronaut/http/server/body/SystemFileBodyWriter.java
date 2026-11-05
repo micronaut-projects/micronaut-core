@@ -273,6 +273,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
                     delegate.skipNBytes(toSkip);
                     skipSuccess = true;
                 } catch (EOFException ignored) {
+                    // the file is shorter than the range start, skipSuccess stays false
                 }
             }
             return skipSuccess;

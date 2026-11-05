@@ -77,7 +77,8 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
     @Nullable
     private Object body;
     @Nullable
-    private NettyHttpParameters httpParameters;
+    @SuppressWarnings("java:S3077") // volatile only publishes the double-checked creation
+    private volatile NettyHttpParameters httpParameters;
     private ConversionService conversionService = ConversionService.SHARED;
 
     /**

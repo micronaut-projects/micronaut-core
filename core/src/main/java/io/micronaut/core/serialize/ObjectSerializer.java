@@ -41,6 +41,8 @@ public interface ObjectSerializer {
      * @deprecated JDK serialization is insecure when deserializing data that can be influenced by an attacker.
      * Use a safer serialization format instead.
      */
+    // JDK must stay a JdkSerializer, a public class that another thread can initialize first, until its removal
+    @SuppressWarnings("ClassInitializationDeadlock")
     @Deprecated(since = "5.2", forRemoval = true)
     ObjectSerializer JDK = new JdkSerializer();
 
