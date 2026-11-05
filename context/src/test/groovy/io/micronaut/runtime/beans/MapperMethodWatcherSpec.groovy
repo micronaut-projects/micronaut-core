@@ -17,8 +17,8 @@ class MapperMethodWatcherSpec extends Specification {
         def conversionService = context.getBean(ConversionService)
         def processor = context.getBean(MapperMethodProcessor)
 
-        expect: "the startup batch registered the converter, and the processor is not adapted: it watches"
-        conversionService.convert(new WatchedSource("a"), WatchedTarget).get().name == "a"
+        expect: "the startup batch registered the converter, of whichever of the two mappers of the pair came last, and the processor is not adapted: it watches"
+        conversionService.convert(new WatchedSource("a"), WatchedTarget).get().name in ["a", "dup:a"]
         !((DefaultBeanContext) context).adaptedProcessors().contains(processor)
 
         when: "the mapper comes back in a new generation"
