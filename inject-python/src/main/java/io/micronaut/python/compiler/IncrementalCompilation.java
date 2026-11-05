@@ -75,7 +75,7 @@ final class IncrementalCompilation {
     private static final Pattern PYTHON_TYPE = Pattern.compile("(?m)^\\s*class\\s+([A-Za-z_]\\w*)\\b");
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_$][\\w$]*");
     private static final Pattern IMPORT_ALIAS = Pattern.compile("\\s+as\\s+");
-    private static final Pattern PYTHON_STAR_IMPORT = Pattern.compile("(?m)^\\s*from\\s+\\S+\\s+import\\s+\\*");
+    private static final Pattern PYTHON_STAR_IMPORT = Pattern.compile("(?m)^\\s*(?:[^\\n]*:\\s*)?from\\b[^\\n]*\\bimport\\s*\\*");
     private static final Pattern PYTHON_DECLARATION = Pattern.compile("[A-Za-z_]\\w*\\s*(?::|=(?!=))");
     private static final Pattern DYNAMIC_PYTHON_REFERENCE = Pattern.compile(
         "\\b(?:__import__|import_module|globals|locals)\\s*\\(|@\\s*Mixin\\b"
@@ -84,10 +84,12 @@ final class IncrementalCompilation {
     // object it is ordinary attribute access and must not force every Python source through the
     // processor again.
     private static final Pattern PYTHON_GETATTR = Pattern.compile("\\bgetattr\\s*\\(\\s*([A-Za-z_]\\w*)");
-    private static final Pattern PYTHON_IMPORT_STATEMENT = Pattern.compile("(?m)^\\s*import\\s+([^\\n#]+)");
+    // an import may follow the colon of a compound statement on its line ("try: import a")
+    private static final Pattern PYTHON_IMPORT_STATEMENT = Pattern.compile("(?m)^\\s*(?:[^\\n]*:\\s*)?import\\s+([^\\n#]+)");
+    // the module, which needs no space beside a dot and may hold some ("from.a import b", "from . a import(b)"), and
     // the imported names, on one line or spread over lines inside parentheses
-    private static final Pattern PYTHON_FROM_IMPORT_MODULE_AND_NAMES = Pattern.compile("(?m)^\\s*from\\s+(\\S+)\\s+import\\s+(?:\\(([^)]*)\\)|([^\\n]+))");
-    private static final Pattern PYTHON_FROM_IMPORT_NAMES = Pattern.compile("(?m)^\\s*from\\s+\\S+\\s+import\\s+(?:\\(([^)]*)\\)|([^\\n]+))");
+    private static final Pattern PYTHON_FROM_IMPORT = Pattern.compile("(?m)^\\s*(?:[^\\n]*:\\s*)?from\\b\\s*(\\S[^\\n]*?)\\s*(?<!\\w)import\\b\\s*(?:\\(([^)]*)\\)|([^\\n]+))");
+    private static final Pattern PYTHON_DEFINITION = Pattern.compile("(?:async\\s+def|def|class)\\s+([A-Za-z_]\\w*)");
 
     private final Path javaRoot;
     private final List<Path> pythonRoots;
@@ -424,42 +426,103 @@ final class IncrementalCompilation {
         if (!affectsPython) {
             return false;
         }
-        Set<String> pythonModules = scannedSources.values().stream()
-            .filter(source -> source.state().language() == Language.PYTHON)
-            .map(source -> pythonModule(source.state().relativePath()))
-            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        PythonModules pythonModules = new PythonModules(scannedSources.values());
         return scannedSources.values().stream()
             .filter(source -> source.state().language() == Language.PYTHON)
             .anyMatch(source -> hasDynamicOrUnresolvedPythonRelationship(source, pythonModules));
     }
 
+    /**
+     * Whether the Python sources, by their paths under the source root, hold a relationship that the static analysis
+     * cannot prove isolated, so that a change to any of them reprocesses them all.
+     *
+     * @param sources The contents of the sources by their relative paths
+     * @return Whether one of them holds such a relationship
+     */
+    static boolean hasDynamicOrUnresolvedPythonRelationship(Map<String, String> sources) {
+        List<ScannedSource> scanned = sources.entrySet().stream()
+            .map(source -> new ScannedSource(new SourceState(
+                source.getKey(), Language.PYTHON, source.getKey(), "", "", Set.of(), Set.of(), pythonTypes(source.getValue(), source.getKey())
+            ), source.getValue()))
+            .toList();
+        PythonModules pythonModules = new PythonModules(scanned);
+        return scanned.stream().anyMatch(source -> hasDynamicOrUnresolvedPythonRelationship(source, pythonModules));
+    }
+
     private static boolean hasDynamicOrUnresolvedPythonRelationship(ScannedSource source,
-                                                                    Set<String> pythonModules) {
+                                                                    PythonModules pythonModules) {
         if (DYNAMIC_PYTHON_REFERENCE.matcher(source.content()).find()
-            || PYTHON_STAR_IMPORT.matcher(source.content()).find()
-            || readsAttributesOfImportedModule(source.content())) {
+            || PYTHON_STAR_IMPORT.matcher(logicalStatements(source.content())).find()
+            || readsAttributesOfImportedModule(source.content())
+            || hasUnresolvedRelativeImport(source, pythonModules)) {
             return true;
         }
         for (String module : pythonImports(source.content())) {
-            if (module.startsWith(".")) {
-                String resolved = resolveRelativePythonModule(source.state().relativePath(), module);
-                if (!pythonModules.contains(resolved) && !pythonModules.contains(resolved + PYTHON_INIT_MODULE_SUFFIX)) {
-                    return true;
-                }
-            } else {
+            if (!module.startsWith(".")) {
                 int separator = module.indexOf('.');
                 String topLevelModule = separator == -1 ? module : module.substring(0, separator);
-                boolean localPackage = pythonModules.stream()
-                    .anyMatch(candidate -> candidate.equals(topLevelModule)
-                        || candidate.startsWith(topLevelModule + '.'));
-                if (localPackage
-                    && !pythonModules.contains(module)
-                    && !pythonModules.contains(module + PYTHON_INIT_MODULE_SUFFIX)) {
+                if (pythonModules.isModuleOrPackage(topLevelModule) && !pythonModules.isModule(module)) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a relative import names what the sources do not show: a module or package that is not among them, a
+     * parent beyond the top-level package, which fails at run time, or a name that is neither a submodule nor
+     * something the module binds. What they do show relates the importer through {@link #createSourceStates}.
+     */
+    private static boolean hasUnresolvedRelativeImport(ScannedSource source, PythonModules pythonModules) {
+        String relativePath = source.state().relativePath();
+        Matcher fromImports = PYTHON_FROM_IMPORT.matcher(logicalStatements(source.content()));
+        while (fromImports.find()) {
+            String module = fromImportModule(fromImports);
+            if (module.startsWith(".")) {
+                String resolved = resolveRelativePythonModule(relativePath, module);
+                if (parentCount(module) > relativePath.chars().filter(c -> c == '/').count()
+                    || !pythonModules.isModuleOrPackage(resolved)) {
+                    return true;
+                }
+                for (String name : fromImportNames(fromImports)) {
+                    if (!pythonModules.providesName(resolved, name)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The names a module binds outside the bodies of its functions and classes, those it binds conditionally included.
+     * A name bound in a way this does not read, such as by unpacking, only keeps every Python source being reprocessed;
+     * one read by mistake, such as an argument of a call spread over lines, cannot leave a dependent out, as the import
+     * of the module relates the dependent to it whatever the name.
+     */
+    private static Set<String> pythonModuleBindings(String content) {
+        Set<String> names = new HashSet<>(importBoundNames(content));
+        int bodyOf = -1;
+        for (String line : logicalStatements(content).lines().toList()) {
+            String statement = line.stripLeading();
+            int indentation = line.length() - statement.length();
+            if (statement.isEmpty() || (bodyOf != -1 && indentation > bodyOf)) {
+                continue;
+            }
+            bodyOf = -1;
+            Matcher definition = PYTHON_DEFINITION.matcher(statement);
+            if (definition.lookingAt()) {
+                names.add(definition.group(1));
+                bodyOf = indentation;
+            } else if (PYTHON_DECLARATION.matcher(statement).lookingAt()) {
+                Matcher name = IDENTIFIER.matcher(statement);
+                if (name.lookingAt()) {
+                    names.add(name.group());
+                }
+            }
+        }
+        return names;
     }
 
     /**
@@ -471,15 +534,27 @@ final class IncrementalCompilation {
         if (!getattr.find()) {
             return false;
         }
+        Set<String> importedNames = importBoundNames(content);
+        do {
+            if (importedNames.contains(getattr.group(1))) {
+                return true;
+            }
+        } while (getattr.find());
+        return false;
+    }
+
+    /**
+     * The names a source's import statements bind.
+     */
+    private static Set<String> importBoundNames(String content) {
         Set<String> importedNames = new LinkedHashSet<>();
         // "import a.b, c as d" binds a and d
         for (String[] clause : directImportClauses(content)) {
             importedNames.add(clause[1]);
         }
-        Matcher fromImports = PYTHON_FROM_IMPORT_NAMES.matcher(logicalStatements(content));
+        Matcher fromImports = PYTHON_FROM_IMPORT.matcher(logicalStatements(content));
         while (fromImports.find()) {
-            String imported = fromImports.group(1) != null ? fromImports.group(1) : fromImports.group(2);
-            for (String name : imported.replaceAll("#[^\\n]*", "").split(",")) {
+            for (String name : fromImportClauses(fromImports)) {
                 String[] parts = IMPORT_ALIAS.split(name.trim());
                 String bound = parts[parts.length - 1].trim();
                 if (!bound.isEmpty()) {
@@ -487,12 +562,7 @@ final class IncrementalCompilation {
                 }
             }
         }
-        do {
-            if (importedNames.contains(getattr.group(1))) {
-                return true;
-            }
-        } while (getattr.find());
-        return false;
+        return importedNames;
     }
 
     /**
@@ -506,21 +576,17 @@ final class IncrementalCompilation {
         return new StatementScanner(content.replace("\\\r\n", " ").replace("\\\n", " ")).scan();
     }
 
-    private static Set<String> pythonImports(String content) {
+    static Set<String> pythonImports(String content) {
         Set<String> modules = new LinkedHashSet<>();
         String statements = logicalStatements(content);
-        Matcher fromImports = PYTHON_FROM_IMPORT_MODULE_AND_NAMES.matcher(statements);
+        Matcher fromImports = PYTHON_FROM_IMPORT.matcher(statements);
         while (fromImports.find()) {
-            String module = fromImports.group(1);
+            String module = fromImportModule(fromImports);
             modules.add(module);
             // "from pkg import beta" may name the submodule pkg.beta: a candidate the resolver keeps
             // only when such a module exists, otherwise the name is an attribute of the package
-            String imported = fromImports.group(2) != null ? fromImports.group(2) : fromImports.group(3);
-            for (String name : imported.replaceAll("#[^\\n]*", "").split(",")) {
-                String bound = IMPORT_ALIAS.split(name.trim())[0].trim();
-                if (!bound.isEmpty() && bound.matches("\\w+")) {
-                    modules.add(module.endsWith(".") ? module + bound : module + "." + bound);
-                }
+            for (String name : fromImportNames(fromImports)) {
+                modules.add(module.endsWith(".") ? module + name : module + "." + name);
             }
         }
         // every clause of "import a.b, c as d" is a dependency, not only the first
@@ -528,6 +594,29 @@ final class IncrementalCompilation {
             modules.add(clause[0]);
         }
         return modules;
+    }
+
+    private static String fromImportModule(Matcher fromImport) {
+        return fromImport.group(1).replaceAll("\\s", "");
+    }
+
+    private static String[] fromImportClauses(Matcher fromImport) {
+        String imported = fromImport.group(2) != null ? fromImport.group(2) : fromImport.group(3);
+        return imported.replaceAll("#[^\\n]*", "").split(",");
+    }
+
+    /**
+     * The names a {@code from} import takes from its module, without their aliases.
+     */
+    private static List<String> fromImportNames(Matcher fromImport) {
+        List<String> names = new ArrayList<>();
+        for (String clause : fromImportClauses(fromImport)) {
+            String name = IMPORT_ALIAS.split(clause.trim())[0].trim();
+            if (!name.isEmpty() && name.matches("\\w+")) {
+                names.add(name);
+            }
+        }
+        return names;
     }
 
     /**
@@ -555,10 +644,7 @@ final class IncrementalCompilation {
 
     private static String resolveRelativePythonModule(String relativePath, String module) {
         String currentPackage = pythonPackage(relativePath);
-        int parentCount = 0;
-        while (parentCount < module.length() && module.charAt(parentCount) == '.') {
-            parentCount++;
-        }
+        int parentCount = parentCount(module);
         String resolvedPackage = currentPackage;
         for (int i = 1; i < parentCount; i++) {
             int separator = resolvedPackage.lastIndexOf('.');
@@ -569,6 +655,14 @@ final class IncrementalCompilation {
             return suffix;
         }
         return suffix.isEmpty() ? resolvedPackage : resolvedPackage + '.' + suffix;
+    }
+
+    private static int parentCount(String module) {
+        int parentCount = 0;
+        while (parentCount < module.length() && module.charAt(parentCount) == '.') {
+            parentCount++;
+        }
+        return parentCount;
     }
 
     private static boolean containsDeletedPythonSource(Set<String> affected,
@@ -1528,6 +1622,53 @@ final class IncrementalCompilation {
     }
 
     private record PythonScope(int indentation, boolean function) {
+    }
+
+    /**
+     * What an import can name among the Python sources of a compilation.
+     */
+    private static final class PythonModules {
+        private final Map<String, ScannedSource> sources = new HashMap<>();
+        private final Set<String> packages = new HashSet<>();
+        private final Set<String> types = new HashSet<>();
+        private final Map<String, Set<String>> bindings = new HashMap<>();
+
+        PythonModules(Collection<ScannedSource> scannedSources) {
+            for (ScannedSource source : scannedSources) {
+                if (source.state().language() == Language.PYTHON) {
+                    String module = pythonModule(source.state().relativePath());
+                    sources.put(module, source);
+                    types.addAll(source.state().types());
+                    for (int separator = module.indexOf('.'); separator != -1; separator = module.indexOf('.', separator + 1)) {
+                        packages.add(module.substring(0, separator));
+                    }
+                }
+            }
+        }
+
+        boolean isModule(String name) {
+            return sources.containsKey(name) || sources.containsKey(name + PYTHON_INIT_MODULE_SUFFIX);
+        }
+
+        boolean isModuleOrPackage(String name) {
+            return isModule(name) || packages.contains(name);
+        }
+
+        /**
+         * Whether {@code from module import name} finds the name: a submodule, a name the module binds, or, in a package
+         * without a source initialiser, a class of one of its modules, which the initialiser the compiler generates
+         * serves and the identifier scan of the importer relates to that module.
+         */
+        boolean providesName(String module, String name) {
+            if (isModuleOrPackage(module + '.' + name)) {
+                return true;
+            }
+            ScannedSource source = sources.containsKey(module) ? sources.get(module) : sources.get(module + PYTHON_INIT_MODULE_SUFFIX);
+            if (source == null) {
+                return types.contains(module + '.' + name);
+            }
+            return bindings.computeIfAbsent(source.state().key(), ignored -> pythonModuleBindings(source.content())).contains(name);
+        }
     }
 
     private enum Language {
