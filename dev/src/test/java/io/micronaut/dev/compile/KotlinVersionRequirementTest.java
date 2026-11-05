@@ -21,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,6 +34,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -57,6 +59,17 @@ class KotlinVersionRequirementTest {
         for (String supported : List.of("2.4.0-Beta1", "2.4.0", "2.4.10-release-377", "2.10.0", "3.0.0", "snapshot")) {
             assertTrue(KotlinSourceCompiler.isSupported(supported), supported);
         }
+    }
+
+    @Test
+    void aTooOldApiOrImplementationIsNamedAndAnUnknownOneIsNotRefused() {
+        assertEquals("2.3.21", KotlinSourceCompiler.tooOld("2.3.21", "2.4.10"));
+        assertEquals("2.3.21", KotlinSourceCompiler.tooOld("2.4.10", "2.3.21"));
+        assertEquals("2.2.0", KotlinSourceCompiler.tooOld("2.2.0", "2.3.21"));
+        assertEquals("2.3.21", KotlinSourceCompiler.tooOld(null, "2.3.21"));
+        assertEquals("2.3.21", KotlinSourceCompiler.tooOld("2.3.21", null));
+        assertNull(KotlinSourceCompiler.tooOld("2.4.0", "2.4.10"));
+        assertNull(KotlinSourceCompiler.tooOld(null, null));
     }
 
     @Test
@@ -85,7 +98,12 @@ class KotlinVersionRequirementTest {
         ).collect(Collectors.joining(File.pathSeparator));
         Path argfile = project.resolve("jvm.argfile");
         Files.write(argfile, List.of("-cp", "\"" + classpath.replace("\\", "\\\\") + "\""));
-        List<String> command = new ArrayList<>(List.of(java, "@" + argfile, Probe.class.getName()));
+        List<String> command = new ArrayList<>(List.of(java));
+        // a coverage agent measures the probe too, the one place this path runs
+        ManagementFactory.getRuntimeMXBean().getInputArguments().stream()
+            .filter(argument -> argument.startsWith("-javaagent:") && argument.contains("jacoco"))
+            .forEach(command::add);
+        command.addAll(List.of("@" + argfile, Probe.class.getName()));
         Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
         StringBuilder output = new StringBuilder();
         Thread reader = new Thread(() -> {

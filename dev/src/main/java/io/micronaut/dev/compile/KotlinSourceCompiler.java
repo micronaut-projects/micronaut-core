@@ -143,7 +143,19 @@ public final class KotlinSourceCompiler extends StagedSourceCompiler {
         if (api != null && !isSupported(api)) {
             return api;
         }
-        String compiler = toolchains ? KotlinCompilation.compilerVersion() : null;
+        return tooOld(api, toolchains ? KotlinCompilation.compilerVersion() : null);
+    }
+
+    /**
+     * @param api The version of the Build Tools API, if known
+     * @param compiler The version of its implementation, if known
+     * @return The version that is too old, the API's first, null if neither is
+     */
+    @Nullable
+    static String tooOld(@Nullable String api, @Nullable String compiler) {
+        if (api != null && !isSupported(api)) {
+            return api;
+        }
         return compiler != null && !isSupported(compiler) ? compiler : null;
     }
 
