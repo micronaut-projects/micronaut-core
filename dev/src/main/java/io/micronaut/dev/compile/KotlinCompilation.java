@@ -80,6 +80,8 @@ final class KotlinCompilation {
     private static final Pattern PACKAGE = Pattern.compile("^\\s*package\\s+([\\w.]+)", Pattern.MULTILINE);
     private static final String MODULE_NAME = "main";
     private static final String CLASS_SUFFIX = ".class";
+    // what KSP and the symbol processors exchange: its API, whose signatures use the standard library
+    private static final List<String> KSP_PACKAGE_PREFIXES = List.of("com.google.devtools.ksp.", "kotlin.");
 
     @Nullable
     private static volatile KotlinToolchains toolchains; // NOSONAR java:S3077 loaded once and only the reference is published; the toolchains are thread-safe
@@ -184,7 +186,7 @@ final class KotlinCompilation {
             }
             return null;
         }
-        try (ProcessorPathLoader processorLoader = new ProcessorPathLoader(processorPath, KotlinCompilation.class.getClassLoader())) {
+        try (CompilerPluginLoader processorLoader = new CompilerPluginLoader(processorPath, KSP_PACKAGE_PREFIXES)) {
             return KspCompilation.run(request, toCompile, classpath, processorLoader, MODULE_NAME, diagnostics);
         }
     }
@@ -432,39 +434,6 @@ final class KotlinCompilation {
             }
         }
         return urls;
-    }
-
-    /**
-     * The loader of the processor path: the classes resolve through the parent, the API and the launch classpath,
-     * and the provider service files come from the processor path alone, so that a provider elsewhere on the
-     * launch classpath is not run as if the project had configured it.
-     */
-    private static final class ProcessorPathLoader extends URLClassLoader {
-
-        static {
-            registerAsParallelCapable();
-        }
-
-        ProcessorPathLoader(URL[] urls, @Nullable ClassLoader parent) {
-            super(urls, parent);
-        }
-
-        @Override
-        public java.util.Enumeration<URL> getResources(String name) throws IOException {
-            if (PROVIDER_SERVICE.equals(name)) {
-                return findResources(name);
-            }
-            return super.getResources(name);
-        }
-
-        @Override
-        @Nullable
-        public URL getResource(String name) {
-            if (PROVIDER_SERVICE.equals(name)) {
-                return findResource(name);
-            }
-            return super.getResource(name);
-        }
     }
 
     /**
