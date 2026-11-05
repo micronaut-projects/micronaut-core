@@ -34,6 +34,7 @@ import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
 import io.micronaut.python.processing.staticcompile.StaticCompilationDecision;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import javax.annotation.processing.Processor;
 import javax.tools.Diagnostic;
@@ -232,7 +233,8 @@ final class PyronautJavaCompiler {
         this.processAggregatingPythonVisitors = processAggregatingPythonVisitors;
     }
 
-    Set<String> aggregatingSources(List<File> classpath,
+    Set<String> aggregatingSources(File targetDir,
+                                   List<File> classpath,
                                    List<File> annotationProcessorPath,
                                    String javaSrc,
                                    String pythonSrc) {
@@ -252,15 +254,7 @@ final class PyronautJavaCompiler {
         }
 
         List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
-        ClassLoader classLoader;
-        try (var _ = CompilationProfiler.span(profiler, "javac.processor-class-loader")) {
-            classLoader = pythonProcessingSession == null
-                ? createAnnotationProcessorClassLoader(processorClasspath)
-                : pythonProcessingSession.classLoader(
-                    processorClasspath,
-                    () -> createAnnotationProcessorClassLoader(processorClasspath)
-                );
-        }
+        ClassLoader classLoader = processorClassLoader(processorClasspath, targetDir);
         try {
             @SuppressWarnings({"rawtypes", "unchecked"})
             List<TypeElementVisitor<?, ?>> visitors = (List) SoftServiceLoader
@@ -402,12 +396,48 @@ final class PyronautJavaCompiler {
                                              List<File> annotationProcessorPath,
                                              List<String> compilerOptions) {
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
-        InMemoryJavaFileManager inMemoryJavaFileManager = new InMemoryJavaFileManager(
-            compiler.getStandardFileManager(diagnosticCollector, null, null));
+        StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnosticCollector, null, null);
+        try {
+            InMemoryJavaFileManager inMemoryJavaFileManager = new InMemoryJavaFileManager(fileManager);
 
-        compileJava(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions, inMemoryJavaFileManager, diagnosticCollector);
+            compileJava(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions, inMemoryJavaFileManager, diagnosticCollector);
 
-        return inMemoryJavaFileManager.getOutputFiles();
+            return inMemoryJavaFileManager.getOutputFiles();
+        } finally {
+            closeFileManager(fileManager);
+        }
+    }
+
+    /**
+     * The class loader of the annotation processors for a compilation. A session keeps its class loader from one
+     * compilation to the next, so it never holds the output of the compilations: a class it loaded from there would
+     * be the one it serves after the source changed. The compiler itself resolves the output, through its class path.
+     */
+    private ClassLoader processorClassLoader(List<File> processorClasspath, @Nullable File outputDirectory) {
+        try (var _ = CompilationProfiler.span(profiler, "javac.processor-class-loader")) {
+            if (pythonProcessingSession == null) {
+                return createAnnotationProcessorClassLoader(processorClasspath);
+            }
+            List<File> retained = withoutDirectory(processorClasspath, outputDirectory);
+            return pythonProcessingSession.classLoader(retained, () -> createAnnotationProcessorClassLoader(retained));
+        }
+    }
+
+    private static List<File> withoutDirectory(List<File> classpath, @Nullable File directory) {
+        if (classpath == null || directory == null) {
+            return classpath;
+        }
+        return classpath.stream()
+            .filter(entry -> !isSameDirectory(entry, directory))
+            .toList();
+    }
+
+    private static boolean isSameDirectory(File first, File second) {
+        try {
+            return first.isDirectory() && second.isDirectory() && Files.isSameFile(first.toPath(), second.toPath());
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     private IncrementalCompilationTrace compileJava(JavaFileObject[] sources,
@@ -448,34 +478,30 @@ final class PyronautJavaCompiler {
         List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
         List<File> compileClasspath = effectiveClasspath(classpath);
         List<String> options = buildCompilerOptions(compileClasspath, bootclasspath, annotationProcessorPath, compilerOptions);
-        ClassLoader classLoader;
-        try (var _ = CompilationProfiler.span(profiler, "javac.processor-class-loader")) {
-            classLoader = pythonProcessingSession == null
-                ? createAnnotationProcessorClassLoader(processorClasspath)
-                : pythonProcessingSession.classLoader(
-                    processorClasspath,
-                    () -> createAnnotationProcessorClassLoader(processorClasspath)
-                );
-        }
+        java.nio.file.Path outputDirectory = fileManager instanceof TrackingJavaFileManager trackingFileManager
+            ? trackingFileManager.targetDirectory()
+            : null;
+        ClassLoader classLoader = processorClassLoader(processorClasspath, outputDirectory == null ? null : outputDirectory.toFile());
         System.setProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         System.setProperty(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         ClassLoader previous = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(classLoader);
 
-        java.nio.file.Path outputDirectory = fileManager instanceof TrackingJavaFileManager trackingFileManager
-            ? trackingFileManager.targetDirectory()
-            : null;
         List<Processor> processors;
         try (var _ = CompilationProfiler.span(profiler, "javac.processors")) {
             processors = getAnnotationProcessors(classLoader, outputDirectory);
         } catch (RuntimeException | LinkageError e) {
+            Thread.currentThread().setContextClassLoader(previous);
             if (pythonProcessingSession == null) {
                 closeClassLoader(classLoader);
+            } else {
+                pythonProcessingSession.compilationFinished(false);
             }
             throw e;
         }
 
         boolean success;
+        boolean completed = false;
         try {
             JavaCompiler.CompilationTask task = compiler.getTask(
                 null, // Writer for additional output
@@ -514,6 +540,7 @@ final class PyronautJavaCompiler {
             try (var _ = CompilationProfiler.span(profiler, "javac.task")) {
                 success = task.call();
             }
+            completed = true;
             if (success) {
                 reportProcessorMessages(diagnosticCollector);
             }
@@ -556,6 +583,8 @@ final class PyronautJavaCompiler {
             shutdownProcessors(processors);
             if (pythonProcessingSession == null) {
                 closeClassLoader(classLoader);
+            } else {
+                pythonProcessingSession.compilationFinished(completed);
             }
         }
         if (!success) {
@@ -960,28 +989,43 @@ final class PyronautJavaCompiler {
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
         StandardJavaFileManager fileManager =
             compiler.getStandardFileManager(diagnosticCollector, null, null);
-        TrackingJavaFileManager trackingFileManager = new TrackingJavaFileManager(
-            fileManager,
-            targetDir.toPath()
-        );
-
-        // Set the class output location
         try {
-            fileManager.setLocation(StandardLocation.CLASS_OUTPUT,
-                Collections.singletonList(targetDir));
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to set output location", e);
-        }
+            TrackingJavaFileManager trackingFileManager = new TrackingJavaFileManager(
+                fileManager,
+                targetDir.toPath()
+            );
 
-        return compileJava(
-            sources,
-            classpath,
-            bootclasspath,
-            annotationProcessorPath,
-            compilerOptions,
-            trackingFileManager,
-            diagnosticCollector
-        );
+            // Set the class output location
+            try {
+                fileManager.setLocation(StandardLocation.CLASS_OUTPUT,
+                    Collections.singletonList(targetDir));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to set output location", e);
+            }
+
+            return compileJava(
+                sources,
+                classpath,
+                bootclasspath,
+                annotationProcessorPath,
+                compilerOptions,
+                trackingFileManager,
+                diagnosticCollector
+            );
+        } finally {
+            closeFileManager(fileManager);
+        }
+    }
+
+    /**
+     * Closes the file manager of a compilation, which holds every jar of the class path open.
+     */
+    private static void closeFileManager(JavaFileManager fileManager) {
+        try {
+            fileManager.close();
+        } catch (IOException ignored) {
+            // Nothing useful can be done while releasing a compiler's files.
+        }
     }
 
     private List<String> buildCompilerOptions(List<File> classpath,
