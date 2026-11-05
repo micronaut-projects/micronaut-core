@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.body.CloseableByteBody;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
@@ -57,6 +58,19 @@ public interface RequestHandler {
      * @param attachment Object passed to {@link OutboundAccess#attachment(Object)}
      */
     default void responseWritten(@Nullable Object attachment) {
+    }
+
+    /**
+     * Called roughly when a response has been written, with the response status and the number of
+     * body bytes written. The default implementation delegates to {@link #responseWritten(Object)}.
+     *
+     * @param attachment    Object passed to {@link OutboundAccess#attachment(Object)}
+     * @param status        The response status, or {@code null} if no response was established
+     * @param bytesWritten  The number of response body bytes written (post-compression)
+     * @since 5.3.0
+     */
+    default void responseWritten(@Nullable Object attachment, @Nullable HttpStatus status, long bytesWritten) {
+        responseWritten(attachment);
     }
 
     /**

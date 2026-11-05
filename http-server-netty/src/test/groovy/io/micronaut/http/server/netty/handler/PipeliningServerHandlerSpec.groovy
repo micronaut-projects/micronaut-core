@@ -13,7 +13,7 @@ import io.micronaut.http.exceptions.ContentLengthExceededException
 import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.micronaut.http.netty.body.StreamingNettyByteBody
-import io.micronaut.buffer.netty.NettyReadBufferFactory
+import io.micronaut.http.server.netty.HttpCompressionStrategy
 import io.netty.buffer.AbstractByteBufAllocator
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
@@ -1323,6 +1323,232 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.finishAndReleaseAll()
         then:
         unwritten == 0
+    }
+
+    def 'responseWritten reports the response status and body bytes'() {
+        given:
+        HttpStatus reportedStatus = null
+        long reportedBytes = -1
+        byte[] payload = "hello world".getBytes(StandardCharsets.UTF_8)
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                outboundAccess.write(
+                    new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.ACCEPTED),
+                    new NettyByteBodyFactory(ctx.channel()).adapt(Unpooled.copiedBuffer(payload)))
+            }
+
+            @Override
+            void responseWritten(Object attachment, HttpStatus status, long bytesWritten) {
+                reportedStatus = status
+                reportedBytes = bytesWritten
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+
+        then:
+        ch.checkException()
+        reportedStatus == HttpStatus.ACCEPTED
+        reportedBytes == payload.length
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'responseWritten reports post-compression bytes'() {
+        given:
+        HttpStatus reportedStatus = null
+        long reportedBytes = -1
+        byte[] payload = new byte[10_000]
+        java.util.Arrays.fill(payload, (byte) 'A')
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                outboundAccess.write(
+                    new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK),
+                    new NettyByteBodyFactory(ctx.channel()).adapt(Unpooled.copiedBuffer(payload)))
+            }
+
+            @Override
+            void responseWritten(Object attachment, HttpStatus status, long bytesWritten) {
+                reportedStatus = status
+                reportedBytes = bytesWritten
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+        handler.setCompressor(Compressor.create(new HttpCompressionStrategy() {
+            @Override
+            boolean isEnabled() {
+                return true
+            }
+
+            @Override
+            boolean shouldCompress(HttpResponse response) {
+                return true
+            }
+
+            @Override
+            int getMaxZstdEncodeSize() {
+                return 1 << 20
+            }
+        }))
+        def ch = new EmbeddedChannel(handler)
+        def outboundRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/")
+        outboundRequest.headers().add(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.GZIP)
+
+        when:
+        ch.writeInbound(outboundRequest)
+        HttpResponse wireResponse = null
+        long wireBytes = 0
+        Object outbound
+        while ((outbound = ch.readOutbound()) != null) {
+            if (outbound instanceof HttpResponse) {
+                wireResponse = (HttpResponse) outbound
+            }
+            if (outbound instanceof HttpContent) {
+                def content = ((HttpContent) outbound).content()
+                wireBytes += content.readableBytes()
+                content.release()
+            }
+        }
+
+        then:
+        ch.checkException()
+        wireResponse.headers().get(HttpHeaderNames.CONTENT_ENCODING) == 'gzip'
+        reportedStatus == HttpStatus.OK
+        reportedBytes == wireBytes
+        reportedBytes > 0
+        // 10_000 identical bytes compress to far less than the uncompressed payload
+        reportedBytes < payload.length
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'responseWritten handles an unregistered status code'() {
+        given:
+        HttpStatus reportedStatus = null
+        long reportedBytes = -1
+        byte[] payload = "custom".getBytes(StandardCharsets.UTF_8)
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                outboundAccess.write(
+                    new DefaultHttpResponse(HttpVersion.HTTP_1_1, new HttpResponseStatus(299, "Custom")),
+                    new NettyByteBodyFactory(ctx.channel()).adapt(Unpooled.copiedBuffer(payload)))
+            }
+
+            @Override
+            void responseWritten(Object attachment, HttpStatus status, long bytesWritten) {
+                reportedStatus = status
+                reportedBytes = bytesWritten
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+
+        then:
+        ch.checkException()
+        reportedStatus == null
+        reportedBytes == payload.length
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'responseWritten reports zero bytes for a head response'() {
+        given:
+        HttpStatus reportedStatus = null
+        long reportedBytes = -1
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                outboundAccess.writeHeadResponse(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK))
+            }
+
+            @Override
+            void responseWritten(Object attachment, HttpStatus status, long bytesWritten) {
+                reportedStatus = status
+                reportedBytes = bytesWritten
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.HEAD, "/"))
+
+        then:
+        ch.checkException()
+        reportedStatus == HttpStatus.OK
+        reportedBytes == 0
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'responseWritten reports the status and bytes of each pipelined response'() {
+        given:
+        List<HttpStatus> statuses = []
+        List<Long> byteCounts = []
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                boolean first = request.uri() == "/first"
+                byte[] payload = (first ? "one" : "three").getBytes(StandardCharsets.UTF_8)
+                outboundAccess.write(
+                    new DefaultHttpResponse(HttpVersion.HTTP_1_1, first ? HttpResponseStatus.OK : HttpResponseStatus.ACCEPTED),
+                    new NettyByteBodyFactory(ctx.channel()).adapt(Unpooled.copiedBuffer(payload)))
+            }
+
+            @Override
+            void responseWritten(Object attachment, HttpStatus status, long bytesWritten) {
+                statuses << status
+                byteCounts << bytesWritten
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/first"))
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/second"))
+
+        then:
+        ch.checkException()
+        statuses == [HttpStatus.OK, HttpStatus.ACCEPTED]
+        byteCounts == [3L, 5L]
+
+        cleanup:
+        ch.finishAndReleaseAll()
     }
 
     def 'reentrant close'() {
