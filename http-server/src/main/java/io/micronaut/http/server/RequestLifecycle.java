@@ -282,9 +282,7 @@ public class RequestLifecycle {
 
     private ExecutionFlow<HttpResponse<?>> handleErrorRoute(HttpRequest<?> request, PropagatedContext propagatedContext, RouteMatch<?> errorRoute, Throwable cause) {
         RouteExecutor.setRouteAttributes(request, errorRoute);
-        if (routeExecutor.serverConfiguration.isLogHandledExceptions()) {
-            routeExecutor.logException(cause);
-        }
+        boolean logHandledExceptions = routeExecutor.serverConfiguration.isLogHandledExceptions();
         try {
             return ExecutionFlow.just(errorRoute)
                 .flatMap(routeMatch -> routeExecutor.callRoute(propagatedContext, routeMatch, request)
@@ -292,6 +290,9 @@ public class RequestLifecycle {
                 )
                 .onErrorResume(u -> createDefaultErrorResponseFlow(request, u, propagatedContext))
                 .<HttpResponse<?>>map(response -> {
+                    if (logHandledExceptions) {
+                        routeExecutor.logHandledException(cause, response);
+                    }
                     RouteAttributes.setException(response, cause);
                     return response;
                 })
@@ -321,9 +322,6 @@ public class RequestLifecycle {
         Supplier<ExecutionFlow<HttpResponse<?>>> responseSupplier = () -> {
             ExceptionHandler<Throwable, ?> handler = routeExecutor.beanContext.getBean(handlerDefinition);
             try {
-                if (routeExecutor.serverConfiguration.isLogHandledExceptions()) {
-                    routeExecutor.logException(cause);
-                }
                 return propagatedContext.propagate(() -> {
                     Object result = handler.handle(request, cause);
                     return routeExecutor.createResponseForBody(propagatedContext, request, result, routeInfo, null);
@@ -332,12 +330,16 @@ public class RequestLifecycle {
                 return createDefaultErrorResponseFlow(request, e, propagatedContext);
             }
         };
+        final boolean logHandledExceptions = routeExecutor.serverConfiguration.isLogHandledExceptions();
         final Executor executor = routeExecutor.findExecutor(routeInfo);
         final ExecutionFlow<HttpResponse<?>> responseFlow = executor == null
             ? responseSupplier.get()
             : ExecutionFlow.async(executor, responseSupplier);
         return responseFlow
             .<HttpResponse<?>>map(response -> {
+                if (logHandledExceptions) {
+                    routeExecutor.logHandledException(cause, response);
+                }
                 RouteAttributes.setException(response, cause);
                 return response;
             })
