@@ -24,6 +24,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class ProxyHeaderParserTest {
 
@@ -45,6 +46,18 @@ class ProxyHeaderParserTest {
     void balancedQuotedValueIsStillUnwrapped() {
         ProxyHeaderParser parser = new ProxyHeaderParser(forwarded("for=\"192.0.2.60:4711\""));
         assertEquals(List.of("192.0.2.60:4711"), parser.getFor());
+    }
+
+    @Test
+    void malformedForwardedPortIsIgnored() {
+        MutableHttpRequest<Object> request = HttpRequest.GET("/");
+        request.header("X-Forwarded-Host", "example.com");
+        request.header("X-Forwarded-Port", "not-a-port");
+        request.header("X-Forwarded-For", "192.0.2.60");
+        ProxyHeaderParser parser = assertDoesNotThrow(() -> new ProxyHeaderParser(request));
+        assertEquals("example.com", parser.getHost());
+        assertNull(parser.getPort());
+        assertEquals(List.of("192.0.2.60"), parser.getFor());
     }
 
     private static HttpRequest<?> forwarded(String forwarded) {

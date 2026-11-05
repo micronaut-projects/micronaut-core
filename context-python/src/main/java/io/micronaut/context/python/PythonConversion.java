@@ -477,6 +477,7 @@ public final class PythonConversion {
             try {
                 type = Class.forName(candidate, false, classLoader);
             } catch (ClassNotFoundException | LinkageError e) {
+                // no generated type under this name, try the next candidate
             }
             if (type != null && type != declaredType && declaredType.isAssignableFrom(type) && isGeneratedFor(type, moduleName, qualifiedName)) {
                 try {

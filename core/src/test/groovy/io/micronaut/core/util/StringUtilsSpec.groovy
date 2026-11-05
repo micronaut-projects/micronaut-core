@@ -34,6 +34,11 @@ class StringUtilsSpec extends Specification {
         null                     | null
     }
 
+    void "test convertDotToUnderscore without uppercase"() {
+        expect:
+        StringUtils.convertDotToUnderscore("micronaut.Config.files", false) == "micronaut_Config_files"
+    }
+
     @Unroll
     void "test prependUri(#base, #uri) == #expected"() {
 
