@@ -808,7 +808,7 @@ record MethodFilter<T>(FilterOrder order,
             };
         } else if (type.isAsync()) {
             var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
-            return new DelayedFilterReturnHandler(isResponseFilter, next, nullable) {
+            return new DelayedFilterReturnHandler(next, nullable) {
                 @Override
                 @SuppressWarnings("unchecked")
                 public ExecutionFlow<FilterContext> handle(FilterContext context, @Nullable Object returnValue, @Nullable InternalFilterContinuation<?> continuation) {
@@ -980,12 +980,10 @@ record MethodFilter<T>(FilterOrder order,
     }
 
     private abstract static class DelayedFilterReturnHandler implements FilterReturnHandler {
-        final boolean isResponseFilter;
         final FilterReturnHandler next;
         final boolean nullable;
 
-        private DelayedFilterReturnHandler(boolean isResponseFilter, FilterReturnHandler next, boolean nullable) {
-            this.isResponseFilter = isResponseFilter;
+        private DelayedFilterReturnHandler(FilterReturnHandler next, boolean nullable) {
             this.next = next;
             this.nullable = nullable;
         }

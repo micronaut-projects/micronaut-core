@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 /**
- * The package info.
+ * Context propagation configuration.
  */
-package io.micronaut.inject.annotation;
+@NullMarked
+package io.micronaut.context.propagation;
+
+import org.jspecify.annotations.NullMarked;

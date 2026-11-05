@@ -51,7 +51,8 @@ final class DefaultFilterRoute implements FilterRoute {
     private @Nullable Set<HttpMethod> httpMethods;
     private @Nullable FilterPatternStyle patternStyle;
     private volatile @Nullable GenericHttpFilter filter;
-    private @Nullable AnnotationMetadata annotationMetadata;
+    @SuppressWarnings("java:S3077") // volatile only publishes the double-checked resolution
+    private volatile @Nullable AnnotationMetadata annotationMetadata;
     private final boolean isPreMatching;
     private @Nullable String matchingAnnotation;
     // built from the patterns and the pattern style whenever they change: like them, it is only

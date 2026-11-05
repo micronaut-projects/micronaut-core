@@ -48,6 +48,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -272,7 +273,7 @@ final class KotlinCompilation {
                 Path file = location != null ? Path.of(location.getPath()) : null;
                 diagnostics.add(new CompileDiagnostic(mapped, message, file, location != null ? location.getLine() : 0, location != null ? location.getColumn() : 0));
             }
-            return severity.name().toLowerCase() + ": " + message;
+            return severity.name().toLowerCase(Locale.ROOT) + ": " + message;
         });
         try (KotlinToolchains.BuildSession session = kotlin.createBuildSession()) {
             CompilationResult result = session.executeOperation(operation.build(), kotlin.createInProcessExecutionPolicy(), new CompilerLog());
