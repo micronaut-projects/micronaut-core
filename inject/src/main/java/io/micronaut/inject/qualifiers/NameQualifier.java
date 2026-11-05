@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.qualifiers;
 
+import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -72,6 +73,12 @@ final class NameQualifier<T> extends FilteringQualifier<T> implements io.microna
             }
         }
         return thisName.equalsIgnoreCase(name) || thisName.equalsIgnoreCase(name + beanType.getSimpleName());
+    }
+
+    @Override
+    public boolean contains(Qualifier<T> qualifier) {
+        // names compare as they do against a candidate, while equals stays exact for use as a key
+        return qualifier instanceof NameQualifier<T> that && name.equalsIgnoreCase(that.name);
     }
 
     @Override
