@@ -39,16 +39,16 @@ import java.util.Optional;
  * @since 5.3.0
  */
 @Internal
-public final class ReadableBodyBinder implements NonBlockingBodyArgumentBinder<Readable> {
+final class ReadableBodyBinder implements NonBlockingBodyArgumentBinder<Readable> {
 
-    public static final Argument<Readable> TYPE = Argument.of(Readable.class);
+    static final Argument<Readable> TYPE = Argument.of(Readable.class);
 
     private final InputStreamBodyBinder inputStreamBodyBinder;
 
     /**
      * @param inputStreamBodyBinder The binder of the stream of the body
      */
-    public ReadableBodyBinder(InputStreamBodyBinder inputStreamBodyBinder) {
+    ReadableBodyBinder(InputStreamBodyBinder inputStreamBodyBinder) {
         this.inputStreamBodyBinder = inputStreamBodyBinder;
     }
 
