@@ -22,6 +22,7 @@ import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.banner.Banner;
+import io.micronaut.context.banner.ImageBanner;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.CachedEnvironment;
@@ -704,8 +705,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     private Banner resolveBanner(PrintStream out) {
-        return getResourceLoader().getResource(BANNER_NAME)
-            .map(resource -> (Banner) new ResourceBanner(resource, out))
+        return ImageBanner.resolve(getResourceLoader(), out)
+            .or(() -> getResourceLoader().getResource(BANNER_NAME).map(resource -> new ResourceBanner(resource, out)))
             .orElseGet(() -> new MicronautBanner(out));
     }
 
