@@ -341,6 +341,37 @@ class TestModeTest {
         assertEquals(1, second.failed());
     }
 
+    @Test
+    void aTestEditTheBuildToolHasNotCompiledLeavesTheResultsAsTheyAre() throws Exception {
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Path test = Files.createDirectories(project.resolve("src/test/java/app"));
+        Files.writeString(main.resolve("Greeter.java"), greeter("one"));
+        Path greeterTest = test.resolve("GreeterTest.java");
+        Files.writeString(greeterTest, greeterTest("two"));
+        javac(project.resolve("build/test-classes"), greeterTest, main.resolve("Greeter.java"));
+        runtime = new MicronautDevMain().launch(manifest("""
+            micronaut.dev.test.compile.java.mode=build-tool
+            micronaut.dev.build-tool.trigger=build/trigger
+            """), new String[0]);
+        assertEquals(1, runtime.lastTestRun().orElseThrow().failed());
+        assertEquals(Set.of("app.GreeterTest"), runtime.failedTestClasses());
+
+        // a compilation failed and left the test's class out, as the compiler plugin of Maven does, and the test is edited
+        Files.delete(project.resolve("build/test-classes/app/GreeterTest.class"));
+        Files.writeString(greeterTest, greeterTest("one"));
+        long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
+        while (System.nanoTime() < deadline) {
+            assertEquals(Set.of("app.GreeterTest"), runtime.failedTestClasses());
+            Thread.sleep(50);
+        }
+
+        // the next compilation succeeded
+        javac(project.resolve("build/test-classes"), greeterTest, main.resolve("Greeter.java"));
+        Files.writeString(project.resolve("build/trigger"), String.valueOf(System.nanoTime()));
+        assertEquals(1, runtime.awaitTestRun(2, TIMEOUT).passed());
+        assertTrue(runtime.failedTestClasses().isEmpty(), runtime.failedTestClasses().toString());
+    }
+
     private static void javac(Path output, Path... sources) throws Exception {
         Files.createDirectories(output);
         List<String> arguments = new java.util.ArrayList<>(List.of("-d", output.toString(), "-cp", System.getProperty("java.class.path"), "-proc:none"));
