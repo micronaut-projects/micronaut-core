@@ -3083,7 +3083,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * The enabled definitions with an executable method annotated with the given annotation. Only their conditions are
      * evaluated: the provider caches a definition whose conditions fail as disabled, so evaluating those of every
      * definition, as {@link #getAllBeanDefinitions()} does, would disable for good a definition whose
-     * {@code @Requires(beans = ...)} fails only until its bean is registered.
+     * {@code @Requires(beans = ...)} fails only until its bean is registered. A definition whose class is absent is
+     * left out: the scan asks for no such bean, as a startup that never looks one up does not load it.
      *
      * @param annotationType The annotation
      * @param runtimeOnly Whether only the definitions registered at runtime are read, which the index of the
@@ -3091,7 +3092,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @return The definitions
      */
     List<BeanDefinition<Object>> definitionsWithMethodsAnnotated(Class<? extends Annotation> annotationType, boolean runtimeOnly) {
-        return beanDefinitionProvider.getBeanDefinitions(this, runtimeOnly ? RuntimeBeanDefinition.class::isInstance : null, definition -> {
+        return beanDefinitionProvider.getBeanDefinitions(this, runtimeOnly ? RuntimeBeanDefinition.class::isInstance : DefaultBeanContext::isClassPresent, definition -> {
             for (ExecutableMethod<Object, ?> method : definition.getExecutableMethods()) {
                 if (method.getAnnotationMetadata().hasStereotype(annotationType)) {
                     return true;
@@ -3099,6 +3100,29 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
             return false;
         });
+    }
+
+    /**
+     * The definitions a watch of every type lists: those {@link #getBeanDefinitions(Argument, Qualifier)} lists for
+     * {@code Object}, without the definitions whose class is absent, as {@link #definitionsWithMethodsAnnotated} leaves
+     * them out.
+     *
+     * @param qualifier The qualifier of the watch
+     * @param <T> The bean type of the watch
+     * @return The definitions
+     */
+    @SuppressWarnings("unchecked")
+    <T> Collection<BeanDefinition<T>> definitionsOfEveryType(@Nullable Qualifier<T> qualifier) {
+        Argument<T> everyType = (Argument<T>) Argument.OBJECT_ARGUMENT;
+        // findBeanCandidates for Object, filtering the references as well: it is not shared, since that lookup is a hot path
+        // and takes no reference filter, and the cached candidates include the absent definitions. Keep the two in step
+        Collection<BeanDefinition<T>> candidates = collectBeanCandidates(null, everyType, true,
+            beanDefinitionProvider.getBeanDefinitions(this, everyType, DefaultBeanContext::isClassPresent, (Predicate) FILTER_OUT_ANY_PROVIDERS));
+        return Collections.unmodifiableCollection(qualifier != null ? qualifier.filterQualified(everyType.getType(), candidates) : candidates);
+    }
+
+    private static boolean isClassPresent(BeanDefinitionReference<?> reference) {
+        return !(reference instanceof AbstractInitializableBeanDefinitionAndReference<?> definition && definition.isClassAbsent());
     }
 
     /**
@@ -3196,6 +3220,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
         if (beanType.getType() == Object.class) {
             // Don't include @Any providers when looking up all beans - otherwise we will add bean providers
+            // definitionsOfEveryType repeats this lookup for Object: keep the two in step
             if (predicate == null) {
                 predicate = (Predicate) FILTER_OUT_ANY_PROVIDERS;
             } else {
