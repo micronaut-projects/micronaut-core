@@ -156,6 +156,77 @@ class DevRuntimeLifecycleTest {
     }
 
     @Test
+    void aBuildToolCompilationIsOnlyLookedAtOnceItsTriggerIsTouched() throws Exception {
+        Path source = project.resolve("src/main/java/app/Thing.java");
+        Path compiled = project.resolve("build/classes/app/Thing.class");
+        Files.createDirectories(source.getParent());
+        Files.createDirectories(compiled.getParent());
+        Files.writeString(source, "package app; class Thing { }");
+        Files.writeString(compiled, "one");
+        DevManifest manifest = manifest("""
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.mode=build-tool
+            micronaut.dev.compile.java.output=build/classes
+            micronaut.dev.build-tool.trigger=build/micronaut-dev/compiled
+            """);
+        AtomicInteger launches = new AtomicInteger();
+        DevRuntime runtime = runtime(manifest, (loader, mainClass, args) -> {
+            launches.incrementAndGet();
+            startContext(loader, "DevRuntimeLifecycleTest");
+        });
+        try {
+            ApplicationContext first = runtime.start(new String[0]);
+
+            // a compilation failed and left its class out, as the compiler plugin of Maven does, and the source is edited
+            Files.delete(compiled);
+            Files.writeString(source, "package app; class Thing { int edited; }");
+            long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
+            while (System.nanoTime() < deadline) {
+                assertEquals(1, launches.get());
+                assertEquals(1, runtime.generation());
+                assertTrue(first.isRunning());
+                Thread.sleep(50);
+            }
+
+            // the next compilation succeeded
+            Files.writeString(compiled, "two");
+            Files.writeString(project.resolve("build/micronaut-dev/compiled"), "touched");
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(1));
+            assertNotSame(first, second);
+            assertTrue(second.isRunning());
+            assertFalse(first.isRunning());
+            assertEquals(2, launches.get());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void withoutATriggerAnEditStillReloadsWhatTheBuildToolCompiledIntoAnOutputAbsentAtTheStart() throws Exception {
+        Path source = project.resolve("src/main/java/app/Thing.java");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, "package app; class Thing { }");
+        DevManifest manifest = manifest("""
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.mode=build-tool
+            micronaut.dev.compile.java.output=build/classes
+            """);
+        DevRuntime runtime = runtime(manifest, (loader, mainClass, args) -> startContext(loader, "DevRuntimeLifecycleTest"));
+        try {
+            runtime.start(new String[0]);
+
+            Path compiled = project.resolve("build/classes/app/Thing.class");
+            Files.createDirectories(compiled.getParent());
+            Files.writeString(compiled, "one");
+            Files.writeString(source, "package app; class Thing { int edited; }");
+
+            assertTrue(runtime.awaitGeneration(2, Duration.ofMinutes(1)).isRunning());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
     void aSecondRuntimeIsRefusedAndARestartThatFailsToStartIsRetried() throws Exception {
         Files.createDirectories(project.resolve("src/main/java"));
         Files.createDirectories(project.resolve("build/classes"));

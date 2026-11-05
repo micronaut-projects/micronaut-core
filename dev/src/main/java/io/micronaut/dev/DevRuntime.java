@@ -1152,7 +1152,7 @@ public final class DevRuntime implements Closeable {
         }
         Set<Path> roots = new LinkedHashSet<>();
         for (SourceRoot root : manifest.sourceRoots()) {
-            if (!Files.isDirectory(root.path())) {
+            if (!Files.isDirectory(root.path()) || Compilations.toldByTrigger(manifest, root.kind())) {
                 continue;
             }
             if (manifest.compileMode(root.kind()) == CompileMode.EMBEDDED && !compilers.containsKey(root.kind())) {
@@ -1164,7 +1164,7 @@ public final class DevRuntime implements Closeable {
             roots.add(root.path().toAbsolutePath().normalize());
         }
         for (SourceRoot root : manifest.testSourceRoots()) {
-            if (tests != null && Files.isDirectory(root.path())) {
+            if (tests != null && Files.isDirectory(root.path()) && !Compilations.toldByTrigger(tests.tests(), root.kind())) {
                 String[] globs = root.kind().extensions().stream().flatMap(extension -> Stream.of("*." + extension, "**/*." + extension)).toArray(String[]::new);
                 directoryWatcher.directory(root.path()).include(globs).watch(batch -> {
                     Pending sources = sourceBatch(root, batch);
