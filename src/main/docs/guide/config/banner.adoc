@@ -13,7 +13,28 @@ $ ./gradlew run
 17:07:22.997 [main] INFO  io.micronaut.runtime.Micronaut - Startup completed in 611ms. Server Running: http://localhost:8080
 ----
 
-To customize the banner with your own ASCII Art (just plain ASCII at this moment), create the file `src/main/resources/micronaut-banner.txt` and it will be used instead.
+To customize the text banner, create the file `src/main/resources/micronaut-banner.txt` and it will be used instead.
+
+When the application starts in a Kitty, iTerm2, or WezTerm terminal, the default banner emits a pre-rendered Micronaut logo. You can also customize this image.
+
+Set the `MICRONAUT_BANNER_MODE` environment variable to choose the output mode. The default, `auto`, detects the terminal protocol. Set it to `ascii` to always print ASCII art, or to `kitty` to force the Kitty graphics protocol (which is supported by iTerm2 as well). A forced protocol bypasses terminal detection, so use it only when the output terminal supports it. If the image resource is missing, Micronaut prints the ASCII banner.
+
+Set `MICRONAUT_BANNER_THEME` to `light` or `dark` to select the right logo for the given terminal theme. The default, `auto`, checks the `COLORFGBG` environment variable when it is set: background color index `7` or `15` selects a logo for light mode terminals; other values and an unset variable select dark mode. Set the variable explicitly when the terminal does not provide `COLORFGBG`.
+
+[source,bash]
+----
+MICRONAUT_BANNER_MODE=ascii ./gradlew run
+MICRONAUT_BANNER_MODE=kitty ./gradlew run
+MICRONAUT_BANNER_MODE=kitty MICRONAUT_BANNER_THEME=light ./gradlew run
+----
+
+As with the `micronaut-banner.txt` ASCII override, image overrides use root-level classpath resources in your application, separate from Micronaut's internal resources. To customize Kitty graphics protocol terminals, including Kitty, iTerm2, and WezTerm, add PNGs for light and dark mode at:
+
+[source,text]
+----
+src/main/resources/micronaut-banner.png
+src/main/resources/micronaut-banner-light.png
+----
 
 To disable it, modify your `Application` class:
 
