@@ -371,7 +371,9 @@ abstract class AbstractJdkHttpClient {
                 }
 
                 try {
-                    return server.resolve(ContextPathUtils.prepend(requestURI, contextPath));
+                    // Service-ID load balancers may select URLs with different base paths.
+                    String resolvedContextPath = contextPath == null ? server.getURI().getRawPath() : contextPath;
+                    return server.resolve(ContextPathUtils.prepend(requestURI, resolvedContextPath));
                 } catch (URISyntaxException e) {
                     throw populateServiceId(new HttpClientException("Failed to construct the request URI", e), clientId, configuration);
                 }

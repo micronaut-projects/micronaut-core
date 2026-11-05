@@ -16,6 +16,24 @@ micronaut:
 
 You can then inject a client with `@Client("foo")`, and it will use the above configuration to load balance between the two configured servers.
 
+The `url` (or each entry in `urls`) can include a base path, such as `http://foo1/api/data`.
+Requests from `@Client("foo")` preserve this base path, including when the route uses query parameters.
+For example, a route `/items{?name}` is requested at `/api/data/items?name=...`.
+Alternatively, configure the host in `url` and the base path separately in `path`:
+
+[configuration]
+----
+micronaut:
+  http:
+    services:
+      foo:
+        url: http://foo1
+        path: /api/data
+----
+
+An explicitly configured client `path` takes precedence over the base path in the service URL.
+Requests using an absolute URL bypass the configured service URL and path.
+
 IMPORTANT: When using `@Client` with service discovery, the service id must be specified in the annotation in kebab-case. The configuration in the example above however can be in camel case.
 
 TIP: You can override this configuration in production by specifying an environment variable such as `MICRONAUT_HTTP_SERVICES_FOO_URLS=http://prod1,http://prod2`
