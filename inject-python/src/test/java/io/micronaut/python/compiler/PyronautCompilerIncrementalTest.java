@@ -1614,6 +1614,42 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
+    void aModuleWithAnUnderscoreInItsNameKeepsItsClassWhenItIsReprocessedAlone(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python/pkg"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Files.writeString(python.resolve("alpha.py"), """
+            from jakarta.inject import Singleton
+
+            @Singleton
+            class Alpha:
+                value: int = 1
+            """);
+        Path module = python.resolve("my_module.py");
+        String source = """
+            from typing import Annotated
+            from jakarta.inject import Inject
+            from .alpha import Alpha
+
+            alpha: Annotated[Alpha, Inject]
+
+            def greeting() -> str:
+                return "%s"
+            """;
+        Files.writeString(module, source.formatted("one"));
+        compilePython(directory.resolve("python"), java, output, cache);
+        // the module holds an injection point, so that it is a bean with a class of its own
+        Path definition = output.resolve("pkg/$MyModule$Definition.class");
+        assertTrue(Files.isRegularFile(definition), "the class of the module");
+
+        Files.writeString(module, source.formatted("two"));
+        compilePython(directory.resolve("python"), java, output, cache);
+
+        assertTrue(Files.isRegularFile(definition), "the class of the module is gone");
+    }
+
+    @Test
     void aSubmoduleImportedFromItsPackageIsADependency(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python"));
         Path java = Files.createDirectories(directory.resolve("java"));

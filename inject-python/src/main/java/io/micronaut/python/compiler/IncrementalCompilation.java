@@ -502,12 +502,14 @@ final class IncrementalCompilation {
      * of the module relates the dependent to it whatever the name.
      */
     private static Set<String> pythonModuleBindings(String content) {
-        Set<String> names = new HashSet<>(importBoundNames(content));
+        Set<String> names = new HashSet<>();
+        StringBuilder moduleLevel = new StringBuilder();
         int bodyOf = -1;
         for (String line : logicalStatements(content).lines().toList()) {
             String statement = line.stripLeading();
             int indentation = line.length() - statement.length();
-            if (statement.isEmpty() || (bodyOf != -1 && indentation > bodyOf)) {
+            // a signature spread over lines closes at the indentation of its definition, ahead of the body
+            if (statement.isEmpty() || (bodyOf != -1 && (indentation > bodyOf || statement.startsWith(")")))) {
                 continue;
             }
             bodyOf = -1;
@@ -515,13 +517,17 @@ final class IncrementalCompilation {
             if (definition.lookingAt()) {
                 names.add(definition.group(1));
                 bodyOf = indentation;
-            } else if (PYTHON_DECLARATION.matcher(statement).lookingAt()) {
+                continue;
+            }
+            if (PYTHON_DECLARATION.matcher(statement).lookingAt()) {
                 Matcher name = IDENTIFIER.matcher(statement);
                 if (name.lookingAt()) {
                     names.add(name.group());
                 }
             }
+            moduleLevel.append(line).append('\n');
         }
+        names.addAll(importBoundNames(moduleLevel.toString()));
         return names;
     }
 

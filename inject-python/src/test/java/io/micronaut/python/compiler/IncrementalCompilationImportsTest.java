@@ -146,6 +146,22 @@ class IncrementalCompilationImportsTest {
     }
 
     @Test
+    void anImportInsideAFunctionOrClassIsNotABindingOfTheModule() {
+        for (String body : List.of(
+            "def other():\n    from .fallback import conditional\n",
+            "async def other(\n    value,\n) -> int:\n    from .fallback import conditional\n",
+            "class Other:\n    from .fallback import conditional\n"
+        )) {
+            Map<String, String> sources = Map.of(
+                "pkg/fallback.py", "conditional = 1\n",
+                "pkg/lazy.py", "def __getattr__(name):\n    return name\n\n" + body,
+                "pkg/consumer.py", "from .lazy import conditional\n"
+            );
+            assertTrue(IncrementalCompilation.hasDynamicOrUnresolvedPythonRelationship(sources), body);
+        }
+    }
+
+    @Test
     void aDynamicImportForcesEverySourceBesideResolvedRelativeImports() {
         assertTrue(unresolved("pkg/consumer.py", "from .models import Model\nimport importlib\nimportlib.import_module(\"pkg.models\")"));
     }
