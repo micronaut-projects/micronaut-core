@@ -101,7 +101,7 @@ final class StartFailures {
         }
         System.err.println(message);
         if (failure != null) {
-            failure.printStackTrace();
+            failure.printStackTrace(System.err);
         }
     }
 

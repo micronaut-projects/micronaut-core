@@ -20,11 +20,14 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -68,7 +71,13 @@ class LauncherFailedStartTest {
         Path argfile = project.resolve("jvm.argfile");
         Files.write(argfile, List.of("-cp", "\"" + classpath.replace("\\", "\\\\") + "\""));
         Path output = project.resolve("output.txt");
-        Process process = new ProcessBuilder(java, "@" + argfile, "-Xmx512m", MicronautDevMain.class.getName(), "--manifest", project.resolve("dev.properties").toString())
+        List<String> command = new ArrayList<>(List.of(java));
+        // a coverage agent measures the launcher too, the one place these paths run
+        ManagementFactory.getRuntimeMXBean().getInputArguments().stream()
+            .filter(argument -> argument.startsWith("-javaagent:") && argument.contains("jacoco"))
+            .forEach(command::add);
+        command.addAll(List.of("@" + argfile, "-Xmx512m", MicronautDevMain.class.getName(), "--manifest", project.resolve("dev.properties").toString()));
+        Process process = new ProcessBuilder(command)
             .redirectErrorStream(true)
             .redirectOutput(output.toFile())
             .start();
@@ -85,8 +94,12 @@ class LauncherFailedStartTest {
             assertTrue(await(process, output, text -> text.contains(CHANGED)), () -> "The change started no generation, the launcher's status " + status(process) + ":\n" + read(output));
             assertTrue(process.isAlive(), () -> "The launcher exited with status " + status(process) + ":\n" + read(output));
         } finally {
-            process.destroyForcibly();
-            process.waitFor();
+            // not forcibly at first: a coverage agent writes what it measured as the JVM shuts down
+            process.destroy();
+            if (!process.waitFor(20, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                process.waitFor();
+            }
         }
     }
 
