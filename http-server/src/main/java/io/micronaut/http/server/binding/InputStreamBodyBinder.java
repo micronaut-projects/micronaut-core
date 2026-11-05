@@ -111,8 +111,11 @@ public final class InputStreamBodyBinder implements NonBlockingBodyArgumentBinde
         }
 
         private static IOException unwrap(IOException e) {
-            if (e.getCause() instanceof ContentLengthExceededException exceeded) {
-                throw exceeded;
+            // the limit failure may be wrapped more than once, e.g. in an UncheckedIOException of the body stream
+            for (Throwable cause = e.getCause(); cause != null && cause != cause.getCause(); cause = cause.getCause()) {
+                if (cause instanceof ContentLengthExceededException exceeded) {
+                    throw exceeded;
+                }
             }
             return e;
         }
