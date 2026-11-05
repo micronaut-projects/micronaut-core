@@ -16,9 +16,25 @@
 package io.micronaut.inject.convert
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.type.Argument
 import spock.lang.Specification
 
 class ConverterAsLambdaSpec extends Specification {
+
+    void "list converter beans retain their target type arguments"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(['spec.name': 'genericListConverters'])
+
+        expect:
+        ctx.conversionService.convert('1;2', Argument.listOf(Integer)).get() == [1, 2]
+        ctx.conversionService.convert('FOO;BAR', Argument.listOf(TestConverters.Status)).get() == [TestConverters.Status.FOO, TestConverters.Status.BAR]
+        ctx.conversionService.convert('a,b', Argument.listOf(String)).get() == ['a', 'b']
+        ctx.conversionService.convert('3;4', Argument.listOf(Integer)).get() == [3, 4]
+        ctx.conversionService.convert('a,b', List).get() == ['a', 'b']
+
+        cleanup:
+        ctx.close()
+    }
 
     void "test converter registered via lambda"() {
         given:

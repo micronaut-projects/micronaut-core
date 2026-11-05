@@ -1,5 +1,7 @@
 The Micronaut framework includes an extensible type conversion mechanism. To add additional type converters you register beans of type api:core.convert.TypeConverter[].
 
+The target type parameters of a converter bean are retained when selecting a converter. For example, a `TypeConverter<String, List<Integer>>` applies to `List<Integer>`, not to `List<String>` or a raw `List`. If no converter matches the requested target type parameters, conversion falls back to converters registered for the raw target type.
+
 The following example shows how to use one of the built-in converters (Map to an Object) or create your own.
 
 Consider the following api:context.annotation.ConfigurationProperties[]:

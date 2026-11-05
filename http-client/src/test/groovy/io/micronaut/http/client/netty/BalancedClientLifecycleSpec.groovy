@@ -15,6 +15,7 @@ import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketClient
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 class BalancedClientLifecycleSpec extends Specification {
 
@@ -92,7 +93,11 @@ class BalancedClientLifecycleSpec extends Specification {
 
     def 'refresh reaches live balanced clients and does not restart closed ones'() {
         given:
-        def server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'BalancedClientLifecycleSpec'])
+        def server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'BalancedClientLifecycleSpec',
+                // Wait for the first connection to return to the pool before the next request.
+                'micronaut.http.client.pool.max-concurrent-http1-connections': 1,
+        ])
         def ctx = server.applicationContext
         def live = ctx.createBean(HttpClient, server.URL)
         def closed = ctx.createBean(HttpClient, server.URL)
@@ -105,9 +110,13 @@ class BalancedClientLifecycleSpec extends Specification {
         live.toBlocking().retrieve('/balanced-client/port') == firstPort
 
         when:
+        def oldChannel = connectionManager(live).getChannels().first()
         ctx.getBean(Argument.of(ApplicationEventPublisher, RefreshEvent)).publishEvent(new RefreshEvent())
 
         then: 'the live client dropped its connection'
+        new PollingConditions(timeout: 5).eventually {
+            assert !oldChannel.isActive()
+        }
         live.toBlocking().retrieve('/balanced-client/port') != firstPort
 
         and: 'the closed client stays closed'

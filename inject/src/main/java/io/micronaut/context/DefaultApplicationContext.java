@@ -774,8 +774,8 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
             List<Argument<?>> typeArguments = typeConverterRegistration.getBeanDefinition().getTypeArguments(TypeConverter.class);
             if (typeArguments.size() == 2) {
                 Class<?> source = typeArguments.get(0).getType();
-                Class<?> target = typeArguments.get(1).getType();
-                if (!(source == Object.class && target == Object.class)) {
+                Argument<?> target = typeArguments.get(1);
+                if (!(source == Object.class && target.getType() == Object.class)) {
                     defaultMutableConversionService.addInternalConverter(source, target, typeConverter);
                 }
             }

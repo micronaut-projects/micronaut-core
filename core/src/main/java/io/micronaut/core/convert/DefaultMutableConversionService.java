@@ -271,7 +271,7 @@ public class DefaultMutableConversionService implements MutableConversionService
             return Optional.of((T) object);
         }
 
-        TypeConverter<Object, T> typeConverter = resolveTypeConverter(sourceType, targetType, formattingAnnotation(context.getAnnotationMetadata()));
+        TypeConverter<Object, T> typeConverter = resolveTypeConverter(sourceType, targetType, formattingAnnotation(context.getAnnotationMetadata()), context.getTypeParameters());
         if (typeConverter == UNCONVERTIBLE) {
             return Optional.empty();
         }
@@ -308,17 +308,21 @@ public class DefaultMutableConversionService implements MutableConversionService
         return null;
     }
 
-    private <T> TypeConverter<Object, T> resolveTypeConverter(Class<?> sourceType, Class<T> targetType, @Nullable String formattingAnnotation) {
-        return resolveTypeConverter(sourceType, targetType, formattingAnnotation, converterCache);
+    private <T> TypeConverter<Object, T> resolveTypeConverter(Class<?> sourceType, Class<T> targetType, @Nullable String formattingAnnotation, Argument<?>[] targetTypeParameters) {
+        return resolveTypeConverter(sourceType, targetType, formattingAnnotation, targetTypeParameters, converterCache);
     }
 
-    private <T> TypeConverter<Object, T> resolveTypeConverter(Class<?> sourceType, Class<T> targetType, @Nullable String formattingAnnotation, ConverterCache cache) {
-        ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
+    private <T> TypeConverter<Object, T> resolveTypeConverter(Class<?> sourceType, Class<T> targetType, @Nullable String formattingAnnotation, Argument<?>[] targetTypeParameters, ConverterCache cache) {
+        ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation, targetTypeParameters);
         TypeConverter<Object, T> typeConverter = findConverter(pair, cache);
         if (typeConverter == null) {
             // the exact pair first: the hierarchy of a primitive source type is empty
             typeConverter = customConverters.get(pair);
-            if (typeConverter == null) {
+            if (typeConverter == null && targetTypeParameters.length > 0) {
+                typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation, targetTypeParameters);
+            }
+            if (typeConverter == null || typeConverter == UNCONVERTIBLE) {
+                // Preserve raw converters and the lookup hook overridden by subclasses.
                 typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
             }
             cache.put(pair, typeConverter);
@@ -328,7 +332,7 @@ public class DefaultMutableConversionService implements MutableConversionService
 
     @Override
     public <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType) {
-        return resolveTypeConverter(sourceType, targetType, null) != UNCONVERTIBLE;
+        return resolveTypeConverter(sourceType, targetType, null, Argument.ZERO_ARGUMENTS) != UNCONVERTIBLE;
     }
 
     @Nullable
@@ -384,6 +388,22 @@ public class DefaultMutableConversionService implements MutableConversionService
     @Internal
     public <S, T> void addInternalConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
         addConverterAnalyzeSource(internalConverters, sourceType, targetType, typeConverter, new Registration(typeConverter, sourceType, targetType));
+        invalidateConverterCache();
+    }
+
+    /**
+     * Add an internal converter retaining the target type parameters.
+     *
+     * @param sourceType    The source type
+     * @param targetType    The target argument
+     * @param typeConverter The converter
+     * @param <S>           The source type
+     * @param <T>           The target type
+     */
+    @Internal
+    public <S, T> void addInternalConverter(Class<S> sourceType, Argument<T> targetType, TypeConverter<S, T> typeConverter) {
+        addConverterAnalyzeSource(internalConverters, sourceType, targetType.getType(), typeConverter,
+            new Registration(typeConverter, sourceType, targetType.getType(), targetType.getTypeParameters()));
         invalidateConverterCache();
     }
 
@@ -485,7 +505,7 @@ public class DefaultMutableConversionService implements MutableConversionService
                                           Class<T> targetType,
                                           TypeConverter<S, T> typeConverter,
                                           Registration owner) {
-        ConvertiblePair pair = newPair(sourceType, targetType, typeConverter);
+        ConvertiblePair pair = newPair(sourceType, targetType, typeConverter, owner.targetTypeParameters);
         typeConverters.put(pair, typeConverter);
         ownersOf(typeConverters).put(pair, owner);
     }
@@ -1331,14 +1351,22 @@ public class DefaultMutableConversionService implements MutableConversionService
      * @return type converter
      */
     protected <T> TypeConverter<Object, T> findTypeConverter(Class<?> sourceType, Class<T> targetType, @Nullable String formattingAnnotation) {
+        return findTypeConverter(sourceType, targetType, formattingAnnotation, Argument.ZERO_ARGUMENTS);
+    }
+
+    private <T> TypeConverter<Object, T> findTypeConverter(Class<?> sourceType, Class<T> targetType, @Nullable String formattingAnnotation, Argument<?>[] targetTypeParameters) {
         // read before the registered converters: what they hold now is not cached past a change to them
         ConverterCache cache = converterCache;
         List<Class<?>> sourceHierarchy = resolveHierarchy(sourceType);
         List<Class<?>> targetHierarchy = resolveHierarchy(targetType);
         for (Class<?> sourceSuperType : sourceHierarchy) {
             for (Class<?> targetSuperType : targetHierarchy) {
-                ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation);
+                ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation, targetTypeParameters);
                 TypeConverter<Object, T> typeConverter = findRegisteredConverter(pair);
+                if (typeConverter == null && formattingAnnotation != null && targetTypeParameters.length > 0) {
+                    // A formatting converter still takes precedence over an unformatted generic converter.
+                    typeConverter = findRegisteredConverter(new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation));
+                }
                 if (typeConverter != null) {
                     cache.put(pair, typeConverter);
                     return typeConverter;
@@ -1349,7 +1377,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         if (hasFormatting) {
             for (Class<?> sourceSuperType : sourceHierarchy) {
                 for (Class<?> targetSuperType : targetHierarchy) {
-                    ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType);
+                    ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, null, targetTypeParameters);
                     TypeConverter<Object, T> typeConverter = findRegisteredConverter(pair);
                     if (typeConverter != null) {
                         cache.put(pair, typeConverter);
@@ -1402,14 +1430,22 @@ public class DefaultMutableConversionService implements MutableConversionService
                 .orElse(null);
     }
 
-    private <S, T> ConvertiblePair newPair(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
-        ConvertiblePair pair;
-        if (typeConverter instanceof FormattingTypeConverter<S, T, ?> formattingTypeConverter) {
-            pair = new ConvertiblePair(sourceType, targetType, formattingTypeConverter.annotationType().getName());
-        } else {
-            pair = new ConvertiblePair(sourceType, targetType);
+    private <S, T> ConvertiblePair newPair(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter, Argument<?>[] targetTypeParameters) {
+        String formattingAnnotation = typeConverter instanceof FormattingTypeConverter<S, T, ?> formattingTypeConverter
+            ? formattingTypeConverter.annotationType().getName() : null;
+        return new ConvertiblePair(sourceType, targetType, formattingAnnotation, targetTypeParameters);
+    }
+
+    private static boolean sameTypeParameters(Argument<?>[] first, Argument<?>[] second) {
+        if (first.length != second.length) {
+            return false;
         }
-        return pair;
+        for (int i = 0; i < first.length; i++) {
+            if (!first[i].equalsType(second[i])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -1433,8 +1469,12 @@ public class DefaultMutableConversionService implements MutableConversionService
      * @param converter The converter
      * @param source The source type it was registered for
      * @param target The target type it was registered for
+     * @param targetTypeParameters The target type parameters
      */
-    private record Registration(TypeConverter<?, ?> converter, Class<?> source, Class<?> target) {
+    private record Registration(TypeConverter<?, ?> converter, Class<?> source, Class<?> target, Argument<?>[] targetTypeParameters) {
+        Registration(TypeConverter<?, ?> converter, Class<?> source, Class<?> target) {
+            this(converter, source, target, Argument.ZERO_ARGUMENTS);
+        }
     }
 
     /**
@@ -1458,6 +1498,7 @@ public class DefaultMutableConversionService implements MutableConversionService
     private static final class ConvertiblePair {
         final Class<?> source;
         final Class<?> target;
+        final Argument<?>[] targetTypeParameters;
         @Nullable
         final String formattingAnnotation;
         final int hashCode;
@@ -1467,10 +1508,19 @@ public class DefaultMutableConversionService implements MutableConversionService
         }
 
         ConvertiblePair(Class<?> source, Class<?> target, @Nullable String formattingAnnotation) {
+            this(source, target, formattingAnnotation, Argument.ZERO_ARGUMENTS);
+        }
+
+        ConvertiblePair(Class<?> source, Class<?> target, @Nullable String formattingAnnotation, Argument<?>[] targetTypeParameters) {
             this.source = source;
             this.target = target;
+            this.targetTypeParameters = targetTypeParameters;
             this.formattingAnnotation = formattingAnnotation;
-            this.hashCode = ObjectUtils.hash(source, target, formattingAnnotation);
+            int hash = ObjectUtils.hash(source, target, formattingAnnotation);
+            for (Argument<?> typeParameter : targetTypeParameters) {
+                hash = 31 * hash + typeParameter.typeHashCode();
+            }
+            this.hashCode = hash;
         }
 
         @Override
@@ -1488,7 +1538,8 @@ public class DefaultMutableConversionService implements MutableConversionService
             if (!target.equals(pair.target)) {
                 return false;
             }
-            return Objects.equals(formattingAnnotation, pair.formattingAnnotation);
+            return Objects.equals(formattingAnnotation, pair.formattingAnnotation)
+                && sameTypeParameters(targetTypeParameters, pair.targetTypeParameters);
         }
 
         @Override
@@ -1513,6 +1564,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         private final DefaultMutableConversionService conversionService;
         private final Class<S> sourceType;
         private final Class<T> argumentType;
+        private final Argument<?>[] targetTypeParameters;
         private final AnnotationMetadata annotationMetadata;
         /**
          * The type of the argument, or its wrapper type, as {@link #convert(Object, Class, Class, ConversionContext)} passes it to the converter.
@@ -1533,6 +1585,7 @@ public class DefaultMutableConversionService implements MutableConversionService
             this.conversionService = conversionService;
             this.sourceType = sourceType;
             this.argumentType = argument.getType();
+            this.targetTypeParameters = argument.getTypeParameters();
             this.annotationMetadata = argument.getAnnotationMetadata();
             this.targetType = argumentType.isPrimitive() ? (Class<T>) ReflectionUtils.getWrapperType(argumentType) : argumentType;
             this.unchanged = targetType == Object.class
@@ -1546,7 +1599,8 @@ public class DefaultMutableConversionService implements MutableConversionService
             if (value == null) {
                 return Optional.empty();
             }
-            if (value.getClass() != sourceType || type != argumentType || context.getAnnotationMetadata() != annotationMetadata) {
+            if (value.getClass() != sourceType || type != argumentType || context.getAnnotationMetadata() != annotationMetadata
+                || !sameTypeParameters(targetTypeParameters, context.getTypeParameters())) {
                 return conversionService.convert(value, type, context);
             }
             if (unchanged) {
@@ -1660,7 +1714,7 @@ public class DefaultMutableConversionService implements MutableConversionService
             ConverterCache cache = conversionService.converterCache;
             Resolution<T> current = resolution;
             if (current == null || current.generation != cache.generation) {
-                current = new Resolution<>(cache.generation, conversionService.resolveTypeConverter(sourceType, targetType, formattingAnnotation, cache));
+                current = new Resolution<>(cache.generation, conversionService.resolveTypeConverter(sourceType, targetType, formattingAnnotation, targetTypeParameters, cache));
                 resolution = current;
             }
             return current.typeConverter;

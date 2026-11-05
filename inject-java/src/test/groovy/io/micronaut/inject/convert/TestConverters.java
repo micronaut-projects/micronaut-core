@@ -16,9 +16,12 @@
 package io.micronaut.inject.convert;
 
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.TypeConverter;
 
 import jakarta.inject.Singleton;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 @Factory
@@ -33,6 +36,23 @@ public class TestConverters {
         };
     }
 
+    @Singleton
+    @Requires(property = "spec.name", value = "genericListConverters")
+    TypeConverter<String, List<Integer>> integerListConverter() {
+        return (object, targetType, context) -> Optional.of(Arrays.stream(object.split(";"))
+            .map(Integer::valueOf).toList());
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = "genericListConverters")
+    TypeConverter<String, List<Status>> statusListConverter() {
+        return (object, targetType, context) -> Optional.of(Arrays.stream(object.split(";"))
+            .map(Status::valueOf).toList());
+    }
+
+    enum Status {
+        FOO, BAR
+    }
 
     static class Foo {
         private String name;
