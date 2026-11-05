@@ -332,10 +332,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             refreshingThread = Thread.currentThread();
             try {
                 rebuild.run();
-                state = writeState;
-                published = true;
-                mirrorPublishedState();
-                propertiesPublished();
+                if (publishesRefresh()) {
+                    state = writeState;
+                    published = true;
+                    mirrorPublishedState();
+                    propertiesPublished();
+                }
             } finally {
                 adding = insideAdd;
                 if (insideAdd) {
@@ -410,6 +412,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     void propertiesPublished() {
         // nothing to note
+    }
+
+    /**
+     * Whether a refresh that has rebuilt the catalogs publishes them. If not, they are discarded
+     * as those of a refresh that fails are, but without a failure. Called with the catalog lock
+     * held.
+     *
+     * @return Whether to publish them
+     */
+    boolean publishesRefresh() {
+        return true;
     }
 
     /**
@@ -907,6 +920,18 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     @SuppressWarnings("MagicNumber")
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
         this.propertySources.put(properties.getName(), properties);
+        processRegistered(properties, convention);
+    }
+
+    /**
+     * Processes a property source that is registered by its name already, see
+     * {@link #processPropertySource(PropertySource, PropertySource.PropertyConvention)}. The code of
+     * the property source runs with the catalog lock held.
+     *
+     * @param properties The property source
+     * @param convention The property convention
+     */
+    void processRegistered(PropertySource properties, PropertySource.PropertyConvention convention) {
         synchronized (catalogLock) {
             if (alreadyProcessed(properties)) {
                 return;
