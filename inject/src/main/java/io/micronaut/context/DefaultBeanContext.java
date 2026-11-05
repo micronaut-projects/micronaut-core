@@ -2117,7 +2117,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                         return;
                     }
                     BeanRegistration<T> targetRegistration = interceptedProxy.interceptedTargetRegistration();
-                    if (targetRegistration instanceof BeanDisposingRegistration<T> disposingTargetRegistration && targetRegistration.bean == interceptedTarget) {
+                    if (targetRegistration instanceof BeanDisposingRegistration<T> _ && targetRegistration.bean == interceptedTarget) {
                         // resolved after the proxy was created, so not among its dependents: destroyed through its own
                         // registration, with the interceptors created for it, unless it was destroyed already
                         destroyBean(targetRegistration);
@@ -4271,7 +4271,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             if (isProxy) {
                 definition = getProxyTargetBeanDefinition(beanType, qualifier);
             }
-            BeanRegistration<T> scoped = getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition, heldRegistration);
+            BeanRegistration<T> scoped = getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, definition, heldRegistration);
             recordDependency(resolutionContext, scoped.beanDefinition, qualifier);
             return scoped;
         }
@@ -4375,7 +4375,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     private <T> BeanRegistration<T> getOrCreateScopedRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                                   CustomScope<?> registeredScope,
                                                                   @Nullable Qualifier<T> qualifier,
-                                                                  Argument<T> beanType,
                                                                   BeanDefinition<T> definition,
                                                                   boolean heldRegistration) {
         BeanKey<T> beanKey = new BeanKey<>(definition.asArgument(), qualifier);
