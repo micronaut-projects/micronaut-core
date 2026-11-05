@@ -323,6 +323,48 @@ public class FormArgumentsTest {
 
     @Test
     @Tag("multipart")
+    void aCollectionOfCompletedFileUploadsGetsEveryFile() throws IOException {
+        try (ServerUnderTest server = server()) {
+            MultipartBody one = MultipartBody.builder()
+                .addPart("files", "only.txt", MediaType.TEXT_PLAIN_TYPE, bytes("data"))
+                .build();
+            MultipartBody two = MultipartBody.builder()
+                .addPart("files", "a.txt", MediaType.TEXT_PLAIN_TYPE, bytes("aa"))
+                .addPart("name", "Fred")
+                .addPart("files", "b.txt", MediaType.TEXT_PLAIN_TYPE, bytes("bbb"))
+                .build();
+            for (String uri : List.of(LEGACY + "/files-array", LEGACY + "/files-list", LEGACY + "/files-optional")) {
+                Response response = call(server, multipart(uri, one));
+                assertEquals(HttpStatus.OK, response.status(), response.body());
+                assertEquals("[only.txt=data]", response.body(), uri);
+                response = call(server, multipart(uri, two));
+                assertEquals(HttpStatus.OK, response.status(), response.body());
+                assertEquals("[a.txt=aa, b.txt=bbb]", response.body(), uri);
+            }
+            // no file of the name
+            Response absent = call(server, multipart(LEGACY + "/files-optional", MultipartBody.builder().addPart("name", "Fred").build()));
+            assertEquals(HttpStatus.OK, absent.status(), absent.body());
+            assertEquals("empty", absent.body());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void aCollectionOfCompletedFileUploadsWithATextFieldOfTheNameIsNotBound() throws IOException {
+        try (ServerUnderTest server = server()) {
+            MultipartBody mixed = MultipartBody.builder()
+                .addPart("files", "a.txt", MediaType.TEXT_PLAIN_TYPE, bytes("aa"))
+                .addPart("files", "not a file")
+                .build();
+            for (String uri : List.of(LEGACY + "/files-array", LEGACY + "/files-list")) {
+                Response response = call(server, multipart(uri, mixed));
+                assertEquals(HttpStatus.BAD_REQUEST, response.status(), uri + " " + response.body());
+            }
+        }
+    }
+
+    @Test
+    @Tag("multipart")
     void anOptionalCollectionOfATextFieldOfAMultipartFormGetsEveryValue() throws IOException {
         try (ServerUnderTest server = server()) {
             MultipartBody tags = MultipartBody.builder().addPart("tags", "one").addPart("name", "Fred").addPart("tags", "two").build();
@@ -972,6 +1014,31 @@ public class FormArgumentsTest {
         @Post(uri = "/by-name", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
         String byName(CompletedFileUpload avatar, String name) throws IOException {
             return describe(name, avatar);
+        }
+
+        @Post(uri = "/files-array", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+        String filesArray(@Part("files") CompletedFileUpload[] files) throws IOException {
+            return describe(Arrays.asList(files));
+        }
+
+        @Post(uri = "/files-list", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+        String filesList(@Part("files") List<CompletedFileUpload> files) throws IOException {
+            return describe(files);
+        }
+
+        @Post(uri = "/files-optional", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+        String filesOptional(@Part("files") Optional<List<CompletedFileUpload>> files) throws IOException {
+            return files.isPresent() ? describe(files.get()) : "empty";
+        }
+
+        private static String describe(List<CompletedFileUpload> files) throws IOException {
+            List<String> described = new ArrayList<>();
+            for (CompletedFileUpload file : files) {
+                try (file) {
+                    described.add(file.getFilename() + "=" + text(file.getBytes()));
+                }
+            }
+            return described.toString();
         }
 
         private static String describe(String name, CompletedFileUpload file) throws IOException {
