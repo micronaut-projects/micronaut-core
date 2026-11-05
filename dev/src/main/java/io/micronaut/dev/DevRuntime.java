@@ -1126,9 +1126,9 @@ public final class DevRuntime implements Closeable {
             if (!Files.isDirectory(root.path())) {
                 continue;
             }
-            if (manifest.compileMode(root.kind()) == CompileMode.BUILD_TOOL) {
-                // the build tool says when its output is whole: an edit it has not compiled yet reloads nothing, and reading the
-                // output then would find what its last compilation left, a failed one without its classes
+            if (manifest.buildToolTrigger() != null && manifest.compileMode(root.kind()) == CompileMode.BUILD_TOOL) {
+                // the trigger says when the build tool's output is whole: an edit it has not compiled yet reloads nothing, and
+                // reading the output then would find what its last compilation left, a failed one without its classes
                 continue;
             }
             if (manifest.compileMode(root.kind()) == CompileMode.EMBEDDED && !compilers.containsKey(root.kind())) {
@@ -1140,7 +1140,7 @@ public final class DevRuntime implements Closeable {
             roots.add(root.path().toAbsolutePath().normalize());
         }
         for (SourceRoot root : manifest.testSourceRoots()) {
-            if (tests != null && Files.isDirectory(root.path()) && tests.tests().compileMode(root.kind()) != CompileMode.BUILD_TOOL) {
+            if (tests != null && Files.isDirectory(root.path()) && (manifest.buildToolTrigger() == null || tests.tests().compileMode(root.kind()) != CompileMode.BUILD_TOOL)) {
                 String[] globs = root.kind().extensions().stream().flatMap(extension -> Stream.of("*." + extension, "**/*." + extension)).toArray(String[]::new);
                 directoryWatcher.directory(root.path()).include(globs).watch(batch -> {
                     Pending sources = sourceBatch(root, batch);

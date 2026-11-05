@@ -202,6 +202,31 @@ class DevRuntimeLifecycleTest {
     }
 
     @Test
+    void withoutATriggerAnEditStillReloadsWhatTheBuildToolCompiledIntoAnOutputAbsentAtTheStart() throws Exception {
+        Path source = project.resolve("src/main/java/app/Thing.java");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, "package app; class Thing { }");
+        DevManifest manifest = manifest("""
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.mode=build-tool
+            micronaut.dev.compile.java.output=build/classes
+            """);
+        DevRuntime runtime = runtime(manifest, (loader, mainClass, args) -> startContext(loader, "DevRuntimeLifecycleTest"));
+        try {
+            runtime.start(new String[0]);
+
+            Path compiled = project.resolve("build/classes/app/Thing.class");
+            Files.createDirectories(compiled.getParent());
+            Files.writeString(compiled, "one");
+            Files.writeString(source, "package app; class Thing { int edited; }");
+
+            assertTrue(runtime.awaitGeneration(2, Duration.ofMinutes(1)).isRunning());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
     void aSecondRuntimeIsRefusedAndARestartThatFailsToStartIsRetried() throws Exception {
         Files.createDirectories(project.resolve("src/main/java"));
         Files.createDirectories(project.resolve("build/classes"));
