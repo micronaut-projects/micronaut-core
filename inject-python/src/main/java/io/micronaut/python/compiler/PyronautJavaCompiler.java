@@ -47,6 +47,7 @@ import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
@@ -396,15 +397,14 @@ final class PyronautJavaCompiler {
                                              List<File> annotationProcessorPath,
                                              List<String> compilerOptions) {
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
-        StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnosticCollector, null, null);
-        try {
+        try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnosticCollector, null, null)) {
             InMemoryJavaFileManager inMemoryJavaFileManager = new InMemoryJavaFileManager(fileManager);
 
             compileJava(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions, inMemoryJavaFileManager, diagnosticCollector);
 
             return inMemoryJavaFileManager.getOutputFiles();
-        } finally {
-            closeFileManager(fileManager);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to release the files of a compilation", e);
         }
     }
 
@@ -987,9 +987,7 @@ final class PyronautJavaCompiler {
                                               List<File> annotationProcessorPath,
                                               List<String> compilerOptions) {
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
-        StandardJavaFileManager fileManager =
-            compiler.getStandardFileManager(diagnosticCollector, null, null);
-        try {
+        try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnosticCollector, null, null)) {
             TrackingJavaFileManager trackingFileManager = new TrackingJavaFileManager(
                 fileManager,
                 targetDir.toPath()
@@ -1012,19 +1010,8 @@ final class PyronautJavaCompiler {
                 trackingFileManager,
                 diagnosticCollector
             );
-        } finally {
-            closeFileManager(fileManager);
-        }
-    }
-
-    /**
-     * Closes the file manager of a compilation, which holds every jar of the class path open.
-     */
-    private static void closeFileManager(JavaFileManager fileManager) {
-        try {
-            fileManager.close();
-        } catch (IOException ignored) {
-            // Nothing useful can be done while releasing a compiler's files.
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to release the files of a compilation", e);
         }
     }
 
