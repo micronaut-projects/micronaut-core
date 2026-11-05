@@ -60,7 +60,7 @@ import java.util.List;
  */
 @Internal
 @ServerFilter("/**")
-@Requires(classes = ServerFilter.class)
+@Requires(classes = {ServerFilter.class, Router.class})
 @DevelopmentActive
 @Requires(beans = DevRuntime.class)
 public final class DevAccessFilter implements Ordered {
