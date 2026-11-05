@@ -26,6 +26,7 @@ import org.jspecify.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATIONS;
 
@@ -84,12 +85,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     public @Nullable <T extends Annotation> T synthesize(Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         if (hasAnnotation(annotationClass) || hasStereotype(annotationClass)) {
-            String annotationName = annotationClass.getName();
-            return (T) getAnnotationMap().computeIfAbsent(annotationName, s -> {
-                final AnnotationValue<T> annotationValue = findAnnotation(annotationClass).orElse(null);
-                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
-
-            });
+            return synthesizeCached(getAnnotationMap(), annotationClass, () -> findAnnotation(annotationClass).orElse(null));
         }
         return null;
     }
@@ -101,12 +97,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
         if (hasAnnotation(sourceAnnotation) || hasStereotype(sourceAnnotation)) {
-            String annotationName = annotationClass.getName();
-            return (T) getAnnotationMap().computeIfAbsent(annotationName, s -> {
-                final AnnotationValue<T> annotationValue = (AnnotationValue<T>) findAnnotation(sourceAnnotation).orElse(null);
-                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
-
-            });
+            return synthesizeCached(getAnnotationMap(), annotationClass, () -> (AnnotationValue<T>) findAnnotation(sourceAnnotation).orElse(null));
         }
         return null;
     }
@@ -117,13 +108,8 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass, String sourceAnnotation) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
-        String annotationName = annotationClass.getName();
         if (hasDeclaredAnnotation(sourceAnnotation) || hasDeclaredStereotype(sourceAnnotation)) {
-            return (T) getDeclaredAnnotationMap().computeIfAbsent(annotationName, s -> {
-                final AnnotationValue<T> annotationValue = (AnnotationValue<T>) findDeclaredAnnotation(sourceAnnotation).orElse(null);
-                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
-
-            });
+            return synthesizeCached(getDeclaredAnnotationMap(), annotationClass, () -> (AnnotationValue<T>) findDeclaredAnnotation(sourceAnnotation).orElse(null));
         }
         return null;
     }
@@ -134,13 +120,33 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         String annotationName = annotationClass.getName();
         if (hasDeclaredAnnotation(annotationName) || hasDeclaredStereotype(annotationName)) {
-            return (T) getDeclaredAnnotationMap().computeIfAbsent(annotationName, s -> {
-                final AnnotationValue<T> annotationValue = findDeclaredAnnotation(annotationClass).orElse(null);
-                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
-
-            });
+            return synthesizeCached(getDeclaredAnnotationMap(), annotationClass, () -> findDeclaredAnnotation(annotationClass).orElse(null));
         }
         return null;
+    }
+
+    /**
+     * The annotation cached under the name of the given type, if it is of that very type, or else a new one. The same
+     * name may be that of a type of another class loader, as when each deployment of a container defines its own copy
+     * of an annotation: the annotation of the type first asked for is the one kept.
+     */
+    @SuppressWarnings("unchecked")
+    private static <T extends Annotation> @Nullable T synthesizeCached(Map<String, Annotation> cache,
+                                                                       Class<T> annotationClass,
+                                                                       Supplier<@Nullable AnnotationValue<T>> annotationValue) {
+        String annotationName = annotationClass.getName();
+        Annotation cached = cache.get(annotationName);
+        if (cached != null && cached.annotationType() == annotationClass) {
+            return (T) cached;
+        }
+        T annotation = AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue.get());
+        if (cached == null && annotation != null) {
+            Annotation previous = cache.putIfAbsent(annotationName, annotation);
+            if (previous != null && previous.annotationType() == annotationClass) {
+                return (T) previous;
+            }
+        }
+        return annotation;
     }
 
     @Override
