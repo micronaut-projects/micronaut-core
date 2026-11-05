@@ -3114,6 +3114,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @SuppressWarnings("unchecked")
     <T> Collection<BeanDefinition<T>> definitionsOfEveryType(@Nullable Qualifier<T> qualifier) {
         Argument<T> everyType = (Argument<T>) Argument.OBJECT_ARGUMENT;
+        // findBeanCandidates for Object, filtering the references as well: it is not shared, since that lookup is a hot path
+        // and takes no reference filter, and the cached candidates include the absent definitions. Keep the two in step
         Collection<BeanDefinition<T>> candidates = collectBeanCandidates(null, everyType, true,
             beanDefinitionProvider.getBeanDefinitions(this, everyType, DefaultBeanContext::isClassPresent, (Predicate) FILTER_OUT_ANY_PROVIDERS));
         return Collections.unmodifiableCollection(qualifier != null ? qualifier.filterQualified(everyType.getType(), candidates) : candidates);
@@ -3218,6 +3220,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
         if (beanType.getType() == Object.class) {
             // Don't include @Any providers when looking up all beans - otherwise we will add bean providers
+            // definitionsOfEveryType repeats this lookup for Object: keep the two in step
             if (predicate == null) {
                 predicate = (Predicate) FILTER_OUT_ANY_PROVIDERS;
             } else {
