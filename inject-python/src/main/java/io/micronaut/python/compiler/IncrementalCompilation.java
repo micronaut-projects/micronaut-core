@@ -497,19 +497,26 @@ final class IncrementalCompilation {
 
     /**
      * The names a module binds outside the bodies of its functions and classes, those it binds conditionally included.
-     * A name bound in a way this does not read, such as by unpacking, only keeps every Python source being reprocessed;
-     * one read by mistake, such as an argument of a call spread over lines, cannot leave a dependent out, as the import
-     * of the module relates the dependent to it whatever the name.
+     * A name bound in a way this does not read, such as by unpacking, only keeps every Python source being reprocessed.
      */
     private static Set<String> pythonModuleBindings(String content) {
         Set<String> names = new HashSet<>();
         StringBuilder moduleLevel = new StringBuilder();
         int bodyOf = -1;
+        int bracketDepth = 0;
         for (String line : logicalStatements(content).lines().toList()) {
             String statement = line.stripLeading();
             int indentation = line.length() - statement.length();
-            // a signature spread over lines closes at the indentation of its definition, ahead of the body
-            if (statement.isEmpty() || (bodyOf != -1 && (indentation > bodyOf || statement.startsWith(")")))) {
+            boolean continuation = bracketDepth > 0;
+            bracketDepth = Math.max(0, bracketDepth + bracketDelta(statement));
+            // what a bracket spreads over lines may close at any indentation: it belongs to the statement it started in
+            if (continuation) {
+                if (bodyOf == -1) {
+                    moduleLevel.append(line).append('\n');
+                }
+                continue;
+            }
+            if (statement.isEmpty() || (bodyOf != -1 && indentation > bodyOf)) {
                 continue;
             }
             bodyOf = -1;

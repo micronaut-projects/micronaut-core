@@ -86,6 +86,15 @@ class IncrementalCompilationImportsTest {
     }
 
     @Test
+    void aNameInsideABracketSpreadOverLinesIsNotABindingOfTheModule() {
+        Map<String, String> sources = Map.of(
+            "pkg/calls.py", "result = dict(\n    named=1,\n)\n",
+            "pkg/consumer.py", "from .calls import named\n"
+        );
+        assertTrue(IncrementalCompilation.hasDynamicOrUnresolvedPythonRelationship(sources));
+    }
+
+    @Test
     void aRelativeImportFromAParentIsResolved() {
         assertFalse(unresolved("pkg/nested/consumer.py", "from ..models import Model"));
         assertFalse(unresolved("pkg/nested/consumer.py", "from .. import models"));
@@ -150,6 +159,7 @@ class IncrementalCompilationImportsTest {
         for (String body : List.of(
             "def other():\n    from .fallback import conditional\n",
             "async def other(\n    value,\n) -> int:\n    from .fallback import conditional\n",
+            "def other():\n    value = [\n        1,\n]\n    from .fallback import conditional\n",
             "class Other:\n    from .fallback import conditional\n"
         )) {
             Map<String, String> sources = Map.of(
