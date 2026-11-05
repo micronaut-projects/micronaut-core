@@ -131,7 +131,8 @@ public class MicronautDevMain {
 
     /**
      * Starts the runtime for a manifest: the loader, the watcher and the application, returning once
-     * the first generation started. The application runs on its own thread.
+     * the first generation started, or failed to: the failure is reported, and the next change launches a generation.
+     * The application runs on its own thread.
      *
      * @param manifest The manifest
      * @param args The application's arguments
@@ -155,7 +156,7 @@ public class MicronautDevMain {
         if (manifest.mode() == DevMode.TEST) {
             runtime.startTests();
         } else {
-            runtime.start(args);
+            runtime.startAwaitingChange(args);
         }
         return runtime;
     }

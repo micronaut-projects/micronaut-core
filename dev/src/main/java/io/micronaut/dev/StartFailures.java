@@ -53,6 +53,22 @@ final class StartFailures {
     }
 
     /**
+     * @param cause What a generation's main threw
+     * @return Its message, with the message of its root cause when that says more
+     */
+    static String why(Throwable cause) {
+        String why = cause.getMessage() == null ? cause.getClass().getName() : cause.getMessage();
+        Throwable root = cause;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        if (root != cause && root.getMessage() != null && !why.contains(root.getMessage())) {
+            why += " (" + root.getMessage() + ")";
+        }
+        return why;
+    }
+
+    /**
      * Reports a generation that does not run, which a change starts again.
      *
      * @param failure Why it does not run
@@ -106,6 +122,23 @@ final class StartFailures {
     }
 
     /**
+     * As {@link #hold()}, and with the given action, unless the generation that failed is no longer the current one:
+     * asked under the monitor {@link #released} takes, so that a later generation's success is not overwritten.
+     *
+     * @param current Whether the generation is still the current one
+     * @param action What else marks it failed
+     * @return Whether it is still the current one
+     */
+    synchronized boolean holdIf(BooleanSupplier current, Runnable action) {
+        boolean still = current.getAsBoolean();
+        if (still) {
+            hold();
+            action.run();
+        }
+        return still;
+    }
+
+    /**
      * A generation runs, with threads of its own, unless its main just failed: a {@link #hold()} that follows stands.
      *
      * @param stillRuns Whether it still runs, asked under the same monitor as the hold
@@ -135,6 +168,17 @@ final class StartFailures {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * The application's main failed, or returned, without a context that started: nothing of it runs any more, unlike a
+     * start that timed out or was interrupted, whose main may still be running beside the next generation.
+     */
+    static final class Failed extends IllegalStateException {
+
+        Failed(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 }

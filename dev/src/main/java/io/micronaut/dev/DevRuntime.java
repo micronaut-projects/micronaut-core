@@ -81,6 +81,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -302,6 +303,21 @@ public final class DevRuntime implements Closeable {
      * @throws IllegalStateException if another runtime runs the process or the application failed to start
      */
     public ApplicationContext start(String[] args) {
+        return Objects.requireNonNull(start(args, false));
+    }
+
+    /**
+     * As {@link #start(String[])}, except that an application that cannot start at all is reported and watched too.
+     *
+     * @param args The application's arguments
+     * @return The started context, or null when no context started
+     * @throws IllegalStateException if another runtime runs the process
+     */
+    @Nullable ApplicationContext startAwaitingChange(String[] args) {
+        return start(args, true);
+    }
+
+    private @Nullable ApplicationContext start(String[] args, boolean awaitChange) {
         if (tests != null) {
             throw new IllegalStateException("The manifest is in test mode: startTests() runs the tests");
         }
@@ -333,7 +349,23 @@ public final class DevRuntime implements Closeable {
             thread.setDaemon(true);
             thread.start();
             worker = thread;
-            first = launch("first start");
+            int generation = classLoader.generation();
+            try {
+                first = launch("first start");
+            } catch (StartFailures.Failed e) {
+                if (!awaitChange) {
+                    throw e;
+                }
+                // unless a change launched the next generation meanwhile, which answers for itself
+                boolean current = startFailures.holdIf(() -> classLoader.generation() == generation, requests::startFailed);
+                reconcileOutputs();
+                if (current) {
+                    StartFailures.reportStart(e);
+                } else {
+                    whenReady().join(); // this non-daemon thread keeps the JVM until that generation has threads of its own
+                }
+                return null;
+            }
             // as after a restart: the servers bind a moment after the context starts, and the first generation is
             // only reported started once they accept, when a retained socket was handed to one
             ApplicationContext launched = first;
@@ -1766,7 +1798,7 @@ public final class DevRuntime implements Closeable {
             throw new IllegalStateException("Interrupted while the application started (" + reason + ")", e);
         } catch (ExecutionException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
-            throw new IllegalStateException("The application failed to start (" + reason + "): " + cause.getMessage(), cause);
+            throw new StartFailures.Failed("The application failed to start (" + reason + "): " + cause.getMessage(), cause);
         } catch (TimeoutException e) {
             throw new IllegalStateException("The application did not start within " + START_TIMEOUT + " (" + reason + ")", e);
         }
@@ -1776,13 +1808,6 @@ public final class DevRuntime implements Closeable {
      * Why a generation whose context started does not run, as {@link #whyNotRunning} tells it. Should the generation be
      * found running, a main that fails from here on reports that itself, in {@link #mainFailedLate}: nothing else looks
      * at its failure, and with no thread left to keep it alive the JVM would exit with status 0.
-     *
-     * @param generation The generation's context
-     * @param launching The thread running its main
-     * @param failure What its main threw, if it threw
-     * @param definesServer Whether its context defines an HTTP server
-     * @param reason What launched it, for the message
-     * @return Why it does not run, or null when it does, or when it is no longer the current generation
      */
     private @Nullable RuntimeException notRunning(ApplicationContext generation, @Nullable Thread launching, AtomicReference<@Nullable Throwable> failure,
                                                   boolean definesServer, String reason) {
@@ -1803,10 +1828,6 @@ public final class DevRuntime implements Closeable {
      * Main failed after its generation was found running, on the thread that ran it: a main that goes on after it
      * started the application, or that takes longer than its servers are waited for. A generation already replaced, by a
      * restart that stopped the context under its main, did not fail.
-     *
-     * @param generation The generation's loader
-     * @param failure Where what its main threw belongs
-     * @param thrown What its main threw
      */
     private void mainFailedLate(GenerationClassLoader generation, AtomicReference<@Nullable Throwable> failure, Throwable thrown) {
         failure.set(thrown);
@@ -1869,14 +1890,7 @@ public final class DevRuntime implements Closeable {
         if (cause == null) {
             why = running ? "its HTTP server is not running" : "its context stopped right after it started";
         } else {
-            why = cause.getMessage() == null ? cause.getClass().getName() : cause.getMessage();
-            Throwable root = cause;
-            while (root.getCause() != null && root.getCause() != root) {
-                root = root.getCause();
-            }
-            if (root != cause && root.getMessage() != null && !why.contains(root.getMessage())) {
-                why += " (" + root.getMessage() + ")";
-            }
+            why = StartFailures.why(cause);
         }
         return new IllegalStateException("generation " + classLoader.generation() + " failed to start (" + reason + "): " + why, cause);
     }
