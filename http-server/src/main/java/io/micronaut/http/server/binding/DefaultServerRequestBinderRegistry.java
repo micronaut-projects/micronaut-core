@@ -64,7 +64,9 @@ public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRe
         internalRequestBinderRegistry.addArgumentBinder(new MultipartBodyArgumentBinder(
             formFactory
         ));
-        internalRequestBinderRegistry.addArgumentBinder(new InputStreamBodyBinder(bodyBinder));
+        InputStreamBodyBinder inputStreamBodyBinder = new InputStreamBodyBinder(bodyBinder);
+        internalRequestBinderRegistry.addArgumentBinder(inputStreamBodyBinder);
+        internalRequestBinderRegistry.addArgumentBinder(new ReadableBodyBinder(inputStreamBodyBinder));
         StreamingFileUploadBinder streamingFileUploadBinder = new StreamingFileUploadBinder(formFactory);
         internalRequestBinderRegistry.addArgumentBinder(streamingFileUploadBinder);
         CompletedFileUploadBinder completedFileUploadBinder = new CompletedFileUploadBinder(formFactory);
@@ -96,7 +98,13 @@ public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRe
     @Internal
     @Override
     public boolean bindsRequestAsIs(Argument<?> argument) {
-        // a subclass may find another binder than the internal registry
-        return getClass() == DefaultServerRequestBinderRegistry.class && internalRequestBinderRegistry.bindsRequestAsIs(argument);
+        if (!internalRequestBinderRegistry.bindsRequestAsIs(argument)) {
+            return false;
+        }
+        if (getClass() == DefaultServerRequestBinderRegistry.class) {
+            return true;
+        }
+        // a subclass may override the lookup and find another binder than the internal registry
+        return findArgumentBinder(argument).orElse(null) == internalRequestBinderRegistry.findArgumentBinder(argument).orElse(null);
     }
 }

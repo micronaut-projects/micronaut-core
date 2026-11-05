@@ -106,7 +106,9 @@ public class ProxyHeaderParser {
                         forwardedPort = Integer.valueOf(portHeader);
                     }
                 }
-            } catch (NumberFormatException ignored) { }
+            } catch (NumberFormatException ignored) {
+                // a malformed port is ignored, the forwarded port stays unset
+            }
             String forwardedForHeader = headers.get(X_FORWARDED_FOR);
             if (forwardedForHeader != null) {
                 forwardedFor = Arrays.stream(forwardedForHeader.split(ELEMENT_DELIMITER))

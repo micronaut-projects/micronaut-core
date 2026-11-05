@@ -186,7 +186,7 @@ public class HandlerRouteServerSentEventsTest {
              Socket socket = connect(server)) {
             request(socket, "GET /sse/fields HTTP/1.1\r\nHost: localhost\r\nAccept-Encoding: gzip, deflate, br, zstd, snappy\r\nConnection: close\r\n\r\n");
             String received = readToEnd(socket.getInputStream());
-            String head = received.substring(0, received.indexOf("\r\n\r\n")).toLowerCase();
+            String head = received.substring(0, received.indexOf("\r\n\r\n")).toLowerCase(Locale.ROOT);
             assertFalse(head.contains("content-encoding"), head);
             assertTrue(received.contains("data: one"), received);
         }

@@ -37,6 +37,8 @@ public interface BeanIntrospector {
     /**
      * The default shared {@link BeanIntrospector}.
      */
+    // The package-private DefaultBeanIntrospector is only instantiated by this interface, so no other thread can initialize it first
+    @SuppressWarnings("ClassInitializationDeadlock")
     BeanIntrospector SHARED = new DefaultBeanIntrospector();
 
     /**

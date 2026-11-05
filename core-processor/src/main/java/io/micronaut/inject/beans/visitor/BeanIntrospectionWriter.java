@@ -316,7 +316,6 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      */
     private boolean membersDescribed;
     private boolean hierarchyDescribed;
-    private VisitorContext visitorContext;
 
     /**
      * Default constructor.
@@ -338,7 +337,6 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, beanClassElement);
         evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
         enumValueOfMethod = enumValueOfMethod(beanClassElement);
-        this.visitorContext = visitorContext;
     }
 
     /**

@@ -58,6 +58,7 @@ final class DevLogging {
 
     // the logger of DefaultEnvironment, which is not public
     static final String ENVIRONMENT_LOGGER = "io.micronaut.context.env.DefaultEnvironment";
+
     private static final String LOGGER_CONTEXT = "ch.qos.logback.classic.LoggerContext";
     // Logback's own names, spelled out: this class is loaded whether Logback is present or not
     private static final String CONFIG_FILE_PROPERTY = "logback.configurationFile";
