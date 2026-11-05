@@ -325,8 +325,9 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         // the members compare as they do against a candidate: a qualifier without members selects by type alone,
         // a member left at its default is the same as one writing that default down, and a member this qualifier
         // records as non-binding is left out of both
-        return other.bindingValues() == null
-            || matchesBindingValues(resolveBindingValues(nonBindingMembers, other.bindingValues()), qualifierAnn == null ? Map.of() : qualifierAnn.getValues());
+        Map<CharSequence, Object> otherValues = other.bindingValues();
+        return otherValues == null
+            || matchesBindingValues(resolveBindingValues(nonBindingMembers, otherValues), qualifierAnn == null ? Map.of() : qualifierAnn.getValues());
     }
 
     @Override
