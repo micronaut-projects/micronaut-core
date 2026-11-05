@@ -619,6 +619,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "getFactoryBean", BeanDefinition.class, Class.class, Qualifier.class);
 
+    private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN_TARGET = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "getFactoryBeanTarget", BeanDefinition.class, Class.class, Qualifier.class);
+
     private static final Method METHOD_PROXY_TARGET_TYPE = ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType");
 
     private static final Method METHOD_PROXY_TARGET_CLASS = ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetType");
@@ -2212,7 +2214,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                                  List<StatementDef> additionalStatements,
                                                  List<? extends ExpressionDef> values) {
         MethodElement methodElement = factorMethodDefinition.methodElement();
-        ExpressionDef factoryBean = getFactoryBean(aThis, methodParameters, methodElement.getOwningType(), methodElement.isStatic(), additionalStatements);
+        ExpressionDef factoryBean = getFactoryBean(aThis, methodParameters, methodElement.getOwningType(), methodElement.isStatic(), methodElement.isFinal() || methodElement.isPrivate(), additionalStatements);
         return getBeanFromFactoryMethod(factorMethodDefinition, factoryBean, values);
     }
 
@@ -2221,7 +2223,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                                 List<StatementDef> additionalStatements,
                                                 FieldDefinition<ClassElement, FieldElement> factoryFieldDefinition) {
         FieldElement fieldElement = factoryFieldDefinition.fieldElement();
-        ExpressionDef factoryBean = getFactoryBean(aThis, methodParameters, fieldElement.getDeclaringType(), fieldElement.isStatic(), additionalStatements);
+        ExpressionDef factoryBean = getFactoryBean(aThis, methodParameters, fieldElement.getDeclaringType(), fieldElement.isStatic(), true, additionalStatements);
         return getBeanFromFactoryField(factoryFieldDefinition, factoryBean);
     }
 
@@ -2330,6 +2332,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                          List<VariableDef.MethodParameter> parameters,
                                          ClassElement factoryClass,
                                          boolean isStaticMember,
+                                         boolean isNotDispatchedByProxy,
                                          List<StatementDef> additionalStatements) {
         if (isStaticMember) {
             return ExpressionDef.nullValue();
@@ -2349,8 +2352,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         ExpressionDef beanResolutionContxt = parameters.getFirst();
         // the factory is marked as the dependent factory; a context recording the dependency graph also attributes
         // the lookup to the produced definition, so the graph records the factory as a dependency of the bean it produces
+        // a member no proxy can dispatch - a field, or a final or private method such as the getter of a Kotlin
+        // property - is read off the instance a proxy of the factory targets: the proxy's own state is never initialized
         StatementDef.DefineAndAssign defineAndAssign = beanResolutionContxt
-            .invoke(METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN,
+            .invoke(isNotDispatchedByProxy ? METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN_TARGET : METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN,
                 // the definition of the produced bean
                 aThis,
                 // the factory type
