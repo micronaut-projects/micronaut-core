@@ -65,6 +65,7 @@ public class IOUtils {
     private static final String SCHEME_JAR = "jar";
     private static final String SCHEME_ZIP = "zip";
     private static final String SCHEME_WSJAR = "wsjar";
+    private static final String SCHEME_NESTED = "nested";
 
     private static final String COLON = ":";
 
@@ -173,7 +174,9 @@ public class IOUtils {
                 if (sep != -1) {
                     jarUri = jarUri.substring(0, sep);
                 }
-                if (!jarUri.startsWith(SCHEME_FILE + COLON)) {
+                // A jar nested in a Spring Boot executable jar has a nested: URI, which the file system
+                // provider of the Spring Boot loader opens, so it is not turned into a file: URI
+                if (!jarUri.startsWith(SCHEME_FILE + COLON) && !jarUri.startsWith(SCHEME_NESTED + COLON)) {
                     // Special case WebLogic classloader
                     // https://github.com/micronaut-projects/micronaut-core/issues/8636
                     jarUri = jarUri.startsWith("/") ?
