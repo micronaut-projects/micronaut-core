@@ -623,6 +623,9 @@ public class Publishers {
     public static <E> Publisher<E> bufferNow(@NonNull Publisher<E> source) {
         Sinks.Many<E> sink = Sinks.many().unicast().onBackpressureBuffer();
         var subscriber = new CoreSubscriber<E>() {
+            @Nullable
+            volatile Subscription subscription;
+
             // the elements the source drops, e.g. on cancellation, are closed like the ones the sink drops
             private final Context context = Operators.enableOnDiscard(Context.empty(), this::discard);
 
@@ -630,9 +633,6 @@ public class Publishers {
             public Context currentContext() {
                 return context;
             }
-
-            @Nullable
-            volatile Subscription subscription;
 
             void cancel() {
                 // best effort...
