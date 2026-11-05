@@ -91,7 +91,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -198,8 +197,6 @@ public final class DevRuntime implements Closeable {
     private @Nullable Instrumentation instrumentation;
     private final InPlaceUpdates inPlaceUpdates = new InPlaceUpdates(this);
     private volatile @Nullable Thread worker; // NOSONAR java:S3077 only the reference is published
-    private final AtomicInteger redefinitions = new AtomicInteger();
-    private final AtomicInteger inPlacePatches = new AtomicInteger();
     private OutputSnapshot snapshot = OutputSnapshot.empty();
     /**
      * The changes of the batch whose compilation failed, merged into the next batch until they compile: the next edit

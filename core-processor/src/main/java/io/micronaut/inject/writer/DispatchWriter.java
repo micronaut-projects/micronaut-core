@@ -361,7 +361,7 @@ public final class DispatchWriter implements ClassOutputWriter {
                 .build((aThis, methodParameters) -> StatementDef.multi(
                     aThis.field(interceptableField).isTrue().and(methodParameters.get(1).instanceOf(interceptedProxy))
                         .doIf(
-                            buildDispatch(aThis, methodParameters, interceptableMethodDispatchTargets, null)
+                            buildDispatch(methodParameters, interceptableMethodDispatchTargets, null)
                         ),
                     buildDispatch(aThis, methodParameters, dispatchers),
                     ExpressionDef.nullValue().returning()
@@ -385,11 +385,10 @@ public final class DispatchWriter implements ClassOutputWriter {
                                        List<VariableDef.MethodParameter> methodParameters,
                                        List<Map.Entry<DispatchTarget, Integer>> dispatchers) {
         VariableDef.MethodParameter methodIndex = methodParameters.get(0);
-        return buildDispatch(aThis, methodParameters, dispatchers, unknownDispatchHandler.apply(aThis, methodIndex));
+        return buildDispatch(methodParameters, dispatchers, unknownDispatchHandler.apply(aThis, methodIndex));
     }
 
-    private StatementDef buildDispatch(VariableDef.This aThis,
-                                       List<VariableDef.MethodParameter> methodParameters,
+    private StatementDef buildDispatch(List<VariableDef.MethodParameter> methodParameters,
                                        List<Map.Entry<DispatchTarget, Integer>> dispatchers,
                                        @Nullable
                                        StatementDef defaultCase) {

@@ -142,7 +142,8 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
 
     private static boolean isSnakeYamlPresent() {
         try {
-            Class<Yaml> yamlClass = Yaml.class;
+            // resolving the class literal fails without SnakeYAML
+            Class<Yaml> _ = Yaml.class;
             return true;
         } catch (Throwable e) {
             return false;
