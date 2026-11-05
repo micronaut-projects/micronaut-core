@@ -21,6 +21,7 @@ import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.cookie.SameSite;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -54,7 +55,7 @@ public final class HttpTypeConverterRegistrar implements TypeConverterRegistrar 
                 return Optional.empty();
             }
             return conversions.computeIfAbsent(object, charSequence -> {
-                String name = StringUtils.capitalize(object.toString().toLowerCase());
+                String name = StringUtils.capitalize(object.toString().toLowerCase(Locale.ROOT));
                 for (SameSite sameSite : SameSite.values()) {
                     if (sameSite.name().equals(name)) {
                         return Optional.of(sameSite);

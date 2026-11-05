@@ -441,7 +441,7 @@ public final class StringUtils {
 
     /**
      * Replace the dots in the property with underscore and
-     * transform to uppercase.
+     * transform to uppercase using {@link Locale#ROOT}.
      *
      * @param dottedProperty The property with dots, example - a.b.c
      * @return The converted value
@@ -452,7 +452,8 @@ public final class StringUtils {
 
     /**
      * Replace the dots in the property with underscore and
-     * transform to uppercase based on given flag.
+     * transform to uppercase based on given flag. The uppercase transformation uses
+     * {@link Locale#ROOT}, so the result does not depend on the default locale.
      *
      * @param dottedProperty The property with dots, example - a.b.c
      * @param uppercase      To transform to uppercase string
@@ -463,7 +464,7 @@ public final class StringUtils {
             return dottedProperty;
         }
         dottedProperty = dottedProperty.replace('.', '_');
-        return uppercase ? dottedProperty.toUpperCase() : dottedProperty;
+        return uppercase ? dottedProperty.toUpperCase(Locale.ROOT) : dottedProperty;
     }
 
     /**

@@ -172,7 +172,8 @@ public final class StaticBodyGenerator {
             if (!(statement instanceof Ir.Local local)) {
                 break;
             }
-            if (copiedParameter(local.value()) instanceof Ir.Param param) {
+            Ir.@Nullable Param param = copiedParameter(local.value());
+            if (param != null) {
                 copied.add(param.name());
             }
         }
@@ -236,12 +237,14 @@ public final class StaticBodyGenerator {
             case Ir.If branch -> {
                 collectNames(branch.test(), names);
                 collectNames(branch.then(), names);
-                if (branch.orElse() instanceof Ir.Body orElse) {
+                Ir.@Nullable Body orElse = branch.orElse();
+                if (orElse != null) {
                     collectNames(orElse, names);
                 }
             }
             case Ir.Return ret -> {
-                if (ret.value() instanceof Ir.Expression value) {
+                Ir.@Nullable Expression value = ret.value();
+                if (value != null) {
                     collectNames(value, names);
                 }
             }
@@ -271,14 +274,16 @@ public final class StaticBodyGenerator {
                     }
                     collectNames(handler.body(), names);
                 }
-                if (t.finallyBody() instanceof Ir.Body finallyBody) {
+                Ir.@Nullable Body finallyBody = t.finallyBody();
+                if (finallyBody != null) {
                     collectNames(finallyBody, names);
                 }
             }
             case Ir.Param param -> names.add(param.name());
             case Ir.LocalRef ref -> names.add(ref.name());
             case Ir.InvokeJava call -> {
-                if (call.receiver() instanceof Ir.Expression receiver) {
+                Ir.@Nullable Expression receiver = call.receiver();
+                if (receiver != null) {
                     collectNames(receiver, names);
                 }
                 call.arguments().forEach(a -> collectNames(a, names));
@@ -302,7 +307,8 @@ public final class StaticBodyGenerator {
             case Ir.Unary unary -> collectNames(unary.operand(), names);
             case Ir.Compare compare -> {
                 collectNames(compare.left(), names);
-                if (compare.right() instanceof Ir.Expression right) {
+                Ir.@Nullable Expression right = compare.right();
+                if (right != null) {
                     collectNames(right, names);
                 }
             }
@@ -414,11 +420,17 @@ public final class StaticBodyGenerator {
             case Ir.Break b -> b.loop() == loop;
             case Ir.Continue c -> c.loop() == loop;
             case Ir.Body body -> body.statements().stream().anyMatch(s -> exits(s, loop));
-            case Ir.If branch -> exits(branch.then(), loop) || (branch.orElse() instanceof Ir.Body orElse && exits(orElse, loop));
+            case Ir.If branch -> {
+                Ir.@Nullable Body orElse = branch.orElse();
+                yield exits(branch.then(), loop) || (orElse != null && exits(orElse, loop));
+            }
             case Ir.While w -> exits(w.body(), loop);
             case Ir.ForRange f -> exits(f.body(), loop);
             case Ir.ForEach f -> exits(f.body(), loop);
-            case Ir.Try t -> exits(t.body(), loop) || t.catches().stream().anyMatch(c -> exits(c.body(), loop)) || (t.finallyBody() instanceof Ir.Body finallyBody && exits(finallyBody, loop));
+            case Ir.Try t -> {
+                Ir.@Nullable Body finallyBody = t.finallyBody();
+                yield exits(t.body(), loop) || t.catches().stream().anyMatch(c -> exits(c.body(), loop)) || (finallyBody != null && exits(finallyBody, loop));
+            }
             default -> false;
         };
     }
@@ -441,7 +453,8 @@ public final class StaticBodyGenerator {
      */
     private StatementDef loopBody(Loop loop, Ir.Body body, List<StatementDef> perIteration) {
         List<StatementDef> statements = new ArrayList<>();
-        if (loop.continued() instanceof VariableDef.Local continued) {
+        VariableDef.@Nullable Local continued = loop.continued();
+        if (continued != null) {
             statements.add(new StatementDef.DefineAndAssign(continued, ExpressionDef.falseValue()));
         }
         statements.add(statements(body));
@@ -539,7 +552,8 @@ public final class StaticBodyGenerator {
                         return statements(handler.body());
                     });
                 }
-                yield t.finallyBody() instanceof Ir.Body finallyBody ? tried.doFinally(statements(finallyBody)) : tried;
+                Ir.@Nullable Body finallyBody = t.finallyBody();
+                yield finallyBody != null ? tried.doFinally(statements(finallyBody)) : tried;
             }
             case Ir.Eval eval -> {
                 ExpressionDef value = expression(eval.expression());

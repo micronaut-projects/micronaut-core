@@ -33,6 +33,8 @@ public interface ConversionService {
     /**
      * The default shared conversion service.
      */
+    // SHARED must stay a DefaultMutableConversionService; MutableConversionService.create() initializes this interface first
+    @SuppressWarnings("ClassInitializationDeadlock")
     ConversionService SHARED = new DefaultMutableConversionService();
 
     /**
