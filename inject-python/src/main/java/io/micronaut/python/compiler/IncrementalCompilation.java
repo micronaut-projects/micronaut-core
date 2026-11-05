@@ -309,6 +309,8 @@ final class IncrementalCompilation {
                 for (String staleOutput : stalePythonOutputs) {
                     deleteManagedOutput(staleOutput);
                 }
+                // the list above still names them, and the virtual file system fails on an entry whose file is gone
+                rebuildPythonFilesList();
                 outputFiles = listOutputs();
             }
             pythonAggregatingOutputs.retainAll(outputFiles);
