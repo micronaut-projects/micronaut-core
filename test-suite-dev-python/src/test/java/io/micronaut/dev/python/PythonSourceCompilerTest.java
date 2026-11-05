@@ -245,6 +245,32 @@ class PythonSourceCompilerTest {
     }
 
     @Test
+    void anOptimisticCompilationKeepsTheClassOfAModuleWithAnUnderscoreInItsName() throws Exception {
+        PythonFixture fixture = PythonFixture.create(project);
+        String source = """
+            from typing import Annotated
+            from jakarta.inject import Inject
+            from app.greeter import PythonGreeter
+
+            greeter: Annotated[PythonGreeter, Inject]
+
+
+            def greeting() -> str:
+                return "%s"
+            """;
+        Path module = fixture.writePython("app/my_module.py", source.formatted("one"));
+        assertTrue(compiler.compile(fixture.request(Set.of(), Set.of()).asFull().withIncrementalMode(IncrementalMode.OPTIMISTIC)).isSuccess());
+        Path definition = fixture.classOutput().resolve("app/$MyModule$Definition.class");
+        assertTrue(Files.exists(definition));
+
+        fixture.writePython("app/my_module.py", source.formatted("two"));
+        CompilationResult result = compiler.compile(fixture.request(Set.of(module), Set.of()).withIncrementalMode(IncrementalMode.OPTIMISTIC));
+
+        assertEquals(CompilationResult.Status.SUCCESS, result.status(), result.diagnostics().toString());
+        assertTrue(Files.exists(definition), "the class of the module is gone");
+    }
+
+    @Test
     void moreThanOneJavaRootIsReported() throws Exception {
         PythonFixture fixture = PythonFixture.create(project);
         Path second = Files.createDirectories(project.resolve("src/other/java"));
