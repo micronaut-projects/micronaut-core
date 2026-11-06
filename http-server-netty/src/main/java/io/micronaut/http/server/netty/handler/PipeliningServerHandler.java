@@ -1558,7 +1558,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
             EventLoop eventLoop = requiredCtx().channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
-                eventLoop.execute(() -> write(handler));
+                try {
+                    eventLoop.execute(() -> write(handler));
+                } catch (Throwable t) {
+                    // the event loop shut down: the handler is never installed, release what it holds
+                    handler.discardRefused();
+                    throw t;
+                }
                 return;
             }
 
@@ -1646,7 +1652,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     // event loop, where it is written
                     CloseableByteBody claimed = body.move();
                     try {
-                        eventLoop.execute(() -> write(response, claimed));
+                        eventLoop.execute(() -> writeClaimed(response, claimed));
                     } catch (Throwable t) {
                         // the event loop shut down: the caller no longer closes the body
                         claimed.close();
@@ -1682,6 +1688,42 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 oh.writer.attach(streaming.primary(oh.writer));
                 write(oh);
             }
+        }
+
+        /**
+         * Write a response whose streamed body was claimed on another thread.
+         *
+         * @param response The response
+         * @param body     The claimed body
+         */
+        private void writeClaimed(HttpResponse response, CloseableByteBody body) {
+            if (responseStarted()) {
+                // another response was written for the request meanwhile: this one is refused
+                body.close();
+                LOG.warn("Only one response per request: a response written from another thread is dropped");
+                return;
+            }
+            try {
+                write(response, body);
+            } catch (Throwable t) {
+                // closes nothing once the body was claimed for the response
+                body.close();
+                giveUpOffLoopWrite(t);
+            }
+        }
+
+        /**
+         * Give up on a response whose write moved to the event loop and failed there: the
+         * caller is gone, so it cannot answer a fallback response. The request is answered with
+         * a 500 and the connection closes once the responses before it are written, as for a
+         * request the request handler failed to accept.
+         *
+         * @param t The failure
+         */
+        private void giveUpOffLoopWrite(Throwable t) {
+            LOG.warn("Failed to write the response: {}", t.getMessage(), t);
+            requestHandler.responseFailed(attachment, t);
+            rejectUnaccepted(this);
         }
 
         @Override
