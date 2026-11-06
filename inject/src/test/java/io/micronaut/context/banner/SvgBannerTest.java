@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.banner;
 
+import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
@@ -29,11 +31,14 @@ import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.CRC32;
@@ -385,6 +390,41 @@ class SvgBannerTest {
     }
 
     @Test
+    void onlyTheAnimatedModeAnimates() {
+        Map<String, String> kitty = Map.of("TERM", "xterm-kitty");
+
+        assertTrue(new BannerTerminal(BannerMode.ANIMATED, kitty::get, () -> true).animates());
+        assertTrue(new BannerTerminal(BannerMode.AUTO, Map.of("TERM", "xterm-kitty", "MICRONAUT_BANNER_MODE", "animated")::get, () -> true).animates(),
+            "the environment variable enables it too");
+        assertFalse(new BannerTerminal(BannerMode.AUTO, kitty::get, () -> true).animates());
+        assertFalse(new BannerTerminal(BannerMode.KITTY, kitty::get, () -> true).animates());
+        assertFalse(new BannerTerminal(BannerMode.ANIMATED, kitty::get, () -> false).animates(), "not in a terminal that displays images");
+        assertFalse(new BannerTerminal(BannerMode.ANIMATED, Map.of("MICRONAUT_BANNER_MODE", "ascii")::get, () -> true).animates());
+    }
+
+    @Test
+    void theSvgBannerIsOnlyUsedWhenAnimated(@TempDir Path dir) throws IOException {
+        Files.createDirectories(dir.resolve("META-INF/micronaut"));
+        byte[] png = {1, 2, 3, 4};
+        Files.write(dir.resolve(ImageBanner.RESOURCE), png);
+        Files.writeString(dir.resolve(ImageBanner.SVG_RESOURCE), "<svg width='8' height='4'><rect width='8' height='4'/></svg>");
+        Map<String, String> kitty = Map.of("TERM", "xterm-kitty");
+
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[] {dir.toUri().toURL()}, null)) {
+            ResourceLoader loader = ClassPathResourceLoader.defaultLoader(classLoader);
+            List<Chunk> animated = chunks(capture(out -> ImageBanner.resolve(new BannerTerminal(BannerMode.ANIMATED, kitty::get, () -> true), loader, out)
+                .orElseThrow().print()));
+            List<Chunk> auto = chunks(capture(out -> ImageBanner.resolve(new BannerTerminal(BannerMode.AUTO, kitty::get, () -> true), loader, out)
+                .orElseThrow().print()));
+
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(decode(animated)));
+            assertEquals(8, image.getWidth());
+            assertEquals(0xFF000000, image.getRGB(4, 2));
+            assertArrayEquals(png, decode(auto));
+        }
+    }
+
+    @Test
     void invalidSvgPrintsNothing(@TempDir Path dir) throws IOException {
         Path file = Files.writeString(dir.resolve("banner.svg"), "<html></html>");
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -396,13 +436,13 @@ class SvgBannerTest {
     @Test
     void defaultLogoIsAnimatedAndEndsAsTheCompleteLogoInTheThemeColor() throws IOException {
         for (boolean light : new boolean[] {false, true}) {
-            BannerTerminal terminal = new BannerTerminal(
+            BannerTerminal terminal = new BannerTerminal(BannerMode.ANIMATED,
                 name -> switch (name) {
-                    case "MICRONAUT_BANNER_MODE" -> "kitty";
+                    case "TERM" -> "xterm-kitty";
                     case "MICRONAUT_BANNER_THEME" -> light ? "light" : "dark";
                     default -> null;
                 },
-                () -> false);
+                () -> true);
             List<Chunk> chunks = chunks(capture(out -> new MicronautBanner(out, terminal, Runnable::run).print()));
 
             assertTrue(chunks.get(0).control().matches("a=T,f=100,i=\\d+,q=2,r=6,m=1"), chunks.get(0).control());

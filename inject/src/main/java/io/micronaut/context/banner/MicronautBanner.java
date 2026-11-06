@@ -44,7 +44,18 @@ public class MicronautBanner implements Banner {
      * @param out The print stream
      */
     public MicronautBanner(PrintStream out) {
-        this(out, BannerTerminal.current());
+        this(out, BannerMode.AUTO);
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param out The print stream
+     * @param mode The banner mode
+     * @since 5.3.0
+     */
+    public MicronautBanner(PrintStream out, BannerMode mode) {
+        this(out, BannerTerminal.current(mode));
     }
 
     /**
@@ -75,13 +86,14 @@ public class MicronautBanner implements Banner {
      *
      * @param resourceLoader The loader of the banners of the application
      * @param out The print stream
+     * @param mode The banner mode
      * @return The banner
      * @since 5.3.0
      */
-    public static Banner resolve(ResourceLoader resourceLoader, PrintStream out) {
-        return ImageBanner.resolve(resourceLoader, out)
+    public static Banner resolve(ResourceLoader resourceLoader, PrintStream out, BannerMode mode) {
+        return ImageBanner.resolve(resourceLoader, out, mode)
             .or(() -> ResourceBanner.resolve(resourceLoader, out))
-            .orElseGet(() -> new MicronautBanner(out));
+            .orElseGet(() -> new MicronautBanner(out, mode));
     }
 
     @Override

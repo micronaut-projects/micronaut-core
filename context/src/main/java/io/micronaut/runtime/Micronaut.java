@@ -22,6 +22,7 @@ import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.banner.Banner;
+import io.micronaut.context.banner.BannerMode;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.DevelopmentMode;
@@ -68,6 +69,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     private static final long SHUTDOWN_MONITOR_INTERVAL_MS = 250;
 
     private final Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
+    private BannerMode bannerMode = BannerMode.AUTO;
     /**
      * Whether this launcher may exit the JVM, decided once the environment started: a server that fails to start, or
      * an application that stops, stops the context and with it the environment, whose properties are then gone.
@@ -486,6 +488,19 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         return (Micronaut) super.banner(isEnabled);
     }
 
+    /**
+     * Sets how the banner is displayed, unless the {@code MICRONAUT_BANNER_MODE} environment variable
+     * says otherwise. A banner disabled with {@link #banner(boolean)} stays disabled.
+     *
+     * @param mode The banner mode
+     * @return This application
+     * @since 5.3.0
+     */
+    public Micronaut bannerMode(BannerMode mode) {
+        this.bannerMode = mode;
+        return this;
+    }
+
     @Override
     @Experimental
     public Micronaut beanDefinitionPrefetchEnabled(boolean enabled) {
@@ -702,7 +717,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     private Banner resolveBanner(PrintStream out) {
-        return MicronautBanner.resolve(getResourceLoader(), out);
+        return MicronautBanner.resolve(getResourceLoader(), out, bannerMode);
     }
 
     /**

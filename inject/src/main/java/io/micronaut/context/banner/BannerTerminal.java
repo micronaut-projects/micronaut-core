@@ -28,10 +28,11 @@ import java.util.function.Function;
  * What the banners need to know about the terminal they print to: whether it displays images and
  * which image suits its theme.
  *
+ * @param mode The mode set by the application, overridden by the environment variable
  * @param env The environment variables
  * @param interactive Whether the output is an interactive terminal, consulted last since opening the console is not free
  */
-record BannerTerminal(Function<String, @Nullable String> env, BooleanSupplier interactive) {
+record BannerTerminal(BannerMode mode, Function<String, @Nullable String> env, BooleanSupplier interactive) {
 
     private static final String BANNER_MODE_ENV = "MICRONAUT_BANNER_MODE";
     private static final String BANNER_THEME_ENV = "MICRONAUT_BANNER_THEME";
@@ -43,13 +44,15 @@ record BannerTerminal(Function<String, @Nullable String> env, BooleanSupplier in
     private static final String WEZTERM_PROGRAM = "WezTerm";
     private static final String KITTY = "kitty";
     private static final String AUTO = "auto";
+    private static final String ANIMATED = "animated";
     private static final String THEME_LIGHT = "light";
 
     /**
+     * @param mode The mode set by the application
      * @return The terminal of this process
      */
-    static BannerTerminal current() {
-        return new BannerTerminal(System::getenv, BannerTerminal::isConsoleInteractive);
+    static BannerTerminal current(BannerMode mode) {
+        return new BannerTerminal(mode, System::getenv, BannerTerminal::isConsoleInteractive);
     }
 
     /**
@@ -77,15 +80,32 @@ record BannerTerminal(Function<String, @Nullable String> env, BooleanSupplier in
      * @return Whether this terminal displays images sent with the Kitty graphics protocol
      */
     boolean supportsImages() {
-        String mode = env.apply(BANNER_MODE_ENV);
-        if (mode != null) {
-            return switch (mode.trim().toLowerCase(Locale.ROOT)) {
-                case KITTY -> true;
-                case "", AUTO -> isDetectedKittyTerminal();
-                default -> false;
-            };
+        return switch (effectiveMode()) {
+            case AUTO, ANIMATED -> isDetectedKittyTerminal();
+            case KITTY -> true;
+            case ASCII -> false;
+        };
+    }
+
+    /**
+     * @return Whether the banner is an animated image, which {@link BannerMode#ANIMATED} enables
+     */
+    boolean animates() {
+        return effectiveMode() == BannerMode.ANIMATED && supportsImages();
+    }
+
+    private BannerMode effectiveMode() {
+        String override = env.apply(BANNER_MODE_ENV);
+        if (override == null) {
+            return mode;
         }
-        return isDetectedKittyTerminal();
+        return switch (override.trim().toLowerCase(Locale.ROOT)) {
+            case "" -> mode;
+            case AUTO -> BannerMode.AUTO;
+            case KITTY -> BannerMode.KITTY;
+            case ANIMATED -> BannerMode.ANIMATED;
+            default -> BannerMode.ASCII;
+        };
     }
 
     /**

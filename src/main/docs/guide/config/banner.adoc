@@ -28,6 +28,21 @@ MICRONAUT_BANNER_MODE=kitty ./gradlew run
 MICRONAUT_BANNER_MODE=kitty MICRONAUT_BANNER_THEME=light ./gradlew run
 ----
 
+To choose the mode in your `Application` class, call `bannerMode`. The `MICRONAUT_BANNER_MODE` environment variable takes precedence, so the mode can still be changed where the application runs:
+
+[source,java]
+----
+public class Application {
+
+    public static void main(String[] args) {
+        Micronaut.build(args)
+                 .bannerMode(BannerMode.ASCII) // <1>
+                 .start();
+    }
+}
+----
+<1> Set the mode to `AUTO` (the default), `KITTY`, `ASCII`, or `ANIMATED`
+
 To display your own image in these terminals, add a PNG at the following location. It is displayed at its pixel size and is included in GraalVM native images automatically:
 
 [source,text]
@@ -39,7 +54,9 @@ To use a different image in terminals with a light background, also add `src/mai
 
 In these terminals `banner.png` is used in preference to `micronaut-banner.txt`, so you can provide both and the text banner is printed everywhere else.
 
-You can provide an SVG image instead, at `src/main/resources/META-INF/micronaut/banner.svg` (and `banner-light.svg` for a light background). It is used in preference to `banner.png`, is rendered at its `width` and `height` in pixels, and can be animated with SMIL `<animate>` and `<animateTransform>` elements, which play once, or in a loop when an animation has `repeatCount="indefinite"`. The default Micronaut logo is such an animated SVG. Use `currentColor` to follow the terminal theme: it is white on a dark background and black on a light one.
+To animate the banner, set the `ANIMATED` mode. The `ANIMATED` mode (`MICRONAUT_BANNER_MODE=animated`) enables animated banners. It detects the terminal like `AUTO`, and in a terminal that displays images the default banner is an animated Micronaut logo. The animation starts as soon as the banner is printed and its frames are sent while the application starts, so the banner does not delay startup.
+
+In this mode you can provide an SVG image, at `src/main/resources/META-INF/micronaut/banner.svg` (and `banner-light.svg` for a light background). It is used in preference to `banner.png`, is rendered at its `width` and `height` in pixels, and can be animated with SMIL `<animate>` and `<animateTransform>` elements, which play once, or in a loop when an animation has `repeatCount="indefinite"`. Use `currentColor` to follow the terminal theme: it is white on a dark background and black on a light one. In the other modes `banner.svg` is ignored.
 
 [source,xml]
 ----
@@ -52,7 +69,7 @@ You can provide an SVG image instead, at `src/main/resources/META-INF/micronaut/
 </svg>
 ----
 
-The banner renderer supports a subset of SVG: the `path` (with every command), `polygon`, `polyline`, `line`, `rect`, `circle`, `ellipse`, `g` and nested `svg` elements, `image` elements with an embedded PNG (`data:image/png;base64,...`), `clipPath`, transforms, and the fill, stroke, opacity and `color` properties. Strokes always have round joins. Text, gradients, masks, filters and CSS style sheets are not rendered, so convert text to paths and CSS animations to SMIL. A terminal that displays images but not animations shows the image as it is when the animation ends.
+The banner renderer supports a subset of SVG: the `path` (with every command), `polygon`, `polyline`, `line`, `rect`, `circle`, `ellipse`, `g` and nested `svg` elements, `image` elements with an embedded PNG (`data:image/png;base64,...`), `clipPath`, transforms, and the fill, stroke, opacity and `color` properties. Strokes always have round joins. Text, gradients, masks, filters and CSS style sheets are not rendered, so convert text to paths and CSS animations to SMIL. A terminal that displays images but not animations shows the image as it is when the animation ends. Every frame that changes is sent to the terminal, so keep animations short: a long animation of a large image can send tens of megabytes.
 
 To disable it, modify your `Application` class:
 

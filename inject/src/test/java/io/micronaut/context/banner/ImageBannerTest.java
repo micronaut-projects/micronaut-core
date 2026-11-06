@@ -18,6 +18,7 @@ package io.micronaut.context.banner;
 import com.github.stefanbirkner.systemlambda.SystemLambda;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.Micronaut;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -26,6 +27,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -49,7 +51,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ImageBannerTest {
 
     private static final Pattern GRAPHICS = Pattern.compile("\u001B_G([^;]*);([^\u001B]*)\u001B\\\\");
-    private static final String ANIMATED_LOGO = "a=T,f=100,i=\\d+,q=2,r=6,m=1";
+    private static final String LOGO = "io/micronaut/context/banner/micronaut-banner/logo.png";
+    private static final String LOGO_LIGHT = "io/micronaut/context/banner/micronaut-banner/logo-light.png";
 
     @Test
     void largeImageIsSentInProtocolChunks(@TempDir Path dir) throws IOException {
@@ -112,6 +115,20 @@ class ImageBannerTest {
     }
 
     @Test
+    void applicationSetsTheModeUnlessTheEnvironmentOverridesIt() {
+        Map<String, String> kittyTerminal = Map.of("TERM", "xterm-kitty");
+        assertTrue(terminal(BannerMode.KITTY, Map.of(), false).supportsImages());
+        assertFalse(terminal(BannerMode.ASCII, kittyTerminal, true).supportsImages());
+        assertTrue(terminal(BannerMode.AUTO, kittyTerminal, true).supportsImages());
+        assertFalse(terminal(BannerMode.AUTO, kittyTerminal, false).supportsImages());
+
+        assertTrue(terminal(BannerMode.ASCII, Map.of("MICRONAUT_BANNER_MODE", "kitty"), false).supportsImages());
+        assertFalse(terminal(BannerMode.KITTY, Map.of("MICRONAUT_BANNER_MODE", "ascii"), false).supportsImages());
+        assertFalse(terminal(BannerMode.KITTY, Map.of("MICRONAUT_BANNER_MODE", "auto"), false).supportsImages());
+        assertTrue(terminal(BannerMode.KITTY, Map.of("MICRONAUT_BANNER_MODE", " "), false).supportsImages());
+    }
+
+    @Test
     void lightThemeIsDetectedFromTheBackgroundColor() {
         assertTrue(terminal(Map.of("COLORFGBG", "0;15"), true).isLightTheme());
         assertTrue(terminal(Map.of("COLORFGBG", "0;default;7"), true).isLightTheme());
@@ -149,12 +166,18 @@ class ImageBannerTest {
 
     @Test
     void defaultBannerPrintsTheLogoScaledToRows() throws IOException {
-        String dark = capture(out -> new MicronautBanner(out, terminal(Map.of("MICRONAUT_BANNER_MODE", "kitty"), false), Runnable::run).print());
-        String light = capture(out -> new MicronautBanner(out, terminal(Map.of("MICRONAUT_BANNER_MODE", "kitty", "MICRONAUT_BANNER_THEME", "light"), false), Runnable::run).print());
+        String dark = capture(out -> new MicronautBanner(out, terminal(Map.of("MICRONAUT_BANNER_MODE", "kitty"), false)).print());
+        String light = capture(out -> new MicronautBanner(out, terminal(Map.of("MICRONAUT_BANNER_MODE", "kitty", "MICRONAUT_BANNER_THEME", "light"), false)).print());
 
-        assertTrue(chunks(dark).get(0).control().matches(ANIMATED_LOGO), chunks(dark).get(0).control());
-        assertEquals(0xFFFFFF, inkColor(rootFrame(chunks(dark))), "the dark theme logo is white");
-        assertEquals(0x000000, inkColor(rootFrame(chunks(light))), "the light theme logo is black");
+        assertEquals("a=T,f=100,q=2,r=6,m=1", chunks(dark).get(0).control());
+        assertArrayEquals(resource(LOGO), decode(chunks(dark)));
+        assertArrayEquals(resource(LOGO_LIGHT), decode(chunks(light)));
+    }
+
+    @Test
+    void logoMatchesItsTheme() throws IOException {
+        assertEquals(0xFFFFFF, inkColor(resource(LOGO)), "the dark theme logo is white");
+        assertEquals(0x000000, inkColor(resource(LOGO_LIGHT)), "the light theme logo is black");
     }
 
     @Test
@@ -172,20 +195,6 @@ class ImageBannerTest {
     }
 
     @Test
-    void applicationSvgBannerIsPreferredOverItsPngBanner(@TempDir Path dir) throws Exception {
-        Files.createDirectories(dir.resolve("META-INF/micronaut"));
-        Files.write(dir.resolve(ImageBanner.RESOURCE), new byte[] {1, 2, 3, 4});
-        Files.writeString(dir.resolve(ImageBanner.SVG_RESOURCE), "<svg width='8' height='4'><rect width='8' height='4'/></svg>");
-
-        List<Chunk> chunks = chunks(applicationOutput(dir, "kitty"));
-
-        assertEquals(1, chunks.size());
-        BufferedImage image = ImageIO.read(new ByteArrayInputStream(decode(chunks)));
-        assertEquals(8, image.getWidth());
-        assertEquals(0xFF000000, image.getRGB(4, 2));
-    }
-
-    @Test
     void textBannerIsPreferredOverTheDefaultLogo(@TempDir Path dir) throws Exception {
         Files.writeString(dir.resolve("micronaut-banner.txt"), "custom text banner");
 
@@ -197,18 +206,31 @@ class ImageBannerTest {
 
     @Test
     void defaultLogoIsPrintedWithoutCustomBanners(@TempDir Path dir) throws Exception {
-        String control = chunks(applicationOutput(dir, "kitty")).get(0).control();
+        assertArrayEquals(resource(LOGO), decode(chunks(applicationOutput(dir, "kitty"))));
+    }
 
-        assertTrue(control.matches(ANIMATED_LOGO), control);
+    @Test
+    void modeSetOnTheApplicationSelectsTheBanner(@TempDir Path dir) throws Exception {
+        assertArrayEquals(resource(LOGO), decode(chunks(applicationOutput(dir, null, BannerMode.KITTY))));
+
+        String ascii = applicationOutput(dir, null, BannerMode.ASCII);
+        assertTrue(chunks(ascii).isEmpty());
+        assertTrue(ascii.contains("|  \\/  (_) ___ _ __ ___"), ascii);
+
+        assertTrue(chunks(applicationOutput(dir, "ascii", BannerMode.KITTY)).isEmpty());
     }
 
     private static String applicationOutput(Path dir, String mode) throws Exception {
+        return applicationOutput(dir, mode, BannerMode.AUTO);
+    }
+
+    private static String applicationOutput(Path dir, @Nullable String envMode, BannerMode mode) throws Exception {
         try (URLClassLoader classLoader = new URLClassLoader(new URL[] {dir.toUri().toURL()}, ImageBannerTest.class.getClassLoader())) {
             String[] output = new String[1];
-            SystemLambda.withEnvironmentVariable("MICRONAUT_BANNER_MODE", mode)
+            SystemLambda.withEnvironmentVariable("MICRONAUT_BANNER_MODE", envMode)
                 .and("MICRONAUT_BANNER_THEME", "dark")
                 .execute(() -> output[0] = SystemLambda.tapSystemOut(() -> {
-                    try (ApplicationContext ignored = Micronaut.build(new String[0]).classLoader(classLoader).deduceEnvironment(false).start()) {
+                    try (ApplicationContext ignored = Micronaut.build(new String[0]).bannerMode(mode).classLoader(classLoader).deduceEnvironment(false).start()) {
                         // only the banner printed by the start matters
                     }
                 }));
@@ -217,7 +239,11 @@ class ImageBannerTest {
     }
 
     private static BannerTerminal terminal(Map<String, String> env, boolean interactive) {
-        return new BannerTerminal(env::get, () -> interactive);
+        return terminal(BannerMode.AUTO, env, interactive);
+    }
+
+    private static BannerTerminal terminal(BannerMode mode, Map<String, String> env, boolean interactive) {
+        return new BannerTerminal(mode, env::get, () -> interactive);
     }
 
     private static String capture(ThrowingBanner banner) {
@@ -245,15 +271,10 @@ class ImageBannerTest {
         return Base64.getDecoder().decode(payload.toString());
     }
 
-    private static byte[] rootFrame(List<Chunk> chunks) {
-        List<Chunk> root = new ArrayList<>();
-        for (Chunk chunk : chunks) {
-            root.add(chunk);
-            if (chunk.control().endsWith("m=0")) {
-                return decode(root);
-            }
+    private static byte[] resource(String name) throws IOException {
+        try (InputStream stream = ImageBannerTest.class.getClassLoader().getResourceAsStream(name)) {
+            return stream.readAllBytes();
         }
-        throw new AssertionError("Unterminated image");
     }
 
     private static int inkColor(byte[] png) throws IOException {

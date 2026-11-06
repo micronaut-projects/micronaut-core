@@ -29,13 +29,15 @@ import java.util.Base64;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
 
 /**
  * Prints a banner from a PNG or SVG resource with the Kitty graphics protocol, which is implemented by
  * terminals such as Kitty, iTerm2 and WezTerm.
  *
- * <p>An SVG image may be animated with SMIL {@code <animate>} and {@code <animateTransform>}
- * elements: it is rendered to frames that are sent as a Kitty animation. The first frame sent is
+ * <p>With {@link BannerMode#ANIMATED}, an SVG image is used in preference to the PNG, and it may be
+ * animated with SMIL {@code <animate>} and {@code <animateTransform>} elements: it is rendered to
+ * frames that are sent as a Kitty animation. The first frame sent is
  * the image at the end of its animation, so a terminal that displays images but not animations
  * still shows the complete banner. See {@link SvgImage} for the supported subset of SVG.</p>
  *
@@ -66,8 +68,11 @@ public class ImageBanner implements Banner {
     public static final String LIGHT_SVG_RESOURCE = "META-INF/micronaut/banner-light.svg";
 
     private static final Logger LOG = LoggerFactory.getLogger(ImageBanner.class);
-    // The logo is drawn in currentColor, which is white on a dark background and black on a light one
-    private static final String LOGO = "io/micronaut/context/banner/micronaut-banner/logo.svg";
+    // The white logo, for the dark background terminals usually have
+    private static final String LOGO = "io/micronaut/context/banner/micronaut-banner/logo.png";
+    private static final String LOGO_LIGHT = "io/micronaut/context/banner/micronaut-banner/logo-light.png";
+    // The animated logo is drawn in currentColor, which is white on a dark background and black on a light one
+    private static final String ANIMATED_LOGO = "io/micronaut/context/banner/micronaut-banner/logo.svg";
     private static final int DARK_THEME_COLOR = 0xFFFFFFFF;
     private static final int LIGHT_THEME_COLOR = 0xFF000000;
     // Device pixels per terminal row an SVG scaled to rows is rendered with, enough for HiDPI displays
@@ -96,7 +101,7 @@ public class ImageBanner implements Banner {
 
     /**
      * Constructor for an image displayed at its pixel size. The terminal is not checked: use
-     * {@link #resolve(ResourceLoader, PrintStream)} unless the output is known to display images.
+     * {@link #resolve(ResourceLoader, PrintStream, BannerMode)} unless the output is known to display images.
      *
      * @param resource The PNG with the banner
      * @param out The print stream
@@ -127,16 +132,20 @@ public class ImageBanner implements Banner {
      *
      * @param resourceLoader The loader of the {@link #RESOURCE} and {@link #LIGHT_RESOURCE} images
      * @param out The print stream
+     * @param mode The banner mode
      * @return The banner, empty if the terminal displays no images or the application has no image
      */
-    public static Optional<Banner> resolve(ResourceLoader resourceLoader, PrintStream out) {
-        return resolve(BannerTerminal.current(), resourceLoader, out);
+    public static Optional<Banner> resolve(ResourceLoader resourceLoader, PrintStream out, BannerMode mode) {
+        return resolve(BannerTerminal.current(mode), resourceLoader, out);
     }
 
     static Optional<Banner> resolve(BannerTerminal terminal, ResourceLoader resourceLoader, PrintStream out) {
+        // an SVG banner is only used when animation is enabled, otherwise the PNG banner is
+        Optional<URL> svg = terminal.animates()
+            ? terminal.selectImage(resourceLoader::getResource, SVG_RESOURCE, LIGHT_SVG_RESOURCE)
+            : Optional.empty();
         int color = themeColor(terminal);
-        return terminal.selectImage(resourceLoader::getResource, SVG_RESOURCE, LIGHT_SVG_RESOURCE)
-            .or(() -> terminal.selectImage(resourceLoader::getResource, RESOURCE, LIGHT_RESOURCE))
+        return svg.or(() -> terminal.selectImage(resourceLoader::getResource, RESOURCE, LIGHT_RESOURCE))
             .map(image -> new ImageBanner(image, out, 0, color, BACKGROUND));
     }
 
@@ -150,8 +159,12 @@ public class ImageBanner implements Banner {
      */
     static boolean printLogo(BannerTerminal terminal, PrintStream out, Executor frames) {
         ClassLoader classLoader = ImageBanner.class.getClassLoader();
-        return terminal.selectImage(name -> Optional.ofNullable(classLoader.getResource(name)), LOGO, LOGO)
-            .map(logo -> new ImageBanner(logo, out, LOGO_ROWS, themeColor(terminal), frames).printImage())
+        Function<String, Optional<URL>> lookup = name -> Optional.ofNullable(classLoader.getResource(name));
+        Optional<URL> logo = terminal.animates()
+            ? terminal.selectImage(lookup, ANIMATED_LOGO, ANIMATED_LOGO)
+            : terminal.selectImage(lookup, LOGO, LOGO_LIGHT);
+        return logo
+            .map(image -> new ImageBanner(image, out, LOGO_ROWS, themeColor(terminal), frames).printImage())
             .orElse(false);
     }
 
