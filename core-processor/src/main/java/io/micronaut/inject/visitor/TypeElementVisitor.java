@@ -158,6 +158,24 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
      * {@link VisitorContext#registerBean(ClassElement, io.micronaut.inject.ast.Element...)} is written by every
      * compiler, javac, KSP, Groovy and Python. A source generated here is not visited anymore.</p>
      *
+     * <p>An incremental compilation compiles the changed sources only, so the visitor sees only them, here as in
+     * every other method. A bean added here is therefore written as an output of all its originating elements, and
+     * has to be given every class it follows from as originating element, for an incremental build to compile those
+     * classes again with any of them:</p>
+     *
+     * <ul>
+     *     <li>javac: every originating element is passed to the filer, also to the filer of Gradle, which tracks an
+     *     isolating processor's outputs by a single originating type. A bean with originating elements in several
+     *     types makes Gradle compile every source in the next incremental compilation, which is what keeps the bean
+     *     right, at the cost of incremental compilation.</li>
+     *     <li>KSP: the bean is written as an aggregating output of the files of its originating elements, which KSP
+     *     writes again, processing those files again, whenever a source of the compilation is changed, added or
+     *     removed.</li>
+     *     <li>Groovy and Python: the originating elements are not reported to the build. Neither compiler tracks the
+     *     origins of what the visitors write, and an incremental Python compilation visits the changed Python classes
+     *     only.</li>
+     * </ul>
+     *
      * <p>Where each compiler calls it:</p>
      *
      * <ul>
@@ -166,9 +184,13 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
      *     source generated there is compiled, but javac warns that it is not processed.</li>
      *     <li>KSP: from {@code SymbolProcessor.finish}. KSP invalidates the elements of a round when the round ends,
      *     so an element kept from a {@code visit} method or from {@link #finishRound(VisitorContext)} must not be used
-     *     here: look the classes up again by name, with {@link VisitorContext#getClassElement(String)}.</li>
+     *     here: look the classes up again by name, with {@link VisitorContext#getClassElement(String)}, which resolves
+     *     them anew.</li>
      *     <li>Groovy: at class generation, after the last round.</li>
-     *     <li>Python: after the single round of the compilation.</li>
+     *     <li>Python: once, after the single round of the Python classes. javac then compiles the Java classes
+     *     generated for them in the same compilation, and the visitors of every class visit them again there, but
+     *     javac does not call this method again, so that such a visitor does not contribute a Python class twice. It
+     *     is not called either for the Java sources compiled together with Python sources.</li>
      * </ul>
      *
      * @param visitorContext The visitor context

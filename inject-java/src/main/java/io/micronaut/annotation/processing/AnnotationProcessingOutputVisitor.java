@@ -59,6 +59,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     private final Map<String, Optional<GeneratedFile>> generatedFiles = new LinkedHashMap<>();
     private final boolean isGradleFiler;
     private boolean finalRound;
+    private boolean everyOriginatingElement;
 
     /**
      * @param filer The {@link Filer} for creating new files
@@ -86,6 +87,22 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         this.finalRound = true;
     }
 
+    /**
+     * Sets whether the files visited from now on are written with every originating element, as the outputs of
+     * everything the compilation contained, instead of the first originating element only for the filer of Gradle.
+     *
+     * <p>The filer of an isolating Gradle processor tracks a file with exactly one originating type, and recompiles
+     * every source in the next incremental compilation when a file has several. A file written once every round is
+     * over, for what several types contained, has to be recompiled with them, so it is written with all of them.</p>
+     *
+     * @param everyOriginatingElement Whether every originating element is passed to the filer
+     * @since 5.3.0
+     */
+    @Internal
+    public void setEveryOriginatingElement(boolean everyOriginatingElement) {
+        this.everyOriginatingElement = everyOriginatingElement;
+    }
+
     private static boolean isEclipseFiler(Filer filer) {
         return filer != null && filer.getClass().getTypeName().startsWith("org.eclipse.jdt");
     }
@@ -97,31 +114,13 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
     @Override
     public OutputStream visitClass(String classname, io.micronaut.inject.ast.Element... originatingElements) throws IOException {
-        JavaFileObject javaFileObject;
         Element[] nativeOriginatingElements;
-        if (ArrayUtils.isNotEmpty(originatingElements)) {
-            if (isGradleFiler) {
-                // gradle filer only support single originating element for isolating processors
-                final io.micronaut.inject.ast.Element e = originatingElements[0];
-                final Object nativeType = e.getNativeType();
-                if (nativeType instanceof JavaNativeElement javaNativeElement) {
-                    nativeOriginatingElements = new Element[] {javaNativeElement.element()};
-                } else {
-                    nativeOriginatingElements = ELEMENTS_EMPTY_ARRAY;
-                }
-            } else {
-                // other compilers like the IntelliJ compiler support multiple
-                var list = new ArrayList<Element>(originatingElements.length);
-                for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
-                    Object nativeType = originatingElement.getNativeType();
-                    if (nativeType instanceof JavaNativeElement javaNativeElement) {
-                        list.add(javaNativeElement.element());
-                    }
-                }
-                nativeOriginatingElements = list.toArray(ELEMENTS_EMPTY_ARRAY);
-            }
+        if (isGradleFiler && !everyOriginatingElement && ArrayUtils.isNotEmpty(originatingElements)) {
+            // gradle filer only support single originating element for isolating processors
+            nativeOriginatingElements = toJavaElements(originatingElements[0]);
         } else {
-            nativeOriginatingElements = ELEMENTS_EMPTY_ARRAY;
+            // other compilers like the IntelliJ compiler support multiple
+            nativeOriginatingElements = toJavaElements(originatingElements);
         }
         if (finalRound) {
             int lastDot = classname.lastIndexOf('.');
@@ -129,21 +128,55 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
             String fileName = classname.substring(lastDot + 1) + JavaFileObject.Kind.CLASS.extension;
             return filer.createResource(StandardLocation.CLASS_OUTPUT, packageName, fileName, nativeOriginatingElements).openOutputStream();
         }
-        javaFileObject = filer.createClassFile(classname, nativeOriginatingElements);
-        return javaFileObject.openOutputStream();
+        return filer.createClassFile(classname, nativeOriginatingElements).openOutputStream();
+    }
+
+    private static Element[] toJavaElements(io.micronaut.inject.ast.@Nullable Element... originatingElements) {
+        if (ArrayUtils.isEmpty(originatingElements)) {
+            return ELEMENTS_EMPTY_ARRAY;
+        }
+        var list = new ArrayList<Element>(originatingElements.length);
+        for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
+            if (originatingElement != null && originatingElement.getNativeType() instanceof JavaNativeElement javaNativeElement) {
+                list.add(javaNativeElement.element());
+            }
+        }
+        return list.toArray(ELEMENTS_EMPTY_ARRAY);
     }
 
     @Override
-    @SuppressWarnings("java:S1075")
     public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement) {
+        Element element = originatingElement instanceof ElementProvider jne ? jne.element() : null;
+        writeServiceDescriptor(type, classname, element);
+    }
+
+    /**
+     * Writes the service entry of a generated class, with the first of its originating elements, or with every one
+     * of them once {@link #setEveryOriginatingElement(boolean)} is set, like the class itself.
+     *
+     * @param type                The fully qualified service name
+     * @param classname           The fully qualified class name
+     * @param originatingElements The originating elements of the class
+     * @since 5.3.0
+     */
+    @Internal
+    public void visitServiceEntry(String type, String classname, io.micronaut.inject.ast.Element... originatingElements) {
+        if (everyOriginatingElement || ArrayUtils.isEmpty(originatingElements)) {
+            writeServiceDescriptor(type, classname, toJavaElements(originatingElements));
+        } else {
+            visitServiceDescriptor(type, classname, originatingElements[0]);
+        }
+    }
+
+    @SuppressWarnings("java:S1075")
+    private void writeServiceDescriptor(String type, String classname, Element... originatingElements) {
         final String path = "META-INF/micronaut/" + type + "/" + classname;
         try {
-            Element element = originatingElement instanceof ElementProvider jne ? jne.element() : null;
             final FileObject fileObject = filer.createResource(
                 StandardLocation.CLASS_OUTPUT,
                 "",
                 path,
-                element
+                originatingElements
             );
             try (Writer w = fileObject.openWriter()) {
                 w.write("");

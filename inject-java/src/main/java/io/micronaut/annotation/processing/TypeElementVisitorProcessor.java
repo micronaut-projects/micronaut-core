@@ -136,6 +136,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      * The number of bean definitions written for each name, over every round.
      */
     private final Map<String, Integer> beanNameCounts = new HashMap<>();
+    /**
+     * Whether the compilation contains the Java classes the Python compiler generated for its Python classes: the
+     * Python compiler has then finished the compilation of the visitors already.
+     */
+    private boolean compilesPython;
 
     /**
      * The visited annotation names.
@@ -336,6 +341,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     }
                 }
 
+                for (JavaClassElement javaClassElement : javaClassElements) {
+                    compilesPython |= isGeneratedForPython(javaClassElement);
+                }
                 for (LoadedVisitor loadedVisitor : loadedVisitors) {
                     for (JavaClassElement javaClassElement : javaClassElements) {
                         try {
@@ -363,10 +371,19 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 // nothing generated in the final round is processed, so it is not a round for the visitors
                 finishVisitors("the round", TypeElementVisitor::finishRound);
             } else {
-                // every round is over: the beans registered now are written below, in the final round
+                // every round is over: the beans registered now are written below, in the final round, with every
+                // originating element, since they follow from what the whole compilation contained
                 classWriterOutputVisitor.finalRound();
+                classWriterOutputVisitor.setEveryOriginatingElement(true);
                 javaVisitorContext.finalRound();
-                finishVisitors("the compilation", TypeElementVisitor::finishCompilation);
+                // The Python compiler finishes the compilation of the Python classes itself. The visitors of every
+                // class visit them again here, as the Java classes generated for them, so finishing the compilation
+                // again would contribute them twice
+                if (!compilesPython) {
+                    javaVisitorContext.setEveryOriginatingElement(true);
+                    finishVisitors("the compilation", TypeElementVisitor::finishCompilation);
+                    javaVisitorContext.setEveryOriginatingElement(false);
+                }
             }
 
             for (LoadedVisitor loadedVisitor : loadedVisitors) {

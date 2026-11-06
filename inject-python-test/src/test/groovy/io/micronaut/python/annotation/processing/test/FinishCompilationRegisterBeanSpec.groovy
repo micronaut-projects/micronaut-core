@@ -22,11 +22,11 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.visitor.rounds.Recorded
 import io.micronaut.inject.visitor.rounds.RegisteredRecord
-import io.micronaut.python.processing.element.PythonClassElement
 
 /**
- * A bean registered from {@link TypeElementVisitor#finishCompilation(VisitorContext)} is written for a Python
- * compilation, with what every class of the compilation contained.
+ * A bean registered from {@link TypeElementVisitor#finishCompilation(VisitorContext)} is written once for a Python
+ * compilation, with what every class of the compilation contained, by a visitor of every class: javac visits the Java
+ * classes generated for the Python classes again, but does not finish the compilation again.
  */
 class FinishCompilationRegisterBeanSpec extends AbstractPythonTypeElementSpec {
 
@@ -40,7 +40,8 @@ class CompiledSecond:
     pass
 ''')
 
-        expect:
+        expect:"one bean, for the Python classes, which the visitor also visited as the Java classes generated for them"
+        context.getBeansOfType(RegisteredRecord, Qualifiers.byName('compilation')).size() == 1
         context.getBeanDefinition(RegisteredRecord, Qualifiers.byName('compilation'))
                 .stringValues(Recorded, 'classes') as List == ['python.CompiledFirst', 'python.CompiledSecond']
         context.getBean(RegisteredRecord, Qualifiers.byName('compilation')) instanceof RegisteredRecord
@@ -50,8 +51,8 @@ class CompiledSecond:
     }
 
     /**
-     * Registers a bean of {@link RegisteredRecord} once the compilation is finished, for the Python classes whose
-     * name starts with {@code Compiled}.
+     * Registers a bean of {@link RegisteredRecord} once the compilation is finished, for the classes whose name
+     * starts with {@code Compiled}, whatever their language.
      */
     static class CompilationRecordingVisitor implements TypeElementVisitor<Object, Object> {
 
@@ -64,7 +65,7 @@ class CompiledSecond:
 
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
-            if (element instanceof PythonClassElement && element.simpleName.startsWith('Compiled')) {
+            if (element.simpleName.startsWith('Compiled')) {
                 compiled.add(element.name)
             }
         }

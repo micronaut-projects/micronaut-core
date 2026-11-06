@@ -207,8 +207,10 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
 
     override fun finish() {
         try {
-            // every round is over, but the classes can still be looked up by name: the beans registered now are
-            // written before the visitors finish
+            // every round is over, but the classes can still be looked up by name, anew: the beans registered now are
+            // written before the visitors finish, as aggregating outputs of their originating files
+            visitorContext.clearSymbolCaches()
+            visitorContext.finishingCompilation = true
             for (loadedVisitor in loadedVisitors) {
                 visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
                 try {
@@ -221,6 +223,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 }
             }
             writeBeanElementBuilders()
+            visitorContext.finishingCompilation = false
             visitorContext.finishing = true
             for (loadedVisitor in loadedVisitors) {
                 visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING

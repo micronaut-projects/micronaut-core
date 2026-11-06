@@ -95,6 +95,9 @@ public class RoundsVisitor implements TypeElementVisitor<Object, Object> {
 
     @Override
     public void finishRound(VisitorContext context) {
+        // the classes are looked up by name at the end of every round, the last one included, so that a compiler
+        // caching the lookups has them cached when the compilation is finished
+        compiledClasses.forEach(context::getClassElement);
         if (round.isEmpty()) {
             return;
         }
@@ -133,9 +136,9 @@ public class RoundsVisitor implements TypeElementVisitor<Object, Object> {
         }
         List<String> classes = compiledClasses.stream().sorted().toList();
         EVENTS.add(COMPILATION + classes);
-        // the elements of the rounds may be invalid by now (KSP), so the classes are looked up again
+        // the elements of the rounds may be invalid by now (KSP), so the classes are looked up again by name
         ClassElement[] originatingElements = classes.stream()
-            .map(name -> context.getRequiredClassElement(name, context.getElementAnnotationMetadataFactory()))
+            .map(name -> context.getClassElement(name).orElseThrow(() -> new IllegalStateException("No class " + name)))
             .toArray(ClassElement[]::new);
         ClassElement beanType = context.getRequiredClassElement(RegisteredRecord.class.getName(), context.getElementAnnotationMetadataFactory());
         context.registerBean(beanType, originatingElements)

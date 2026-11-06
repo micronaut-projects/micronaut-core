@@ -297,6 +297,17 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     /**
+     * Sets whether the files the visitors write from now on carry every originating element, see
+     * {@link AnnotationProcessingOutputVisitor#setEveryOriginatingElement(boolean)}.
+     *
+     * @param everyOriginatingElement Whether every originating element is passed to the filer
+     * @since 5.3.0
+     */
+    public void setEveryOriginatingElement(boolean everyOriginatingElement) {
+        outputVisitor.setEveryOriginatingElement(everyOriginatingElement);
+    }
+
+    /**
      * Resolves a type element by name, caching the resolved symbol for the current round. Only
      * successful lookups are cached: a name that does not resolve yet may resolve in a later round.
      *
