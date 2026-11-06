@@ -502,7 +502,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public ConnectionHandler build() {
             connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
-            Http2FrameListener fl = decompress ? new DelegatingDecompressorFrameListener(connection(), frameListener, false) {
+            Http2FrameListener fl = decompress ? new DelegatingDecompressorFrameListener(connection(), frameListener, false, 0) {
                 @Override
                 protected @Nullable EmbeddedChannel newContentDecompressor(ChannelHandlerContext ctx, CharSequence contentEncoding) throws Http2Exception {
                     ZlibWrapper wrapper;
