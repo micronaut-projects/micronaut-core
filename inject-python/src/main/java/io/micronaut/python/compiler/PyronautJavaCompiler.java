@@ -412,6 +412,8 @@ final class PyronautJavaCompiler {
      * The class loader of the annotation processors for a compilation. A session keeps its class loader from one
      * compilation to the next, so it never holds the output of the compilations: a class it loaded from there would
      * be the one it serves after the source changed. The compiler itself resolves the output, through its class path.
+     * A compilation without a session gets a new class loader each time and keeps the output on it, so a processor that
+     * loads a class from there finds it only without a session.
      */
     private ClassLoader processorClassLoader(List<File> processorClasspath, @Nullable File outputDirectory) {
         try (var _ = CompilationProfiler.span(profiler, "javac.processor-class-loader")) {
