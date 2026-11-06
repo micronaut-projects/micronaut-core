@@ -333,6 +333,22 @@ final class RestartRequests implements RequestAdmission {
     }
 
     /**
+     * Whether a generation created an HTTP server yet.
+     *
+     * @param generation The generation
+     * @return Whether it did
+     */
+    static boolean anyServer(ApplicationContext generation) {
+        try {
+            return !generation.getActiveBeanRegistrations(EmbeddedServer.class).isEmpty();
+        } catch (RuntimeException e) {
+            // a context stopped meanwhile runs no server
+            LOG.debug("Cannot look up the servers of a generation", e);
+            return false;
+        }
+    }
+
+    /**
      * Waits, briefly, for the HTTP servers of a generation that just started: the application starts them after its
      * context, on its own thread.
      */

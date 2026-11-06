@@ -67,6 +67,26 @@ class DefaultBeanIntrospectorTest {
     }
 
     @Test
+    void introspectionOfAnotherClassLoadersClassOfTheSameNameIsNotReturned() throws Exception {
+        // each deployment of a container defines its own copy of a class, under the same name
+        Path classesDir = tempDir.resolve("classes");
+        compileChildLoaderIntrospection(classesDir);
+        writeMicronautServiceEntry(classesDir);
+
+        URL[] urls = { classesDir.toUri().toURL() };
+        try (URLClassLoader firstDeployment = new URLClassLoader(urls, getClass().getClassLoader());
+             URLClassLoader secondDeployment = new URLClassLoader(urls, getClass().getClassLoader())) {
+            DefaultBeanIntrospector introspector = new DefaultBeanIntrospector(firstDeployment);
+            Class<?> firstType = firstDeployment.loadClass("example.ChildBean");
+            Class<?> secondType = secondDeployment.loadClass("example.ChildBean");
+
+            assertNotEquals(firstType, secondType);
+            assertEquals(firstType, introspector.findIntrospection(firstType).orElseThrow().getBeanType());
+            assertEquals(secondType, introspector.findIntrospection(secondType).orElseThrow().getBeanType());
+        }
+    }
+
+    @Test
     void beanClassLoaderWithItsOwnCoreIsALookupMiss() throws Exception {
         // the Fn testing harness runs Micronaut in its own class loader while the test types come from the application
         // class loader, whose introspections implement a BeanIntrospectionReference that is not the one of the introspector

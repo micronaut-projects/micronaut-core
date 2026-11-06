@@ -98,13 +98,10 @@ class BalancedClientLifecycleSpec extends Specification {
         def closed = ctx.createBean(HttpClient, server.URL)
         closed.close()
 
-        when:
-        def firstPort = live.toBlocking().retrieve('/balanced-client/port')
+        when: 'the pooled connection is reused'
+        def firstPort = portOfAReusedConnection(live)
 
-        then: 'the pooled connection is reused'
-        live.toBlocking().retrieve('/balanced-client/port') == firstPort
-
-        when:
+        and:
         ctx.getBean(Argument.of(ApplicationEventPublisher, RefreshEvent)).publishEvent(new RefreshEvent())
 
         then: 'the live client dropped its connection'
@@ -116,6 +113,21 @@ class BalancedClientLifecycleSpec extends Specification {
         cleanup:
         live.close()
         server.close()
+    }
+
+    /**
+     * A response can arrive before its connection is back in the pool, and the next request then opens another one.
+     */
+    private static String portOfAReusedConnection(HttpClient client) {
+        def previous = client.toBlocking().retrieve('/balanced-client/port')
+        for (int i = 0; i < 50; i++) {
+            def port = client.toBlocking().retrieve('/balanced-client/port')
+            if (port == previous) {
+                return port
+            }
+            previous = port
+        }
+        throw new IllegalStateException('No connection was reused')
     }
 
     private static ConnectionManager connectionManager(Object client) {
