@@ -57,11 +57,11 @@ import java.util.stream.Stream;
  * same GraalPy read too.</p>
  *
  * <p>The first run seeds the tree in the background and the application does not wait for it: a generation started
- * before it is complete uses the real standard library. The tree is built under a temporary name and renamed once complete,
- * so that a context never sees half of it, and of two processes seeding at once the first rename wins. A tree is named
- * after the GraalPy version and the location and time of the real standard library. Python checks each bytecode file
- * against the time and size of its source, through the link, so a file that does not match is compiled from its source
- * as it would be without this.</p>
+ * before it is complete uses the real standard library. The tree is built under a temporary name and renamed once
+ * complete, so that a context never sees half of it, and of two processes seeding at once the first rename wins. A tree
+ * is named after the GraalPy version and the location and time of the real standard library. Python checks each
+ * bytecode file against the time and size of its source, through the link, so a file that does not match is compiled
+ * from its source as it would be without this.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -74,6 +74,7 @@ final class PythonStdlibBytecode {
     private static final String COMPLETE = ".complete";
     private static final String CURRENT = ".current";
     private static final String PYCACHE = "__pycache__";
+    private static final String COMPILATION = "engine.Compilation";
     private static final Duration ABANDONED = Duration.ofHours(1);
     /**
      * A file only present in a usable standard library; a link to it dangles once the real one is gone.
@@ -108,8 +109,8 @@ final class PythonStdlibBytecode {
     }
 
     /**
-     * The standard library for the generation about to start. The first call looks for the tree of an earlier run and starts
-     * seeding in the background, which leaves such a tree alone when it is still the right one.
+     * The standard library for the generation about to start. The first call looks for the tree of an earlier run and
+     * starts seeding in the background, which leaves such a tree alone when it is still the right one.
      *
      * @return The directory for {@code python.StdLibHome}, or null to leave the real standard library in place
      */
@@ -154,7 +155,8 @@ final class PythonStdlibBytecode {
     }
 
     /**
-     * Finds the tree of the real standard library, seeding it unless it exists, and uses it from the next generation on.
+     * Finds the tree of the real standard library, seeding it unless it exists, and uses it from the next generation
+     * on.
      */
     void seed() {
         try {
@@ -209,7 +211,8 @@ final class PythonStdlibBytecode {
     }
 
     /**
-     * What a process killed while it was seeding left behind, which nothing else would ever remove from this directory.
+     * What a process killed while it was seeding left behind, which nothing else would ever remove from this
+     * directory.
      */
     private void deleteAbandoned(Path target) throws IOException {
         List<Path> abandoned;
@@ -238,7 +241,8 @@ final class PythonStdlibBytecode {
 
     /**
      * Whether a tree still has everything it was built with: a cleaner of old files may have taken part of it, and a
-     * module missing from it would fail to import. Walks the tree, so this is for the start of a process, not a generation.
+     * module missing from it would fail to import. Walks the tree, so this is for the start of a process, not of a
+     * generation.
      */
     private static boolean whole(Path candidate) {
         if (!usable(candidate)) {
@@ -333,10 +337,24 @@ final class PythonStdlibBytecode {
             .option("python.PosixModuleBackend", "java")
             .out(OutputStream.nullOutputStream())
             .err(OutputStream.nullOutputStream());
+        if (compilationIsAnOption()) {
+            // runs once, so nothing gained: and the first engine that compiles sizes the JVM's one queue of compiler
+            // threads, which the engine of the application limits to one, as seeding would otherwise leave it at several
+            builder.option(COMPILATION, Boolean.FALSE.toString());
+        }
         if (standardLibrary != null) {
             builder.option("python.StdLibHome", standardLibrary.toString());
         }
         return builder.build();
+    }
+
+    /**
+     * @return Whether the active Truffle runtime knows the option, which only the optimizing runtime does
+     */
+    private static boolean compilationIsAnOption() {
+        try (Engine probe = Engine.create()) {
+            return probe.getOptions().get(COMPILATION) != null;
+        }
     }
 
     private static Engine engine() {
