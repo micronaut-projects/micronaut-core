@@ -19,6 +19,7 @@ import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.beandefinition.SharedInterceptorRegistrations;
+import io.micronaut.context.AbstractBeanResolutionContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -40,7 +41,7 @@ import java.util.List;
  * The default {@link RuntimeProxyDefinition}.
  *
  * @param proxyBeanDefinition The proxy bean definition
- * @param resolutionContext   The bean resolution context
+ * @param resolutionContext   The bean resolution context, for a proxy target the one the proxy resolves its target through
  * @param interceptedMethods  The intercepted methods
  * @param introduction        Whether the proxy is an introduction
  * @param proxyTarget         Whether the proxy is a proxy target bean
@@ -94,6 +95,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                                                               Object[] constructorValues) {
 
         Collection<ExecutableMethod<T, ?>> executableMethods;
+        BeanDefinition<T> targetDefinition = null;
         // The qualifier is only current while the proxy is created, so it is kept to resolve the target on each call
         Qualifier<T> targetQualifier = (Qualifier<T>) resolutionContext.getCurrentQualifier();
         if (isProxyTarget) {
@@ -101,9 +103,8 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
             BeanContext beanContext = resolutionContext
                 .getContext();
             Argument<T> argument = Argument.of(beanType);
-            executableMethods = beanContext
-                .getProxyTargetBeanDefinition(argument, targetQualifier)
-                .getExecutableMethods();
+            targetDefinition = beanContext.getProxyTargetBeanDefinition(argument, targetQualifier);
+            executableMethods = targetDefinition.getExecutableMethods();
         } else {
             executableMethods = proxyBeanDefinition.getExecutableMethods();
         }
@@ -122,7 +123,10 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                 interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) executableMethod, (Interceptor[]) methodInterceptors));
             }
         }
-        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, isProxyTarget, constructorValues, targetQualifier);
+        // The proxy can resolve its target on every call and from any thread, long after this resolution is over
+        BeanResolutionContext retained = targetDefinition != null && resolutionContext instanceof AbstractBeanResolutionContext creating
+            ? creating.copyForRuntimeProxyTarget(targetDefinition) : resolutionContext;
+        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, retained, interceptedMethods, false, isProxyTarget, constructorValues, targetQualifier);
     }
 
     /**
@@ -190,7 +194,9 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         Argument<T> argument = Argument.of(beanType);
         BeanDefinition<T> proxyTargetBeanDefinition = beanContext
             .getProxyTargetBeanDefinition(argument, targetQualifier);
-        return resolutionContext.getProxyTargetBean(proxyTargetBeanDefinition, argument, targetQualifier);
+        BeanResolutionContext context = resolutionContext instanceof AbstractBeanResolutionContext retained
+            ? retained.runtimeProxyTargetContext() : resolutionContext;
+        return context.getProxyTargetBean(proxyTargetBeanDefinition, argument, targetQualifier);
     }
 
     @Override
