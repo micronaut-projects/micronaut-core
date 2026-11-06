@@ -463,6 +463,153 @@ class DevRuntimeTest {
     }
 
     @Test
+    void aConfigurationFileThatCannotBeReadLeavesTheGenerationRunningUntilItIsCorrected() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Path application = src.resolve("Application.java");
+        String source = """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", -1)).start();
+                }
+            }
+            """;
+        Files.writeString(application, source);
+        Path config = Files.createDirectories(project.resolve("src/main/resources")).resolve("application.json");
+        Files.writeString(config, "{\"app\": {\"label\": \"alpha\"}}");
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+
+            // the file does not parse: the generation carries on with what it read
+            Files.writeString(config, "{\"app\": ");
+            runtime.changed(List.of(config), List.of());
+            assertEquals(1, runtime.generation());
+            assertTrue(first.isRunning());
+            assertEquals("alpha", first.getEnvironment().getProperty("app.label", String.class).orElse(null));
+
+            // nor does a class change start a generation that could not read the file
+            Files.writeString(application, source + "class Added {}\n");
+            runtime.changed(List.of(application), List.of());
+            assertEquals(1, runtime.generation());
+            assertTrue(first.isRunning());
+
+            // corrected, what waited is applied, the class change with it
+            Files.writeString(config, "{\"app\": {\"label\": \"beta\"}}");
+            runtime.changed(List.of(config), List.of());
+            assertEquals(2, runtime.generation());
+            assertFalse(first.isRunning());
+            assertEquals("beta", runtime.context().orElseThrow().getEnvironment().getProperty("app.label", String.class).orElse(null));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aStartThatCannotReadItsConfigurationLeavesTheLauncherUp() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Path application = src.resolve("Application.java");
+        String good = """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", -1)).start();
+                }
+            }
+            """;
+        Files.writeString(application, good);
+        Path config = Files.createDirectories(project.resolve("src/main/resources")).resolve("application.json");
+        String readable = "{\"app\": {\"label\": \"alpha\"}}";
+        Files.writeString(config, readable);
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            // the main fails, so no generation runs when the file breaks: the next start has to read it, and cannot
+            Files.writeString(application, good.replace("io.micronaut.runtime.Micronaut.build", "if (true) { throw new IllegalStateException(\"fails\"); } io.micronaut.runtime.Micronaut.build"));
+            runtime.changed(List.of(application), List.of());
+            assertTrue(runtime.context().isEmpty() || !runtime.context().orElseThrow().isRunning());
+            Files.writeString(config, "{\"app\": ");
+            Files.writeString(application, good);
+            runtime.changed(List.of(application, config), List.of());
+            assertTrue(runtime.context().isEmpty() || !runtime.context().orElseThrow().isRunning());
+
+            // this test is still running, and the correction starts the application
+            Files.writeString(config, readable);
+            runtime.changed(List.of(config), List.of());
+            assertTrue(runtime.context().orElseThrow().isRunning());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aConfigurationFileCorrectedAsItWasLeavesTheGenerationAsItIs() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", -1)).start();
+                }
+            }
+            """);
+        Path config = Files.createDirectories(project.resolve("src/main/resources")).resolve("application.json");
+        String good = "{\"app\": {\"label\": \"alpha\"}}";
+        Files.writeString(config, good);
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            Files.writeString(config, "{\"app\": ");
+            runtime.changed(List.of(config), List.of());
+            Files.writeString(config, good);
+            runtime.changed(List.of(config), List.of());
+            assertEquals(1, runtime.generation());
+            assertTrue(first.isRunning());
+            assertEquals("alpha", first.getEnvironment().getProperty("app.label", String.class).orElse(null));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
     void aLateReportOfAWriteOfADeletedStaticFileIsSettledAsADeletion() throws Exception {
         Path src = Files.createDirectories(project.resolve("src/main/java/app"));
         Files.writeString(src.resolve("Application.java"), """
