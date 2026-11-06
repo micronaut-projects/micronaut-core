@@ -54,6 +54,9 @@ public final class StreamingFileUploadBinder implements TypedRequestArgumentBind
     @Override
     public BindingResult<StreamingFileUpload> bindForFormRequest(ArgumentConversionContext<StreamingFileUpload> context,
                                                                FormCapableHttpRequest<?> request) {
+        if (request.getContentType().isEmpty() || !request.hasFormBody()) {
+            return BindingResult.unsatisfied();
+        }
 
         Argument<StreamingFileUpload> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());

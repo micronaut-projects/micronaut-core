@@ -1199,7 +1199,9 @@ final class BeanWatchRegistry {
         @SuppressWarnings("unchecked")
         private Collection<BeanDefinition<T>> current() {
             if (beanType != null) {
-                return context.getBeanDefinitions(beanType, qualifier);
+                // a watch of every type asks for no bean in particular, so that a definition whose class is absent is
+                // none of its concern, where a lookup of the bean's own type is told why it failed
+                return isEveryType(beanType) ? context.definitionsOfEveryType(qualifier) : context.getBeanDefinitions(beanType, qualifier);
             }
             return (Collection<BeanDefinition<T>>) (Collection<?>) context.getBeanDefinitions((Qualifier<Object>) qualifier);
         }

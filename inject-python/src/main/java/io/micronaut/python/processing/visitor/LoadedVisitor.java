@@ -33,8 +33,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 @Internal
 final class LoadedVisitor implements Ordered {
 
-    private static final String OBJECT_CLASS = Object.class.getName();
-
     private final TypeElementVisitor<?, ?> visitor;
     private final String classAnnotation;
     private final String elementAnnotation;

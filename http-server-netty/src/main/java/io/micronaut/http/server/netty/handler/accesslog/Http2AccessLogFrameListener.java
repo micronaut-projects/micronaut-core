@@ -40,7 +40,18 @@ public final class Http2AccessLogFrameListener extends Http2FrameListenerDecorat
     }
 
     private void logHeaders(ChannelHandlerContext ctx, int streamId, Http2Headers headers) throws Http2Exception {
-        HttpRequest request = HttpConversionUtil.toHttpRequest(streamId, headers, false);
+        if (headers.method() == null) {
+            // trailers, or a malformed request that the delegate rejects with a stream error
+            return;
+        }
+        HttpRequest request;
+        try {
+            request = HttpConversionUtil.toHttpRequest(streamId, headers, false);
+        } catch (RuntimeException e) {
+            // malformed request (e.g. no :path). Leave it to the delegate, which resets only this
+            // stream. Failing here would be treated as a connection error.
+            return;
+        }
         manager.logHeaders(ctx, streamId, request);
     }
 

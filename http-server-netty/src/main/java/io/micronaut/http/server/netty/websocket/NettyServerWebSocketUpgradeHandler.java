@@ -330,6 +330,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             try {
                 pipeline.remove(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER);
             } catch (NoSuchElementException ignored) {
+                // the access logger is optional and may not be in the pipeline
             }
 
             // the connection of a WebSocket route reads once its handlers are done, see

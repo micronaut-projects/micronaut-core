@@ -199,7 +199,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     }
                     return dispatchClientCall(
                         context, returnType, reactiveValueType, httpMethod, httpMethodName, clientMethod,
-                        interceptedMethod, annotationMetadata, httpClient, errorType, valueType, declaringType);
+                        interceptedMethod, httpClient, errorType, valueType, declaringType);
                 } finally {
                     if (kotlinScope != null) {
                         kotlinScope.close();
@@ -221,7 +221,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                       String httpMethodName,
                                       ClientMethod clientMethod,
                                       InterceptedMethod interceptedMethod,
-                                      AnnotationMetadata annotationMetadata,
                                       HttpClient httpClient,
                                       Argument<?> errorType,
                                       Argument<?> valueType,
@@ -229,13 +228,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return switch (interceptedMethod.resultType()) {
             case PUBLISHER ->
                 handlePublisher(context, returnType, reactiveValueType, httpMethod, httpMethodName,
-                    clientMethod, interceptedMethod, annotationMetadata, httpClient, errorType, valueType, declaringType);
+                    clientMethod, interceptedMethod, httpClient, errorType, valueType, declaringType);
             case COMPLETION_STAGE ->
                 handleCompletionStage(context, httpMethod, httpMethodName, clientMethod, interceptedMethod,
-                    annotationMetadata, httpClient, returnType, errorType, valueType, reactiveValueType, declaringType);
+                    httpClient, returnType, errorType, valueType, reactiveValueType, declaringType);
             case SYNCHRONOUS ->
                 handleSynchronous(context, returnType, httpClient, httpMethod, httpMethodName, clientMethod,
-                    interceptedMethod, annotationMetadata, errorType, declaringType);
+                    interceptedMethod, errorType, declaringType);
         };
     }
 
@@ -247,7 +246,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                      String httpMethodName,
                                      ClientMethod clientMethod,
                                      InterceptedMethod interceptedMethod,
-                                     AnnotationMetadata annotationMetadata,
                                      Argument<?> errorType,
                                      Class<?> declaringType) {
 
@@ -287,7 +285,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                          String httpMethodName,
                                          ClientMethod clientMethod,
                                          InterceptedMethod interceptedMethod,
-                                         AnnotationMetadata annotationMetadata,
                                          HttpClient httpClient,
                                          ReturnType<?> returnType,
                                          Argument<?> errorType,
@@ -360,7 +357,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                    String httpMethodName,
                                    ClientMethod clientMethod,
                                    InterceptedMethod interceptedMethod,
-                                   AnnotationMetadata annotationMetadata,
                                    HttpClient httpClient,
                                    Argument<?> errorType,
                                    Argument<?> valueType,
@@ -374,7 +370,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             bindRequest(context, httpMethod, httpMethodName, clientMethod, interceptedMethod));
         Publisher<?> publisher;
         if (!isSingle && httpClient instanceof StreamingHttpClient client) {
-            publisher = httpClientResponseStreamingPublisher(client, context, requestPublisher, errorType, valueType);
+            publisher = httpClientResponseStreamingPublisher(client, requestPublisher, errorType, valueType);
         } else {
             publisher = httpClientResponsePublisher(httpClient, requestPublisher, returnType, errorType, valueType);
         }
@@ -598,7 +594,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     private Publisher<?> httpClientResponseStreamingPublisher(StreamingHttpClient streamingHttpClient,
-                                                           MethodInvocationContext<Object, Object> context,
                                                            Publisher<RequestBinderResult> requestPublisher,
                                                            Argument<?> errorType,
                                                            Argument<?> reactiveValueArgument) {

@@ -105,6 +105,8 @@ final class NettyHttpClientBuilder {
     @Nullable
     ExecutorService blockingExecutor = null;
     NettyHttpClient.@Nullable LifecycleListener lifecycleListener = null;
+    @Nullable
+    RetainedClientConnections retainedConnections = null;
 
     NettyZlibCodecFactory zlibCodecFactory = DefaultNettyZlibCodecFactory.INSTANCE;
 
@@ -286,6 +288,11 @@ final class NettyHttpClientBuilder {
 
     NettyHttpClientBuilder lifecycleListener(NettyHttpClient.@Nullable LifecycleListener lifecycleListener) {
         this.lifecycleListener = lifecycleListener;
+        return this;
+    }
+
+    NettyHttpClientBuilder retainedConnections(@Nullable RetainedClientConnections retainedConnections) {
+        this.retainedConnections = retainedConnections;
         return this;
     }
 

@@ -77,6 +77,10 @@ sealed interface BodyFallThrough permits BodyFallThrough.AcrossSpecificity {
 
         @Override
         public <T, R> List<List<UriRouteMatch<T, R>>> rank(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches) {
+            if (matches.size() == 1) {
+                // one route is its own rank: nothing to rank, and the caller's list is not kept
+                return List.of(List.of(matches.get(0)));
+            }
             List<UriRouteMatch<T, R>> remaining = new ArrayList<>(matches);
             List<List<UriRouteMatch<T, R>>> ranks = new ArrayList<>(2);
             while (!remaining.isEmpty()) {
