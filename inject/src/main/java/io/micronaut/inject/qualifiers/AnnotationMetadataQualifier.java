@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.qualifiers;
 
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.NonBinding;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -58,33 +59,57 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
      * injection point; a qualifier built from an annotation given to the API names the annotation it selects by.
      */
     final boolean matchByName;
+    /**
+     * The members left out of {@link #qualifierAnn}, which {@link #contains(Qualifier)} leaves out of a qualifier
+     * built without the list, as a candidate carrying this list does.
+     */
+    private final Set<String> nonBindingMembers;
 
     private AnnotationMetadataQualifier(String annotationName,
                                         String annotationSimpleName,
                                         @Nullable AnnotationValue<Annotation> value,
+                                        Set<String> nonBindingMembers,
                                         boolean matchByName) {
         this.annotationName = annotationName;
         this.annotationSimpleName = annotationSimpleName;
         this.qualifierAnn = value;
+        this.nonBindingMembers = nonBindingMembers;
         this.matchByName = matchByName;
+    }
+
+    private static <T> AnnotationMetadataQualifier<T> fromValues(AnnotationMetadata annotationMetadata,
+                                                                 String annotationName,
+                                                                 String annotationSimpleName,
+                                                                 Map<CharSequence, Object> values,
+                                                                 boolean matchByName) {
+        Set<String> nonBinding = resolveNonBindingMembers(annotationMetadata, annotationName, values);
+        return new AnnotationMetadataQualifier<>(
+            annotationName,
+            annotationSimpleName,
+            resolveBindingAnnotationValue(annotationName, nonBinding, values),
+            nonBinding,
+            matchByName
+        );
     }
 
     static <T> AnnotationMetadataQualifier<T> fromType(AnnotationMetadata annotationMetadata,
                                                        Class<? extends Annotation> annotationType) {
-        return new AnnotationMetadataQualifier<>(
+        return fromValues(
+            annotationMetadata,
             annotationType.getName(),
             annotationType.getSimpleName(),
-            resolveBindingAnnotationValue(annotationMetadata, annotationType.getName()),
+            annotationMetadata.getValues(annotationType.getName()),
             true
         );
     }
 
     static <T> AnnotationMetadataQualifier<T> fromTypeName(AnnotationMetadata annotationMetadata,
                                                            String annotationTypeName) {
-        return new AnnotationMetadataQualifier<>(
+        return fromValues(
+            annotationMetadata,
             annotationTypeName,
             NameUtils.getSimpleName(annotationTypeName),
-            resolveBindingAnnotationValue(annotationMetadata, annotationTypeName),
+            annotationMetadata.getValues(annotationTypeName),
             true
         );
     }
@@ -122,10 +147,11 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
     private static <T extends Annotation> AnnotationMetadataQualifier<T> fromValue(AnnotationMetadata annotationMetadata,
                                                                                    AnnotationValue<T> annotationValue,
                                                                                    boolean matchByName) {
-        return new AnnotationMetadataQualifier<>(
+        return fromValues(
+            annotationMetadata,
             annotationValue.getAnnotationName(),
             NameUtils.getSimpleName(annotationValue.getAnnotationName()),
-            resolveBindingAnnotationValue(annotationMetadata, annotationValue.getAnnotationName(), annotationValue.getValues()),
+            annotationValue.getValues(),
             matchByName
         );
     }
@@ -153,6 +179,7 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
             annotationType.getName(),
             annotationType.getSimpleName(),
             new AnnotationValue<>(annotationType.getName(), bindingValues),
+            Collections.emptySet(),
             false
         );
     }
@@ -229,9 +256,12 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         // The list is the one the candidate's occurrence of this annotation records, not the one on the shared
         // qualifier stereotype, which merges the lists of every qualifier the candidate carries
         Set<String> nonBinding = resolveNonBindingMembers(candidateMetadata, annotationName);
+        return matchesBindingValues(resolveBindingValues(nonBinding, qualifierAnn.getValues()), resolveBindingValues(nonBinding, candidateMetadata.getValues(annotationName)));
+    }
+
+    private boolean matchesBindingValues(Map<CharSequence, Object> qualifierValues, Map<CharSequence, Object> candidateValues) {
         Map<CharSequence, Object> defaults = AnnotationMetadataSupport.getDefaultValues(annotationName);
-        return withDefaults(resolveBindingValues(nonBinding, qualifierAnn.getValues()), defaults)
-            .matches(withDefaults(resolveBindingValues(nonBinding, candidateMetadata.getValues(annotationName)), defaults));
+        return withDefaults(qualifierValues, defaults).matches(withDefaults(candidateValues, defaults));
     }
 
     private AnnotationValue<Annotation> withDefaults(Map<CharSequence, Object> bindingValues,
@@ -239,24 +269,21 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         return new AnnotationValue<>(annotationName, bindingValues, defaults);
     }
 
-    @Nullable
-    private static <K extends Annotation> AnnotationValue<K> resolveBindingAnnotationValue(AnnotationMetadata annotationMetadata,
-                                                                                           String annotationName) {
-        return resolveBindingAnnotationValue(annotationMetadata, annotationName, annotationMetadata.getValues(annotationName));
+    /**
+     * The non-binding members of an annotation value: the ones its own record of non-binding members, or failing
+     * that the record of the metadata's occurrence of the annotation, lists.
+     */
+    private static Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata,
+                                                        String annotationName,
+                                                        Map<CharSequence, Object> values) {
+        Set<String> nonBinding = values.get(AnnotationUtil.NON_BINDING_ATTRIBUTE) instanceof String[] recorded ? toSet(recorded) : Collections.emptySet();
+        return nonBinding.isEmpty() ? resolveNonBindingMembers(annotationMetadata, annotationName) : nonBinding;
     }
 
-    /**
-     * The binding members of an annotation value: the ones its own record of non-binding members, or failing
-     * that the record of the metadata's occurrence of the annotation, does not list.
-     */
     @Nullable
-    private static <K extends Annotation> AnnotationValue<K> resolveBindingAnnotationValue(AnnotationMetadata annotationMetadata,
-                                                                                           String annotationName,
+    private static <K extends Annotation> AnnotationValue<K> resolveBindingAnnotationValue(String annotationName,
+                                                                                           Set<String> nonBinding,
                                                                                            Map<CharSequence, Object> values) {
-        Set<String> nonBinding = values.get(AnnotationUtil.NON_BINDING_ATTRIBUTE) instanceof String[] recorded ? toSet(recorded) : Collections.emptySet();
-        if (nonBinding.isEmpty()) {
-            nonBinding = resolveNonBindingMembers(annotationMetadata, annotationName);
-        }
         Map<CharSequence, Object> bindingValues = resolveBindingValues(nonBinding, values);
         if (CollectionUtils.isNotEmpty(bindingValues)) {
             return new AnnotationValue<>(annotationName, bindingValues);
@@ -287,6 +314,20 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
 
     private static Set<String> toSet(String[] members) {
         return ArrayUtils.isNotEmpty(members) ? new LinkedHashSet<>(Arrays.asList(members)) : Collections.emptySet();
+    }
+
+    @Override
+    public boolean contains(Qualifier<T> qualifier) {
+        QualifierUtils.AnnotationSelection other = QualifierUtils.extractAnnotationSelection(qualifier);
+        if (other == null || !annotationName.equals(other.annotationName())) {
+            return false;
+        }
+        // the members compare as they do against a candidate: a qualifier without members selects by type alone,
+        // a member left at its default is the same as one writing that default down, and a member this qualifier
+        // records as non-binding is left out of both
+        Map<CharSequence, Object> otherValues = other.bindingValues();
+        return otherValues == null
+            || matchesBindingValues(resolveBindingValues(nonBindingMembers, otherValues), qualifierAnn == null ? Map.of() : qualifierAnn.getValues());
     }
 
     @Override
