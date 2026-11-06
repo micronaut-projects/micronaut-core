@@ -3,6 +3,7 @@ package io.micronaut.context.python;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
 import org.junit.jupiter.api.Test;
 
@@ -140,6 +141,58 @@ final class PythonApplicationRuntimeTest {
             assertEquals(3, outerContext.eval(PYTHON, "1 + 2").asInt(), "the enclosing context is still open");
         }
         assertNull(PythonApplicationRuntime.current());
+    }
+
+    @Test
+    void aRuntimeInstalledBeforeAnyApplicationIsClaimedByTheNextApplicationWhichClosesIt() {
+        // a generated class creates its Python object before the application context exists (the
+        // instance of a test that provides the properties of its application context)
+        PythonApplicationRuntime unclaimed = PythonApplicationRuntime.requireForNewInstance();
+        Context context = unclaimed.context();
+        assertSame(unclaimed, PythonApplicationRuntime.current(), "generated code resolves the runtime built for it");
+        assertSame(unclaimed, PythonApplicationRuntime.unclaimed());
+        assertSame(unclaimed, PythonApplicationRuntime.requireForNewInstance(), "the runtime is built once");
+
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            assertNull(PythonApplicationRuntime.unclaimed(), "the application claimed the runtime");
+            assertSame(unclaimed, applicationContext.getBean(PythonApplicationRuntime.class));
+            assertSame(context, applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON)), "the claimed context is the primary context");
+            assertEquals(context.getEngine(), applicationContext.getBean(Engine.class, Qualifiers.byName(PYTHON)), "the engine of the claimed context is adopted with it");
+
+            try (ApplicationContext nested = ApplicationContext.run()) {
+                assertNotSame(context, nested.getBean(Context.class, Qualifiers.byName(PYTHON)), "a runtime is claimed once");
+            }
+            assertSame(unclaimed, PythonApplicationRuntime.current());
+            assertEquals(3, context.eval(PYTHON, "1 + 2").asInt(), "the claimed context is still open");
+        } finally {
+            if (PythonApplicationRuntime.unclaimed() == unclaimed) {
+                PythonContextRuntime.resetContext();
+                context.close(true);
+            }
+        }
+        assertClosed(context, "the application that claimed the context closes it");
+        assertNull(PythonApplicationRuntime.current());
+    }
+
+    @Test
+    void anApplicationThatIsRunningProvidesTheRuntimeOfNewInstances() {
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            assertSame(applicationContext.getBean(PythonApplicationRuntime.class), PythonApplicationRuntime.requireForNewInstance());
+            assertNull(PythonApplicationRuntime.unclaimed());
+        }
+    }
+
+    @Test
+    void resetContextForgetsAnUnclaimedRuntime() {
+        PythonApplicationRuntime unclaimed = PythonApplicationRuntime.requireForNewInstance();
+        try {
+            PythonContextRuntime.resetContext();
+
+            assertNull(PythonApplicationRuntime.unclaimed());
+            assertNull(PythonApplicationRuntime.current());
+        } finally {
+            unclaimed.context().close(true);
+        }
     }
 
     /**
