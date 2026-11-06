@@ -47,8 +47,7 @@ class DefaultEvent<T> implements Event<T> {
     }
 
     @Override
-    @SuppressWarnings("NullAway") // null only for an event created with Event.empty()
-    public T getData() {
+    public @Nullable T getData() {
         return data;
     }
 

@@ -52,7 +52,7 @@ public interface Event<T> {
     /**
      * @return The data object to write, or null for an event without data (see {@link #empty()})
      */
-    T getData();
+    @Nullable T getData();
 
     /**
      * @return The ID of the event, or null if there is no ID

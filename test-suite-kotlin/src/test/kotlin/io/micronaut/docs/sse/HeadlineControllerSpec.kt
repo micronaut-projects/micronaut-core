@@ -22,7 +22,7 @@ class HeadlineControllerSpec: StringSpec() {
             val headline = headlineClient.streamHeadlines().blockFirst()
 
             headline.shouldNotBeNull()
-            headline.data.text!!.shouldStartWith("Latest Headline")
+            headline.data!!.text!!.shouldStartWith("Latest Headline")
         }
         // end::streamingClient[]
     }
