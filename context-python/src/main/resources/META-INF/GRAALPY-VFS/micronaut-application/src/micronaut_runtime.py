@@ -366,10 +366,9 @@ def _micronaut_reactive_context():
 
 
 def _micronaut_is_asyncio_future(value):
-    # importing asyncio takes longer than the rest of this module, and until something has imported it
-    # no value can be one of its futures; the asyncio bridge module imports it when a coroutine first runs
-    asyncio = sys.modules.get("asyncio")
-    return asyncio is not None and asyncio.isfuture(value)
+    # asyncio.isfuture, which is this check and no more: importing asyncio for it would cost every context
+    # longer than the rest of this module, and a value may advertise the marker before asyncio is loaded
+    return hasattr(value.__class__, "_asyncio_future_blocking") and value._asyncio_future_blocking is not None
 
 
 def __micronaut_async_member_value(target, adapter, context):

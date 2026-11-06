@@ -42,29 +42,34 @@ final class PythonRuntimeModuleTest {
     }
 
     /**
-     * A member's value is adapted unless it is awaitable already or an asyncio future, which asyncio can tell
-     * only once it is loaded: a value with the future marker but no {@code __await__} shows both sides.
+     * A member's value is adapted unless it is awaitable already or an asyncio future, which is what asyncio.isfuture
+     * says of it whether or not asyncio is loaded: a value advertising the marker with no {@code __await__} shows that.
      */
     @Test
-    void anAsyncioFutureIsLeftAloneOnceAsyncioIsLoaded() {
+    void anAsyncioFutureIsLeftAloneWithOrWithoutAsyncioLoaded() {
         try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
             Value target = context.eval(PYTHON, """
                 class FutureLike:
                     _asyncio_future_blocking = False
+                class NotAFuture:
+                    _asyncio_future_blocking = None
                 class Target:
                     def future(self):
                         return FutureLike()
+                    def not_a_future(self):
+                        return NotAFuture()
                     def plain(self):
                         return 1
                 Target()
                 """);
             Value member = PythonContextRuntime.helper(context, "__micronaut_async_member_value")
                 .execute(target, new MarkingAdapter(), "context");
-            assertEquals("adapted", member.invokeMember("plain").asString());
-            assertEquals("adapted", member.invokeMember("future").asString(), "asyncio is not loaded, so nothing is its future");
-            context.eval(PYTHON, "import asyncio");
-            assertEquals("adapted", member.invokeMember("plain").asString());
-            assertEquals("FutureLike", member.invokeMember("future").getMetaObject().getMetaSimpleName());
+            for (int i = 0; i < 2; i++) {
+                assertEquals("adapted", member.invokeMember("plain").asString());
+                assertEquals("adapted", member.invokeMember("not_a_future").asString());
+                assertEquals("FutureLike", member.invokeMember("future").getMetaObject().getMetaSimpleName());
+                context.eval(PYTHON, "import asyncio");
+            }
         }
     }
 
