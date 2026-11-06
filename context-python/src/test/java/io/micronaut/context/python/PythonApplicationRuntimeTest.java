@@ -50,7 +50,6 @@ final class PythonApplicationRuntimeTest {
     void noApplicationIsOnItsWay() {
         PythonContextRuntime.setReuseContext(false);
         PythonContextRuntime.resetContext();
-        PythonEntryPointPermission.applicationRecorded();
     }
 
     @Test
@@ -377,6 +376,21 @@ final class PythonApplicationRuntimeTest {
 
         PythonContextRuntime.resetContext();
 
+        assertLeftoverReferenceFails();
+    }
+
+    /**
+     * A reset also ends what a JVM with no application yet allows: a reference held across it is a
+     * leftover reference of the context the reset closed.
+     */
+    @Test
+    void aResetBeforeTheFirstApplicationOfTheJvmGrantsNothing() {
+        PythonEntryPointPermission.reset();
+        Context bootstrapped = PythonContextRuntime.getContext();
+
+        PythonContextRuntime.resetContext();
+
+        assertClosed(bootstrapped, "the reset closes the context no application adopted");
         assertLeftoverReferenceFails();
     }
 

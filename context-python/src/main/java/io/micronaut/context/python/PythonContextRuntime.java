@@ -231,8 +231,8 @@ public final class PythonContextRuntime {
      * <p>
      * A context bootstrapped for an entry point outside an application that no application adopted
      * is closed with the engine created for it. A reset grants nothing: generated code reached after
-     * it fails as it did before it, and a builder the calling thread left behind no longer counts as
-     * an application on its way.
+     * it fails until the builder of an application is created, and a builder the calling thread left
+     * behind no longer counts as an application on its way.
      */
     public static void resetContext() {
         PythonEntryPointPermission.revoke();
