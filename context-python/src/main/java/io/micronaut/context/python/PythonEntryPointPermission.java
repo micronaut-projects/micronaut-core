@@ -47,8 +47,10 @@ import java.lang.ref.WeakReference;
 @Internal
 final class PythonEntryPointPermission {
 
-    // the newest builder of each thread. The value is a plain WeakReference, so a pooled thread that
-    // outlives the class loader of the application holds neither the builder nor a class of that loader
+    // the newest builder of each thread only: Micronaut Test creates a builder and then replaces it with
+    // the one of a contextBuilder, and tracking the replaced one would leave it granting after the
+    // application closed. The value is a plain WeakReference, so a pooled thread that outlives the class
+    // loader of the application holds neither the builder nor a class of that loader
     private static final ThreadLocal<WeakReference<ApplicationContextBuilder>> ON_ITS_WAY = new ThreadLocal<>();
     private static volatile boolean applicationRecorded;
 

@@ -349,6 +349,22 @@ final class PythonApplicationRuntimeTest {
     }
 
     /**
+     * Micronaut Test creates a builder and replaces it with the one of a {@code contextBuilder}: the
+     * newest builder of a thread is the one on its way, so the replaced one grants nothing once the
+     * application of the newest closed, even before it is collected.
+     */
+    @Test
+    void aBuilderThatWasReplacedOnItsThreadGrantsNothingAfterTheApplicationOfTheNewerOneClosed() {
+        ApplicationContextBuilder replaced = ApplicationContext.builder();
+        ApplicationContextBuilder newest = ApplicationContext.builder();
+
+        newest.start().close();
+
+        assertLeftoverReferenceFails();
+        Reference.reachabilityFence(replaced);
+    }
+
+    /**
      * A reset takes the JVM back to no application running, which grants nothing: generated code
      * reached after it is a leftover reference exactly as it was before the reset.
      */
