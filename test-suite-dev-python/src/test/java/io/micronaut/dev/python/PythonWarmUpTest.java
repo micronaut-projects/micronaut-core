@@ -89,6 +89,17 @@ class PythonWarmUpTest {
     }
 
     @Test
+    void pythonTestsWarmUpInTestModeOnly() throws Exception {
+        ClassLoader parent = PythonWarmUpTest.class.getClassLoader();
+        String tests = "micronaut.dev.sources.java=src/main/java\nmicronaut.dev.test.sources.python=src/test/python\n";
+        assertNull(PythonWarmUp.start(manifest(tests), parent));
+        Thread thread = PythonWarmUp.start(manifest(tests + "micronaut.dev.mode=test\n"), parent);
+        assertNotNull(thread);
+        thread.join(TimeUnit.MINUTES.toMillis(2));
+        assertFalse(thread.isAlive(), "the warm-up did not end");
+    }
+
+    @Test
     void aLauncherWithoutThePythonRuntimeStartsNothing() throws Exception {
         try (URLClassLoader noRuntime = new URLClassLoader(new URL[0], ClassLoader.getPlatformClassLoader())) {
             assertNull(PythonWarmUp.start(manifest(PYTHON_SOURCES), noRuntime));

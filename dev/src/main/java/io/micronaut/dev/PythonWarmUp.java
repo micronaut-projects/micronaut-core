@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.dev.manifest.DevMode;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.jspecify.annotations.Nullable;
@@ -34,7 +35,7 @@ import java.io.OutputStream;
  * that second: the context of the application then finds the work done. Started any later, it gains nothing, as the
  * two threads then wait for each other on the same classes.
  *
- * <p>Only a launch with Python sources starts it, and only on a JVM: a native image has no classes to load.
+ * <p>Only a launch with Python sources, or in test mode Python tests, starts it, and only on a JVM: a native image has no classes to load.
  * {@code micronaut.dev.python.warm-up=false} turns it off.</p>
  *
  * @author graemerocher
@@ -65,7 +66,7 @@ public final class PythonWarmUp {
      */
     public static @Nullable Thread start(DevManifest manifest, ClassLoader parent) {
         if (!manifest.pythonWarmUp()
-            || manifest.sourceRoots(SourceKind.PYTHON).isEmpty()
+            || !hasPythonSources(manifest)
             || System.getProperty("org.graalvm.nativeimage.imagecode") != null
             || FALSE.equalsIgnoreCase(System.getProperty(PYTHON_ENABLED))
             || FALSE.equalsIgnoreCase(System.getenv(PYTHON_ENABLED_VARIABLE))
@@ -78,6 +79,11 @@ public final class PythonWarmUp {
         thread.setContextClassLoader(parent);
         thread.start();
         return thread;
+    }
+
+    private static boolean hasPythonSources(DevManifest manifest) {
+        return !manifest.sourceRoots(SourceKind.PYTHON).isEmpty()
+            || manifest.mode() == DevMode.TEST && manifest.testSourceRoots().stream().anyMatch(root -> root.kind() == SourceKind.PYTHON);
     }
 
     private static void warmUp() {
