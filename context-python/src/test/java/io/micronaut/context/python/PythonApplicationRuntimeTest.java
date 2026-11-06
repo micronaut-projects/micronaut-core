@@ -395,6 +395,26 @@ final class PythonApplicationRuntimeTest {
     }
 
     /**
+     * A reset that only reloads the modules of a reused context ends the builder of the calling thread
+     * all the same.
+     */
+    @Test
+    void aResetWithContextReuseRevokesTheBuilderOfTheCallingThread() {
+        ApplicationContextBuilder abandoned = ApplicationContext.builder();
+        try (Context reused = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            PythonApplicationRuntime runtime = PythonContextRuntime.setContext(reused, null);
+            PythonContextRuntime.setReuseContext(true);
+
+            PythonContextRuntime.resetContext();
+
+            PythonContextRuntime.setReuseContext(false);
+            assertTrue(PythonApplicationRuntime.uninstall(runtime));
+            assertLeftoverReferenceFails();
+        }
+        Reference.reachabilityFence(abandoned);
+    }
+
+    /**
      * With context reuse the context belongs to the JVM rather than to an application: the applications
      * that use a bootstrapped context neither adopt it nor close it. It stays the bootstrapped one, so
      * it is closed with its engine when it is finally dropped, since no application ever will.

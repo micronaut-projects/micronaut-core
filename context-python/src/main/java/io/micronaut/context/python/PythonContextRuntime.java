@@ -235,12 +235,12 @@ public final class PythonContextRuntime {
      * an application on its way.
      */
     public static void resetContext() {
+        PythonEntryPointPermission.revoke();
         PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
         if (runtime != null && isReuseContext()) {
             runtime.context().eval(RELOAD_MODULES_SOURCE);
             return;
         }
-        PythonEntryPointPermission.revoke();
         for (PythonApplicationRuntime uninstalled : PythonApplicationRuntime.uninstallAll()) {
             PythonContextRegistry.forgetContext(uninstalled.context());
         }
