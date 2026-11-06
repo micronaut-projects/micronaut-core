@@ -1381,6 +1381,7 @@ public class MediaType implements CharSequence {
                 try {
                     return List.of(MediaType.of(singleHeader));
                 } catch (IllegalArgumentException ignored) {
+                    // fall through to the slow path, which skips invalid media types
                 }
             } else if (singleHeader.length() <= MAX_CACHED_HEADER_LENGTH) {
                 // a single header listing several media types has to be split, parsed and sorted,

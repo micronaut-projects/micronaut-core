@@ -155,7 +155,9 @@ class JsonPieceReaderTest {
 
         assertThrows(CodecException.class, () -> handler.read(Argument.listOf(Book.class), MediaType.APPLICATION_JSON_STREAM_TYPE, new SimpleHttpHeaders(),
             NettyByteBufferFactory.DEFAULT.wrap(input)));
-        assertEquals(0, input.refCnt());
+        // like the other readers, the input is released on success only: the caller still owns it
+        assertEquals(1, input.refCnt());
+        input.release();
     }
 
     @Test

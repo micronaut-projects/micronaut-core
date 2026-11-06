@@ -813,7 +813,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             }
 
             // Apply visibility filtering
-            if (!isAccessibleViaVisibility(property, visibility)) {
+            if (!isAccessibleViaVisibility(visibility)) {
                 continue;
             }
 
@@ -868,7 +868,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return false;
     }
 
-    private static boolean isAccessibleViaVisibility(PropertyElement property, io.micronaut.context.annotation.BeanProperties.Visibility visibility) {
+    private static boolean isAccessibleViaVisibility(io.micronaut.context.annotation.BeanProperties.Visibility visibility) {
         // For Python, we consider all properties accessible for now
         // In the future, we could check for private/protected modifiers if Python supports them
         return visibility == io.micronaut.context.annotation.BeanProperties.Visibility.ANY ||

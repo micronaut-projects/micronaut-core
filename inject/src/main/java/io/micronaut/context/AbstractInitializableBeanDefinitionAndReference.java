@@ -172,6 +172,28 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
         return true;
     }
 
+    /**
+     * Whether the static initializer of this definition failed because a class it refers to is absent, as with an
+     * optional dependency, which {@link #isPresent()} cannot say without eliminating the definition from every lookup.
+     * A failure of any other kind is not an absent class, nor is a class that is there and whose own static initializer
+     * failed earlier, which the JVM reports as a {@link NoClassDefFoundError} caused by that failure.
+     *
+     * @return True if loading this definition would fail for an absent class
+     */
+    final boolean isClassAbsent() {
+        if (failedInitialization == null) {
+            return false;
+        }
+        return switch (BeanInitializationFailure.typeOf(failedInitialization)) {
+            case "java.lang.NoClassDefFoundError" -> {
+                Throwable cause = failedInitialization.getCause();
+                yield cause == null || !"java.lang.ExceptionInInitializerError".equals(BeanInitializationFailure.typeOf(cause));
+            }
+            case "java.lang.TypeNotPresentException", "java.lang.ClassNotFoundException" -> true;
+            default -> false;
+        };
+    }
+
     @Override
     public int getOrder() {
         return 0;

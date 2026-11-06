@@ -24,7 +24,6 @@ import io.micronaut.http.HttpRequest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -37,6 +36,7 @@ import java.util.stream.Stream;
 @Internal
 public final class DefaultUnmatchedRequestArgumentBinder<T> implements PostponedRequestArgumentBinder<T>, UnmatchedRequestArgumentBinder {
 
+    private final boolean specific;
     private final List<RequestArgumentBinder<Object>> internalPreUnmatchedArgumentBinders;
     private final List<RequestArgumentBinder<Object>> unmatchedArgumentBinders;
     private final List<RequestArgumentBinder<Object>> internalPostUnmatchedArgumentBinders;
@@ -49,9 +49,25 @@ public final class DefaultUnmatchedRequestArgumentBinder<T> implements Postponed
     public DefaultUnmatchedRequestArgumentBinder(List<RequestArgumentBinder<Object>> internalPreUnmatchedArgumentBinders,
                                                  List<RequestArgumentBinder<Object>> unmatchedArgumentBinders,
                                                  List<RequestArgumentBinder<Object>> internalPostUnmatchedArgumentBinders) {
+        this.specific = false;
         this.internalPreUnmatchedArgumentBinders = internalPreUnmatchedArgumentBinders;
         this.unmatchedArgumentBinders = unmatchedArgumentBinders;
         this.internalPostUnmatchedArgumentBinders = internalPostUnmatchedArgumentBinders;
+    }
+
+    private DefaultUnmatchedRequestArgumentBinder(List<RequestArgumentBinder<Object>> before,
+                                                  List<RequestArgumentBinder<Object>> after) {
+        specific = true;
+        internalPreUnmatchedArgumentBinders = before;
+        unmatchedArgumentBinders = List.of();
+        internalPostUnmatchedArgumentBinders = after;
+    }
+
+    private List<RequestArgumentBinder<Object>> binders(boolean postponed) {
+        if (specific) {
+            return postponed ? internalPostUnmatchedArgumentBinders : internalPreUnmatchedArgumentBinders;
+        }
+        return stream().filter(b -> (b instanceof PostponedRequestArgumentBinder) == postponed).toList();
     }
 
     private Stream<RequestArgumentBinder<Object>> stream() {
@@ -66,46 +82,49 @@ public final class DefaultUnmatchedRequestArgumentBinder<T> implements Postponed
 
     @Override
     public RequestArgumentBinder<T> createSpecific(Argument<T> argument) {
-        Function<RequestArgumentBinder<Object>, RequestArgumentBinder<Object>> createSpecific = b -> b.createSpecific((Argument<Object>) argument);
-        return new DefaultUnmatchedRequestArgumentBinder<>(
-            internalPreUnmatchedArgumentBinders.stream().map(createSpecific).toList(),
-            unmatchedArgumentBinders.stream().map(createSpecific).toList(),
-            internalPostUnmatchedArgumentBinders.stream().map(createSpecific).toList()
-        );
+        List<RequestArgumentBinder<Object>> before = new ArrayList<>();
+        List<RequestArgumentBinder<Object>> after = new ArrayList<>();
+        for (RequestArgumentBinder<Object> binder : stream().toList()) {
+            RequestArgumentBinder<Object> prepared = binder.createSpecific((Argument<Object>) argument);
+            (prepared instanceof PostponedRequestArgumentBinder ? after : before).add(prepared);
+        }
+        return new DefaultUnmatchedRequestArgumentBinder<>(List.copyOf(before), List.copyOf(after));
     }
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> request) {
-        List<PendingRequestBindingResult<?>> pending = new ArrayList<>();
+        List<BindingResult<?>> pending = new ArrayList<>();
         List<ConversionError> errors = new ArrayList<>();
-        boolean allUnsatisfied = true;
-        for (RequestArgumentBinder<Object> binder : stream().filter(binder -> !(binder instanceof PostponedRequestArgumentBinder)).toList()) {
+        for (RequestArgumentBinder<Object> binder : binders(false)) {
             BindingResult<?> result = binder.bind((ArgumentConversionContext<Object>) context, request);
             if (result.isPresentAndSatisfied()) {
                 return (BindingResult<T>) result;
-            } else if (result instanceof PendingRequestBindingResult<?> pendingRequestBindingResult) {
-                pending.add(pendingRequestBindingResult);
-                allUnsatisfied = false;
-            } else {
-                if (result != BindingResult.UNSATISFIED) {
-                    errors.addAll(result.getConversionErrors());
-                    allUnsatisfied = false;
-                }
+            } else if (result.isPending()) {
+                pending.add(result);
+            } else if (result != BindingResult.UNSATISFIED) {
+                errors.addAll(result.getConversionErrors());
             }
         }
-        if (allUnsatisfied) {
+        if (pending.isEmpty() && errors.isEmpty()) {
+            // Leave missing arguments for the binders that run after filters.
             return BindingResult.unsatisfied();
         }
         return new PendingRequestBindingResult<>() {
 
             @Override
             public boolean isPending() {
-                return pending.stream().allMatch(PendingRequestBindingResult::isPending);
+                return !pending.isEmpty() && pending.stream().allMatch(BindingResult::isPending);
             }
 
             @Override
             public Optional<T> getValue() {
                 return pending.stream().filter(r -> !r.isPending()).findFirst().flatMap(r -> (Optional<? extends T>) r.getValue());
+            }
+
+            @Override
+            public boolean isConvertedToArgumentType() {
+                return pending.stream().filter(r -> !r.isPending()).findFirst()
+                    .map(BindingResult::isConvertedToArgumentType).orElse(false);
             }
 
             @Override
@@ -118,7 +137,7 @@ public final class DefaultUnmatchedRequestArgumentBinder<T> implements Postponed
     @Override
     public BindingResult<T> bindPostponed(ArgumentConversionContext<T> context, HttpRequest<?> request) {
         BindingResult<T> lastWithError = null;
-        for (RequestArgumentBinder<Object> binder : stream().filter(binder -> (binder instanceof PostponedRequestArgumentBinder)).toList()) {
+        for (RequestArgumentBinder<Object> binder : binders(true)) {
             BindingResult<?> result = binder.bind((ArgumentConversionContext<Object>) context, request);
             if (result.getValue().isPresent()) {
                 return (BindingResult<T>) result;

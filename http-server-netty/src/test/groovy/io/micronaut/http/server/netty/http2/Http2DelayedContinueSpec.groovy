@@ -26,10 +26,13 @@ import io.netty.handler.codec.http2.Http2FrameCodecBuilder
 import io.netty.handler.codec.http2.Http2HeadersFrame
 import io.netty.handler.codec.http2.Http2StreamFrame
 import io.netty.util.ReferenceCountUtil
+import jakarta.annotation.PreDestroy
 import org.jspecify.annotations.NonNull
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Scheduler
+import reactor.core.scheduler.Schedulers
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
@@ -153,6 +156,18 @@ class Http2DelayedContinueSpec extends Specification {
     @Requires(property = 'spec.name', value = 'Http2DelayedContinueSpec')
     @Controller('/h2-delayed-continue')
     static class DelayedContinueController {
+        /**
+         * Delays the subscription on a thread of this test, not of the global schedulers of
+         * Reactor: a thread created during another test belongs to the resource scope of that
+         * test, which the leak detector closed.
+         */
+        private final Scheduler delays = Schedulers.newSingle("h2-delayed-continue")
+
+        @PreDestroy
+        void close() {
+            delays.dispose()
+        }
+
         @Post(value = '/now', consumes = 'text/plain', produces = 'text/plain')
         Publisher<String> now(@Body Publisher<byte[]> body) {
             return join(body)
@@ -161,7 +176,7 @@ class Http2DelayedContinueSpec extends Specification {
         @Post(value = '/later', consumes = 'text/plain', produces = 'text/plain')
         Publisher<String> later(@Body Publisher<byte[]> body) {
             // subscribe to the body only after the inbound read has completed
-            return Mono.delay(Duration.ofMillis(DELAY_MS)).then(join(body))
+            return Mono.delay(Duration.ofMillis(DELAY_MS), delays).then(join(body))
         }
 
         private static Mono<String> join(Publisher<byte[]> body) {

@@ -20,6 +20,7 @@ import io.micronaut.dev.livereload.LiveReloadServer;
 import io.micronaut.dev.livereload.LiveReloadServerFactory;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * The factory the launcher service-loads.
@@ -33,5 +34,10 @@ public final class NettyLiveReloadServerFactory implements LiveReloadServerFacto
     @Override
     public LiveReloadServer start(int port) throws IOException {
         return NettyLiveReloadServer.start(port);
+    }
+
+    @Override
+    public LiveReloadServer start(int port, List<String> allowedOrigins) throws IOException {
+        return NettyLiveReloadServer.start(port, allowedOrigins);
     }
 }

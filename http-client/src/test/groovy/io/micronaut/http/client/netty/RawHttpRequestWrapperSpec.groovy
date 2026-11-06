@@ -5,8 +5,8 @@ import io.micronaut.core.io.buffer.ByteArrayBufferFactory
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.body.CloseableByteBody
-import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.body.stream.AvailableByteArrayBody
+import io.micronaut.http.cookie.Cookie
 import spock.lang.Specification
 
 class RawHttpRequestWrapperSpec extends Specification {
