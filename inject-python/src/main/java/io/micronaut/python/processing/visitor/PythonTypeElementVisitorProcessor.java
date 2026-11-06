@@ -208,7 +208,7 @@ public final class PythonTypeElementVisitorProcessor {
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             try {
                 loadedVisitor.getVisitor().finishCompilation(pythonVisitorContext);
-            } catch (Throwable e) {
+            } catch (Exception e) {
                 failVisitor(pythonVisitorContext, loadedVisitor, "finishCompilation", e);
             }
         }

@@ -67,7 +67,7 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
                 } catch (ProcessingException ex) {
                     def element = ex.getOriginatingElement()
                     visitorContext.fail(ex.getMessage(), element instanceof GroovyNativeElement ? (element as GroovyNativeElement).annotatedNode() : (ASTNode) null)
-                } catch (Throwable e) {
+                } catch (Exception e) {
                     AstMessageUtils.error(
                             source,
                             source.getAST(),
