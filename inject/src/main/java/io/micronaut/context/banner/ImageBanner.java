@@ -93,7 +93,7 @@ public class ImageBanner implements Banner {
     private static final int CHUNK_SIZE = 4096;
     private static final String ANIMATE = "a=a,i=";
 
-    private final URL resource;
+    private final URL bannerUrl;
     private final PrintStream out;
     private final int rows;
     private final int currentColor;
@@ -120,7 +120,7 @@ public class ImageBanner implements Banner {
      * @param frames Renders and sends the frames of an animated image after the first
      */
     ImageBanner(URL resource, PrintStream out, int rows, int currentColor, Executor frames) {
-        this.resource = resource;
+        this.bannerUrl = resource;
         this.out = out;
         this.rows = rows;
         this.currentColor = currentColor;
@@ -184,7 +184,7 @@ public class ImageBanner implements Banner {
      */
     boolean printImage() {
         byte[] image;
-        try (InputStream stream = resource.openStream()) {
+        try (InputStream stream = bannerUrl.openStream()) {
             image = stream.readAllBytes();
         } catch (IOException e) {
             if (LOG.isErrorEnabled()) {
@@ -192,7 +192,7 @@ public class ImageBanner implements Banner {
             }
             return false;
         }
-        if (!resource.getPath().endsWith(".svg")) {
+        if (!bannerUrl.getPath().endsWith(".svg")) {
             out.println();
             out.print(transmission("a=T,f=100," + QUIET + scaling(), image));
             out.println();
@@ -204,7 +204,7 @@ public class ImageBanner implements Banner {
         } catch (RuntimeException e) {
             // a banner must never stop the application from starting
             if (LOG.isErrorEnabled()) {
-                LOG.error("The banner {} is not an SVG image that can be rendered.", resource, e);
+                LOG.error("The banner {} is not an SVG image that can be rendered.", bannerUrl, e);
             }
             return false;
         }

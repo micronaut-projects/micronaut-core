@@ -42,7 +42,7 @@ public class ResourceBanner implements Banner {
 
     private static final Logger LOG = LoggerFactory.getLogger(ResourceBanner.class);
 
-    private final URL resource;
+    private final URL bannerUrl;
     private final PrintStream out;
 
     /**
@@ -51,7 +51,7 @@ public class ResourceBanner implements Banner {
      * @param out The print stream
      */
     public ResourceBanner(URL resource, PrintStream out) {
-        this.resource = resource;
+        this.bannerUrl = resource;
         this.out = out;
     }
 
@@ -69,7 +69,7 @@ public class ResourceBanner implements Banner {
 
     @Override
     public void print() {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(resource.openStream(), StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(bannerUrl.openStream(), StandardCharsets.UTF_8))) {
             String banner = reader.lines().collect(Collectors.joining("\n"));
             out.println(banner + "\n");
         } catch (IOException e) {
