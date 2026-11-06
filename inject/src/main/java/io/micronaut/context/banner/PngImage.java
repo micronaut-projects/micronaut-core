@@ -235,7 +235,15 @@ final class PngImage {
                 int gray = channel(row, x * 2, depth);
                 yield channel(row, x * 2 + 1, depth) << 24 | gray << 16 | gray << 8 | gray;
             }
-            case RGB -> 0xFF000000 | channel(row, x * 3, depth) << 16 | channel(row, x * 3 + 1, depth) << 8 | channel(row, x * 3 + 2, depth);
+            case RGB -> {
+                // tRNS holds a 16-bit color key: a pixel of exactly that color is transparent
+                boolean transparent = transparency != null && transparency.length >= 6
+                    && full(row, x * 3, depth) == (transparency[0] << 8 | transparency[1])
+                    && full(row, x * 3 + 1, depth) == (transparency[2] << 8 | transparency[3])
+                    && full(row, x * 3 + 2, depth) == (transparency[4] << 8 | transparency[5]);
+                yield (transparent ? 0 : 0xFF000000) | channel(row, x * 3, depth) << 16 | channel(row, x * 3 + 1, depth) << 8
+                    | channel(row, x * 3 + 2, depth);
+            }
             default -> channel(row, x * 4 + 3, depth) << 24 | channel(row, x * 4, depth) << 16
                 | channel(row, x * 4 + 1, depth) << 8 | channel(row, x * 4 + 2, depth);
         };
@@ -254,6 +262,13 @@ final class PngImage {
                 yield (row[x / perByte] >> shift) & ((1 << depth) - 1);
             }
         };
+    }
+
+    /**
+     * @return A sample of a multi channel image at its full depth of 8 or 16 bits
+     */
+    private static int full(byte[] row, int index, int depth) {
+        return depth == 16 ? (row[2 * index] & 0xFF) << 8 | row[2 * index + 1] & 0xFF : row[index] & 0xFF;
     }
 
     /**

@@ -111,19 +111,39 @@ final class Geometry {
     }
 
     /**
-     * Outlines the stroke of the shape.
+     * Outlines the stroke of the shape. The outline is built in the coordinates of the element and then
+     * transformed, so that a non-uniform scale or a skew shapes the stroke as it shapes the path.
      *
      * @param matrix The transform to device coordinates
-     * @param width The stroke width in device pixels
+     * @param width The stroke width in the coordinates of the element
      * @param lineCap The line cap
-     * @return The polygons covering the stroke, to fill with the non-zero rule
+     * @return The polygons covering the stroke in device coordinates, to fill with the non-zero rule
      */
     List<double[]> stroke(double[] matrix, double width, int lineCap) {
-        List<double[]> polygons = new ArrayList<>();
-        for (int i = 0; i < subpaths.size(); i++) {
-            Stroker.stroke(flatten(subpaths.get(i), matrix), closed.get(i), width / 2, lineCap, polygons);
+        // the largest scale of the transform decides how finely the outline is flattened
+        double scale = Math.max(Math.hypot(matrix[0], matrix[1]), Math.hypot(matrix[2], matrix[3]));
+        if (scale <= 0) {
+            return List.of();
         }
-        return polygons;
+        double[] local = {scale, 0, 0, scale, 0, 0};
+        List<double[]> outline = new ArrayList<>();
+        for (int i = 0; i < subpaths.size(); i++) {
+            // flattened in element coordinates magnified to device size, then shrunk back
+            double[] points = flatten(subpaths.get(i), local);
+            for (int k = 0; k < points.length; k++) {
+                points[k] /= scale;
+            }
+            Stroker.stroke(points, closed.get(i), width / 2, lineCap, Stroker.CHORD / scale, outline);
+        }
+        for (double[] polygon : outline) {
+            for (int k = 0; k + 1 < polygon.length; k += 2) {
+                double x = polygon[k];
+                double y = polygon[k + 1];
+                polygon[k] = tx(matrix, x, y);
+                polygon[k + 1] = ty(matrix, x, y);
+            }
+        }
+        return outline;
     }
 
     private static double[] flatten(double[] subpath, double[] matrix) {
@@ -249,7 +269,8 @@ final class Geometry {
                 Character next = scanner.nextCommand();
                 if (next != null) {
                     command = next;
-                } else if (command == 0) {
+                } else if (command == 0 || command == 'Z' || command == 'z') {
+                    // numbers without a command, or after a closepath, which takes none, are an error
                     break;
                 } else if (command == 'M') {
                     command = 'L';

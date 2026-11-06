@@ -22,6 +22,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.zip.CRC32;
@@ -44,6 +45,13 @@ final class SvgRaster {
     private final int height;
     // premultiplied red, green, blue and alpha in [0, 1]
     private final float[] pixels;
+    // layers composited into this raster, kept for reuse
+    private final List<SvgRaster> layers = new ArrayList<>();
+    // the bounds of the pixels drawn since this raster was last cleared
+    private int dirtyLeft;
+    private int dirtyTop;
+    private int dirtyRight = -1;
+    private int dirtyBottom = -1;
 
     SvgRaster(int width, int height) {
         if (width <= 0 || height <= 0) {
@@ -52,6 +60,60 @@ final class SvgRaster {
         this.width = width;
         this.height = height;
         this.pixels = new float[width * height * 4];
+        this.dirtyLeft = width;
+        this.dirtyTop = height;
+    }
+
+    /**
+     * @return A transparent raster of the same size, to compose a group in before {@link #composite(SvgRaster, double)}
+     */
+    SvgRaster layer() {
+        return layers.isEmpty() ? new SvgRaster(width, height) : layers.remove(layers.size() - 1);
+    }
+
+    /**
+     * Draws a layer over this raster with an opacity, then clears the layer for reuse.
+     *
+     * @param layer A raster from {@link #layer()}
+     * @param alpha The opacity of the layer in [0, 1]
+     */
+    void composite(SvgRaster layer, double alpha) {
+        float opacity = (float) alpha;
+        for (int y = layer.dirtyTop; y <= layer.dirtyBottom; y++) {
+            for (int x = layer.dirtyLeft; x <= layer.dirtyRight; x++) {
+                int offset = (y * width + x) * 4;
+                float a = layer.pixels[offset + 3] * opacity;
+                if (a > 0) {
+                    float keep = 1 - a;
+                    pixels[offset] = layer.pixels[offset] * opacity + pixels[offset] * keep;
+                    pixels[offset + 1] = layer.pixels[offset + 1] * opacity + pixels[offset + 1] * keep;
+                    pixels[offset + 2] = layer.pixels[offset + 2] * opacity + pixels[offset + 2] * keep;
+                    pixels[offset + 3] = a + pixels[offset + 3] * keep;
+                    touch(x, y);
+                }
+                Arrays.fill(layer.pixels, offset, offset + 4, 0);
+            }
+        }
+        layer.dirtyLeft = width;
+        layer.dirtyTop = height;
+        layer.dirtyRight = -1;
+        layer.dirtyBottom = -1;
+        layers.add(layer);
+    }
+
+    private void touch(int x, int y) {
+        if (x < dirtyLeft) {
+            dirtyLeft = x;
+        }
+        if (x > dirtyRight) {
+            dirtyRight = x;
+        }
+        if (y < dirtyTop) {
+            dirtyTop = y;
+        }
+        if (y > dirtyBottom) {
+            dirtyBottom = y;
+        }
     }
 
     int width() {
@@ -183,6 +245,7 @@ final class SvgRaster {
         if (a <= 0) {
             return;
         }
+        touch(index % width, index / width);
         int offset = index * 4;
         float keep = 1 - a;
         pixels[offset] = red * a + pixels[offset] * keep;

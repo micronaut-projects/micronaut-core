@@ -28,8 +28,10 @@ final class Stroker {
     static final int ROUND = 1;
     static final int SQUARE = 2;
 
-    // the length of the chords of the discs, in device pixels
-    private static final double CHORD = 1.5;
+    /**
+     * The length of the chords of the discs in device pixels.
+     */
+    static final double CHORD = 1.5;
 
     private Stroker() {
     }
@@ -41,9 +43,10 @@ final class Stroker {
      * @param closed Whether the polyline is a closed subpath, joined at its start rather than capped
      * @param halfWidth Half the stroke width in device pixels
      * @param lineCap The cap of open polylines
+     * @param chord The length of the chords of the discs at joins and round caps
      * @param polygons The list to add the polygons to
      */
-    static void stroke(double[] points, boolean closed, double halfWidth, int lineCap, List<double[]> polygons) {
+    static void stroke(double[] points, boolean closed, double halfWidth, int lineCap, double chord, List<double[]> polygons) {
         if (halfWidth <= 0 || points.length < 2) {
             return;
         }
@@ -54,7 +57,7 @@ final class Stroker {
         }
         if (count == 1) {
             if (lineCap == ROUND) {
-                polygons.add(disc(unique[0], unique[1], halfWidth));
+                polygons.add(disc(unique[0], unique[1], halfWidth, chord));
             } else if (lineCap == SQUARE) {
                 polygons.add(oriented(new double[] {
                     unique[0] - halfWidth, unique[1] - halfWidth, unique[0] + halfWidth, unique[1] - halfWidth,
@@ -91,7 +94,7 @@ final class Stroker {
         for (int i = 0; i < count; i++) {
             boolean end = i == 0 || i == count - 1;
             if (!end || closed || lineCap == ROUND) {
-                polygons.add(disc(unique[2 * i], unique[2 * i + 1], halfWidth));
+                polygons.add(disc(unique[2 * i], unique[2 * i + 1], halfWidth, chord));
             }
         }
     }
@@ -110,8 +113,8 @@ final class Stroker {
         return result;
     }
 
-    private static double[] disc(double cx, double cy, double radius) {
-        int n = (int) Math.max(8, Math.min(64, Math.ceil(2 * Math.PI * radius / CHORD)));
+    private static double[] disc(double cx, double cy, double radius, double chord) {
+        int n = (int) Math.max(8, Math.min(64, Math.ceil(2 * Math.PI * radius / chord)));
         double[] polygon = new double[n * 2];
         for (int i = 0; i < n; i++) {
             double angle = 2 * Math.PI * i / n;

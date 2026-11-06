@@ -162,7 +162,7 @@ final class SvgImage {
      */
     void render(double time, SvgRaster raster, int currentColor) {
         double[] matrix = viewport(viewBox, 0, 0, raster.width(), raster.height());
-        Style style = new Style(0xFF000000, 1, false, 0, 1, 1, Stroker.BUTT, currentColor);
+        Style style = Style.initial(currentColor);
         render(root, time, matrix, style, 1, null, raster);
     }
 
@@ -184,7 +184,8 @@ final class SvgImage {
         }
         double[] matrix = Affine.multiply(parentMatrix, element.transform(time));
         Style style = parentStyle.derive(element, time);
-        double opacity = parentOpacity * clamp(element.number("opacity", time, 1));
+        double ownOpacity = clamp(element.number("opacity", time, 1));
+        double opacity = parentOpacity * ownOpacity;
         if (opacity <= 0) {
             return;
         }
@@ -215,12 +216,21 @@ final class SvgImage {
         float[] mask = clip(element, time, matrix, parentMask, raster);
         switch (element.name) {
             case "svg", "g", "a" -> {
-                for (Element child : element.children) {
-                    render(child, time, matrix, style, opacity, mask, raster);
+                if (ownOpacity < 1 && drawsOverlapping(element)) {
+                    // group opacity applies once to the composed group, so overlapping children do not add up
+                    SvgRaster layer = raster.layer();
+                    for (Element child : element.children) {
+                        render(child, time, matrix, style, 1, mask, layer);
+                    }
+                    raster.composite(layer, opacity);
+                } else {
+                    for (Element child : element.children) {
+                        render(child, time, matrix, style, opacity, mask, raster);
+                    }
                 }
             }
             case "path", "polygon", "polyline", "rect", "circle", "ellipse", "line" -> {
-                if (!visible(element, time)) {
+                if (style.hidden) {
                     return;
                 }
                 Geometry geometry = Geometry.of(element, time);
@@ -229,13 +239,12 @@ final class SvgImage {
                     raster.fill(geometry.flatten(matrix), style.evenOdd, style.fill, alpha, mask);
                 }
                 if (style.stroke != 0 && style.strokeWidth > 0) {
-                    double scale = Math.sqrt(Math.abs(matrix[0] * matrix[3] - matrix[1] * matrix[2]));
                     double alpha = ((style.stroke >>> 24) / 255.0) * style.strokeOpacity * opacity;
-                    raster.fill(geometry.stroke(matrix, style.strokeWidth * scale, style.lineCap), false, style.stroke, alpha, mask);
+                    raster.fill(geometry.stroke(matrix, style.strokeWidth, style.lineCap), false, style.stroke, alpha, mask);
                 }
             }
             case "image" -> {
-                if (visible(element, time)) {
+                if (!style.hidden) {
                     drawImage(element, time, matrix, opacity, mask, raster);
                 }
             }
@@ -248,6 +257,25 @@ final class SvgImage {
     private static boolean visible(Element element, double time) {
         String visibility = element.property("visibility", time);
         return !"hidden".equals(visibility) && !"collapse".equals(visibility);
+    }
+
+    /**
+     * @return Whether a group draws more than one thing, which may overlap, so that its opacity needs a layer
+     */
+    private static boolean drawsOverlapping(Element group) {
+        int drawn = 0;
+        for (Element child : group.children) {
+            if (Geometry.SHAPES.contains(child.name) || "image".equals(child.name)) {
+                drawn++;
+            } else if (!child.children.isEmpty() && !"defs".equals(child.name) && !"clipPath".equals(child.name)) {
+                // a nested group may draw several shapes
+                drawn += 2;
+            }
+            if (drawn > 1) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private float @Nullable [] clip(Element element, double time, double[] matrix, float @Nullable [] parentMask, SvgRaster raster) {
@@ -367,16 +395,24 @@ final class SvgImage {
      * The inherited painting properties.
      *
      * @param fill The ARGB fill, 0 for none
+     * @param fillCurrent Whether the fill is {@code currentColor}, which follows the {@code color} of each element
      * @param fillOpacity The fill opacity
      * @param evenOdd Whether the fill rule is even-odd
      * @param stroke The ARGB stroke, 0 for none
+     * @param strokeCurrent Whether the stroke is {@code currentColor}
      * @param strokeOpacity The stroke opacity
      * @param strokeWidth The stroke width
      * @param lineCap The line cap of strokes
      * @param color The ARGB value of {@code currentColor}
+     * @param hidden Whether {@code visibility} hides the shapes, which a descendant can make visible again
      */
-    private record Style(int fill, double fillOpacity, boolean evenOdd, int stroke, double strokeOpacity, double strokeWidth,
-                         int lineCap, int color) {
+    private record Style(int fill, boolean fillCurrent, double fillOpacity, boolean evenOdd,
+                         int stroke, boolean strokeCurrent, double strokeOpacity, double strokeWidth, int lineCap,
+                         int color, boolean hidden) {
+
+        static Style initial(int currentColor) {
+            return new Style(0xFF000000, false, 1, false, 0, false, 1, 1, Stroker.BUTT, currentColor, false);
+        }
 
         Style derive(Element element, double time) {
             int newColor = color;
@@ -387,30 +423,44 @@ final class SvgImage {
                     newColor = parsed;
                 }
             }
-            int newFill = paint(element.property("fill", time), fill, newColor);
-            int newStroke = paint(element.property("stroke", time), stroke, newColor);
+            String fillValue = specified(element.property("fill", time));
+            boolean newFillCurrent = fillValue != null ? isCurrentColor(fillValue) : fillCurrent;
+            int newFill = paint(fillValue, newFillCurrent ? newColor : fill, newColor);
+            String strokeValue = specified(element.property("stroke", time));
+            boolean newStrokeCurrent = strokeValue != null ? isCurrentColor(strokeValue) : strokeCurrent;
+            int newStroke = paint(strokeValue, newStrokeCurrent ? newColor : stroke, newColor);
             double newFillOpacity = clamp(element.number("fill-opacity", time, fillOpacity));
             double newStrokeOpacity = clamp(element.number("stroke-opacity", time, strokeOpacity));
             double newStrokeWidth = Math.max(0, element.number("stroke-width", time, strokeWidth));
-            String rule = element.property("fill-rule", time);
-            boolean newEvenOdd = rule == null || INHERIT.equals(rule) ? evenOdd : "evenodd".equals(rule);
-            String cap = element.property("stroke-linecap", time);
-            int newCap = cap == null || INHERIT.equals(cap) ? lineCap : switch (cap.trim()) {
+            String rule = specified(element.property("fill-rule", time));
+            boolean newEvenOdd = rule != null ? "evenodd".equals(rule) : evenOdd;
+            String cap = specified(element.property("stroke-linecap", time));
+            int newCap = cap == null ? lineCap : switch (cap.trim()) {
                 case "round" -> Stroker.ROUND;
                 case "square" -> Stroker.SQUARE;
                 default -> Stroker.BUTT;
             };
-            return new Style(newFill, newFillOpacity, newEvenOdd, newStroke, newStrokeOpacity, newStrokeWidth, newCap, newColor);
+            String visibility = specified(element.property("visibility", time));
+            boolean newHidden = visibility != null ? "hidden".equals(visibility) || "collapse".equals(visibility) : hidden;
+            return new Style(newFill, newFillCurrent, newFillOpacity, newEvenOdd, newStroke, newStrokeCurrent, newStrokeOpacity,
+                newStrokeWidth, newCap, newColor, newHidden);
         }
 
-        private int paint(@Nullable String value, int inherited, int newColor) {
-            if (value != null && !INHERIT.equals(value)) {
+        /**
+         * @return The value, null when it is absent or {@code inherit}
+         */
+        private static @Nullable String specified(@Nullable String value) {
+            return value == null || INHERIT.equals(value.trim()) ? null : value.trim();
+        }
+
+        private static boolean isCurrentColor(String value) {
+            return "currentcolor".equalsIgnoreCase(value);
+        }
+
+        private static int paint(@Nullable String value, int inherited, int newColor) {
+            if (value != null) {
                 Integer parsed = Paint.parse(value, newColor);
                 return parsed == null ? 0 : parsed;
-            }
-            if (inherited != 0 && inherited == color) {
-                // an inherited currentColor follows the color of this element
-                return newColor;
             }
             return inherited;
         }
@@ -492,7 +542,7 @@ final class SvgImage {
             }
             for (Animation animation : animations) {
                 if (!animation.transform && animation.attribute.equals(attribute) && animation.texts == null) {
-                    double[] animated = animation.value(time);
+                    double[] animated = animation.value(time, new double[] {value});
                     if (animated != null && animated.length > 0) {
                         value = animation.additive ? value + animated[0] : animated[0];
                     }
@@ -509,7 +559,7 @@ final class SvgImage {
             double[] matrix = Affine.parse(attributes.get("transform"));
             for (Animation animation : animations) {
                 if (animation.transform) {
-                    double[] values = animation.value(time);
+                    double[] values = animation.value(time, Affine.neutral(animation.attribute));
                     if (values != null) {
                         double[] animated = Affine.of(animation.attribute, values);
                         matrix = animation.additive ? Affine.multiply(matrix, animated) : animated;
@@ -572,6 +622,8 @@ final class SvgImage {
         final boolean freeze;
         final boolean additive;
         final boolean discrete;
+        // a to animation, which goes from the underlying value to its only value
+        final boolean toOnly;
         final double @Nullable [][] values;
         final String @Nullable [] texts;
         final double[] keyTimes;
@@ -592,7 +644,14 @@ final class SvgImage {
                 repeat = Math.max(length(repeatCount, 1), 0);
             }
             freeze = "freeze".equals(element.attr("fill"));
-            additive = "sum".equals(element.attr("additive"));
+            String valuesAttribute = element.attr("values");
+            boolean listed = valuesAttribute != null && !valuesAttribute.isBlank();
+            boolean noFrom = !listed && element.attr("from") == null;
+            toOnly = noFrom && element.attr("to") != null;
+            // a by animation without from adds its change to the underlying value
+            boolean byOnly = noFrom && element.attr("to") == null && element.attr("by") != null;
+            // a to animation ignores additive, it already starts from the underlying value
+            additive = (!toOnly && "sum".equals(element.attr("additive"))) || byOnly;
             String calcMode = element.attr("calcMode");
             String[] raw = rawValues(element);
             boolean numeric = true;
@@ -623,9 +682,9 @@ final class SvgImage {
                 }
             }
             keyTimes = times;
-            if ("spline".equals(calcMode) && element.attr("keySplines") != null && count > 1) {
+            if ("spline".equals(calcMode) && element.attr("keySplines") != null && (count > 1 || toOnly)) {
                 String[] splines = element.attr("keySplines").split(";");
-                double[][] parsed = new double[count - 1][];
+                double[][] parsed = new double[Math.max(count - 1, 1)][];
                 for (int i = 0; i < parsed.length; i++) {
                     double[] spline = i < splines.length ? numbers(splines[i]) : new double[0];
                     parsed[i] = spline.length == 4 ? spline : new double[] {0, 0, 1, 1};
@@ -652,7 +711,10 @@ final class SvgImage {
             String to = element.attr("to");
             String by = element.attr("by");
             if (to == null && by != null) {
-                double[] start = numbers(from == null ? "0" : from);
+                if (from == null) {
+                    return new String[] {"0", by};
+                }
+                double[] start = numbers(from);
                 double[] delta = numbers(by);
                 StringBuilder end = new StringBuilder();
                 for (int i = 0; i < delta.length; i++) {
@@ -687,12 +749,28 @@ final class SvgImage {
         }
 
         double @Nullable [] value(double time) {
+            return value(time, new double[0]);
+        }
+
+        /**
+         * @param time The document time
+         * @param underlying The value without this animation, where a {@code to} animation starts
+         * @return The animated value, null when the animation does not apply
+         */
+        double @Nullable [] value(double time, double[] underlying) {
             double progress = progress(time);
             if (progress < 0 || values == null) {
                 return null;
             }
             if (values.length == 1) {
-                return values[0];
+                if (!toOnly) {
+                    return values[0];
+                }
+                if (discrete) {
+                    return progress < 0.5 ? underlying : values[0];
+                }
+                double fraction = keySplines == null ? progress : Easing.cubicBezier(keySplines[0], progress);
+                return interpolate(underlying, values[0], fraction);
             }
             int segment = segment(progress);
             if (discrete) {
@@ -706,8 +784,10 @@ final class SvgImage {
             if (keySplines != null) {
                 fraction = Easing.cubicBezier(keySplines[segment], fraction);
             }
-            double[] from = values[segment];
-            double[] to = values[segment + 1];
+            return interpolate(values[segment], values[segment + 1], fraction);
+        }
+
+        private static double[] interpolate(double[] from, double[] to, double fraction) {
             double[] result = new double[Math.max(from.length, to.length)];
             for (int i = 0; i < result.length; i++) {
                 double a = i < from.length ? from[i] : 0;
@@ -886,6 +966,14 @@ final class SvgImage {
             return matrix;
         }
 
+        /**
+         * @param function The transform function
+         * @return The arguments for which the function changes nothing, where a {@code to} animation of it starts
+         */
+        static double[] neutral(String function) {
+            return "scale".equals(function) ? new double[] {1, 1} : new double[] {0, 0, 0};
+        }
+
         static double[] of(String function, double[] v) {
             return switch (function) {
                 case "matrix" -> v.length == 6 ? v.clone() : IDENTITY;
@@ -1057,6 +1145,9 @@ final class SvgImage {
                         if (position < xml.length() && xml.charAt(position) == '=') {
                             position++;
                             skipWhitespace();
+                            if (position >= xml.length()) {
+                                throw new IllegalArgumentException("Unterminated attribute " + attribute + " of <" + name + ">");
+                            }
                             char quote = xml.charAt(position);
                             int close = xml.indexOf(quote, position + 1);
                             if ((quote != '"' && quote != '\'') || close < 0) {

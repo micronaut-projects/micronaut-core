@@ -26,18 +26,23 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.CRC32;
+import java.util.zip.DeflaterOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SvgBannerTest {
@@ -173,6 +178,129 @@ class SvgBannerTest {
         assertEquals(RED, image.getRGB(27, 10));
         assertEquals(0, image.getRGB(32, 10) >>> 24, "the transparent half of the image");
         assertEquals(0, image.getRGB(18, 10) >>> 24, "clipped to the nested viewport");
+    }
+
+    @Test
+    void numbersAfterAClosepathEndThePath() {
+        List<double[]> polygons = assertTimeoutPreemptively(Duration.ofSeconds(5),
+            () -> Geometry.path("M0 0 L10 0 L10 10 Z 1 2").flatten(SvgImage.Affine.IDENTITY));
+
+        assertEquals(1, polygons.size());
+    }
+
+    @Test
+    void truncatedSvgPrintsNothing(@TempDir Path dir) throws IOException {
+        Path file = Files.writeString(dir.resolve("banner.svg"), "<svg width=");
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+
+        assertFalse(new ImageBanner(file.toUri().toURL(), new PrintStream(bytes)).printImage());
+        assertEquals(0, bytes.size());
+    }
+
+    @Test
+    void toAndByAnimationsStartFromTheUnderlyingValue() {
+        SvgImage svg = SvgImage.parse("""
+            <svg width="10" height="10">
+              <rect x="2" width="10" height="10"><animate attributeName="x" to="12" dur="2s"/></rect>
+              <rect x="2" width="10" height="10"><animate attributeName="x" by="10" dur="2s"/></rect>
+              <rect width="10" height="10"><animateTransform attributeName="transform" type="scale" to="3" dur="2s"/></rect>
+            </svg>""");
+        List<SvgImage.Element> rects = svg.rootForTest().children;
+
+        assertEquals(7, rects.get(0).number("x", 1, 0), 1e-9);
+        assertEquals(7, rects.get(1).number("x", 1, 0), 1e-9);
+        assertEquals(2, rects.get(2).transform(1)[0], 1e-9);
+    }
+
+    @Test
+    void groupOpacityAppliesOnceToOverlappingShapes() throws IOException {
+        BufferedImage image = render("""
+            <svg width="30" height="10">
+              <g opacity="0.5" fill="red">
+                <rect width="20" height="10"/>
+                <rect x="10" width="20" height="10"/>
+              </g>
+            </svg>""", 0);
+
+        assertEquals(128, image.getRGB(5, 5) >>> 24, 1);
+        assertEquals(128, image.getRGB(15, 5) >>> 24, 1, "the overlap is no more opaque than the rest");
+    }
+
+    @Test
+    void visibilityIsInherited() throws IOException {
+        BufferedImage image = render("""
+            <svg width="20" height="10">
+              <g visibility="hidden">
+                <rect width="10" height="10"/>
+                <rect x="10" width="10" height="10" visibility="visible"/>
+              </g>
+            </svg>""", 0);
+
+        assertEquals(0, image.getRGB(5, 5) >>> 24);
+        assertEquals(0xFF000000, image.getRGB(15, 5));
+    }
+
+    @Test
+    void aLiteralColorIsNotCurrentColorEvenWhenTheyAreEqual() throws IOException {
+        BufferedImage image = render("""
+            <svg width="10" height="10">
+              <g fill="black"><rect width="10" height="10" color="red"/></g>
+            </svg>""", 0, 0xFF000000);
+
+        assertEquals(0xFF000000, image.getRGB(5, 5));
+    }
+
+    @Test
+    void strokesFollowNonUniformScaling() throws IOException {
+        BufferedImage image = render("""
+            <svg width="40" height="20">
+              <line x1="5" y1="0" x2="5" y2="20" stroke="red" stroke-width="2" transform="scale(4 1)"/>
+            </svg>""", 0);
+
+        // the line is at x = 20, and its 2 units are 8 pixels wide
+        assertEquals(RED, image.getRGB(17, 10));
+        assertEquals(RED, image.getRGB(23, 10));
+        assertEquals(0, image.getRGB(25, 10) >>> 24);
+        assertEquals(0, image.getRGB(14, 10) >>> 24);
+    }
+
+    @Test
+    void theColorKeyOfATrueColorPngIsTransparent() throws IOException {
+        // two pixels, red and green, with red as the transparent color key
+        byte[] png = png(2, 1, 2, new byte[] {0, (byte) 0xFF, 0, 0, 0, (byte) 0xFF, 0},
+            new byte[] {0, (byte) 0xFF, 0, 0, 0, 0});
+
+        PngImage image = PngImage.decode(png);
+
+        assertEquals(0x00FF0000, image.argb()[0]);
+        assertEquals(0xFF00FF00, image.argb()[1]);
+    }
+
+    private static byte[] png(int width, int height, int colorType, byte[] filteredRows, byte[] transparency) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(new byte[] {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'});
+        ByteBuffer header = ByteBuffer.allocate(13).putInt(width).putInt(height).put((byte) 8).put((byte) colorType)
+            .put((byte) 0).put((byte) 0).put((byte) 0);
+        chunk(out, "IHDR", header.array());
+        chunk(out, "tRNS", transparency);
+        ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+        try (DeflaterOutputStream deflate = new DeflaterOutputStream(compressed)) {
+            deflate.write(filteredRows);
+        }
+        chunk(out, "IDAT", compressed.toByteArray());
+        chunk(out, "IEND", new byte[0]);
+        return out.toByteArray();
+    }
+
+    private static void chunk(ByteArrayOutputStream out, String type, byte[] data) {
+        byte[] typeBytes = type.getBytes(StandardCharsets.US_ASCII);
+        CRC32 crc = new CRC32();
+        crc.update(typeBytes);
+        crc.update(data);
+        out.writeBytes(ByteBuffer.allocate(4).putInt(data.length).array());
+        out.writeBytes(typeBytes);
+        out.writeBytes(data);
+        out.writeBytes(ByteBuffer.allocate(4).putInt((int) crc.getValue()).array());
     }
 
     @Test

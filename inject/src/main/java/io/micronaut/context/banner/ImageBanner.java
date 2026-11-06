@@ -185,17 +185,16 @@ public class ImageBanner implements Banner {
             out.println();
             return true;
         }
-        SvgImage svg;
         try {
-            svg = SvgImage.parse(new String(image, StandardCharsets.UTF_8));
-        } catch (IllegalArgumentException e) {
+            printSvg(SvgImage.parse(new String(image, StandardCharsets.UTF_8)));
+            return true;
+        } catch (RuntimeException e) {
+            // a banner must never stop the application from starting
             if (LOG.isErrorEnabled()) {
-                LOG.error("The banner {} is not a valid SVG image.", resource, e);
+                LOG.error("The banner {} is not an SVG image that can be rendered.", resource, e);
             }
             return false;
         }
-        printSvg(svg);
-        return true;
     }
 
     private String scaling() {
