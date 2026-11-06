@@ -176,6 +176,7 @@ final class GenerationMemory {
      * infos of the calling thread's group only, so it runs on a thread of each group: a template rendered on a virtual
      * thread, say, reads its model in the group of the virtual threads.
      */
+    @SuppressWarnings("java:S3014") // the JDK keys this cache by thread group, so an executor cannot reach it
     private static void flushBeanInfos() {
         if (NativeImageUtils.inImageRuntimeCode() || !JAVA_DESKTOP) {
             // a native image never unloads a class it defined at runtime
