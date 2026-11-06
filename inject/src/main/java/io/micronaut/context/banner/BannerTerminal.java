@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.Console;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
@@ -29,9 +30,10 @@ import java.util.function.Function;
  * which image suits its theme.
  *
  * @param env The environment variables
- * @param interactive Whether the output is an interactive terminal, consulted last since opening the console is not free
+ * @param interactive Whether the output is an interactive terminal, consulted after the environment since opening the console is not free
+ * @param gradle Whether the process was launched by Gradle, which forwards its child process output
  */
-record BannerTerminal(Function<String, @Nullable String> env, BooleanSupplier interactive) {
+record BannerTerminal(Function<String, @Nullable String> env, BooleanSupplier interactive, BooleanSupplier gradle) {
 
     private static final String BANNER_MODE_ENV = "MICRONAUT_BANNER_MODE";
     private static final String BANNER_THEME_ENV = "MICRONAUT_BANNER_THEME";
@@ -40,7 +42,7 @@ record BannerTerminal(Function<String, @Nullable String> env, BooleanSupplier in
      * @return The terminal of this process
      */
     static BannerTerminal current() {
-        return new BannerTerminal(System::getenv, BannerTerminal::isConsoleInteractive);
+        return new BannerTerminal(System::getenv, BannerTerminal::isConsoleInteractive, BannerTerminal::isLaunchedByGradle);
     }
 
     /**
@@ -117,9 +119,24 @@ record BannerTerminal(Function<String, @Nullable String> env, BooleanSupplier in
         String termProgram = env.apply("TERM_PROGRAM");
         boolean kitty = env.apply("KITTY_WINDOW_ID") != null
             || (term != null && term.toLowerCase(Locale.ROOT).contains("kitty"))
+            || "xterm-ghostty".equals(term)
+            || "ghostty".equals(termProgram)
             || "iTerm.app".equals(termProgram)
             || "WezTerm".equals(termProgram);
-        return kitty && interactive.getAsBoolean();
+        return kitty && (interactive.getAsBoolean() || gradle.getAsBoolean());
+    }
+
+    private static boolean isLaunchedByGradle() {
+        try {
+            return ProcessHandle.current().parent()
+                .flatMap(parent -> parent.info().arguments())
+                .map(arguments -> Arrays.stream(arguments).anyMatch(argument ->
+                    "org.gradle.launcher.daemon.bootstrap.GradleDaemon".equals(argument)
+                        || "org.gradle.launcher.GradleMain".equals(argument)))
+                .orElse(false);
+        } catch (UnsupportedOperationException | SecurityException e) {
+            return false;
+        }
     }
 
     @SuppressWarnings({"NoReflection", "SystemConsoleNull"}) // The JDK 22 API must remain optional for older runtime versions.

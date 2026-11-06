@@ -15,9 +15,11 @@ $ ./gradlew run
 
 To customize the text banner, create the file `src/main/resources/micronaut-banner.txt` and it will be used instead.
 
-When the application starts in a Kitty, iTerm2, or WezTerm terminal, the default banner displays the Micronaut logo. You can also replace this image.
+When the application starts in a Kitty, Ghostty, iTerm2, or WezTerm terminal, the default banner displays the Micronaut logo. You can also replace this image.
 
 Set the `MICRONAUT_BANNER_MODE` environment variable to choose the output mode. The default, `auto`, detects the terminal protocol. Set it to `ascii` to always print ASCII art, or to `kitty` to force the Kitty graphics protocol (which is supported by iTerm2 as well). A forced protocol bypasses terminal detection, so use it only when the output terminal supports it. If the image resource is missing, Micronaut prints the ASCII banner.
+
+Automatic detection requires an interactive console or a process launched directly by Gradle, which forwards the application's output. Running `./gradlew run` in a supported terminal therefore displays the image banner. If you redirect Gradle's output to a file, set `MICRONAUT_BANNER_MODE=ascii` to keep image escape sequences out of the file.
 
 Set `MICRONAUT_BANNER_THEME` to `light` or `dark` to select the right logo for the given terminal theme. The default, `auto`, checks the `COLORFGBG` environment variable when it is set: background color index `7` or `15` selects a logo for light mode terminals; other values and an unset variable select dark mode. Set the variable explicitly when the terminal does not provide `COLORFGBG`.
 

@@ -97,6 +97,9 @@ class ImageBannerTest {
         for (Map<String, String> env : List.of(
             Map.of("KITTY_WINDOW_ID", "1"),
             Map.of("TERM", "xterm-kitty"),
+            Map.of("TERM", "xterm-ghostty"),
+            Map.of("TERM_PROGRAM", "ghostty"),
+            Map.of("TERM_PROGRAM", "ghostty", "MICRONAUT_BANNER_MODE", "auto"),
             Map.of("TERM_PROGRAM", "iTerm.app"),
             Map.of("TERM_PROGRAM", "WezTerm"),
             Map.of("TERM_PROGRAM", "WezTerm", "MICRONAUT_BANNER_MODE", "auto"))) {
@@ -110,7 +113,17 @@ class ImageBannerTest {
     void imageSupportCanBeForced() {
         assertTrue(terminal(Map.of("MICRONAUT_BANNER_MODE", "kitty"), false).supportsImages());
         assertFalse(terminal(Map.of("MICRONAUT_BANNER_MODE", "ascii", "TERM", "xterm-kitty"), true).supportsImages());
+        assertFalse(terminal(Map.of("MICRONAUT_BANNER_MODE", "ascii", "TERM_PROGRAM", "ghostty"), true).supportsImages());
         assertFalse(terminal(Map.of("MICRONAUT_BANNER_MODE", "other", "TERM", "xterm-kitty"), true).supportsImages());
+    }
+
+    @Test
+    void gradleLaunchesCanDisplayImagesOnlyInSupportedTerminals() {
+        assertTrue(terminal(Map.of("TERM_PROGRAM", "ghostty"), false, true).supportsImages());
+        assertTrue(terminal(Map.of("TERM", "xterm-ghostty"), false, true).supportsImages());
+        assertTrue(terminal(Map.of("TERM", "xterm-kitty"), false, true).supportsImages());
+        assertFalse(terminal(Map.of("TERM_PROGRAM", "Apple_Terminal"), false, true).supportsImages());
+        assertFalse(terminal(Map.of("TERM_PROGRAM", "ghostty", "MICRONAUT_BANNER_MODE", "ascii"), false, true).supportsImages());
     }
 
     @Test
@@ -209,7 +222,11 @@ class ImageBannerTest {
     }
 
     private static BannerTerminal terminal(Map<String, String> env, boolean interactive) {
-        return new BannerTerminal(env::get, () -> interactive);
+        return terminal(env, interactive, false);
+    }
+
+    private static BannerTerminal terminal(Map<String, String> env, boolean interactive, boolean gradle) {
+        return new BannerTerminal(env::get, () -> interactive, () -> gradle);
     }
 
     private static String capture(ThrowingBanner banner) {

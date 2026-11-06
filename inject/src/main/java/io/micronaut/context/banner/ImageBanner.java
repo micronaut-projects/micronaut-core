@@ -28,7 +28,7 @@ import java.util.Optional;
 
 /**
  * Prints a banner from a PNG resource with the Kitty graphics protocol, which is implemented by
- * terminals such as Kitty, iTerm2 and WezTerm.
+ * terminals such as Kitty, Ghostty, iTerm2 and WezTerm.
  *
  * @since 5.3.0
  */
