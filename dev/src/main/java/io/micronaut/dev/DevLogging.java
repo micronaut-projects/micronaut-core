@@ -56,13 +56,14 @@ import java.util.Set;
 @Internal
 final class DevLogging {
 
+    // the logger of DefaultEnvironment, which is not public
+    static final String ENVIRONMENT_LOGGER = "io.micronaut.context.env.DefaultEnvironment";
+
     private static final String LOGGER_CONTEXT = "ch.qos.logback.classic.LoggerContext";
     // Logback's own names, spelled out: this class is loaded whether Logback is present or not
     private static final String CONFIG_FILE_PROPERTY = "logback.configurationFile";
     private static final String AUTOCONFIG_FILE = "logback.xml";
     private static final String TEST_AUTOCONFIG_FILE = "logback-test.xml";
-    // the logger of DefaultEnvironment, which is not public
-    static final String ENVIRONMENT_LOGGER = "io.micronaut.context.env.DefaultEnvironment";
     private static final Logger LOG = LoggerFactory.getLogger(DevLogging.class);
 
     private volatile boolean stale = true;

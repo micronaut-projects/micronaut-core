@@ -94,19 +94,16 @@ public class ProxyHeaderParser {
                     });
         } else {
             forwardedProto = StringUtils.trimToNull(headers.get(X_FORWARDED_PROTO));
-            forwardedHost = headers.get(X_FORWARDED_HOST);
-            try {
-                if (forwardedHost != null && forwardedHost.contains(":")) {
-                    String[] parts = forwardedHost.split(":");
-                    forwardedHost = parts[0];
-                    forwardedPort = Integer.valueOf(parts[1]);
-                } else {
-                    String portHeader = headers.get(X_FORWARDED_PORT);
-                    if (portHeader != null) {
-                        forwardedPort = Integer.valueOf(portHeader);
-                    }
+            String forwardedHostHeader = headers.get(X_FORWARDED_HOST);
+            if (forwardedHostHeader != null) {
+                parseForwardedHost(forwardedHostHeader);
+            }
+            if (forwardedPort == null) {
+                String portHeader = headers.get(X_FORWARDED_PORT);
+                if (portHeader != null) {
+                    forwardedPort = parsePort(portHeader);
                 }
-            } catch (NumberFormatException ignored) { }
+            }
             String forwardedForHeader = headers.get(X_FORWARDED_FOR);
             if (forwardedForHeader != null) {
                 forwardedFor = Arrays.stream(forwardedForHeader.split(ELEMENT_DELIMITER))
