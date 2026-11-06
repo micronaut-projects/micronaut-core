@@ -1169,6 +1169,9 @@ abstract class MultiplexedServerHandler {
                     LOG.warn("Failed to write the streamed response: {}", t.getMessage(), t);
                     requestHandler.responseFailed(attachment, t);
                     reset(t);
+                    // the body may still be open: disposing the writer reports the response as
+                    // written, which lets the upstream discard the rest and releases what is held
+                    writer.dispose();
                     return false;
                 }
             }
