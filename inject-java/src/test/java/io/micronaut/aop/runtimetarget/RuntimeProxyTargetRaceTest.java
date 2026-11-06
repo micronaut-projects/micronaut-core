@@ -1,11 +1,14 @@
 package io.micronaut.aop.runtimetarget;
 
 import io.micronaut.aop.runtime.DefaultRuntimeProxyDefinition;
+import io.micronaut.context.AbstractBeanResolutionContext;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.DependentBeanProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -18,6 +21,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -33,6 +39,7 @@ class RuntimeProxyTargetRaceTest {
     @AfterEach
     void cleanup() {
         TargetProbe.onCreation = () -> { };
+        SelfCallingTarget.proxy = null;
         executor.shutdownNow();
     }
 
@@ -96,6 +103,86 @@ class RuntimeProxyTargetRaceTest {
             assertEquals(1, CachingTarget.TARGETS_DESTROYED.get());
             assertEquals(CachingTarget.Dependency.CREATED.get(), CachingTarget.Dependency.DESTROYED.get());
         }
+    }
+
+    @Test
+    void onlyATargetResolvedWhileItsProxyIsCreatedIsOwnedWhenTheProxyIsInjected() {
+        try (ApplicationContext context = ApplicationContext.run()) {
+            CachingTarget.TARGETS_DESTROYED.set(0);
+            CachingTarget.Dependency.CREATED.set(0);
+            CachingTarget.Dependency.DESTROYED.set(0);
+            BeanRegistration<ProxyHolder> registration = context.getBeanRegistration(ProxyHolder.class, null);
+
+            // the two proxies, and not the target that the one called once it existed resolved in the same resolution
+            assertEquals(2, ((DependentBeanProvider) registration).dependentBeans().size());
+            context.destroyBean(registration);
+
+            assertEquals(1, CachingTarget.TARGETS_DESTROYED.get());
+            assertEquals(CachingTarget.Dependency.CREATED.get(), CachingTarget.Dependency.DESTROYED.get());
+        }
+    }
+
+    @Test
+    void aProxyCreatedWithoutARegistrationDoesNotKeepTheContextCreatingIt() throws Exception {
+        try (ApplicationContext context = ApplicationContext.run()) {
+            InjectingTarget proxy = context.createBean(InjectingTarget.class);
+            assertEquals(List.of(), callConcurrently(proxy::injected));
+
+            AbstractBeanResolutionContext retained = retainedBy(context);
+            assertSame(retained, retained.runtimeProxyTargetContext());
+
+            assertNotNull(context.createBean(CachingTarget.class));
+        }
+    }
+
+    @Test
+    void aCallOnTheCreatingThreadLetsGoOfTheContextCreatingTheProxy() throws Exception {
+        try (ApplicationContext context = ApplicationContext.run()) {
+            InjectingTarget proxy = context.getBean(InjectingTarget.class);
+            AbstractBeanResolutionContext retained = retainedBy(context);
+            assertNotNull(creatorOf(retained));
+
+            assertTrue(proxy.injected());
+
+            assertNull(creatorOf(retained));
+        }
+    }
+
+    @Test
+    void aCallOnAnotherThreadLetsGoOfTheContextCreatingTheProxy() throws Exception {
+        try (ApplicationContext context = ApplicationContext.run()) {
+            InjectingTarget proxy = context.getBean(InjectingTarget.class);
+            AbstractBeanResolutionContext retained = retainedBy(context);
+            assertNotNull(creatorOf(retained));
+
+            assertTrue(get(executor.submit(proxy::injected)));
+
+            assertNull(creatorOf(retained));
+        }
+    }
+
+    @Test
+    void aTargetCallingItsOwnProxyWhileAnOuterResolutionGoesOnIsNotACircularDependency() {
+        try (ApplicationContext context = ApplicationContext.run()) {
+            SelfCallingTarget.CREATED.set(0);
+            SelfCallingTarget.limit = 3;
+
+            assertNotNull(context.getBean(SelfCallingHolder.class));
+
+            assertEquals(3, SelfCallingTarget.CREATED.get());
+        }
+    }
+
+    private static AbstractBeanResolutionContext retainedBy(ApplicationContext context) {
+        DefaultRuntimeProxyDefinition<?> definition = (DefaultRuntimeProxyDefinition<?>) context.getBean(PerCallTargetProxyCreator.class)
+            .definitions.get(InjectingTarget.class);
+        return (AbstractBeanResolutionContext) definition.resolutionContext();
+    }
+
+    private static Object creatorOf(AbstractBeanResolutionContext retained) throws ReflectiveOperationException {
+        Field creator = AbstractBeanResolutionContext.class.getDeclaredField("runtimeProxyCreator");
+        creator.setAccessible(true);
+        return creator.get(retained);
     }
 
     /**

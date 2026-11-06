@@ -117,7 +117,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         }
         // The proxy can resolve its target on every call and from any thread, long after this resolution is over
         BeanResolutionContext retained = targetDefinition != null && resolutionContext instanceof AbstractBeanResolutionContext creating
-            ? creating.copyForRuntimeProxyTarget(targetDefinition) : resolutionContext;
+            ? creating.copyForRuntimeProxyTarget(proxyBeanDefinition, targetDefinition) : resolutionContext;
         return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, retained, interceptedMethods, false, isProxyTarget, constructorValues, targetQualifier);
     }
 

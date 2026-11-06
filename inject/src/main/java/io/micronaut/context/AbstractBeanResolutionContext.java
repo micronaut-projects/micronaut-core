@@ -80,14 +80,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Nullable
     private List<BeanRegistration<?>> dependentBeans;
     private boolean lazyProxyTarget;
-    /** The context creating the runtime proxy this context is retained by; see {@link #copyForRuntimeProxyTarget}. */
+    /** What creates the runtime proxy this context is retained by, until a call finds that over; see {@link #copyForRuntimeProxyTarget}. */
     @Nullable
-    private AbstractBeanResolutionContext runtimeProxyCreator;
-    /** The creation of that proxy. */
-    @Nullable
-    private BeanCreationState runtimeProxyCreation;
-    /** The thread creating that proxy, the only one to which either of them means anything. */
-    private long runtimeProxyCreatorThread;
+    private RuntimeProxyCreator runtimeProxyCreator;
     /** The ownership of the bean this context is creating at the moment, or null outside a creation. */
     @Nullable
     BeanCreationState creationState;
@@ -734,6 +729,19 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public BeanResolutionContext copyForLazyProxyTarget(BeanDefinition<?> proxyBeanDefinition) {
+        BeanResolutionContext copy = copyForProxyTarget(proxyBeanDefinition);
+        if (copy instanceof AbstractBeanResolutionContext abstractCopy) {
+            // taken by the creation of the proxy once the proxy is instantiated, for its registration
+            if (lazyProxyTargetCopies == null) {
+                lazyProxyTargetCopies = new HashMap<>(2);
+            }
+            // keyed by the class of the definition the proxy resolves its target with, which is the target's
+            lazyProxyTargetCopies.put(proxyBeanDefinition.getClass(), abstractCopy);
+        }
+        return copy;
+    }
+
+    private BeanResolutionContext copyForProxyTarget(BeanDefinition<?> proxyBeanDefinition) {
         BeanResolutionContext copy = copy();
         if (!context.getBeanResolutionCustomizer().shouldPreserveLazyProxyTargetResolutionPath(this, proxyBeanDefinition)) {
             copy.getPath().clear();
@@ -747,12 +755,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             if (creationState != null) {
                 abstractCopy.lazyProxyDependencies = creationState.dependencies;
             }
-            // taken by the creation of the proxy once the proxy is instantiated, for its registration
-            if (lazyProxyTargetCopies == null) {
-                lazyProxyTargetCopies = new HashMap<>(2);
-            }
-            // keyed by the class of the definition the proxy resolves its target with, which is the target's
-            lazyProxyTargetCopies.put(proxyBeanDefinition.getClass(), abstractCopy);
         }
         return copy;
     }
@@ -767,17 +769,22 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * path, whatever the path is now. The proxy creator can also resolve the one target it keeps while it creates the
      * proxy: that one remains a part of the creation, see {@link #runtimeProxyTargetContext()}.</p>
      *
+     * <p>A target that calls its own proxy while it is created is not reported as a circular dependency: the call
+     * resolves a further target, and without an end to it the thread runs out of stack.</p>
+     *
+     * @param proxyDefinition The definition of the proxy
      * @param targetDefinition The definition of the target of the proxy
      * @return The context for the proxy to retain
+     * @since 5.2.23
      */
     @Internal
-    public final BeanResolutionContext copyForRuntimeProxyTarget(BeanDefinition<?> targetDefinition) {
-        BeanResolutionContext copy = copyForLazyProxyTarget(targetDefinition);
+    public final BeanResolutionContext copyForRuntimeProxyTarget(BeanDefinition<?> proxyDefinition, BeanDefinition<?> targetDefinition) {
+        // the creation of a proxy definition takes the copy back for its registration, and nothing takes it for another
+        BeanResolutionContext copy = proxyDefinition instanceof ProxyBeanDefinition<?>
+            ? copyForLazyProxyTarget(targetDefinition) : copyForProxyTarget(targetDefinition);
         copy.getPath().clear();
         if (creationState != null && copy instanceof AbstractBeanResolutionContext retained) {
-            retained.runtimeProxyCreator = this;
-            retained.runtimeProxyCreation = creationState;
-            retained.runtimeProxyCreatorThread = Thread.currentThread().threadId();
+            retained.runtimeProxyCreator = new RuntimeProxyCreator(this, creationState, Thread.currentThread().threadId());
         }
         return copy;
     }
@@ -786,15 +793,32 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * @return The context to resolve the target of a runtime proxy through at this moment: the one creating the proxy,
      * on the thread creating it and for as long as it does, so that the target and what it receives are owned by the
      * proxy; this context otherwise
+     * @since 5.2.23
      */
     @Internal
     public final BeanResolutionContext runtimeProxyTargetContext() {
-        // only the creating thread goes on to read the other two fields, which it wrote itself
-        if (runtimeProxyCreatorThread == Thread.currentThread().threadId()
-            && runtimeProxyCreator != null && runtimeProxyCreator.creationState == runtimeProxyCreation) {
-            return runtimeProxyCreator;
+        RuntimeProxyCreator creator = runtimeProxyCreator;
+        if (creator == null) {
+            return this;
         }
+        // only the creating thread can read what its context is creating
+        if (creator.thread == Thread.currentThread().threadId() && creator.context.creationState == creator.creation) {
+            return creator.context;
+        }
+        // the creation is over, or the proxy left it early and what it resolves from now on is not owned by it: the
+        // proxy can outlive what created it by far, and has no use for it any more
+        runtimeProxyCreator = null;
         return this;
+    }
+
+    /**
+     * What creates a runtime proxy.
+     *
+     * @param context The context creating the proxy
+     * @param creation The creation of the proxy
+     * @param thread The thread creating the proxy, the only one to which the other two mean anything
+     */
+    private record RuntimeProxyCreator(AbstractBeanResolutionContext context, BeanCreationState creation, long thread) {
     }
 
     /**
