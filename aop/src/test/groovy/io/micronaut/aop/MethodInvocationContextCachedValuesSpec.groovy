@@ -66,6 +66,19 @@ class MethodInvocationContextCachedValuesSpec extends Specification {
         thrown(IllegalStateException)
     }
 
+    void "an invocation with metadata of its own asks the method for a value derived from the unevaluated metadata"() {
+        given:
+        def kept = new Object()
+        ExecutableMethod method = [
+            getAnnotationMetadata : { metadata() },
+            getCachedUnevaluatedValue: { Class key, java.util.function.Function factory -> kept }
+        ] as ExecutableMethod
+        MethodInvocationContext context = invocation(method, metadata())
+
+        expect:
+        context.getCachedUnevaluatedValue(Object, m -> new Object()).is(kept)
+    }
+
     private static AnnotationMetadata metadata() {
         def metadata = new MutableAnnotationMetadata()
         metadata.addDeclaredAnnotation(Marked.name, [value: "marked"])

@@ -124,7 +124,7 @@ public final class HttpRequestFactory {
             MediaType requestContentType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
             if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
                 if (bodyValue instanceof CharSequence) {
-                    return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
+                    return HttpRequest.BodyPublishers.ofString(bodyValue.toString(), request.getCharacterEncoding());
                 }
                 if (bodyValue instanceof Map<?, ?> mapBody) {
                     return HttpRequest.BodyPublishers.ofString(encodeBody(mapBody, request.getCharacterEncoding()));
@@ -134,7 +134,7 @@ public final class HttpRequestFactory {
                 throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
             }
             if (bodyValue instanceof CharSequence) {
-                return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
+                return HttpRequest.BodyPublishers.ofString(bodyValue.toString(), request.getCharacterEncoding());
             }
             if (mediaTypeCodecRegistry != null) {
                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);

@@ -70,6 +70,8 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class FormFactory {
     private static final String COMPLETER = FormRouteCompleter.class.getName();
     private static final Logger LOG = LoggerFactory.getLogger(FormFactory.class);
+    private static final Object CLOSED_SENTINEL = new Object();
+    private static final String CONCURRENT_CLOSE_MESSAGE = "Request terminated with upload in progress";
 
     private final Executor diskWriteExecutor;
     private final HttpServerConfiguration configuration;
@@ -153,10 +155,21 @@ public final class FormFactory {
      * @return A flow that completes when the full field has been buffered
      */
     public ExecutionFlow<CompletedAttribute> completeAttribute(FormCapableHttpRequest<?> request, RawFormField formField) {
-        return InternalByteBody.bufferFlow(formField.byteBody()).map(av -> {
+        // register the disposal up front: the attribute may only finish buffering after the
+        // request lifecycle has already ended, and must then be released right away
+        AtomicReference<@Nullable Object> closeResource = new AtomicReference<>();
+        request.addDisposalResource(() -> {
+            if (closeResource.getAndSet(CLOSED_SENTINEL) instanceof CompletedAttribute attr) {
+                attr.close();
+            }
+        });
+        return InternalByteBody.bufferFlow(formField.byteBody()).flatMap(av -> {
             CompletedAttribute attr = CompletedAttribute.create(formField.metadata(), av.toReadBuffer());
-            request.addDisposalResource(attr::close);
-            return attr;
+            if (closeResource.compareAndSet(null, attr)) {
+                return ExecutionFlow.just(attr);
+            }
+            attr.close();
+            return ExecutionFlow.error(new IllegalStateException(CONCURRENT_CLOSE_MESSAGE));
         });
     }
 
@@ -174,8 +187,10 @@ public final class FormFactory {
             return ExecutionFlow.error(new HttpStatusException(HttpStatus.BAD_REQUEST, "Field [" + formField.metadata().name() + "] was expected to be a file upload, but is missing a file name"));
         }
         ToDiskSubscriber tds = new ToDiskSubscriber(formField.metadata(), request.byteBodyFactory().readBufferFactory());
-        formField.byteBody().toReadBufferPublisher().subscribe(tds);
+        // register the cleanup before subscribing: the upload may complete synchronously, and
+        // a cleanup registered after the request was released runs right away
         request.addDisposalResource(tds::cleanup);
+        formField.byteBody().toReadBufferPublisher().subscribe(tds);
         return tds.result;
     }
 
@@ -239,8 +254,6 @@ public final class FormFactory {
      * This subscriber collects form data and saves it to disk when necessary.
      */
     private final class ToDiskSubscriber implements Subscriber<ReadBuffer> {
-        private static final Object CLOSED_SENTINEL = new Object();
-
         private final FormFieldMetadata metadata;
         private final ReadBufferFactory bufferFactory;
 
@@ -282,7 +295,7 @@ public final class FormFactory {
         }
 
         private RuntimeException concurrentClose(@org.jspecify.annotations.Nullable Closeable cl) {
-            RuntimeException e = new IllegalStateException("Request terminated with upload in progress");
+            RuntimeException e = new IllegalStateException(CONCURRENT_CLOSE_MESSAGE);
             if (cl != null) {
                 try {
                     cl.close();

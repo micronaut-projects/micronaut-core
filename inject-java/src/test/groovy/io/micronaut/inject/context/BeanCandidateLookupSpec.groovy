@@ -153,8 +153,8 @@ public class Beans {
         context.getBeanDefinitions((Class) engine, onlyTheOldEngine).isEmpty()
         context.getBeanDefinitions(onlyTheOldEngine).isEmpty()
 
-        and: 'a filtering qualifier'
-        context.getBeanDefinitions((Class) engine, Qualifiers.byName('old')).isEmpty()
+        and: 'a filtering qualifier, for which the replacement satisfies the qualifier of the bean it replaces'
+        context.getBeanDefinitions((Class) engine, Qualifiers.byName('old'))*.beanType == [type(context, 'NewEngine')]
         !context.getBeanDefinitions(Qualifiers.byName('old'))*.beanType.contains(type(context, 'OldEngine'))
 
         cleanup:

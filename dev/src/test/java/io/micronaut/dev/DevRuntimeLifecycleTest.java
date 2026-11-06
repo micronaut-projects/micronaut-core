@@ -41,9 +41,9 @@ class DevRuntimeLifecycleTest {
 
     @Test
     void onlyTheGenerationsOlderThanTheToleranceCountAsLeaked() {
-        assertEquals(List.of(), DevRuntime.olderThanTolerance(List.of(), 5));
-        assertEquals(List.of(1, 2), DevRuntime.olderThanTolerance(List.of(1, 2, 3, 4), 5));
-        assertEquals(List.of(), DevRuntime.olderThanTolerance(List.of(1, 2), 3));
+        assertEquals(List.of(), GenerationMemory.olderThanTolerance(List.of(), 5));
+        assertEquals(List.of(1, 2), GenerationMemory.olderThanTolerance(List.of(1, 2, 3, 4), 5));
+        assertEquals(List.of(), GenerationMemory.olderThanTolerance(List.of(1, 2), 3));
     }
 
     @Test
@@ -86,6 +86,144 @@ class DevRuntimeLifecycleTest {
         assertTrue(e.getMessage().contains("returned without starting a context"), e.getMessage());
         assertNull(DevRuntime.current());
         assertFalse(silent.context().isPresent());
+    }
+
+    @Test
+    void aMainThatFailsOnceItsGenerationWasFoundRunningFailsTheStart() throws Exception {
+        Files.createDirectories(project.resolve("build/classes"));
+        DevManifest manifest = manifest("");
+        CountDownLatch reported = new CountDownLatch(1);
+        DevRuntime runtime = runtime(manifest, (loader, mainClass, args) -> {
+            ApplicationContext.builder()
+                .classLoader(loader)
+                .properties(Map.of("spec.name", "DevRuntimeLifecycleTest"))
+                .start();
+            reported.await();
+            throw new IOException("no database");
+        });
+        try {
+            // main outlasts the wait for its server: the launching thread finds the generation running, and main goes on
+            ApplicationContext first = runtime.start(new String[0]);
+            assertFalse(runtime.isStartFailed());
+            reported.countDown();
+            long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+            while (!runtime.isStartFailed() && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+            }
+            assertTrue(runtime.isStartFailed());
+            assertTrue(first.isRunning());
+            IllegalStateException e = assertThrows(IllegalStateException.class, () -> runtime.awaitGeneration(1, Duration.ofSeconds(1)));
+            assertTrue(e.getCause().getMessage().contains("no database"), e.getCause().getMessage());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aFailedStartKeepsTheProcessUntilAGenerationRunsOrTheRuntimeCloses() throws Exception {
+        Files.createDirectories(project.resolve("src/main/java"));
+        Files.createDirectories(project.resolve("build/classes"));
+        DevManifest manifest = manifest("""
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.mode=build-tool
+            micronaut.dev.compile.java.output=build/classes
+            micronaut.dev.build-tool.trigger=build/micronaut-dev/compiled
+            """);
+        AtomicInteger launches = new AtomicInteger();
+        DevRuntime runtime = runtime(manifest, (loader, mainClass, args) -> {
+            ApplicationContext.builder()
+                .classLoader(loader)
+                .properties(Map.of("spec.name", "DevRuntimeLifecycleTest"))
+                .start();
+            if (launches.incrementAndGet() != 2) {
+                throw new IOException("no database");
+            }
+        });
+        try {
+            runtime.start(new String[0]);
+            assertTrue(runtime.isStartFailed());
+            assertNotNull(startFailedHold());
+
+            runtime.restart();
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(1));
+            assertTrue(second.isRunning());
+            assertFalse(runtime.isStartFailed());
+            awaitNoStartFailedHold();
+        } finally {
+            runtime.close();
+        }
+        awaitNoStartFailedHold();
+    }
+
+    @Test
+    void aBuildToolCompilationIsOnlyLookedAtOnceItsTriggerIsTouched() throws Exception {
+        Path source = project.resolve("src/main/java/app/Thing.java");
+        Path compiled = project.resolve("build/classes/app/Thing.class");
+        Files.createDirectories(source.getParent());
+        Files.createDirectories(compiled.getParent());
+        Files.writeString(source, "package app; class Thing { }");
+        Files.writeString(compiled, "one");
+        DevManifest manifest = manifest("""
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.mode=build-tool
+            micronaut.dev.compile.java.output=build/classes
+            micronaut.dev.build-tool.trigger=build/micronaut-dev/compiled
+            """);
+        AtomicInteger launches = new AtomicInteger();
+        DevRuntime runtime = runtime(manifest, (loader, mainClass, args) -> {
+            launches.incrementAndGet();
+            startContext(loader, "DevRuntimeLifecycleTest");
+        });
+        try {
+            ApplicationContext first = runtime.start(new String[0]);
+
+            // a compilation failed and left its class out, as the compiler plugin of Maven does, and the source is edited
+            Files.delete(compiled);
+            Files.writeString(source, "package app; class Thing { int edited; }");
+            long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
+            while (System.nanoTime() < deadline) {
+                assertEquals(1, launches.get());
+                assertEquals(1, runtime.generation());
+                assertTrue(first.isRunning());
+                Thread.sleep(50);
+            }
+
+            // the next compilation succeeded
+            Files.writeString(compiled, "two");
+            Files.writeString(project.resolve("build/micronaut-dev/compiled"), "touched");
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(1));
+            assertNotSame(first, second);
+            assertTrue(second.isRunning());
+            assertFalse(first.isRunning());
+            assertEquals(2, launches.get());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void withoutATriggerAnEditStillReloadsWhatTheBuildToolCompiledIntoAnOutputAbsentAtTheStart() throws Exception {
+        Path source = project.resolve("src/main/java/app/Thing.java");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, "package app; class Thing { }");
+        DevManifest manifest = manifest("""
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.mode=build-tool
+            micronaut.dev.compile.java.output=build/classes
+            """);
+        DevRuntime runtime = runtime(manifest, (loader, mainClass, args) -> startContext(loader, "DevRuntimeLifecycleTest"));
+        try {
+            runtime.start(new String[0]);
+
+            Path compiled = project.resolve("build/classes/app/Thing.class");
+            Files.createDirectories(compiled.getParent());
+            Files.writeString(compiled, "one");
+            Files.writeString(source, "package app; class Thing { int edited; }");
+
+            assertTrue(runtime.awaitGeneration(2, Duration.ofMinutes(1)).isRunning());
+        } finally {
+            runtime.close();
+        }
     }
 
     @Test
@@ -266,6 +404,22 @@ class DevRuntimeLifecycleTest {
             causes.add(cause);
         }
         return causes;
+    }
+
+    private static Thread startFailedHold() {
+        return Thread.getAllStackTraces().keySet().stream()
+            .filter(thread -> thread.getName().equals("micronaut-dev-start-failed"))
+            .filter(thread -> !thread.isDaemon())
+            .findFirst()
+            .orElse(null);
+    }
+
+    private static void awaitNoStartFailedHold() throws InterruptedException {
+        long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+        while (startFailedHold() != null && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        assertNull(startFailedHold());
     }
 
     private DevRuntime runtime(DevManifest manifest, DevRuntime.ApplicationLauncher launcher) {

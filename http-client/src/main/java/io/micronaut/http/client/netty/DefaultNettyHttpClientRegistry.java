@@ -634,7 +634,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             .informationalServiceId(clientId)
             .conversionService(beanContext.getBean(ConversionService.class))
             .resolverGroup(addressResolverGroupName == null ? null : beanContext.getBean(AddressResolverGroup.class, Qualifiers.byName(addressResolverGroupName)))
-            .blockingExecutor(blockingExecutor);
+            .blockingExecutor(blockingExecutor)
+            // development mode keeps the idle connections of a client across restarts
+            .retainedConnections(this.beanContext.findBean(RetainedClientConnections.class).orElse(null));
     }
 
     private EventLoopGroup resolveEventLoopGroup(HttpClientConfiguration configuration, BeanContext beanContext) {
@@ -762,6 +764,27 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     /**
+     * The keys a metadata had before the given one, so that disposing its client also disposes the clients it
+     * was given before the properties changed.
+     *
+     * @param replaced The entry replaced, if any
+     * @param key      The new key
+     * @return The previous keys
+     */
+    private static List<ClientKey> previousKeys(@Nullable CachedClientKey replaced, ClientKey key) {
+        if (replaced == null) {
+            return List.of();
+        }
+        if (replaced.key().equals(key)) {
+            return replaced.previousKeys();
+        }
+        List<ClientKey> keys = new ArrayList<>(replaced.previousKeys().size() + 1);
+        keys.addAll(replaced.previousKeys());
+        keys.add(replaced.key());
+        return List.copyOf(keys);
+    }
+
+    /**
      * Client key.
      */
     @Internal
@@ -833,27 +856,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param previousKeys The keys the metadata had before
      */
     private record CachedClientKey(ClientKey key, long revision, List<ClientKey> previousKeys) {
-    }
-
-    /**
-     * The keys a metadata had before the given one, so that disposing its client also disposes the clients it
-     * was given before the properties changed.
-     *
-     * @param replaced The entry replaced, if any
-     * @param key      The new key
-     * @return The previous keys
-     */
-    private static List<ClientKey> previousKeys(@Nullable CachedClientKey replaced, ClientKey key) {
-        if (replaced == null) {
-            return List.of();
-        }
-        if (replaced.key().equals(key)) {
-            return replaced.previousKeys();
-        }
-        List<ClientKey> keys = new ArrayList<>(replaced.previousKeys().size() + 1);
-        keys.addAll(replaced.previousKeys());
-        keys.add(replaced.key());
-        return List.copyOf(keys);
     }
 
 }

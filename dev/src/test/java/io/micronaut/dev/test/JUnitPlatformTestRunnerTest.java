@@ -53,6 +53,10 @@ class JUnitPlatformTestRunnerTest {
         assertEquals("runStarted", events.events.getFirst());
         assertEquals("runFinished", events.events.getLast());
         assertSame(summary, events.summary);
+        // the tests the platform discovered, before the first started: the console counts them done out of these
+        assertEquals("testsPlanned " + events.planned, events.events.get(1));
+        // the platform counts what it discovered: the tests of a class that failed to set up, and dynamic tests, come on top
+        assertTrue(events.planned > 0 && events.planned <= events.outcomes.size(), "planned " + events.planned);
 
         assertEquals(TestStatus.PASSED, events.status(TestFixture.CALCULATOR + ".adds()"));
         assertEquals(TestStatus.FAILED, events.status(TestFixture.CALCULATOR + ".fails()"));

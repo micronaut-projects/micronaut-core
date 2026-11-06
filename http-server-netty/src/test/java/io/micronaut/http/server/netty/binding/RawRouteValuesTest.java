@@ -25,6 +25,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
@@ -98,6 +99,35 @@ class RawRouteValuesTest {
     @Test
     void theDecodedValueIsStillDecoded() throws Exception {
         assertEquals("a/b été", get("/raw/decoded/a%2Fb%20%C3%A9t%C3%A9"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/raw/decoded-plus/", "/raw/fn-decoded/"})
+    void aDecodedPathVariableKeepsAPlusAsAPlus(String path) throws Exception {
+        // only form and query decoding treat a + as a space, RFC 3986 section 3.3
+        assertEquals("a+b c+", get(path + "a+b%20c%2B"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/raw/decoded-plus/", "/raw/fn-decoded/"})
+    void anEncodedPlusIsAPlusAndAnEncodedSpaceASpace(String path) throws Exception {
+        // %2B on its own, and %20 in the same segment, without a literal +
+        assertEquals("+", get(path + "%2B"));
+        assertEquals("a b", get(path + "a%20b"));
+        assertEquals("+ +", get(path + "%2B%20%2B"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/raw/decoded-plus/", "/raw/fn-decoded/"})
+    void aPlusInAPathVariableIsASpaceWhenConfigured(String path) throws Exception {
+        // the decoding before 5.3, like a form value
+        try (ApplicationContext plusAsSpace = ApplicationContext.run(Map.of("spec.name", SPEC_NAME, "micronaut.server.port", -1,
+            "micronaut.router.path-variable-plus-as-space", true))) {
+            int port = plusAsSpace.getBean(EmbeddedServer.class).start().getPort();
+            java.net.http.HttpResponse<String> response = client.send(java.net.http.HttpRequest.newBuilder(
+                URI.create("http://localhost:" + port + path + "a+b%20c%2B")).build(), BodyHandlers.ofString());
+            assertEquals("a b c+", response.body());
+        }
     }
 
     @Test
@@ -359,6 +389,12 @@ class RawRouteValuesTest {
             return pathVariables.getString("name");
         }
 
+        @Get(uri = "/decoded-plus/{name:[^/]+}", produces = MediaType.TEXT_PLAIN)
+        String decodedPlus(@PathVariable String name, PathVariables pathVariables) {
+            assertEquals(name, pathVariables.getString("name"));
+            return name;
+        }
+
         @Get(uri = "/twice/{name}", produces = MediaType.TEXT_PLAIN)
         String twice(PathVariables pathVariables) {
             return pathVariables.raw().raw().getString("name");
@@ -556,6 +592,8 @@ class RawRouteValuesTest {
     static class RawRoutes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
+            routes.GET("/raw/fn-decoded/{name:[^/]+}", (request, pathVariables) ->
+                HttpResponse.ok(pathVariables.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.GET("/raw/fn/{name:[^/]+}", (request, pathVariables) ->
                 HttpResponse.ok(pathVariables.rawString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.locate("/raw/orgs/{id}", (request, pathVariables) -> pathVariables.rawString("id"), new OrgRoutes());

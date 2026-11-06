@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== A plus sign in a path variable is a plus sign (5.3)
+
+The decoded value of a path variable, for example a api:http.annotation.PathVariable[] argument, `getString` of api:http.PathVariables[] or `getVariableValues()` of a route match, now keeps a `+` as a plus sign, as RFC 3986 defines for the path. Previously the router decoded the values like form data, so `/items/a+b` gave `a b`. A space in a path is percent-encoded as `%20`, which is still decoded to a space, and `%2B` is decoded to `+` as before. A client that sent `+` for a space in a path should send `%20`. Query parameters and form fields are not affected: they still decode a `+` to a space. To keep the previous decoding, where a `+` in a path variable is a space, set `micronaut.router.path-variable-plus-as-space: true`.
+
 === `@ServerWebSocket` URIs are under the context path (5.3)
 
 When `micronaut.server.context-path` is set, the URI of a ann:websocket.annotation.ServerWebSocket[] is now under the context path, like the URIs of the controllers and of the WebSocket routes of the route builder. Previously a `@ServerWebSocket("/chat")` was mapped under `/chat` whatever the context path, and with a context path of `/app` it is now mapped under `/app/chat`: an upgrade request to `/chat` is no longer answered by the WebSocket. Clients should connect to the URI under the context path. The URI is resolved by the api:web.router.RouteBuilder.UriNamingStrategy[], like the URI of a controller, so that a custom naming strategy that does not add the context path keeps the previous URI.

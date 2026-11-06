@@ -67,6 +67,14 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
         return !closed && destructionThread == Thread.currentThread() && context.isContextConfigured();
     }
 
+    /**
+     * @return Whether this destruction invocation has not returned yet, whichever thread asks: work its callbacks
+     * hand to another thread runs within it
+     */
+    boolean isDestructionInvocationOpen() {
+        return !closed && destructionThread != null && context.isContextConfigured();
+    }
+
     @Override
     public <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
         if (closed) {

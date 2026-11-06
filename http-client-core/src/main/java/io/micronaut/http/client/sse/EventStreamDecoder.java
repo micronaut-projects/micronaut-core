@@ -77,12 +77,33 @@ public final class EventStreamDecoder {
     private @Nullable String id;
     private @Nullable String name;
     private @Nullable Duration retry;
+    private final @Nullable EventStreamState state;
+    /**
+     * The last event id handed out with an event or a block without data.
+     */
+    private @Nullable String reportedId;
 
     /**
      * @param maxBufferSize The maximum size of a line, and of the data of one event
      */
     public EventStreamDecoder(long maxBufferSize) {
+        this(maxBufferSize, null);
+    }
+
+    /**
+     * @param maxBufferSize The maximum size of a line, and of the data of one event
+     * @param state         The state that follows the reconnection time as soon as a
+     *                      {@code retry} field is read, or {@code null}. With a state, a block
+     *                      without data that changes the last event id is handed out as a marker
+     *                      among the events by {@link #decode(byte[], int, int, Consumer)}, see
+     *                      {@link #isControl(Event)}, so that the id is taken once the events
+     *                      before it were delivered. The other {@code decode} methods take the
+     *                      ids into the state themselves, as they return the events
+     * @since 5.3.0
+     */
+    public EventStreamDecoder(long maxBufferSize, @Nullable EventStreamState state) {
         this.maxBufferSize = maxBufferSize;
+        this.state = state;
     }
 
     /**
@@ -108,8 +129,46 @@ public final class EventStreamDecoder {
      */
     public List<Event<byte[]>> decode(byte[] bytes, int offset, int length) {
         List<Event<byte[]>> events = new ArrayList<>(2);
-        decode(bytes, offset, length, events::add);
+        EventStreamState s = state;
+        if (s == null) {
+            decode(bytes, offset, length, events::add);
+        } else {
+            // the events are delivered as they are returned
+            decode(bytes, offset, length, event -> {
+                if (deliver(event, s)) {
+                    events.add(event);
+                }
+            });
+        }
         return events;
+    }
+
+    /**
+     * Whether an event is a marker of a block without data that set the last event id, which
+     * only a decoder with a state hands out, and which is not an event of the stream.
+     *
+     * @param event The event
+     * @return Whether it is a marker
+     * @since 5.3.0
+     */
+    public static boolean isControl(Event<?> event) {
+        return event instanceof ControlEvent<?>;
+    }
+
+    /**
+     * Take the last event id of a delivered event, or of a marker, into the state.
+     *
+     * @param event The event or marker that is delivered
+     * @param state The state
+     * @return Whether it is an event of the stream, rather than a marker
+     * @since 5.3.0
+     */
+    public static boolean deliver(Event<?> event, EventStreamState state) {
+        String eventId = event.getId();
+        if (eventId != null) {
+            state.lastEventId(eventId);
+        }
+        return !isControl(event);
     }
 
     /**
@@ -270,6 +329,10 @@ public final class EventStreamDecoder {
                 if (!value.isEmpty() && value.chars().allMatch(c -> c >= '0' && c <= '9')) {
                     try {
                         retry = Duration.ofMillis(Long.parseLong(value));
+                        if (state != null) {
+                            // the reconnection time is set as soon as the field is read
+                            state.reconnectionTime(retry);
+                        }
                     } catch (NumberFormatException e) {
                         // too large, ignored
                     }
@@ -284,11 +347,18 @@ public final class EventStreamDecoder {
 
     private @Nullable Event<byte[]> dispatch() {
         if (!hasData) {
-            // an event without data is not dispatched
+            // an event without data is not dispatched, but the last event id is still set: a
+            // marker takes its place among the events, so that it is set in order
             name = null;
             retry = null;
+            String lastId = id;
+            if (state != null && lastId != null && !lastId.equals(reportedId)) {
+                reportedId = lastId;
+                return new ControlEvent<>(lastId);
+            }
             return null;
         }
+        reportedId = id;
         byte[] bytes = firstData == null ? data.toByteArray() : firstData;
         Event<byte[]> event = Event.of(bytes)
             .name(name)

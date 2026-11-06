@@ -46,14 +46,40 @@ public final class DevelopmentMode {
      */
     public static final String PROPERTY = "micronaut.dev.enabled";
 
+    /**
+     * The property the test mode of a development launcher sets to {@code true} on the application contexts its
+     * tests start. Test mode does not switch on development mode for them, since a test runs as it would in the
+     * build, but a module can keep what is expensive to create, and independent of the context, warm across the
+     * runs.
+     *
+     * @since 5.3.0
+     */
+    public static final String TEST_PROPERTY = "micronaut.dev.test.enabled";
+
     private DevelopmentMode() {
+    }
+
+    /**
+     * Whether the given property resolver belongs to an application context a test started in the test mode of a
+     * development launcher.
+     *
+     * @param propertyResolver The property resolver, typically the environment
+     * @return True if the test mode of a development launcher started the context
+     * @since 5.3.0
+     */
+    public static boolean isTestMode(PropertyResolver propertyResolver) {
+        return propertyResolver.getProperty(TEST_PROPERTY, String.class).map(StringUtils.TRUE::equalsIgnoreCase).orElse(false);
     }
 
     /**
      * Whether development mode is active for the given property resolver.
      *
+     * <p>Given the environment, {@link Environment#isDevelopmentMode()} answers the same and is the entry point to
+     * use; this method serves a property resolver that is not an environment.</p>
+     *
      * @param propertyResolver The property resolver, typically the environment
      * @return True if development mode is active
+     * @see Environment#isDevelopmentMode()
      */
     public static boolean isEnabled(PropertyResolver propertyResolver) {
         // the same test as the @Requires of DevelopmentActive and DevelopmentInactive

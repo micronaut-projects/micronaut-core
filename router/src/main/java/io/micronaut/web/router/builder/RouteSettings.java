@@ -71,6 +71,7 @@ public final class RouteSettings {
     private @Nullable AnnotationMetadataProvider element;
     private @Nullable Argument<?> responseType;
     private boolean anyMethod;
+    private boolean declaresHead;
 
     /**
      * @param exposePort Exposes the port of the route when it is set
@@ -108,6 +109,7 @@ public final class RouteSettings {
         this.element = other.element;
         this.responseType = other.responseType;
         this.anyMethod = other.anyMethod;
+        this.declaresHead = other.declaresHead;
     }
 
     /**
@@ -131,6 +133,22 @@ public final class RouteSettings {
      */
     public boolean isAnyMethod() {
         return anyMethod;
+    }
+
+    /**
+     * Mark the route as declared together with a {@code HEAD} route of the same handler, e.g. by
+     * {@link HttpRouteBuilder#route(java.util.Set, String)} or a locator: a {@code GET} route
+     * then has no implicit {@code HEAD} route.
+     */
+    public void declaresHead() {
+        this.declaresHead = true;
+    }
+
+    /**
+     * @return Whether the route is declared together with a {@code HEAD} route of the same handler
+     */
+    public boolean isDeclaresHead() {
+        return declaresHead;
     }
 
     /**

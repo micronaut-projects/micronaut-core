@@ -246,7 +246,7 @@ public final class TreeGenerator extends JsonGenerator {
         return writeName(Long.toString(id));
     }
 
-    private JsonGenerator writeScalar(JsonToken token, JsonNode value) throws StreamWriteException {
+    private JsonGenerator writeScalar(JsonNode value) throws StreamWriteException {
         if (structureStack.isEmpty()) {
             complete(value);
         } else {
@@ -257,7 +257,7 @@ public final class TreeGenerator extends JsonGenerator {
 
     @Override
     public JsonGenerator writeString(String text) {
-        return writeScalar(JsonToken.VALUE_STRING, JsonNode.createStringNode(text));
+        return writeScalar(JsonNode.createStringNode(text));
     }
 
     @Override
@@ -333,38 +333,38 @@ public final class TreeGenerator extends JsonGenerator {
 
     @Override
     public JsonGenerator writeNumber(short v) throws JacksonException {
-        return writeScalar(JsonToken.VALUE_NUMBER_INT, JsonNode.createNumberNode(v));
+        return writeScalar(JsonNode.createNumberNode(v));
     }
 
     @Override
     public JsonGenerator writeNumber(int v) {
-        return writeScalar(JsonToken.VALUE_NUMBER_INT, JsonNode.createNumberNode(v));
+        return writeScalar(JsonNode.createNumberNode(v));
     }
 
     @Override
     public JsonGenerator writeNumber(long v) {
-        return writeScalar(JsonToken.VALUE_NUMBER_INT, JsonNode.createNumberNode(v));
+        return writeScalar(JsonNode.createNumberNode(v));
     }
 
     @Override
     public JsonGenerator writeNumber(BigInteger v) {
         // the tree codec could normalize
-        return writeScalar(JsonToken.VALUE_NUMBER_INT, JsonNode.createNumberNode(v));
+        return writeScalar(JsonNode.createNumberNode(v));
     }
 
     @Override
     public JsonGenerator writeNumber(double v) {
-        return writeScalar(JsonToken.VALUE_NUMBER_FLOAT, JsonNode.createNumberNode(v));
+        return writeScalar(JsonNode.createNumberNode(v));
     }
 
     @Override
     public JsonGenerator writeNumber(float v) {
-        return writeScalar(JsonToken.VALUE_NUMBER_FLOAT, JsonNode.createNumberNode(v));
+        return writeScalar(JsonNode.createNumberNode(v));
     }
 
     @Override
     public JsonGenerator writeNumber(BigDecimal v) {
-        return writeScalar(JsonToken.VALUE_NUMBER_FLOAT, JsonNode.createNumberNode(v));
+        return writeScalar(JsonNode.createNumberNode(v));
     }
 
     @Override
@@ -374,12 +374,12 @@ public final class TreeGenerator extends JsonGenerator {
 
     @Override
     public JsonGenerator writeBoolean(boolean state) {
-        return writeScalar(state ? JsonToken.VALUE_TRUE : JsonToken.VALUE_FALSE, JsonNode.createBooleanNode(state));
+        return writeScalar(JsonNode.createBooleanNode(state));
     }
 
     @Override
     public JsonGenerator writeNull() {
-        return writeScalar(JsonToken.VALUE_NULL, JsonNode.nullNode());
+        return writeScalar(JsonNode.nullNode());
     }
 
     @Override
@@ -393,7 +393,7 @@ public final class TreeGenerator extends JsonGenerator {
         if (rootNode == null) {
             return writeNull();
         } else if (rootNode instanceof JsonNode node) {
-            return writeScalar(JsonToken.VALUE_EMBEDDED_OBJECT, node);
+            return writeScalar(node);
         } else {
             try {
                 JsonStreamTransfer.transferNext(rootNode.traverse(ObjectReadContext.empty()), this, JsonStreamConfig.DEFAULT);
