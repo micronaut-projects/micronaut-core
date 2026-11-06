@@ -26,6 +26,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.beans.Introspector;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -69,6 +70,10 @@ final class GenerationMemory {
      * Reactor's schedulers: the shared ones live as long as the JVM and create their threads as work needs them.
      */
     private static final String REACTOR_SCHEDULERS = "reactor.core.scheduler.Schedulers";
+    /**
+     * Whether there is a {@link Introspector} to flush: {@code java.desktop} may be left out of the runtime.
+     */
+    private static final boolean JAVA_DESKTOP = ModuleLayer.boot().findModule("java.desktop").isPresent();
 
     private final DevClassLoader classLoader;
     // at most one check pending: reloads in quick succession start one thread and one collection
@@ -153,7 +158,8 @@ final class GenerationMemory {
 
     /**
      * Forgets what the process-wide caches hold of a retired generation: the introspections the shared introspector
-     * indexed for its loader, held softly so that they would keep it until the memory runs short, and its service entries.
+     * indexed for its loader, held softly so that they would keep it until the memory runs short, its service entries,
+     * and what the JDK's {@code java.beans} caches hold softly of the classes read through its {@code Introspector}.
      *
      * @param retired The retired generation
      */
@@ -162,6 +168,36 @@ final class GenerationMemory {
         ReloadableBeanIntrospector.invalidateShared(retired);
         // what a stopping context cached again after the swap goes too
         AnnotationMetadataSupport.retireClassLoader(retired);
+        flushBeanInfos();
+    }
+
+    /**
+     * Flushes the caches of {@link Introspector}, which cannot be flushed for one class loader. A flush empties the bean
+     * infos of the calling thread's group only, so it runs on a thread of each group: a template rendered on a virtual
+     * thread, say, reads its model in the group of the virtual threads.
+     */
+    @SuppressWarnings("java:S3014") // the JDK keys this cache by thread group, so an executor cannot reach it
+    private static void flushBeanInfos() {
+        if (NativeImageUtils.inImageRuntimeCode() || !JAVA_DESKTOP) {
+            // a native image never unloads a class it defined at runtime
+            return;
+        }
+        ThreadGroup root = Thread.currentThread().getThreadGroup();
+        while (root.getParent() != null) {
+            root = root.getParent();
+        }
+        ThreadGroup[] groups = new ThreadGroup[root.activeGroupCount()];
+        int count = root.enumerate(groups);
+        // enumerating a group leaves the group itself out
+        groups = Arrays.copyOf(groups, count + 1);
+        groups[count] = root;
+        try {
+            for (ThreadGroup group : groups) {
+                Thread.ofPlatform().group(group).daemon().name("micronaut-dev-bean-info-flush").start(Introspector::flushCaches).join();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
