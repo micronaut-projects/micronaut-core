@@ -316,6 +316,9 @@ class SvgBannerTest {
             Files.write(dir.resolve("frame-%03d.png".formatted(frame)), raster.toPng());
         }
         System.out.println("Rendered " + (frames + 1) + " frames in " + (System.nanoTime() - start) / 1_000_000 + " ms");
+        try (var files = Files.list(dir)) {
+            assertEquals(frames + 1, files.filter(file -> file.getFileName().toString().startsWith("frame-")).count());
+        }
     }
 
     private static List<Chunk> rootFrame(List<Chunk> chunks) {

@@ -36,10 +36,12 @@ final class Geometry {
     // the control point distance of a cubic approximating a quarter circle
     private static final double KAPPA = 0.5522847498307936;
 
+    private static final String POLYGON = "polygon";
+
     /**
      * The elements with an outline.
      */
-    static final Set<String> SHAPES = Set.of("path", "polygon", "polyline", "rect", "circle", "ellipse", "line");
+    static final Set<String> SHAPES = Set.of("path", Geometry.POLYGON, "polyline", "rect", "circle", "ellipse", "line");
 
     /**
      * Each subpath is the start point followed by six coordinates per cubic segment.
@@ -63,9 +65,9 @@ final class Geometry {
                 String d = element.attributes.getOrDefault("d", "");
                 yield element.geometry(d, () -> path(d));
             }
-            case "polygon", "polyline" -> {
+            case POLYGON, "polyline" -> {
                 String points = element.attributes.getOrDefault("points", "");
-                boolean polygon = "polygon".equals(element.name);
+                boolean polygon = POLYGON.equals(element.name);
                 yield element.geometry(points, () -> polygon(SvgImage.numbers(points), polygon));
             }
             case "line" -> polygon(new double[] {element.number("x1", time, 0), element.number("y1", time, 0),

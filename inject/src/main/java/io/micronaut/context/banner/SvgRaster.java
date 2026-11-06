@@ -321,7 +321,7 @@ final class SvgRaster {
 
     private static void span(float[] coverage, double start, double end, float weight) {
         double from = Math.max(0, start);
-        double to = Math.min(coverage.length - 1, end);
+        double to = Math.min(coverage.length - 1.0, end);
         if (to <= from) {
             return;
         }

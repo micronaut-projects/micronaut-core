@@ -86,6 +86,7 @@ public class ImageBanner implements Banner {
     // errors are suppressed along with the OK responses, which the terminal would otherwise type into stdin
     private static final String QUIET = "q=2";
     private static final int CHUNK_SIZE = 4096;
+    private static final String ANIMATE = "a=a,i=";
 
     private final URL resource;
     private final PrintStream out;
@@ -230,8 +231,8 @@ public class ImageBanner implements Banner {
         int id = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
         out.println();
         out.print(transmission("a=T,f=100,i=" + id + "," + QUIET + scaling(), last)
-            + control("a=a,i=" + id + ",r=1,z=-1," + QUIET)
-            + control("a=a,i=" + id + ",s=2," + QUIET));
+            + control(ANIMATE + id + ",r=1,z=-1," + QUIET)
+            + control(ANIMATE + id + ",s=2," + QUIET));
         out.println();
         out.flush();
         int frameWidth = width;
@@ -265,7 +266,7 @@ public class ImageBanner implements Banner {
         }
         // the last frame, then the animation leaves the loading state to play once or loop
         write(transmission("a=f,f=100,i=" + id + ",z=" + pendingGap + "," + QUIET, pending)
-            + control("a=a,i=" + id + ",s=3,v=" + (svg.loops() ? 1 : 2) + "," + QUIET));
+            + control(ANIMATE + id + ",s=3,v=" + (svg.loops() ? 1 : 2) + "," + QUIET));
     }
 
     private void write(String sequences) {

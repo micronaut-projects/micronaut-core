@@ -47,6 +47,9 @@ import java.util.function.Supplier;
 final class SvgImage {
 
     private static final double DEFAULT_SIZE = 150;
+    private static final String WIDTH_ATTRIBUTE = "width";
+    private static final String HEIGHT_ATTRIBUTE = "height";
+    private static final String INHERIT = "inherit";
 
     private final Element root;
     private final Map<String, Element> ids = new HashMap<>();
@@ -60,8 +63,8 @@ final class SvgImage {
         this.root = root;
         index(root);
         double[] box = numbers(root.attr("viewBox"));
-        double w = length(root.attr("width"), -1);
-        double h = length(root.attr("height"), -1);
+        double w = length(root.attr(WIDTH_ATTRIBUTE), -1);
+        double h = length(root.attr(HEIGHT_ATTRIBUTE), -1);
         if (box.length == 4 && box[2] > 0 && box[3] > 0) {
             viewBox = box;
             if (w <= 0 && h <= 0) {
@@ -187,8 +190,8 @@ final class SvgImage {
         }
         if ("svg".equals(element.name) && element != root) {
             double[] box = numbers(element.attr("viewBox"));
-            double w = element.number("width", time, box.length == 4 ? box[2] : 0);
-            double h = element.number("height", time, box.length == 4 ? box[3] : 0);
+            double w = element.number(WIDTH_ATTRIBUTE, time, box.length == 4 ? box[2] : 0);
+            double h = element.number(HEIGHT_ATTRIBUTE, time, box.length == 4 ? box[3] : 0);
             if (w <= 0 || h <= 0) {
                 return;
             }
@@ -287,8 +290,8 @@ final class SvgImage {
         if (image == null) {
             return;
         }
-        double w = element.number("width", time, image.width());
-        double h = element.number("height", time, image.height());
+        double w = element.number(WIDTH_ATTRIBUTE, time, image.width());
+        double h = element.number(HEIGHT_ATTRIBUTE, time, image.height());
         if (w <= 0 || h <= 0) {
             return;
         }
@@ -378,7 +381,7 @@ final class SvgImage {
         Style derive(Element element, double time) {
             int newColor = color;
             String colorValue = element.property("color", time);
-            if (colorValue != null && !"inherit".equals(colorValue)) {
+            if (colorValue != null && !INHERIT.equals(colorValue)) {
                 Integer parsed = Paint.parse(colorValue, color);
                 if (parsed != null) {
                     newColor = parsed;
@@ -390,9 +393,9 @@ final class SvgImage {
             double newStrokeOpacity = clamp(element.number("stroke-opacity", time, strokeOpacity));
             double newStrokeWidth = Math.max(0, element.number("stroke-width", time, strokeWidth));
             String rule = element.property("fill-rule", time);
-            boolean newEvenOdd = rule == null || "inherit".equals(rule) ? evenOdd : "evenodd".equals(rule);
+            boolean newEvenOdd = rule == null || INHERIT.equals(rule) ? evenOdd : "evenodd".equals(rule);
             String cap = element.property("stroke-linecap", time);
-            int newCap = cap == null || "inherit".equals(cap) ? lineCap : switch (cap.trim()) {
+            int newCap = cap == null || INHERIT.equals(cap) ? lineCap : switch (cap.trim()) {
                 case "round" -> Stroker.ROUND;
                 case "square" -> Stroker.SQUARE;
                 default -> Stroker.BUTT;
@@ -401,7 +404,7 @@ final class SvgImage {
         }
 
         private int paint(@Nullable String value, int inherited, int newColor) {
-            if (value != null && !"inherit".equals(value)) {
+            if (value != null && !INHERIT.equals(value)) {
                 Integer parsed = Paint.parse(value, newColor);
                 return parsed == null ? 0 : parsed;
             }

@@ -28,12 +28,8 @@ import java.util.zip.Inflater;
  *
  * <p>Every color type is supported at bit depths up to 8, and 16-bit images are reduced to 8 bits.
  * Interlaced images are not supported.</p>
- *
- * @param width The width
- * @param height The height
- * @param argb The pixels, row by row, with straight alpha
  */
-record PngImage(int width, int height, int[] argb) {
+final class PngImage {
 
     private static final long SIGNATURE = 0x89504E470D0A1A0AL;
     private static final int MAX_PIXELS = 8192 * 8192;
@@ -42,6 +38,37 @@ record PngImage(int width, int height, int[] argb) {
     private static final int PALETTE = 3;
     private static final int GRAY_ALPHA = 4;
     private static final int RGBA = 6;
+
+    private final int width;
+    private final int height;
+    private final int[] argb;
+
+    private PngImage(int width, int height, int[] argb) {
+        this.width = width;
+        this.height = height;
+        this.argb = argb;
+    }
+
+    /**
+     * @return The width
+     */
+    int width() {
+        return width;
+    }
+
+    /**
+     * @return The height
+     */
+    int height() {
+        return height;
+    }
+
+    /**
+     * @return The pixels, row by row, with straight alpha
+     */
+    int[] argb() {
+        return argb;
+    }
 
     /**
      * Decodes a PNG.
@@ -141,8 +168,7 @@ record PngImage(int width, int height, int[] argb) {
     }
 
     private static byte[] inflate(byte[] compressed, int size) {
-        Inflater inflater = new Inflater();
-        try {
+        try (Inflater inflater = new Inflater()) {
             inflater.setInput(compressed);
             byte[] raw = new byte[size];
             int read = 0;
@@ -159,8 +185,6 @@ record PngImage(int width, int height, int[] argb) {
             return raw;
         } catch (DataFormatException e) {
             throw new IllegalArgumentException("Corrupt PNG data", e);
-        } finally {
-            inflater.end();
         }
     }
 
