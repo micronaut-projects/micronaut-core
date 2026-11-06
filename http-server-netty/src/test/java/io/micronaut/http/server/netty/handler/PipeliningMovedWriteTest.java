@@ -15,7 +15,10 @@
  */
 package io.micronaut.http.server.netty.handler;
 
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.body.ByteBody.SplitBackpressureMode;
 import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
@@ -45,14 +48,23 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.reactivestreams.Publisher;
 
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.OptionalLong;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -64,12 +76,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class PipeliningMovedWriteTest {
 
+    private static final String REQUEST = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+
     private final RejectingEventLoop serverLoop = new RejectingEventLoop();
     private final EventLoopGroup clientGroup = new MultiThreadIoEventLoopGroup(1, LocalIoHandler.newFactory());
-    private final CompletableFuture<OutboundAccess> access = new CompletableFuture<>();
+    private final BlockingQueue<OutboundAccess> accesses = new LinkedBlockingQueue<>();
     private final CompletableFuture<Channel> connection = new CompletableFuture<>();
-    private final CompletableFuture<Throwable> responseFailed = new CompletableFuture<>();
-    private final CompletableFuture<Object> responseWritten = new CompletableFuture<>();
+    private final List<String> callbacks = new CopyOnWriteArrayList<>();
+    private final List<Throwable> failures = new CopyOnWriteArrayList<>();
     private final CompletableFuture<String> received = new CompletableFuture<>();
 
     @AfterEach
@@ -80,7 +94,7 @@ class PipeliningMovedWriteTest {
 
     @Test
     void aFullBodyIsReleasedIfTheEventLoopRejectsTheWrite() throws Exception {
-        OutboundAccess outboundAccess = request();
+        OutboundAccess outboundAccess = connect(1);
         NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
         ByteBuf content = Unpooled.copiedBuffer("hello", StandardCharsets.US_ASCII);
         serverLoop.rejectNext(Thread.currentThread());
@@ -93,21 +107,10 @@ class PipeliningMovedWriteTest {
 
     @Test
     void aMovedWriteThatFailsOnTheEventLoopAnswersA500AndClosesTheConnection() throws Exception {
-        OutboundAccess outboundAccess = request();
+        OutboundAccess outboundAccess = connect(1);
         outboundAccess.attachment("request");
-        ByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
         CompletableFuture<Void> discarded = new CompletableFuture<>();
-        ByteBodyFactory.StreamingBody body = factory.createStreamingBody(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
-            @Override
-            public void onBytesConsumed(long bytesConsumed) {
-                // the body never sends data: there is no producer to resume
-            }
-
-            @Override
-            public void allowDiscard() {
-                discarded.complete(null);
-            }
-        });
+        ByteBodyFactory.StreamingBody body = streamingBody(discarded::complete);
 
         // not on the event loop: the headers are prepared there, and fail
         outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, new FailingHeaders()), body.rootBody());
@@ -115,12 +118,104 @@ class PipeliningMovedWriteTest {
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 500 "), response);
         assertTrue(response.toLowerCase().contains("connection: close"), response);
-        assertInstanceOf(IllegalStateException.class, responseFailed.get(10, TimeUnit.SECONDS));
-        assertEquals("request", responseWritten.get(10, TimeUnit.SECONDS));
         discarded.get(10, TimeUnit.SECONDS);
+        assertCallbacks("failed request", "written request");
+        assertInstanceOf(IllegalStateException.class, failures.get(0));
     }
 
-    private OutboundAccess request() throws Exception {
+    @Test
+    void theAnswerOfAFailedMovedWriteWaitsForTheResponsesBeforeIt() throws Exception {
+        OutboundAccess first = connect(2);
+        first.attachment("first");
+        OutboundAccess second = accesses.poll(10, TimeUnit.SECONDS);
+        assertNotNull(second);
+        second.attachment("second");
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+
+        // the second response fails while the first one is not written yet
+        second.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, new FailingHeaders()), streamingBody(null).rootBody());
+        barrier();
+        first.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), factory.adapt(Unpooled.copiedBuffer("first", StandardCharsets.US_ASCII)));
+
+        String response = received.get(10, TimeUnit.SECONDS);
+        int ok = response.indexOf("HTTP/1.1 200 ");
+        int error = response.indexOf("HTTP/1.1 500 ");
+        assertTrue(ok >= 0 && error > ok, response);
+        assertTrue(response.substring(ok, error).endsWith("first"), response);
+        assertCallbacks("failed second", "written first", "written second");
+    }
+
+    @Test
+    void anInstalledResponseWhoseBodyFailsToStartClosesTheConnection() throws Exception {
+        OutboundAccess outboundAccess = connect(1);
+        outboundAccess.attachment("request");
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        ByteBodyFactory.StreamingBody body = factory.createStreamingBody(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
+            @Override
+            public void start() {
+                throw new IllegalStateException("cannot start the body");
+            }
+
+            @Override
+            public void onBytesConsumed(long bytesConsumed) {
+                // the body never sends data: there is no producer to resume
+            }
+        });
+
+        // the handler is installed and has prepared the head when the body fails to start
+        outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), body.rootBody());
+
+        // the cut response cannot be followed by another one: the connection closes
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(!response.contains("HTTP/1.1 500 "), response);
+        assertCallbacks("failed request", "written request");
+    }
+
+    @Test
+    void aFailingCleanupOfTheBodyDoesNotStopTheAnswer() throws Exception {
+        OutboundAccess outboundAccess = connect(1);
+        outboundAccess.attachment("request");
+        FailingCloseBody body = new FailingCloseBody();
+
+        outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, new FailingHeaders()), body);
+
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 500 "), response);
+        assertCallbacks("failed request", "written request");
+        assertEquals(1, body.closes);
+        assertEquals("cannot close the body", failures.get(0).getSuppressed()[0].getMessage());
+    }
+
+    private ByteBodyFactory.StreamingBody streamingBody(@Nullable Consumer<Void> onDiscard) throws Exception {
+        ByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        return factory.createStreamingBody(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
+            @Override
+            public void onBytesConsumed(long bytesConsumed) {
+                // the body never sends data: there is no producer to resume
+            }
+
+            @Override
+            public void allowDiscard() {
+                if (onDiscard != null) {
+                    onDiscard.accept(null);
+                }
+            }
+        });
+    }
+
+    /**
+     * The callbacks of the request handler, once everything the event loop had to do is done.
+     */
+    private void assertCallbacks(String... expected) throws Exception {
+        barrier();
+        assertEquals(List.of(expected), callbacks);
+    }
+
+    private void barrier() throws Exception {
+        serverLoop.submit(() -> { }).get(10, TimeUnit.SECONDS);
+    }
+
+    private OutboundAccess connect(int requests) throws Exception {
         Channel serverChannel = new ServerBootstrap()
             .group(serverLoop)
             .channel(LocalServerChannel.class)
@@ -132,25 +227,23 @@ class PipeliningMovedWriteTest {
                         public void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                             body.close();
                             connection.complete(ctx.channel());
-                            access.complete(outboundAccess);
+                            accesses.add(outboundAccess);
                         }
 
                         @Override
                         public void handleUnboundError(Throwable cause) {
-                            access.completeExceptionally(cause);
+                            failures.add(cause);
                         }
 
                         @Override
                         public void responseFailed(Object attachment, Throwable cause) {
-                            responseFailed.complete(cause);
+                            failures.add(cause);
+                            callbacks.add("failed " + attachment);
                         }
 
                         @Override
                         public void responseWritten(Object attachment) {
-                            // completes once: a second call is a failure of the contract
-                            if (!responseWritten.complete(attachment)) {
-                                responseWritten.obtrudeException(new AssertionError("responseWritten called twice"));
-                            }
+                            callbacks.add("written " + attachment);
                         }
                     }));
                 }
@@ -178,8 +271,10 @@ class PipeliningMovedWriteTest {
             .connect(serverChannel.localAddress())
             .sync()
             .channel();
-        clientChannel.writeAndFlush(Unpooled.copiedBuffer("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n", StandardCharsets.US_ASCII));
-        return access.get(10, TimeUnit.SECONDS);
+        clientChannel.writeAndFlush(Unpooled.copiedBuffer(REQUEST.repeat(requests), StandardCharsets.US_ASCII));
+        OutboundAccess first = accesses.poll(10, TimeUnit.SECONDS);
+        assertNotNull(first);
+        return first;
     }
 
     /**
@@ -193,6 +288,50 @@ class PipeliningMovedWriteTest {
                 throw new IllegalStateException("cannot prepare the headers");
             }
             return super.remove(name);
+        }
+    }
+
+    /**
+     * A streamed body whose cleanup fails. The response fails before it reads the body, so only
+     * its claim and its close are reached.
+     */
+    private static final class FailingCloseBody implements CloseableByteBody {
+        volatile int closes;
+
+        @Override
+        public void close() {
+            closes++;
+            throw new IllegalStateException("cannot close the body");
+        }
+
+        @Override
+        public CloseableByteBody move() {
+            return this;
+        }
+
+        @Override
+        public OptionalLong expectedLength() {
+            return OptionalLong.empty();
+        }
+
+        @Override
+        public CloseableByteBody split(SplitBackpressureMode backpressureMode) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public InputStream toInputStream() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Publisher<byte[]> toByteArrayPublisher() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public CompletableFuture<? extends CloseableAvailableByteBody> buffer() {
+            throw new UnsupportedOperationException();
         }
     }
 
