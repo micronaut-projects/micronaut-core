@@ -97,6 +97,7 @@ class PythonGreeter(GreetingBase):
     void "Python calls the inherited methods of the Java base that declare a type variable of their own"() {
         given:
         ApplicationContext ctx = buildContext('''
+import java
 from jakarta.inject import Singleton
 from micronaut.context.annotation import Executable
 from micronaut.python.annotation.processing.test.javabases import GreetingBase
@@ -118,6 +119,18 @@ class GenericCaller(GreetingBase):
     @Executable
     def pack_is_not_a_member(self) -> bool:
         return hasattr(self, "packAll")
+
+    @Executable
+    def members(self, name: str) -> bool:
+        return hasattr(self, name)
+
+    @Executable
+    def sort_a_list(self) -> str:
+        return self.sortLists([java.type("java.util.List").of()])
+
+    @Executable
+    def run_a_list(self) -> str:
+        return self.runLists([java.type("java.util.List").of()])
 ''', true)
 
         when:
@@ -127,8 +140,108 @@ class GenericCaller(GreetingBase):
         greeter.bind_a_type() == 'bind:GreetingBase'
         greeter.tag_a_value() == 'tag:v'
 
-        and: 'a method taking an array of its own type variable stays out: its erasure cannot be named in the dispatcher'
+        and: 'a method taking an array of its own type variable stays out, as the dispatcher has no entry for it'
         !greeter.pack_is_not_a_member()
+
+        and: 'the run time leaves out what the dispatcher leaves out, so that Python sees no member it cannot call'
+        ['packGrid', 'packEach', 'runBoth', 'runNarrowed', 'mayThrowAnything'].every { !greeter.members(it) }
+
+        and: 'an array of a type over the variable is called, whatever bounds the variable'
+        greeter.sort_a_list() == 'lists:1'
+        greeter.run_a_list() == 'runnable-lists:1'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python calls the methods of a Java base naming a class type variable, as the extended type resolves it"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import GenericRepository
+from micronaut.python.annotation.processing.test.javabases.GenericRepository import Integers, Names, Numbers
+
+
+@Singleton
+class NestedBound(Numbers[int]):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def calls(self) -> str:
+        return "|".join([self.saveAll([1, 2], "t"), self.save(1), self.add(1)])
+
+
+@Singleton
+class NestedResolved(Integers):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def calls(self) -> str:
+        return "|".join([self.saveAll([1, 2], "t"), self.save(1), self.add(1)])
+
+
+@Singleton
+class Bound(GenericRepository[str]):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def calls(self) -> str:
+        return "|".join([self.save("a"), self.saveAll(["a", "b"], "t"), self.saveTagged("a", "t"), self.add("a"), self.addAll(["a"])])
+
+
+@Singleton
+class Resolved(Names):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def calls(self) -> str:
+        return "|".join([self.save("a"), self.saveAll(["a", "b"], "t"), self.saveTagged("a", "t"), self.add("a"), self.addAll(["a"])])
+
+
+@Singleton
+class Raw(GenericRepository):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def calls(self) -> str:
+        return "|".join([self.save("a"), self.saveAll(["a", "b"], "t"), self.saveTagged("a", "t"), self.add("a"), self.addAll(["a"])])
+''', true)
+
+        expect:
+        ['Bound', 'Resolved', 'Raw'].every { ctx.getBean(ctx.classLoader.loadClass("python.$it")).calls() == 'a|saveAll:2t|saveTagged:at|add:a|addAll:1' }
+        ['NestedBound', 'NestedResolved'].every { ctx.getBean(ctx.classLoader.loadClass("python.$it")).calls() == 'numbers:2t|number:1|added:1' }
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "of two overloads of a Java base with the same erasure, Python reaches the one the JVM selects"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+import java
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases.BindingOverloads import Both
+
+
+@Singleton
+class Binding(Both):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def bound(self) -> str:
+        return self.bind(java.type("java.lang.String"))
+''', true)
+
+        expect: 'the method of the class, as for a Java subclass'
+        ctx.getBean(ctx.classLoader.loadClass('python.Binding')).bound() == 'generic:String'
 
         cleanup:
         ctx?.close()

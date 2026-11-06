@@ -329,9 +329,7 @@ public final class PythonJavaBases {
         for (Method method : type.getDeclaredMethods()) {
             int modifiers = method.getModifiers();
             if (Modifier.isStatic(modifiers) || Modifier.isAbstract(modifiers) || method.isSynthetic() || method.isBridge()
-                || isErasedArrayOfOwnTypeVariable(method)) {
-                // a method taking an array of a type variable it declares (toArray(T[])) is not reachable
-                // through the generated dispatcher either
+                || isLeftOutOfDispatcher(method)) {
                 continue;
             }
             // no Python name can call a method whose name contains $, which the dispatcher leaves out
@@ -346,27 +344,47 @@ public final class PythonJavaBases {
     }
 
     /**
-     * Whether a method takes an array of a type variable it declares itself, the one shape of a generic
-     * method the generated dispatcher leaves out because the erasure of such a parameter cannot be named.
+     * Whether the generated dispatcher leaves a method out because of its signature: the rule of
+     * {@code PythonStubGenerator.isDispatchableBaseMethod}, which has the reasons, over reflection. A method throwing
+     * a Throwable that is not an Exception or, for a method declaring type variables, taking an array of more than
+     * one dimension, an array of such a variable, or such a variable bounded by an intersection.
      */
-    private static boolean isErasedArrayOfOwnTypeVariable(Method method) {
-        TypeVariable<Method>[] declared = method.getTypeParameters();
-        if (declared.length == 0) {
+    private static boolean isLeftOutOfDispatcher(Method method) {
+        for (Class<?> thrown : method.getExceptionTypes()) {
+            if (!Exception.class.isAssignableFrom(thrown)) {
+                return true;
+            }
+        }
+        List<TypeVariable<Method>> declared = List.of(method.getTypeParameters());
+        if (declared.isEmpty()) {
             return false;
         }
-        for (Type parameterType : method.getGenericParameterTypes()) {
-            if (!(parameterType instanceof GenericArrayType arrayType)
-                || !(arrayType.getGenericComponentType() instanceof TypeVariable<?> component)) {
-                continue;
+        for (Class<?> parameterType : method.getParameterTypes()) {
+            if (parameterType.isArray() && parameterType.getComponentType().isArray()) {
+                return true;
             }
-            for (TypeVariable<Method> variable : declared) {
-                // by name: the generic declaration of a variable is not the same Method instance
-                if (variable.getName().equals(component.getName())) {
+        }
+        try {
+            for (Type parameterType : method.getGenericParameterTypes()) {
+                boolean array = parameterType instanceof GenericArrayType;
+                Type type = array ? ((GenericArrayType) parameterType).getGenericComponentType() : parameterType;
+                if (type instanceof TypeVariable<?> variable && declared.contains(variable)
+                    && (array || hasIntersectionBound(variable))) {
                     return true;
                 }
             }
+        } catch (TypeNotPresentException e) {
+            // a class only the generic signature names is absent (an optional dependency), so its shape cannot be
+            // told: the method stays out, as it did before any method with type variables was dispatched, and the
+            // other members of the base stay visible
+            return true;
         }
         return false;
+    }
+
+    private static boolean hasIntersectionBound(TypeVariable<?> variable) {
+        Type[] bounds = variable.getBounds();
+        return bounds.length > 1 || bounds[0] instanceof TypeVariable<?> bound && hasIntersectionBound(bound);
     }
 
     /**

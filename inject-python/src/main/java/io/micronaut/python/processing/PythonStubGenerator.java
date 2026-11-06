@@ -813,17 +813,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             // inherited signature are not always resolved against the extended type. So is a
                             // type variable of a Java base, which renders as Object: one a raw base
                             // (Composite<T extends Component>) leaves unresolved takes the erased bound in
-                            // super.label(T), and one an inherited interface resolves (HasComponents extends
-                            // HasComponentsOfType<Component>) takes its resolution in super.addComponentAsFirst(T).
+                            // super.label(T), and one the extended type gives a type argument (HasComponents extends
+                            // HasComponentsOfType<Component>, class P(Base[str])) takes it in super.addComponentAsFirst(T).
                             // The erasure of a type variable drops its array dimensions (addEach(T[])), so they
                             // are put back
                             ClassElement parameterType = parameters[i].getGenericType();
-                            if (isJavaTypeVariable(parameterType)) {
-                                TypeDef erased = erasedType(parameterType);
-                                if (parameterType.isArray()) {
-                                    erased = erased.array(parameterType.getArrayDimensions());
+                            // the dimensions of an array of a type variable that a type variable of the Python class replaces
+                            // (class P(Base[T], Generic[T])) are only on the erased type
+                            int dimensions = parameters[i].getType().getArrayDimensions();
+                            if (parameterType instanceof GenericPlaceholderElement placeholder && (dimensions > 0 || isJavaTypeVariable(placeholder))) {
+                                ClassElement resolution = extendedTypeResolution(superType, method, placeholder);
+                                TypeDef erased = erasedType(resolution);
+                                // a type variable of the Python class is what super.m(T) takes
+                                TypeDef cast = resolution instanceof GenericPlaceholderElement && !isJavaTypeVariable(resolution) ? sourceSignatureType(resolution) : erased;
+                                if (dimensions > 0) {
+                                    erased = erased.array(dimensions);
+                                    cast = cast.array(dimensions);
                                 }
-                                converted.add(PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, ExpressionDef.constant(erased)).cast(erased));
+                                converted.add(PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, ExpressionDef.constant(erased)).cast(cast));
                             } else {
                                 converted.add(isParameterizedReference(parameterType)
                                     ? PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, classLiteral(parameterType)).cast(dispatchedType(method, parameterType))
@@ -881,6 +888,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * @return The type the argument is cast to
      */
     private static TypeDef dispatchedType(MethodElement method, ClassElement parameterType) {
+        if (parameterType.isArray() && !(parameterType instanceof GenericPlaceholderElement) && !method.getDeclaredTypeVariables().isEmpty()) {
+            // an array of a parameterized type (List<T>[]) is raw: its erased form names the bound of the variable,
+            // which a self-referencing or intersection bound does not accept
+            return erasedType(parameterType.fromArray()).array();
+        }
         if (parameterType instanceof GenericPlaceholderElement || parameterType.isArray()
             || parameterType.getTypeArguments().size() != 1 || method.getDeclaredTypeVariables().isEmpty()) {
             return erasedType(parameterType);
@@ -930,11 +942,48 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * Whether the dispatcher of the Java base can call a method the base declares. It declares none of the
-     * type variables such a method declares of its own, so a parameter naming one is written as the erasure
-     * of its bound. An array of such a type variable ({@code toArray(T[])}) has no erasure the dispatcher
-     * can name (the element model erases the array away together with the variable), so that method is
-     * left out, as it was before any method with type variables was dispatched.
+     * What a type variable in the signature of a base method stands for in the type the Python class extends, which
+     * is what {@code super.m(...)} takes. The element model does not resolve a variable of the class in every
+     * case (a base nested in another class: {@code class P(Outer.Base[str])}, {@code class Child extends
+     * Outer.Base<String>}), so the type argument is read from the extended type. A variable the method declares stands
+     * for its first bound, which may in turn be a variable of the class ({@code <S extends E> save(S)}), and a variable
+     * of the Python class ({@code class P(Base[T], Generic[T])}) for itself.
+     *
+     * @param superType The extended type
+     * @param method The method of the Java base
+     * @param placeholder A type variable of its signature
+     * @return The type it stands for
+     */
+    private static ClassElement extendedTypeResolution(ClassElement superType, MethodElement method, GenericPlaceholderElement placeholder) {
+        if (!isJavaTypeVariable(placeholder)) {
+            ClassElement component = placeholder;
+            while (component.isArray()) {
+                component = component.fromArray();
+            }
+            return component;
+        }
+        if (placeholder.getResolved().isPresent() || placeholder.isRawType()) {
+            return resolvedOrFirstBound(placeholder);
+        }
+        if (isDeclaredTypeVariable(method, placeholder)) {
+            ClassElement bound = firstBound(placeholder);
+            return bound instanceof GenericPlaceholderElement variable ? extendedTypeResolution(superType, method, variable) : bound;
+        }
+        ClassElement argument = superType.getTypeArguments(method.getDeclaringType().getName()).get(placeholder.getVariableName());
+        return argument != null ? argument : firstBound(placeholder);
+    }
+
+    /**
+     * Whether the dispatcher of the Java base can call a method the base declares, which decides what
+     * {@code PythonJavaBases.collectMethodNames} has to leave out by the same rule: the two must agree, or Python
+     * sees a member the dispatcher cannot serve. The dispatcher declares none of the type variables a method declares
+     * of its own, so a parameter naming one is written as the erasure of its bound. Three shapes of parameter of such
+     * a method stay out, as every one of them did before any method with type variables was dispatched. An array of
+     * such a variable ({@code toArray(T[])}, {@code T...}): the overload check reads the erasure of the variable
+     * without its dimension. Such a variable bounded by an intersection ({@code <T extends Runnable & Comparable<T>>
+     * m(T)}): the erasure is only the first bound, which javac does not accept, and no cast names the intersection.
+     * And an array of more than one dimension of any type ({@code T[][]}, {@code String[][]}): the generated class
+     * literal has one dimension, which the cast does not compile against.
      *
      * @param method The method of the Java base
      * @return Whether the dispatcher can call it
@@ -945,14 +994,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         for (ParameterElement parameter : method.getParameters()) {
             ClassElement type = parameter.getGenericType();
-            // the element model may carry the array dimensions on the type variable itself or on an
-            // array type over it, so both are asked
-            if (type.getArrayDimensions() > 0
-                && (isDeclaredTypeVariable(method, type) || isDeclaredTypeVariable(method, type.fromArray()))) {
+            int dimensions = type.getArrayDimensions();
+            if (dimensions > 1) {
+                return false;
+            }
+            // the element model may carry the array dimension on the type variable itself or on an array type over it
+            ClassElement component = dimensions > 0 ? type.fromArray() : type;
+            if (isDeclaredTypeVariable(method, component)
+                && (dimensions > 0 || hasIntersectionBound((GenericPlaceholderElement) component))) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static boolean hasIntersectionBound(GenericPlaceholderElement variable) {
+        List<? extends ClassElement> bounds = variable.getBounds();
+        return bounds.size() > 1
+            || !bounds.isEmpty() && bounds.getFirst() instanceof GenericPlaceholderElement bound && hasIntersectionBound(bound);
     }
 
     /**
