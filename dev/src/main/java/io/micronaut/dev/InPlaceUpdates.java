@@ -182,6 +182,8 @@ final class InPlaceUpdates {
             snapshotChange.close();
         }
         // with the class file lock released: the contexts the reloader patches may load classes through the generation
+        // the classes are already redefined, and a request until the patch below is done runs their new bodies against the
+        // old resources: the JVM and the reloader cannot apply the two as one
         InPlaceResourceReloader.Result patched = null;
         if (reloader != null) {
             try {
