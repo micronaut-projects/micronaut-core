@@ -350,6 +350,108 @@ class RetainedRegistrationsSpec extends Specification {
         EmptyProviderHolder.DESTROYED.get() == 1
     }
 
+    void "a context whose start failed destroys what it created and hands the retained beans back as they were given"() {
+        given: "the retained beans of a context that ran"
+        ApplicationContext first = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .beanDependencyTrackingEnabled(true)
+            .start()
+        Expensive expensive = first.getBean(Consumer).expensive
+        def retained = ((DefaultBeanContext) first).stopRetaining { it.beanType == Expensive }
+        Consumer.DESTROYED.set(0)
+
+        when: "the next context adopts them, creates a bean of its own, and fails to start"
+        ApplicationContext failed = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec', 'retain.fail-start': true)
+            .beanDependencyTrackingEnabled(true)
+            .retainedRegistrations(retained)
+            .build()
+        failed.start()
+
+        then:
+        thrown(RuntimeException)
+        !failed.running
+
+        when: "it is stopped as any context is"
+        failed.stop()
+
+        then: "that stops nothing, as it never did"
+        Consumer.DESTROYED.get() == 0
+
+        when: "it is stopped as a context whose start failed"
+        def handedBack = ((DefaultBeanContext) failed).stopFailedStart(retained)
+
+        then: "what it created is destroyed, and what it was given is not"
+        Consumer.DESTROYED.get() == 1
+        Expensive.DESTROYED.get() == 0
+        Scratch.DESTROYED.get() == 0
+        handedBack as Set == retained as Set
+        !failed.running
+
+        when: "asked again"
+        def again = ((DefaultBeanContext) failed).stopFailedStart(retained)
+
+        then: "it has nothing more to do, and nothing more to say"
+        again.isEmpty()
+        Consumer.DESTROYED.get() == 1
+
+        when: "a context that starts adopts them"
+        ApplicationContext third = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .beanDependencyTrackingEnabled(true)
+            .retainedRegistrations(handedBack)
+            .start()
+
+        then: "as if the failed one had never been"
+        third.getBean(Expensive).is(expensive)
+        Expensive.CREATED.get() == 1
+
+        when:
+        third.close()
+
+        then: "and it destroys them, with what they own, once"
+        Expensive.DESTROYED.get() == 1
+        Scratch.DESTROYED.get() == 1
+    }
+
+    void "a context that never started hands back what it was configured with, and one that started hands back nothing"() {
+        given:
+        ApplicationContext first = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .beanDependencyTrackingEnabled(true)
+            .start()
+        Expensive expensive = first.getBean(Consumer).expensive
+        def retained = ((DefaultBeanContext) first).stopRetaining { it.beanType == Expensive }
+
+        when: "the next context is built, and never started"
+        ApplicationContext built = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .beanDependencyTrackingEnabled(true)
+            .retainedRegistrations(retained)
+            .build()
+        def handedBack = ((DefaultBeanContext) built).stopFailedStart(retained)
+
+        then:
+        handedBack as Set == retained as Set
+        Expensive.DESTROYED.get() == 0
+
+        when: "one that starts adopts them"
+        ApplicationContext running = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .beanDependencyTrackingEnabled(true)
+            .retainedRegistrations(handedBack)
+            .start()
+
+        then: "it keeps running, and keeps them"
+        ((DefaultBeanContext) running).stopFailedStart(handedBack).isEmpty()
+        running.running
+        running.getBean(Expensive).is(expensive)
+        Expensive.DESTROYED.get() == 0
+
+        cleanup:
+        running?.close()
+    }
+
     void "stopping without retention destroys everything as before"() {
         given:
         ApplicationContext context = ApplicationContext.run('spec.name': 'RetainedRegistrationsSpec')
