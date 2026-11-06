@@ -4,7 +4,7 @@ The difference is large: a bridge call from a generated Java stub into Python co
 
 == Choosing a JDK
 
-The GraalPy version is `{graalpyVersion}`. Use a GraalVM JDK from the matching GraalVM release line, for example GraalVM 25.5.x for GraalPy 25.5.x. The JDK's build string then contains the same Truffle line, such as `25.0.4.1.1+1-LTS-jvmci-25.4-b23`.
+The GraalPy version is `{graalpyVersion}`. Use a GraalVM JDK from the matching GraalVM release line, for example GraalVM 25.5.x for GraalPy 25.5.x. The JDK's build string then contains the same Truffle line, such as `25.0.5.0.3+1-LTS-jvmci-25.5-b26`.
 
 The following JVMs run Python interpreted, even though some of them are GraalVM builds:
 
