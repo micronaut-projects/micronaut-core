@@ -347,7 +347,7 @@ final class Geometry {
                         boolean sweep = scanner.nextFlag();
                         double endX = ox + scanner.next();
                         double endY = oy + scanner.next();
-                        builder.arcTo(x, y, rx, ry, rotation, largeArc, sweep, endX, endY);
+                        builder.arcTo(rx, ry, rotation, largeArc, sweep, endX, endY);
                         x = endX;
                         y = endY;
                     }
@@ -403,7 +403,12 @@ final class Geometry {
             cubicTo(x0 + 2.0 / 3 * (qx - x0), y0 + 2.0 / 3 * (qy - y0), x + 2.0 / 3 * (qx - x), y + 2.0 / 3 * (qy - y), x, y);
         }
 
-        void arcTo(double x0, double y0, double rx, double ry, double rotation, boolean largeArc, boolean sweep, double x, double y) {
+        /**
+         * Adds an elliptical arc from the current point.
+         */
+        void arcTo(double rx, double ry, double rotation, boolean largeArc, boolean sweep, double x, double y) {
+            double x0 = lastX;
+            double y0 = lastY;
             if (x0 == x && y0 == y) {
                 return;
             }
@@ -443,21 +448,34 @@ final class Geometry {
             int segments = (int) Math.ceil(Math.abs(delta) / (Math.PI / 2) - 1e-9);
             double step = delta / segments;
             double k = 4.0 / 3 * Math.tan(step / 4);
+            double[] ellipse = {cx, cy, rx, ry, cos, sin};
             double theta = theta1;
             for (int i = 0; i < segments; i++) {
                 double c1 = Math.cos(theta);
                 double s1 = Math.sin(theta);
                 double c2 = Math.cos(theta + step);
                 double s2 = Math.sin(theta + step);
-                double[] p1 = point(cx, cy, rx, ry, cos, sin, c1 - k * s1, s1 + k * c1);
-                double[] p2 = point(cx, cy, rx, ry, cos, sin, c2 + k * s2, s2 - k * c2);
-                double[] p3 = i == segments - 1 ? new double[] {x, y} : point(cx, cy, rx, ry, cos, sin, c2, s2);
+                double[] p1 = point(ellipse, c1 - k * s1, s1 + k * c1);
+                double[] p2 = point(ellipse, c2 + k * s2, s2 - k * c2);
+                double[] p3 = i == segments - 1 ? new double[] {x, y} : point(ellipse, c2, s2);
                 cubicTo(p1[0], p1[1], p2[0], p2[1], p3[0], p3[1]);
                 theta += step;
             }
         }
 
-        private static double[] point(double cx, double cy, double rx, double ry, double cos, double sin, double ux, double uy) {
+        /**
+         * @param ellipse The center, radii, and the cosine and sine of the rotation of the ellipse
+         * @param ux The x of the point on the unit circle
+         * @param uy The y of the point on the unit circle
+         * @return The point on the ellipse
+         */
+        private static double[] point(double[] ellipse, double ux, double uy) {
+            double cx = ellipse[0];
+            double cy = ellipse[1];
+            double rx = ellipse[2];
+            double ry = ellipse[3];
+            double cos = ellipse[4];
+            double sin = ellipse[5];
             return new double[] {cx + rx * ux * cos - ry * uy * sin, cy + rx * ux * sin + ry * uy * cos};
         }
 

@@ -230,7 +230,7 @@ class ImageBannerTest {
             SystemLambda.withEnvironmentVariable("MICRONAUT_BANNER_MODE", envMode)
                 .and("MICRONAUT_BANNER_THEME", "dark")
                 .execute(() -> output[0] = SystemLambda.tapSystemOut(() -> {
-                    try (ApplicationContext ignored = Micronaut.build(new String[0]).bannerMode(mode).classLoader(classLoader).deduceEnvironment(false).start()) {
+                    try (ApplicationContext _ = Micronaut.build(new String[0]).bannerMode(mode).classLoader(classLoader).deduceEnvironment(false).start()) {
                         // only the banner printed by the start matters
                     }
                 }));

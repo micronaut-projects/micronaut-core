@@ -207,7 +207,7 @@ final class SvgRaster {
         double density = Math.sqrt(Math.abs(1 / determinant));
         int samples = (int) Math.max(1, Math.min(8, Math.ceil(density)));
         float weight = 1f / (samples * samples);
-        int[] pixels = image.argb();
+        int[] source = image.argb();
         for (int y = top; y < bottom; y++) {
             for (int x = left; x < right; x++) {
                 float red = 0;
@@ -223,7 +223,7 @@ final class SvgRaster {
                         if (ix < 0 || iy < 0 || ix >= image.width() || iy >= image.height()) {
                             continue;
                         }
-                        int pixel = pixels[iy * image.width() + ix];
+                        int pixel = source[iy * image.width() + ix];
                         float pixelAlpha = (pixel >>> 24) / 255f * weight;
                         red += ((pixel >> 16) & 0xFF) / 255f * pixelAlpha;
                         green += ((pixel >> 8) & 0xFF) / 255f * pixelAlpha;

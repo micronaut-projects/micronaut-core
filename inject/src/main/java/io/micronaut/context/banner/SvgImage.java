@@ -594,7 +594,7 @@ final class SvgImage {
                     try {
                         image = PngImage.decode(Base64.getMimeDecoder().decode(href.substring(comma + 1)));
                     } catch (IllegalArgumentException e) {
-                        image = null;
+                        // an image that cannot be decoded is not drawn
                     }
                 }
             }
@@ -632,7 +632,11 @@ final class SvgImage {
         Animation(Element element) {
             transform = "animateTransform".equals(element.name);
             String type = element.attr("type");
-            attribute = transform ? (type == null ? "translate" : type.trim()) : String.valueOf(element.attr("attributeName")).trim();
+            if (transform) {
+                attribute = type == null ? "translate" : type.trim();
+            } else {
+                attribute = String.valueOf(element.attr("attributeName")).trim();
+            }
             begin = seconds(element.attr("begin"), 0);
             dur = seconds(element.attr("dur"), 0);
             String repeatCount = element.attr("repeatCount");
@@ -974,11 +978,15 @@ final class SvgImage {
             return "scale".equals(function) ? new double[] {1, 1} : new double[] {0, 0, 0};
         }
 
+        private static double second(double[] values, double fallback) {
+            return values.length > 1 ? values[1] : fallback;
+        }
+
         static double[] of(String function, double[] v) {
             return switch (function) {
                 case "matrix" -> v.length == 6 ? v.clone() : IDENTITY;
-                case "translate" -> v.length == 0 ? IDENTITY : new double[] {1, 0, 0, 1, v[0], v.length > 1 ? v[1] : 0};
-                case "scale" -> v.length == 0 ? IDENTITY : new double[] {v[0], 0, 0, v.length > 1 ? v[1] : v[0], 0, 0};
+                case "translate" -> v.length == 0 ? IDENTITY : new double[] {1, 0, 0, 1, v[0], second(v, 0)};
+                case "scale" -> v.length == 0 ? IDENTITY : new double[] {v[0], 0, 0, second(v, v[0]), 0, 0};
                 case "rotate" -> {
                     if (v.length == 0) {
                         yield IDENTITY;
@@ -1124,39 +1132,7 @@ final class SvgImage {
                     position++;
                     String name = localName(name());
                     Map<String, String> attributes = new HashMap<>();
-                    boolean selfClosing = false;
-                    while (true) {
-                        skipWhitespace();
-                        if (position >= xml.length()) {
-                            throw new IllegalArgumentException("Unterminated element <" + name + ">");
-                        }
-                        char c = xml.charAt(position);
-                        if (c == '/') {
-                            selfClosing = true;
-                            position = end(">");
-                            break;
-                        }
-                        if (c == '>') {
-                            position++;
-                            break;
-                        }
-                        String attribute = localName(name());
-                        skipWhitespace();
-                        if (position < xml.length() && xml.charAt(position) == '=') {
-                            position++;
-                            skipWhitespace();
-                            if (position >= xml.length()) {
-                                throw new IllegalArgumentException("Unterminated attribute " + attribute + " of <" + name + ">");
-                            }
-                            char quote = xml.charAt(position);
-                            int close = xml.indexOf(quote, position + 1);
-                            if ((quote != '"' && quote != '\'') || close < 0) {
-                                throw new IllegalArgumentException("Malformed attribute " + attribute + " of <" + name + ">");
-                            }
-                            attributes.put(attribute, unescape(xml.substring(position + 1, close)));
-                            position = close + 1;
-                        }
-                    }
+                    boolean selfClosing = attributes(name, attributes);
                     Element element = new Element(name, attributes);
                     if (stack.isEmpty()) {
                         if (root == null) {
@@ -1179,6 +1155,47 @@ final class SvgImage {
                 throw new IllegalArgumentException("No root element");
             }
             return root;
+        }
+
+        /**
+         * Reads the attributes of a start tag up to its end.
+         *
+         * @param name The element
+         * @param attributes The map to add the attributes to
+         * @return Whether the tag closes the element too
+         */
+        private boolean attributes(String name, Map<String, String> attributes) {
+            while (true) {
+                skipWhitespace();
+                if (position >= xml.length()) {
+                    throw new IllegalArgumentException("Unterminated element <" + name + ">");
+                }
+                char c = xml.charAt(position);
+                if (c == '/') {
+                    position = end(">");
+                    return true;
+                }
+                if (c == '>') {
+                    position++;
+                    return false;
+                }
+                String attribute = localName(name());
+                skipWhitespace();
+                if (position < xml.length() && xml.charAt(position) == '=') {
+                    position++;
+                    skipWhitespace();
+                    if (position >= xml.length()) {
+                        throw new IllegalArgumentException("Unterminated attribute " + attribute + " of <" + name + ">");
+                    }
+                    char quote = xml.charAt(position);
+                    int close = xml.indexOf(quote, position + 1);
+                    if ((quote != '"' && quote != '\'') || close < 0) {
+                        throw new IllegalArgumentException("Malformed attribute " + attribute + " of <" + name + ">");
+                    }
+                    attributes.put(attribute, unescape(xml.substring(position + 1, close)));
+                    position = close + 1;
+                }
+            }
         }
 
         private int end(String terminator) {
