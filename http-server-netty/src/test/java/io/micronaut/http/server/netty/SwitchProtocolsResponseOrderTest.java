@@ -17,10 +17,13 @@ import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.runtime.server.EmbeddedServer;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.ByteArrayOutputStream;
 import java.net.Socket;
@@ -77,8 +80,19 @@ class SwitchProtocolsResponseOrderTest {
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Upgrades {
+        /**
+         * Delays the slow response on a thread of this test, not of the global schedulers of
+         * Reactor: a thread created during another test belongs to the resource scope of that
+         * test, which the leak detector closed, so the body could not be allocated on it.
+         */
+        final Scheduler delays = Schedulers.newSingle("switch-protocols-delays");
         volatile Duration slowDelay = Duration.ZERO;
         final CountDownLatch sent = new CountDownLatch(1);
+
+        @PreDestroy
+        void close() {
+            delays.dispose();
+        }
     }
 
     @Controller("/order")
@@ -92,7 +106,7 @@ class SwitchProtocolsResponseOrderTest {
 
         @Get(value = "/slow", produces = MediaType.TEXT_PLAIN)
         Mono<String> slow() {
-            return Mono.delay(upgrades.slowDelay).map(i -> "SLOW-BODY");
+            return Mono.delay(upgrades.slowDelay, upgrades.delays).map(i -> "SLOW-BODY");
         }
 
         @Get("/switch")

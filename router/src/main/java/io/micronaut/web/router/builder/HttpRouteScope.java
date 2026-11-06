@@ -515,4 +515,21 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
         locateAsync(prefixUri, locator, target -> routes);
     }
 
+    /**
+     * Declare a locator route whose locator reads the body of the request, e.g. a form, before it
+     * locates the target: the body stage, {@link LocatorSpec#body(io.micronaut.core.type.Argument)},
+     * {@link LocatorSpec#body()} or {@link LocatorSpec#form()}, followed by the locator. The
+     * located routes read the body again. See {@link LocatorSpec}.
+     *
+     * <pre>{@code
+     * routes.locator("/accounts/{id}")
+     *     .form()
+     *     .locate((request, pathVariables, form) -> accounts.find(form.getString("token")), accountRoutes);
+     * }</pre>
+     *
+     * @param prefixUri The prefix, see {@link #locate(String, LocatorHandler, Function)}
+     * @return The body stage of the locator route
+     * @since 5.3.0
+     */
+    LocatorSpec locator(String prefixUri);
 }

@@ -30,6 +30,11 @@ import io.micronaut.python.imports.ResolvedModule;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
 import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.staticcompile.StaticCompilationConfiguration;
+import io.micronaut.python.processing.staticcompile.StaticCompilationDecision;
+import io.micronaut.python.processing.staticcompile.StaticCompilationMode;
+import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
+import io.micronaut.python.processing.staticcompile.StaticCompilationReport;
 import io.micronaut.python.processing.typecheck.JavaInstanceAliases;
 import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
 import io.micronaut.python.processing.typecheck.TypeCheckMode;
@@ -55,6 +60,7 @@ import javax.lang.model.element.TypeElement;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -91,14 +97,15 @@ import java.util.stream.Collectors;
  * each registered processor. The options below are declared by this processor's
  * {@link io.micronaut.inject.visitor.TypeElementVisitor}s, which a tool enumerating processors
  * never sees; {@code TypeElementVisitorProcessor} aggregates its visitors' options for the same
- * reason, and this processor loads its visitors too late in a round to do that dynamically.
+ * reason, and this processor loads its visitors too late in a round to do that dynamically. The
+ * options the processor reads itself (the source root, the bytecode cache, type checking and
+ * static compilation) are added by {@link #getSupportedOptions()}, which advertises both.
  *
  * @author Micronaut
  * @since 5.2.0
  */
 @SupportedAnnotationTypes(PythonAnnotationProcessor.PYTHON_APPLICATION_ANNOTATION)
 @SupportedOptions({
-    PythonAnnotationProcessor.SOURCE_ROOT_OPTION,
     PythonClassExclusions.OPTION,
     PythonReflectionGate.OPTION,
     PythonReflectionGate.WARNINGS_OPTION,
@@ -113,6 +120,15 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      * directories are resolved against. Without it they resolve against the working directory.
      */
     public static final String SOURCE_ROOT_OPTION = "micronaut.python.source.root";
+    /**
+     * The compiler option that sets whether every generated Python resource gets a GraalPy bytecode cache, {@code true} or
+     * {@code false}, as {@link #setCompilePythonBytecode(boolean)} does. A tool that compiles a project again in process,
+     * such as development mode, passes the setting of the build that compiled it first, so that both write the same
+     * resources and file list.
+     *
+     * @since 5.3.0
+     */
+    public static final String BYTECODE_OPTION = "micronaut.python.bytecode";
     public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_SRC_PATH + "__main__.py";
     /**
      * The prefix of the modules through which a compilation contributes members to a package (or, at
@@ -292,6 +308,12 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
     private Consumer<PythonDiagnostic> diagnosticCallback;
+    private Consumer<StaticCompilationDecision> staticDecisionCallback;
+    private boolean experimentalNoteGiven;
+    // the sources whose bytecode is compiled once the static compilation plan has rewritten their runtime trees
+    private final List<PendingBytecode> pendingBytecode = new ArrayList<>();
+    // the static compilation report directories written by this compilation, so elements sharing one keep each other's decisions
+    private final Set<Path> reportDirectories = new HashSet<>();
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
     private ClassLoader classLoader;
     private boolean compilePythonBytecode;
@@ -324,13 +346,58 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         this.diagnosticCallback = callback;
     }
 
+    /**
+     * Set the callback to be invoked for each static compilation decision, before the report is written.
+     *
+     * @param callback The callback function
+     * @since 5.3.0
+     */
+    public void setStaticCompilationDecisionCallback(Consumer<StaticCompilationDecision> callback) {
+        this.staticDecisionCallback = callback;
+    }
+
     @Override
     public Set<String> getSupportedOptions() {
         Set<String> options = new HashSet<>(super.getSupportedOptions());
         options.add(SOURCE_ROOT_OPTION);
+        options.add(BYTECODE_OPTION);
         options.add(TypeCheckMode.OPTION);
         options.add(TypeCheckMode.ANNOTATIONS_OPTION);
+        options.add(StaticCompilationMode.OPTION);
+        options.add(StaticCompilationMode.REPORT_OPTION);
+        options.add(StaticCompilationMode.STRICT_OPTION);
+        options.add(StaticCompilationMode.ANNOTATIONS_OPTION);
+        options.add(StaticCompilationMode.TRACE_OPTION);
         return options;
+    }
+
+    /**
+     * The static compilation requested through the processor options.
+     */
+    private StaticCompilationConfiguration staticCompilationConfiguration() {
+        Map<String, String> options = processingEnv.getOptions();
+        StaticCompilationMode mode;
+        try {
+            mode = StaticCompilationMode.fromOption(options.get(StaticCompilationMode.OPTION));
+        } catch (IllegalArgumentException e) {
+            throw new ProcessingException(null, e.getMessage());
+        }
+        String report = options.get(StaticCompilationMode.REPORT_OPTION);
+        boolean strict = Boolean.parseBoolean(options.get(StaticCompilationMode.STRICT_OPTION));
+        return new StaticCompilationConfiguration(
+            mode,
+            report == null || report.isBlank() ? null : Path.of(report.trim()),
+            strict,
+            optionList(options.get(StaticCompilationMode.ANNOTATIONS_OPTION)),
+            Boolean.parseBoolean(options.get(StaticCompilationMode.TRACE_OPTION))
+        );
+    }
+
+    private static List<String> optionList(String value) {
+        return value == null ? List.of() : Arrays.stream(value.split(","))
+            .map(String::trim)
+            .filter(name -> !name.isEmpty())
+            .toList();
     }
 
     /**
@@ -426,6 +493,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
+        String bytecode = processingEnv.getOptions().get(BYTECODE_OPTION);
+        if (bytecode != null) {
+            compilePythonBytecode = Boolean.parseBoolean(bytecode.trim());
+        }
         if (classLoader == null) {
             classLoader = Thread.currentThread().getContextClassLoader();
             if (classLoader == null) {
@@ -493,7 +564,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     private void processAnnotation(TypeElement element, PythonApplicationValues values) {
+        long started = PipelineTimings.start();
+        try {
+            processAnnotationTimed(element, values);
+        } finally {
+            PipelineTimings.stop(PipelineTimings.PROCESSOR, started);
+        }
+    }
+
+    private void processAnnotationTimed(TypeElement element, PythonApplicationValues values) {
         writtenVfsPaths.clear();
+        pendingBytecode.clear();
         try {
             ClassElement originatingElement = javaVisitorContext.getRequiredClassElement(
                 element.getQualifiedName().toString(),
@@ -630,6 +711,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             // Every class of the compilation is modelled and registered: check the Python code against
             // the Java types it uses, and stop before any stub is generated when the check fails
             reportDiagnostics(parser.typeCheck(processingEnvironment.visitorContext()), transformedList, element, originatingElement);
+            planStaticCompilation(processingEnvironment, transformedList, element, originatingElement);
+            compilePendingBytecode(processingEnvironment, originatingElement);
 
             Map<String, String> allDecorators = new LinkedHashMap<>();
             Map<String, List<Map<String, String>>> allImports = new LinkedHashMap<>();
@@ -806,7 +889,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 transformedList,
                 Arrays.asList(srcDirs),
                 javaVisitorContext,
-                typeCheckConfiguration()
+                typeCheckConfiguration(),
+                staticCompilationConfiguration()
             );
             Map<String, ClassDef> retained = PythonClassExclusions.retain(
                 environment.classes(),
@@ -829,6 +913,80 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         } catch (Exception e) {
             throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
         }
+    }
+
+    /**
+     * Decides which function bodies could be compiled statically, hands every decision to the
+     * callback, writes the report when a directory is configured, and reports the explicit
+     * switches that cannot be honoured.
+     */
+    private void planStaticCompilation(PythonProcessingEnvironment processingEnvironment,
+                                       List<PythonAstParser.TransformResult> transformedList,
+                                       TypeElement element,
+                                       ClassElement originatingElement) {
+        StaticCompilationConfiguration configuration = staticCompilationConfiguration();
+        StaticCompilationPlan plan = parser.staticPlan(processingEnvironment.visitorContext()).withTrace(configuration.trace());
+        processingEnvironment.staticCompilationPlan().set(plan);
+        // a module without a generated class gets one for the functions it compiles into static methods
+        parser.staticScripts().forEach(processingEnvironment::addScript);
+        boolean planned = configuration.mode() != StaticCompilationMode.OFF || !plan.decisions().isEmpty();
+        if (!planned && plan.diagnostics().isEmpty()) {
+            return;
+        }
+        // in mode off a CompileStatic text records every function, EXCLUDED: the note is for a compilation that compiles
+        boolean compiles = configuration.mode() != StaticCompilationMode.OFF
+            || plan.decisions().stream().anyMatch(decision -> decision.outcome() == StaticCompilationDecision.Outcome.COMPILED);
+        if (compiles && !experimentalNoteGiven) {
+            // once per compilation, whatever the number of rounds and applications
+            experimentalNoteGiven = true;
+            note("Static compilation of Python is experimental and in use (%s): the compiled bodies run as Java, with Python semantics reproduced by the compiler. %s; @CompileStatic(False) keeps a function in Python.",
+                configuration.mode() == StaticCompilationMode.OFF ? "switched on by CompileStatic" : "mode " + configuration.mode().optionValue(),
+                configuration.reportDirectory() != null
+                    ? "Review the decisions in " + configuration.reportDirectory()
+                    : "Set " + StaticCompilationMode.REPORT_OPTION + " to write the report of the decisions");
+        }
+        if (staticDecisionCallback != null) {
+            plan.decisions().forEach(staticDecisionCallback);
+        }
+        if (planned && configuration.reportDirectory() != null) {
+            // an incremental build planned the affected sources: the ones it was given and the ones
+            // it transformed, so a source whose functions are gone loses its previous decisions
+            Set<String> plannedSources = null;
+            if (incrementalSources != null) {
+                plannedSources = new HashSet<>(incrementalSources);
+                for (PythonAstParser.TransformResult transformResult : transformedList) {
+                    plannedSources.add(PythonAstParser.sourcePathOf(transformResult.originalSource()));
+                }
+                for (StaticCompilationDecision decision : plan.decisions()) {
+                    if (decision.sourcePath() != null) {
+                        plannedSources.add(decision.sourcePath());
+                    }
+                }
+            }
+            boolean incremental = plannedSources != null;
+            Path reportDirectory = configuration.reportDirectory().toAbsolutePath().normalize();
+            if (!reportDirectories.add(reportDirectory) && plannedSources == null) {
+                // an earlier element of this compilation wrote to the same directory: keep its decisions
+                plannedSources = new HashSet<>();
+                for (PythonAstParser.TransformResult transformResult : transformedList) {
+                    plannedSources.add(PythonAstParser.sourcePathOf(transformResult.originalSource()));
+                }
+                for (StaticCompilationDecision decision : plan.decisions()) {
+                    if (decision.sourcePath() != null) {
+                        plannedSources.add(decision.sourcePath());
+                    }
+                }
+            }
+            try {
+                StaticCompilationReport.write(reportDirectory, configuration.mode(), plan.decisions(), plannedSources, incremental);
+            } catch (UncheckedIOException e) {
+                IOException cause = e.getCause();
+                throw new ProcessingException(originatingElement, "Cannot write the static compilation report to the directory ["
+                    + reportDirectory + "] given by the option " + StaticCompilationMode.REPORT_OPTION + ": "
+                    + (cause.getMessage() != null ? cause.getMessage() : cause.toString()));
+            }
+        }
+        reportDiagnostics(plan.diagnostics(), transformedList, element, originatingElement);
     }
 
     /**
@@ -909,6 +1067,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 for (var srcDir : srcDirs) {
                     Path directory = Paths.get(srcDir);
                     if (Files.isDirectory(directory)) {
+                        // the sources of a directory in the order of their paths, not the order the file system lists them
+                        // in, which differs between file systems: the modules of a compilation are checked, planned and
+                        // generated in this order, so the same sources give the same output everywhere
+                        Map<String, Path> files = new TreeMap<>();
                         try {
                             Files.walkFileTree(directory, new SimpleFileVisitor<>() {
                                 @Override
@@ -938,11 +1100,14 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                                     "Micronaut generates package __init__.py files for the GraalPy VFS; remove [" + relative + "] from the project source."
                                             );
                                         }
-                                        sources.add(Source.newBuilder(PYTHON_LANGUAGE, file.toFile()).build());
+                                        files.put(relative, file);
                                     }
                                     return FileVisitResult.CONTINUE;
                                 }
                             });
+                            for (Path file : files.values()) {
+                                sources.add(Source.newBuilder(PYTHON_LANGUAGE, file.toFile()).build());
+                            }
                         } catch (IOException e) {
                             throw new ProcessingException(originatingElement, "Error processing python code in directory [" + directory + "]: " + e.getMessage());
                         }
@@ -1075,20 +1240,46 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                              PythonAstParser.TransformResult transformResult,
                                              ClassElement originatingElement) {
         writePythonSourceToVfs(filesList, filePath, content, originatingElement);
-        if (!compilePythonBytecode && !parser.requiresRuntimeBytecode(transformResult)) {
-            return;
+        // the bytecode is compiled from the runtime tree once the static compilation plan has
+        // rewritten the compiled functions of the tree to delegate to their Java bodies
+        pendingBytecode.add(new PendingBytecode(filesList, filePath, transformResult));
+    }
+
+    /**
+     * Rewrites the compiled functions of every runtime tree to delegate to their Java bodies, then
+     * compiles the bytecode of the sources that need it.
+     */
+    private void compilePendingBytecode(PythonProcessingEnvironment processingEnvironment, ClassElement originatingElement) {
+        long started = PipelineTimings.start();
+        try {
+            compilePendingBytecodeTimed(processingEnvironment, originatingElement);
+        } finally {
+            PipelineTimings.stop(PipelineTimings.BYTECODE, started);
         }
-        try (var _ = CompilationProfiler.span(profiler, "python.bytecode")) {
-            PythonBytecodeCompiler.Result result = parser.compileRuntimeBytecode(
-                transformResult,
-                runtimeFilename(filePath)
-            );
-            writePythonBytecodeToVfs(filesList, filePath, result, originatingElement);
-        } catch (ProcessingException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ProcessingException(originatingElement, "Failed to compile mapped Python bytecode for [" + filePath + "]: " + e.getMessage(), e);
+    }
+
+    private void compilePendingBytecodeTimed(PythonProcessingEnvironment processingEnvironment, ClassElement originatingElement) {
+        StaticCompilationPlan plan = processingEnvironment.staticCompilationPlan().get();
+        for (PendingBytecode pending : pendingBytecode) {
+            if (plan != null && !plan.bodies().isEmpty()) {
+                parser.applyStaticDelegation(pending.transformResult(), plan);
+            }
+            if (!compilePythonBytecode && !parser.requiresRuntimeBytecode(pending.transformResult())) {
+                continue;
+            }
+            try (var _ = CompilationProfiler.span(profiler, "python.bytecode")) {
+                PythonBytecodeCompiler.Result result = parser.compileRuntimeBytecode(
+                    pending.transformResult(),
+                    runtimeFilename(pending.filePath())
+                );
+                writePythonBytecodeToVfs(pending.filesList(), pending.filePath(), result, originatingElement);
+            } catch (ProcessingException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ProcessingException(originatingElement, "Failed to compile mapped Python bytecode for [" + pending.filePath() + "]: " + e.getMessage(), e);
+            }
         }
+        pendingBytecode.clear();
     }
 
     private boolean writePythonSourceToVfs(StringBuilder filesList,
@@ -1670,4 +1861,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private record PythonApplicationValues(String code, String[] src) {
     }
 
+    /**
+     * A source written to the VFS whose bytecode is still to be compiled.
+     *
+     * @param filesList       The VFS file list the bytecode entry is added to
+     * @param filePath        The VFS path of the source
+     * @param transformResult The transformed source
+     */
+    private record PendingBytecode(StringBuilder filesList, String filePath, PythonAstParser.TransformResult transformResult) {
+    }
 }

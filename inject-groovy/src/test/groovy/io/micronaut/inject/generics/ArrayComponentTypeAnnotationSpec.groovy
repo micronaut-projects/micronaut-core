@@ -21,6 +21,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
 
 /**
@@ -135,6 +136,38 @@ class Holder {
 
     private ExecutableMethod<?, ?> method() {
         return buildBeanDefinition('test.Bean', SOURCE).executableMethods.find { it.methodName == 'method' }
+    }
+
+    void "an array of an enum, with or without type annotations, stays an array of the enum"() {
+        given:
+        ClassElement element = buildClassElement('test.Levels', '''
+package test
+
+import java.lang.annotation.*
+
+class Levels {
+    void method(Level[] plain, Level @Mark("outer") [] annotated, Level[][] nested) {
+    }
+}
+
+enum Level { LOW, HIGH }
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE_USE)
+@interface Mark {
+    String value()
+}
+''')
+        MethodElement method = element.getEnclosedElements(ElementQuery.ALL_METHODS.named('method')).first()
+        Map<String, ClassElement> types = method.parameters.collectEntries { [it.name, it.genericType] }
+
+        expect:
+        types.values().every { it.array && it instanceof EnumElement }
+        types.plain.fromArray() instanceof EnumElement
+        types.annotated.fromArray() instanceof EnumElement
+        types.nested.fromArray().fromArray() instanceof EnumElement
+        (types.plain.fromArray() as EnumElement).values() == ['LOW', 'HIGH']
+        marks(types.annotated) == ['outer', '-']
     }
 
     private static Argument<?> argument(ExecutableMethod<?, ?> method, String name) {

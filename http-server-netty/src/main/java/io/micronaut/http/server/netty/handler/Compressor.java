@@ -395,6 +395,7 @@ public final class Compressor {
                     try {
                         channel.finishAndReleaseAll();
                     } catch (DecompressionException ignored) {
+                        // the output is discarded, so a failure while finishing it is irrelevant
                     }
                 }
                 finished = true;

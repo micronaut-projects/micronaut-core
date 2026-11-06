@@ -162,6 +162,34 @@ class Test {
         kind << ['compiled', 'written']
     }
 
+    @Unroll
+    void "annotations in a container that is not repeatable retain what they compose (#kind)"() {
+        given:
+        AnnotationMetadata metadata = buildMethodAnnotationMetadata('legacycontainer.Test', """
+package legacycontainer
+
+import io.micronaut.inject.annotation.RetainedBundle
+
+class Test {
+    @RetainedBundle.List([@RetainedBundle(min = 3), @RetainedBundle(min = 7)])
+    void bundled() {
+    }
+}
+""", 'bundled')
+        if (kind == 'written') {
+            metadata = writeAndLoadMetadata('legacycontainer.Test', metadata)
+        }
+        List<AnnotationValue<?>> bundled = metadata.getAnnotation(RetainedBundle.List.name).getAnnotations('value')
+
+        expect: 'each occurrence retains what it composes, aliases applied'
+        bundled*.values == [[min: 3], [min: 7]]
+        bundled.collect { limitOf(it) } == [[[min: 3]], [[min: 7]]]
+        bundled.collect { it.getStereotypes()*.annotationName } == [[Limit.name]] * 2
+
+        where:
+        kind << ['compiled', 'written']
+    }
+
     private static Map<String, Object> range(int from) {
         return [name: 'RetainedRange', values: [from: from], stereotypes: [bounded(from)]]
     }
