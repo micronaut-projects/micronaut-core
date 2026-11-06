@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.annotation.processing.test.junit
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.PythonContextRuntime
 import io.micronaut.python.compiler.PyronautCompiler
 import org.junit.platform.engine.discovery.DiscoverySelectors
@@ -244,6 +245,51 @@ class OrderServiceTest:
         then:
         summary.testsFoundCount == 2
         summary.testsSucceededCount == 2
+        summary.testsFailedCount == 0
+        summary.containersFailedCount == 0
+    }
+
+    void "test a Python TestPropertyProvider supplies the properties of the context of its own test"() {
+        given: "an application that ran and shut down in this JVM, so this is not its first application"
+        ApplicationContext.run().close()
+
+        and:
+        def sources = [
+            "example/ContainerPropertiesTest.py": '''
+from typing import Annotated
+
+from io.micronaut.context.env import Environment
+from io.micronaut.python.annotation.processing.test.junit import CompiledTestContextBuilder
+from jakarta.inject import Inject
+from java.lang import String
+from java.util import Map
+from micronaut.test.extensions.junit5.annotation import MicronautTest
+from micronaut.test.support import TestPropertyProvider
+from org.junit.jupiter.api import Test, TestInstance
+
+
+@MicronautTest(contextBuilder=CompiledTestContextBuilder)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class ContainerPropertiesTest(TestPropertyProvider):
+
+    environment: Annotated[Environment, Inject]
+
+    def getProperties(self) -> Map[str, str]:
+        self.supplied = "jdbc:test"
+        return Map.of("container.url", self.supplied)
+
+    @Test
+    def test_the_context_has_the_properties_and_the_object_that_supplied_them(self):
+        assert self.environment.getProperty("container.url", String).get() == self.supplied
+'''
+        ]
+
+        when:
+        def summary = compileAndRun(sources, "example.ContainerPropertiesTest")
+
+        then: "the entry point got a context, and the application adopted it"
+        summary.testsFoundCount == 1
+        summary.testsSucceededCount == 1
         summary.testsFailedCount == 0
         summary.containersFailedCount == 0
     }

@@ -71,12 +71,12 @@ import java.util.function.Supplier;
  * {@code @MicronautTest}, a reflective no-arg instantiation). {@link #require()} then builds a
  * default context for them, and the application that starts next adopts it instead of building a
  * second one, so the Python objects created before the application are the ones it sees. That
- * capability is deliberately narrow: it is available only while no application has been recorded,
- * that is before the first application of the JVM and between the creation of an application
- * context builder and the application it builds (see {@link #expectApplication()}). Generated code
- * reached after an application shut down is a leftover reference, not an entry point, and keeps
- * failing with {@code GraalPy context has not been initialized} rather than silently starting a
- * second Python runtime.
+ * capability is deliberately narrow: it is available only before the first application of the JVM
+ * and to the entry points of an application whose builder is on its way (see
+ * {@link PythonEntryPointPermission}). Generated code reached after an application shut down is a
+ * leftover reference, not an entry point, and keeps failing with
+ * {@code GraalPy context has not been initialized} rather than silently starting a second Python
+ * runtime.
  *
  * @author Micronaut Team
  * @since 5.2.0
@@ -89,18 +89,6 @@ final class PythonApplicationRuntime {
     // next context replaces it, which must not keep the failed context alive
     private static final AtomicReference<@Nullable WeakReference<BeanContext>> BOOTSTRAP_CONTEXT = new AtomicReference<>();
     private static final ThreadLocal<Boolean> BOOTSTRAPPING = ThreadLocal.withInitial(() -> false);
-    /**
-     * Whether generated code that finds no runtime and no recorded application context may build a
-     * default one for itself: {@code true} until an application context is recorded, and again from
-     * the moment an application context builder is created (an application is on its way, and the
-     * entry points of that application run before it is recorded) until that application records
-     * itself or shuts down.
-     * <p>
-     * Generated code reached after the application that owned the runtime closed therefore keeps
-     * failing loudly instead of bootstrapping a context of its own, while a platform entry point of
-     * the application that is about to start gets one.
-     */
-    private static final AtomicBoolean OUTSIDE_APPLICATION = new AtomicBoolean(true);
     private static final Logger LOG = LoggerFactory.getLogger(PythonApplicationRuntime.class);
     /** The installed runtimes, the one generated code resolves last; guarded by itself. */
     private static final List<PythonApplicationRuntime> INSTALLED = new ArrayList<>();
@@ -179,23 +167,7 @@ final class PythonApplicationRuntime {
      */
     static void bootstrapFrom(BeanContext beanContext) {
         BOOTSTRAP_CONTEXT.set(new WeakReference<>(beanContext));
-        // from here on generated code builds the context of this application; a call that arrives
-        // with no application recorded at all is a leftover of it, not an entry point before it
-        OUTSIDE_APPLICATION.set(false);
-    }
-
-    /**
-     * Record that an application context is being prepared: its entry points
-     * ({@code TestPropertyProvider.getProperties()} and everything else the platform runs while it
-     * builds the context) reach generated code before {@link #bootstrapFrom(BeanContext)} records the
-     * application, and a default context is bootstrapped for them.
-     * <p>
-     * Called for every application context builder that is created (see
-     * {@code PythonRuntimeBootstrapConfigurer}), which is what separates an entry point of the
-     * application that is starting from a leftover reference of one that shut down.
-     */
-    static void expectApplication() {
-        OUTSIDE_APPLICATION.set(true);
+        PythonEntryPointPermission.applicationRecorded();
     }
 
     /**
@@ -206,10 +178,8 @@ final class PythonApplicationRuntime {
      */
     static void forgetBootstrap(BeanContext beanContext) {
         WeakReference<BeanContext> recorded = BOOTSTRAP_CONTEXT.get();
-        if (recorded != null && recorded.get() == beanContext && BOOTSTRAP_CONTEXT.compareAndSet(recorded, null)) {
-            // generated code reached from here on belongs to no application: a leftover reference of
-            // the one that shut down, which must fail rather than bootstrap a runtime of its own
-            OUTSIDE_APPLICATION.set(false);
+        if (recorded != null && recorded.get() == beanContext) {
+            BOOTSTRAP_CONTEXT.compareAndSet(recorded, null);
         }
     }
 
@@ -233,7 +203,7 @@ final class PythonApplicationRuntime {
             if (beanContext == null) {
                 // a platform entry point running before any application context exists; a call that
                 // arrives after an application shut down is a leftover reference and gets no context
-                return OUTSIDE_APPLICATION.get() ? bootstrapStandalone() : null;
+                return PythonEntryPointPermission.isGranted() ? bootstrapStandalone() : null;
             }
             // creating the primary context bean installs the runtime (GraalPyContextFactory)
             beanContext.getBean(Context.class, Qualifiers.byName(PythonContextRuntime.PYTHON));
@@ -484,8 +454,6 @@ final class PythonApplicationRuntime {
             neverAdopted = standalone;
             standalone = null;
             CURRENT.set(null);
-            // the JVM-wide state is back to what it was before any application ran, entry points included
-            OUTSIDE_APPLICATION.set(true);
         }
         if (neverAdopted != null) {
             // closing a context runs guest code, so it happens outside the monitor

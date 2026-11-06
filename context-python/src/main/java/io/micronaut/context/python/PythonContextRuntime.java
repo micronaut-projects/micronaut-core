@@ -229,10 +229,10 @@ public final class PythonContextRuntime {
      * {@link GraalPyContextFactory}; this method serves tests and tooling that reset the JVM-wide
      * state between applications.
      * <p>
-     * The reset returns the JVM to the state it was in before any application ran: a context
-     * bootstrapped for an entry point outside an application that no application adopted is closed
-     * with the engine created for it, and an entry point reached afterwards may bootstrap a context
-     * again, as it may in a JVM where no application has run yet.
+     * A context bootstrapped for an entry point outside an application that no application adopted
+     * is closed with the engine created for it. A reset grants nothing: generated code reached after
+     * it fails as it did before it, and a builder the calling thread left behind no longer counts as
+     * an application on its way.
      */
     public static void resetContext() {
         PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
@@ -240,6 +240,7 @@ public final class PythonContextRuntime {
             runtime.context().eval(RELOAD_MODULES_SOURCE);
             return;
         }
+        PythonEntryPointPermission.revoke();
         for (PythonApplicationRuntime uninstalled : PythonApplicationRuntime.uninstallAll()) {
             PythonContextRegistry.forgetContext(uninstalled.context());
         }

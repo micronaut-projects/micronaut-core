@@ -21,6 +21,9 @@ import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.BootstrapContextAccess;
 import io.micronaut.context.annotation.ContextConfigurer;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
+
+import java.lang.ref.WeakReference;
 
 /**
  * Records the application context that is starting, so generated Python code that runs before the
@@ -42,9 +45,10 @@ import io.micronaut.core.annotation.Internal;
  * platform entry points of the application run ({@code TestPropertyProvider.getProperties()} is
  * called while the builder is being filled in). Generated Python code reached from one of them finds
  * neither a runtime nor a recorded application context, so {@link #configure(ApplicationContextBuilder)}
- * records that an application is on its way and a default context may be bootstrapped for it. A call
- * that arrives when no application is on its way and none is recorded either is a leftover reference
- * of an application that shut down, and keeps failing.
+ * records that the application of this builder is on its way and a default context may be bootstrapped
+ * for it, until the builder produces its application: every builder has a configurer of its own. A
+ * call that arrives with nothing on its way is a leftover reference of an application that shut down,
+ * and keeps failing (see {@link PythonEntryPointPermission}).
  *
  * @author Micronaut Team
  * @since 5.3.0
@@ -53,15 +57,21 @@ import io.micronaut.core.annotation.Internal;
 @ContextConfigurer
 public final class PythonRuntimeBootstrapConfigurer implements ApplicationContextConfigurer {
 
+    private @Nullable WeakReference<ApplicationContextBuilder> onItsWay;
+
     @Override
     public void configure(ApplicationContextBuilder builder) {
-        PythonApplicationRuntime.expectApplication();
+        onItsWay = PythonEntryPointPermission.expect(builder);
     }
 
     @Override
     public void configure(ApplicationContext applicationContext) {
         if (applicationContext.containsBean(BootstrapContextAccess.class)) {
             return;
+        }
+        WeakReference<ApplicationContextBuilder> produced = onItsWay;
+        if (produced != null) {
+            produced.clear();
         }
         PythonApplicationRuntime.bootstrapFrom(applicationContext);
     }

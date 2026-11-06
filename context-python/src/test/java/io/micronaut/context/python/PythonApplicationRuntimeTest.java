@@ -1,14 +1,28 @@
 package io.micronaut.context.python;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.filter.ThresholdFilter;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
+import java.lang.ref.Reference;
+import java.lang.ref.WeakReference;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,6 +40,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * closes hands the enclosing one back.
  */
 final class PythonApplicationRuntimeTest {
+
+    /**
+     * Every test starts from, and leaves behind, a JVM in which an application has run and none is on
+     * its way: the permission to bootstrap a context is JVM-wide state.
+     */
+    @BeforeEach
+    @AfterEach
+    void noApplicationIsOnItsWay() {
+        PythonContextRuntime.setReuseContext(false);
+        PythonContextRuntime.resetContext();
+        PythonEntryPointPermission.applicationRecorded();
+    }
 
     @Test
     void theRuntimeBeanIsBoundToThePrimaryContextAndThePoolRegistersThere() {
@@ -222,6 +248,262 @@ final class PythonApplicationRuntimeTest {
         assertClosed(bootstrapped, "the bootstrapped context is closed when it is dropped");
         assertThrows(IllegalStateException.class, () -> Context.newBuilder(PYTHON).engine(engine).build(),
             "the engine created for the bootstrapped context is closed with it");
+    }
+
+    /**
+     * Before the first application of the JVM nothing can be a leftover reference, so a reflective
+     * no-arg instantiation gets a context without any builder on its way, and the application that
+     * starts next adopts it.
+     */
+    @Test
+    void anEntryPointBeforeTheFirstApplicationOfTheJvmBootstrapsAContext() {
+        PythonEntryPointPermission.reset();
+
+        Context bootstrapped = PythonContextRuntime.getContext();
+
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            assertSame(bootstrapped, applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON)));
+        }
+        assertClosed(bootstrapped, "the application closes the context it adopted");
+        assertLeftoverReferenceFails();
+    }
+
+    /**
+     * A builder that is created and abandoned, which is what a test that builds a configuration and
+     * never starts it does, stops being an application on its way once it is collected: a leftover
+     * reference reached afterwards fails instead of building a GraalPy context and an engine that only
+     * a reset would ever close.
+     */
+    @Test
+    void anAbandonedBuilderLeavesNoPermissionBehindOnceItIsCollected() throws InterruptedException {
+        WeakReference<ApplicationContextBuilder> abandoned = new WeakReference<>(ApplicationContext.builder());
+
+        for (int i = 0; i < 100 && abandoned.get() != null; i++) {
+            System.gc();
+            Thread.sleep(20);
+        }
+
+        assertNull(abandoned.get(), "the builder is collected");
+        assertLeftoverReferenceFails();
+    }
+
+    /**
+     * A builder grants the entry points of its own application, which the platform runs on the thread
+     * that fills the builder in: a leftover reference of another application reached on another thread
+     * in the meantime gets nothing.
+     */
+    @Test
+    void aBuilderGrantsNothingToAnotherThread() throws InterruptedException {
+        ApplicationContextBuilder onItsWay = ApplicationContext.builder();
+
+        AtomicReference<@Nullable Throwable> failure = new AtomicReference<>();
+        Thread leftover = new Thread(PythonApplicationRuntimeTest::assertLeftoverReferenceFails);
+        leftover.setUncaughtExceptionHandler((thread, e) -> failure.set(e));
+        leftover.start();
+        leftover.join();
+
+        assertNull(failure.get(), () -> "the other thread bootstrapped a context: " + failure.get());
+        Reference.reachabilityFence(onItsWay);
+    }
+
+    /**
+     * A builder created while another application runs is on its way however that application ends:
+     * the shutdown of the running application takes nothing from it, so its entry point still gets the
+     * context its application adopts.
+     */
+    @Test
+    void aBuilderCreatedWhileAnApplicationRunsKeepsItsPermissionWhenThatApplicationCloses() {
+        ApplicationContextBuilder next;
+        try (ApplicationContext running = ApplicationContext.run()) {
+            assertTrue(running.isRunning());
+            next = ApplicationContext.builder();
+        }
+        assertNull(PythonApplicationRuntime.current(), "no application is running");
+
+        Context bootstrapped = PythonContextRuntime.getContext();
+
+        try (ApplicationContext applicationContext = next.start()) {
+            assertSame(bootstrapped, applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON)),
+                "the application adopts the context its entry point was given");
+        }
+        assertClosed(bootstrapped, "the application closes the context it adopted");
+    }
+
+    /**
+     * A builder that produced its application has nothing on its way any more, even though the
+     * application context keeps it reachable and whichever thread started it.
+     */
+    @Test
+    void aBuilderThatProducedItsApplicationGrantsNothingAfterThatApplicationClosed() throws InterruptedException {
+        ApplicationContextBuilder builder = ApplicationContext.builder();
+
+        AtomicReference<@Nullable Throwable> failure = new AtomicReference<>();
+        Thread starter = new Thread(() -> builder.start().close());
+        starter.setUncaughtExceptionHandler((thread, e) -> failure.set(e));
+        starter.start();
+        starter.join();
+
+        assertNull(failure.get(), () -> "the application failed: " + failure.get());
+        assertLeftoverReferenceFails();
+        Reference.reachabilityFence(builder);
+    }
+
+    /**
+     * A reset takes the JVM back to no application running, which grants nothing: generated code
+     * reached after it is a leftover reference exactly as it was before the reset.
+     */
+    @Test
+    void aResetAfterAnApplicationClosedGrantsNothing() {
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            assertTrue(applicationContext.isRunning());
+        }
+        assertLeftoverReferenceFails();
+
+        PythonContextRuntime.resetContext();
+
+        assertLeftoverReferenceFails();
+    }
+
+    /**
+     * A reset also ends what the calling thread had on its way, so a builder it abandoned is not an
+     * application on its way until the collector gets to it.
+     */
+    @Test
+    void aResetRevokesTheBuilderOfTheCallingThread() {
+        ApplicationContextBuilder abandoned = ApplicationContext.builder();
+
+        PythonContextRuntime.resetContext();
+
+        assertLeftoverReferenceFails();
+        Reference.reachabilityFence(abandoned);
+    }
+
+    /**
+     * With context reuse the context belongs to the JVM rather than to an application: the applications
+     * that use a bootstrapped context neither adopt it nor close it. It stays the bootstrapped one, so
+     * it is closed with its engine when it is finally dropped, since no application ever will.
+     */
+    @Test
+    void contextReuseKeepsABootstrappedContextOutOfEveryApplication() {
+        ApplicationContextBuilder builder = ApplicationContext.builder();
+        Context bootstrapped = PythonContextRuntime.getContext();
+        Engine engine = bootstrapped.getEngine();
+        PythonContextRuntime.setReuseContext(true);
+        try {
+            try (ApplicationContext first = builder.start()) {
+                assertSame(bootstrapped, first.getBean(Context.class, Qualifiers.byName(PYTHON)));
+            }
+            assertEquals(3, bootstrapped.eval(PYTHON, "1 + 2").asInt(), "the application leaves the reused context open");
+            assertSame(bootstrapped, PythonContextRuntime.getContext(), "the reused context stays installed");
+            try (ApplicationContext second = ApplicationContext.run()) {
+                assertSame(bootstrapped, second.getBean(Context.class, Qualifiers.byName(PYTHON)));
+            }
+            PythonContextRuntime.resetContext();
+            assertSame(bootstrapped, PythonContextRuntime.getContext(), "with reuse a reset only reloads the modules");
+        } finally {
+            PythonContextRuntime.setReuseContext(false);
+        }
+
+        PythonContextRuntime.resetContext();
+
+        assertNull(PythonApplicationRuntime.current());
+        assertClosed(bootstrapped, "the context is closed when it is dropped");
+        assertThrows(IllegalStateException.class, () -> Context.newBuilder(PYTHON).engine(engine).build(),
+            "the engine created for the context is closed with it");
+    }
+
+    /**
+     * The configuration of an application that adopts a bootstrapped context was not applied to that
+     * context: the adoption still happens, and the application is told what it lost.
+     */
+    @Test
+    void anApplicationThatAdoptsAContextIsWarnedAboutTheConfigurationNotAppliedToIt() {
+        ListAppender<ILoggingEvent> warnings = captureWarnings(GraalPyContextFactory.class);
+        try {
+            ApplicationContextBuilder builder = ApplicationContext.builder().properties(Map.of(
+                "graalpy.context.options.python.DontWriteBytecodeFlag", "true",
+                "graalpy.context.host-class-lookup", List.of("com.example")
+            ));
+            Context bootstrapped = PythonContextRuntime.getContext();
+            try (ApplicationContext applicationContext = builder.start()) {
+                assertSame(bootstrapped, applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON)),
+                    "the application adopts the context despite its configuration");
+            }
+            assertEquals(1, warnings.list.size(), () -> warnings.list.toString());
+            String warning = warnings.list.getFirst().getFormattedMessage();
+            assertTrue(warning.contains("graalpy.context.options [python.DontWriteBytecodeFlag]"), warning);
+            assertTrue(warning.contains("graalpy.context.host-class-lookup [com.example]"), warning);
+            assertTrue(warning.contains("are not applied"), warning);
+        } finally {
+            stopCapturing(GraalPyContextFactory.class, warnings);
+        }
+    }
+
+    /**
+     * An application with nothing of its own to lose adopts the context silently.
+     */
+    @Test
+    void anApplicationWithTheDefaultConfigurationAdoptsAContextWithoutAWarning() {
+        ListAppender<ILoggingEvent> warnings = captureWarnings(GraalPyContextFactory.class);
+        try {
+            ApplicationContextBuilder builder = ApplicationContext.builder();
+            Context bootstrapped = PythonContextRuntime.getContext();
+            try (ApplicationContext applicationContext = builder.start()) {
+                assertSame(bootstrapped, applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON)));
+            }
+            assertTrue(warnings.list.isEmpty(), () -> warnings.list.toString());
+        } finally {
+            stopCapturing(GraalPyContextFactory.class, warnings);
+        }
+    }
+
+    /**
+     * A context bootstrapped by another class loader is not the one this application would have
+     * built: the application builds its own, is told so, and the first context stays with the entry
+     * point until it is dropped.
+     */
+    @Test
+    void anApplicationFromAnotherClassLoaderBuildsItsOwnContextAndIsWarned() {
+        ListAppender<ILoggingEvent> warnings = captureWarnings(PythonApplicationRuntime.class);
+        try {
+            ApplicationContextBuilder builder = ApplicationContext.builder()
+                .classLoader(new URLClassLoader(new URL[0], PythonApplicationRuntimeTest.class.getClassLoader()));
+            Context bootstrapped = PythonContextRuntime.getContext();
+            try (ApplicationContext applicationContext = builder.start()) {
+                Context own = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
+                assertNotSame(bootstrapped, own, "the application builds a context of its own");
+                assertSame(own, PythonContextRuntime.getContext());
+            }
+            assertEquals(1, warnings.list.size(), () -> warnings.list.toString());
+            assertTrue(warnings.list.getFirst().getFormattedMessage().contains("builds a second context"), () -> warnings.list.toString());
+            assertSame(bootstrapped, PythonContextRuntime.getContext(), "the first context stays with the entry point");
+            assertEquals(3, bootstrapped.eval(PYTHON, "1 + 2").asInt());
+        } finally {
+            stopCapturing(PythonApplicationRuntime.class, warnings);
+        }
+    }
+
+    private static void assertLeftoverReferenceFails() {
+        IllegalStateException e = assertThrows(IllegalStateException.class, PythonContextRuntime::getContext,
+            "a leftover reference bootstrapped a context");
+        assertTrue(e.getMessage().startsWith("GraalPy context has not been initialized"), e.getMessage());
+        assertFalse(PythonContextRuntime.isInitialized(), "no context was bootstrapped for the leftover reference");
+    }
+
+    private static ListAppender<ILoggingEvent> captureWarnings(Class<?> loggingClass) {
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.addFilter(new ThresholdFilter() {{
+            setLevel("WARN");
+            start();
+        }});
+        appender.start();
+        ((Logger) LoggerFactory.getLogger(loggingClass)).addAppender(appender);
+        return appender;
+    }
+
+    private static void stopCapturing(Class<?> loggingClass, ListAppender<ILoggingEvent> appender) {
+        ((Logger) LoggerFactory.getLogger(loggingClass)).detachAppender(appender);
+        appender.stop();
     }
 
     /**
