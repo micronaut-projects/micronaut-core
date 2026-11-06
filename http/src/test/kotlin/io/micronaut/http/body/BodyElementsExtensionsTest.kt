@@ -16,6 +16,7 @@
 package io.micronaut.http.body
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onCompletion
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.util.Optional
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
@@ -86,6 +88,8 @@ class BodyElementsExtensionsTest {
     private fun assertUndeliveredElementIsClosed(failingClose: Boolean) {
         val emitted = mutableListOf<Element>()
         val second = CompletableDeferred<Unit>()
+        // one thread: a task of the executor runs once the flow suspended
+        val executor = Executors.newSingleThreadExecutor()
         val elements = flow {
             var n = 0
             while (true) {
@@ -96,13 +100,16 @@ class BodyElementsExtensionsTest {
                 }
                 emit(element)
             }
-        }.asBodyElements()
+        }.asBodyElements(executor.asCoroutineDispatcher())
         val first = elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS).get()
         // the flow offers the second element, which nobody takes
         val offered = java.util.concurrent.CompletableFuture<Unit>()
         second.invokeOnCompletion { offered.complete(Unit) }
         offered.get(10, TimeUnit.SECONDS)
+        // the element reached the channel: an emit that a close cancelled before would drop it unseen
+        executor.submit { }.get(10, TimeUnit.SECONDS)
         elements.close()
+        executor.shutdown()
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
         while (!synchronized(emitted) { emitted[1].closed } && System.nanoTime() < deadline) {
             Thread.sleep(10)
