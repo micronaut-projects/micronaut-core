@@ -35,4 +35,14 @@ public interface OutboundAccess extends NettyWriteContext {
      * unrecoverable error that may corrupt future requests. This method has no effect on HTTP/2.
      */
     void closeAfterWrite();
+
+    /**
+     * Give up on the response of this request, after writing it failed in a way that may have
+     * left a part of it on the connection, so that no other response can be written in its
+     * place: HTTP/1.1 closes the connection, HTTP/2 resets the stream. Does nothing if the
+     * response was written completely.
+     *
+     * @since 5.2.16
+     */
+    void abort();
 }

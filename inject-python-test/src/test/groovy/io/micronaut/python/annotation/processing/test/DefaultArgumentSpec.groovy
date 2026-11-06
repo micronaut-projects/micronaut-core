@@ -45,6 +45,36 @@ class Greeter:
         }
     }
 
+    void "positional-only parameters are parameters of the method, with their defaults aligned"() {
+        expect:
+        buildClassElement('''
+class Lookup:
+    def lookup(self, key: str, /, suffix: str = ".") -> str:
+        return key + suffix
+
+    def lookup_defaulted(self, key: str, scope: str = "global", /, suffix: str = ".", times: int = 1) -> str:
+        return key + suffix
+
+    def only(self, key: str, count: int = 1, /) -> str:
+        return key
+''') { ClassElement element ->
+            def lookup = element.findMethod("lookup").get()
+            assert lookup.parameters*.name == ["key", "suffix"]
+            assert lookup.parameters*.type*.name == ["java.lang.String", "java.lang.String"]
+            assert !lookup.parameters[0].hasDefault()
+            assert lookup.parameters[1].hasDefault()
+
+            def defaulted = element.findMethod("lookup_defaulted").get()
+            assert defaulted.parameters*.name == ["key", "scope", "suffix", "times"]
+            assert defaulted.parameters*.hasDefault() == [false, true, true, true]
+
+            def only = element.findMethod("only").get()
+            assert only.parameters*.name == ["key", "count"]
+            assert only.parameters*.hasDefault() == [false, true]
+            return element
+        }
+    }
+
     void "a defaulted parameter on an executable method is optional at the injection point"() {
         given:
         def definition = buildBeanDefinition("python", "GreeterService", '''

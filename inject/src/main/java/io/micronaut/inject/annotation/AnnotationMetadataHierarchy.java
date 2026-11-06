@@ -156,6 +156,13 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     /**
+     * @return Whether the declared accessors treat every element of the hierarchy as declared
+     */
+    boolean isDelegateDeclaredToAllElements() {
+        return delegateDeclaredToAllElements;
+    }
+
+    /**
      * @return The metadata that is actually declared in the element
      */
     public AnnotationMetadata getRootMetadata() {

@@ -74,7 +74,10 @@ final class ThrowableSuperConstructor {
      * @throws ProcessingException When no constructor of the base matches the super call
      */
     static ThrowableSuperConstructor resolve(ClassElement element, ClassElement superType, PythonVisitorContext visitorContext) {
-        List<SuperArgumentDef> superArguments = superArguments(element);
+        // Native Python exceptions accept arbitrary args, not the Java wrapper's constructor args.
+        boolean nativeException = element instanceof AbstractPythonClassElement pythonClass
+            && pythonClass.getNativeType().bases().stream().anyMatch(base -> base.nativeException());
+        List<SuperArgumentDef> superArguments = nativeException ? null : superArguments(element);
         List<ConstructorElement> constructors = superType.getAccessibleConstructors()
             .stream()
             .filter(candidate -> candidate.isPublic() || candidate.isProtected() || candidate.getDeclaringType().getPackageName().equals(element.getPackageName()))

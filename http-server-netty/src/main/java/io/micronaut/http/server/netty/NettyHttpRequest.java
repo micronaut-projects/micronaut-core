@@ -189,6 +189,10 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private Object legacyBody;
     @Nullable
     private List<Runnable> disposalResources;
+    /**
+     * Set once {@link #release()} ran. Guarded by {@code this}, like {@link #disposalResources}.
+     */
+    private boolean released;
     @Nullable
     private ParsedFormType parsedFormType;
 
@@ -406,8 +410,14 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         if (attributes != null) {
             attributes.forEach(NettyHttpRequest::cleanup);
         }
-        if (disposalResources != null) {
-            for (Runnable r : disposalResources) {
+        List<Runnable> toDispose;
+        synchronized (this) {
+            released = true;
+            toDispose = disposalResources;
+            disposalResources = null;
+        }
+        if (toDispose != null) {
+            for (Runnable r : toDispose) {
                 r.run();
             }
         }
@@ -720,8 +730,9 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     public @NonNull Flux<RawFormField> getRawFormFields(ByteBody byteBody) {
         NettyHttpServerConfiguration nhsc = (NettyHttpServerConfiguration) serverConfiguration;
         long undecodedLimit = Math.min(nhsc.getFieldMaxBufferedBytes(), nhsc.getFormMaxBufferedBytes());
+        Charset charset = getCharacterEncoding();
         PostBodyDecoder.Builder builder = PostBodyDecoder.builder()
-            .charset(getCharacterEncoding())
+            .charset(charset)
             .maxFields(nhsc.getFormMaxFields())
             .enableQuirks(nhsc.getFormDecoderQuirks().toArray(new DecoderQuirk[0]))
             .undecodedLimit(undecodedLimit > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) undecodedLimit);
@@ -737,6 +748,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
         return new FormDemuxer(
             decoder,
+            formType instanceof NettyHttpRequest.FormTypeMultipart multipart ? multipart.boundary() : null,
+            charset,
             channelHandlerContext.channel(),
             new BodySizeLimits(nhsc.getFieldMaxBytes(), nhsc.getFieldMaxBufferedBytes()),
             new BodySizeLimits(nhsc.getFormMaxBytes(), nhsc.getFormMaxBufferedBytes()),
@@ -791,11 +804,18 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
-    public synchronized void addDisposalResource(Runnable dispose) {
-        if (disposalResources == null) {
-            disposalResources = new ArrayList<>(1);
+    public void addDisposalResource(Runnable dispose) {
+        synchronized (this) {
+            if (!released) {
+                if (disposalResources == null) {
+                    disposalResources = new ArrayList<>(1);
+                }
+                disposalResources.add(dispose);
+                return;
+            }
         }
-        disposalResources.add(dispose);
+        // the request is already released, nobody would run this later
+        dispose.run();
     }
 
     private sealed interface FormType {

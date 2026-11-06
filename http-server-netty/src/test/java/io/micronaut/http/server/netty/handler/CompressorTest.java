@@ -38,7 +38,8 @@ class CompressorTest {
 
     /**
      * Reference implementation: the previous split-based tokenizer. The in-place version must
-     * pick the same algorithm for every header.
+     * pick the same algorithm for every header. The selection step follows the weights the same
+     * way {@link Compressor#determineEncoding(java.util.Iterator, Set)} does.
      */
     private static Compressor.Algorithm referenceDetermineEncoding(List<String> headerValues, Set<Compressor.Algorithm> available) {
         boolean brotli = available.contains(Compressor.Algorithm.BR);
@@ -78,37 +79,19 @@ class CompressorTest {
                 }
             }
         }
-        if (brQ > 0.0f || zstdQ > 0.0f || snappyQ > 0.0f || gzipQ > 0.0f || deflateQ > 0.0f) {
-            if (brQ != -1.0f && brQ >= zstdQ && brotli) {
-                return Compressor.Algorithm.BR;
-            } else if (zstdQ != -1.0f && zstdQ >= snappyQ && zstd) {
-                return Compressor.Algorithm.ZSTD;
-            } else if (snappyQ != -1.0f && snappyQ >= gzipQ && snappy) {
-                return Compressor.Algorithm.SNAPPY;
-            } else if (gzipQ != -1.0f && gzipQ >= deflateQ && gzip) {
-                return Compressor.Algorithm.GZIP;
-            } else if (deflateQ != -1.0f && deflate) {
-                return Compressor.Algorithm.DEFLATE;
+        // selection by weight (RFC 9110 12.4.2): q=0 is not acceptable, the order breaks ties
+        float[] weights = {brQ, zstdQ, snappyQ, gzipQ, deflateQ};
+        boolean[] enabled = {brotli, zstd, snappy, gzip, deflate};
+        Compressor.Algorithm best = null;
+        float bestQ = 0.0f;
+        for (int i = 0; i < weights.length; i++) {
+            float q = weights[i] == -1.0f ? starQ : weights[i];
+            if (enabled[i] && q > bestQ) {
+                best = Compressor.Algorithm.values()[i];
+                bestQ = q;
             }
         }
-        if (starQ > 0.0f) {
-            if (brQ == -1.0f && brotli) {
-                return Compressor.Algorithm.BR;
-            }
-            if (zstdQ == -1.0f && zstd) {
-                return Compressor.Algorithm.ZSTD;
-            }
-            if (snappyQ == -1.0f && snappy) {
-                return Compressor.Algorithm.SNAPPY;
-            }
-            if (gzipQ == -1.0f && gzip) {
-                return Compressor.Algorithm.GZIP;
-            }
-            if (deflateQ == -1.0f && deflate) {
-                return Compressor.Algorithm.DEFLATE;
-            }
-        }
-        return null;
+        return best;
     }
 
     /**
@@ -146,6 +129,55 @@ class CompressorTest {
         Compressor compressor = new Compressor(STRATEGY);
         assertEquals(Compressor.Algorithm.GZIP, compressor.determineEncoding(List.of("gzip").iterator()));
         assertEquals(Compressor.Algorithm.SNAPPY, compressor.determineEncoding(List.of("snappy").iterator()));
+    }
+
+    /**
+     * An explicit {@code q=0} marks an encoding as not acceptable (RFC 9110 12.4.2), and the
+     * encoding with the highest weight wins; the algorithm order only breaks ties.
+     */
+    @ParameterizedTest
+    @MethodSource
+    void determineEncodingHonoursWeights(String header, Compressor.Algorithm expected) {
+        Set<Compressor.Algorithm> all = EnumSet.allOf(Compressor.Algorithm.class);
+        assertEquals(expected, Compressor.determineEncoding(List.of(header).iterator(), all), header);
+    }
+
+    private static Stream<Arguments> determineEncodingHonoursWeights() {
+        return Stream.of(
+            // q=0 is never selected
+            Arguments.of("br;q=0, gzip;q=1", Compressor.Algorithm.GZIP),
+            Arguments.of("br;q=0, gzip", Compressor.Algorithm.GZIP),
+            Arguments.of("zstd;q=0, gzip", Compressor.Algorithm.GZIP),
+            Arguments.of("snappy;q=0, deflate", Compressor.Algorithm.DEFLATE),
+            Arguments.of("gzip;q=0", null),
+            Arguments.of("br;q=0, gzip;q=0", null),
+            Arguments.of("br;q=0, *", Compressor.Algorithm.ZSTD),
+            Arguments.of("br;q=0, zstd;q=0, snappy;q=0, gzip;q=0, deflate;q=0, *", null),
+            // the highest weight wins, not only against the next algorithm in the order
+            Arguments.of("br;q=0.1, gzip;q=1", Compressor.Algorithm.GZIP),
+            Arguments.of("br;q=0.1, zstd;q=0.2, deflate;q=0.9", Compressor.Algorithm.DEFLATE),
+            Arguments.of("zstd;q=0.5, deflate;q=0.6", Compressor.Algorithm.DEFLATE),
+            Arguments.of("snappy;q=0.3, gzip;q=0.4", Compressor.Algorithm.GZIP),
+            Arguments.of("deflate;q=0.5, gzip;q=1.0", Compressor.Algorithm.GZIP),
+            Arguments.of("deflate;q=1.0, gzip;q=0.5", Compressor.Algorithm.DEFLATE),
+            // ties keep the current preference: br, zstd, snappy, gzip, deflate
+            Arguments.of("gzip, deflate, br", Compressor.Algorithm.BR),
+            Arguments.of("deflate, gzip", Compressor.Algorithm.GZIP),
+            Arguments.of("deflate;q=0.5, zstd;q=0.5, gzip;q=0.5", Compressor.Algorithm.ZSTD),
+            Arguments.of("zstd;q=0.5, br;q=0.5", Compressor.Algorithm.BR),
+            Arguments.of("snappy, zstd", Compressor.Algorithm.ZSTD),
+            Arguments.of("*", Compressor.Algorithm.BR),
+            Arguments.of("br;q=0.9, gzip;q=0.8, *;q=0.1", Compressor.Algorithm.BR)
+        );
+    }
+
+    @Test
+    void anUnavailableAlgorithmFallsBackToTheNextHighestWeight() {
+        Set<Compressor.Algorithm> gzipAndDeflate = EnumSet.of(Compressor.Algorithm.GZIP, Compressor.Algorithm.DEFLATE);
+        // deflate is preferred but unavailable, gzip is acceptable
+        assertEquals(Compressor.Algorithm.GZIP, Compressor.determineEncoding(List.of("deflate;q=1.0, gzip;q=0.5").iterator(), EnumSet.of(Compressor.Algorithm.GZIP)));
+        assertEquals(Compressor.Algorithm.DEFLATE, Compressor.determineEncoding(List.of("br;q=1, gzip;q=0.2, deflate;q=0.4").iterator(), gzipAndDeflate));
+        assertNull(Compressor.determineEncoding(List.of("br, gzip;q=0").iterator(), gzipAndDeflate));
     }
 
     /**

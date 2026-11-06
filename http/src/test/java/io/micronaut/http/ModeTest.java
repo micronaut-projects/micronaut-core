@@ -33,14 +33,15 @@ class ModeTest {
      * The mode values the specification lists, so that this enum drifting away from the
      * specification fails here rather than silently dropping metadata at runtime.
      *
-     * @see <a href="https://www.w3.org/TR/fetch-metadata/#sec-fetch-mode-header">Mode</a>
+     * @see <a href="https://fetch.spec.whatwg.org/#concept-request-mode">Request mode</a>
      */
     private static final Set<String> SPECIFICATION_VALUES = Set.of(
         "same-origin",
         "no-cors",
         "cors",
         "navigate",
-        "websocket"
+        "websocket",
+        "webtransport"
     );
 
     @Test

@@ -14,8 +14,8 @@ from .BackendClient import BackendClient
 String = java.type("java.lang.String")
 
 
-# Constructor injection on a bean with async methods: the event-loop context needs its own instance
-# of the controller, created with the same dependencies.
+# Constructor injection on a bean with async methods: its Java dependencies are adapted so their async
+# results can be awaited.
 @Requires(property="spec.name", value="PythonAsyncioSpec")
 @Controller("/async-constructor")
 class AsyncConstructorController:

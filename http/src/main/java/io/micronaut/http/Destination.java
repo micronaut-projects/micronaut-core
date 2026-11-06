@@ -25,6 +25,10 @@ import org.jspecify.annotations.Nullable;
  * destination absent from it. {@link #of(String)} answers {@code null} for such a value, and
  * {@link SecFetch} keeps the rest of the metadata readable rather than discarding it.
  *
+ * <p>The list covers the destinations of the Fetch Standard, those that other specifications add
+ * to it, and the ones shipping browsers send on the wire. Each constant that comes from outside
+ * the Fetch Standard documents its source.
+ *
  * @see <a href="https://www.w3.org/TR/fetch-metadata/#sec-fetch-dest-header">Sec-Fetch-Dest</a>
  * @see <a href="https://fetch.spec.whatwg.org/#concept-request-destination">Request destination</a>
  * @since 5.1.12
@@ -33,8 +37,20 @@ public enum Destination {
     EMPTY("empty"),
     AUDIO("audio"),
     AUDIOWORKLET("audioworklet"),
+    /**
+     * The fetch of a {@code <link rel="compression-dictionary">} resource.
+     *
+     * @see <a href="https://html.spec.whatwg.org/multipage/links.html#link-type-compression-dictionary">HTML: link type "compression-dictionary"</a>
+     * @since 5.2.16
+     */
+    COMPRESSION_DICTIONARY("compression-dictionary"),
     DOCUMENT("document"),
     EMBED("embed"),
+    /**
+     * The navigation of a {@code <fencedframe>} element.
+     *
+     * @see <a href="https://wicg.github.io/fenced-frame/#new-request-destination">Fenced Frame</a>
+     */
     FENCEDFRAME("fencedframe"),
     FONT("font"),
     FRAME("frame"),
@@ -48,12 +64,34 @@ public enum Destination {
     SCRIPT("script"),
     SERVICEWORKER("serviceworker"),
     SHAREDWORKER("sharedworker"),
+    /**
+     * The fetch of a speculation rules resource.
+     *
+     * @see <a href="https://wicg.github.io/nav-speculation/speculation-rules.html#fetch-destination">Speculation Rules</a>
+     */
     SPECULATIONRULES("speculationrules"),
     STYLE("style"),
     TEXT("text"),
     TRACK("track"),
     VIDEO("video"),
+    /**
+     * The fetch of a web bundle from a {@code <script type="webbundle">} element.
+     *
+     * @see <a href="https://wicg.github.io/webpackage/subresource-loading.html">Subresource Loading with Web Bundles</a>
+     * @since 5.2.16
+     */
+    WEBBUNDLE("webbundle"),
     WEBIDENTITY("webidentity"),
+    /**
+     * A WebTransport session handshake. The Fetch Standard gives such a request the empty
+     * destination and the {@link Mode#WEBTRANSPORT} mode, but Firefox reports the handshake with
+     * this destination instead, so it is listed to classify what arrives on the wire.
+     *
+     * @see <a href="https://fetch.spec.whatwg.org/#concept-request-destination">Fetch Standard: request destination</a>
+     * @see <a href="https://searchfox.org/mozilla-central/search?q=webtransport&path=">Firefox implementation reference</a>
+     * @since 5.2.16
+     */
+    WEBTRANSPORT("webtransport"),
     WORKER("worker"),
     XSLT("xslt");
 

@@ -1,6 +1,11 @@
 package io.micronaut.python.annotation.processing.test.reactive
 
+import io.micronaut.context.python.PythonContextRuntime
+import io.micronaut.email.AsyncEmailSender
+import io.micronaut.email.DefaultAsyncEmailSender
+import io.micronaut.http.client.HttpClient
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
+import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
@@ -8,6 +13,100 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
 class ReactiveReturnTypeSpec extends AbstractPythonTypeElementSpec {
+
+    void "python coroutine implementing Publisher interface emits scalar to injected Python caller"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test.reactive import PublisherFinder
+
+@Singleton
+class AsyncFinder(PublisherFinder):
+    async def find(self, id: str, callback=None) -> str:
+        return id
+
+@Singleton
+class AsyncCaller:
+    def __init__(self, finder: PublisherFinder):
+        self.finder = finder
+
+    async def call(self) -> str:
+        return await self.finder.find("from-python")
+''', true)
+
+        when:
+        PublisherFinder finder = context.getBean(PublisherFinder)
+        def caller = getBean(context, 'python.AsyncCaller')
+
+        then:
+        Flux.from(finder.find("from-java")).blockFirst() == "from-java"
+        caller.call().toCompletableFuture().get() == "from-python"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "reuse-context HTTP controller awaits DefaultAsyncEmailSender delegation"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Named, Singleton
+from io.micronaut.email import AsyncEmailSender, AsyncTransactionalEmailSender, Email
+from micronaut.http.annotation import Controller, Get
+
+class AcceptedResponse:
+    def getStatusCode(self) -> int:
+        return 202
+
+@Singleton
+@Named("sendgrid")
+class EmailSenderReplacement(AsyncTransactionalEmailSender):
+    def getName(self) -> str:
+        return "sendgrid"
+
+    async def sendAsync(self, email: Email, email_request=None) -> AcceptedResponse:
+        return AcceptedResponse()
+
+@Controller("/email-async")
+class EmailController:
+    def __init__(self, sender: AsyncEmailSender):
+        self.sender = sender
+
+    @Get
+    async def send(self) -> str:
+        email = (
+            Email.builder()
+            .from_("sender@example.com")
+            .to("test@example.com")
+            .subject("test")
+            .body("body")
+        )
+        response = await self.sender.sendAsync(email)
+        return str(response.getStatusCode())
+
+''', true)
+
+        PythonContextRuntime.setReuseContext(true)
+        assert context.getBean(AsyncEmailSender) instanceof DefaultAsyncEmailSender
+        def server = context.getBean(EmbeddedServer)
+        server.start()
+        def client = context.createBean(HttpClient, server.URL)
+
+        when:
+        def result
+        try {
+            result = client.toBlocking().retrieve("/email-async")
+        } catch (io.micronaut.http.client.exceptions.HttpClientResponseException error) {
+            result = error.response.getBody(String).orElse(error.message)
+        }
+
+        then:
+        result == "202"
+
+        cleanup:
+        client?.close()
+        context?.close()
+        PythonContextRuntime.setReuseContext(false)
+    }
 
     void "python implementation of Mono and Flux interface methods returning Reactor types"() {
         given:

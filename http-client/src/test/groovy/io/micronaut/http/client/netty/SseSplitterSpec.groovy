@@ -52,4 +52,44 @@ class SseSplitterSpec extends Specification {
         ['fo', 'o\n\n']      | ['foo', '']
         ['fo', 'o\nbar\n']   | ['foo', 'bar']
     }
+
+    def 'partial line is released on cancel'() {
+        given:
+        ByteBuf input = Unpooled.copiedBuffer('foo\nba', StandardCharsets.UTF_8)
+
+        when:
+        def first = SseSplitter
+                .split(Flux.just(input).concatWith(Flux.never()), BodySizeLimits.UNLIMITED)
+                .next()
+                .block()
+
+        then:
+        first.toString(StandardCharsets.UTF_8) == 'foo'
+        input.refCnt() == 0
+
+        cleanup:
+        first?.release()
+    }
+
+    def 'partial line is released when the line limit is exceeded'() {
+        given:
+        // retain once more so that a double release is visible in the reference count
+        ByteBuf a = Unpooled.copiedBuffer('fo', StandardCharsets.UTF_8).retain()
+        ByteBuf b = Unpooled.copiedBuffer('obarbaz\n', StandardCharsets.UTF_8).retain()
+
+        when:
+        SseSplitter
+                .split(Flux.just(a, b), new BodySizeLimits(Long.MAX_VALUE, 5))
+                .collectList()
+                .block()
+
+        then:
+        thrown(io.micronaut.http.client.exceptions.ContentLengthExceededException)
+        a.refCnt() == 1
+        b.refCnt() == 1
+
+        cleanup:
+        a.release()
+        b.release()
+    }
 }

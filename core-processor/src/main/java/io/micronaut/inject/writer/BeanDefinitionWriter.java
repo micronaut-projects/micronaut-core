@@ -713,7 +713,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private String proxyBeanDefinitionName, proxyBeanTypeName;
 
-    private final OriginatingElements originatingElements;
+    private OriginatingElements originatingElements;
 
     private ClassDef.ClassDefBuilder classDefBuilder;
 
@@ -2368,20 +2368,22 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 .ofType(arrayOfClasses)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
                 .build();
-            initStatements.add(
-                beanDefinitionTypeDef.getStaticField(indexesField).put(
-                    arrayOfClasses.instantiate(
-                        indexes.stream().map(av -> asClassExpression(av.stringValue().orElseThrow())).toArray(ExpressionDef[]::new)
+            VariableDef.StaticField staticFieldIndexes = beanDefinitionTypeDef.getStaticField(indexesField);
+            // Like the exposed types, the indexes only make the bean enumerable, so a missing type does not fail the bean
+            statements.add(StatementDef.doTry(
+                    staticFieldIndexes.put(
+                        arrayOfClasses.instantiate(
+                            indexes.stream().map(av -> asClassExpression(av.stringValue().orElseThrow())).toArray(ExpressionDef[]::new)
+                        )
                     )
-                )
+                ).doCatch(Throwable.class,
+                    exceptionVar -> staticFieldIndexes.put(arrayOfClasses.instantiate()))
             );
 
             classDefBuilder.addField(indexesField);
             classDefBuilder.addMethod(
                 MethodDef.override(GET_INDEXES_METHOD).build((aThis, methodParameters) -> aThis.type().getStaticField(indexesField).returning())
             );
-
-            failStatements.add(beanDefinitionTypeDef.getStaticField(indexesField).put(arrayOfClasses.instantiate()));
         }
 
         statements.add(
@@ -4936,6 +4938,16 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     @Override
     public void addOriginatingElement(Element element) {
         originatingElements.addOriginatingElement(element);
+    }
+
+    /**
+     * Makes the given element the only originating element of the definition. The executable methods and the proxies
+     * of the definition take the originating elements when they are created, so this has to be called before.
+     *
+     * @param element The originating element
+     */
+    void setOriginatingElement(Element element) {
+        originatingElements = OriginatingElements.of(element);
     }
 
     /**
