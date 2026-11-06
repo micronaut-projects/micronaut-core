@@ -56,6 +56,14 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
 
     private final boolean specific;
     /**
+     * Whether the argument of a specific binder is annotated with {@link QueryValue}.
+     */
+    private final boolean hasQueryValue;
+    /**
+     * Whether the argument of a specific binder is annotated with {@link Format}.
+     */
+    private final boolean hasFormat;
+    /**
      * The introspection of the argument type of a specific binder, resolved on the first POJO binding:
      * {@link #NOT_RESOLVED}, {@link #NO_INTROSPECTION} or the introspection.
      */
@@ -70,6 +78,8 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
     public QueryValueArgumentBinder(ConversionService conversionService) {
         super(conversionService);
         this.specific = false;
+        this.hasQueryValue = false;
+        this.hasFormat = false;
     }
 
     /**
@@ -81,6 +91,9 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
     public QueryValueArgumentBinder(ConversionService conversionService, Argument<T> argument) {
         super(conversionService, argument);
         this.specific = true;
+        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        this.hasQueryValue = annotationMetadata.hasAnnotation(QUERY_VALUE);
+        this.hasFormat = annotationMetadata.hasAnnotation(FORMAT);
     }
 
     @Override
@@ -110,7 +123,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
         Argument<T> argument = context.getArgument();
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
 
-        if (source.getMethod().permitsRequestBody() && !annotationMetadata.hasAnnotation(QUERY_VALUE)) {
+        if (source.getMethod().permitsRequestBody() && !(specific ? hasQueryValue : annotationMetadata.hasAnnotation(QUERY_VALUE))) {
             // During the unmatched check avoid requests that don't allow bodies
             return BindingResult.unsatisfied();
         }
@@ -130,7 +143,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
         // First try converting from the ConvertibleMultiValues type and if conversion is successful, return it.
         // Otherwise, use the given uri template to deduce what to do with the variable
         Optional<T> multiValueConversion;
-        if (annotationMetadata.hasAnnotation(FORMAT)) {
+        if (specific ? hasFormat : annotationMetadata.hasAnnotation(FORMAT)) {
             multiValueConversion = conversionService.convert(parameters, context);
         } else {
             multiValueConversion = Optional.empty();

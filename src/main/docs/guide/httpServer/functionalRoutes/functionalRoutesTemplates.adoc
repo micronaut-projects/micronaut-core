@@ -1,11 +1,17 @@
-The `String` templates of the routes are URI templates, unless a group parses them with another template language: `templates(parser)` on a group takes a api:http.uri.RouteTemplateParser[], which parses the templates of the routes and of the locator prefixes of the group into api:http.uri.RouteTemplate[] instances, e.g. the templates of a JAX-RS application. These are experimental SPIs for the integrations of other web frameworks.
+Most applications should use the default URI templates and route selection. The experimental APIs in this section support integrations with other web frameworks that need different matching rules.
 
-The routes of a template language usually also share a api:web.router.spi.RouteMatchSelector[], given with `selectedBy(selector)` on a group or a route. When every route that matches a request has the same selector, the selector chooses among their matches, instead of the Micronaut policy, and may negotiate the media type of the response, which the handler reads with `RouteMatchSelector.selectedMediaType(pathVariables)`. Its `order()` ranks the routes where no selection runs, e.g. among locator routes. When the routes that match have different selectors, or none, the Micronaut policy applies, as it does for every route without a selector.
+=== Custom Template Languages
 
-By default the router gives a selector only the routes whose consumed and produced types are compatible with the content type and the accepted types of the request. A selector that ranks the routes by the path first, as JAX-RS does (section 3.7.2), overrides `selectsMediaTypes()` to return `true`:
+Call `templates(parser)` on a group to provide an api:http.uri.RouteTemplateParser[]. It parses route paths and locator prefixes into api:http.uri.RouteTemplate[] instances.
 
-* The selector is given the matching routes of the method of the request whatever their media types, so it can choose the route of the most specific template first. When that route cannot serve the media types of the request, it returns `Selection.notAcceptable(match)` or `Selection.unsupportedMediaType(match)`: the request is answered with `406` or `415`, with the produced or consumed types of that route, as a failure of that route: the status and error routes of its groups, and of the groups of its locator routes, answer before the global ones, and a static file of the same path is not served. An empty selection is still answered as when no route matches, with `404` or `405`.
-* For example, with `/r/fixed` producing `application/json` and `/r/{x}` producing `text/plain`, `GET /r/fixed` with `Accept: text/plain` is answered with `406` by `/r/fixed`, instead of being routed to `/r/{x}`.
-* When the routes matching a request do not all have that selector, the routes whose media types are not compatible are dropped first, as for other routes.
+=== Custom Route Selection
 
-A locator route accepts every HTTP method. When its selector has an `order()`, the router drops a locator route that a route of the same selector, which is not a locator route, is more specific than for any HTTP method: the request is then routed as if the locator route did not match the path. With a route `GET /items/sub` and a locator route `/items/{id}`, `OPTIONS /items/sub` is answered by the automatic `OPTIONS` response with `Allow: GET, HEAD, OPTIONS` (with `micronaut.server.dispatch-options-requests` enabled) and `POST /items/sub` with `405`, instead of running the locator with `sub` as its id. A path that the more specific route does not match, such as `/items/5/details`, is still located.
+Use `selectedBy(selector)` on a group or route to provide an api:web.router.spi.RouteMatchSelector[]. The selector runs when all matching candidates share the same selector instance. Otherwise, Micronaut's normal matching policy applies.
+
+A selector can also negotiate the response media type. Handlers can read it with `RouteMatchSelector.selectedMediaType(pathVariables)`.
+
+By default, the router removes candidates with incompatible media types before invoking the selector. An integration that must choose by path first can return `true` from `selectsMediaTypes()` and report `Selection.notAcceptable(match)` or `Selection.unsupportedMediaType(match)` for `406` or `415`. Returning no selection instead means no route was found.
+
+For locator precedence, a selector can provide an `order()` comparator. It lets a more specific route take precedence over a locator of the same selector, including when determining allowed methods.
+
+See the API documentation for the full selection contract. Custom selectors cannot be combined with request-body conditions.

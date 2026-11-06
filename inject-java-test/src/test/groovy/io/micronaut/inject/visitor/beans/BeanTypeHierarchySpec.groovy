@@ -322,7 +322,7 @@ class Child<T extends Number> extends Base<T> implements Comparable<Child<T>> {
 ''')
         def hierarchy = introspection.getTypeHierarchy().orElseThrow()
         def classLoader = introspection.beanType.classLoader
-        def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName('test.Child', 'test')).getConstructor().newInstance()
+        def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName('test.Child', 'test', 'Child')).getConstructor().newInstance()
 
         expect: "the record carries what the raw hierarchy does not"
         record.type == introspection.beanType

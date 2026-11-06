@@ -43,14 +43,15 @@ import java.util.concurrent.atomic.AtomicReference;
  * Finds the {@link TypeHierarchy} records a compilation wrote.
  *
  * <p>A record is a generated class, registered as a {@code META-INF/micronaut} service of {@link TypeHierarchy},
- * whose name says which type it describes. A lookup reads the names of the service entries of the class loader,
- * which the service index of a packaged application already holds, and loads the record of the type asked for: no
- * record of another type is loaded, and the class asked about is not read reflectively. A type recorded from several
- * packages has a record in each, and a record written outside the package of the type can have left out super types
- * it could not name ({@link TypeHierarchy#getOmittedSuperTypeNames()}): the record in the package of the type is
- * preferred, otherwise the one that left out the fewest, the first by name among those, whatever order the class path
- * lists them in. The record found is instantiated once: the lookups that follow in the class loader find the same
- * instance, which does not keep the class loader of the record from being collected.</p>
+ * whose name says which type it describes and which top-level class of the compilation recorded it. A lookup reads
+ * the names of the service entries of the class loader, which the service index of a packaged application already
+ * holds, and loads the record of the type asked for: no record of another type is loaded, and the class asked about
+ * is not read reflectively. A type recorded from several classes has a record for each, and a record written outside
+ * the package of the type can have left out super types it could not name
+ * ({@link TypeHierarchy#getOmittedSuperTypeNames()}): a record in the package of the type is preferred, otherwise the
+ * one that left out the fewest, the first by name among those, whatever order the class path lists them in. Each
+ * record found is instantiated once: the lookups that follow in the class loader find the same instance, which does
+ * not keep the class loader of the record from being collected.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -65,6 +66,7 @@ public final class TypeHierarchies {
 
     private static final String SERVICE_NAME = TypeHierarchy.class.getName();
     private static final String RELOCATED_PREFIX = "$$";
+    private static final String ORIGIN_SEPARATOR = "$$";
 
     // the names of the records of a class loader, by the name of the type each describes, the preferred one first, and
     // the records found so far, held weakly: nothing of the index holds a class of the loader, which stays collectable
@@ -146,15 +148,16 @@ public final class TypeHierarchies {
     }
 
     private static @Nullable TypeHierarchy load(String typeName, List<String> recordNames, ClassLoader classLoader) {
-        String ownRecord = recordClassName(typeName, packageOf(typeName));
+        String typePackage = packageOf(typeName);
         TypeHierarchy preferred = null;
         for (String recordName : recordNames) {
             Optional<TypeHierarchy> hierarchy = SoftServiceLoader.load(TypeHierarchy.class, classLoader, recordName::equals).firstAvailable();
             if (hierarchy.isEmpty()) {
                 continue;
             }
-            if (recordName.equals(ownRecord)) {
-                // the record in the package of the type, first in the list, names every class of the package
+            if (packageOf(recordName).equals(typePackage)) {
+                // a record in the package of the type, first in the list, names every class of the package: the
+                // records of the several classes that recorded the type there are the same
                 return once(hierarchy.get());
             }
             // records written from other packages can each have left out other super types: the one that left out
@@ -193,12 +196,8 @@ public final class TypeHierarchies {
     }
 
     /**
-     * The name of the record of a type. A record written into the package of the type is named after the type,
-     * {@code com.example.$Foo$TypeHierarchy} for {@code com.example.Foo}. A record written into another package, as a
-     * record of a public class of a library or of the JDK is, goes into a sub-package of that package named after
-     * the package of the type, with {@code $$} in front of its first segment: {@code com.example.$$java.util.$ArrayList$TypeHierarchy}.
-     * Every segment stays a Java identifier, so no character of a type name is escaped and the type name reads back
-     * without ambiguity; a source package whose segment starts with {@code $$} is not expected.
+     * The name of the record of a type, as written before records were named after the class that recorded them,
+     * see {@link #recordClassName(String, String, String)}. A record of that name is still found.
      *
      * @param typeName      The name of the type
      * @param recordPackage The package the record is written into
@@ -206,6 +205,38 @@ public final class TypeHierarchies {
      */
     @Internal
     public static String recordClassName(String typeName, String recordPackage) {
+        return recordClassName(typeName, recordPackage, null);
+    }
+
+    /**
+     * The name of the record of a type. A record written into the package of the type is named after the type,
+     * {@code com.example.$Foo$TypeHierarchy} for {@code com.example.Foo}. A record written into another package, as a
+     * record of a public class of a library or of the JDK is, goes into a sub-package of that package named after
+     * the package of the type, with {@code $$} in front of its first segment: {@code com.example.$$java.util.$ArrayList$TypeHierarchy}.
+     * Every segment stays a Java identifier, so no character of a type name is escaped and the type name reads back
+     * without ambiguity; a source package whose segment starts with {@code $$} is not expected.
+     *
+     * <p>Each top-level class of a compilation that records a type writes a record of its own, named after it with
+     * {@code $$} in front: {@code com.example.$Foo$TypeHierarchy$$Origin}, its dollar signs replaced by underscores.
+     * The record and its service entry then belong to that class alone, and an incremental compilation that
+     * recompiles or deletes the class drops its record only, not one other classes still need.</p>
+     *
+     * @param typeName      The name of the type
+     * @param recordPackage The package the record is written into
+     * @param originName    The simple name of the top-level class that records the type, or null for a record
+     *                      that belongs to no class
+     * @return The name of the record
+     */
+    @Internal
+    public static String recordClassName(String typeName, String recordPackage, @Nullable String originName) {
+        String recordName = recordClassNameOf(typeName, recordPackage);
+        if (originName == null || originName.isEmpty()) {
+            return recordName;
+        }
+        return recordName + ORIGIN_SEPARATOR + originName.replace('$', '_');
+    }
+
+    private static String recordClassNameOf(String typeName, String recordPackage) {
         int lastDot = typeName.lastIndexOf('.');
         String typePackage = lastDot < 0 ? "" : typeName.substring(0, lastDot);
         String simpleName = typeName.substring(lastDot + 1);
@@ -219,17 +250,26 @@ public final class TypeHierarchies {
     }
 
     /**
-     * The name of the type a record describes, the inverse of {@link #recordClassName(String, String)}.
+     * The name of the type a record describes, the inverse of {@link #recordClassName(String, String, String)}, for
+     * the names with and without the class that recorded the type.
      *
      * @param recordClassName The name of the record
      * @return The name of the type, or {@code null} if the name is not that of a record
      */
     @Internal
     public static @Nullable String recordedTypeName(String recordClassName) {
-        if (!recordClassName.endsWith(RECORD_SUFFIX)) {
+        String name;
+        int origin = recordClassName.lastIndexOf(RECORD_SUFFIX + ORIGIN_SEPARATOR);
+        int originStart = origin + RECORD_SUFFIX.length() + ORIGIN_SEPARATOR.length();
+        if (origin > 0 && originStart < recordClassName.length() && recordClassName.indexOf('$', originStart) < 0
+            && recordClassName.indexOf('.', originStart) < 0) {
+            // the origin, a class name without dollar signs, follows the suffix
+            name = recordClassName.substring(0, origin);
+        } else if (recordClassName.endsWith(RECORD_SUFFIX)) {
+            name = recordClassName.substring(0, recordClassName.length() - RECORD_SUFFIX.length());
+        } else {
             return null;
         }
-        String name = recordClassName.substring(0, recordClassName.length() - RECORD_SUFFIX.length());
         int lastDot = name.lastIndexOf('.');
         String lastSegment = name.substring(lastDot + 1);
         if (lastSegment.length() < 2 || lastSegment.charAt(0) != '$') {
@@ -277,11 +317,11 @@ public final class TypeHierarchies {
         if (index.isEmpty()) {
             return Map.of();
         }
-        // a type can be recorded from several packages, which name what they could: the record in the package of the
-        // type first, then the others by name, whatever order the class path lists them in
+        // a type can be recorded from several classes and packages, which name what they could: the records in the
+        // package of the type first, then the others, each by name, whatever order the class path lists them in
         index.replaceAll((typeName, names) -> {
-            String ownRecord = recordClassName(typeName, packageOf(typeName));
-            names.sort(Comparator.comparing((String name) -> !name.equals(ownRecord)).thenComparing(Comparator.naturalOrder()));
+            String typePackage = packageOf(typeName);
+            names.sort(Comparator.comparing((String name) -> !packageOf(name).equals(typePackage)).thenComparing(Comparator.naturalOrder()));
             return List.copyOf(names);
         });
         return Map.copyOf(index);

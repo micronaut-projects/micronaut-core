@@ -240,6 +240,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                     T converted = isoFormatter.parse(object, query);
                     return Optional.of(converted);
                 } catch (DateTimeParseException ignored) {
+                    // not ISO formatted, fall back to RFC 1123 below
                 }
             }
             // fall back to RFC 1123 date time for compatibility
@@ -272,6 +273,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                     CharSequence converted = isoFormatter.format(object);
                     return Optional.of(converted);
                 } catch (DateTimeException ignored) {
+                    // not formattable as ISO, fall back to RFC 1123 below
                 }
             }
             // fall back to RFC 1123 date time for compatibility
@@ -306,6 +308,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                     T converted = isoFormatter.parse(object.toString(), query);
                     return Optional.of(converted);
                 } catch (DateTimeParseException ignored) {
+                    // not ISO formatted, fall back to RFC 1123 below
                 }
             }
             // fall back to RFC 1123 date time for compatibility

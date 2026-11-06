@@ -60,6 +60,11 @@ public final class TestEventListeners {
             }
 
             @Override
+            public void testsPlanned(long count) {
+                each(all, listener -> listener.testsPlanned(count));
+            }
+
+            @Override
             public void output(TestId test, TestOutput stream, String text) {
                 each(all, listener -> listener.output(test, stream, text));
             }

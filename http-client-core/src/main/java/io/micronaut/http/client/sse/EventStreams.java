@@ -52,6 +52,7 @@ import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -86,7 +87,7 @@ public final class EventStreams {
                                                                    MessageBodyHandlerRegistry handlerRegistry,
                                                                    Argument<B> eventType,
                                                                    long maxBufferSize) {
-        return response(response, handlerRegistry, eventType, maxBufferSize, UnaryOperator.identity());
+        return response(response, handlerRegistry, eventType, maxBufferSize, UnaryOperator.identity(), null);
     }
 
     /**
@@ -100,14 +101,18 @@ public final class EventStreams {
      * @param maxBufferSize   The maximum size of a line, and of the data of one event
      * @param decorate        Decorates a failure of the events like the other failures of the
      *                        client, e.g. with its service id
+     * @param state           The reconnection state to update as the events are delivered, or
+     *                        {@code null}
      * @param <B>             The event data type
      * @return The response, whose body is the events
      */
+    @SuppressWarnings("java:S2095") // the elements own the event reader, and close it
     public static <B> HttpResponse<BodyElements<Event<B>>> response(ByteBodyHttpResponse<?> response,
                                                                    MessageBodyHandlerRegistry handlerRegistry,
                                                                    Argument<B> eventType,
                                                                    long maxBufferSize,
-                                                                   UnaryOperator<HttpClientException> decorate) {
+                                                                   UnaryOperator<HttpClientException> decorate,
+                                                                   @Nullable EventStreamState state) {
         UnaryOperator<Throwable> wrap = error -> wrap(error, decorate);
         CloseableByteBody body = response.byteBody().move();
         try {
@@ -116,7 +121,8 @@ public final class EventStreams {
             BodyElements<Event<B>> elements;
             if (contentType != null && MediaType.TEXT_EVENT_STREAM_TYPE.matches(contentType)) {
                 // the data of each event is JSON
-                elements = new ByteBodyElements<>(body, reader(handlerRegistry, eventType, headers, maxBufferSize), wrap, true);
+                elements = withState(new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize, state),
+                    dataReader(handlerRegistry, eventType, MediaType.APPLICATION_JSON_TYPE, headers)), wrap, true), state);
             } else {
                 // a single body, such as JSON, is one event
                 MediaType mediaType = contentType == null ? MediaType.APPLICATION_JSON_TYPE : contentType;
@@ -160,17 +166,20 @@ public final class EventStreams {
      * @param maxBufferSize The maximum size of a line, of the data of one event, and of a body
      *                      that is not an event stream
      * @param jsonMapper    Supplies the mapper when the event type needs JSON decoding
+     * @param state         The reconnection state to update as the events are delivered, or
+     *                      {@code null}
      * @param <B>           The event data type
      * @return The response, whose body is the events
      */
     public static <B> HttpResponse<BodyElements<Event<B>>> response(HttpResponse<BodyElements<ByteBuffer<?>>> response,
                                                                    Argument<B> eventType,
                                                                    long maxBufferSize,
-                                                                   Supplier<JsonMapper> jsonMapper) {
+                                                                   Supplier<JsonMapper> jsonMapper,
+                                                                   @Nullable EventStreamState state) {
         BodyElements<ByteBuffer<?>> pieces = Objects.requireNonNull(response.body(), "The response has no elements");
         MediaType contentType = response.getContentType().orElse(null);
         boolean events = contentType != null && MediaType.TEXT_EVENT_STREAM_TYPE.matches(contentType);
-        return ElementsResponse.of(response, new PieceEvents<>(pieces, events ? new EventStreamDecoder(maxBufferSize) : null, defaultReader(eventType, jsonMapper), maxBufferSize));
+        return ElementsResponse.of(response, withState(new PieceEvents<>(pieces, events ? new EventStreamDecoder(maxBufferSize, state) : null, defaultReader(eventType, jsonMapper), maxBufferSize), state));
     }
 
     @SuppressWarnings("unchecked")
@@ -210,6 +219,7 @@ public final class EventStreams {
      * @param maxBufferSize   The maximum size of a line, and of the data of one event
      * @param decorate        Decorates a failure of the events like the other failures of the
      *                        client, e.g. with its service id
+     * @param state           The reconnection state to update, or {@code null}
      * @param <B>             The event data type
      * @return The response, whose body is the events
      */
@@ -218,7 +228,8 @@ public final class EventStreams {
                                                                               MessageBodyHandlerRegistry handlerRegistry,
                                                                               Argument<B> eventType,
                                                                               long maxBufferSize,
-                                                                              UnaryOperator<HttpClientException> decorate) {
+                                                                              UnaryOperator<HttpClientException> decorate,
+                                                                              @Nullable EventStreamState state) {
         UnaryOperator<Throwable> wrap = error -> error instanceof DataDecodeFailure failure && failure.getCause() != null
             ? failure.getCause()
             : wrap(error, decorate);
@@ -239,7 +250,7 @@ public final class EventStreams {
                 }
                 return decoded;
             };
-            return ElementsResponse.of(response, new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize), rawFailures), wrap, true));
+            return ElementsResponse.of(response, withState(new ByteBodyElements<>(body, new EventReader<>(new EventStreamDecoder(maxBufferSize, state), rawFailures), wrap, true), state));
         } catch (RuntimeException e) {
             body.close();
             throw e;
@@ -299,6 +310,21 @@ public final class EventStreams {
             }
             return decoded;
         };
+    }
+
+    /**
+     * The state of the request of an event stream, the {@link EventStreamState#ATTRIBUTE}
+     * attribute.
+     *
+     * @param request The request, as sent: after the filters, and of the last redirect
+     * @return The state, or {@code null}
+     */
+    public static @Nullable EventStreamState state(HttpRequest<?> request) {
+        return request.getAttribute(EventStreamState.ATTRIBUTE, EventStreamState.class).orElse(null);
+    }
+
+    private static <B> BodyElements<Event<B>> withState(BodyElements<Event<B>> events, @Nullable EventStreamState state) {
+        return state == null ? events : new StateElements<>(events, state);
     }
 
     /**
@@ -422,7 +448,7 @@ public final class EventStreams {
                     } finally {
                         // the events before a failure are delivered first
                         for (Event<byte[]> event : events) {
-                            push(Event.of(event, reader.apply(event.getData())));
+                            push(event instanceof ControlEvent<byte[]> control ? control.cast() : Event.of(event, reader.apply(event.getData())));
                         }
                     }
                 }
@@ -436,6 +462,105 @@ public final class EventStreams {
         @Override
         protected void release() {
             pieces.close();
+        }
+    }
+
+    /**
+     * The events, which take the last event id into the state as they are handed out, in the
+     * order of the stream, and skip the markers of the blocks without data.
+     *
+     * @param <B> The event data type
+     */
+    private static final class StateElements<B> implements BodyElements<Event<B>> {
+        private final BodyElements<Event<B>> events;
+        private final EventStreamState state;
+        /**
+         * An event taken to answer {@link #state()}, handed out next.
+         */
+        private @Nullable Event<B> peeked;
+
+        StateElements(BodyElements<Event<B>> events, EventStreamState state) {
+            this.events = events;
+            this.state = state;
+        }
+
+        @Override
+        public CompletionStage<Optional<Event<B>>> next() {
+            Event<B> event = takePeeked();
+            if (event != null) {
+                return CompletableFuture.completedStage(Optional.of(event));
+            }
+            return events.next().thenCompose(next -> {
+                if (next.isPresent() && !EventStreamDecoder.deliver(next.get(), state)) {
+                    return next();
+                }
+                return CompletableFuture.completedStage(next);
+            });
+        }
+
+        @Override
+        public @Nullable Event<B> poll() {
+            Event<B> event = takePeeked();
+            if (event != null) {
+                return event;
+            }
+            while ((event = events.poll()) != null) {
+                if (EventStreamDecoder.deliver(event, state)) {
+                    return event;
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public State state() {
+            synchronized (this) {
+                if (peeked != null) {
+                    return State.AVAILABLE;
+                }
+            }
+            while (true) {
+                State current = events.state();
+                if (current != State.AVAILABLE) {
+                    return current;
+                }
+                Event<B> event = events.poll();
+                if (event == null) {
+                    return events.state();
+                }
+                if (!EventStreamDecoder.isControl(event)) {
+                    // the id is taken when the event is handed out
+                    synchronized (this) {
+                        peeked = event;
+                    }
+                    return State.AVAILABLE;
+                }
+                EventStreamDecoder.deliver(event, state);
+            }
+        }
+
+        private synchronized @Nullable Event<B> takePeeked() {
+            Event<B> event = peeked;
+            peeked = null;
+            if (event != null) {
+                EventStreamDecoder.deliver(event, state);
+            }
+            return event;
+        }
+
+        @Override
+        public @Nullable Throwable failure() {
+            return events.failure();
+        }
+
+        @Override
+        public CompletionStage<Void> closeAsync() {
+            return events.closeAsync();
+        }
+
+        @Override
+        public void close() {
+            events.close();
         }
     }
 
@@ -497,7 +622,10 @@ public final class EventStreams {
         @Override
         public @Nullable Event<B> poll() {
             Event<byte[]> event = events.poll();
-            return event == null ? null : Event.of(event, dataReader.apply(event.getData()));
+            if (event == null) {
+                return null;
+            }
+            return event instanceof ControlEvent<byte[]> control ? control.cast() : Event.of(event, dataReader.apply(event.getData()));
         }
 
         @Override

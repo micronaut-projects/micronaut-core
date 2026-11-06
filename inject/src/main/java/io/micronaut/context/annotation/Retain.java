@@ -62,15 +62,23 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface Retain {
 
     /**
-     * The configuration prefixes a change under which releases the retained bean: the next context
-     * creates it again from the changed configuration, so that a changed connection URL produces a new
-     * pool. A data source would name {@code datasources}, for example.
+     * The configuration prefixes a change under which releases the retained bean, besides those of its
+     * configuration beans: the next context creates it again from the changed configuration, so that a
+     * changed connection URL produces a new pool.
      *
-     * <p>A configuration bean the retained bean received under one of these prefixes, or under a prefix within one,
-     * does not keep it from being retained, and is not retained with it: each generation binds it again. The bean
-     * must therefore copy the values it needs, and not keep the configuration bean.</p>
+     * <p>The bean is also released by a change under the prefix of any configuration bean in its closure,
+     * without naming it here: a {@link ConfigurationProperties}, an {@link EachProperty} entry, whose own
+     * prefix counts, so that a change of one entry releases only the beans made from it, or another
+     * {@link ConfigurationReader}, that the bean, the factory that produced it or any singleton it holds
+     * received, nested configuration included. These prefixes therefore only need to name what the bean
+     * reads outside configuration beans, such as a raw {@link Property} or {@link Value}, and with none the
+     * bean is released by the configuration of its closure alone.</p>
      *
-     * @return The configuration prefixes, empty when no configuration change releases the bean
+     * <p>A configuration bean in the closure is not retained with the bean, nor does it keep it from being
+     * retained: each generation binds it again. The bean must therefore copy the values it needs, and not
+     * keep the configuration bean.</p>
+     *
+     * @return The configuration prefixes, empty when only the configuration of its closure releases the bean
      */
     String[] invalidatedBy() default {};
 }

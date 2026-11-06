@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -78,7 +79,7 @@ class RawUpgradeTest {
             RawUpstream.Connection connection = upstream.nextConnection(TIMEOUT_SECONDS);
             Assertions.assertNotNull(connection, "The client did not connect");
             Assertions.assertTrue(connection.awaitRequest(TIMEOUT_SECONDS), "The request did not arrive");
-            String head = connection.received().toLowerCase();
+            String head = connection.received().toLowerCase(Locale.ROOT);
             Assertions.assertTrue(head.contains("upgrade: echo"), "The Upgrade header was not relayed: " + head);
             Assertions.assertTrue(head.contains("connection: upgrade"), "Connection does not name the upgrade: " + head);
             connection.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: echo\r\nConnection: Upgrade\r\n\r\n");

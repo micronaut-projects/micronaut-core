@@ -19,6 +19,7 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Set;
 
@@ -47,8 +48,11 @@ public interface RetentionCriteria {
      * {@link BeanRetentionPolicy#observedConfigurationPrefixes(BeanRegistration)} declares them: a configuration bean
      * under one of them that the singleton holds is not retained with it, nor does it keep it from being retained.
      *
+     * A configuration bean of its closure under another prefix is observed instead, by {@link #touches(String)}, so
+     * the prefixes only need to cover what the singleton reads outside configuration beans.
+     *
      * @param registration The retained singleton's registration
-     * @return The prefixes, empty when no configuration change releases it
+     * @return The prefixes, empty when only the configuration beans of its closure release it
      */
     Set<String> observedConfigurationPrefixes(BeanRegistration<?> registration);
 
@@ -61,6 +65,33 @@ public interface RetentionCriteria {
      * @return True when the class is replaced
      */
     default boolean isReplaced(Class<?> type) {
+        return false;
+    }
+
+    /**
+     * What refuses a singleton, so that it is not retained whatever {@link #retain(BeanRegistration)} answers for
+     * it, nor is a singleton that holds it: a {@link BeanRetentionPolicy} that
+     * {@link BeanRetentionPolicy.Decision#REFUSE refuses} it. It is asked about every singleton of the closure of a
+     * bean {@link #retain(BeanRegistration) retained}, and the log names it by its class.
+     *
+     * @param registration The singleton's registration
+     * @return What refuses it, or null when nothing does
+     */
+    default @Nullable Object refusedBy(BeanRegistration<?> registration) {
+        return null;
+    }
+
+    /**
+     * Whether the change behind the restart touched configuration at or under the prefix. A retained singleton is
+     * released when a configuration bean in its closure, under a prefix that
+     * {@link #observedConfigurationPrefixes(BeanRegistration)} does not cover, is under a touched prefix: the singleton
+     * was made from that configuration, which the next context binds again. It is asked about the prefix of each such
+     * configuration bean, the entry's own for an {@link io.micronaut.context.annotation.EachProperty} entry.
+     *
+     * @param prefix The prefix of a configuration bean in the closure of a retained singleton
+     * @return True when the change touched it
+     */
+    default boolean touches(String prefix) {
         return false;
     }
 }

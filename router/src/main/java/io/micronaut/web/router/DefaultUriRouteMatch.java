@@ -22,6 +22,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.QueryStringDecoder;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.DelegatingExecutableMethod;
@@ -47,8 +48,8 @@ import java.util.Optional;
 public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements UriRouteMatch<T, R> {
 
     private final UriMatchInfo matchInfo;
-    private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
+    private final boolean plusAsSpace;
     private final @Nullable MediaType selectedMediaType;
     /**
      * The status a route selector rejected the request with, {@code 406} or {@code 415}, see
@@ -64,33 +65,38 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @param matchInfo The URI match info
      * @param routeInfo The URI route
      * @param defaultCharset The default charset
+     * @param plusAsSpace Whether a {@code +} in a path variable is decoded as a space, see {@link RouteAssembly#PATH_VARIABLE_PLUS_AS_SPACE}
      * @param conversionService The conversion service
      */
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
                          UriRouteInfo<T, R> routeInfo,
-                         Charset defaultCharset, ConversionService conversionService
+                         Charset defaultCharset,
+                         boolean plusAsSpace,
+                         ConversionService conversionService
     ) {
-        this(matchInfo, routeInfo, defaultCharset, conversionService, null);
+        this(matchInfo, routeInfo, defaultCharset, plusAsSpace, conversionService, null);
     }
 
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
                                  UriRouteInfo<T, R> routeInfo,
                                  Charset defaultCharset,
+                                 boolean plusAsSpace,
                                  ConversionService conversionService,
                                  @Nullable MediaType selectedMediaType) {
-        this(matchInfo, routeInfo, defaultCharset, conversionService, selectedMediaType, null);
+        this(matchInfo, routeInfo, defaultCharset, plusAsSpace, conversionService, selectedMediaType, null);
     }
 
     private DefaultUriRouteMatch(UriMatchInfo matchInfo,
                                  UriRouteInfo<T, R> routeInfo,
                                  Charset defaultCharset,
+                                 boolean plusAsSpace,
                                  ConversionService conversionService,
                                  @Nullable MediaType selectedMediaType,
                                  @Nullable HttpStatus rejectionStatus) {
         super(routeInfo, conversionService);
         this.matchInfo = matchInfo;
-        this.uriRouteInfo = routeInfo;
         this.defaultCharset = defaultCharset;
+        this.plusAsSpace = plusAsSpace;
         this.selectedMediaType = selectedMediaType;
         this.rejectionStatus = rejectionStatus;
     }
@@ -100,7 +106,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @return A new match of the same route and path with the media type
      */
     DefaultUriRouteMatch<T, R> withSelectedMediaType(MediaType mediaType) {
-        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, mediaType);
+        return new DefaultUriRouteMatch<>(matchInfo, getRouteInfo(), defaultCharset, plusAsSpace, conversionService, mediaType);
     }
 
     /**
@@ -108,7 +114,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @return A new match with the match info and the negotiated media type of this match
      */
     DefaultUriRouteMatch<T, R> withMatchInfo(UriMatchInfo matchInfo) {
-        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, selectedMediaType, rejectionStatus);
+        return new DefaultUriRouteMatch<>(matchInfo, getRouteInfo(), defaultCharset, plusAsSpace, conversionService, selectedMediaType, rejectionStatus);
     }
 
     /**
@@ -116,7 +122,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      * @return A new match of the same route and path, rejected with the status
      */
     DefaultUriRouteMatch<T, R> withRejectionStatus(HttpStatus status) {
-        return new DefaultUriRouteMatch<>(matchInfo, uriRouteInfo, defaultCharset, conversionService, selectedMediaType, status);
+        return new DefaultUriRouteMatch<>(matchInfo, getRouteInfo(), defaultCharset, plusAsSpace, conversionService, selectedMediaType, status);
     }
 
     /**
@@ -179,8 +185,8 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
             if (!(matchInfo instanceof DynamicRouteTarget.ResolvedMatchInfo resolved) || resolved.annotationMetadata().isEmpty()) {
                 return null;
             }
-            AnnotationMetadata metadata = RouteLocator.layered(resolved.annotationMetadata(), executableMethod.getAnnotationMetadata());
-            inheriting = new InheritingExecutableMethod<>(executableMethod, metadata);
+            AnnotationMetadata metadata = RouteLocator.layered(resolved.annotationMetadata(), super.getExecutableMethod().getAnnotationMetadata());
+            inheriting = new InheritingExecutableMethod<>(super.getExecutableMethod(), metadata);
             inheritingMethod = inheriting;
         }
         return inheriting;
@@ -199,7 +205,9 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
                 variables = CollectionUtils.newLinkedHashMap(matchVariables.size());
                 matchVariables.forEach((k, v) -> {
                     if (v instanceof CharSequence) {
-                        v = URLDecoder.decode(v.toString(), defaultCharset);
+                        v = plusAsSpace
+                            ? URLDecoder.decode(v.toString(), defaultCharset)
+                            : QueryStringDecoder.decodePathComponent(v.toString(), defaultCharset);
                     }
                     variables.put(k, v);
                 });
@@ -220,7 +228,9 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
         Map<String, Object> raw = rawVariables;
         if (raw == null) {
             Map<String, Object> matchVariables = matchInfo.getVariableValues();
-            if (matchVariables.containsValue(null)) {
+            if (CollectionUtils.isEmpty(matchVariables)) {
+                raw = Map.of();
+            } else if (matchVariables.containsValue(null)) {
                 // an optional variable that is absent has no value
                 raw = CollectionUtils.newLinkedHashMap(matchVariables.size());
                 for (Map.Entry<String, Object> entry : matchVariables.entrySet()) {
@@ -247,18 +257,20 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public UriRouteInfo<T, R> getRouteInfo() {
-        return uriRouteInfo;
+        // the route info of the superclass, which the constructors only take as a URI route
+        return (UriRouteInfo<T, R>) routeInfo;
     }
 
     @Override
     public HttpMethod getHttpMethod() {
-        return uriRouteInfo.getHttpMethod();
+        return getRouteInfo().getHttpMethod();
     }
 
     @Override
     public String toString() {
-        return uriRouteInfo.getHttpMethod() + " - " + matchInfo.getUri();
+        return getRouteInfo().getHttpMethod() + " - " + matchInfo.getUri();
     }
 
     /**

@@ -17,7 +17,6 @@ package io.micronaut.docs.devmode.tck;
 
 import io.micronaut.dev.tck.ReloadHarness;
 import io.micronaut.dev.tck.ReloadTck;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -31,7 +30,6 @@ class GreetingRegistryReloadTest {
     Path tempDir;
 
     @Test
-    @Disabled("Until the development runtime releases what Netty, Reactor and the shared executable methods keep of a retired generation, an application of the full docs test classpath keeps it reachable")
     void theRegistryFollowsAReload() {
         // tag::harness[]
         try (ReloadHarness harness = ReloadHarness.inDirectory(tempDir)) {

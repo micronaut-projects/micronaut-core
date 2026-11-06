@@ -213,21 +213,6 @@ class KotlinSourceCompilerSpec extends Specification {
 
     private CompilationRequest request(Set<Path> changed = [] as Set, Set<Path> deleted = [] as Set, List<String> options = []) {
         List<Path> classpath = System.getProperty("java.class.path").split(File.pathSeparator).collect { Path.of(it) }
-        new CompilationRequest(SourceKind.KOTLIN, [new SourceRoot(SourceKind.KOTLIN, src)], changed, deleted, false, classpath, processorPath(), out, project.resolve("build/generated"), options)
-    }
-
-    /**
-     * The classpath entries that register a symbol processor: the Micronaut processor and the test one.
-     * The processors are found on the processor path alone, so the entries holding their service files are it.
-     */
-    private static List<Path> processorPath() {
-        String service = "META-INF/services/com.google.devtools.ksp.processing.SymbolProcessorProvider"
-        KotlinSourceCompilerSpec.classLoader.getResources(service).toList().collect { URL url ->
-            String location = url.toString()
-            if (location.startsWith("jar:")) {
-                return Path.of(new URI(location.substring(4, location.indexOf("!"))))
-            }
-            return Path.of(url.toURI()).parent.parent.parent
-        }.unique()
+        new CompilationRequest(SourceKind.KOTLIN, [new SourceRoot(SourceKind.KOTLIN, src)], changed, deleted, false, classpath, classpath, out, project.resolve("build/generated"), options)
     }
 }
