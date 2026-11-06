@@ -50,6 +50,8 @@ final class SvgImage {
     private static final String WIDTH_ATTRIBUTE = "width";
     private static final String HEIGHT_ATTRIBUTE = "height";
     private static final String INHERIT = "inherit";
+    private static final String VIEW_BOX = "viewBox";
+    private static final String SCALE = "scale";
 
     private final Element root;
     private final Map<String, Element> ids = new HashMap<>();
@@ -62,7 +64,7 @@ final class SvgImage {
     private SvgImage(Element root) {
         this.root = root;
         index(root);
-        double[] box = numbers(root.attr("viewBox"));
+        double[] box = numbers(root.attr(VIEW_BOX));
         double w = length(root.attr(WIDTH_ATTRIBUTE), -1);
         double h = length(root.attr(HEIGHT_ATTRIBUTE), -1);
         if (box.length == 4 && box[2] > 0 && box[3] > 0) {
@@ -101,7 +103,7 @@ final class SvgImage {
         double innerWidth = width;
         double innerHeight = height;
         if ("svg".equals(element.name) && element != root) {
-            double[] box = numbers(element.attr("viewBox"));
+            double[] box = numbers(element.attr(VIEW_BOX));
             if (box.length == 4 && box[2] > 0 && box[3] > 0) {
                 innerWidth = box[2];
                 innerHeight = box[3];
@@ -213,7 +215,7 @@ final class SvgImage {
             return;
         }
         if ("svg".equals(element.name) && element != root) {
-            double[] box = numbers(element.attr("viewBox"));
+            double[] box = numbers(element.attr(VIEW_BOX));
             double w = element.number(WIDTH_ATTRIBUTE, time, box.length == 4 ? box[2] : 0);
             double h = element.number(HEIGHT_ATTRIBUTE, time, box.length == 4 ? box[3] : 0);
             if (w <= 0 || h <= 0) {
@@ -595,8 +597,8 @@ final class SvgImage {
          */
         private double percentage(String attribute, double percent) {
             double reference = switch (attribute) {
-                case "x", "width", "cx", "rx", "x1", "x2" -> viewport[0];
-                case "y", "height", "cy", "ry", "y1", "y2" -> viewport[1];
+                case "x", WIDTH_ATTRIBUTE, "cx", "rx", "x1", "x2" -> viewport[0];
+                case "y", HEIGHT_ATTRIBUTE, "cy", "ry", "y1", "y2" -> viewport[1];
                 case "r", "stroke-width" -> Math.sqrt((viewport[0] * viewport[0] + viewport[1] * viewport[1]) / 2);
                 default -> 1;
             };
@@ -718,7 +720,7 @@ final class SvgImage {
                 double[][] parsed = new double[raw.length][];
                 for (int i = 0; i < raw.length; i++) {
                     parsed[i] = numbers(raw[i]);
-                    if (transform && "scale".equals(attribute) && parsed[i].length == 1) {
+                    if (transform && SCALE.equals(attribute) && parsed[i].length == 1) {
                         // scale(s) scales both axes, so it interpolates as scale(s, s)
                         parsed[i] = new double[] {parsed[i][0], parsed[i][0]};
                     }
@@ -1031,7 +1033,7 @@ final class SvgImage {
          * @return The arguments for which the function changes nothing, where a {@code to} animation of it starts
          */
         static double[] neutral(String function) {
-            return "scale".equals(function) ? new double[] {1, 1} : new double[] {0, 0, 0};
+            return SCALE.equals(function) ? new double[] {1, 1} : new double[] {0, 0, 0};
         }
 
         private static double second(double[] values, double fallback) {
@@ -1042,7 +1044,7 @@ final class SvgImage {
             return switch (function) {
                 case "matrix" -> v.length == 6 ? v.clone() : IDENTITY;
                 case "translate" -> v.length == 0 ? IDENTITY : new double[] {1, 0, 0, 1, v[0], second(v, 0)};
-                case "scale" -> v.length == 0 ? IDENTITY : new double[] {v[0], 0, 0, second(v, v[0]), 0, 0};
+                case SCALE -> v.length == 0 ? IDENTITY : new double[] {v[0], 0, 0, second(v, v[0]), 0, 0};
                 case "rotate" -> {
                     if (v.length == 0) {
                         yield IDENTITY;
