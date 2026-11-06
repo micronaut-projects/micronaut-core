@@ -39,6 +39,21 @@ To use a different image in terminals with a light background, also add `src/mai
 
 In these terminals `banner.png` is used in preference to `micronaut-banner.txt`, so you can provide both and the text banner is printed everywhere else.
 
+You can provide an SVG image instead, at `src/main/resources/META-INF/micronaut/banner.svg` (and `banner-light.svg` for a light background). It is used in preference to `banner.png`, is rendered at its `width` and `height` in pixels, and can be animated with SMIL `<animate>` and `<animateTransform>` elements, which play once, or in a loop when an animation has `repeatCount="indefinite"`. The default Micronaut logo is such an animated SVG. Use `currentColor` to follow the terminal theme: it is white on a dark background and black on a light one.
+
+[source,xml]
+----
+<svg width="300" height="60" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="30" cy="30" r="20" fill="currentColor">
+    <animate attributeName="opacity" values="0;1" dur="0.5s" fill="freeze"/>
+    <animateTransform attributeName="transform" type="translate" values="-30 0;0 0" dur="0.5s"
+                      calcMode="spline" keySplines="0.2 0.8 0.2 1" fill="freeze"/>
+  </circle>
+</svg>
+----
+
+The banner renderer supports a subset of SVG: the `path` (with every command), `polygon`, `polyline`, `rect`, `circle`, `ellipse` and `g` elements, transforms, and the `fill`, `fill-opacity`, `fill-rule`, `opacity` and `color` properties. Strokes, text, gradients, and clipping are not rendered, so convert text and strokes to paths. A terminal that displays images but not animations shows the image as it is when the animation ends.
+
 To disable it, modify your `Application` class:
 
 [source,java]

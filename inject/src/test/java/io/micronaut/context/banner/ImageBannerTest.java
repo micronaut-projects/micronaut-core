@@ -26,7 +26,6 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -50,8 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ImageBannerTest {
 
     private static final Pattern GRAPHICS = Pattern.compile("\u001B_G([^;]*);([^\u001B]*)\u001B\\\\");
-    private static final String LOGO = "io/micronaut/context/banner/micronaut-banner/logo.png";
-    private static final String LOGO_LIGHT = "io/micronaut/context/banner/micronaut-banner/logo-light.png";
+    private static final String ANIMATED_LOGO = "a=T,f=100,i=\\d+,q=2,r=6,m=1";
 
     @Test
     void largeImageIsSentInProtocolChunks(@TempDir Path dir) throws IOException {
@@ -154,15 +152,9 @@ class ImageBannerTest {
         String dark = capture(out -> new MicronautBanner(out, terminal(Map.of("MICRONAUT_BANNER_MODE", "kitty"), false)).print());
         String light = capture(out -> new MicronautBanner(out, terminal(Map.of("MICRONAUT_BANNER_MODE", "kitty", "MICRONAUT_BANNER_THEME", "light"), false)).print());
 
-        assertEquals("a=T,f=100,q=2,r=6,m=1", chunks(dark).get(0).control());
-        assertArrayEquals(resource(LOGO), decode(chunks(dark)));
-        assertArrayEquals(resource(LOGO_LIGHT), decode(chunks(light)));
-    }
-
-    @Test
-    void logoMatchesItsTheme() throws IOException {
-        assertEquals(0xFFFFFF, inkColor(resource(LOGO)), "the dark theme logo is white");
-        assertEquals(0x000000, inkColor(resource(LOGO_LIGHT)), "the light theme logo is black");
+        assertTrue(chunks(dark).get(0).control().matches(ANIMATED_LOGO), chunks(dark).get(0).control());
+        assertEquals(0xFFFFFF, inkColor(rootFrame(chunks(dark))), "the dark theme logo is white");
+        assertEquals(0x000000, inkColor(rootFrame(chunks(light))), "the light theme logo is black");
     }
 
     @Test
@@ -180,6 +172,20 @@ class ImageBannerTest {
     }
 
     @Test
+    void applicationSvgBannerIsPreferredOverItsPngBanner(@TempDir Path dir) throws Exception {
+        Files.createDirectories(dir.resolve("META-INF/micronaut"));
+        Files.write(dir.resolve(ImageBanner.RESOURCE), new byte[] {1, 2, 3, 4});
+        Files.writeString(dir.resolve(ImageBanner.SVG_RESOURCE), "<svg width='8' height='4'><rect width='8' height='4'/></svg>");
+
+        List<Chunk> chunks = chunks(applicationOutput(dir, "kitty"));
+
+        assertEquals(1, chunks.size());
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(decode(chunks)));
+        assertEquals(8, image.getWidth());
+        assertEquals(0xFF000000, image.getRGB(4, 2));
+    }
+
+    @Test
     void textBannerIsPreferredOverTheDefaultLogo(@TempDir Path dir) throws Exception {
         Files.writeString(dir.resolve("micronaut-banner.txt"), "custom text banner");
 
@@ -191,7 +197,9 @@ class ImageBannerTest {
 
     @Test
     void defaultLogoIsPrintedWithoutCustomBanners(@TempDir Path dir) throws Exception {
-        assertArrayEquals(resource(LOGO), decode(chunks(applicationOutput(dir, "kitty"))));
+        String control = chunks(applicationOutput(dir, "kitty")).get(0).control();
+
+        assertTrue(control.matches(ANIMATED_LOGO), control);
     }
 
     private static String applicationOutput(Path dir, String mode) throws Exception {
@@ -237,10 +245,15 @@ class ImageBannerTest {
         return Base64.getDecoder().decode(payload.toString());
     }
 
-    private static byte[] resource(String name) throws IOException {
-        try (InputStream stream = ImageBannerTest.class.getClassLoader().getResourceAsStream(name)) {
-            return stream.readAllBytes();
+    private static byte[] rootFrame(List<Chunk> chunks) {
+        List<Chunk> root = new ArrayList<>();
+        for (Chunk chunk : chunks) {
+            root.add(chunk);
+            if (chunk.control().endsWith("m=0")) {
+                return decode(root);
+            }
         }
+        throw new AssertionError("Unterminated image");
     }
 
     private static int inkColor(byte[] png) throws IOException {
