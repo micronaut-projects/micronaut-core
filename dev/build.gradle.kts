@@ -26,6 +26,8 @@ dependencies {
     compileOnly(libs.ksp.aaEmbeddable)
     // the embedded Python compiler exists when the Pyronaut compiler is on the launch classpath
     compileOnly(projects.micronautInjectPython)
+    // the compiled standard library of Python exists when the Python runtime is on the classpath
+    compileOnly(projects.micronautContextPython)
     // the built-in test runner exists when the project's JUnit Platform launcher is on the launch classpath
     compileOnly(libs.junit.platform.launcher)
     // attaches the agent to a JVM launched without -javaagent, when the project puts it on the classpath

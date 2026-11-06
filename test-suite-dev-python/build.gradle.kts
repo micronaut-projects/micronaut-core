@@ -17,4 +17,9 @@ dependencies {
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     systemProperty("micronaut.python.pool.enabled", "false")
+    // the compiled standard library of Python, in the build rather than in the caches of the user running the tests
+    val stdlibBytecode = layout.buildDirectory.dir("python-stdlib")
+    doFirst {
+        systemProperty("micronaut.dev.python.stdlib-bytecode-dir", stdlibBytecode.get().asFile.path)
+    }
 }

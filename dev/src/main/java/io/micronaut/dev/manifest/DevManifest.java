@@ -170,6 +170,8 @@ public final class DevManifest {
     private final Path projectDir;
     private final DevReloadStrategy strategy;
     private final boolean patchInPlace;
+    private final boolean pythonStdlibBytecode;
+    private final @Nullable Path pythonStdlibBytecodeDirectory;
     private final List<Path> runtimeClasspath;
     private final List<Path> reloadableRoots;
     private final List<Path> compileClasspath;
@@ -211,6 +213,9 @@ public final class DevManifest {
         this.projectDir = path(directory, properties.getProperty(PREFIX + "project-dir", "."));
         this.strategy = DevReloadStrategy.valueOf(properties.getProperty(PREFIX + "strategy", "auto").trim().toUpperCase(Locale.ROOT));
         this.patchInPlace = Boolean.parseBoolean(properties.getProperty(PREFIX + "patch-in-place", "true").trim());
+        this.pythonStdlibBytecode = Boolean.parseBoolean(properties.getProperty(PREFIX + "python.stdlib-bytecode", "true").trim());
+        String stdlibBytecodeDirectory = properties.getProperty(PREFIX + "python.stdlib-bytecode-dir");
+        this.pythonStdlibBytecodeDirectory = stdlibBytecodeDirectory == null ? null : path(directory, stdlibBytecodeDirectory);
         this.runtimeClasspath = paths(directory, properties.getProperty(PREFIX + "runtime-classpath", ""));
         List<Path> reloadable = paths(directory, require(properties, "reloadable"));
         this.compileClasspath = paths(directory, properties.getProperty(PREFIX + COMPILE_CLASSPATH, ""));
@@ -396,6 +401,25 @@ public final class DevManifest {
      */
     public boolean patchInPlace() {
         return patchInPlace;
+    }
+
+    /**
+     * Whether the GraalPy contexts of the application read the standard library from a copy of it that has bytecode,
+     * which saves compiling the modules they import in each generation. On by default;
+     * {@code micronaut.dev.python.stdlib-bytecode=false} leaves them on the standard library GraalPy finds.
+     *
+     * @return Whether the standard library of Python is compiled once for all generations
+     */
+    public boolean pythonStdlibBytecode() {
+        return pythonStdlibBytecode;
+    }
+
+    /**
+     * @return The directory of the compiled standard library of Python
+     * ({@code micronaut.dev.python.stdlib-bytecode-dir}), or null for the cache directory of the user
+     */
+    public @Nullable Path pythonStdlibBytecodeDirectory() {
+        return pythonStdlibBytecodeDirectory;
     }
 
     /**
