@@ -174,10 +174,31 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     public static <R> List<R> build(List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders,
                                     ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory)
         throws IOException {
+        return build(beanDefinitionBuilders, beanDefinitionBuilderFactory, new HashMap<>());
+    }
+
+    /**
+     * Builds the definitions of the given builders, numbering the ones that would get the same name.
+     *
+     * @param beanDefinitionBuilders       The builders
+     * @param beanDefinitionBuilderFactory The factory
+     * @param nameCounts                   The number of definitions built so far for each name, updated as the builders
+     *                                     are built. A processor that builds the beans of each round separately passes
+     *                                     the same map for every round, so that a bean registered for an element in a
+     *                                     later round does not get the name of one registered for it earlier.
+     * @param <R>                          The type of the result
+     * @return The built definitions
+     * @throws IOException If an error occurs
+     * @since 5.3.0
+     */
+    @Internal
+    public static <R> List<R> build(List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders,
+                                    ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory,
+                                    Map<String, Integer> nameCounts)
+        throws IOException {
         // Builders that would get the same name are numbered in the order they were added. Only the builders added
         // for the same element can share a name, so the number depends neither on the other types of the compilation
         // nor on an earlier compilation.
-        Map<String, Integer> nameCounts = new HashMap<>();
         List<R> result = new ArrayList<>();
         for (AbstractBeanDefinitionBuilder beanDefinitionBuilder : beanDefinitionBuilders) {
             beanDefinitionBuilder.index = nameCounts.merge(beanDefinitionBuilder.getAssociatedBeanBaseName(), 1, Integer::sum) - 1;

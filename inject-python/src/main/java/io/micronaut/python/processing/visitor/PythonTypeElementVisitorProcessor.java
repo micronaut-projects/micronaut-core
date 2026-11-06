@@ -204,6 +204,14 @@ public final class PythonTypeElementVisitorProcessor {
                 failVisitor(pythonVisitorContext, loadedVisitor, "finishRound", e);
             }
         }
+        // ... and so its last round
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            try {
+                loadedVisitor.getVisitor().finishCompilation(pythonVisitorContext);
+            } catch (Throwable e) {
+                failVisitor(pythonVisitorContext, loadedVisitor, "finishCompilation", e);
+            }
+        }
 
         // The stubs are written when the stub generator finishes, so it finishes after every other visitor:
         // the producer methods of the associated beans a visitor registers in visitClass or in its own finish

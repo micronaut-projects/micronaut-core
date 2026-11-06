@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor;
@@ -57,6 +58,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     private final Map<String, FileObject> openedFiles = new LinkedHashMap<>();
     private final Map<String, Optional<GeneratedFile>> generatedFiles = new LinkedHashMap<>();
     private final boolean isGradleFiler;
+    private boolean finalRound;
 
     /**
      * @param filer The {@link Filer} for creating new files
@@ -70,6 +72,18 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         } else {
             this.isGradleFiler = false;
         }
+    }
+
+    /**
+     * Marks the final annotation processing round: the classes visited from now on are written as class output
+     * resources. javac warns about every class file created with {@link Filer#createClassFile} in the final round,
+     * since it is not processed anymore, which a written bean definition does not need to be.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    public void finalRound() {
+        this.finalRound = true;
     }
 
     private static boolean isEclipseFiler(Filer filer) {
@@ -108,6 +122,12 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
             }
         } else {
             nativeOriginatingElements = ELEMENTS_EMPTY_ARRAY;
+        }
+        if (finalRound) {
+            int lastDot = classname.lastIndexOf('.');
+            String packageName = lastDot == -1 ? "" : classname.substring(0, lastDot);
+            String fileName = classname.substring(lastDot + 1) + JavaFileObject.Kind.CLASS.extension;
+            return filer.createResource(StandardLocation.CLASS_OUTPUT, packageName, fileName, nativeOriginatingElements).openOutputStream();
         }
         javaFileObject = filer.createClassFile(classname, nativeOriginatingElements);
         return javaFileObject.openOutputStream();

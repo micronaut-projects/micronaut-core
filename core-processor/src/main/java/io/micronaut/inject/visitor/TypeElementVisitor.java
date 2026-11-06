@@ -149,13 +149,45 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
     }
 
     /**
+     * Called once, after the last round of the compilation, when no class is visited anymore, before
+     * {@link #finish(VisitorContext)}.
+     *
+     * <p>This is the point for work that has to see every class of the compilation, including the classes that
+     * another visitor or annotation processor generated as source in a later round: aggregating what every round
+     * visited, adding the beans that follow from it, and validating the result. A bean added here with
+     * {@link VisitorContext#registerBean(ClassElement, io.micronaut.inject.ast.Element...)} is written by every
+     * compiler, javac, KSP, Groovy and Python. A source generated here is not visited anymore.</p>
+     *
+     * <p>Where each compiler calls it:</p>
+     *
+     * <ul>
+     *     <li>javac: in the final annotation processing round, in which nothing generated is processed anymore.
+     *     The bean definitions are written in that round, without javac warning that they are not processed. A
+     *     source generated there is compiled, but javac warns that it is not processed.</li>
+     *     <li>KSP: from {@code SymbolProcessor.finish}. KSP invalidates the elements of a round when the round ends,
+     *     so an element kept from a {@code visit} method or from {@link #finishRound(VisitorContext)} must not be used
+     *     here: look the classes up again by name, with {@link VisitorContext#getClassElement(String)}.</li>
+     *     <li>Groovy: at class generation, after the last round.</li>
+     *     <li>Python: after the single round of the compilation.</li>
+     * </ul>
+     *
+     * @param visitorContext The visitor context
+     * @since 5.3.0
+     */
+    @Experimental
+    default void finishCompilation(VisitorContext visitorContext) {
+        // no-op
+    }
+
+    /**
      * Called when visitor processing finishes.
      *
      * <p>Under KSP and Groovy, this method is called once, when nothing generated as source is compiled anymore. Under
      * javac, it is called at the end of every annotation processing round, after {@link #finishRound(VisitorContext)},
      * the final round included. Prefer {@link #finishRound(VisitorContext)} for work that has to be done once the
-     * classes of a round are visited: under KSP the elements of the rounds are invalid by the time this method is
-     * called, and no bean can be registered from it.</p>
+     * classes of a round are visited, and {@link #finishCompilation(VisitorContext)} for work that has to be done once
+     * every round is over: under KSP the elements of the rounds are invalid by the time this method is called, and
+     * no bean can be registered from it.</p>
      *
      * @param visitorContext The visitor context
      */

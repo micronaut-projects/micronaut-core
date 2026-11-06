@@ -454,10 +454,10 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * isolating processor expects exactly one originating element, and recompiles every source when there are more.</p>
      *
      * <p>The definition is written with the beans of the current round, see
-     * {@link TypeElementVisitor#finishRound(VisitorContext)}. Registering from
-     * {@link TypeElementVisitor#finish(VisitorContext)} is not portable: Groovy writes the bean, javac writes it in the
-     * final round and warns that the written class is not processed anymore, and KSP refuses it, because it has
-     * invalidated the elements of the compilation once its last round is over.</p>
+     * {@link TypeElementVisitor#finishRound(VisitorContext)}. To register a bean once every round is over, for what
+     * the whole compilation contained, register it from {@link TypeElementVisitor#finishCompilation(VisitorContext)}.
+     * Registering from {@link TypeElementVisitor#finish(VisitorContext)} is not portable: javac calls it in every
+     * round, and KSP refuses it, because it has invalidated the elements of the compilation by then.</p>
      *
      * <p>Like {@link ClassElement#addAssociatedBean(ClassElement)}, it can only be called from an
      * {@link TypeElementVisitor.VisitorKind#ISOLATING} visitor.</p>

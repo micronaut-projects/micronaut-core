@@ -90,7 +90,8 @@ internal class KotlinVisitorContext(
     var aggregating: Boolean = false
 
     /**
-     * Whether the visitors are finishing: every round is over, and KSP has invalidated the elements of the rounds.
+     * Whether the visitors are finishing: every round is over, the beans added from
+     * [io.micronaut.inject.visitor.TypeElementVisitor.finishCompilation] are written, and no bean can be added anymore.
      */
     var finishing: Boolean = false
     private val beanDefinitionBuilders: MutableList<AbstractBeanDefinitionBuilder> = ArrayList()

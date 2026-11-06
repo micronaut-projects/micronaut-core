@@ -31,8 +31,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * Records the rounds of the classes of the package {@value #PACKAGE}, and registers a bean of {@link RegisteredRecord}
  * for each of them from {@link #finishRound(VisitorContext)}, named after the round, and one from
- * {@link #finish(VisitorContext)}, named {@code finish}. Visiting the class {@value #TRIGGER} generates the source of
- * the class {@value #GENERATED}, which the next round visits.
+ * {@link #finish(VisitorContext)}, named {@code finish}, and one from {@link #finishCompilation(VisitorContext)}, named
+ * {@code compilation}, for the classes of every round. Visiting the class {@value #TRIGGER} generates the source of the
+ * class {@value #GENERATED}, which the next round visits.
  */
 public class RoundsVisitor implements TypeElementVisitor<Object, Object> {
 
@@ -47,10 +48,12 @@ public class RoundsVisitor implements TypeElementVisitor<Object, Object> {
 
     private static final String ROUND_PREFIX = "round";
     private static final String FINISH = "finish";
+    private static final String COMPILATION = "compilation";
 
     private static volatile boolean registerInFinish = true;
 
     private final List<ClassElement> round = new ArrayList<>();
+    private final List<String> compilation = new ArrayList<>();
     private ClassElement lastVisited;
     private int rounds;
     private boolean triggerGenerated;
@@ -80,6 +83,7 @@ public class RoundsVisitor implements TypeElementVisitor<Object, Object> {
     public void visitClass(ClassElement element, VisitorContext context) {
         if (element.getName().startsWith(PACKAGE + ".")) {
             round.add(element);
+            compilation.add(element.getName());
             lastVisited = element;
             if (element.getName().equals(TRIGGER) && !triggerGenerated) {
                 triggerGenerated = true;
@@ -119,6 +123,27 @@ public class RoundsVisitor implements TypeElementVisitor<Object, Object> {
                 .qualifier(FINISH)
                 .annotate(AnnotationValue.builder(Recorded.class).member("phase", FINISH).build());
         }
+    }
+
+    @Override
+    public void finishCompilation(VisitorContext context) {
+        if (compilation.isEmpty()) {
+            return;
+        }
+        List<String> classes = compilation.stream().sorted().toList();
+        EVENTS.add(COMPILATION + classes);
+        // the elements of the rounds may be invalid by now (KSP), so the classes are looked up again
+        ClassElement[] originatingElements = classes.stream()
+            .map(name -> context.getRequiredClassElement(name, context.getElementAnnotationMetadataFactory()))
+            .toArray(ClassElement[]::new);
+        ClassElement beanType = context.getRequiredClassElement(RegisteredRecord.class.getName(), context.getElementAnnotationMetadataFactory());
+        context.registerBean(beanType, originatingElements)
+            .qualifier(COMPILATION)
+            .annotate(AnnotationValue.builder(Recorded.class)
+                .member("classes", classes.toArray(new String[0]))
+                .member("phase", COMPILATION)
+                .build());
+        compilation.clear();
     }
 
     private static void generate(ClassElement origin, VisitorContext context) {

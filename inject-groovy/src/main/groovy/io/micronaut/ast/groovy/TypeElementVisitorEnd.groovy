@@ -18,9 +18,11 @@ package io.micronaut.ast.groovy
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
+import io.micronaut.ast.groovy.visitor.GroovyNativeElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.order.OrderUtil
+import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory
 import io.micronaut.inject.processing.definition.OutputObjectDef
 import io.micronaut.inject.visitor.VisitorContext
@@ -58,6 +60,20 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
         if (loadedVisitors != null) {
             List<LoadedVisitor> values = new ArrayList<>(loadedVisitors.values())
             OrderUtil.reverseSort(values)
+            // every round is over: the beans registered now are written below, with the ones registered in finish
+            for (loadedVisitor in values) {
+                try {
+                    loadedVisitor.visitor.finishCompilation(visitorContext)
+                } catch (ProcessingException ex) {
+                    def element = ex.getOriginatingElement()
+                    visitorContext.fail(ex.getMessage(), element instanceof GroovyNativeElement ? (element as GroovyNativeElement).annotatedNode() : (ASTNode) null)
+                } catch (Throwable e) {
+                    AstMessageUtils.error(
+                            source,
+                            source.getAST(),
+                            "Error finishing the compilation of type visitor [$loadedVisitor.visitor]: $e.message")
+                }
+            }
             for (loadedVisitor in values) {
                 try {
                     loadedVisitor.finish(visitorContext)

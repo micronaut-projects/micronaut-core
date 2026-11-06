@@ -60,14 +60,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -129,6 +132,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     private List<LoadedVisitor> loadedVisitors;
     @Nullable
     private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;
+    /**
+     * The number of bean definitions written for each name, over every round.
+     */
+    private final Map<String, Integer> beanNameCounts = new HashMap<>();
 
     /**
      * The visited annotation names.
@@ -354,20 +361,12 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             if (!roundEnv.processingOver()) {
                 // nothing generated in the final round is processed, so it is not a round for the visitors
-                for (LoadedVisitor loadedVisitor : loadedVisitors) {
-                    try {
-                        loadedVisitor.getVisitor().finishRound(javaVisitorContext);
-                    } catch (ProcessingException e) {
-                        var originatingElement = (JavaNativeElement) e.getOriginatingElement();
-                        error(originatingElement == null ? null : originatingElement.element(), "%s", e.getMessage());
-                    } catch (Throwable e) {
-                        var stackTraceWriter = new StringWriter();
-                        e.printStackTrace(new PrintWriter(stackTraceWriter));
-
-                        error("Error finishing the round of type visitor [%s]: %s\n%s",
-                            loadedVisitor.getVisitor(), e.getMessage(), stackTraceWriter);
-                    }
-                }
+                finishVisitors("the round", TypeElementVisitor::finishRound);
+            } else {
+                // every round is over: the beans registered now are written below, in the final round
+                classWriterOutputVisitor.finalRound();
+                javaVisitorContext.finalRound();
+                finishVisitors("the compilation", TypeElementVisitor::finishCompilation);
             }
 
             for (LoadedVisitor loadedVisitor : loadedVisitors) {
@@ -390,7 +389,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         if (CollectionUtils.isNotEmpty(beanDefinitionBuilders)) {
             DefaultElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory = new DefaultElementBeanDefinitionBuilderFactory(javaVisitorContext);
             try {
-                for (OutputObjectDef outputObjectDef : AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory)) {
+                for (OutputObjectDef outputObjectDef : AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)) {
                     write(outputObjectDef, javaVisitorContext);
                 }
             } catch (Exception e) {
@@ -404,6 +403,31 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             javaVisitorContext.finish();
         }
         return false;
+    }
+
+    /**
+     * Calls {@link TypeElementVisitor#finishRound(VisitorContext)} or
+     * {@link TypeElementVisitor#finishCompilation(VisitorContext)} on every visitor, reporting what fails as a
+     * compilation error.
+     *
+     * @param what     What is finished, for the error message
+     * @param callback The callback to call
+     */
+    private void finishVisitors(String what, BiConsumer<TypeElementVisitor<?, ?>, VisitorContext> callback) {
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            try {
+                callback.accept(loadedVisitor.getVisitor(), javaVisitorContext);
+            } catch (ProcessingException e) {
+                var originatingElement = (JavaNativeElement) e.getOriginatingElement();
+                error(originatingElement == null ? null : originatingElement.element(), "%s", e.getMessage());
+            } catch (Throwable e) {
+                var stackTraceWriter = new StringWriter();
+                e.printStackTrace(new PrintWriter(stackTraceWriter));
+
+                error("Error finishing %s of type visitor [%s]: %s\n%s",
+                    what, loadedVisitor.getVisitor(), e.getMessage(), stackTraceWriter);
+            }
+        }
     }
 
     /**

@@ -56,6 +56,10 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     private var typeElementVisitors: Collection<TypeElementVisitor<*, *>>? = null
     private lateinit var visitorContext: KotlinVisitorContext
     private val processed: MutableSet<String> = mutableSetOf()
+    /**
+     * The number of bean definitions written for each name, over every round.
+     */
+    private val beanNameCounts: MutableMap<String, Int> = HashMap()
 
     companion object {
         private val SERVICE_LOADER =
@@ -173,7 +177,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         visitorContext.aggregating = false
         try {
             val beanDefinitionBuilderFactory = DefaultElementBeanDefinitionBuilderFactory(visitorContext)
-            for (outputObjectDef in AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory)) {
+            for (outputObjectDef in AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)) {
                 BeanDefinitionProcessor.write(outputObjectDef, visitorContext, environment)
             }
         } catch (e: ProcessingException) {
@@ -202,8 +206,22 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     }
 
     override fun finish() {
-        visitorContext.finishing = true
         try {
+            // every round is over, but the classes can still be looked up by name: the beans registered now are
+            // written before the visitors finish
+            for (loadedVisitor in loadedVisitors) {
+                visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
+                try {
+                    loadedVisitor.visitor.finishCompilation(visitorContext)
+                } catch (e: ProcessingException) {
+                    BeanDefinitionProcessor.handleProcessingException(environment, e)
+                } catch (e: Exception) {
+                    environment.logger.error("Error finishing the compilation of type visitor [${loadedVisitor.visitor}]: ${e.message}")
+                    environment.logger.exception(e)
+                }
+            }
+            writeBeanElementBuilders()
+            visitorContext.finishing = true
             for (loadedVisitor in loadedVisitors) {
                 visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
                 try {
