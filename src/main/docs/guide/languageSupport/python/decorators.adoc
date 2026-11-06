@@ -1,4 +1,6 @@
-Java annotations are applied to Python classes, functions and parameters as decorators, and as `Annotated[...]` metadata. Whether a decorator is applied bare or called follows from how it is written, as for a Java annotation: `@Singleton` and `@Singleton()` are the same annotation, and every argument of a call is an annotation value. A single positional argument is the `value` member, whatever its type:
+Java annotations are applied to Python classes, functions and parameters as decorators, and as `Annotated[...]` metadata.
+
+A decorator can be applied with or without parenthesis if the target annotation itself doesn't accept any arguments: `@Singleton` and `@Singleton()` are the same annotation, and every argument of a call is an annotation value. A single positional argument is the `value` member, whatever its type:
 
 [source,python]
 ----

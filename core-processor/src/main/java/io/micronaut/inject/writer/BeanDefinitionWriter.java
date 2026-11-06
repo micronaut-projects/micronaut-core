@@ -25,6 +25,7 @@ import io.micronaut.aop.beandefinition.ParameterizedProxyBeanDefinition;
 import io.micronaut.context.AbstractInitializableBeanDefinition;
 import io.micronaut.context.AbstractInitializableBeanDefinitionAndReference;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanInitializationFailure;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -244,6 +245,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final String BUILDER_VARIABLE_PREFIX = "builder";
     private static final String ARGUMENT_MEMBER = "argument";
 
+    private static final Method DETACH_FAILURE = ReflectionUtils.getRequiredInternalMethod(
+        BeanInitializationFailure.class, "detach", Throwable.class);
     private static final Method GET_BEAN_BY_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(
         BeanLocator.class, "getBean", Argument.class);
     private static final Method GET_CANDIDATE_RESOLVER = ReflectionUtils.getRequiredInternalMethod(
@@ -261,23 +264,15 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method GET_BEAN_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getBeanForConstructorArgument", false);
 
-    private static final Method GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getBeanRegistrationsForConstructorArgument", true);
-
     private static final Method GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT_OBJECT = getBeanLookupMethod("getBeanRegistrationsForConstructorArgumentObject", true);
 
     private static final Method GET_BEAN_REGISTRATION_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getBeanRegistrationForConstructorArgument", true);
-
-    private static final Method GET_BEANS_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getBeansOfTypeForConstructorArgument", true);
 
     private static final Method GET_BEANS_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT_OBJECT = getBeanLookupMethod("getBeansOfTypeForConstructorArgumentObject", true);
 
     private static final Method GET_STREAM_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getStreamOfTypeForConstructorArgument", true);
 
-    private static final Method GET_MAP_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getMapOfTypeForConstructorArgument", true);
-
     private static final Method GET_MAP_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT_OBJECT = getBeanLookupMethod("getMapOfTypeForConstructorArgumentObject", true);
-
-    private static final Method FIND_BEAN_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("findBeanForConstructorArgument", true);
 
     private static final Method FIND_BEAN_FOR_CONSTRUCTOR_ARGUMENT_OBJECT = getBeanLookupMethod("findBeanForConstructorArgumentObject", true);
 
@@ -285,13 +280,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method GET_BEAN_FOR_ANNOTATION = getBeanLookupMethod("getBeanForAnnotation", false);
 
-    private static final Method GET_BEAN_REGISTRATIONS_FOR_FIELD = getBeanLookupMethod("getBeanRegistrationsForField", true);
-
     private static final Method GET_BEAN_REGISTRATIONS_FOR_FIELD_OBJECT = getBeanLookupMethod("getBeanRegistrationsForFieldObject", true);
 
     private static final Method GET_BEAN_REGISTRATION_FOR_FIELD = getBeanLookupMethod("getBeanRegistrationForField", true);
-
-    private static final Method GET_BEANS_OF_TYPE_FOR_FIELD = getBeanLookupMethod("getBeansOfTypeForField", true);
 
     private static final Method GET_BEANS_OF_TYPE_FOR_FIELD_OBJECT = getBeanLookupMethod("getBeansOfTypeForFieldObject", true);
 
@@ -299,11 +290,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method GET_STREAM_OF_TYPE_FOR_FIELD = getBeanLookupMethod("getStreamOfTypeForField", true);
 
-    private static final Method GET_MAP_OF_TYPE_FOR_FIELD = getBeanLookupMethod("getMapOfTypeForField", true);
-
     private static final Method GET_MAP_OF_TYPE_FOR_FIELD_OBJECT = getBeanLookupMethod("getMapOfTypeForFieldObject", true);
-
-    private static final Method FIND_BEAN_FOR_FIELD = getBeanLookupMethod("findBeanForField", true);
 
     private static final Method FIND_BEAN_FOR_FIELD_OBJECT = getBeanLookupMethod("findBeanForFieldObject", true);
 
@@ -313,23 +300,15 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method GET_BEAN_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getBeanForMethodArgument", false);
 
-    private static final Method GET_BEAN_REGISTRATIONS_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getBeanRegistrationsForMethodArgument", true);
-
     private static final Method GET_BEAN_REGISTRATIONS_FOR_METHOD_ARGUMENT_OBJECT = getBeanLookupMethodForArgument("getBeanRegistrationsForMethodArgumentObject", true);
 
     private static final Method GET_BEAN_REGISTRATION_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getBeanRegistrationForMethodArgument", true);
-
-    private static final Method GET_BEANS_OF_TYPE_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getBeansOfTypeForMethodArgument", true);
 
     private static final Method GET_BEANS_OF_TYPE_FOR_METHOD_ARGUMENT_OBJECT = getBeanLookupMethodForArgument("getBeansOfTypeForMethodArgumentObject", true);
 
     private static final Method GET_STREAM_OF_TYPE_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getStreamOfTypeForMethodArgument", true);
 
-    private static final Method GET_MAP_OF_TYPE_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getMapOfTypeForMethodArgument", true);
-
     private static final Method GET_MAP_OF_TYPE_FOR_METHOD_ARGUMENT_OBJECT = getBeanLookupMethodForArgument("getMapOfTypeForMethodArgumentObject", true);
-
-    private static final Method FIND_BEAN_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("findBeanForMethodArgument", true);
 
     private static final Method FIND_BEAN_FOR_METHOD_ARGUMENT_OBJECT = getBeanLookupMethodForArgument("findBeanForMethodArgumentObject", true);
 
@@ -501,7 +480,6 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final ClassTypeDef TYPE_OPTIONAL = ClassTypeDef.of(Optional.class);
     private static final Method METHOD_OPTIONAL_OF = ReflectionUtils.getRequiredMethod(Optional.class, "of", Object.class);
 
-    private static final Method BEAN_LOCATOR_METHOD_GET_BEAN = ReflectionUtils.getRequiredInternalMethod(BeanLocator.class, "getBean", Class.class, Qualifier.class);
     private static final Method COLLECTION_TO_ARRAY = ReflectionUtils.getRequiredInternalMethod(Collection.class, "toArray", Object[].class);
 
     private static final Method SET_FIELD_WITH_REFLECTION_METHOD =
@@ -644,6 +622,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "getFactoryBean", BeanDefinition.class, Class.class, Qualifier.class);
 
+    private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN_TARGET = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "getFactoryBeanTarget", BeanDefinition.class, Class.class, Qualifier.class);
+
     private static final Method METHOD_PROXY_TARGET_TYPE = ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType");
 
     private static final Method METHOD_PROXY_TARGET_CLASS = ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetType");
@@ -722,7 +702,6 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final Method IS_PROXY_TARGET_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinitionReference.class, "isProxyTarget");
     private static final Method GET_CONFIGURATION_PATH_METHOD = ReflectionUtils.getRequiredInternalMethod(BeanResolutionContext.class, "getConfigurationPath");
     private static final Method GET_TYPE_PARAMETERS_METHOD = ReflectionUtils.getRequiredInternalMethod(TypeVariableResolver.class, "getTypeParameters");
-    private static final Method ARGUMENT_OF_METHOD = ReflectionUtils.getRequiredInternalMethod(Argument.class, "of", Class.class);
     private static final Method BD_GET_INDEXES_OF_EXECUTABLE_METHODS_FOR_PROCESSING = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "getIndexesOfExecutableMethodsForProcessing");
     private static final Method GET_INDEXES_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinitionReference.class, "getIndexes");
     private static final Method IS_PARALLEL_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinitionReference.class, "isParallel");
@@ -1212,6 +1191,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     public void setExecutableMethodsWriter(ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter) {
         this.executableMethodsDefinitionWriter = executableMethodsDefinitionWriter;
         dontGenerateExecutableMethodsDefinitionWriter();
+    }
+
+    /**
+     * Adds a field to the definition, with the method accessing it.
+     *
+     * @param field  The field
+     * @param method The method
+     */
+    public void addMember(FieldDef field, MethodDef method) {
+        classDefBuilder.addField(field);
+        classDefBuilder.addMethod(method);
     }
 
     public void dontGenerateExecutableMethodsDefinitionWriter() {
@@ -2227,7 +2217,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                                  List<StatementDef> additionalStatements,
                                                  List<? extends ExpressionDef> values) {
         MethodElement methodElement = factorMethodDefinition.methodElement();
-        ExpressionDef factoryBean = getFactoryBean(aThis, methodParameters, methodElement.getOwningType(), methodElement.isStatic(), additionalStatements);
+        ExpressionDef factoryBean = getFactoryBean(aThis, methodParameters, methodElement.getOwningType(), methodElement.isStatic(), methodElement.isFinal() || methodElement.isPrivate(), additionalStatements);
         return getBeanFromFactoryMethod(factorMethodDefinition, factoryBean, values);
     }
 
@@ -2236,7 +2226,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                                 List<StatementDef> additionalStatements,
                                                 FieldDefinition<ClassElement, FieldElement> factoryFieldDefinition) {
         FieldElement fieldElement = factoryFieldDefinition.fieldElement();
-        ExpressionDef factoryBean = getFactoryBean(aThis, methodParameters, fieldElement.getDeclaringType(), fieldElement.isStatic(), additionalStatements);
+        ExpressionDef factoryBean = getFactoryBean(aThis, methodParameters, fieldElement.getDeclaringType(), fieldElement.isStatic(), true, additionalStatements);
         return getBeanFromFactoryField(factoryFieldDefinition, factoryBean);
     }
 
@@ -2345,6 +2335,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                          List<VariableDef.MethodParameter> parameters,
                                          ClassElement factoryClass,
                                          boolean isStaticMember,
+                                         boolean isNotDispatchedByProxy,
                                          List<StatementDef> additionalStatements) {
         if (isStaticMember) {
             return ExpressionDef.nullValue();
@@ -2364,8 +2355,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         ExpressionDef beanResolutionContxt = parameters.getFirst();
         // the factory is marked as the dependent factory; a context recording the dependency graph also attributes
         // the lookup to the produced definition, so the graph records the factory as a dependency of the bean it produces
+        // a member no proxy can dispatch - a field, or a final or private method such as the getter of a Kotlin
+        // property - is read off the instance a proxy of the factory targets: the proxy's own state is never initialized
         StatementDef.DefineAndAssign defineAndAssign = beanResolutionContxt
-            .invoke(METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN,
+            .invoke(isNotDispatchedByProxy ? METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN_TARGET : METHOD_BEAN_RESOLUTION_CONTEXT_GET_FACTORY_BEAN,
                 // the definition of the produced bean
                 aThis,
                 // the factory type
@@ -2541,7 +2534,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                     initStatements
                 )
             ).doCatch(Throwable.class, exceptionVar -> StatementDef.multi(
-                beanDefinitionTypeDef.getStaticField(failedInitializationField).put(exceptionVar),
+                beanDefinitionTypeDef.getStaticField(failedInitializationField).put(
+                    ClassTypeDef.of(BeanInitializationFailure.class).invokeStatic(DETACH_FAILURE, exceptionVar)
+                ),
                 StatementDef.multi(failStatements)
             ))
         );

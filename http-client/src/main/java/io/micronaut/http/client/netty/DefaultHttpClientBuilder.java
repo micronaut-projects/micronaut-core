@@ -171,7 +171,15 @@ public final class DefaultHttpClientBuilder {
         return this;
     }
 
-    DefaultHttpClientBuilder handlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
+    /**
+     * Set the registry of message body readers and writers used to read and write request
+     * and response bodies.
+     *
+     * @param handlerRegistry The handler registry
+     * @return This builder
+     * @since 5.3.0
+     */
+    public DefaultHttpClientBuilder handlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
         delegate.handlerRegistry(handlerRegistry);
         return this;
     }
@@ -236,6 +244,11 @@ public final class DefaultHttpClientBuilder {
 
     DefaultHttpClientBuilder blockingExecutor(@Nullable ExecutorService blockingExecutor) {
         delegate.blockingExecutor(blockingExecutor);
+        return this;
+    }
+
+    DefaultHttpClientBuilder retainedConnections(@Nullable RetainedClientConnections retainedConnections) {
+        delegate.retainedConnections(retainedConnections);
         return this;
     }
 

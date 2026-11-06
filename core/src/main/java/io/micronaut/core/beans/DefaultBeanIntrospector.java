@@ -179,12 +179,17 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
     private BeanIntrospectionReference<Object> findIntrospectionReference(Class<?> beanType, ClassLoader effectiveClassLoader) {
         String beanTypeName = beanType.getName();
         BeanIntrospectionReference<Object> reference = getIntrospections(effectiveClassLoader).get(beanTypeName);
-        if (reference != null) {
+        if (reference != null && reference.getBeanType() == beanType) {
             return reference;
         }
+        // missing, or the introspection of another class loader's class of the same name, as when each deployment
+        // defines its own copy of the class: the class loader of the bean type is the one that knows its introspection
         ClassLoader beanClassLoader = beanType.getClassLoader();
         if (beanClassLoader != null && beanClassLoader != effectiveClassLoader && sharesBeanIntrospectionReference(beanClassLoader)) {
-            return getIntrospections(beanClassLoader).get(beanTypeName);
+            reference = getIntrospections(beanClassLoader).get(beanTypeName);
+            if (reference != null && reference.getBeanType() == beanType) {
+                return reference;
+            }
         }
         return null;
     }

@@ -18,7 +18,6 @@ package io.micronaut.http.server.netty.converters;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.naming.NameUtils;
@@ -40,18 +39,14 @@ import java.util.Optional;
 @Internal
 public final class NettyConverters implements TypeConverterRegistrar {
 
-    private final ConversionService conversionService;
     private final BeanProvider<ChannelOptionFactory> channelOptionFactory;
 
     /**
      * Default constructor.
      *
-     * @param conversionService            The conversion service
      * @param channelOptionFactory         The decoder channel option factory
      */
-    public NettyConverters(ConversionService conversionService,
-                           BeanProvider<ChannelOptionFactory> channelOptionFactory) {
-        this.conversionService = conversionService;
+    public NettyConverters(BeanProvider<ChannelOptionFactory> channelOptionFactory) {
         this.channelOptionFactory = channelOptionFactory;
     }
 

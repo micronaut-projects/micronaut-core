@@ -6,6 +6,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.Retainable
+import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.visitor.VisitorContext
 import jakarta.validation.Constraint
 import jakarta.validation.OverridesAttribute
@@ -31,6 +32,7 @@ import jakarta.validation.Payload;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.lang.annotation.Documented;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
@@ -325,6 +327,142 @@ class Test {
 
         where:
         kind << ['compiled', 'written']
+    }
+
+    void "annotations in a container that is not repeatable retain what they compose when a remapper set their stereotypes"() {
+        given:
+        BeanIntrospection<?> introspection = buildBeanIntrospection('retainedcontainer.Test$Holder', '''
+package retainedcontainer;
+
+import io.micronaut.core.annotation.Introspected;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.ElementType.ANNOTATION_TYPE;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+class Test {
+    @Retention(RUNTIME)
+    @Target(FIELD)
+    @Contract
+    @Required
+    @Single
+    @interface Bundled {
+        String message() default "bundle";
+
+        @Retention(RUNTIME)
+        @Target(FIELD)
+        @interface List {
+            Bundled[] value();
+        }
+    }
+
+    @Retention(RUNTIME)
+    @Target(FIELD)
+    @Contract
+    @Required
+    @Single
+    @Repeatable(Repeated.List.class)
+    @interface Repeated {
+        String message() default "repeated";
+
+        @Retention(RUNTIME)
+        @Target(FIELD)
+        @interface List {
+            Repeated[] value();
+        }
+    }
+
+    @Introspected(accessKind = Introspected.AccessKind.FIELD)
+    static class Holder {
+        @Bundled.List({@Bundled(message = "first"), @Bundled(message = "second")})
+        public String value;
+
+        @Repeated(message = "first")
+        @Repeated(message = "second")
+        public String repeated;
+    }
+}
+
+@Retention(RUNTIME)
+@Target(ANNOTATION_TYPE)
+@interface Contract {
+}
+
+@Retention(RUNTIME)
+@Target(ANNOTATION_TYPE)
+@interface Single {
+}
+
+@Retention(RUNTIME)
+@Target({ FIELD, ANNOTATION_TYPE })
+@Contract
+@interface Required {
+}
+''')
+        List<AnnotationValue<?>> bundled = introspection.getRequiredProperty('value', String)
+                .getAnnotation('retainedcontainer.Test$Bundled$List')
+                .getAnnotations('value')
+        List<AnnotationValue<?>> repeated = introspection.getRequiredProperty('repeated', String)
+                .getAnnotationValuesByName('retainedcontainer.Test$Repeated')
+
+        expect: 'each occurrence read back from the introspection keeps its own values'
+        bundled*.values == [[message: 'first'], [message: 'second']]
+        repeated*.values == [[message: 'first'], [message: 'second']]
+
+        and: 'each occurrence retains the contract, the marker and the composed annotation the remapper set, as in a repeatable container'
+        (bundled + repeated).collect { it.getStereotypes()*.annotationName.toSet() } == [
+                ['retainedcontainer.Contract', 'retainedcontainer.Single', 'retainedcontainer.Required'] as Set
+        ] * 4
+
+        and: 'the composed annotation retains its own contract'
+        (bundled + repeated).every {
+            stereotypesNamed(it, 'retainedcontainer.Required')*.getStereotypes()*.annotationName == [['retainedcontainer.Contract']]
+        }
+
+        and: 'the marker is not retained'
+        (bundled + repeated).every { !it.getStereotypes()*.annotationName.contains(Retainable.name) }
+    }
+
+    /**
+     * Marks the contract and the marker retainable, and sets the contract, the marker and the annotations carrying
+     * the contract as the stereotypes of each annotation held in a container, before the metadata builder sees it,
+     * as the validation integration does for constraints.
+     */
+    static class ContainerContractRemapper implements AnnotationRemapper {
+
+        @Override
+        String getPackageName() {
+            return 'retainedcontainer'
+        }
+
+        @Override
+        List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
+            if (annotation.annotationName in ['retainedcontainer.Contract', 'retainedcontainer.Single']) {
+                return [makeRetainable(annotation)]
+            }
+            List<AnnotationValue<?>> contained = annotation.getAnnotations(AnnotationMetadata.VALUE_MEMBER)
+            if (contained.isEmpty()) {
+                return [annotation]
+            }
+            AnnotationValue<?>[] rewritten = contained.collect { value ->
+                visitorContext.getClassElement(value.annotationName).map { type ->
+                    AnnotationValue<?> contract = type.getAnnotationMetadata().getAnnotation('retainedcontainer.Contract')
+                    if (contract == null) {
+                        return value
+                    }
+                    def builder = value.mutate().stereotype(contract)
+                    type.getAnnotationMetadata().findAnnotation('retainedcontainer.Single').ifPresent { builder.stereotype(it) }
+                    for (String name : type.getAnnotationNamesByStereotype('retainedcontainer.Contract')) {
+                        type.getAnnotationValuesByName(name).each { builder.stereotype(it) }
+                    }
+                    return builder.build()
+                }.orElse(value)
+            } as AnnotationValue<?>[]
+            return [annotation.mutate().member(AnnotationMetadata.VALUE_MEMBER, rewritten).build()]
+        }
     }
 
     private static Map<String, Object> range(int from, boolean written) {

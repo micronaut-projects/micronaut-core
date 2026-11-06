@@ -1836,6 +1836,23 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         }
 
         @Override
+        public boolean isWritable() {
+            return member instanceof Field field && !Modifier.isFinal(field.getModifiers());
+        }
+
+        @Override
+        public void write(B bean, @Nullable Object value) {
+            ArgumentUtils.requireNonNull("bean", bean);
+            if (!declaringType.isInstance(bean)) {
+                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + declaringType);
+            }
+            if (!isWritable()) {
+                throw new UnsupportedOperationException("Cannot write to the property member: " + name);
+            }
+            ReflectionUtils.setField((Field) member, bean, value);
+        }
+
+        @Override
         public String toString() {
             return "BeanPropertyMember{elementType=" + elementType
                 + ", declaringType=" + declaringType
