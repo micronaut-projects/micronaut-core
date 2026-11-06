@@ -81,7 +81,9 @@ class EnvironmentAnnotationMetadataOverridesSpec extends Specification {
             'stringValue(Class)',
             'stringValue(String)',
             'stringValues(Class)',
-            'stringValues(String)'
+            'stringValues(String)',
+            'synthesizeAll(ClassLoader)',
+            'synthesizeDeclared(ClassLoader)'
     ] as Set
 
     void "test every default method of AnnotationMetadata is overridden or only delegates to overridden methods"() {
