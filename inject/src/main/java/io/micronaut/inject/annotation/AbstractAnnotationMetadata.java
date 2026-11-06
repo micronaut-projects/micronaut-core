@@ -140,7 +140,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
             return (T) cached;
         }
         T annotation = AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue.get());
-        if (cached == null && annotation != null) {
+        if (cached == null) {
             Annotation previous = cache.putIfAbsent(annotationName, annotation);
             if (previous != null && previous.annotationType() == annotationClass) {
                 return (T) previous;
