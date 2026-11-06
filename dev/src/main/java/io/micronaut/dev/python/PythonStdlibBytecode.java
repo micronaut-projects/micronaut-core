@@ -135,11 +135,11 @@ final class PythonStdlibBytecode {
         }
         Path found = tree;
         // a cache cleaned while the application runs
-        return found != null && usable(found) ? found : null;
+        return found != null && whole(found) ? found : null;
     }
 
     /**
-     * @return The tree an earlier run recorded, if it was seeded by this version of GraalPy and is still usable
+     * @return The tree an earlier run recorded, if it was seeded by this version of GraalPy and is still whole
      */
     @Nullable Path recorded() {
         try (Engine engine = engine()) {
@@ -236,17 +236,12 @@ final class PythonStdlibBytecode {
         Files.move(file, root.resolve(version + CURRENT), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     }
 
-    private static boolean usable(Path candidate) {
-        return Files.isRegularFile(candidate.resolve(COMPLETE)) && Files.exists(candidate.resolve(PROBE_FILE));
-    }
-
     /**
      * Whether a tree still has everything it was built with: a cleaner of old files may have taken part of it, and a
-     * module missing from it would fail to import. Walks the tree, so this is for the start of a process, not of a
-     * generation.
+     * module missing from it would fail to import. Walks the tree, about a thousand links, once for each generation.
      */
     private static boolean whole(Path candidate) {
-        if (!usable(candidate)) {
+        if (!Files.isRegularFile(candidate.resolve(COMPLETE)) || !Files.exists(candidate.resolve(PROBE_FILE))) {
             return false;
         }
         try {

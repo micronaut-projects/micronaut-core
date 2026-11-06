@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -145,6 +146,14 @@ class PythonStdlibBytecodeTest {
         bytecode.seed();
         assertEquals(tree, bytecode.recorded());
         assertTrue(Files.exists(tree.resolve("bisect.py")));
+
+        // taken from it while the application runs, the next generation goes back to the real standard library
+        assertEquals(tree, bytecode.standardLibrary());
+        Thread.getAllStackTraces().keySet().stream()
+            .filter(thread -> thread.getName().equals("micronaut-dev-python-stdlib"))
+            .forEach(thread -> assertDoesNotThrow(() -> thread.join()));
+        Files.delete(tree.resolve("bisect.py"));
+        assertNull(bytecode.standardLibrary());
     }
 
     @Test
