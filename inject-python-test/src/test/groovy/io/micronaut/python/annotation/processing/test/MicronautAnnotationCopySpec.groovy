@@ -15,10 +15,14 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Requirements
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.python.annotation.processing.test.reflective.MicronautExecutableMarker
+import io.micronaut.python.annotation.processing.test.reflective.MicronautIntrospectedMarker
 import io.micronaut.python.annotation.processing.test.reflective.MicronautTestMarker
 import io.micronaut.python.compiler.PyronautCompiler
-import jakarta.inject.Singleton
 
 /**
  * A Micronaut annotation a module reads reflectively from the generated class rather than through the
@@ -44,11 +48,13 @@ from dataclasses import dataclass
 from jakarta.inject import Singleton
 from micronaut.core.annotation import Introspected
 from micronaut.context.annotation import Executable
-from io.micronaut.python.annotation.processing.test.reflective import MicronautTestMarker
+from io.micronaut.python.annotation.processing.test.reflective import MicronautExecutableMarker, MicronautIntrospectedMarker, MicronautTestMarker
 
 
 @Introspected
 @Singleton
+@MicronautExecutableMarker
+@MicronautIntrospectedMarker
 @MicronautTestMarker("connection")
 @dataclass
 class ConnectionSpec:
@@ -70,9 +76,68 @@ class ConnectionSpec:
         specClass.getAnnotation(MicronautTestMarker)?.value() == "connection"
         specClass.getMethod("probe").getAnnotation(MicronautTestMarker)?.value() == "probe"
 
-        and: "the Micronaut annotations the processing rounds act on stay off the generated source"
+        and: "the Micronaut annotations the processing rounds act on by name stay off the generated source"
         specClass.getAnnotation(Introspected) == null
-        specClass.getAnnotation(Singleton) == null
+        specClass.getMethod("probe").getAnnotation(Executable) == null
+
+        and: "so do the ones they act on through a stereotype"
+        specClass.getAnnotation(MicronautExecutableMarker) == null
+        specClass.getAnnotation(MicronautIntrospectedMarker) == null
+        specClass.getMethod("probe").getAnnotation(MicronautExecutableMarker) == null
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a repeated Micronaut annotation folded into its container stays off the generated source"() {
+        given: 'a repeated @Requires, which the annotation metadata folds into @Requirements'
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Requires
+from io.micronaut.python.annotation.processing.test.reflective import MicronautTestMarker
+
+
+@Singleton
+@Requires(property="spec.name", value="MicronautAnnotationCopySpec")
+@Requires(property="spec.mode", value="copy")
+@MicronautTestMarker("repeated")
+class RepeatedRequires:
+
+    def probe(self) -> str:
+        return "probe"
+''')
+        Class<?> specClass = context.classLoader.loadClass("python.RepeatedRequires")
+
+        expect: 'neither the repeated annotation nor its container is copied'
+        specClass.getAnnotation(Requires) == null
+        specClass.getAnnotation(Requirements) == null
+
+        and: 'the annotation that is reflection data still is'
+        specClass.getAnnotation(MicronautTestMarker)?.value() == "repeated"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a single Micronaut annotation the processing rounds act on stays off the generated source"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Requires
+
+
+@Singleton
+@Requires(property="spec.name", value="MicronautAnnotationCopySpec")
+class SingleRequires:
+
+    def probe(self) -> str:
+        return "probe"
+''')
+        Class<?> specClass = context.classLoader.loadClass("python.SingleRequires")
+
+        expect:
+        specClass.getAnnotation(Requires) == null
+        specClass.getAnnotation(Requirements) == null
 
         cleanup:
         context?.close()
