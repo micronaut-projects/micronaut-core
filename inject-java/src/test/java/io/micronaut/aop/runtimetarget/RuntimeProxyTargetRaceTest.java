@@ -1,6 +1,7 @@
 package io.micronaut.aop.runtimetarget;
 
 import io.micronaut.aop.runtime.DefaultRuntimeProxyDefinition;
+import io.micronaut.context.AbstractBeanResolutionContext;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.DependentBeanProvider;
@@ -20,6 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -122,6 +124,12 @@ class RuntimeProxyTargetRaceTest {
         try (ApplicationContext context = ApplicationContext.run()) {
             InjectingTarget proxy = context.createBean(InjectingTarget.class);
             assertEquals(List.of(), callConcurrently(proxy::injected));
+
+            DefaultRuntimeProxyDefinition<?> definition = (DefaultRuntimeProxyDefinition<?>) context.getBean(PerCallTargetProxyCreator.class)
+                .definitions.get(InjectingTarget.class);
+            AbstractBeanResolutionContext retained = (AbstractBeanResolutionContext) definition.resolutionContext();
+            assertSame(retained, retained.runtimeProxyTargetContext());
+
             assertNotNull(context.createBean(CachingTarget.class));
         }
     }
