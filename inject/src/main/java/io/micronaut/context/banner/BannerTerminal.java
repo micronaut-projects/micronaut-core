@@ -35,6 +35,15 @@ record BannerTerminal(Function<String, @Nullable String> env, BooleanSupplier in
 
     private static final String BANNER_MODE_ENV = "MICRONAUT_BANNER_MODE";
     private static final String BANNER_THEME_ENV = "MICRONAUT_BANNER_THEME";
+    private static final String TERM_ENV = "TERM";
+    private static final String TERM_PROGRAM_ENV = "TERM_PROGRAM";
+    private static final String KITTY_WINDOW_ID_ENV = "KITTY_WINDOW_ID";
+    private static final String COLOR_FG_BG_ENV = "COLORFGBG";
+    private static final String ITERM_PROGRAM = "iTerm.app";
+    private static final String WEZTERM_PROGRAM = "WezTerm";
+    private static final String KITTY = "kitty";
+    private static final String AUTO = "auto";
+    private static final String THEME_LIGHT = "light";
 
     /**
      * @return The terminal of this process
@@ -71,8 +80,8 @@ record BannerTerminal(Function<String, @Nullable String> env, BooleanSupplier in
         String mode = env.apply(BANNER_MODE_ENV);
         if (mode != null) {
             return switch (mode.trim().toLowerCase(Locale.ROOT)) {
-                case "kitty" -> true;
-                case "", "auto" -> isDetectedKittyTerminal();
+                case KITTY -> true;
+                case "", AUTO -> isDetectedKittyTerminal();
                 default -> false;
             };
         }
@@ -86,8 +95,8 @@ record BannerTerminal(Function<String, @Nullable String> env, BooleanSupplier in
         String theme = env.apply(BANNER_THEME_ENV);
         if (theme != null) {
             return switch (theme.trim().toLowerCase(Locale.ROOT)) {
-                case "light" -> true;
-                case "", "auto" -> isDetectedLightTheme();
+                case THEME_LIGHT -> true;
+                case "", AUTO -> isDetectedLightTheme();
                 default -> false;
             };
         }
@@ -95,7 +104,7 @@ record BannerTerminal(Function<String, @Nullable String> env, BooleanSupplier in
     }
 
     private boolean isDetectedLightTheme() {
-        String colorFgBg = env.apply("COLORFGBG");
+        String colorFgBg = env.apply(COLOR_FG_BG_ENV);
         if (colorFgBg == null) {
             return false;
         }
@@ -113,28 +122,18 @@ record BannerTerminal(Function<String, @Nullable String> env, BooleanSupplier in
 
     private boolean isDetectedKittyTerminal() {
         // There is unfortunately no good way to detect terminal capabilities.
-        String term = env.apply("TERM");
-        String termProgram = env.apply("TERM_PROGRAM");
-        boolean kitty = env.apply("KITTY_WINDOW_ID") != null
-            || (term != null && term.toLowerCase(Locale.ROOT).contains("kitty"))
-            || "iTerm.app".equals(termProgram)
-            || "WezTerm".equals(termProgram);
+        String term = env.apply(TERM_ENV);
+        String termProgram = env.apply(TERM_PROGRAM_ENV);
+        boolean kitty = env.apply(KITTY_WINDOW_ID_ENV) != null
+            || (term != null && term.toLowerCase(Locale.ROOT).contains(KITTY))
+            || ITERM_PROGRAM.equals(termProgram)
+            || WEZTERM_PROGRAM.equals(termProgram);
         return kitty && interactive.getAsBoolean();
     }
 
-    @SuppressWarnings({"NoReflection", "SystemConsoleNull"}) // The JDK 22 API must remain optional for older runtime versions.
+    @SuppressWarnings("SystemConsoleNull") // the console is still null when the JVM has none
     private static boolean isConsoleInteractive() {
         Console console = System.console();
-        if (console == null) {
-            return false;
-        }
-        try {
-            return (boolean) Console.class.getMethod("isTerminal").invoke(console);
-        } catch (NoSuchMethodException e) {
-            // On Java versions before 22, a non-null system console is the available terminal check.
-            return true;
-        } catch (ReflectiveOperationException | SecurityException e) {
-            return false;
-        }
+        return console != null && console.isTerminal();
     }
 }

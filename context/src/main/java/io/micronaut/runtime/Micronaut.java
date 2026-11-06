@@ -22,9 +22,7 @@ import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.banner.Banner;
-import io.micronaut.context.banner.ImageBanner;
 import io.micronaut.context.banner.MicronautBanner;
-import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
@@ -66,7 +64,6 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 @NullMarked
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
     static final String TRAINING_ENABLED_ENVIRONMENT_VARIABLE = "MICRONAUT_APPLICATION_TRAINING_ENABLED";
-    private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
     private static final long SHUTDOWN_MONITOR_INTERVAL_MS = 250;
 
@@ -705,9 +702,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     private Banner resolveBanner(PrintStream out) {
-        return ImageBanner.resolve(getResourceLoader(), out)
-            .or(() -> getResourceLoader().getResource(BANNER_NAME).map(resource -> new ResourceBanner(resource, out)))
-            .orElseGet(() -> new MicronautBanner(out));
+        return MicronautBanner.resolve(getResourceLoader(), out);
     }
 
     /**

@@ -15,8 +15,9 @@
  */
 package io.micronaut.context.banner;
 
+import io.micronaut.core.io.ResourceLoader;
+
 import java.io.PrintStream;
-import java.util.Optional;
 
 /**
  * Default implementation of {@link Banner} that prints the default Micronaut banner: the logo when
@@ -31,12 +32,6 @@ public class MicronautBanner implements Banner {
             "| |  | | | (__| | | (_) | | | | (_| | |_| | |_ ",
             "|_|  |_|_|\\___|_|  \\___/|_| |_|\\__,_|\\__,_|\\__|"
     };
-
-    // The white logo, for the dark background terminals usually have
-    private static final String LOGO = "io/micronaut/context/banner/micronaut-banner/logo.png";
-    private static final String LOGO_LIGHT = "io/micronaut/context/banner/micronaut-banner/logo-light.png";
-    // The logo is far larger than it is displayed so that it stays sharp on any display and font size
-    private static final int LOGO_ROWS = 6;
 
     private final PrintStream out;
     private final BannerTerminal terminal;
@@ -61,20 +56,27 @@ public class MicronautBanner implements Banner {
         this.terminal = terminal;
     }
 
+    /**
+     * Finds the banner of the application: its image, otherwise its text, otherwise the default banner.
+     *
+     * @param resourceLoader The loader of the banners of the application
+     * @param out The print stream
+     * @return The banner
+     * @since 5.3.0
+     */
+    public static Banner resolve(ResourceLoader resourceLoader, PrintStream out) {
+        return ImageBanner.resolve(resourceLoader, out)
+            .or(() -> ResourceBanner.resolve(resourceLoader, out))
+            .orElseGet(() -> new MicronautBanner(out));
+    }
+
     @Override
     public void print() {
-        if (printLogo()) {
+        if (ImageBanner.printLogo(terminal, out)) {
             return;
         }
         for (String line : MICRONAUT_BANNER) {
             out.println(line);
         }
-    }
-
-    private boolean printLogo() {
-        ClassLoader classLoader = MicronautBanner.class.getClassLoader();
-        return terminal.selectImage(name -> Optional.ofNullable(classLoader.getResource(name)), LOGO, LOGO_LIGHT)
-            .map(logo -> new ImageBanner(logo, out, LOGO_ROWS).printImage())
-            .orElse(false);
     }
 }

@@ -46,6 +46,11 @@ public class ImageBanner implements Banner {
     public static final String LIGHT_RESOURCE = "META-INF/micronaut/banner-light.png";
 
     private static final Logger LOG = LoggerFactory.getLogger(ImageBanner.class);
+    // The white logo, for the dark background terminals usually have
+    private static final String LOGO = "io/micronaut/context/banner/micronaut-banner/logo.png";
+    private static final String LOGO_LIGHT = "io/micronaut/context/banner/micronaut-banner/logo-light.png";
+    // The logo is far larger than it is displayed so that it stays sharp on any display and font size
+    private static final int LOGO_ROWS = 6;
     private static final String GRAPHICS_START = "\u001B_G";
     private static final String GRAPHICS_END = "\u001B\\";
     // errors are suppressed along with the OK responses, which the terminal would otherwise type into stdin
@@ -94,6 +99,20 @@ public class ImageBanner implements Banner {
     static Optional<Banner> resolve(BannerTerminal terminal, ResourceLoader resourceLoader, PrintStream out) {
         return terminal.selectImage(resourceLoader::getResource, RESOURCE, LIGHT_RESOURCE)
             .map(image -> new ImageBanner(image, out));
+    }
+
+    /**
+     * Prints the Micronaut logo.
+     *
+     * @param terminal The terminal
+     * @param out The print stream
+     * @return Whether the logo was printed, false if the terminal displays no images or the logo cannot be read
+     */
+    static boolean printLogo(BannerTerminal terminal, PrintStream out) {
+        ClassLoader classLoader = ImageBanner.class.getClassLoader();
+        return terminal.selectImage(name -> Optional.ofNullable(classLoader.getResource(name)), LOGO, LOGO_LIGHT)
+            .map(logo -> new ImageBanner(logo, out, LOGO_ROWS).printImage())
+            .orElse(false);
     }
 
     @Override

@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.banner;
 
+import io.micronaut.core.io.ResourceLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,12 +25,20 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
  * Prints a banner from a resource.
  */
 public class ResourceBanner implements Banner {
+
+    /**
+     * The classpath location of the text banner.
+     *
+     * @since 5.3.0
+     */
+    public static final String RESOURCE = "micronaut-banner.txt";
 
     private static final Logger LOG = LoggerFactory.getLogger(ResourceBanner.class);
 
@@ -44,6 +53,18 @@ public class ResourceBanner implements Banner {
     public ResourceBanner(URL resource, PrintStream out) {
         this.resource = resource;
         this.out = out;
+    }
+
+    /**
+     * Finds the text banner of the application.
+     *
+     * @param resourceLoader The loader of the {@link #RESOURCE} text
+     * @param out The print stream
+     * @return The banner, empty if the application has no text banner
+     * @since 5.3.0
+     */
+    public static Optional<Banner> resolve(ResourceLoader resourceLoader, PrintStream out) {
+        return resourceLoader.getResource(RESOURCE).map(resource -> new ResourceBanner(resource, out));
     }
 
     @Override
