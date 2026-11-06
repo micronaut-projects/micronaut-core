@@ -1238,7 +1238,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         MethodReference methodRef = Objects.requireNonNull(methodInjection)[methodIndex];
         AnnotationMetadata parentAnnotationMetadata = methodRef.annotationMetadata;
         Argument<?> argument = methodRef.arguments[argIndex];
-        return resolveContainsValue(resolutionContext, context, parentAnnotationMetadata, argument, isValuePrefix);
+        return resolveContainsValue(resolutionContext, parentAnnotationMetadata, argument, isValuePrefix);
     }
 
     /**
@@ -2159,7 +2159,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Deprecated
     protected final boolean containsValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, boolean isValuePrefix) {
         FieldReference fieldRef = Objects.requireNonNull(fieldInjection)[fieldIndex];
-        return resolveContainsValue(resolutionContext, context, fieldRef.argument.getAnnotationMetadata(), fieldRef.argument, isValuePrefix);
+        return resolveContainsValue(resolutionContext, fieldRef.argument.getAnnotationMetadata(), fieldRef.argument, isValuePrefix);
     }
 
     /**
@@ -2402,7 +2402,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return propertyResolver.containsProperty(value);
     }
 
-    private boolean resolveContainsValue(BeanResolutionContext resolutionContext, BeanContext context, AnnotationMetadata parentAnnotationMetadata, Argument argument, boolean isValuePrefix) {
+    private boolean resolveContainsValue(BeanResolutionContext resolutionContext, AnnotationMetadata parentAnnotationMetadata, Argument<?> argument, boolean isValuePrefix) {
         PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
         if (propertyResolver == null) {
             return false;

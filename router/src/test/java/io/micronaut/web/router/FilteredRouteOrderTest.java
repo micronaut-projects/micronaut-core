@@ -19,14 +19,17 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RequestHandler;
+import io.micronaut.web.router.builder.RequestCondition;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.filter.FilteredRouter;
 import io.micronaut.web.router.version.RouteVersionFilter;
@@ -35,11 +38,14 @@ import io.micronaut.web.router.version.resolution.HeaderVersionResolverConfigura
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -95,6 +101,122 @@ class FilteredRouteOrderTest {
         assertEquals("v1 early", target(router, HttpRequest.GET("/shops/1/items/special").header(VERSION, "1")));
         assertEquals("v2 special", target(router, HttpRequest.GET("/shops/1/items/special").header(VERSION, "2")));
         assertNull(router.findClosest(HttpRequest.GET("/shops/1/items/other").header(VERSION, "2")));
+    }
+
+    @Test
+    void filteredResolutionCollectsTopLevelCandidatesOnce() {
+        AtomicInteger predicates = new AtomicInteger();
+        AtomicInteger locators = new AtomicInteger();
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located ->
+            located.GET("/items/{name}").annotate(version("1")).produces(MediaType.TEXT_PLAIN_TYPE).handle(handler("located")));
+        Router router = versioned(routes -> {
+            routes.GET("/shops/{id}/items/special").where(request -> {
+                predicates.incrementAndGet();
+                return true;
+            }).annotate(version("2")).handle(handler("rejected"));
+            routes.locate("/shops/{id}", (request, variables) -> {
+                locators.incrementAndGet();
+                return "shop";
+            }, target -> items);
+        });
+
+        for (int i = 0; i < 2; i++) {
+            var request = HttpRequest.GET("/shops/1/items/special").header(VERSION, "1").accept(MediaType.TEXT_PLAIN_TYPE);
+            var match = router.resolve(request).matchOrNull();
+            assertNotNull(match);
+            assertEquals("located", ((Named) ((HandlerMethod<?>) match.getRouteInfo().getTargetMethod()).getTarget()).name());
+            assertEquals(Map.of("id", "1", "name", "special"), match.getVariableValues());
+            assertEquals(List.of(MediaType.TEXT_PLAIN_TYPE), match.getRouteInfo().getProduces());
+            assertEquals(i + 1, locators.get());
+            assertEquals(i + 1, predicates.get(), "only one top-level matching pass per resolution");
+        }
+    }
+
+    @Test
+    void locatedBodyConditionsKeepLessSpecificTopLevelCandidates() {
+        AtomicInteger predicates = new AtomicInteger();
+        AtomicInteger specific = new AtomicInteger();
+        AtomicInteger fallback = new AtomicInteger();
+        LocatedRoutes<?> special = TestLocatedRoutes.of(located ->
+            located.POST("/special").annotate(version("1")).where(RequestCondition.bodyText("express"::equals)).consumesAll().handle(handler("special")));
+        LocatedRoutes<?> general = TestLocatedRoutes.of(located ->
+            located.POST("/items/{name}").annotate(version("1")).consumesAll().handle(handler("fallback")));
+        Router router = versioned(routes -> {
+            routes.POST("/shops/{id}/items/special").consumesAll().annotate(version("2")).where(request -> {
+                predicates.incrementAndGet();
+                return true;
+            }).handle(handler("rejected"));
+            routes.locate("/shops/{id}/items", (request, variables) -> {
+                specific.incrementAndGet();
+                return "specific";
+            }, target -> special);
+            routes.locate("/shops/{id}", (request, variables) -> {
+                fallback.incrementAndGet();
+                return "fallback";
+            }, target -> general);
+        });
+
+        var request = HttpRequest.POST("/shops/1/items/special", "ordinary").contentType(MediaType.TEXT_PLAIN_TYPE).header(VERSION, "1");
+        RouteResolution.Pending<Object, Object> resolution = assertInstanceOf(RouteResolution.Pending.class, router.resolve(request));
+        var pending = resolution.pending();
+        assertEquals(2, pending.getRanks().size());
+        var ranks = pending.getRanks();
+        var match = pending.choose(request, ranks.get(1)).matchOrNull();
+        assertNotNull(match);
+        assertEquals("fallback", ((Named) ((HandlerMethod<?>) match.getRouteInfo().getTargetMethod()).getTarget()).name());
+        assertEquals(Map.of("id", "1", "name", "special"), match.getVariableValues());
+        assertEquals(1, specific.get());
+        assertEquals(1, fallback.get());
+        assertEquals(1, predicates.get(), "body fall-through must not recollect top-level candidates");
+    }
+
+    @Test
+    void filteredResolutionLeavesADominatedLocatorUnvisitedAndKeepsAmbiguity() {
+        AtomicInteger locators = new AtomicInteger();
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.GET("/special").handle(handler("located")));
+        Router router = versioned(routes -> {
+            routes.GET("/items/special").annotate(version("1")).handle(handler("static"));
+            routes.locate("/items", (request, variables) -> {
+                locators.incrementAndGet();
+                return "items";
+            }, target -> items);
+        });
+        assertNotNull(router.resolve(HttpRequest.GET("/items/special").header(VERSION, "1")).matchOrNull());
+        assertEquals(0, locators.get());
+
+        Router ambiguous = versioned(routes -> {
+            routes.locate("/items", (request, variables) -> "items", target -> items);
+            routes.GET("/items/special").annotate(version("1")).handle(handler("first"));
+            routes.GET("/items/special").annotate(version("1")).handle(handler("second"));
+        });
+        assertThrows(DuplicateRouteException.class, () -> ambiguous.resolve(HttpRequest.GET("/items/special").header(VERSION, "1")));
+    }
+
+    @Test
+    void filteredLocatedRoutesKeepMethodAndHeadPreferences() {
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> {
+            located.GET("/implicit").handle(handler("get"));
+            located.GET("/explicit").handle(handler("implicit head"));
+            located.route(HttpMethod.HEAD, "/explicit").handle(handler("explicit head"));
+            located.any("/custom").handle(handler("any"));
+            located.route("REPORT", "/custom").handle(handler("report"));
+        });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
+        var routes = new DefaultHttpRouteBuilder(assembly);
+        routes.locate("/items/{id}", (request, variables) -> "items", target -> items);
+        routes.close();
+        Router router = new DefaultRouter(List.of(), List.of(() -> assembly));
+
+        List<HttpRequest<?>> requests = List.of(
+            HttpRequest.HEAD("/items/1/implicit"), HttpRequest.HEAD("/items/1/explicit"),
+            HttpRequest.create(HttpMethod.CUSTOM, "/items/1/custom", "REPORT"),
+            HttpRequest.create(HttpMethod.CUSTOM, "/items/1/custom", "PURGE"));
+        List<String> expected = List.of("get", "explicit head", "report", "any");
+        for (int i = 0; i < requests.size(); i++) {
+            var match = router.resolve(requests.get(i), candidate -> true).matchOrNull();
+            assertNotNull(match);
+            assertEquals(expected.get(i), ((Named) ((HandlerMethod<?>) match.getRouteInfo().getTargetMethod()).getTarget()).name());
+        }
     }
 
     private static AnnotationValue<Version> version(String version) {

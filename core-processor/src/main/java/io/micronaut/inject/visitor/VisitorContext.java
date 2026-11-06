@@ -479,12 +479,13 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * Records the generic hierarchy of a type, which {@link io.micronaut.core.type.TypeHierarchies#find(Class)} finds
      * at run time as a {@link io.micronaut.core.type.TypeHierarchy}: its type variables with their bounds, its generic
      * superclass and its generic interfaces, as declared. The type can be any class the compilation sees, a class of
-     * a library or of the JDK included. The record is a small generated class, written once per type and
-     * package it is written into, however many times the type is recorded from there; a type recorded from several
-     * packages has a record in each, and the lookup prefers the one in the package of the type. A parameterized usage of the type, the
+     * a library or of the JDK included. The record is a small generated class, written once per type and top-level
+     * class of the first originating element, however many times the type is recorded from there; a type recorded from
+     * several classes has a record for each, and the lookup prefers one in the package of the type. A parameterized usage of the type, the
      * {@code Box<String>} of a field, records the declaration {@code Box<T>}.
      *
-     * <p>The record is named after the type and written into the package of the first originating element, or into
+     * <p>The record is named after the type and the top-level class of the first originating element, which owns the
+     * record and its service entry, and written into the package of that element, or into
      * the package of the type when the type itself is not public. A super type the record cannot name from its package
      * is left out of it and named in {@link io.micronaut.core.type.TypeHierarchy#getOmittedSuperTypeNames()}; a visitor
      * that needs to know what was left out calls {@link #recordTypeHierarchy(ClassElement, Element...)} instead. Every

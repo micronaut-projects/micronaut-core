@@ -9,7 +9,9 @@ import com.tschuchort.compiletesting.KotlinCompilation
 import com.tschuchort.compiletesting.KspKt
 import com.tschuchort.compiletesting.Ksp2Kt
 import com.tschuchort.compiletesting.SourceFile
+import io.micronaut.core.type.TypeHierarchy
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessor
+import io.micronaut.kotlin.processing.visitor.TypeElementSymbolProcessor
 import groovy.transform.Immutable
 import spock.lang.Specification
 
@@ -64,7 +66,51 @@ class StartupListener {
         outputs.findAll { it.value.aggregating || !it.value.originatingFiles.contains('StartupListener.kt') } == [:]
     }
 
+    void "each file recording a type owns its record and the service entry of the record"() {
+        given:
+        def outputs = compileVisitors([
+            'First.kt': '''
+package owners
+
+import io.micronaut.core.annotation.TypeHierarchyImport
+
+@TypeHierarchyImport(classes = [java.util.ArrayList::class, Shared::class])
+class First
+''',
+            'Second.kt': '''
+package owners
+
+import io.micronaut.core.annotation.TypeHierarchyImport
+
+@TypeHierarchyImport(classes = [java.util.ArrayList::class, Shared::class])
+class Second
+''',
+            'Shared.kt': '''
+package owners
+
+class Shared : java.util.function.Supplier<String> {
+    override fun get(): String = ""
+}
+'''])
+        def serviceDir = 'META-INF.micronaut.' + TypeHierarchy.name + File.separator
+        def records = outputs.findAll { it.key.contains('$TypeHierarchy') }
+
+        expect: "a class and its service entry per record, both from the file of the class that recorded the type, so that changing one file keeps the record of the other"
+        records.keySet() == ['owners.$$java.util.$ArrayList$TypeHierarchy$$First', 'owners.$Shared$TypeHierarchy$$First',
+                             'owners.$$java.util.$ArrayList$TypeHierarchy$$Second', 'owners.$Shared$TypeHierarchy$$Second']
+            .collectMany { [it + '.class', serviceDir + it + '.'] } as Set
+        records.every { !it.value.aggregating && it.value.originatingFiles == [it.key.contains('$$First') ? 'First.kt' : 'Second.kt'] }
+    }
+
     private static Map<String, Output> compile(String fileName, String source) {
+        return compile([(fileName): source]) { SymbolProcessorEnvironment environment -> new BeanDefinitionProcessor(environment) }
+    }
+
+    private static Map<String, Output> compileVisitors(Map<String, String> sources) {
+        return compile(sources) { SymbolProcessorEnvironment environment -> new TypeElementSymbolProcessor(environment) }
+    }
+
+    private static Map<String, Output> compile(Map<String, String> sources, Closure<SymbolProcessor> processor) {
         Map<String, Output> outputs = [:]
         def compilation = new KotlinCompilation()
         Ksp2Kt.useKsp2(compilation)
@@ -74,8 +120,8 @@ class StartupListener {
             .findAll { !it.isEmpty() }
             .collect { new File(it) }
             .findAll { !it.name.startsWith('kotlin-compiler-embeddable-') && !it.name.startsWith('symbol-processing-aa-embeddable-') }
-        compilation.sources = [SourceFile.@Companion.kotlin(fileName, source, true)]
-        KspKt.setSymbolProcessorProviders(compilation, [new RecordingBeanDefinitionProcessorProvider(outputs)] as List<SymbolProcessorProvider>)
+        compilation.sources = sources.collect { SourceFile.@Companion.kotlin(it.key, it.value, true) }
+        KspKt.setSymbolProcessorProviders(compilation, [new RecordingProcessorProvider(outputs, processor)] as List<SymbolProcessorProvider>)
         def result = compilation.compile()
         assert result.exitCode == KotlinCompilation.ExitCode.OK: result.messages
         return outputs
@@ -94,17 +140,19 @@ class StartupListener {
         }
     }
 
-    private static class RecordingBeanDefinitionProcessorProvider implements SymbolProcessorProvider {
+    private static class RecordingProcessorProvider implements SymbolProcessorProvider {
         private final Map<String, Output> outputs
+        private final Closure<SymbolProcessor> processor
 
-        RecordingBeanDefinitionProcessorProvider(Map<String, Output> outputs) {
+        RecordingProcessorProvider(Map<String, Output> outputs, Closure<SymbolProcessor> processor) {
             this.outputs = outputs
+            this.processor = processor
         }
 
         @Override
         SymbolProcessor create(SymbolProcessorEnvironment environment) {
             def codeGenerator = new RecordingCodeGenerator(environment.codeGenerator, outputs)
-            return new BeanDefinitionProcessor(new SymbolProcessorEnvironment(
+            return processor.call(new SymbolProcessorEnvironment(
                 environment.options,
                 environment.kotlinVersion,
                 codeGenerator,

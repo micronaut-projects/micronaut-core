@@ -35,6 +35,7 @@ import org.reactivestreams.Publisher;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.util.function.Supplier;
 
 /**
  * The body reader that reads a text/plain string converting it into the argument type.
@@ -93,13 +94,25 @@ public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReade
 
     @Override
     public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return BodyPublishers.map(input, byteBuffer -> read0(type, byteBuffer, getCharset(mediaType)));
+        return BodyPublishers.map(input, byteBuffer -> readChunk(byteBuffer, () -> read0(type, byteBuffer, getCharset(mediaType))));
     }
 
     @Override
     public PieceReader<T> openPieceReader(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
         Charset charset = getCharset(mediaType);
-        return PieceReaders.eachPiece(byteBuffer -> read0(type, byteBuffer, charset));
+        return PieceReaders.eachPiece(byteBuffer -> readChunk(byteBuffer, () -> read0(type, byteBuffer, charset)));
+    }
+
+    private static <R> R readChunk(ByteBuffer<?> byteBuffer, Supplier<R> reader) {
+        try {
+            return reader.get();
+        } catch (Throwable t) {
+            // read0 releases on success only, and a chunk has no caller that releases it on failure
+            if (byteBuffer instanceof ReferenceCounted rc) {
+                rc.release();
+            }
+            throw t;
+        }
     }
 
     /**

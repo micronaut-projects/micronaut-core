@@ -78,6 +78,7 @@ noReflection {
     allowIn("io.micronaut.context.python.GraalPyContextCustomizers", "SERVICE_LOADING")
     allowIn("io.micronaut.context.python.GraalPyContextFactory", "SERVICE_LOADING")
     allowIn("io.micronaut.context.python.GraalPyExceptionHandler", "CLASS_LOADING", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.context.python.GraalPyWarmEngine", "CLASS_MEMBERS")
     allowIn("io.micronaut.context.python.GraalPyHostAccessFactory", "ANNOTATIONS", "CLASS_LOADING", "CLASS_NAMES", "SERVICE_LOADING")
     allowIn("io.micronaut.context.python.PythonCallables", "CLASS_LOADING", "CLASS_MEMBERS", "PROXY")
     allowIn("io.micronaut.context.python.PythonCoercion", "ANNOTATIONS", "INTERFACES", "REFLECTIVE_ACCESS")

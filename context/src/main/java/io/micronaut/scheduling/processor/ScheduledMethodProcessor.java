@@ -16,6 +16,7 @@
 package io.micronaut.scheduling.processor;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanDependencyResolver;
 import io.micronaut.context.bind.DefaultExecutableBeanContextBinder;
 import io.micronaut.context.bind.ExecutableBeanContextBinder;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
@@ -50,7 +51,9 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.TaskScheduler;
 import io.micronaut.scheduling.annotation.Scheduled;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -70,6 +73,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
@@ -98,12 +102,22 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
         new DefaultPropertyPlaceholderResolver(new MapPropertyResolver(Map.of()), ConversionService.SHARED);
 
     private final BeanContext beanContext;
+    /**
+     * Resolves the schedulers, so that the processor is recorded as holding them: recreating a scheduler, or the
+     * executor it wraps, recreates the processor, which schedules its methods again on the new scheduler. Null when
+     * the processor was built with the deprecated constructor, which looks the schedulers up in the context.
+     */
+    private final @Nullable BeanDependencyResolver schedulers;
     private final ConversionService conversionService;
     /**
      * The futures of each scheduled method, so that a method that comes back in a new generation with the
      * same schedule keeps its running timers, and one that goes has its timers cancelled.
      */
     private final Map<BeanExecutableMethod<Scheduled>, ScheduledMethod> scheduledTasks = new ConcurrentHashMap<>();
+    /**
+     * Whether the method watch was registered, by the startup event or as the processor was created.
+     */
+    private final AtomicBoolean watching = new AtomicBoolean();
     private volatile @Nullable BeanWatch watch; // NOSONAR java:S3077 only the handle is published; the watch is thread-safe
     /**
      * The configuration watches, one per key a schedule reads through a placeholder, so that a change to any other key
@@ -116,8 +130,8 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      */
     private final Object changeLock = new Object();
     /**
-     * Whether the processor was closed, after which it registers no watch and keeps no timer. Set before the timers
-     * held are cancelled, under the processor's monitor.
+     * Whether the processor was closed, after which it registers no watch and keeps no timer. Set first by the close,
+     * before the watch is read and the timers held are cancelled.
      */
     private volatile boolean closed;
     /**
@@ -129,11 +143,31 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
     /**
      * @param beanContext       The bean context for DI of beans annotated with @Inject
+     * @param schedulers        Resolves the schedulers the methods run on, as dependencies of the processor
      * @param conversionService To convert one type to another
      * @param taskExceptionHandler The default task exception handler
+     * @since 5.3.0
      */
+    @Inject
+    public ScheduledMethodProcessor(BeanContext beanContext, BeanDependencyResolver schedulers, ConversionService conversionService,
+                                    TaskExceptionHandler<?, ?> taskExceptionHandler) {
+        this.beanContext = beanContext;
+        this.schedulers = schedulers;
+        this.conversionService = conversionService;
+        this.taskExceptionHandler = taskExceptionHandler;
+    }
+
+    /**
+     * @param beanContext       The bean context for DI of beans annotated with @Inject
+     * @param conversionService To convert one type to another
+     * @param taskExceptionHandler The default task exception handler
+     * @deprecated The processor resolves its schedulers as dependencies; use
+     * {@link #ScheduledMethodProcessor(BeanContext, BeanDependencyResolver, ConversionService, TaskExceptionHandler)}
+     */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     public ScheduledMethodProcessor(BeanContext beanContext, ConversionService conversionService, TaskExceptionHandler<?, ?> taskExceptionHandler) {
         this.beanContext = beanContext;
+        this.schedulers = null;
         this.conversionService = conversionService;
         this.taskExceptionHandler = taskExceptionHandler;
     }
@@ -161,8 +195,39 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      */
     @EventListener
     void scheduleTasks(StartupEvent ignore) {
-        if (beanContext instanceof WatchableBeanContext watchable) {
-            watch = watchable.methods(Scheduled.class).watch(this);
+        watchMethods();
+    }
+
+    /**
+     * Registers the watch at once when the processor is created once the context has started, as it is when a
+     * scheduler it holds, or the executor that scheduler wraps, is recreated: the destroyed processor cancelled its
+     * timers, and the startup event that registers the watch is not published again.
+     */
+    @PostConstruct
+    void watchIfStarted() {
+        if (beanContext.isRunning()) {
+            try {
+                watchMethods();
+            } catch (RuntimeException e) {
+                // the creation fails, and no pre-destroy method is called on an instance whose creation failed: the
+                // watches and the timers of the methods scheduled before the failure would outlive it
+                close();
+                throw e;
+            }
+        }
+    }
+
+    private void watchMethods() {
+        // registered once, outside the processor's monitor: the first batch may schedule on several threads, which
+        // take the monitor to watch the keys their schedules read
+        if (beanContext instanceof WatchableBeanContext watchable && !closed && watching.compareAndSet(false, true)) {
+            BeanWatch registered = watchable.methods(Scheduled.class).watch(this);
+            watch = registered;
+            if (closed) {
+                // closed while the watch was being registered, before it could be read: the close may also have
+                // cancelled the timers before the first batch scheduled its own, so close again now that it has
+                close();
+            }
             RuntimeException failure = startupFailure;
             if (failure != null) {
                 startupFailure = null;
@@ -360,14 +425,33 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      */
     private Optional<SchedulerBean> findScheduler(AnnotationValue<Scheduled> annotation) {
         String scheduler = annotation.stringValue(MEMBER_SCHEDULER).orElse(TaskExecutors.SCHEDULED);
-        Optional<SchedulerBean> found = beanContext.findBean(TaskScheduler.class, Qualifiers.byName(scheduler))
+        Optional<SchedulerBean> found = findSchedulerBean(TaskScheduler.class, scheduler)
             .map(taskScheduler -> new SchedulerBean(taskScheduler, taskScheduler));
         if (found.isEmpty()) {
-            found = beanContext.findBean(ExecutorService.class, Qualifiers.byName(scheduler))
+            found = findSchedulerBean(ExecutorService.class, scheduler)
                 .filter(ScheduledExecutorService.class::isInstance)
                 .map(executor -> new SchedulerBean(new ScheduledExecutorTaskScheduler(executor), executor));
         }
         return found;
+    }
+
+    /**
+     * Finds a scheduler bean through the resolver, which records it as a dependency of the processor.
+     */
+    private <T> Optional<T> findSchedulerBean(Class<T> type, String name) {
+        BeanDependencyResolver resolver = schedulers;
+        if (resolver == null) {
+            return beanContext.findBean(type, Qualifiers.byName(name));
+        }
+        if (!beanContext.containsBean(type, Qualifiers.byName(name))) {
+            return Optional.empty();
+        }
+        try {
+            // a nullable factory may produce no bean, as findBean tells
+            return Optional.ofNullable(resolver.getBean(type, Qualifiers.byName(name)));
+        } catch (NoSuchBeanException e) {
+            return Optional.empty();
+        }
     }
 
     private void scheduleTask(BeanExecutableMethod<Scheduled> entry) {
@@ -510,13 +594,14 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     @Override
     @PreDestroy
     public void close() {
+        // set before the watch is read: a registration racing the close either sees it or is seen by it
+        closed = true;
         BeanWatch registered = watch;
         if (registered != null) {
             registered.close();
             watch = null;
         }
         synchronized (this) {
-            closed = true;
             for (BeanWatch keyWatch : keyWatches.values()) {
                 keyWatch.close();
             }
