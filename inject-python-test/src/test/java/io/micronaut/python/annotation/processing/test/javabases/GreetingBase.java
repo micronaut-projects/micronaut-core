@@ -15,9 +15,12 @@
  */
 package io.micronaut.python.annotation.processing.test.javabases;
 
+import java.util.List;
+
 /**
- * A concrete Java class with state, an overridable method, a final method, a protected hook and
- * overloads, extended by Python classes in the tests.
+ * A concrete Java class with state, an overridable method, a final method, a protected hook,
+ * protected methods declaring a type variable of their own and overloads, extended by Python
+ * classes in the tests.
  */
 public class GreetingBase {
 
@@ -43,6 +46,46 @@ public class GreetingBase {
 
     protected String protectedHook() {
         return "hook:" + name;
+    }
+
+    protected <T> String bindType(Class<T> type) {
+        return "bind:" + type.getSimpleName();
+    }
+
+    protected <T> String tag(T value) {
+        return "tag:" + value;
+    }
+
+    public <T> T[] packAll(T[] values) {
+        return values;
+    }
+
+    public <T> T[][] packGrid(T[][] values) {
+        return values;
+    }
+
+    public <T> String packEach(String[][] rows, T tag) {
+        return "rows:" + rows.length + tag;
+    }
+
+    public <T extends Runnable & Comparable<T>> String runBoth(T value) {
+        return "both:" + value;
+    }
+
+    public <U extends Runnable & Comparable<U>, T extends U> String runNarrowed(T value) {
+        return "narrowed:" + value;
+    }
+
+    public <T extends Comparable<T>> String sortLists(List<T>[] lists) {
+        return "lists:" + lists.length;
+    }
+
+    public <T extends Runnable & Comparable<T>> String runLists(List<T>[] lists) {
+        return "runnable-lists:" + lists.length;
+    }
+
+    public String mayThrowAnything() throws Throwable {
+        return "thrown";
     }
 
     public int increment() {
