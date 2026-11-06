@@ -680,15 +680,16 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
     /**
      * An environment that could not read its configuration files has published no properties to answer with, while
-     * what its builder gave it is among its property sources.
+     * what its builder gave it is among its property sources, of which the one with the highest order decides.
      */
     private static boolean isDevelopmentModeConfigured(Environment environment) {
+        PropertySource deciding = null;
         for (PropertySource source : environment.getPropertySources()) {
-            if (StringUtils.TRUE.equalsIgnoreCase(String.valueOf(source.get(DevelopmentMode.PROPERTY)))) {
-                return true;
+            if (source.get(DevelopmentMode.PROPERTY) != null && (deciding == null || source.getOrder() >= deciding.getOrder())) {
+                deciding = source;
             }
         }
-        return false;
+        return deciding != null && StringUtils.TRUE.equalsIgnoreCase(String.valueOf(deciding.get(DevelopmentMode.PROPERTY)));
     }
 
     private boolean mayExit(Environment environment) {
