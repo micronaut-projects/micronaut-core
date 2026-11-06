@@ -138,6 +138,13 @@ class PythonStdlibBytecodeTest {
         // seeding replaces what is left of it
         bytecode.seed();
         assertEquals(tree, bytecode.recorded());
+
+        // a module taken from it by a cleaner of old files, which would fail to import
+        Files.delete(tree.resolve("bisect.py"));
+        assertNull(bytecode.recorded());
+        bytecode.seed();
+        assertEquals(tree, bytecode.recorded());
+        assertTrue(Files.exists(tree.resolve("bisect.py")));
     }
 
     @Test

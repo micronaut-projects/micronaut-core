@@ -73,6 +73,7 @@ final class PythonStdlibBytecode {
     private static final String PYTHON = "python";
     private static final String COMPLETE = ".complete";
     private static final String CURRENT = ".current";
+    private static final String PYCACHE = "__pycache__";
     private static final Duration ABANDONED = Duration.ofHours(1);
     /**
      * A file only present in a usable standard library; a link to it dangles once the real one is gone.
@@ -85,7 +86,7 @@ final class PythonStdlibBytecode {
     /**
      * Directories of the real standard library left out: Python finds its packages from the prefix, which stays.
      */
-    private static final Set<String> NOT_LINKED = Set.of("__pycache__", "site-packages");
+    private static final Set<String> NOT_LINKED = Set.of(PYCACHE, "site-packages");
     private static final String COMPILE = """
         def compile_all(directory, recorded_as, not_compiled):
             import compileall, py_compile, re
@@ -145,7 +146,7 @@ final class PythonStdlibBytecode {
                 return null;
             }
             Path candidate = root.resolve(Files.readString(file).trim());
-            return usable(candidate) ? candidate : null;
+            return whole(candidate) ? candidate : null;
         } catch (IOException | RuntimeException e) {
             LOG.debug("Not using the recorded compiled standard library of Python", e);
             return null;
@@ -166,7 +167,7 @@ final class PythonStdlibBytecode {
             }
             String name = version + "-" + digest(standardLibrary);
             Path target = root.resolve(name);
-            if (!usable(target)) {
+            if (!whole(target)) {
                 build(standardLibrary, target);
                 LOG.debug("Compiled the standard library of Python in {} ms", (System.nanoTime() - start) / 1_000_000);
             }
@@ -187,15 +188,15 @@ final class PythonStdlibBytecode {
             try (Context context = context(work)) {
                 context.eval(PYTHON, COMPILE).execute(work.toString(), target.toString(), NOT_COMPILED);
             }
-            Files.createFile(work.resolve(COMPLETE));
-            if (Files.exists(target) && !usable(target)) {
+            Files.writeString(work.resolve(COMPLETE), Long.toString(sources(work) + 1));
+            if (Files.exists(target) && !whole(target)) {
                 // what is left of a tree part of which was removed
                 delete(target);
             }
             try {
                 Files.move(work, target, StandardCopyOption.ATOMIC_MOVE);
             } catch (IOException e) {
-                if (!usable(target)) {
+                if (!whole(target)) {
                     throw e;
                 }
                 LOG.debug("Another process compiled the standard library of Python first");
@@ -233,6 +234,28 @@ final class PythonStdlibBytecode {
 
     private static boolean usable(Path candidate) {
         return Files.isRegularFile(candidate.resolve(COMPLETE)) && Files.exists(candidate.resolve(PROBE_FILE));
+    }
+
+    /**
+     * Whether a tree still has everything it was built with: a cleaner of old files may have taken part of it, and a
+     * module missing from it would fail to import. Walks the tree, so this is for the start of a process, not a generation.
+     */
+    private static boolean whole(Path candidate) {
+        if (!usable(candidate)) {
+            return false;
+        }
+        try {
+            return Long.parseLong(Files.readString(candidate.resolve(COMPLETE)).trim()) == sources(candidate);
+        } catch (IOException | NumberFormatException e) {
+            LOG.debug("Not using the compiled standard library of Python at {}", candidate, e);
+            return false;
+        }
+    }
+
+    private static long sources(Path tree) throws IOException {
+        try (Stream<Path> entries = Files.walk(tree)) {
+            return entries.filter(entry -> !entry.toString().contains(PYCACHE)).count();
+        }
     }
 
     private static void link(Path standardLibrary, Path tree) throws IOException {
