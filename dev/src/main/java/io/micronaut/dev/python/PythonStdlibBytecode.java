@@ -75,6 +75,7 @@ final class PythonStdlibBytecode {
     private static final String CURRENT = ".current";
     private static final String PYCACHE = "__pycache__";
     private static final String COMPILATION = "engine.Compilation";
+    private static final String COMPILER_THREADS = "engine.CompilerThreads";
     private static final Duration ABANDONED = Duration.ofHours(1);
     /**
      * A file only present in a usable standard library; a link to it dangles once the real one is gone.
@@ -338,9 +339,9 @@ final class PythonStdlibBytecode {
             .out(OutputStream.nullOutputStream())
             .err(OutputStream.nullOutputStream());
         if (compilationIsAnOption()) {
-            // runs once, so nothing gained: and the first engine that compiles sizes the JVM's one queue of compiler
-            // threads, which the engine of the application limits to one, as seeding would otherwise leave it at several
-            builder.option(COMPILATION, Boolean.FALSE.toString());
+            // runs once, so compiling it gains nothing; and the first engine of the JVM with a compiler thread, which one
+            // with compilation off still gets, sizes the queue of all: the application's engine asks for one thread
+            builder.option(COMPILATION, Boolean.FALSE.toString()).option(COMPILER_THREADS, "1");
         }
         if (standardLibrary != null) {
             builder.option("python.StdLibHome", standardLibrary.toString());
