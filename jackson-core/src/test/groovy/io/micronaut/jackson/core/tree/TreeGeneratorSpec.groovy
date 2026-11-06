@@ -18,6 +18,25 @@ class TreeGeneratorSpec extends Specification {
         gen.getCompletedValue() == JsonNode.createStringNode("abc")
     }
 
+    def 'scalar #description'() {
+        given:
+        def gen = JsonNodeTreeCodec.getInstance().createTreeGenerator()
+
+        when:
+        write(gen)
+
+        then:
+        gen.isComplete()
+        gen.getCompletedValue() == expected
+
+        where:
+        description | write                                                       | expected
+        'short'     | { TreeGenerator g -> g.writeNumber((short) 7) }             | JsonNode.createNumberNode((short) 7)
+        'float'     | { TreeGenerator g -> g.writeNumber(1.5f) }                  | JsonNode.createNumberNode(1.5f)
+        'boolean'   | { TreeGenerator g -> g.writeBoolean(true) }                 | JsonNode.createBooleanNode(true)
+        'null'      | { TreeGenerator g -> g.writeNull() }                        | JsonNode.nullNode()
+    }
+
     def array() {
         given:
         def gen = JsonNodeTreeCodec.getInstance().createTreeGenerator()

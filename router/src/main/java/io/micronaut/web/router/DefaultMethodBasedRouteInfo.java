@@ -17,7 +17,6 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
-import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
@@ -50,7 +49,6 @@ import java.util.Optional;
 sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> implements MethodBasedRouteInfo<T, R>
     permits DefaultRequestMatcher {
 
-    private static final RequestArgumentBinder[] ZERO_BINDERS = new RequestArgumentBinder[0];
     private static final List<MediaType> CONSUMES_ALL = List.of(MediaType.ALL_TYPE);
     private final MethodExecutionHandle<T, R> targetMethod;
     private final String[] argumentNames;
@@ -60,7 +58,7 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     @Nullable
     private final MessageBodyReader<?> messageBodyReader;
 
-    private RequestArgumentBinder<Object> @Nullable [] argumentBinders;
+    private final RouteArgumentPlan<T, R> argumentPlan;
     private final boolean needsBody;
     private final boolean asyncRequestBody;
 
@@ -120,6 +118,7 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
         }).orElse(null);
         needsBody = optionalBodyArgument.isPresent() || hasArg(arguments, HttpRequest.class);
         asyncRequestBody = MethodBasedRouteInfo.super.isAsyncRequestBody();
+        argumentPlan = new RouteArgumentPlan<>(this);
     }
 
     @Override
@@ -148,26 +147,11 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
 
     @Override
     public RequestArgumentBinder<Object>[] resolveArgumentBinders(RequestBinderRegistry requestBinderRegistry) {
-        // Allow concurrent access
-        if (argumentBinders == null) {
-            argumentBinders = resolveArgumentBindersInternal(requestBinderRegistry);
-        }
-        return argumentBinders;
+        return argumentPlan.binders(this, requestBinderRegistry).all;
     }
 
-    private RequestArgumentBinder<Object>[] resolveArgumentBindersInternal(RequestBinderRegistry requestBinderRegistry) {
-        Argument<?>[] arguments = targetMethod.getArguments();
-        if (arguments.length == 0) {
-            return ZERO_BINDERS;
-        }
-
-        RequestArgumentBinder<Object>[] binders = new RequestArgumentBinder[arguments.length];
-        for (int i = 0; i < arguments.length; i++) {
-            Argument<?> argument = arguments[i];
-            Optional<? extends ArgumentBinder<?, HttpRequest<?>>> argumentBinder = requestBinderRegistry.findArgumentBinder(argument);
-            binders[i] = (RequestArgumentBinder<Object>) argumentBinder.orElse(null);
-        }
-        return binders;
+    final RouteArgumentPlan<T, R> getArgumentPlan() {
+        return argumentPlan;
     }
 
     @Override

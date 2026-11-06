@@ -60,6 +60,8 @@ public interface AnnotationMetadata extends AnnotationSource {
     /**
      * A constant for representing empty metadata.
      */
+    // The package-private EmptyAnnotationMetadata is only instantiated here, so no other thread can initialize it first
+    @SuppressWarnings("ClassInitializationDeadlock")
     AnnotationMetadata EMPTY_METADATA = new EmptyAnnotationMetadata();
 
     /**

@@ -28,7 +28,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -364,7 +363,7 @@ public sealed interface RequestCondition {
      */
     static <T> Body<T> body(Argument<T> type, Predicate<? super T> predicate) {
         Objects.requireNonNull(predicate);
-        return new Body<>(type, value -> CompletableFuture.completedStage(predicate.test(value)), Body.SERVER_LIMIT);
+        return new Body<>(type, new BodyPredicate<>(predicate), Body.SERVER_LIMIT);
     }
 
     /**
@@ -692,6 +691,17 @@ public sealed interface RequestCondition {
                 throw new IllegalArgumentException("The limit of a body condition must not be negative: " + maxBytes);
             }
             return new Body<>(type, condition, maxBytes);
+        }
+
+        /**
+         * @return The predicate of the condition, when it is a synchronous predicate, see
+         * {@link #body(Argument, Predicate)}, which is tested without a stage, otherwise
+         * {@code null}: its stage decides
+         */
+        @Internal
+        @SuppressWarnings("unchecked")
+        public @Nullable Predicate<? super T> predicate() {
+            return condition instanceof BodyPredicate<?> predicate ? ((BodyPredicate<T>) predicate).predicate() : null;
         }
 
         /**

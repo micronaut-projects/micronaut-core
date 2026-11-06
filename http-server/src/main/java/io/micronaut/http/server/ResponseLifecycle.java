@@ -47,6 +47,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.PieceWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.exceptions.NotAcceptableException;
 import io.micronaut.http.server.exceptions.response.Error;
@@ -64,6 +65,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.Executor;
@@ -748,6 +750,10 @@ public abstract class ResponseLifecycle {
             } else if (hse.getMessage() != null) {
                 errorResponse.body(hse.getMessage());
             }
+        } else if (t instanceof ContentLengthExceededException) {
+            // a streamed request body over the size limit, answered like ContentLengthExceededHandler
+            // does for a body that is read before the route returns
+            errorResponse = createContentLengthExceededResponse(request, t);
         } else {
             errorResponse = routeExecutor.createDefaultErrorResponse(request, t);
         }
@@ -770,24 +776,33 @@ public abstract class ResponseLifecycle {
         return e;
     }
 
-    private MutableHttpResponse<?> createJsonSyntaxErrorResponse(HttpRequest<?> request, Throwable t) {
-        MutableHttpResponse<?> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
-        try {
-            response = routeExecutor.getErrorResponseProcessor().processResponse(
-                ErrorContext.builder(request)
-                    .cause(t)
-                    .error(new Error() {
-                        @Override
-                        public String getMessage() {
-                            return "Invalid JSON: " + t.getMessage();
-                        }
+    private MutableHttpResponse<?> createContentLengthExceededResponse(HttpRequest<?> request, Throwable t) {
+        return processErrorResponse(request, HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE), ErrorContext.builder(request)
+            .cause(t)
+            .errorMessage(Objects.requireNonNullElse(t.getMessage(), "Unknown error"))
+            .build());
+    }
 
-                        @Override
-                        public Optional<String> getTitle() {
-                            return Optional.of("Invalid JSON");
-                        }
-                    })
-                    .build(), response);
+    private MutableHttpResponse<?> createJsonSyntaxErrorResponse(HttpRequest<?> request, Throwable t) {
+        return processErrorResponse(request, HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON"), ErrorContext.builder(request)
+            .cause(t)
+            .error(new Error() {
+                @Override
+                public String getMessage() {
+                    return "Invalid JSON: " + t.getMessage();
+                }
+
+                @Override
+                public Optional<String> getTitle() {
+                    return Optional.of("Invalid JSON");
+                }
+            })
+            .build());
+    }
+
+    private MutableHttpResponse<?> processErrorResponse(HttpRequest<?> request, MutableHttpResponse<?> response, ErrorContext errorContext) {
+        try {
+            response = routeExecutor.getErrorResponseProcessor().processResponse(errorContext, response);
         } catch (Exception e) {
             routeExecutor.logException(e);
         }

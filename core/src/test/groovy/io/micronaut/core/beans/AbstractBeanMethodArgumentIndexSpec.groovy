@@ -69,10 +69,7 @@ class AbstractBeanMethodArgumentIndexSpec extends Specification {
             def method = new TestMethod(args(12))
             def start = new CountDownLatch(1)
             def futures = (1..8).collect {
-                pool.submit({
-                    start.await()
-                    (0..<12).every { i -> method.argumentIndexOf("arg$i".toString()) == i }
-                } as Callable<Boolean>)
+                pool.submit({ awaitAndCheckIndexes(start, method, 12) } as Callable<Boolean>)
             }
             start.countDown()
             futures.every { it.get() }
@@ -83,5 +80,10 @@ class AbstractBeanMethodArgumentIndexSpec extends Specification {
 
         cleanup:
         pool.shutdownNow()
+    }
+
+    private static boolean awaitAndCheckIndexes(CountDownLatch start, TestMethod method, int count) {
+        start.await()
+        (0..<count).every { i -> method.argumentIndexOf("arg$i".toString()) == i }
     }
 }

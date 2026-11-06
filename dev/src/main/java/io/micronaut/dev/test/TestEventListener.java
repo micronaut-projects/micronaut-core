@@ -40,6 +40,14 @@ public interface TestEventListener {
     }
 
     /**
+     * The runner knows how many tests the run holds, once it discovered them: a runner that cannot tell does not call it.
+     *
+     * @param count How many tests the run holds
+     */
+    default void testsPlanned(long count) {
+    }
+
+    /**
      * A test starts.
      *
      * @param test The test

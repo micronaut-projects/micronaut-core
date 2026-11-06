@@ -73,6 +73,22 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
         return executableMethod.getCachedValue(key, factory);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The value is kept by the {@link #getExecutableMethod() executable method}, and the factory is given that
+     * method: the value does not depend on the invocation.</p>
+     */
+    @Experimental
+    @Override
+    default <V extends @Nullable Object> V getCachedUnevaluatedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
+        ExecutableMethod<T, R> executableMethod = getExecutableMethod();
+        if (executableMethod == this) {
+            return factory.apply(this);
+        }
+        return executableMethod.getCachedUnevaluatedValue(key, factory);
+    }
+
     @Experimental
     @Override
     default <A extends Annotation> @Nullable AnnotationValue<A> getCachedAnnotationValue(Class<A> annotationType) {
