@@ -33,6 +33,8 @@ import io.micronaut.http.tck.TestScenario;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,6 +49,9 @@ public class FormsJacksonAnnotationsTest {
     private static final String SPEC_NAME = "FormsJacksonAnnotationsTest";
     private static final String JSON_WITH_PAGES = "{\"title\":\"Building Microservices\",\"paginas\":100}";
     private static final String JSON_WITHOUT_PAGES = "{\"title\":\"Building Microservices\"}";
+    private static final String JSON_WITH_WHITESPACE = "{\"title\":\"Building Microservices\",\"notes\":\" \"}";
+    private static final String JSON_WITH_REPEATED_VALUES = "{\"title\":\"Building Microservices\",\"tags\":[\"\",\"java\",\"\"]}";
+    private static final String JSON_WITH_EMPTY_TAG = "{\"title\":\"Building Microservices\",\"tags\":[\"\"]}";
 
     @Test
     public void serverFormSubmissionsSupportJacksonAnnotations() throws IOException {
@@ -55,26 +60,55 @@ public class FormsJacksonAnnotationsTest {
 
         body = "title=Building+Microservices&pages=";
         assertWithBody(body, JSON_WITHOUT_PAGES);
+
+        body = "title=Building+Microservices&paginas=";
+        assertWithBody(body, JSON_WITHOUT_PAGES);
+
+        body = "title=Building+Microservices&publishedAt=";
+        assertWithBody(body, JSON_WITHOUT_PAGES);
+
+        body = "title=Building+Microservices&category=";
+        assertWithBody(body, JSON_WITHOUT_PAGES);
+
+        body = "title=Building+Microservices&notes=+";
+        assertWithBody(body, JSON_WITH_WHITESPACE);
+
+        body = "title=Building+Microservices&tags=&tags=java&tags=";
+        assertWithBody(body, JSON_WITH_REPEATED_VALUES);
+
+        body = "title=Building+Microservices&tags=";
+        assertWithBody(body, JSON_WITH_EMPTY_TAG);
+    }
+
+    @Test
+    public void serverFormSubmissionsKeepEmptyStrings() throws IOException {
+        // The JSON of a response leaves an empty string out, so these report what was bound
+        assertWithBody("/book/strings", "title=Building+Microservices&notes=", "title=[Building Microservices], notes=[]");
+        assertWithBody("/book/strings", "title=&paginas=", "title=[], notes=null");
     }
 
     @Test
     public void httpClientFormSubmissionsDoesNotSupportJacksonAnnotations() throws IOException {
-        Book book = new Book("Building Microservices", 100);
+        Book book = new Book("Building Microservices", 100, null, null, null, null);
         // Jackson annotations (@JsonProperty) are not supported by the HTTP Client and form-url encoded payload.
         assertWithBody(book, JSON_WITHOUT_PAGES);
     }
 
     private static void assertWithBody(Object body, String expectedJson) throws IOException {
+        assertWithBody("/book/save", body, expectedJson);
+    }
+
+    private static void assertWithBody(String uri, Object body, String expected) throws IOException {
         TestScenario.builder()
                 .specName(SPEC_NAME)
-                .request(HttpRequest.POST("/book/save", body).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
+                .request(HttpRequest.POST(uri, body).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
                 .assertion((server, request) ->
                         AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                                 .status(HttpStatus.OK)
                                 .assertResponse(httpResponse -> {
                                     Optional<String> bodyOptional = httpResponse.getBody(String.class);
                                     assertTrue(bodyOptional.isPresent());
-                                    assertEquals(expectedJson, bodyOptional.get());
+                                    assertEquals(expected, bodyOptional.get());
                                 })
                                 .build()))
                 .run();
@@ -88,11 +122,26 @@ public class FormsJacksonAnnotationsTest {
         Book save(@Body Book book) {
             return book;
         }
+
+        @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+        @Post("/strings")
+        String strings(@Body Book book) {
+            return "title=[" + book.title() + "], notes=" + (book.notes() == null ? "null" : "[" + book.notes() + "]");
+        }
     }
 
     @Introspected
     @ReflectiveAccess
-    record Book(@JsonProperty("title") String title, @JsonProperty("paginas") @Nullable Integer pages) {
+    record Book(@JsonProperty("title") String title,
+                @JsonProperty("paginas") @Nullable Integer pages,
+                @JsonProperty("publishedAt") @Nullable LocalDateTime publishedAt,
+                @JsonProperty("category") @Nullable Category category,
+                @JsonProperty("notes") @Nullable String notes,
+                @JsonProperty("tags") @Nullable List<String> tags) {
+    }
+
+    enum Category {
+        TECHNICAL
     }
 
 }
