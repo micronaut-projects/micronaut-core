@@ -21,6 +21,7 @@ import io.micronaut.context.banner.SvgImage.NumberScanner;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 /**
  * The outline of a shape as subpaths of cubic Bézier segments, in the coordinates of its element.
@@ -36,12 +37,19 @@ final class Geometry {
     private static final double KAPPA = 0.5522847498307936;
 
     /**
+     * The elements with an outline.
+     */
+    static final Set<String> SHAPES = Set.of("path", "polygon", "polyline", "rect", "circle", "ellipse", "line");
+
+    /**
      * Each subpath is the start point followed by six coordinates per cubic segment.
      */
     private final List<double[]> subpaths;
+    private final List<Boolean> closed;
 
-    private Geometry(List<double[]> subpaths) {
+    private Geometry(List<double[]> subpaths, List<Boolean> closed) {
         this.subpaths = subpaths;
+        this.closed = closed;
     }
 
     /**
@@ -57,8 +65,11 @@ final class Geometry {
             }
             case "polygon", "polyline" -> {
                 String points = element.attributes.getOrDefault("points", "");
-                yield element.geometry(points, () -> polygon(SvgImage.numbers(points)));
+                boolean polygon = "polygon".equals(element.name);
+                yield element.geometry(points, () -> polygon(SvgImage.numbers(points), polygon));
             }
+            case "line" -> polygon(new double[] {element.number("x1", time, 0), element.number("y1", time, 0),
+                element.number("x2", time, 0), element.number("y2", time, 0)}, false);
             case "rect" -> {
                 double x = element.number("x", time, 0);
                 double y = element.number("y", time, 0);
@@ -76,7 +87,7 @@ final class Geometry {
             }
             case "ellipse" -> ellipse(element.number("cx", time, 0), element.number("cy", time, 0),
                 element.number("rx", time, 0), element.number("ry", time, 0));
-            default -> new Geometry(List.of());
+            default -> new Geometry(List.of(), List.of());
         };
     }
 
@@ -89,38 +100,59 @@ final class Geometry {
     List<double[]> flatten(double[] matrix) {
         List<double[]> polygons = new ArrayList<>(subpaths.size());
         for (double[] subpath : subpaths) {
-            Points points = new Points();
-            double x0 = tx(matrix, subpath[0], subpath[1]);
-            double y0 = ty(matrix, subpath[0], subpath[1]);
-            points.add(x0, y0);
-            for (int i = 2; i + 5 < subpath.length; i += 6) {
-                double x1 = tx(matrix, subpath[i], subpath[i + 1]);
-                double y1 = ty(matrix, subpath[i], subpath[i + 1]);
-                double x2 = tx(matrix, subpath[i + 2], subpath[i + 3]);
-                double y2 = ty(matrix, subpath[i + 2], subpath[i + 3]);
-                double x3 = tx(matrix, subpath[i + 4], subpath[i + 5]);
-                double y3 = ty(matrix, subpath[i + 4], subpath[i + 5]);
-                double ddx = Math.max(Math.abs(x0 - 2 * x1 + x2), Math.abs(x1 - 2 * x2 + x3));
-                double ddy = Math.max(Math.abs(y0 - 2 * y1 + y2), Math.abs(y1 - 2 * y2 + y3));
-                double dd = Math.hypot(ddx, ddy);
-                int n = (int) Math.min(MAX_SEGMENTS, Math.max(1, Math.ceil(Math.sqrt(0.75 * dd / TOLERANCE))));
-                for (int k = 1; k <= n; k++) {
-                    double t = (double) k / n;
-                    double u = 1 - t;
-                    double a = u * u * u;
-                    double b = 3 * u * u * t;
-                    double c = 3 * u * t * t;
-                    double e = t * t * t;
-                    points.add(a * x0 + b * x1 + c * x2 + e * x3, a * y0 + b * y1 + c * y2 + e * y3);
-                }
-                x0 = x3;
-                y0 = y3;
-            }
-            if (points.size > 4) {
-                polygons.add(points.toArray());
+            double[] points = flatten(subpath, matrix);
+            if (points.length > 4) {
+                polygons.add(points);
             }
         }
         return polygons;
+    }
+
+    /**
+     * Outlines the stroke of the shape.
+     *
+     * @param matrix The transform to device coordinates
+     * @param width The stroke width in device pixels
+     * @param lineCap The line cap
+     * @return The polygons covering the stroke, to fill with the non-zero rule
+     */
+    List<double[]> stroke(double[] matrix, double width, int lineCap) {
+        List<double[]> polygons = new ArrayList<>();
+        for (int i = 0; i < subpaths.size(); i++) {
+            Stroker.stroke(flatten(subpaths.get(i), matrix), closed.get(i), width / 2, lineCap, polygons);
+        }
+        return polygons;
+    }
+
+    private static double[] flatten(double[] subpath, double[] matrix) {
+        Points points = new Points();
+        double x0 = tx(matrix, subpath[0], subpath[1]);
+        double y0 = ty(matrix, subpath[0], subpath[1]);
+        points.add(x0, y0);
+        for (int i = 2; i + 5 < subpath.length; i += 6) {
+            double x1 = tx(matrix, subpath[i], subpath[i + 1]);
+            double y1 = ty(matrix, subpath[i], subpath[i + 1]);
+            double x2 = tx(matrix, subpath[i + 2], subpath[i + 3]);
+            double y2 = ty(matrix, subpath[i + 2], subpath[i + 3]);
+            double x3 = tx(matrix, subpath[i + 4], subpath[i + 5]);
+            double y3 = ty(matrix, subpath[i + 4], subpath[i + 5]);
+            double ddx = Math.max(Math.abs(x0 - 2 * x1 + x2), Math.abs(x1 - 2 * x2 + x3));
+            double ddy = Math.max(Math.abs(y0 - 2 * y1 + y2), Math.abs(y1 - 2 * y2 + y3));
+            double dd = Math.hypot(ddx, ddy);
+            int n = (int) Math.min(MAX_SEGMENTS, Math.max(1, Math.ceil(Math.sqrt(0.75 * dd / TOLERANCE))));
+            for (int k = 1; k <= n; k++) {
+                double t = (double) k / n;
+                double u = 1 - t;
+                double a = u * u * u;
+                double b = 3 * u * u * t;
+                double c = 3 * u * t * t;
+                double e = t * t * t;
+                points.add(a * x0 + b * x1 + c * x2 + e * x3, a * y0 + b * y1 + c * y2 + e * y3);
+            }
+            x0 = x3;
+            y0 = y3;
+        }
+        return points.toArray();
     }
 
     private static double tx(double[] m, double x, double y) {
@@ -131,7 +163,7 @@ final class Geometry {
         return m[1] * x + m[3] * y + m[5];
     }
 
-    private static Geometry polygon(double[] coordinates) {
+    private static Geometry polygon(double[] coordinates, boolean closed) {
         Builder builder = new Builder();
         for (int i = 0; i + 1 < coordinates.length; i += 2) {
             if (i == 0) {
@@ -139,6 +171,9 @@ final class Geometry {
             } else {
                 builder.lineTo(coordinates[i], coordinates[i + 1]);
             }
+        }
+        if (closed) {
+            builder.close();
         }
         return builder.build();
     }
@@ -153,6 +188,7 @@ final class Geometry {
             builder.lineTo(x + w, y);
             builder.lineTo(x + w, y + h);
             builder.lineTo(x, y + h);
+            builder.close();
             return builder.build();
         }
         double kx = rx * KAPPA;
@@ -166,6 +202,7 @@ final class Geometry {
         builder.cubicTo(x + rx - kx, y + h, x, y + h - ry + ky, x, y + h - ry);
         builder.lineTo(x, y + ry);
         builder.cubicTo(x, y + ry - ky, x + rx - kx, y, x + rx, y);
+        builder.close();
         return builder.build();
     }
 
@@ -181,6 +218,7 @@ final class Geometry {
         builder.cubicTo(cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy);
         builder.cubicTo(cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry);
         builder.cubicTo(cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy);
+        builder.close();
         return builder.build();
     }
 
@@ -307,7 +345,9 @@ final class Geometry {
 
     private static final class Builder {
         private final List<double[]> subpaths = new ArrayList<>();
+        private final List<Boolean> closed = new ArrayList<>();
         private Points current = new Points();
+        private boolean currentClosed;
         private double lastX;
         private double lastY;
 
@@ -401,6 +441,7 @@ final class Geometry {
         void close() {
             double startX = current.size > 0 ? current.values[0] : lastX;
             double startY = current.size > 0 ? current.values[1] : lastY;
+            currentClosed = true;
             flush();
             moveTo(startX, startY);
         }
@@ -414,13 +455,15 @@ final class Geometry {
         private void flush() {
             if (current.size > 2) {
                 subpaths.add(current.toArray());
+                closed.add(currentClosed);
             }
             current = new Points();
+            currentClosed = false;
         }
 
         Geometry build() {
             flush();
-            return new Geometry(subpaths);
+            return new Geometry(subpaths, closed);
         }
     }
 

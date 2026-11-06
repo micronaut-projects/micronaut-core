@@ -18,6 +18,7 @@ package io.micronaut.context.banner;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -28,11 +29,15 @@ import java.util.function.Supplier;
  * An SVG document reduced to what a banner needs: filled shapes, group transforms and opacity, and
  * the SMIL {@code <animate>} and {@code <animateTransform>} elements that change them over time.
  *
- * <p>Supported: {@code svg}, {@code g}, {@code path} (every command), {@code polygon},
- * {@code polyline}, {@code rect} (with {@code rx}/{@code ry}), {@code circle} and {@code ellipse};
- * the {@code fill}, {@code fill-opacity}, {@code fill-rule}, {@code opacity}, {@code color},
- * {@code display} and {@code visibility} properties as attributes or in {@code style}; every
- * transform function. Strokes, text, gradients, clipping and {@code use} are not rendered.</p>
+ * <p>Supported: {@code svg} (also nested, as a viewport), {@code g}, {@code path} (every command),
+ * {@code polygon}, {@code polyline}, {@code rect} (with {@code rx}/{@code ry}), {@code circle},
+ * {@code ellipse}, {@code image} with an embedded PNG ({@code data:image/png;base64}), and
+ * {@code clipPath} referenced by {@code clip-path}; the {@code fill}, {@code fill-opacity},
+ * {@code fill-rule}, {@code stroke}, {@code stroke-width}, {@code stroke-opacity},
+ * {@code stroke-linecap}, {@code opacity}, {@code color}, {@code clip-rule}, {@code display} and
+ * {@code visibility} properties as attributes or in {@code style}; every transform function.
+ * Joins of strokes are always round. Text, gradients, masks, filters, CSS style sheets and
+ * {@code use} are not rendered.</p>
  *
  * <p>Animations support {@code from}/{@code to}/{@code by}/{@code values}, {@code keyTimes},
  * {@code calcMode} linear, discrete and spline with {@code keySplines}, {@code begin} offsets,
@@ -44,6 +49,7 @@ final class SvgImage {
     private static final double DEFAULT_SIZE = 150;
 
     private final Element root;
+    private final Map<String, Element> ids = new HashMap<>();
     private final double[] viewBox;
     private final double width;
     private final double height;
@@ -52,6 +58,7 @@ final class SvgImage {
 
     private SvgImage(Element root) {
         this.root = root;
+        index(root);
         double[] box = numbers(root.attr("viewBox"));
         double w = length(root.attr("width"), -1);
         double h = length(root.attr("height"), -1);
@@ -80,6 +87,16 @@ final class SvgImage {
         }
         duration = end;
         loops = indefinite;
+    }
+
+    private void index(Element element) {
+        String id = element.attr("id");
+        if (id != null) {
+            ids.putIfAbsent(id, element);
+        }
+        for (Element child : element.children) {
+            index(child);
+        }
     }
 
     /**
@@ -141,16 +158,24 @@ final class SvgImage {
      * @param currentColor The ARGB value of {@code currentColor}
      */
     void render(double time, SvgRaster raster, int currentColor) {
-        double sx = raster.width() / viewBox[2];
-        double sy = raster.height() / viewBox[3];
-        double scale = Math.min(sx, sy);
-        double tx = (raster.width() - viewBox[2] * scale) / 2 - viewBox[0] * scale;
-        double ty = (raster.height() - viewBox[3] * scale) / 2 - viewBox[1] * scale;
-        Style style = new Style(0xFF000000, 1, false, currentColor);
-        render(root, time, new double[] {scale, 0, 0, scale, tx, ty}, style, 1, raster);
+        double[] matrix = viewport(viewBox, 0, 0, raster.width(), raster.height());
+        Style style = new Style(0xFF000000, 1, false, 0, 1, 1, Stroker.BUTT, currentColor);
+        render(root, time, matrix, style, 1, null, raster);
     }
 
-    private void render(Element element, double time, double[] parentMatrix, Style parentStyle, double parentOpacity, SvgRaster raster) {
+    /**
+     * @return The transform of a viewport that fits a view box with {@code xMidYMid meet}
+     */
+    private static double[] viewport(double[] box, double x, double y, double width, double height) {
+        double scale = Math.min(width / box[2], height / box[3]);
+        double tx = x + (width - box[2] * scale) / 2 - box[0] * scale;
+        double ty = y + (height - box[3] * scale) / 2 - box[1] * scale;
+        return new double[] {scale, 0, 0, scale, tx, ty};
+    }
+
+    private void render(Element element, double time, double[] parentMatrix, Style parentStyle, double parentOpacity,
+                        float @Nullable [] inheritedMask, SvgRaster raster) {
+        float @Nullable [] parentMask = inheritedMask;
         if ("none".equals(element.property("display", time))) {
             return;
         }
@@ -160,25 +185,116 @@ final class SvgImage {
         if (opacity <= 0) {
             return;
         }
+        if ("svg".equals(element.name) && element != root) {
+            double[] box = numbers(element.attr("viewBox"));
+            double w = element.number("width", time, box.length == 4 ? box[2] : 0);
+            double h = element.number("height", time, box.length == 4 ? box[3] : 0);
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+            double x = element.number("x", time, 0);
+            double y = element.number("y", time, 0);
+            if (!"visible".equals(element.property("overflow", time))) {
+                // a nested viewport clips its content to its bounds
+                List<double[]> bounds = Geometry.of(new Element("polygon", Map.of("points",
+                    x + "," + y + " " + (x + w) + "," + y + " " + (x + w) + "," + (y + h) + " " + x + "," + (y + h))), time).flatten(matrix);
+                float[] viewportMask = new float[raster.width() * raster.height()];
+                raster.coverage(bounds, false, viewportMask);
+                if (parentMask != null) {
+                    for (int i = 0; i < viewportMask.length; i++) {
+                        viewportMask[i] *= parentMask[i];
+                    }
+                }
+                parentMask = viewportMask;
+            }
+            matrix = Affine.multiply(matrix, viewport(box.length == 4 && box[2] > 0 && box[3] > 0 ? box : new double[] {0, 0, w, h}, x, y, w, h));
+        }
+        float[] mask = clip(element, time, matrix, parentMask, raster);
         switch (element.name) {
-            case "svg", "g" -> {
+            case "svg", "g", "a" -> {
                 for (Element child : element.children) {
-                    render(child, time, matrix, style, opacity, raster);
+                    render(child, time, matrix, style, opacity, mask, raster);
                 }
             }
-            case "path", "polygon", "polyline", "rect", "circle", "ellipse" -> {
-                String visibility = element.property("visibility", time);
-                if ("hidden".equals(visibility) || "collapse".equals(visibility) || style.fill == 0) {
+            case "path", "polygon", "polyline", "rect", "circle", "ellipse", "line" -> {
+                if (!visible(element, time)) {
                     return;
                 }
-                List<double[]> polygons = Geometry.of(element, time).flatten(matrix);
-                double alpha = ((style.fill >>> 24) / 255.0) * style.fillOpacity * opacity;
-                raster.fill(polygons, style.evenOdd, style.fill, alpha);
+                Geometry geometry = Geometry.of(element, time);
+                if (style.fill != 0 && !"line".equals(element.name)) {
+                    double alpha = ((style.fill >>> 24) / 255.0) * style.fillOpacity * opacity;
+                    raster.fill(geometry.flatten(matrix), style.evenOdd, style.fill, alpha, mask);
+                }
+                if (style.stroke != 0 && style.strokeWidth > 0) {
+                    double scale = Math.sqrt(Math.abs(matrix[0] * matrix[3] - matrix[1] * matrix[2]));
+                    double alpha = ((style.stroke >>> 24) / 255.0) * style.strokeOpacity * opacity;
+                    raster.fill(geometry.stroke(matrix, style.strokeWidth * scale, style.lineCap), false, style.stroke, alpha, mask);
+                }
+            }
+            case "image" -> {
+                if (visible(element, time)) {
+                    drawImage(element, time, matrix, opacity, mask, raster);
+                }
             }
             default -> {
-                // defs, text, and everything else this renderer does not draw
+                // defs, clipPath, text, and everything else this renderer does not draw
             }
         }
+    }
+
+    private static boolean visible(Element element, double time) {
+        String visibility = element.property("visibility", time);
+        return !"hidden".equals(visibility) && !"collapse".equals(visibility);
+    }
+
+    private float @Nullable [] clip(Element element, double time, double[] matrix, float @Nullable [] parentMask, SvgRaster raster) {
+        String clipPath = element.property("clip-path", time);
+        if (clipPath == null || !clipPath.startsWith("url(")) {
+            return parentMask;
+        }
+        String id = clipPath.substring(4, clipPath.indexOf(')') < 0 ? clipPath.length() : clipPath.indexOf(')'))
+            .replace("\"", "").replace("'", "").trim();
+        Element clip = ids.get(id.startsWith("#") ? id.substring(1) : id);
+        if (clip == null || !"clipPath".equals(clip.name)) {
+            return parentMask;
+        }
+        double[] clipMatrix = Affine.multiply(matrix, clip.transform(time));
+        float[] mask = new float[raster.width() * raster.height()];
+        for (Element child : clip.children) {
+            if (Geometry.SHAPES.contains(child.name) && visible(child, time)) {
+                String rule = child.property("clip-rule", time);
+                if (rule == null) {
+                    rule = clip.property("clip-rule", time);
+                }
+                List<double[]> polygons = Geometry.of(child, time).flatten(Affine.multiply(clipMatrix, child.transform(time)));
+                raster.coverage(polygons, "evenodd".equals(rule), mask);
+            }
+        }
+        if (parentMask != null) {
+            for (int i = 0; i < mask.length; i++) {
+                mask[i] *= parentMask[i];
+            }
+        }
+        return mask;
+    }
+
+    private static void drawImage(Element element, double time, double[] matrix, double opacity, float @Nullable [] mask, SvgRaster raster) {
+        String href = element.attr("href");
+        if (href == null) {
+            href = element.attr("xlink:href");
+        }
+        PngImage image = element.image(href);
+        if (image == null) {
+            return;
+        }
+        double w = element.number("width", time, image.width());
+        double h = element.number("height", time, image.height());
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        double[] fit = viewport(new double[] {0, 0, image.width(), image.height()},
+            element.number("x", time, 0), element.number("y", time, 0), w, h);
+        raster.drawImage(image, Affine.multiply(matrix, fit), opacity, mask);
     }
 
     static double clamp(double value) {
@@ -245,14 +361,19 @@ final class SvgImage {
     }
 
     /**
-     * The inherited fill properties.
+     * The inherited painting properties.
      *
      * @param fill The ARGB fill, 0 for none
      * @param fillOpacity The fill opacity
      * @param evenOdd Whether the fill rule is even-odd
+     * @param stroke The ARGB stroke, 0 for none
+     * @param strokeOpacity The stroke opacity
+     * @param strokeWidth The stroke width
+     * @param lineCap The line cap of strokes
      * @param color The ARGB value of {@code currentColor}
      */
-    private record Style(int fill, double fillOpacity, boolean evenOdd, int color) {
+    private record Style(int fill, double fillOpacity, boolean evenOdd, int stroke, double strokeOpacity, double strokeWidth,
+                         int lineCap, int color) {
 
         Style derive(Element element, double time) {
             int newColor = color;
@@ -263,19 +384,32 @@ final class SvgImage {
                     newColor = parsed;
                 }
             }
-            int newFill = fill;
-            String fillValue = element.property("fill", time);
-            if (fillValue != null && !"inherit".equals(fillValue)) {
-                Integer parsed = Paint.parse(fillValue, newColor);
-                newFill = parsed == null ? 0 : parsed;
-            } else if (fill != 0 && fill == color) {
-                // an inherited currentColor follows the color of this element
-                newFill = newColor;
-            }
+            int newFill = paint(element.property("fill", time), fill, newColor);
+            int newStroke = paint(element.property("stroke", time), stroke, newColor);
             double newFillOpacity = clamp(element.number("fill-opacity", time, fillOpacity));
+            double newStrokeOpacity = clamp(element.number("stroke-opacity", time, strokeOpacity));
+            double newStrokeWidth = Math.max(0, element.number("stroke-width", time, strokeWidth));
             String rule = element.property("fill-rule", time);
             boolean newEvenOdd = rule == null || "inherit".equals(rule) ? evenOdd : "evenodd".equals(rule);
-            return new Style(newFill, newFillOpacity, newEvenOdd, newColor);
+            String cap = element.property("stroke-linecap", time);
+            int newCap = cap == null || "inherit".equals(cap) ? lineCap : switch (cap.trim()) {
+                case "round" -> Stroker.ROUND;
+                case "square" -> Stroker.SQUARE;
+                default -> Stroker.BUTT;
+            };
+            return new Style(newFill, newFillOpacity, newEvenOdd, newStroke, newStrokeOpacity, newStrokeWidth, newCap, newColor);
+        }
+
+        private int paint(@Nullable String value, int inherited, int newColor) {
+            if (value != null && !"inherit".equals(value)) {
+                Integer parsed = Paint.parse(value, newColor);
+                return parsed == null ? 0 : parsed;
+            }
+            if (inherited != 0 && inherited == color) {
+                // an inherited currentColor follows the color of this element
+                return newColor;
+            }
+            return inherited;
         }
     }
 
@@ -291,6 +425,8 @@ final class SvgImage {
         private @Nullable Map<String, String> style;
         private @Nullable Geometry geometry;
         private @Nullable String geometryKey;
+        private @Nullable String imageKey;
+        private @Nullable PngImage image;
 
         Element(String name, Map<String, String> attributes) {
             this.name = name;
@@ -388,6 +524,30 @@ final class SvgImage {
             return geometry;
         }
 
+        /**
+         * @param href The reference of an image element
+         * @return The decoded image, null if it is not an embedded PNG or cannot be decoded
+         */
+        @Nullable PngImage image(@Nullable String href) {
+            if (href == null) {
+                return null;
+            }
+            if (!href.equals(imageKey)) {
+                imageKey = href;
+                image = null;
+                int comma = href.indexOf(',');
+                String header = comma < 0 ? "" : href.substring(0, comma).replace(" ", "");
+                if (header.startsWith("data:image/png") && header.endsWith(";base64")) {
+                    try {
+                        image = PngImage.decode(Base64.getMimeDecoder().decode(href.substring(comma + 1)));
+                    } catch (IllegalArgumentException e) {
+                        image = null;
+                    }
+                }
+            }
+            return image;
+        }
+
         List<Animation> allAnimations() {
             List<Animation> all = new ArrayList<>(animations);
             for (Element child : children) {
@@ -450,7 +610,7 @@ final class SvgImage {
                 discrete = true;
             }
             int count = raw.length;
-            double[] times = numbers(element.attr("keyTimes"));
+            double[] times = numbers(String.valueOf(element.attributes.getOrDefault("keyTimes", "")).replace(';', ' '));
             if (times.length != count) {
                 // a discrete animation shows each value for an equal part of the duration
                 times = new double[count];

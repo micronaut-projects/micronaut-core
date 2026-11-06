@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.banner;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -67,9 +69,138 @@ final class SvgRaster {
      * @param evenOdd Whether to use the even-odd rule rather than non-zero
      * @param argb The color, its alpha ignored
      * @param alpha The opacity in [0, 1]
+     * @param mask The coverage of the clip per pixel, null when not clipped
      */
-    void fill(List<double[]> polygons, boolean evenOdd, int argb, double alpha) {
-        if (alpha <= 0 || polygons.isEmpty()) {
+    void fill(List<double[]> polygons, boolean evenOdd, int argb, double alpha, float @Nullable [] mask) {
+        if (alpha <= 0) {
+            return;
+        }
+        float red = ((argb >> 16) & 0xFF) / 255f;
+        float green = ((argb >> 8) & 0xFF) / 255f;
+        float blue = (argb & 0xFF) / 255f;
+        rasterize(polygons, evenOdd, (y, left, coverage, count) -> {
+            int index = y * width + left;
+            for (int i = 0; i < count; i++, index++) {
+                float cover = Math.min(coverage[i], 1f);
+                if (cover > 0) {
+                    blend(index, red, green, blue, (float) (cover * alpha * (mask == null ? 1 : mask[index])));
+                }
+            }
+        });
+    }
+
+    /**
+     * Adds the coverage of polygons to a mask, the union of the shapes of a clip path.
+     *
+     * @param polygons Closed polygons as alternating x and y device coordinates
+     * @param evenOdd Whether to use the even-odd rule rather than non-zero
+     * @param mask The coverage per pixel
+     */
+    void coverage(List<double[]> polygons, boolean evenOdd, float[] mask) {
+        rasterize(polygons, evenOdd, (y, left, coverage, count) -> {
+            int index = y * width + left;
+            for (int i = 0; i < count; i++, index++) {
+                mask[index] = Math.max(mask[index], Math.min(coverage[i], 1f));
+            }
+        });
+    }
+
+    /**
+     * Draws an image, sampling each device pixel enough times to average the image pixels it covers.
+     *
+     * @param image The image
+     * @param matrix The transform from image pixels to device pixels
+     * @param alpha The opacity in [0, 1]
+     * @param mask The coverage of the clip per pixel, null when not clipped
+     */
+    void drawImage(PngImage image, double[] matrix, double alpha, float @Nullable [] mask) {
+        double determinant = matrix[0] * matrix[3] - matrix[1] * matrix[2];
+        if (determinant == 0 || alpha <= 0) {
+            return;
+        }
+        double[] inverse = {
+            matrix[3] / determinant, -matrix[1] / determinant, -matrix[2] / determinant, matrix[0] / determinant,
+            (matrix[2] * matrix[5] - matrix[3] * matrix[4]) / determinant,
+            (matrix[1] * matrix[4] - matrix[0] * matrix[5]) / determinant
+        };
+        double minX = Double.MAX_VALUE;
+        double minY = Double.MAX_VALUE;
+        double maxX = -Double.MAX_VALUE;
+        double maxY = -Double.MAX_VALUE;
+        for (int corner = 0; corner < 4; corner++) {
+            double ix = (corner & 1) == 0 ? 0 : image.width();
+            double iy = (corner & 2) == 0 ? 0 : image.height();
+            double x = matrix[0] * ix + matrix[2] * iy + matrix[4];
+            double y = matrix[1] * ix + matrix[3] * iy + matrix[5];
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+        }
+        int left = (int) Math.max(0, Math.floor(minX));
+        int right = (int) Math.min(width, Math.ceil(maxX));
+        int top = (int) Math.max(0, Math.floor(minY));
+        int bottom = (int) Math.min(height, Math.ceil(maxY));
+        // image pixels per device pixel decides the samples per device pixel
+        double density = Math.sqrt(Math.abs(1 / determinant));
+        int samples = (int) Math.max(1, Math.min(8, Math.ceil(density)));
+        float weight = 1f / (samples * samples);
+        int[] pixels = image.argb();
+        for (int y = top; y < bottom; y++) {
+            for (int x = left; x < right; x++) {
+                float red = 0;
+                float green = 0;
+                float blue = 0;
+                float a = 0;
+                for (int sy = 0; sy < samples; sy++) {
+                    double dy = y + (sy + 0.5) / samples;
+                    for (int sx = 0; sx < samples; sx++) {
+                        double dx = x + (sx + 0.5) / samples;
+                        int ix = (int) Math.floor(inverse[0] * dx + inverse[2] * dy + inverse[4]);
+                        int iy = (int) Math.floor(inverse[1] * dx + inverse[3] * dy + inverse[5]);
+                        if (ix < 0 || iy < 0 || ix >= image.width() || iy >= image.height()) {
+                            continue;
+                        }
+                        int pixel = pixels[iy * image.width() + ix];
+                        float pixelAlpha = (pixel >>> 24) / 255f * weight;
+                        red += ((pixel >> 16) & 0xFF) / 255f * pixelAlpha;
+                        green += ((pixel >> 8) & 0xFF) / 255f * pixelAlpha;
+                        blue += (pixel & 0xFF) / 255f * pixelAlpha;
+                        a += pixelAlpha;
+                    }
+                }
+                if (a <= 0) {
+                    continue;
+                }
+                int index = y * width + x;
+                float coverage = (float) (a * alpha * (mask == null ? 1 : mask[index]));
+                blend(index, red / a, green / a, blue / a, coverage);
+            }
+        }
+    }
+
+    private void blend(int index, float red, float green, float blue, float a) {
+        if (a <= 0) {
+            return;
+        }
+        int offset = index * 4;
+        float keep = 1 - a;
+        pixels[offset] = red * a + pixels[offset] * keep;
+        pixels[offset + 1] = green * a + pixels[offset + 1] * keep;
+        pixels[offset + 2] = blue * a + pixels[offset + 2] * keep;
+        pixels[offset + 3] = a + pixels[offset + 3] * keep;
+    }
+
+    /**
+     * Receives the coverage of a pixel row.
+     */
+    @FunctionalInterface
+    private interface RowSink {
+        void row(int y, int left, float[] coverage, int count);
+    }
+
+    private void rasterize(List<double[]> polygons, boolean evenOdd, RowSink sink) {
+        if (polygons.isEmpty()) {
             return;
         }
         int edgeCount = 0;
@@ -93,7 +224,7 @@ final class SvgRaster {
         if (top >= bottom || left >= right) {
             return;
         }
-        // edges as x0, y0, x1, y1, direction with y0 < y1, bucketed by the first row they cross
+        // edges as x0, y0, x1, y1, direction with y0 < y1, bucketed by the rows they cross
         double[] edges = new double[edgeCount * 5];
         int edges5 = 0;
         for (double[] polygon : polygons) {
@@ -136,21 +267,18 @@ final class SvgRaster {
             }
         }
 
-        float red = ((argb >> 16) & 0xFF) / 255f;
-        float green = ((argb >> 8) & 0xFF) / 255f;
-        float blue = (argb & 0xFF) / 255f;
         float[] coverage = new float[right - left + 1];
         double[] crossings = new double[16];
         int[] directions = new int[16];
         float weight = 1f / SUBSAMPLES;
         for (int row = 0; row < rows; row++) {
             int y = top + row;
-            Arrays.fill(coverage, 0);
             int from = rowCounts[row];
             int to = rowCounts[row + 1];
             if (from == to) {
                 continue;
             }
+            Arrays.fill(coverage, 0);
             if (to - from > crossings.length) {
                 crossings = new double[(to - from) * 2];
                 directions = new int[(to - from) * 2];
@@ -187,19 +315,7 @@ final class SvgRaster {
                     }
                 }
             }
-            int offset = (y * width + left) * 4;
-            for (int i = 0; i < right - left && left + i < width; i++, offset += 4) {
-                float cover = Math.min(coverage[i], 1f);
-                if (cover <= 0) {
-                    continue;
-                }
-                float a = (float) (cover * alpha);
-                float keep = 1 - a;
-                pixels[offset] = red * a + pixels[offset] * keep;
-                pixels[offset + 1] = green * a + pixels[offset + 1] * keep;
-                pixels[offset + 2] = blue * a + pixels[offset + 2] * keep;
-                pixels[offset + 3] = a + pixels[offset + 3] * keep;
-            }
+            sink.row(y, left, coverage, Math.min(right, width) - left);
         }
     }
 

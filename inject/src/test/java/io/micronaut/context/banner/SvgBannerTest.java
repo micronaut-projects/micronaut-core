@@ -129,6 +129,53 @@ class SvgBannerTest {
     }
 
     @Test
+    void keyTimesPlaceTheValues() {
+        SvgImage svg = SvgImage.parse("""
+            <svg width="10" height="10"><rect width="10" height="10">
+              <animate attributeName="x" values="0;0;100;200" keyTimes="0;0.85;0.925;1" dur="10s"/>
+            </rect></svg>""");
+        SvgImage.Element rect = svg.rootForTest().children.get(0);
+
+        assertEquals(0, rect.number("x", 8, 0), 1e-9);
+        assertEquals(50, rect.number("x", 8.875, 0), 1e-9);
+        assertEquals(150, rect.number("x", 9.625, 0), 1e-9);
+    }
+
+    @Test
+    void strokesAndClipPathsAreRendered() throws IOException {
+        BufferedImage image = render("""
+            <svg width="40" height="20">
+              <defs><clipPath id="left"><rect width="20" height="20"/></clipPath></defs>
+              <g clip-path="url(#left)">
+                <line x1="2" y1="10" x2="38" y2="10" stroke="red" stroke-width="4" stroke-linecap="round"/>
+              </g>
+            </svg>""", 0);
+
+        assertEquals(RED, image.getRGB(10, 10));
+        assertEquals(RED, image.getRGB(1, 10) | 0xFF000000, "the round cap");
+        assertEquals(0, image.getRGB(10, 5) >>> 24, "outside the stroke");
+        assertEquals(0, image.getRGB(30, 10) >>> 24, "clipped");
+    }
+
+    @Test
+    void embeddedPngImagesAreDrawnInNestedViewports() throws IOException {
+        SvgRaster source = new SvgRaster(4, 4);
+        source.fill(List.of(new double[] {0, 0, 2, 0, 2, 4, 0, 4}), false, RED, 1, null);
+        String png = Base64.getEncoder().encodeToString(source.toPng());
+
+        BufferedImage image = render("""
+            <svg width="40" height="20" xmlns:xlink="http://www.w3.org/1999/xlink">
+              <svg x="20" width="20" height="20" viewBox="1 0 2 4">
+                <image width="4" height="4" xlink:href="data:image/png;base64,%s"/>
+              </svg>
+            </svg>""".formatted(png), 0);
+
+        assertEquals(RED, image.getRGB(27, 10));
+        assertEquals(0, image.getRGB(32, 10) >>> 24, "the transparent half of the image");
+        assertEquals(0, image.getRGB(18, 10) >>> 24, "clipped to the nested viewport");
+    }
+
+    @Test
     void splinesEaseTheInterpolation() {
         SvgImage svg = SvgImage.parse("""
             <svg width="10" height="10"><rect width="10" height="10">

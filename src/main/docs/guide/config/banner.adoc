@@ -52,7 +52,7 @@ You can provide an SVG image instead, at `src/main/resources/META-INF/micronaut/
 </svg>
 ----
 
-The banner renderer supports a subset of SVG: the `path` (with every command), `polygon`, `polyline`, `rect`, `circle`, `ellipse` and `g` elements, transforms, and the `fill`, `fill-opacity`, `fill-rule`, `opacity` and `color` properties. Strokes, text, gradients, and clipping are not rendered, so convert text and strokes to paths. A terminal that displays images but not animations shows the image as it is when the animation ends.
+The banner renderer supports a subset of SVG: the `path` (with every command), `polygon`, `polyline`, `line`, `rect`, `circle`, `ellipse`, `g` and nested `svg` elements, `image` elements with an embedded PNG (`data:image/png;base64,...`), `clipPath`, transforms, and the fill, stroke, opacity and `color` properties. Strokes always have round joins. Text, gradients, masks, filters and CSS style sheets are not rendered, so convert text to paths and CSS animations to SMIL. A terminal that displays images but not animations shows the image as it is when the animation ends.
 
 To disable it, modify your `Application` class:
 
