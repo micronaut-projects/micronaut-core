@@ -44,6 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -63,6 +64,7 @@ public class FilterErrorTest {
     @Test
     void testFilterThrowingExceptionHandledByExceptionHandlerThrowingException() throws IOException {
         asserts(SPEC_NAME + "3",
+            Map.of("micronaut.server.error-response-include-message", "always"),
             HttpRequest.GET("/filter-error-spec-3")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
             (server, request) -> {

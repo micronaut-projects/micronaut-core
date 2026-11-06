@@ -51,7 +51,9 @@ final class NettyInputStreamBodyBinder implements NonBlockingBodyArgumentBinder<
 
     @Override
     public BindingResult<InputStream> bind(ArgumentConversionContext<InputStream> context, HttpRequest<?> source) {
-        if (source instanceof NettyHttpRequest<?> nhr) {
+        // the request itself, or e.g. the mutable view of the request that a filter continued with
+        NettyHttpRequest<?> nhr = NettyHttpRequest.findBodyRequest(source);
+        if (nhr != null) {
             if (nhr.byteBody().expectedLength().orElse(-1) == 0) {
                 return BindingResult.empty();
             }

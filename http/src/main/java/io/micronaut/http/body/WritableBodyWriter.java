@@ -48,6 +48,10 @@ import java.io.OutputStream;
 @Experimental
 @BootstrapContextCompatible
 public final class WritableBodyWriter implements TypedMessageBodyHandler<Writable>, ChunkedMessageBodyReader<Writable>, ResponseBodyWriter<Writable> {
+    /**
+     * The type this handler is for, resolved once: isWriteable asks for it on every response.
+     */
+    private static final Argument<Writable> TYPE = Argument.of(Writable.class);
 
     private final ApplicationConfiguration applicationConfiguration;
 
@@ -57,7 +61,7 @@ public final class WritableBodyWriter implements TypedMessageBodyHandler<Writabl
 
     @Override
     public Argument<Writable> getType() {
-        return Argument.of(Writable.class);
+        return TYPE;
     }
 
     @Override

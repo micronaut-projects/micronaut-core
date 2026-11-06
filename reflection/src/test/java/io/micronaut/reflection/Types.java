@@ -28,6 +28,10 @@ public class Types {
         // the signature is what is read, the body is never called
     }
 
+    public <M extends Comparable<String> & Cloneable> void distinctlyNamed(List<M> inside) {
+        // the variable is named unlike the parameter of the type holding it, which is the E of List<E>
+    }
+
     public <T extends Comparable<T>> void recursive(T value) {
         // the signature is what is read, the body is never called
     }

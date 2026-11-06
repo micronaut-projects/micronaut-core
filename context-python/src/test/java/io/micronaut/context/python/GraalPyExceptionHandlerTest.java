@@ -17,14 +17,71 @@ package io.micronaut.context.python;
 
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GraalPyExceptionHandlerTest {
+
+    @Test
+    void originalExceptionIsRestoredOnlyInItsOwningContext() {
+        try (Context owner = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+             Context other = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value original = owner.eval(PYTHON, "ValueError('duplicate')");
+            PythonBoom wrapper = new PythonBoom(original);
+            owner.enter();
+            try {
+                assertSame(original, PythonExceptions.original(wrapper));
+                assertNull(PythonExceptions.original(new IllegalStateException("java")));
+                assertNull(PythonExceptions.original(new PythonBoom(owner.eval(PYTHON, "object()"))));
+            } finally {
+                owner.leave();
+            }
+            other.enter();
+            try {
+                assertNull(PythonExceptions.original(wrapper));
+            } finally {
+                other.leave();
+            }
+        }
+    }
+
+    @Test
+    void interceptedCallsRaiseTheOriginalExceptionOutsideTheJavaFailureHandler() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value original = context.eval(PYTHON, "ValueError('duplicate')");
+            PythonBoom wrapper = new PythonBoom(original);
+            ProxyExecutable fail = args -> { throw wrapper; };
+            Value wrap = PythonContextRuntime.helper(context, "__micronaut_intercepted_call");
+            context.getBindings(PYTHON).putMember("original", original);
+            context.getBindings(PYTHON).putMember("fixed", wrap.execute(context.eval(PYTHON, "lambda self, key='email': None"), fail));
+            context.getBindings(PYTHON).putMember("variadic", wrap.execute(context.eval(PYTHON, "lambda self, *args: None"), fail));
+            assertDoesNotThrow(() -> context.eval(PYTHON, """
+                for call in (fixed, variadic):
+                    try:
+                        call()
+                    except ValueError as error:
+                        assert error is original
+                        assert error.args == ('duplicate',)
+                        assert error.__context__ is None
+                        assert not error.__suppress_context__
+                    else:
+                        raise AssertionError('original exception was not raised')
+                """));
+        }
+    }
 
     @Test
     void hostRuntimeExceptionsAreRethrownAcrossPythonBoundary() {
@@ -136,9 +193,126 @@ class GraalPyExceptionHandlerTest {
         }
     }
 
+    /**
+     * A Java exception that Python creates and raises crosses back to Java with Truffle bookkeeping in
+     * its suppressed exceptions: {@code HostException.wrap} shares the lazy guest stack trace with the
+     * host throwable by attaching a {@code TruffleStackTrace.LazyStackTrace} to it. That entry is not
+     * an exception the application suppressed, and a serializer rendering the suppressed exceptions of
+     * an error response fails on it, for example the problem+json body provider with
+     * {@code No serializable introspection present for type LazyStackTrace}.
+     */
+    @Test
+    void truffleBookkeepingIsNotReportedAmongTheSuppressedExceptions() {
+        try (Engine engine = GraalPyEngineFactory.buildPythonEngine();
+             Context context = Context.newBuilder(PYTHON)
+                 .allowAllAccess(true)
+                 .engine(engine)
+                 .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+                 .build()) {
+            context.eval(PYTHON, """
+                import java
+                IllegalStateException = java.type("java.lang.IllegalStateException")
+
+                def raise_java():
+                    raise IllegalStateException("boom")
+                """);
+            Value callback = context.getBindings(PYTHON).getMember("raise_java");
+
+            IllegalStateException exception = assertThrows(IllegalStateException.class, callback::execute);
+
+            assertEquals("boom", exception.getMessage());
+            assertEquals(1, exception.getSuppressed().length,
+                "Truffle attaches its guest stack trace to the host throwable and it cannot be taken off again");
+            assertTrue(PythonExceptions.isTruffleStackTrace(exception.getSuppressed()[0]),
+                "the attached entry: " + Arrays.toString(exception.getSuppressed()));
+            assertEquals(0, PythonExceptions.suppressed(exception).length,
+                "reported suppressed exceptions: " + Arrays.toString(PythonExceptions.suppressed(exception)));
+        }
+    }
+
+    /**
+     * The exceptions the application itself suppressed are not lost when the throwable crosses Python.
+     */
+    @Test
+    void genuineSuppressedExceptionsSurviveTheCrossing() {
+        try (Engine engine = GraalPyEngineFactory.buildPythonEngine();
+             Context context = Context.newBuilder(PYTHON)
+                 .allowAllAccess(true)
+                 .engine(engine)
+                 .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+                 .build()) {
+            context.getBindings(PYTHON).putMember("thrower", new Thrower());
+            Value callback = context.eval(PYTHON, "lambda: thrower.throwWithSuppressed()");
+
+            IllegalStateException exception = assertThrows(IllegalStateException.class, callback::execute);
+
+            assertEquals("boom", exception.getMessage());
+            Throwable[] suppressed = PythonExceptions.suppressed(exception);
+            assertEquals(1, suppressed.length, "reported suppressed exceptions: " + Arrays.toString(suppressed));
+            assertEquals("closed badly", suppressed[0].getMessage());
+        }
+    }
+
+    @Test
+    void returnsAnExceptionAlreadyMappedByTheContextHandler() {
+        PythonBoom[] mapped = new PythonBoom[1];
+        try (Context context = Context.newBuilder(PYTHON)
+            .exceptionHandler(exception -> {
+                throw mapped[0];
+            })
+            .build()) {
+            Value guest = context.eval(PYTHON, "RuntimeError('native')");
+            mapped[0] = new PythonBoom(guest);
+
+            assertSame(mapped[0], GraalPyExceptionHandler.toHostThrowable(guest));
+            assertSame(guest, mapped[0].asPolyglotValue());
+        }
+    }
+
+    @Test
+    void preservesOperationalFailuresFromTheContextHandler() {
+        IllegalStateException failure = new IllegalStateException("mapping failed");
+        try (Context context = Context.newBuilder(PYTHON)
+            .exceptionHandler(exception -> {
+                throw failure;
+            })
+            .build()) {
+            Value guest = context.eval(PYTHON, "RuntimeError('native')");
+
+            assertSame(failure, assertThrows(IllegalStateException.class,
+                () -> GraalPyExceptionHandler.toHostThrowable(guest)));
+        }
+    }
+
+    @Test
+    void preservesHostThrowableIdentity() {
+        IllegalArgumentException host = new IllegalArgumentException("host");
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            assertSame(host, GraalPyExceptionHandler.toHostThrowable(context.asValue(host)));
+        }
+    }
+
+    @Test
+    void retainsPolyglotExceptionsForUnmappedNativeBuiltins() {
+        try (Context context = Context.newBuilder(PYTHON).build()) {
+            Value guest = context.eval(PYTHON, "ValueError('native')");
+
+            PolyglotException exception = assertInstanceOf(PolyglotException.class,
+                GraalPyExceptionHandler.toHostThrowable(guest));
+            assertTrue(exception.isGuestException());
+            assertTrue(exception.getMessage().contains("native"));
+        }
+    }
+
     public static final class Thrower {
         public void throwRuntime() {
             throw new IllegalStateException("boom");
+        }
+
+        public void throwWithSuppressed() {
+            IllegalStateException exception = new IllegalStateException("boom");
+            exception.addSuppressed(new IllegalArgumentException("closed badly"));
+            throw exception;
         }
     }
 

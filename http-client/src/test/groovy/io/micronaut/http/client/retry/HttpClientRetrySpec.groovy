@@ -44,7 +44,8 @@ class HttpClientRetrySpec extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'spec.name': 'HttpClientRetrySpec'
+            'spec.name': 'HttpClientRetrySpec',
+            'micronaut.server.error-response-include-message': 'always'
     ])
 
     @Shared

@@ -8,6 +8,13 @@
         </encoder>
     </appender>
 
+    <!-- access log used by the HTTP stack benchmarks with -Dmicronaut.bench.access-log=true:
+         the log line is built by the server but never written -->
+    <appender name="NOP" class="ch.qos.logback.core.helpers.NOPAppender"/>
+    <logger name="bench-access-log" level="info" additivity="false">
+        <appender-ref ref="NOP" />
+    </logger>
+
     <root level="info">
         <appender-ref ref="STDOUT" />
     </root>

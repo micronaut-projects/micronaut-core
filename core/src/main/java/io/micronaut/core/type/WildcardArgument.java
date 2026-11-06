@@ -34,7 +34,8 @@ import java.util.List;
  * <p>For compatibility with what the processors have always emitted, a wildcard argument also reports
  * {@link #isTypeVariable()} as {@code true} and may implement {@link GenericPlaceholder}, named after the type
  * parameter it stands for; a consumer that needs to tell a wildcard from a type variable should test for this
- * interface first. {@link #equalsType(Argument)} and {@link #typeHashCode()} do not consider the bounds.</p>
+ * interface first. {@link #equalsType(Argument)} and {@link #typeHashCode()} do not consider the bounds, at any
+ * depth: {@code Map<String, ? extends Object>} has the type of {@code Map<String, Object>}.</p>
  *
  * @param <T> The type the wildcard is bounded by
  * @author Denis Stepanov

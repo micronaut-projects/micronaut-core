@@ -8,9 +8,10 @@ from micronaut.test.extensions.junit5.annotation import MicronautTest
 from micronaut.websocket import WebSocketClient
 from org.junit.jupiter.api import Test
 
+from .ChatClientWebSocket import ChatClientWebSocket
+
 Flux = java.type("reactor.core.publisher.Flux")
 TimeUnit = java.type("java.util.concurrent.TimeUnit")
-ChatClientClass = java.type("micronaut.docs.http.server.netty.websocket.ChatClientWebSocket")
 
 
 @Property(name="spec.name", value="SimpleTextWebSocketSpec")
@@ -21,10 +22,10 @@ class SimpleTextWebSocketSpec:
     @Test
     def test_simple_text_websocket_exchange(self):
         fred = Flux.from_(
-            self.wsClient.connect(ChatClientClass, "/chat/stuff/fred")
+            self.wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred")
         ).blockFirst()
         bob = Flux.from_(
-            self.wsClient.connect(ChatClientClass, {"topic": "stuff", "username": "bob"})
+            self.wsClient.connect(ChatClientWebSocket, {"topic": "stuff", "username": "bob"})
         ).blockFirst()
 
         assert fred.getSession() is not None

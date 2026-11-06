@@ -22,6 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.server.tck.CorsAssertion;
+import io.micronaut.http.server.tck.CorsUtils;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.RequestSupplier;
@@ -40,7 +41,6 @@ import java.util.Optional;
 import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SuppressWarnings({
     "java:S2259", // The tests will show if it's null
@@ -329,7 +329,7 @@ public class CorsSimpleRequestTest {
         assertEquals(0, refreshCounter.getRefreshCount());
         AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
             .status(HttpStatus.FORBIDDEN)
-            .assertResponse(response -> assertFalse(response.getHeaders().contains("Vary")))
+            .assertResponse(CorsUtils::assertVaryDoesNotNameOrigin)
             .build());
         assertEquals(0, refreshCounter.getRefreshCount());
     }

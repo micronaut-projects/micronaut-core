@@ -38,6 +38,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -289,6 +290,7 @@ public abstract class HttpClientConfiguration {
             this.bufferErrorBodyForStreaming = copy.bufferErrorBodyForStreaming;
             this.defaultCharset = copy.defaultCharset;
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
+            this.decompressionEnabled = copy.decompressionEnabled;
             this.eventLoopGroup = copy.eventLoopGroup;
             this.followRedirects = copy.followRedirects;
             this.redirectAlwaysFilteredHeaders = copy.redirectAlwaysFilteredHeaders;
@@ -306,6 +308,7 @@ public abstract class HttpClientConfiguration {
             this.proxySelector = copy.proxySelector;
             this.proxyType = copy.proxyType;
             this.proxyUsername = copy.proxyUsername;
+            this.requestTimeout = copy.requestTimeout;
             this.readIdleTimeout = copy.readIdleTimeout;
             this.connectionPoolIdleTimeout = copy.connectionPoolIdleTimeout;
             this.readTimeout = copy.readTimeout;
@@ -314,6 +317,20 @@ public abstract class HttpClientConfiguration {
             this.sslConfiguration = copy.sslConfiguration;
             this.threadFactory = copy.threadFactory;
             this.httpVersion = copy.httpVersion;
+            // these have non-null defaults, so only overwrite them when the source
+            // actually carries a value
+            if (copy.plaintextMode != null) {
+                this.plaintextMode = copy.plaintextMode;
+            }
+            if (copy.alpnModes != null) {
+                this.alpnModes = new ArrayList<>(copy.alpnModes);
+            }
+            this.allowBlockEventLoop = copy.allowBlockEventLoop;
+            if (copy.dnsResolutionMode != null) {
+                this.dnsResolutionMode = copy.dnsResolutionMode;
+            }
+            this.addressResolverGroupName = copy.addressResolverGroupName;
+            this.pcapLoggingPathPattern = copy.pcapLoggingPathPattern;
         }
     }
 
@@ -1186,6 +1203,35 @@ public abstract class HttpClientConfiguration {
         private HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality = ConnectionLocality.PREFERRED;
 
         private PoolVersion version = PoolVersion.V4_9;
+
+        /**
+         * Default constructor.
+         */
+        public ConnectionPoolConfiguration() {
+        }
+
+        /**
+         * Copy constructor.
+         *
+         * @param copy The connection pool configuration to copy
+         */
+        protected ConnectionPoolConfiguration(@Nullable ConnectionPoolConfiguration copy) {
+            if (copy != null) {
+                this.maxPendingConnections = copy.maxPendingConnections;
+                this.maxConcurrentRequestsPerHttp2Connection = copy.maxConcurrentRequestsPerHttp2Connection;
+                this.maxConcurrentHttp1Connections = copy.maxConcurrentHttp1Connections;
+                this.maxConcurrentHttp2Connections = copy.maxConcurrentHttp2Connections;
+                this.maxPendingAcquires = copy.maxPendingAcquires;
+                this.acquireTimeout = copy.acquireTimeout;
+                this.enabled = copy.enabled;
+                if (copy.connectionLocality != null) {
+                    this.connectionLocality = copy.connectionLocality;
+                }
+                if (copy.version != null) {
+                    this.version = copy.version;
+                }
+            }
+        }
 
         /**
          * Whether connection pooling is enabled.

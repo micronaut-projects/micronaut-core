@@ -23,6 +23,7 @@ import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelOption
+import io.netty.handler.codec.http.multipart.MemoryFileUpload
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
@@ -86,6 +87,37 @@ class ConverterRegistrySpec extends Specification {
 
         cleanup:
         ctx1.close()
+    }
+
+    def "test convert a completed netty HttpData"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        MemoryFileUpload upload = new MemoryFileUpload('file', 'file.txt', 'text/plain', null, StandardCharsets.UTF_8, 4)
+        upload.setContent(Unpooled.copiedBuffer('test', StandardCharsets.UTF_8))
+
+        expect: 'the conversions registered by NettyConvertersSpi are reachable through the public ConversionService'
+        upload.completed
+        ctx.getBean(ConversionService).convert(upload, byte[]).get() == 'test'.bytes
+        ctx.getBean(ConversionService).convert(upload, CharSequence).get() == 'test'
+
+        cleanup:
+        upload.release()
+        ctx.close()
+    }
+
+    def "test an incomplete netty HttpData does not convert"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        MemoryFileUpload upload = new MemoryFileUpload('file', 'file.txt', 'text/plain', null, StandardCharsets.UTF_8, 4)
+
+        expect: 'a partially received upload yields no value rather than a truncated one'
+        !upload.completed
+        ctx.getBean(ConversionService).convert(upload, byte[]) == Optional.empty()
+        ctx.getBean(ConversionService).convert(upload, CharSequence) == Optional.empty()
+
+        cleanup:
+        upload.release()
+        ctx.close()
     }
 
     def "config properties"() {

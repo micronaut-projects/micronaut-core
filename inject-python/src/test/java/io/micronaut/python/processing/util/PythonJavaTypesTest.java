@@ -47,11 +47,25 @@ final class PythonJavaTypesTest {
     }
 
     @Test
-    void concreteClassesExcludeInterfacesAndAbstractTypes() {
-        assertTrue(PythonJavaTypes.isConcreteClass(ClassElement.of(String.class)));
-        assertFalse(PythonJavaTypes.isConcreteClass(ClassElement.of(Runnable.class)));
-        assertFalse(PythonJavaTypes.isConcreteClass(ClassElement.of(Number.class)));
-        assertFalse(PythonJavaTypes.isConcreteClass(null));
+    void extensibleClassesExcludeInterfacesAndThrowables() {
+        assertTrue(PythonJavaTypes.isExtensibleClass(ClassElement.of(String.class)));
+        assertTrue(PythonJavaTypes.isExtensibleClass(ClassElement.of(Number.class)));
+        assertFalse(PythonJavaTypes.isExtensibleClass(ClassElement.of(Runnable.class)));
+        assertFalse(PythonJavaTypes.isExtensibleClass(ClassElement.of(RuntimeException.class)));
+        assertFalse(PythonJavaTypes.isExtensibleClass(null));
+    }
+
+    @Test
+    void boxedTypesMatchTheirPrimitiveWithTheSameArrayDimensions() {
+        assertTrue(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(int.class), ClassElement.of(Integer.class)));
+        assertTrue(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(int[].class), ClassElement.of(int[].class)));
+        // int[] and Integer[] are distinct Java types, unlike int and Integer
+        assertFalse(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(int[].class), ClassElement.of(Integer[].class)));
+        assertTrue(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(String.class), ClassElement.of(String.class)));
+        assertFalse(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(int.class), ClassElement.of(Integer[].class)));
+        assertFalse(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(Integer[].class), ClassElement.of(int.class)));
+        assertFalse(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(int[].class), ClassElement.of(int[][].class)));
+        assertFalse(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(int.class), ClassElement.of(Long.class)));
     }
 
     @Test

@@ -31,6 +31,11 @@ public interface MutableConversionService extends ConversionService {
      * @return A new mutable conversion service.
      */
     static MutableConversionService create() {
+        // Initialize ConversionService first: its static initializer builds SHARED, a DefaultMutableConversionService.
+        // Starting from DefaultMutableConversionService instead can deadlock with a thread that initializes
+        // ConversionService, and builds SHARED before the static state of DefaultMutableConversionService is set.
+        // SHARED is null if this runs while SHARED itself is being built, so it is read but not checked.
+        ConversionService _ = ConversionService.SHARED;
         return new DefaultMutableConversionService();
     }
 

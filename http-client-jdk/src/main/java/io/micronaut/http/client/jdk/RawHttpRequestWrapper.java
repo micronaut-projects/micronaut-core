@@ -22,13 +22,14 @@ import io.micronaut.http.MutableHttpRequestWrapper;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.client.RawRequestCookies;
+import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.netty.handler.codec.http.HttpRequest;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
-import java.io.IOException;
 
 /**
  * This is a combination of a {@link HttpRequest} with a {@link ByteBody}. It implements
@@ -59,7 +60,15 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
     }
 
     @Override
-    public void close() throws IOException {
+    public MutableHttpRequest<B> cookie(Cookie cookie) {
+        // the raw request is sent with the headers of the wrapped request: a cookie a client
+        // filter adds goes to its Cookie header, like for a client request
+        RawRequestCookies.addCookie(getHeaders(), cookie);
+        return this;
+    }
+
+    @Override
+    public void close() {
         byteBody.close();
     }
 }

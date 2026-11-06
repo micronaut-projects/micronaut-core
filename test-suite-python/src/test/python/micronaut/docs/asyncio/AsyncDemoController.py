@@ -112,7 +112,7 @@ class AsyncDemoController:
     async def context_id(self) -> str:
         return builtins.__MN_CTX_ID__
 
-    # A dataclass body arrives as the generated Java class and is rebuilt in the event-loop context;
+    # A dataclass body arrives as the generated Java class and is rebuilt in the controller's context;
     # the response leaves that context again. With the pool enabled this is the pooled value path.
     @Post("/echo-note")
     async def echo_note(self, note: Annotated[Note, Body]) -> Note:

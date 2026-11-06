@@ -50,6 +50,7 @@ import java.util.function.Predicate;
 public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements UriRouteInfo<T, R> {
 
     private final HttpMethod httpMethod;
+    private final String httpMethodName;
     private final UriMatchTemplate uriMatchTemplate;
     private final UriTemplateMatcher uriTemplateMatcher;
     private final Charset defaultCharset;
@@ -99,9 +100,49 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                ExecutorSelector executorSelector,
                                MessageBodyHandlerRegistry messageBodyHandlerRegistry,
                                boolean implicitHead) {
+        this(httpMethod, httpMethod.name(), uriMatchTemplate, defaultCharset, targetMethod, bodyArgumentName, bodyArgument,
+            consumesMediaTypes, producesMediaTypes, predicates, port, conversionService, executorSelector,
+            messageBodyHandlerRegistry, implicitHead);
+    }
+
+    /**
+     * @param httpMethod                 The HTTP method
+     * @param httpMethodName             The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+     * @param uriMatchTemplate           The URI match template
+     * @param defaultCharset             The default charset
+     * @param targetMethod               The target method
+     * @param bodyArgumentName           The body argument name
+     * @param bodyArgument               The body argument
+     * @param consumesMediaTypes         The consumed media types
+     * @param producesMediaTypes         The produced media types
+     * @param predicates                 The predicates
+     * @param port                       The port
+     * @param conversionService          The conversion service
+     * @param executorSelector           The executor selector
+     * @param messageBodyHandlerRegistry The message body handler registry
+     * @param implicitHead               Whether this is an implicit {@code HEAD} route
+     * @since 5.2.3
+     */
+    @SuppressWarnings("ParameterNumber")
+    public DefaultUrlRouteInfo(HttpMethod httpMethod,
+                               String httpMethodName,
+                               UriMatchTemplate uriMatchTemplate,
+                               Charset defaultCharset,
+                               MethodExecutionHandle<T, R> targetMethod,
+                               @Nullable String bodyArgumentName,
+                               @Nullable Argument<?> bodyArgument,
+                               List<MediaType> consumesMediaTypes,
+                               List<MediaType> producesMediaTypes,
+                               List<Predicate<HttpRequest<?>>> predicates,
+                               @Nullable Integer port,
+                               ConversionService conversionService,
+                               ExecutorSelector executorSelector,
+                               MessageBodyHandlerRegistry messageBodyHandlerRegistry,
+                               boolean implicitHead) {
         super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates, messageBodyHandlerRegistry);
         this.implicitHead = implicitHead;
         this.httpMethod = httpMethod;
+        this.httpMethodName = httpMethodName;
         this.uriMatchTemplate = uriMatchTemplate;
         this.uriTemplateMatcher = new UriTemplateMatcher(uriMatchTemplate.getTemplateString());
         this.defaultCharset = defaultCharset;
@@ -113,6 +154,11 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Override
     public HttpMethod getHttpMethod() {
         return httpMethod;
+    }
+
+    @Override
+    public String getHttpMethodName() {
+        return httpMethodName;
     }
 
     @Override

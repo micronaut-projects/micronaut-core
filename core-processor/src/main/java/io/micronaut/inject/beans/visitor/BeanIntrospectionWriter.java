@@ -181,7 +181,8 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         AbstractInitializableBeanIntrospection.BeanConstructorRef.class,
         AnnotationMetadata.class,
         Argument[].class,
-        int.class
+        int.class,
+        boolean.class
     );
 
     private static final java.lang.reflect.Constructor<?> ENUM_INTROSPECTION_SUPER_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
@@ -262,6 +263,11 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
     private static final java.lang.reflect.Method HAS_CONSTRUCTOR_METHOD = ReflectionUtils.getRequiredMethod(
         AbstractInitializableBeanIntrospection.class,
         "hasConstructor"
+    );
+
+    private static final java.lang.reflect.Method IS_STATIC_CREATOR_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        AbstractInitializableBeanIntrospection.class,
+        "isStaticCreator"
     );
 
     private static final java.lang.reflect.Method INSTANTIATE_CONSTRUCTOR_INTERNAL_METHOD = ReflectionUtils.getRequiredInternalMethod(
@@ -1078,6 +1084,13 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                 getBooleanMethod(HAS_CONSTRUCTOR_METHOD, true)
             );
         }
+        MethodElement instantiatingConstructor = constructor != null ? constructor : defaultConstructor;
+        if (beanClassElement.isEnum() || (instantiatingConstructor != null && instantiatingConstructor.isStatic())) {
+            // an enum valueOf or a static @Creator: the bean is not created through a constructor of its type
+            classDefBuilder.addMethod(
+                getBooleanMethod(IS_STATIC_CREATOR_METHOD, true)
+            );
+        }
         if (defaultConstructor != null) {
             classDefBuilder.addMethod(
                 getInstantiateMethod(defaultConstructor, INSTANTIATE_METHOD)
@@ -1390,7 +1403,9 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                     loadClassValueExpressionFn
                 ),
                 // 3: instantiate dispatch index
-                ExpressionDef.constant(constructorIndex)
+                ExpressionDef.constant(constructorIndex),
+                // 4: a constructor of the bean type, or a static creator method
+                ExpressionDef.constant(!declaredConstructor.isStatic())
             );
     }
 

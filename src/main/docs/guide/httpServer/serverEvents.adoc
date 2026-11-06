@@ -16,9 +16,17 @@ The HTTP server emits a number of <<events, Bean Events>>, defined in the pkg:io
 |api:discovery.event.ServiceStoppedEvent[]
 |Emitted after all api:runtime.server.event.ServerShutdownEvent[] listeners have been invoked and exposes the api:discovery.EmbeddedServerInstance[]
 
+|api:http.context.event.HttpRequestReceivedEvent[]
+|Emitted for every request the server receives, before the request is routed. Exposes the request without its body.
+
+|api:http.context.event.HttpRequestTerminatedEvent[]
+|Emitted for every request once the server is done with it. This does not imply that a response was delivered.
+
 |===
 
 WARNING: Doing significant work within a listener for a api:runtime.server.event.ServerStartupEvent[] will increase startup time.
+
+WARNING: Listeners for api:http.context.event.HttpRequestReceivedEvent[] and api:http.context.event.HttpRequestTerminatedEvent[] are invoked on the thread the server selects for request handling, which with the default `micronaut.server.thread-selection` (`MANUAL`, and also with `AUTO`) is the Netty event loop of the connection. They must not block: a slow listener delays every other connection on that event loop. Annotate the `@EventListener` method with ann:scheduling.annotation.Async[] to run it on an executor, or set `micronaut.server.thread-selection` to `BLOCKING` to move listeners (and controllers) off the event loop. With debug logging enabled for `io.micronaut.http.server.netty.RoutingInBoundHandler`, the server logs listeners that take longer than 100 ms on the event loop.
 
 The following example defines a api:context.event.ApplicationEventListener[] that listens for api:runtime.server.event.ServerStartupEvent[]:
 

@@ -15,7 +15,6 @@
  */
 package io.micronaut.python.annotation.processing.test
 
-import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.inject.ast.ClassElement
 
 /**
@@ -42,6 +41,36 @@ class Greeter:
 
             def plain = element.findMethod("plain").get()
             assert !plain.parameters[0].hasDefault()
+            return element
+        }
+    }
+
+    void "positional-only parameters are parameters of the method, with their defaults aligned"() {
+        expect:
+        buildClassElement('''
+class Lookup:
+    def lookup(self, key: str, /, suffix: str = ".") -> str:
+        return key + suffix
+
+    def lookup_defaulted(self, key: str, scope: str = "global", /, suffix: str = ".", times: int = 1) -> str:
+        return key + suffix
+
+    def only(self, key: str, count: int = 1, /) -> str:
+        return key
+''') { ClassElement element ->
+            def lookup = element.findMethod("lookup").get()
+            assert lookup.parameters*.name == ["key", "suffix"]
+            assert lookup.parameters*.type*.name == ["java.lang.String", "java.lang.String"]
+            assert !lookup.parameters[0].hasDefault()
+            assert lookup.parameters[1].hasDefault()
+
+            def defaulted = element.findMethod("lookup_defaulted").get()
+            assert defaulted.parameters*.name == ["key", "scope", "suffix", "times"]
+            assert defaulted.parameters*.hasDefault() == [false, true, true, true]
+
+            def only = element.findMethod("only").get()
+            assert only.parameters*.name == ["key", "count"]
+            assert only.parameters*.hasDefault() == [false, true]
             return element
         }
     }
@@ -113,9 +142,9 @@ class Conf:
         introspection.getRequiredProperty("port", Integer).get(instance) == 9090
     }
 
-    void "a dataclass with a mutable default is left to the stub rather than materialised"() {
+    void "a dataclass with a mutable default is constructed through its Python constructor"() {
         given: 'a default_factory, which Python must evaluate itself'
-        def introspection = buildBeanIntrospection("python.Tags", '''
+        def context = buildContext('''
 from dataclasses import dataclass, field
 from typing import List
 from micronaut.core.annotation import Introspected
@@ -125,14 +154,16 @@ from micronaut.core.annotation import Introspected
 class Tags:
     names: List[str] = field(default_factory=list)
 ''')
+        def introspection = getBeanIntrospection(context, "python.Tags")
 
-        expect: 'no caller-side default is available, so no-arg instantiation is refused'
-        introspection != null
+        when: 'no caller-side default is available, so the no-arg constructor creates the Python object'
+        def instance = introspection.instantiate()
 
-        when:
-        introspection.instantiate()
+        then: 'the default factory ran'
+        instance.names == []
+        instance.asPolyglotValue().getMember("names").arraySize == 0
 
-        then:
-        thrown(InstantiationException)
+        cleanup:
+        context?.close()
     }
 }

@@ -1,21 +1,27 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.PolyglotException;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The application runtime owns the primary context, the pool and the offload executor of one
- * application; generated code resolves the runtime installed last.
+ * application; generated code resolves the runtime installed last, and a nested application that
+ * closes hands the enclosing one back.
  */
 final class PythonApplicationRuntimeTest {
 
@@ -46,18 +52,26 @@ final class PythonApplicationRuntimeTest {
     }
 
     @Test
-    void aReplacedRuntimeCannotUninstallItsSuccessor() {
+    void installedRuntimesNestAndUninstallingTheInnerOneRestoresTheOuterOne() {
         try (Context first = Context.newBuilder(PYTHON).allowAllAccess(true).build();
              Context second = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
-            PythonApplicationRuntime old = PythonContextRuntime.setContext(first, null);
+            PythonApplicationRuntime outer = PythonContextRuntime.setContext(first, null);
             assertTrue(PythonContextRuntime.isCurrentContext(first));
             assertTrue(PythonContextRuntime.isCurrentContext(first.eval(PYTHON, "object()").getContext()), "a context view matches the primary context");
 
-            PythonApplicationRuntime replacement = PythonContextRuntime.setContext(second, null);
-            assertFalse(PythonApplicationRuntime.uninstall(old), "the old runtime is no longer installed");
-            assertSame(replacement, PythonApplicationRuntime.current());
+            PythonApplicationRuntime inner = PythonContextRuntime.setContext(second, null);
+            assertSame(inner, PythonApplicationRuntime.current());
             assertTrue(PythonContextRuntime.isCurrentContext(second));
             assertFalse(PythonContextRuntime.isCurrentContext(first));
+
+            assertTrue(PythonApplicationRuntime.uninstall(inner), "the inner runtime was installed");
+            assertSame(outer, PythonApplicationRuntime.current(), "the outer runtime is resolved again");
+            assertTrue(PythonContextRuntime.isCurrentContext(first));
+            assertFalse(PythonApplicationRuntime.uninstall(inner), "an uninstalled runtime is not installed");
+
+            PythonApplicationRuntime replacement = PythonContextRuntime.setContext(second, null);
+            assertTrue(PythonApplicationRuntime.uninstall(outer), "an enclosing runtime can be uninstalled while a nested one is installed");
+            assertSame(replacement, PythonApplicationRuntime.current(), "uninstalling the enclosing runtime leaves the nested one in place");
 
             PythonContextRuntime.resetContext();
             assertNull(PythonApplicationRuntime.current());
@@ -66,5 +80,74 @@ final class PythonApplicationRuntimeTest {
         } finally {
             PythonContextRuntime.resetContext();
         }
+    }
+
+    @Test
+    void resetContextUninstallsEveryRuntime() {
+        try (Context first = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+             Context second = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            PythonContextRuntime.setContext(first, null);
+            PythonContextRuntime.setContext(second, null);
+
+            PythonContextRuntime.resetContext();
+
+            assertNull(PythonApplicationRuntime.current());
+            assertFalse(PythonContextRuntime.isInitialized());
+        } finally {
+            PythonContextRuntime.resetContext();
+        }
+    }
+
+    @Test
+    void aNestedApplicationOwnsItsOwnContextAndRestoresTheEnclosingRuntimeWhenItCloses() {
+        try (ApplicationContext outer = ApplicationContext.run()) {
+            PythonApplicationRuntime outerRuntime = outer.getBean(PythonApplicationRuntime.class);
+            Context outerContext = outer.getBean(Context.class, Qualifiers.byName(PYTHON));
+            Context nestedContext;
+            try (ApplicationContext nested = ApplicationContext.run()) {
+                PythonApplicationRuntime nestedRuntime = nested.getBean(PythonApplicationRuntime.class);
+                nestedContext = nested.getBean(Context.class, Qualifiers.byName(PYTHON));
+                assertNotSame(outerRuntime, nestedRuntime);
+                assertNotSame(outerContext, nestedContext, "a nested application builds its own primary context");
+                assertSame(nestedRuntime, PythonApplicationRuntime.current(), "generated code resolves the nested application while it runs");
+                assertSame(nestedContext, PythonContextRuntime.getContext());
+            }
+            assertSame(outerRuntime, PythonApplicationRuntime.current(), "closing the nested application restores the enclosing runtime");
+            assertSame(outerContext, PythonContextRuntime.getContext());
+            assertEquals(3, outerContext.eval(PYTHON, "1 + 2").asInt(), "the enclosing context is still open");
+            assertClosed(nestedContext, "the nested context is closed");
+        }
+        assertNull(PythonApplicationRuntime.current());
+        assertFalse(PythonContextRuntime.isInitialized());
+    }
+
+    @Test
+    void aNestedApplicationClosedInsideAnExecutionOfTheEnclosingContextIsClosedOnceThatExecutionEnds() {
+        try (ApplicationContext outer = ApplicationContext.run()) {
+            PythonApplicationRuntime outerRuntime = outer.getBean(PythonApplicationRuntime.class);
+            Context outerContext = outer.getBean(Context.class, Qualifiers.byName(PYTHON));
+            // a Python test method of the enclosing application runs ApplicationContext.run(...) and closes it
+            Context nestedContext = PythonContextRegistry.withExecutionFrame(outerContext, () -> {
+                ApplicationContext nested = ApplicationContext.run();
+                Context context = nested.getBean(Context.class, Qualifiers.byName(PYTHON));
+                nested.close();
+                assertSame(outerRuntime, PythonApplicationRuntime.current(), "the enclosing runtime is resolved as soon as the nested application closes");
+                assertEquals(3, context.eval(PYTHON, "1 + 2").asInt(), "the nested context stays open until the enclosing execution ends");
+                return context;
+            });
+            assertClosed(nestedContext, "the nested context is closed after the execution");
+            assertSame(outerRuntime, PythonApplicationRuntime.current());
+            assertEquals(3, outerContext.eval(PYTHON, "1 + 2").asInt(), "the enclosing context is still open");
+        }
+        assertNull(PythonApplicationRuntime.current());
+    }
+
+    /**
+     * A context closed with cancellation reports its closure as a cancelled polyglot exception; one
+     * closed without does as an illegal state.
+     */
+    private static void assertClosed(Context context, String message) {
+        RuntimeException e = assertThrows(RuntimeException.class, () -> context.eval(PYTHON, "1"), message);
+        assertTrue(e instanceof IllegalStateException || (e instanceof PolyglotException polyglotException && polyglotException.isCancelled()), message + ": " + e);
     }
 }

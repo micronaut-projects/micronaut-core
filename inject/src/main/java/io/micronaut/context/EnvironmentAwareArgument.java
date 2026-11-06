@@ -36,6 +36,7 @@ import org.jspecify.annotations.Nullable;
 final class EnvironmentAwareArgument<T> extends DefaultArgument<T> implements EnvironmentConfigurable {
 
     private final AnnotationMetadata annotationMetadata;
+    private final boolean rawType;
     @Nullable
     private Environment environment;
 
@@ -45,7 +46,13 @@ final class EnvironmentAwareArgument<T> extends DefaultArgument<T> implements En
      */
     EnvironmentAwareArgument(Argument<T> argument) {
         super(argument.getType(), argument.getName(), argument.getAnnotationMetadata(), argument.getTypeVariables(), argument.getTypeParameters());
+        this.rawType = argument.isRawType();
         this.annotationMetadata = initAnnotationMetadata(argument.getAnnotationMetadata());
+    }
+
+    @Override
+    public boolean isRawType() {
+        return rawType;
     }
 
     @Override

@@ -15,11 +15,35 @@
  */
 package io.micronaut.core.reflect
 
+import io.micronaut.core.reflect.exception.InvocationException
 import spock.lang.Specification
 
 import java.lang.reflect.Field
 
 class ReflectionUtilsSpec extends Specification {
+
+    void "test invokeMethodPropagating returns the result"() {
+        expect:
+        ReflectionUtils.invokeMethodPropagating(null, Throwing.getDeclaredMethod('echo', String), 'hello') == 'hello'
+    }
+
+    void "test invokeMethodPropagating throws the checked exception of the method unwrapped"() {
+        when:
+        ReflectionUtils.invokeMethodPropagating(null, Throwing.getDeclaredMethod('fail'))
+
+        then:
+        IOException e = thrown()
+        e.message == 'fail'
+    }
+
+    void "test invokeMethodPropagating wraps an illegal access"() {
+        when:
+        ReflectionUtils.invokeMethodPropagating(null, Throwing.getDeclaredMethod('hidden'))
+
+        then:
+        InvocationException e = thrown()
+        e.cause instanceof IllegalAccessException
+    }
 
     void "test findField"() {
         given:
@@ -48,5 +72,19 @@ class ReflectionUtilsSpec extends Specification {
 
     class Foo {
         String bar
+    }
+
+    static class Throwing {
+        static String echo(String value) {
+            return value
+        }
+
+        static String fail() throws IOException {
+            throw new IOException('fail')
+        }
+
+        private static String hidden() {
+            return 'hidden'
+        }
     }
 }

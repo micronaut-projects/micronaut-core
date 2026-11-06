@@ -68,4 +68,9 @@ public class SimpleHttpRequestFactory implements HttpRequestFactory {
     public <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri) {
         return new SimpleHttpRequest<>(httpMethod, uri, null);
     }
+
+    @Override
+    public <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri, String httpMethodName) {
+        return new SimpleHttpRequest<>(httpMethod, uri, null, httpMethodName);
+    }
 }

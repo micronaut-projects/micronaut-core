@@ -30,7 +30,6 @@ import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.compression.DeflateOptions;
 import io.netty.handler.codec.compression.GzipOptions;
 import io.netty.handler.codec.compression.SnappyFrameEncoder;
-import io.netty.handler.codec.compression.SnappyOptions;
 import io.netty.handler.codec.compression.StandardCompressionOptions;
 import io.netty.handler.codec.compression.ZlibCodecFactory;
 import io.netty.handler.codec.compression.ZlibWrapper;
@@ -44,12 +43,18 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.Objects;
+import java.util.Set;
 
 final class Compressor {
+    /**
+     * All algorithms, in order of preference when the client gives several the same weight.
+     */
+    private static final Algorithm[] ALGORITHMS = Algorithm.values();
+
     private final HttpCompressionStrategy strategy;
     @Nullable
     private final BrotliOptions brotliOptions;
@@ -57,7 +62,10 @@ final class Compressor {
     private final DeflateOptions deflateOptions;
     @Nullable
     private final ZstdOptions zstdOptions;
-    private final SnappyOptions snappyOptions;
+    /**
+     * The algorithms with options, i.e. those {@link #determineEncoding(Iterator)} may pick.
+     */
+    private final Set<Algorithm> available;
 
     Compressor(HttpCompressionStrategy strategy) {
         assert strategy.isEnabled();
@@ -74,7 +82,15 @@ final class Compressor {
             StandardCompressionOptions.zstd().blockSize(),
             strategy.getMaxZstdEncodeSize())
             : null;
-        this.snappyOptions = StandardCompressionOptions.snappy();
+        // snappy, gzip and deflate need no options and are always available
+        EnumSet<Algorithm> algorithms = EnumSet.of(Algorithm.SNAPPY, Algorithm.GZIP, Algorithm.DEFLATE);
+        if (brotliOptions != null) {
+            algorithms.add(Algorithm.BR);
+        }
+        if (zstdOptions != null) {
+            algorithms.add(Algorithm.ZSTD);
+        }
+        this.available = Collections.unmodifiableSet(algorithms);
     }
 
     @Nullable
@@ -93,11 +109,7 @@ final class Compressor {
             // already encoded
             return null;
         }
-        List<String> acceptEncoding = new ArrayList<>();
-        for (String s : request.headers().getAll(HttpHeaderNames.ACCEPT_ENCODING)) {
-            acceptEncoding.addAll(Arrays.asList(s.split(",")));
-        }
-        Algorithm encoding = determineEncoding(acceptEncoding);
+        Algorithm encoding = determineEncoding(request.headers().valueStringIterator(HttpHeaderNames.ACCEPT_ENCODING));
         if (encoding == null) {
             return null;
         }
@@ -116,9 +128,30 @@ final class Compressor {
         return new BrotliEncoder(Objects.requireNonNull(brotliOptions, "Brotli not available").parameters());
     }
 
+    /**
+     * Pick the response encoding from the {@code Accept-Encoding} header values among the
+     * algorithms this compressor has options for.
+     *
+     * @param acceptEncodingValues The raw header values
+     * @return The algorithm to use, or {@code null} for no compression
+     */
+    @Nullable
+    Algorithm determineEncoding(Iterator<String> acceptEncodingValues) {
+        return determineEncoding(acceptEncodingValues, available);
+    }
+
+    /**
+     * Pick the response encoding from the {@code Accept-Encoding} header values. Each value is
+     * a comma-separated list of {@code encoding[;q=weight]} entries; the entries are examined in
+     * place, without splitting the header into strings.
+     *
+     * @param acceptEncodingValues The raw header values
+     * @param available            The algorithms that may be chosen
+     * @return The algorithm to use, or {@code null} for no compression
+     */
     @SuppressWarnings("FloatingPointEquality")
     @Nullable
-    private Algorithm determineEncoding(List<String> acceptEncoding) {
+    static Algorithm determineEncoding(Iterator<String> acceptEncodingValues, Set<Algorithm> available) {
         // from HttpContentCompressor, slightly modified
         float starQ = -1.0f;
         float brQ = -1.0f;
@@ -126,65 +159,66 @@ final class Compressor {
         float snappyQ = -1.0f;
         float gzipQ = -1.0f;
         float deflateQ = -1.0f;
-        for (String encoding : acceptEncoding) {
-            float q = 1.0f;
-            int equalsPos = encoding.indexOf('=');
-            if (equalsPos != -1) {
-                try {
-                    q = Float.parseFloat(encoding.substring(equalsPos + 1));
-                } catch (NumberFormatException e) {
-                    // Ignore encoding
-                    q = 0.0f;
+        while (acceptEncodingValues.hasNext()) {
+            String header = acceptEncodingValues.next();
+            int length = header.length();
+            int start = 0;
+            while (start <= length) {
+                int end = header.indexOf(',', start);
+                if (end == -1) {
+                    end = length;
                 }
-            }
-            if (encoding.contains("*")) {
-                starQ = q;
-            } else if (encoding.contains("br") && q > brQ) {
-                brQ = q;
-            } else if (encoding.contains("zstd") && q > zstdQ) {
-                zstdQ = q;
-            } else if (encoding.contains("snappy") && q > snappyQ) {
-                snappyQ = q;
-            } else if (encoding.contains("gzip") && q > gzipQ) {
-                gzipQ = q;
-            } else if (encoding.contains("deflate") && q > deflateQ) {
-                deflateQ = q;
-            }
-        }
-        if (brQ > 0.0f || zstdQ > 0.0f || snappyQ > 0.0f || gzipQ > 0.0f || deflateQ > 0.0f) {
-            if (brQ != -1.0f && brQ >= zstdQ && this.brotliOptions != null) {
-                return Algorithm.BR;
-            } else if (zstdQ != -1.0f && zstdQ >= snappyQ && this.zstdOptions != null) {
-                return Algorithm.ZSTD;
-            } else if (snappyQ != -1.0f && snappyQ >= gzipQ && this.snappyOptions != null) {
-                return Algorithm.SNAPPY;
-            } else if (gzipQ != -1.0f && gzipQ >= deflateQ && this.gzipOptions != null) {
-                return Algorithm.GZIP;
-            } else if (deflateQ != -1.0f && this.deflateOptions != null) {
-                return Algorithm.DEFLATE;
+                float q = 1.0f;
+                int equalsPos = header.indexOf('=', start, end);
+                if (equalsPos != -1) {
+                    try {
+                        q = Float.parseFloat(header.substring(equalsPos + 1, end));
+                    } catch (NumberFormatException e) {
+                        // Ignore encoding
+                        q = 0.0f;
+                    }
+                }
+                if (header.indexOf("*", start, end) != -1) {
+                    starQ = q;
+                } else if (header.indexOf("br", start, end) != -1 && q > brQ) {
+                    brQ = q;
+                } else if (header.indexOf("zstd", start, end) != -1 && q > zstdQ) {
+                    zstdQ = q;
+                } else if (header.indexOf("snappy", start, end) != -1 && q > snappyQ) {
+                    snappyQ = q;
+                } else if (header.indexOf("gzip", start, end) != -1 && q > gzipQ) {
+                    gzipQ = q;
+                } else if (header.indexOf("deflate", start, end) != -1 && q > deflateQ) {
+                    deflateQ = q;
+                }
+                start = end + 1;
             }
         }
-        if (starQ > 0.0f) {
-            if (brQ == -1.0f && this.brotliOptions != null) {
-                return Algorithm.BR;
+        // RFC 9110 12.4.2: an encoding the client lists takes its own weight, any other the
+        // weight of "*"; a weight of 0 means "not acceptable". The highest weight wins and the
+        // order of the Algorithm constants (br, zstd, snappy, gzip, deflate) breaks ties.
+        Algorithm best = null;
+        float bestQ = 0.0f;
+        for (Algorithm algorithm : ALGORITHMS) {
+            float q = switch (algorithm) {
+                case BR -> brQ;
+                case ZSTD -> zstdQ;
+                case SNAPPY -> snappyQ;
+                case GZIP -> gzipQ;
+                case DEFLATE -> deflateQ;
+            };
+            if (q == -1.0f) {
+                q = starQ;
             }
-            if (zstdQ == -1.0f && this.zstdOptions != null) {
-                return Algorithm.ZSTD;
-            }
-            if (snappyQ == -1.0f && this.snappyOptions != null) {
-                return Algorithm.SNAPPY;
-            }
-            if (gzipQ == -1.0f && this.gzipOptions != null) {
-                return Algorithm.GZIP;
-            }
-            if (deflateQ == -1.0f && this.deflateOptions != null) {
-                return Algorithm.DEFLATE;
+            if (q > bestQ && available.contains(algorithm)) {
+                best = algorithm;
+                bestQ = q;
             }
         }
-        return null;
+        return best;
     }
 
-    private enum Algorithm {
+    enum Algorithm {
         BR(HttpHeaderValues.BR),
         ZSTD(HttpHeaderValues.ZSTD),
         SNAPPY(HttpHeaderValues.SNAPPY),

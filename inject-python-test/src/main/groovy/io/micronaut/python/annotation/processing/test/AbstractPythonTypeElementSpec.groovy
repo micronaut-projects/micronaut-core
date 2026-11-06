@@ -213,12 +213,13 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
 
         // Process Python code and generate Java classes
         List<ClassElement> capturedElements = []
-        def compiler = PyronautCompiler.builder()
+        def compilerBuilder = PyronautCompiler.builder()
             .pythonCode(pythonCode)
             .classElementCallback { ClassElement classElement ->
                 capturedElements.add(classElement)
             }
-            .build()
+        configureCompiler(compilerBuilder)
+        def compiler = compilerBuilder.build()
 
         ClassLoader pythonClassLoader = compiler.buildClassLoader()
 
@@ -262,6 +263,14 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
      * @param contextBuilder The context builder
      */
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
+    }
+
+    /**
+     * Allows configuring the compiler used by {@link #buildContext}, for example to add a Python
+     * source directory or resources to the class loader of the compiled application.
+     * @param compilerBuilder The compiler builder
+     */
+    protected void configureCompiler(PyronautCompiler.Builder compilerBuilder) {
     }
 
     protected static void warmPool(ApplicationContext context, def executor, int size) {

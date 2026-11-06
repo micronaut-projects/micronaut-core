@@ -15,10 +15,14 @@
  */
 package io.micronaut.python.processing.element;
 
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Set;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
@@ -70,6 +74,37 @@ abstract sealed class AbstractPythonElement extends AbstractAnnotationElement im
     @Override
     public boolean isPublic() {
         return true;
+    }
+
+    /**
+     * Python has no access modifiers, so the modifiers are derived from the visibility, static, abstract and
+     * final predicates of the element: an element is public unless its name marks it private, which keeps the
+     * modifier set consistent with {@link #isPublic()}, {@link #isStatic()}, {@link #isAbstract()} and
+     * {@link #isFinal()} for the callers that filter on modifiers, such as
+     * {@code ElementQuery.modifiers(...)} and {@code BeanElementBuilder.produceBeans(...)}.
+     *
+     * @return The modifiers
+     */
+    @Override
+    public Set<ElementModifier> getModifiers() {
+        Set<ElementModifier> modifiers = EnumSet.noneOf(ElementModifier.class);
+        if (isPublic()) {
+            modifiers.add(ElementModifier.PUBLIC);
+        } else if (isProtected()) {
+            modifiers.add(ElementModifier.PROTECTED);
+        } else if (isPrivate()) {
+            modifiers.add(ElementModifier.PRIVATE);
+        }
+        if (isStatic()) {
+            modifiers.add(ElementModifier.STATIC);
+        }
+        if (isAbstract()) {
+            modifiers.add(ElementModifier.ABSTRACT);
+        }
+        if (isFinal()) {
+            modifiers.add(ElementModifier.FINAL);
+        }
+        return Collections.unmodifiableSet(modifiers);
     }
 
     @Override

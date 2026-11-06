@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.qualifiers;
 
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.NonBinding;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -181,9 +182,12 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         // default records something other than a qualifier writing that default down. The two are the same
         // annotation, and AnnotationValue#matches compares them as such, filling in the members neither of them
         // declared from the one set of defaults both sides are given here
+        return matchesBindingValues(qualifierAnn.getValues(), resolveBindingValues(candidateMetadata, candidateMetadata.getValues(annotationName)));
+    }
+
+    private boolean matchesBindingValues(Map<CharSequence, Object> qualifierValues, Map<CharSequence, Object> candidateValues) {
         Map<CharSequence, Object> defaults = AnnotationMetadataSupport.getDefaultValues(annotationName);
-        return withDefaults(qualifierAnn.getValues(), defaults)
-            .matches(withDefaults(resolveBindingValues(candidateMetadata, candidateMetadata.getValues(annotationName)), defaults));
+        return withDefaults(qualifierValues, defaults).matches(withDefaults(candidateValues, defaults));
     }
 
     private AnnotationValue<Annotation> withDefaults(Map<CharSequence, Object> bindingValues,
@@ -226,6 +230,18 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
     private static Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
         String[] nonBindingArray = AnnotationUtil.resolveNonBindingMembers(annotationMetadata);
         return ArrayUtils.isNotEmpty(nonBindingArray) ? new LinkedHashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();
+    }
+
+    @Override
+    public boolean contains(Qualifier<T> qualifier) {
+        Map.Entry<String, Map<CharSequence, Object>> other = QualifierUtils.extractAnnotationAndBindingValues(qualifier);
+        if (other == null || !annotationName.equals(other.getKey())) {
+            return false;
+        }
+        // the members compare as they do against a candidate: a qualifier without members selects by type alone
+        // and a member left at its default is the same as one writing that default down
+        return other.getValue() == null
+            || matchesBindingValues(other.getValue(), qualifierAnn == null ? Map.of() : qualifierAnn.getValues());
     }
 
     @Override

@@ -141,7 +141,10 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
     /**
      * A {@code call_soon}/{@code call_later} callback may outlive the coroutine that scheduled it;
      * it runs inside an execution frame of its context so shutdown waits for it, and it is skipped
-     * once the context has been unregistered for closing.
+     * once the context has been unregistered for closing. The propagated context of the callback
+     * is the one of the asyncio task owning it, restored by the task's {@code contextvars} when the
+     * callback runs (see {@link PythonEventLoop#executeCallback}), not the context of the thread
+     * scheduling it.
      */
     private static Runnable guestCallback(Value callback) {
         Context context = callback.getContext();

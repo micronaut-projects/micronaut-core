@@ -48,6 +48,7 @@ class ReactorContextPropagationSpec {
                 }
                 .collectList()
                 .block()
+                .let(::requireNotNull)
 
         for (t in result) {
             assert(t.t1 == t.t2)
@@ -154,4 +155,3 @@ suspend fun ServerFilterChain.next(request: HttpRequest<*>): MutableHttpResponse
     return this.proceed(request).asFlow().single()
 }
 // end::suspendfilter[]
-

@@ -51,16 +51,37 @@ final class JavaCompilationTracker implements TaskListener {
     // resolving a file object's real path costs two syscalls and is asked for once per recorded
     // reference, so remember it; a compilation does not move its sources underneath itself
     private final Map<URI, Optional<String>> sourceKeys = new LinkedHashMap<>();
+    private CompilationProfiler profiler;
 
     JavaCompilationTracker(JavacTask task) {
         this.trees = Trees.instance(task);
     }
 
     @Override
+    public void started(TaskEvent event) {
+        if (event.getKind() == TaskEvent.Kind.ANNOTATION_PROCESSING_ROUND) {
+            CompilationProfiler.increment(profiler, "javac.rounds", 1);
+        }
+    }
+
+    /**
+     * Sets the profiler counting the rounds and the units javac analyses and generates, or null.
+     *
+     * @param profiler The profiler
+     */
+    void setProfiler(CompilationProfiler profiler) {
+        this.profiler = profiler;
+    }
+
+    @Override
     public void finished(TaskEvent event) {
+        if (event.getKind() == TaskEvent.Kind.GENERATE) {
+            CompilationProfiler.increment(profiler, "javac.generated-types", 1);
+        }
         if (event.getKind() != TaskEvent.Kind.ANALYZE || event.getCompilationUnit() == null) {
             return;
         }
+        CompilationProfiler.increment(profiler, "javac.analyzed-units", 1);
         CompilationUnitTree compilationUnit = event.getCompilationUnit();
         String source = sourceKey(compilationUnit.getSourceFile());
         if (source == null) {
@@ -108,16 +129,19 @@ final class JavaCompilationTracker implements TaskListener {
     void recordGeneratedSource(JavaFileObject generatedSource,
                                boolean pythonProcessor,
                                Element... originatingElements) {
-        if (originatingElements.length != 1) {
+        String generated = fileSourceKey(generatedSource);
+        if (generated == null) {
             return;
         }
-        String generated = fileSourceKey(generatedSource);
-        String origin = sourceKey(originatingElements[0]);
-        if (generated != null && origin != null) {
+        String origin = originatingElements.length == 1 ? sourceKey(originatingElements[0]) : null;
+        if (origin != null) {
             generatedSourceOrigins.put(generated, origin);
-            if (pythonProcessor) {
-                pythonGeneratedSources.add(generated);
-            }
+        }
+        // a source Python processing generates without an origin among the sources, such as the
+        // provider of the functional interfaces of all of them, is tracked too: the classes and the
+        // resources derived from it are then Python processing outputs rather than unknown ones
+        if (pythonProcessor) {
+            pythonGeneratedSources.add(generated);
         }
     }
 

@@ -11,6 +11,7 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import io.netty.pkitesting.CertificateBuilder;
 import io.netty.pkitesting.X509Bundle;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -27,6 +28,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 public class FileCertificateProviderTest {
+    /**
+     * The file watcher watches the parent directory of the certificate. On macOS the JDK only has a
+     * polling watch service that stats every entry of that directory on each poll, so the shared
+     * system temp directory (often 100k+ entries) makes a single poll take longer than the test
+     * waits for a reload. Keep the certificate files in a directory of their own.
+     */
+    @TempDir
+    Path tempDir;
+
     private static void write(String fqdn, Path certFile, Format format) throws Exception {
         X509Bundle bundle = new CertificateBuilder()
             .algorithm(CertificateBuilder.Algorithm.rsa2048)
@@ -49,7 +59,7 @@ public class FileCertificateProviderTest {
     public void simple(Format format) throws Exception {
         assumeTrue(format != Format.PKCS12); // PKCS#12 doesn't store certs for some reason
 
-        Path certFile = Files.createTempFile(getClass().getName(), "." + format);
+        Path certFile = Files.createTempFile(tempDir, getClass().getName(), "." + format);
         write("CN=localhost", certFile, format);
         try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Map.of(
             "spec.name", "FileCertificateProviderTest",
@@ -73,7 +83,7 @@ public class FileCertificateProviderTest {
     public void mtlsRefresh(Format format) throws Exception {
         assumeTrue(format != Format.PKCS12); // PKCS#12 doesn't store certs for some reason
 
-        Path certFile = Files.createTempFile(getClass().getName(), "." + format);
+        Path certFile = Files.createTempFile(tempDir, getClass().getName(), "." + format);
         write("CN=a", certFile, format);
         try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Map.ofEntries(
             Map.entry("spec.name", "FileCertificateProviderTest"),
@@ -104,8 +114,8 @@ public class FileCertificateProviderTest {
 
     @Test
     public void separateFiles() throws Exception {
-        Path keyFile = Files.createTempFile(getClass().getName(), ".pem");
-        Path certFile = Files.createTempFile(getClass().getName(), ".pem");
+        Path keyFile = Files.createTempFile(tempDir, getClass().getName(), ".pem");
+        Path certFile = Files.createTempFile(tempDir, getClass().getName(), ".pem");
 
         X509Bundle cert = new CertificateBuilder()
             .algorithm(CertificateBuilder.Algorithm.rsa2048)

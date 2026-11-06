@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.annotation;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -48,5 +49,20 @@ public final class AnnotationMemberReflection {
             names.add(method.getReturnType().getName());
         }
         return names;
+    }
+
+    /**
+     * The return type name of the {@code value} member of an annotation class, as
+     * {@link Class#getTypeName()} spells it ({@code java.lang.Class}, {@code java.lang.String[]}).
+     *
+     * @param annotationType The loaded annotation type
+     * @return The type name, or null when the annotation has no {@code value} member
+     */
+    public static @Nullable String valueMemberTypeName(Class<?> annotationType) {
+        try {
+            return annotationType.getDeclaredMethod("value").getReturnType().getTypeName();
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
     }
 }

@@ -1,0 +1,34 @@
+A project usually has more than one set of Python sources: the application in `src/main/python` and its tests in `src/test/python`. The build compiles each source set separately, into its own output directory, and compiles the test sources against the output of the main sources, as it does for Java. At run time all the outputs are on the class path together.
+
+== Importing classes of another source set
+
+Consider a bean of the main sources:
+
+[source,python]
+.src/main/python/micronaut/docs/sourceroots/greeting_service.py
+----
+from jakarta.inject import Singleton
+
+
+@Singleton
+class GreetingService:
+    def greet(self, name: str) -> str:
+        return f"Hello {name}"
+----
+
+A test imports it with an ordinary Python import, from its module or from its package, and uses it as a type:
+
+snippet::micronaut.docs.sourceroots.GreetingServiceSpec[tags="test", indent=0, title="A test of another source set"]
+
+<1> The class is imported from the main sources
+<2> It is used as the type of an injection point
+
+The compiler resolves such an import through the class path: the generated bridge class of every Python class carries the metadata the compiler needs to map the import to its Java type, so a constructor parameter, field or return type annotated with the imported class is compiled with that type, exactly as when the class belongs to the same source set, and injection works across source sets. Python libraries packaged as jars are imported the same way. The import stays a Python import at run time; it is never rewritten to the Java bridge.
+
+== Packages spanning source sets
+
+Both source sets commonly contribute modules to the same Python package, as `micronaut.docs.sourceroots` above. Each compilation output is a GraalPy virtual file system root and the roots are merged into one namespace at run time, where a file that exists in several roots is served from one of them.
+
+The compiler therefore generates package initialisers (`__init__.py`) that carry no members themselves. Every compilation writes the members it contributes to a package (the classes of its modules, the generated decorators and Java types it imports) to a module named `__micronaut_members_` followed by a hash of its content, and the initialiser, identical in every root, imports the members of all the modules it finds. The same mechanism serves the launcher of the top-level modules. Packages spanning source sets, or spanning an application and a library, thus expose the members of all of them.
+
+No build configuration is needed for any of this; in particular the source sets need not be merged into one directory before compilation.

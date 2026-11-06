@@ -173,7 +173,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         this.methodInjection = methodInjection;
         this.fieldInjection = fieldInjection;
         this.annotationInjection = annotationInjection;
-        this.executableMethodsDefinition = executableMethodsDefinition;
+        this.executableMethodsDefinition = executableMethodsDefinition instanceof AbstractExecutableMethodsDefinition<T> methods
+            ? methods.forBeanDefinition()
+            : executableMethodsDefinition;
         this.typeArgumentsMap = typeArgumentsMap;
         this.precalculatedInfo = precalculatedInfo;
     }
@@ -235,6 +237,14 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             return Arrays.asList(arguments);
         }
         return Collections.emptyList();
+    }
+
+    @Override
+    public final Collection<String> getTypeArgumentKeys() {
+        if (typeArgumentsMap == null) {
+            return Collections.emptySet();
+        }
+        return Collections.unmodifiableSet(typeArgumentsMap.keySet());
     }
 
     @Override
@@ -551,7 +561,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                     fieldReference.argument.getType(),
                     fieldReference.argument.getName(),
                     fieldReference.argument.getAnnotationMetadata(),
-                    fieldReference.argument.getTypeParameters()
+                    fieldReference.argument.getTypeParameters(),
+                    fieldReference.argument.isRawType()
             );
             if (environment != null) {
                 ((EnvironmentConfigurable) fieldInjectionPoint).configure(environment);
@@ -2363,11 +2374,14 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                 if (value.isPresent()) {
                     return value.get();
                 } else {
+                    Optional<?> defaultValue = argumentAnnotationMetadata.getValue(Bindable.class, "defaultValue", argument);
+                    if (defaultValue.isPresent()) {
+                        return defaultValue.get();
+                    }
                     if (argument.isDeclaredNullable()) {
                         return null;
                     }
-                    return argumentAnnotationMetadata.getValue(Bindable.class, "defaultValue", argument)
-                            .orElseThrow(() -> DependencyInjectionException.missingProperty(resolutionContext, conversionContext, valString));
+                    throw DependencyInjectionException.missingProperty(resolutionContext, conversionContext, valString);
                 }
             }
         }
@@ -2658,7 +2672,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         Optional<?> expressionValue =
             argument.getAnnotationMetadata()
                 .getValue(Value.class, t);
-        return expressionValue.orElse(null);
+        Object value = expressionValue.orElse(null);
+        return argument.isOptional() ? Optional.ofNullable(value) : value;
     }
 
     @Internal

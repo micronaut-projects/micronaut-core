@@ -104,10 +104,102 @@ class FileUploadSpec extends Specification {
         server.stop()
     }
 
+    def 'attribute is decoded with the charset declared by the part'() {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': 'FileUploadSpec'])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+
+        // everything but the value is US-ASCII, so the whole body can be encoded with the part
+        // charset. The value is the single byte 0xE9 in ISO-8859-1, which is not valid UTF-8.
+        byte[] body = ("--boundary\r\n" +
+                "Content-Disposition: form-data; name=\"value\"\r\n" +
+                "Content-Type: text/plain; charset=" + charset + "\r\n" +
+                "\r\n" +
+                "\u00e9" +
+                "\r\n--boundary--\r\n").getBytes(charset)
+
+        when:
+        def connection = (HttpURLConnection) new URL("http://$server.host:$server.port/multipart/" + path).openConnection()
+        connection.setRequestMethod("POST")
+        connection.addRequestProperty("Content-Type", "multipart/form-data; boundary=boundary")
+        connection.setDoOutput(true)
+        connection.setDoInput(true)
+        connection.connect()
+        connection.outputStream.write(body)
+        connection.outputStream.close()
+        def response = new String(connection.inputStream.readAllBytes(), StandardCharsets.UTF_8)
+
+        then:
+        response == "\u00e9"
+
+        cleanup:
+        server.stop()
+        ctx.close()
+
+        where:
+        charset      | path
+        "ISO-8859-1" | "attribute"
+        "UTF-8"      | "attribute"
+        "ISO-8859-1" | "optional-attribute"
+        "UTF-8"      | "optional-attribute"
+    }
+
+    def 'attribute with an unresolvable declared charset falls back to the charset of the request'() {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': 'FileUploadSpec'])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+
+        // the part metadata is client input and is not validated, so the declared charset may be
+        // a name no charset has (charset=invalid) or one that is not a legal charset name at all
+        // (charset=8859_1!). Either way the request charset (UTF-8 here) decodes the value.
+        byte[] body = ("--boundary\r\n" +
+                "Content-Disposition: form-data; name=\"value\"\r\n" +
+                "Content-Type: text/plain; charset=" + charset + "\r\n" +
+                "\r\n" +
+                "\u00e9" +
+                "\r\n--boundary--\r\n").getBytes(StandardCharsets.UTF_8)
+
+        when:
+        def connection = (HttpURLConnection) new URL("http://$server.host:$server.port/multipart/attribute").openConnection()
+        connection.setRequestMethod("POST")
+        connection.addRequestProperty("Content-Type", "multipart/form-data; boundary=boundary")
+        connection.setDoOutput(true)
+        connection.setDoInput(true)
+        connection.connect()
+        connection.outputStream.write(body)
+        connection.outputStream.close()
+        def status = connection.responseCode
+        def stream = status == 200 ? connection.inputStream : connection.errorStream
+        def response = new String(stream.readAllBytes(), StandardCharsets.UTF_8)
+
+        then:
+        status == 200
+        response == "\u00e9"
+
+        cleanup:
+        server.stop()
+        ctx.close()
+
+        where:
+        charset << ["invalid", "8859_1!"]
+    }
+
     @Controller('/multipart')
     @Requires(property = 'spec.name', value = 'FileUploadSpec')
     @Produces(MediaType.TEXT_PLAIN)
     static class MultipartController {
+        @Post(value = '/attribute', consumes = MediaType.MULTIPART_FORM_DATA)
+        String attribute(@Part String value) {
+            return value
+        }
+
+        @Post(value = '/optional-attribute', consumes = MediaType.MULTIPART_FORM_DATA)
+        String optionalAttribute(@Part Optional<String> value) {
+            return value.orElse("(absent)")
+        }
+
         @Post(value = '/complete-file-upload', consumes = MediaType.MULTIPART_FORM_DATA)
         String completeFileUpload(CompletedFileUpload data) {
             def bytes = data.inputStream.bytes

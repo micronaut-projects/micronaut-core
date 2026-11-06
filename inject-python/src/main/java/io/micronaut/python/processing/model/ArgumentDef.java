@@ -35,6 +35,7 @@ import java.util.Objects;
  * @param decorators The decorators applied to this parameter.
  * @param documentation The parameter documentation string.
  * @param declaringFunction The function that declares this argument.
+ * @param variadic Whether the parameter collects the remaining positional arguments ({@code *args}); its type is the array of the annotated element type.
  * @author Micronaut Team
  * @since 5.2.0
  */
@@ -47,7 +48,8 @@ public record ArgumentDef(
     boolean hasDefaultValue,
     List<DecoratorDef> decorators,
     String documentation,
-    FunctionDef declaringFunction
+    FunctionDef declaringFunction,
+    boolean variadic
 ) implements ElementDef {
 
     public ArgumentDef {
@@ -59,11 +61,11 @@ public record ArgumentDef(
     }
 
     public ArgumentDef(String name, TypeRef typeAnnotation) {
-        this(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, null, false, List.of(), null, null);
+        this(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, null, false, List.of(), null, null, false);
     }
 
     public ArgumentDef(String name, String annotation, TypeRef typeAnnotation, Object defaultValue, List<DecoratorDef> decorators, String documentation) {
-        this(name, annotation, typeAnnotation, defaultValue, defaultValue != null, decorators, documentation, null);
+        this(name, annotation, typeAnnotation, defaultValue, defaultValue != null, decorators, documentation, null, false);
     }
 
     public ArgumentDef(String name,
@@ -73,7 +75,7 @@ public record ArgumentDef(
                        List<DecoratorDef> decorators,
                        String documentation,
                        FunctionDef declaringFunction) {
-        this(name, annotation, typeAnnotation, defaultValue, defaultValue != null, decorators, documentation, declaringFunction);
+        this(name, annotation, typeAnnotation, defaultValue, defaultValue != null, decorators, documentation, declaringFunction, false);
     }
 
     @Override
@@ -98,7 +100,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, TypeRef typeAnnotation) {
-        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, null, false, List.of(), null, null);
+        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, null, false, List.of(), null, null, false);
     }
 
     /**
@@ -108,7 +110,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name) {
-        return new ArgumentDef(name, null, null, null, false, List.of(), null, null);
+        return new ArgumentDef(name, null, null, null, false, List.of(), null, null, false);
     }
 
     /**
@@ -120,7 +122,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, TypeRef typeAnnotation, Object defaultValue) {
-        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, defaultValue, defaultValue != null, List.of(), null, null);
+        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, defaultValue, defaultValue != null, List.of(), null, null, false);
     }
 
     /**
@@ -133,7 +135,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, TypeRef typeAnnotation, Object defaultValue, String documentation) {
-        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, defaultValue, defaultValue != null, List.of(), documentation, null);
+        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, defaultValue, defaultValue != null, List.of(), documentation, null, false);
     }
 
     /**
@@ -148,7 +150,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, String annotation, TypeRef typeAnnotation, Object defaultValue, List<DecoratorDef> decorators, String documentation) {
-        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, defaultValue != null, decorators, documentation, null);
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, defaultValue != null, decorators, documentation, null, false);
     }
 
     /**
@@ -170,7 +172,7 @@ public record ArgumentDef(
                                  boolean hasDefaultValue,
                                  List<DecoratorDef> decorators,
                                  String documentation) {
-        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, null);
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, null, false);
     }
 
     /**
@@ -180,6 +182,16 @@ public record ArgumentDef(
      * @return A new ArgumentDef with the declaring function set
      */
     public ArgumentDef withDeclaringFunction(FunctionDef declaringFunction) {
-        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction);
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic);
+    }
+
+    /**
+     * Creates a new ArgumentDef marked as the variadic ({@code *args}) parameter of its function.
+     *
+     * @param variadic Whether the parameter is variadic
+     * @return A new ArgumentDef with the variadic flag set
+     */
+    public ArgumentDef withVariadic(boolean variadic) {
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, hasDefaultValue, decorators, documentation, declaringFunction, variadic);
     }
 }

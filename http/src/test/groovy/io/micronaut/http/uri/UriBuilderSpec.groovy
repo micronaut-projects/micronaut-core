@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.uri
 
+import io.micronaut.http.exceptions.UriSyntaxException
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -195,5 +196,85 @@ class UriBuilderSpec extends Specification {
 
         then:
         builder.build().toString() == "https://google.com/search?q1=v1&q2=v2"
+    }
+
+    void "test uri builder preserves IPv6 host and port"() {
+        given:
+        List<String> sources = [
+                "http://[140d:c0e0:1f1:5463:6518:2:52:7002]:31500",
+                "http://[fe80::1%25eth0]:31500",
+                "http://[fe80::1%eth0]:31500",
+                "http://[fe80::1%ZZ]:31500"
+        ]
+
+        expect:
+        sources.each { source ->
+            [UriBuilder.of(source), UriBuilder.of(URI.create(source))].each { builder ->
+                URI uri = builder.build()
+
+                assert uri.host == URI.create(source).host
+                assert uri.port == 31500
+            }
+        }
+    }
+
+    void "test uri builder supports unbracketed IPv6 host"() {
+        when:
+        URI uri = UriBuilder.of("http://localhost")
+                .host("2001:db8::1")
+                .port(31500)
+                .build()
+
+        then:
+        uri.host == "[2001:db8::1]"
+        uri.port == 31500
+    }
+
+    void "test uri builder expands host templates once"() {
+        expect:
+        UriBuilder.of("http://localhost")
+                .host("{host}")
+                .expand(host: "example.com")
+                .toString() == "http://example.com"
+
+        and:
+        UriBuilder.of("http://localhost")
+                .host("{+host}")
+                .expand(host: "2001:db8::1")
+                .host == "[2001:db8::1]"
+    }
+
+    @Unroll
+    void "test uri builder rejects invalid or unsupported host #host"() {
+        when:
+        UriBuilder.of("http://localhost/base")
+                .host(host)
+                .build()
+
+        then:
+        thrown(UriSyntaxException)
+
+        where:
+        host << [
+                "[::1]/admin?x]",
+                "[::1]?admin=true]",
+                "[::1]#fragment]",
+                "[::1]:8080#]",
+                "[::1]/%0d%0aX-Test:yes#]",
+                "[fe80::1%25eth-0]",
+                "[fe80::1%25eth~0]",
+                "[fe80::1%25eth%2D0]",
+                "example.com:443"
+        ]
+    }
+
+    void "test uri builder rejects malicious reserved host expansion"() {
+        when:
+        UriBuilder.of("http://localhost/base")
+                .host("{+host}")
+                .expand(host: "user@evil.example")
+
+        then:
+        thrown(UriSyntaxException)
     }
 }

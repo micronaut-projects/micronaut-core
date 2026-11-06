@@ -64,7 +64,11 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
                 }
             }
         }
-        if (declaringType == Closeable.class || declaringType == AutoCloseable.class) {
+        if (declaringType == Closeable.class || declaringType == AutoCloseable.class
+            || (context.isAbstract()
+                && context.getMethodName().equals("close")
+                && context.getArguments().length == 0
+                && context.getReturnType().getType().equals(void.class))) {
             // must be close method
             if (webSocketSession != null) {
                 webSocketSession.close();

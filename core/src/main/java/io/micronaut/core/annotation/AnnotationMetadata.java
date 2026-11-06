@@ -238,7 +238,8 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Gets all the annotation values by the given repeatable type name.
+     * Gets all the annotation values by the given type name. A repeatable annotation lists each of its
+     * occurrences, a non-repeatable one is a single-element list and an absent one an empty list.
      *
      * @param annotationType The annotation type
      * @param <T> The annotation type
@@ -261,7 +262,9 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Gets only declared annotation values by the given repeatable type name.
+     * Gets only declared annotation values by the given type name. A repeatable annotation lists each of its
+     * declared occurrences, a non-repeatable declared annotation is a single-element list and an absent one an
+     * empty list, mirroring {@link #getAnnotationValuesByName(String)}.
      *
      * @param annotationType The annotation type
      * @param <T> The annotation type

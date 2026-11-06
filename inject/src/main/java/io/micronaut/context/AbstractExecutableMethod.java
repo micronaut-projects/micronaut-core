@@ -246,6 +246,9 @@ public abstract class AbstractExecutableMethod<T, R> extends AbstractExecutable<
             Map<String, Argument<?>> typeVariables = getTypeVariables();
             Collection<Argument<?>> values = typeVariables.values();
             final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+            if (genericReturnType.isRawType()) {
+                return Argument.ofRawType(getType(), null, annotationMetadata, values.toArray(Argument.ZERO_ARGUMENTS));
+            }
             return Argument.of(getType(), annotationMetadata, values.toArray(Argument.ZERO_ARGUMENTS));
         }
     }

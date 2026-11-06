@@ -1,0 +1,621 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.python.annotation.processing.test
+
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.python.ValueCoercible
+import io.micronaut.python.annotation.processing.test.javabases.AbstractCounter
+import io.micronaut.python.annotation.processing.test.javabases.ContentComposite
+import io.micronaut.python.annotation.processing.test.javabases.CtorHookBase
+import io.micronaut.python.annotation.processing.test.javabases.GenericHolder
+import io.micronaut.python.annotation.processing.test.javabases.GreetingBase
+import io.micronaut.python.annotation.processing.test.javabases.LongBase
+import io.micronaut.python.annotation.processing.test.javabases.Services
+import io.micronaut.python.annotation.processing.test.javabases.VarargsBase
+import io.micronaut.python.compiler.PyronautCompiler
+import org.graalvm.polyglot.Context
+
+/**
+ * Python classes extending Java classes: the generated Java class is the only Java instance of the
+ * base, Python overrides are what Java callers reach, and the Python object reaches the inherited
+ * Java methods, including {@code super()} delegation, through the Java instance.
+ */
+class JavaBaseClassSpec extends AbstractPythonTypeElementSpec {
+
+    void "Python class extending a concrete Java class overrides, delegates to super and calls base methods"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import GreetingBase
+
+
+@Singleton
+class PythonGreeter(GreetingBase):
+    def __init__(self):
+        super().__init__("python", 2)
+        self.calls = 0
+
+    def greet(self) -> str:
+        self.calls += 1
+        return "py:" + super().greet()
+
+    @Executable
+    def from_python(self) -> str:
+        return self.describe() + "|" + self.finalGreeting() + "|" + self.protectedHook() + "|" + self.join("a") + "|" + self.join("b", 2) + "|" + self.join(3) + "|" + self.getName()
+
+    @Executable
+    def bump(self) -> int:
+        return self.increment()
+
+    @Executable
+    def same(self) -> bool:
+        return self.self() is self
+''', true)
+
+        when:
+        GreetingBase greeter = ctx.getBean(GreetingBase)
+        Class<?> generatedClass = ctx.classLoader.loadClass('python.PythonGreeter')
+
+        then: 'the generated class extends the Java base and the Python override is what Java reaches'
+        GreetingBase.isAssignableFrom(generatedClass)
+        generatedClass.isInstance(greeter)
+        greeter.greet() == 'py:Hello python x2'
+
+        and: 'a Java method of the base that calls the overridden method reaches the Python override'
+        greeter.describe() == 'describe:py:Hello python x2'
+        greeter.self().is(greeter)
+
+        and: 'Python calls the inherited public, final, protected and overloaded methods on itself'
+        greeter.from_python() == 'describe:py:Hello python x2|final:python|hook:python|a|bb|***|python'
+        greeter.same()
+
+        and: 'the Java base state is shared between the Java and the Python view'
+        greeter.bump() == 3
+        greeter.increment() == 4
+        greeter.greet() == 'py:Hello python x4'
+        ((ValueCoercible) greeter).asPolyglotValue().getMember('calls').asInt() == 4
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "constructor arguments of the Python super call reach the Java base"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from micronaut.python.annotation.processing.test.javabases import GreetingBase
+
+
+class NamedGreeter(GreetingBase):
+    def __init__(self, name: str, count: int):
+        super().__init__(name.upper(), count + 1)
+        self.original = name
+
+    def greet(self) -> str:
+        return "named:" + super().greet()
+''', true)
+
+        when: 'the instance is created from Java'
+        Class<?> generatedClass = ctx.classLoader.loadClass('python.NamedGreeter')
+        GreetingBase fromJava = generatedClass.getConstructor(String, int).newInstance('bob', 1)
+
+        then:
+        fromJava.greet() == 'named:Hello BOB x2'
+        fromJava.getName() == 'BOB'
+        ((ValueCoercible) fromJava).asPolyglotValue().getMember('original').asString() == 'bob'
+
+        when: 'the instance is created in Python'
+        Context polyglot = ctx.getBean(Context)
+        def created = polyglot.eval('python', 'NamedGreeter("ann", 0)')
+        def describedInPython = polyglot.eval('python', 'NamedGreeter("ann", 0).describe()').asString()
+        GreetingBase fromPython = created.as(GreetingBase)
+
+        then: 'the inherited Java method runs on the Java instance created for the Python object'
+        describedInPython == 'describe:named:Hello ANN x1'
+        fromPython.greet() == 'named:Hello ANN x1'
+        fromPython.describe() == 'describe:named:Hello ANN x1'
+        generatedClass.isInstance(fromPython)
+
+        and: 'the Python object maps to one Java instance'
+        created.as(GreetingBase).is(fromPython)
+        created.as(generatedClass).is(fromPython)
+        ((ValueCoercible) fromPython).asPolyglotValue().getMember('original').asString() == 'ann'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python class extending an abstract Java class with state shares that state with Java"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import AbstractCounter
+
+
+@Singleton
+class PythonCounter(AbstractCounter):
+    def __init__(self):
+        super().__init__("c")
+
+    def label(self) -> str:
+        return "L" + str(self.count())
+
+    @Executable
+    def twice(self) -> str:
+        return self.next() + " " + self.next()
+''', true)
+
+        when:
+        AbstractCounter counter = ctx.getBean(AbstractCounter)
+
+        then:
+        counter.next() == 'c1:L1'
+        counter.twice() == 'c2:L2 c3:L3'
+        counter.count() == 3
+        counter.next() == 'c4:L4'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python class extending a static nested Java class referenced through its outer class"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test.javabases import Services
+
+
+@Singleton
+class PythonService(Services.ServiceBase):
+    def __init__(self):
+        super().__init__("python")
+
+    def handle(self, request: str) -> str:
+        return "pong:" + request
+''', true)
+
+        when:
+        Services.ServiceBase service = ctx.getBean(Services.ServiceBase)
+
+        then:
+        service.handle('x') == 'pong:x'
+        service.describe() == 'python:pong:ping'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "a Python class extending a final Java class is a compile error of that class only"() {
+        when:
+        PyronautCompiler.builder().verboseErrors(true).pythonCode('''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test.javabases import FinalBase, GreetingBase
+
+
+@Singleton
+class Refused(FinalBase):
+    pass
+
+
+@Singleton
+class AlsoRefused(FinalBase):
+    pass
+
+
+@Singleton
+class Sibling(GreetingBase):
+    def __init__(self):
+        super().__init__("sibling", 1)
+''').build().buildClassLoader()
+
+        then: 'both refused classes are reported, so processing went on after the first; the sibling has no error'
+        def e = thrown(RuntimeException)
+        e.message.contains('Python class [Refused] cannot extend the final Java class [io.micronaut.python.annotation.processing.test.javabases.FinalBase]')
+        e.message.contains('Python class [AlsoRefused] cannot extend the final Java class')
+        !e.message.contains('Sibling')
+        !e.message.contains('Native Python mode')
+    }
+
+    void "a Python class nested in another class and a class local to a function extend Java classes"() {
+        given: "the base helper is not mangled inside a class body; a function-local class keeps the host adapter"
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import GenericHolder, Services
+
+
+class Holder:
+    class Inner(Services.ServiceBase):
+        def __init__(self):
+            super().__init__("inner")
+
+        def handle(self, request: str) -> str:
+            return "inner:" + request
+
+
+@Singleton
+class User:
+    @Executable
+    def nested(self) -> str:
+        return Holder.Inner().describe()
+
+    @Executable
+    def local(self) -> str:
+        class LocalHolder(GenericHolder):
+            def transform(self, value):
+                return "local:" + value
+
+        holder = LocalHolder()
+        return holder.apply("x") + "/" + holder.value()
+''', true)
+
+        when:
+        def user = ctx.getBean(ctx.classLoader.loadClass('python.User'))
+
+        then: 'the nested class has a generated Java class extending the base'
+        user.nested() == 'inner:inner:ping'
+        ctx.classLoader.loadClass('python.Holder$Inner').superclass == Services.ServiceBase
+
+        and: 'the function-local class works through the host adapter'
+        user.local() == 'local:x/local:x'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "a Java super constructor calling an overridden method reaches the Python object under construction"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test.javabases import CtorHookBase
+
+
+@Singleton
+class Hooked(CtorHookBase):
+    def __init__(self):
+        super().__init__()
+        self.after = "python"
+
+    def initialValue(self) -> str:
+        return "from-python"
+''', true)
+
+        when:
+        CtorHookBase hooked = ctx.getBean(CtorHookBase)
+
+        then: 'the hook ran on the Python override while the Java instance was constructed'
+        hooked.init() == 'from-python'
+        hooked.initialValue() == 'from-python'
+        ((ValueCoercible) hooked).asPolyglotValue().getMember('after').asString() == 'python'
+
+        when: 'an instance is created in Python'
+        Context polyglot = ctx.getBean(Context)
+        def created = polyglot.eval('python', 'Hooked()')
+
+        then:
+        created.as(CtorHookBase).init() == 'from-python'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python calls inherited varargs methods of a Java base with any number of arguments"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+import java
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import VarargsBase
+
+
+@Singleton
+class PythonCollector(VarargsBase):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def collect(self) -> int:
+        Item = VarargsBase.Item
+        self.add()
+        self.add(Item("one"))
+        self.add(Item("two"), Item("three"), Item("four"))
+        self.add("text")
+        self.addAll()
+        self.addAll(Item("five"))
+        self.addAll(Item("six"), Item("seven"))
+        self.addAll("more")
+        items = java.type("io.micronaut.python.annotation.processing.test.javabases.VarargsBase$Item[]")(2)
+        items[0] = Item("eight")
+        items[1] = Item("nine")
+        self.add(items)
+        return self.sum("none") + self.sum("single", 1) + self.sum("several", 1, 2, 3)
+''', true)
+
+        when:
+        VarargsBase collector = ctx.getBean(VarargsBase)
+
+        then: 'zero, one and several arguments or an array reach the varargs overloads, the others keep theirs'
+        collector.collect() == 7
+        collector.items == ['one', 'two', 'three', 'four', 't:text', 'i:five', 'i:six', 'i:seven', 't:more', 'eight', 'nine', 'none=0', 'single=1', 'several=6']
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python calls inherited methods of a Java base from its constructor"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test.javabases import VarargsBase
+
+
+@Singleton
+class PythonBuilt(VarargsBase):
+    def __init__(self):
+        self.add("before")
+        super().__init__()
+        self.add(VarargsBase.Item("built"))
+        self.addAll(VarargsBase.Item("first"))
+
+
+class Labelled(VarargsBase):
+    def __init__(self, label: str, suffix: str = "!"):
+        super().__init__()
+        self.add(label + suffix)
+
+
+class LabelledChild(Labelled):
+    def __init__(self):
+        super().__init__("child")
+        self.add("after")
+
+
+class Allocated(VarargsBase):
+    def __new__(cls, label: str):
+        instance = super().__new__(cls)
+        instance.allocated = "new:" + label
+        return instance
+
+    def __init__(self, label: str):
+        super().__init__()
+        self.add(self.allocated)
+
+
+class Returning(VarargsBase):
+    def __init__(self):
+        super().__init__()
+        return 1
+''', true)
+
+        when:
+        VarargsBase built = ctx.getBean(VarargsBase)
+
+        then: 'the Java instance the context holds is the one the constructor added to'
+        built.items == ['t:before', 'built', 'i:first']
+        ((ValueCoercible) built).asPolyglotValue().as(VarargsBase).is(built)
+
+        when: 'an instance is created from Java with constructor arguments, with and without the defaulted one'
+        Class<?> labelled = ctx.classLoader.loadClass('python.Labelled')
+        VarargsBase fromJava = labelled.getConstructor(String, String).newInstance('java', '?')
+        VarargsBase defaulted = labelled.getConstructor(String, String).newInstance('defaulted', null)
+
+        then:
+        fromJava.items == ['t:java?']
+        ((ValueCoercible) fromJava).asPolyglotValue().as(VarargsBase).is(fromJava)
+        defaulted.items == ['t:defaulted!']
+
+        when: 'an instance is created in Python'
+        Context polyglot = ctx.getBean(Context)
+        VarargsBase fromPython = polyglot.eval('python', 'Labelled("python")').as(VarargsBase)
+
+        then:
+        fromPython.items == ['t:python!']
+
+        when: 'a subclass of the Python class is created from Java'
+        VarargsBase child = ctx.classLoader.loadClass('python.LabelledChild').getConstructor().newInstance()
+
+        then:
+        child.items == ['t:child!', 't:after']
+        ((ValueCoercible) child).asPolyglotValue().as(VarargsBase).is(child)
+
+        when: 'a class allocating its instances in __new__ is created from Java'
+        VarargsBase allocated = ctx.classLoader.loadClass('python.Allocated').getConstructor(String).newInstance('java')
+
+        then: '__new__ receives the constructor arguments before __init__ runs'
+        allocated.items == ['t:new:java']
+
+        when: 'the __init__ of a class returns a value'
+        ctx.classLoader.loadClass('python.Returning').getConstructor().newInstance()
+
+        then: 'it is the error a call of the class raises'
+        Throwable error = thrown()
+        (error instanceof java.lang.reflect.InvocationTargetException ? error.cause : error).message.contains('__init__() should return None')
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python calls an inherited method taking a type variable that the base resolves through an interface"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+import java
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import VarargsBase
+
+
+@Singleton
+class PythonFirst(VarargsBase):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def first(self) -> None:
+        self.addFirst(VarargsBase.Item("first"))
+        items = java.type("io.micronaut.python.annotation.processing.test.javabases.VarargsBase$Item[]")(2)
+        items[0] = VarargsBase.Item("a")
+        items[1] = VarargsBase.Item("b")
+        self.addEach(items)
+''', true)
+
+        when: 'addFirst(T) and addEach(T[]) of HasItems<T>, which VarargsBase resolves to Item'
+        VarargsBase collector = ctx.getBean(VarargsBase)
+        collector.first()
+
+        then: 'the dispatcher passes the argument as an Item, the resolution of T, not as Object, and an array as an Item[]'
+        collector.items == ['f:i:first', 'e:i:a', 'e:i:b']
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python number literals reach boxed constructor parameters by widening"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from micronaut.python.annotation.processing.test.javabases import LongBase
+
+
+class Ided(LongBase):
+    def __init__(self):
+        super().__init__(5, 2)
+''', true)
+
+        when:
+        LongBase ided = ctx.classLoader.loadClass('python.Ided').getConstructor().newInstance()
+
+        then: 'int matched Long and Double as it widens to long and double'
+        ided.id == 5L
+        ided.ratio == 2.0d
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "a Python class extends a generic Java class with a bound type argument"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test.javabases import GenericHolder
+
+
+@Singleton
+class StrHolder(GenericHolder[str]):
+    def transform(self, value: str) -> str:
+        return value.upper()
+''', true)
+
+        when:
+        GenericHolder<String> holder = ctx.getBean(GenericHolder)
+
+        then: 'the override is what the Java base calls and the type argument is bound'
+        holder.apply('abc') == 'ABC'
+        holder.value() == 'ABC'
+        holder.transform('x') == 'X'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "a Python class overrides a method returning the bounded type variable of a raw or parameterized Java base"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from micronaut.python.annotation.processing.test.javabases import ContentComposite
+from micronaut.python.annotation.processing.test.javabases.ContentComposite import Panel
+
+
+class RawView(ContentComposite):
+    def initContent(self) -> Panel:
+        return Panel("raw")
+
+    def label(self, part: ContentComposite.Part) -> str:
+        return "label:" + part.describe()
+
+
+class UnhintedView(ContentComposite):
+    def initContent(self):
+        return Panel("unhinted")
+
+
+class BoundHintView(ContentComposite):
+    def initContent(self) -> ContentComposite.Part:
+        return Panel("bound")
+
+
+class ParameterizedView(ContentComposite[Panel]):
+    def initContent(self) -> Panel:
+        return Panel("parameterized")
+''', true)
+
+        when:
+        def view = { String name -> (ContentComposite) ctx.classLoader.loadClass("python.$name").getConstructor().newInstance() }
+        def initContent = { String name -> ctx.classLoader.loadClass("python.$name").getDeclaredMethod('initContent') }
+
+        then: 'the Java base reaches each Python override through its own call of the protected hook'
+        view('RawView').content.describe() == 'panel:raw'
+        view('RawView').describeContent() == 'label:panel:raw'
+        view('UnhintedView').content.describe() == 'panel:unhinted'
+        view('BoundHintView').content.describe() == 'panel:bound'
+        view('ParameterizedView').content.describe() == 'panel:parameterized'
+
+        and: 'the override of a raw base returns the hint when it is within the bound, or else the bound'
+        initContent('RawView').returnType == ContentComposite.Panel
+        initContent('UnhintedView').returnType == ContentComposite.Part
+        initContent('BoundHintView').returnType == ContentComposite.Part
+
+        and: 'the override of a parameterized base returns the type argument'
+        initContent('ParameterizedView').returnType == ContentComposite.Panel
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "methods inherited from a non-public generic base class are visible on Java objects"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import GenericBuilder
+
+
+@Singleton
+class BuilderUser:
+    @Executable
+    def build(self) -> str:
+        return GenericBuilder.builder().stream("events").configuration(3).build()
+
+    @Executable
+    def build_with_string(self) -> str:
+        builder = GenericBuilder.builder()
+        return builder.configuration("four").stream("s").build()
+
+    @Executable
+    def has_stream(self) -> bool:
+        return hasattr(GenericBuilder.builder(), "stream") and not hasattr(GenericBuilder.builder(), "missing")
+''', true)
+
+        when:
+        def user = ctx.getBean(ctx.classLoader.loadClass('python.BuilderUser'))
+
+        then:
+        user.build() == 'events/3'
+        user.build_with_string() == 's/4'
+        user.has_stream()
+
+        cleanup:
+        ctx?.close()
+    }
+}

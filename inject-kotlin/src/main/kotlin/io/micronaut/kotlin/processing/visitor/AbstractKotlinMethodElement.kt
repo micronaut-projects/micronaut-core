@@ -36,7 +36,8 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     private val owningType: KotlinClassElement,
     annotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext
-) : AbstractKotlinElement<T>(nativeType, annotationMetadataFactory, visitorContext), MethodElement {
+) : AbstractKotlinElement<T>(nativeType, annotationMetadataFactory, visitorContext),
+    io.micronaut.inject.ast.KotlinMethodElement {
 
     abstract val declaration: KSDeclaration?
     abstract val internalDeclaringType: ClassElement
@@ -67,6 +68,16 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
 
     override fun isDefault(): Boolean {
         return !isAbstract && declaringType.isAbstract
+    }
+
+    override fun getKotlinDefaultsTypeName(): String {
+        val declaringType = declaringType
+        // A class emits the synthetic $default method itself, an interface emits it on the
+        // interface, on its DefaultImpls class, or on both, depending on the -jvm-default mode
+        if (declaringType.isInterface && visitorContext.hasDefaultImpls) {
+            return declaringType.name + "\$DefaultImpls"
+        }
+        return declaringType.name
     }
 
     override fun isSuspend(): Boolean {

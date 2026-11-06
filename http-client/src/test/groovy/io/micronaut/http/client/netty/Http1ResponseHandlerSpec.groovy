@@ -269,6 +269,64 @@ class Http1ResponseHandlerSpec extends Specification {
         channel.checkException()
     }
 
+    def "a read requested by the consumer is flushed"() {
+        // On an HTTP/2 stream channel read() writes the window update for the data read so far,
+        // and only flushes it when no read is pending already
+        given:
+        def response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, new DefaultHttpHeaders()
+                .add(HttpHeaderNames.CONTENT_LENGTH, 4))
+        def listener = new SimpleListener()
+        def recorder = new ReadFlushRecorder()
+        def channel = new EmbeddedChannel(recorder, new Http1ResponseHandler(listener))
+        channel.writeInbound(response)
+        def buffer = Unpooled.compositeBuffer()
+        def upstream = ((StreamingNettyByteBody) listener.body).primary(new BufferConsumer() {
+            @Override
+            void add(ReadBuffer buf) {
+                buffer.addComponent(true, NettyReadBufferFactory.toByteBuf(buf))
+            }
+
+            @Override
+            void complete() {
+                // the test checks the received bytes, not the completion
+            }
+
+            @Override
+            void error(Throwable e) {
+                throw e
+            }
+        })
+
+        when:
+        recorder.ops.clear()
+        upstream.start()
+        then:
+        recorder.ops == ["read", "flush"]
+
+        when:
+        channel.writeInbound(new DefaultHttpContent(Unpooled.copiedBuffer("fo", StandardCharsets.UTF_8)))
+        recorder.ops.clear()
+        upstream.onBytesConsumed(2)
+        then:
+        recorder.ops == ["read", "flush"]
+
+        when:
+        channel.writeInbound(new DefaultHttpContent(Unpooled.copiedBuffer("o", StandardCharsets.UTF_8)))
+        recorder.ops.clear()
+        upstream.disregardBackpressure()
+        then:
+        recorder.ops == ["read", "flush"]
+
+        when:
+        channel.writeInbound(new DefaultHttpContent(Unpooled.copiedBuffer("o", StandardCharsets.UTF_8)), LastHttpContent.EMPTY_LAST_CONTENT)
+        then:
+        buffer.toString(StandardCharsets.UTF_8) == "fooo"
+
+        cleanup:
+        buffer.release()
+        channel.checkException()
+    }
+
     def "decode error"() {
         given:
         def exc = new Exception("test")
@@ -305,6 +363,27 @@ class Http1ResponseHandlerSpec extends Specification {
         void read(ChannelHandlerContext ctx) throws Exception {
             reads++
             super.read(ctx)
+        }
+    }
+
+    private static final class ReadFlushRecorder extends ChannelOutboundHandlerAdapter {
+        final List<String> ops = []
+
+        @Override
+        void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+            ctx.channel().config().autoRead = false
+        }
+
+        @Override
+        void read(ChannelHandlerContext ctx) throws Exception {
+            ops.add("read")
+            super.read(ctx)
+        }
+
+        @Override
+        void flush(ChannelHandlerContext ctx) throws Exception {
+            ops.add("flush")
+            super.flush(ctx)
         }
     }
 

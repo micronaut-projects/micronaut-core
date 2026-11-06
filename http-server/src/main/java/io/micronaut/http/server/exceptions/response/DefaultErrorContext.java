@@ -29,13 +29,17 @@ final class DefaultErrorContext implements ErrorContext {
     private final HttpRequest<?> request;
     @Nullable
     private final Throwable cause;
+    @Nullable
+    private final String exceptionMessage;
     private final List<Error> jsonErrors;
 
     private DefaultErrorContext(HttpRequest<?> request,
                                 @Nullable Throwable cause,
+                                @Nullable String exceptionMessage,
                                 List<Error> jsonErrors) {
         this.request = request;
         this.cause = cause;
+        this.exceptionMessage = exceptionMessage;
         this.jsonErrors = jsonErrors;
     }
 
@@ -47,6 +51,11 @@ final class DefaultErrorContext implements ErrorContext {
     @Override
     public Optional<Throwable> getRootCause() {
         return Optional.ofNullable(cause);
+    }
+
+    @Override
+    public Optional<String> getExceptionMessage() {
+        return Optional.ofNullable(exceptionMessage);
     }
 
     @Override
@@ -69,6 +78,8 @@ final class DefaultErrorContext implements ErrorContext {
         private final HttpRequest<?> request;
         @Nullable
         private Throwable cause;
+        @Nullable
+        private String exceptionMessage;
         private final List<Error> jsonErrors = new ArrayList<>();
 
         private Builder(HttpRequest<?> request) {
@@ -78,6 +89,12 @@ final class DefaultErrorContext implements ErrorContext {
         @Override
         public Builder cause(@Nullable Throwable cause) {
             this.cause = cause;
+            return this;
+        }
+
+        @Override
+        public Builder exceptionMessage(@Nullable String exceptionMessage) {
+            this.exceptionMessage = exceptionMessage;
             return this;
         }
 
@@ -109,7 +126,7 @@ final class DefaultErrorContext implements ErrorContext {
 
         @Override
         public ErrorContext build() {
-            return new DefaultErrorContext(request, cause, jsonErrors);
+            return new DefaultErrorContext(request, cause, exceptionMessage, jsonErrors);
         }
     }
 }

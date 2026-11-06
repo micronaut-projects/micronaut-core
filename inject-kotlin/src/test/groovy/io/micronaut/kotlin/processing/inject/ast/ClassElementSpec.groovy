@@ -1552,6 +1552,28 @@ class MyBean {
             !field2.genericType.type.hasAnnotation(TypeUseRuntimeAnn)
     }
 
+    void "test native types of one class at different use sites have different hash codes"() {
+        given:
+            ClassElement ce = buildClassElement('test.MyBean', '''\
+package test
+
+class MyBean {
+    fun save1(book: MyBook) {}
+    fun save2(book: MyBook) {}
+}
+
+class MyBook
+''')
+
+        when:
+            def type1 = ce.findMethod("save1").get().parameters[0].type
+            def type2 = ce.findMethod("save2").get().parameters[0].type
+
+        then: "equals compares the owner (use site), so hashCode includes it too"
+            type1.nativeType != type2.nativeType
+            type1.nativeType.hashCode() != type2.nativeType.hashCode()
+    }
+
     void "test generics model"() {
         ClassElement ce = buildClassElement('test.Test', '''
 package test

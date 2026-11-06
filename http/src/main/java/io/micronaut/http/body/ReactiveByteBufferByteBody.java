@@ -179,6 +179,11 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
         }
 
         @Override
+        public void addAndComplete(ReadBuffer rb) {
+            submit(() -> super.addAndComplete(rb));
+        }
+
+        @Override
         public void error(Throwable e) {
             submit(() -> super.error(e));
         }

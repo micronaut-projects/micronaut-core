@@ -290,6 +290,41 @@ class FooFactory {
         context.close()
     }
 
+    void "an argument with a nested projection has the same type as the argument with the type it is bounded by"() {
+        given: 'a Kotlin Map<String, Any>, whose value parameter is declared out'
+        BeanDefinition<?> client = buildBeanDefinition('test.HeadersClient', '''
+package test
+
+import io.micronaut.context.annotation.Executable
+import jakarta.inject.Singleton
+
+@Singleton
+open class HeadersClient {
+    @Executable
+    open fun send(headers: Map<String, Any>, nested: java.util.List<java.util.Map<String, out Number>>, projected: java.util.Map<String, out Any>) {}
+}
+''')
+        Argument<?>[] arguments = client.executableMethods.find { it.methodName == 'send' }.arguments
+        Argument<?> headers = arguments[0]
+        Argument<?> nested = arguments[1]
+        Argument<?> projected = arguments[2]
+
+        expect:
+        headers.equalsType(Argument.mapOf(String, Object))
+        Argument.mapOf(String, Object).equalsType(headers)
+        headers.typeHashCode() == Argument.mapOf(String, Object).typeHashCode()
+
+        and: 'an explicit projection'
+        projected.typeParameters[1] instanceof WildcardArgument
+        projected.equalsType(Argument.mapOf(String, Object))
+        projected.typeHashCode() == Argument.mapOf(String, Object).typeHashCode()
+        !projected.equalsType(Argument.mapOf(String, String))
+
+        and: 'at any depth, the map named after the type parameter of List it stands for'
+        nested.equalsType(Argument.listOf(Argument.mapOf(String, Number).withName('E')))
+        nested.typeHashCode() == Argument.listOf(Argument.mapOf(String, Number).withName('E')).typeHashCode()
+    }
+
     void "a projection is recorded for introspected properties of a class and a data class"() {
         given:
         BeanIntrospection<?> bean = buildBeanIntrospection('test.Bean', '''

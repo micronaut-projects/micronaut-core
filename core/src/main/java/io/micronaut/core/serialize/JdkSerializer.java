@@ -34,7 +34,10 @@ import java.util.Optional;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated JDK serialization is insecure when deserializing data that can be influenced by an attacker.
+ * Use a safer serialization format instead.
  */
+@Deprecated(since = "5.2", forRemoval = true)
 public final class JdkSerializer implements ObjectSerializer {
 
     private final ConversionService conversionService;

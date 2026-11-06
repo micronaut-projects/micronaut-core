@@ -178,6 +178,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -187,6 +188,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -247,6 +249,8 @@ final class NettyHttpClient implements
     private final ConversionService conversionService;
     @Nullable
     private final ExecutorService blockingExecutor;
+    @Nullable
+    private final LifecycleListener lifecycleListener;
 
     NettyHttpClient(NettyHttpClientBuilder builder) {
         this.loadBalancer = builder.loadBalancer;
@@ -280,6 +284,7 @@ final class NettyHttpClient implements
         this.requestBinderRegistry = builder.requestBinderRegistry == null ? new DefaultRequestBinderRegistry(conversionService) : builder.requestBinderRegistry;
         this.informationalServiceId = builder.informationalServiceId;
         this.blockingExecutor = builder.blockingExecutor;
+        this.lifecycleListener = builder.lifecycleListener;
 
         this.connectionManager = new ConnectionManager(log, configuration, builder);
     }
@@ -332,6 +337,9 @@ final class NettyHttpClient implements
         if (!isRunning()) {
             connectionManager.start();
         }
+        if (lifecycleListener != null) {
+            lifecycleListener.onStart(this);
+        }
         return this;
     }
 
@@ -344,6 +352,9 @@ final class NettyHttpClient implements
     public HttpClient stop() {
         if (isRunning()) {
             connectionManager.shutdown();
+        }
+        if (lifecycleListener != null) {
+            lifecycleListener.onStop(this);
         }
         return this;
     }
@@ -491,6 +502,7 @@ final class NettyHttpClient implements
                 private Subscription dataSubscription;
                 @Nullable
                 private CurrentEvent currentEvent;
+                private final long maxEventSize = sizeLimits().maxBufferSize();
 
                 @Override
                 public void onSubscribe(Subscription s) {
@@ -513,7 +525,7 @@ final class NettyHttpClient implements
                         // emit the current event
                         if (len == 0) {
                             try {
-                                Event event = Event.of(byteBufferFactory.wrap(Objects.requireNonNull(currentEvent).data))
+                                Event event = Event.of(byteBufferFactory.wrap(Objects.requireNonNull(currentEvent).dataArray()))
                                     .name(currentEvent.name)
                                     .retry(currentEvent.retry)
                                     .id(currentEvent.id);
@@ -538,27 +550,26 @@ final class NettyHttpClient implements
                                     fromIndex++;
                                 }
                                 if (fromIndex < len) {
-                                    int toIndex = len - fromIndex;
+                                    int length = len - fromIndex;
                                     switch (type) {
                                         case "data" -> {
-                                            ByteBuffer<?> content = buffer.slice(fromIndex, toIndex);
-                                            byte[] d = currentEvent.data;
-                                            if (d.length == 0) {
-                                                currentEvent.data = content.toByteArray();
-                                            } else {
-                                                currentEvent.data = ArrayUtils.concat(d, content.toByteArray());
+                                            long newSize = (long) currentEvent.dataLength + length;
+                                            if (newSize > maxEventSize) {
+                                                currentEvent = null;
+                                                throw decorate(new ContentLengthExceededException(maxEventSize, newSize));
                                             }
+                                            currentEvent.appendData(buffer.slice(fromIndex, length));
                                         }
                                         case "id" -> {
-                                            ByteBuffer<?> id = buffer.slice(fromIndex, toIndex);
+                                            ByteBuffer<?> id = buffer.slice(fromIndex, length);
                                             currentEvent.id = id.toString(StandardCharsets.UTF_8).trim();
                                         }
                                         case "event" -> {
-                                            ByteBuffer<?> event = buffer.slice(fromIndex, toIndex);
+                                            ByteBuffer<?> event = buffer.slice(fromIndex, length);
                                             currentEvent.name = event.toString(StandardCharsets.UTF_8).trim();
                                         }
                                         case "retry" -> {
-                                            ByteBuffer<?> retry = buffer.slice(fromIndex, toIndex);
+                                            ByteBuffer<?> retry = buffer.slice(fromIndex, length);
                                             String text = retry.toString(StandardCharsets.UTF_8);
                                             if (!StringUtils.isEmpty(text)) {
                                                 currentEvent.retry = Duration.ofMillis(Long.parseLong(text));
@@ -1350,23 +1361,42 @@ final class NettyHttpClient implements
 
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
-        if (requestBody == null) {
-            requestBody = NettyByteBodyFactory.empty();
-        }
+        CloseableByteBody body = requestBody == null ? NettyByteBodyFactory.empty() : requestBody;
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         ExecutionFlow<HttpResponse<?>> mono;
         try {
-            mono = sendRequestWithRedirects(
+            mono = sendRawExchange(
                 propagatedContext,
                 blockedThread == null ? null : new BlockHint(blockedThread, null),
-                new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody),
-                (req, resp) -> ExecutionFlow.just(resp)
+                new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body)
             );
         } catch (RuntimeException | Error e) {
-            requestBody.close();
+            body.close();
             throw e;
         }
-        return toMono(mono, propagatedContext).doOnTerminate(requestBody::close);
+        // doFinally: a cancelled exchange closes the body too, e.g. one that waits for a connection
+        return toMono(mono, propagatedContext).doFinally(signal -> body.close());
+    }
+
+    /**
+     * Send a raw request. A relative request URI is resolved against the URL of this client
+     * first, like the URI of any other request.
+     *
+     * @param propagatedContext The propagated context
+     * @param blockHint         The block hint, if any
+     * @param rawRequest        The raw request
+     * @return The response flow
+     */
+    private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable BlockHint blockHint, MutableHttpRequest<?> rawRequest) {
+        if (rawRequest.getUri().getScheme() != null) {
+            return sendRequestWithRedirects(propagatedContext, blockHint, rawRequest, (req, resp) -> ExecutionFlow.just(resp));
+        }
+        return resolveRequestURI(rawRequest).flatMap(uri -> sendRequestWithRedirects(
+            propagatedContext,
+            blockHint,
+            rawRequest.uri(uri),
+            (req, resp) -> ExecutionFlow.just(resp)
+        ));
     }
 
     private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
@@ -1582,13 +1612,18 @@ final class NettyHttpClient implements
             }
         }
 
+        AtomicBoolean responded = new AtomicBoolean();
+
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, new Http1ResponseHandler(new Http1ResponseHandler.ResponseListener() {
             boolean stillExpectingContinue = expectContinue;
 
             @Override
             public void fail(ChannelHandlerContext ctx, Throwable cause) {
                 poolHandle.taint();
-                completeExceptionallySafe(sink, handleResponseError(request, cause));
+                if (!sink.isCancelled()) {
+                    // nobody takes the error of a cancelled exchange, e.g. its closed connection
+                    completeExceptionallySafe(sink, handleResponseError(request, cause));
+                }
             }
 
             @Override
@@ -1605,11 +1640,25 @@ final class NettyHttpClient implements
 
             @Override
             public void complete(io.netty.handler.codec.http.HttpResponse response, CloseableByteBody body) {
+                responded.set(true);
                 if (!HttpUtil.isKeepAlive(response)) {
                     poolHandle.taint();
                 }
-
+                if (sink.isCancelled()) {
+                    // nobody takes the response of a cancelled exchange
+                    body.close();
+                    return;
+                }
                 sink.complete(new NettyClientByteBodyResponse(response, body, conversionService));
+            }
+
+            @Override
+            public void discardLimitReached() {
+                // the rest of an abandoned body is too long to drain (e.g. an endless stream whose
+                // downstream client went away): close the connection (HTTP/1) or reset the stream
+                // (HTTP/2) instead of reading it
+                poolHandle.taint();
+                poolHandle.channel().close();
             }
 
             @Override
@@ -1637,6 +1686,14 @@ final class NettyHttpClient implements
                     byteBuf.release();
                 }
                 poolHandle.release();
+            }
+        }));
+        // cancelling the exchange before the response arrives aborts the request: the connection
+        // (HTTP/1) or the stream (HTTP/2) is closed, which also stops the request body
+        sink.onCancel(() -> poolHandle.channel().eventLoop().execute(() -> {
+            if (!responded.get()) {
+                poolHandle.taint();
+                poolHandle.channel().close();
             }
         }));
         poolHandle.notifyRequestPipelineBuilt();
@@ -2127,12 +2184,47 @@ final class NettyHttpClient implements
      * Used as a holder for the current SSE event.
      */
     private static final class CurrentEvent {
-        byte[] data = new byte[0];
+        byte[] data = ArrayUtils.EMPTY_BYTE_ARRAY;
+        int dataLength;
         @Nullable
         String id;
         @Nullable
         String name;
         @Nullable
         Duration retry;
+
+        void appendData(ByteBuffer<?> content) {
+            int n = content.readableBytes();
+            int required = dataLength + n;
+            if (required > data.length) {
+                data = Arrays.copyOf(data, Math.max(required, (int) Math.min(2L * data.length, Integer.MAX_VALUE - 8)));
+            }
+            content.read(data, dataLength, n);
+            dataLength = required;
+        }
+
+        byte[] dataArray() {
+            return data.length == dataLength ? data : Arrays.copyOf(data, dataLength);
+        }
+    }
+
+    /**
+     * Notified whenever a client is started or stopped, so that the owner of the client can
+     * track the clients that are running.
+     */
+    interface LifecycleListener {
+        /**
+         * Called after {@link #start()}.
+         *
+         * @param client The client
+         */
+        void onStart(NettyHttpClient client);
+
+        /**
+         * Called after {@link #stop()}, including when the client is closed.
+         *
+         * @param client The client
+         */
+        void onStop(NettyHttpClient client);
     }
 }

@@ -36,7 +36,7 @@ class HeadlineControllerSpec: StringSpec() {
             val headline = firstHeadline.block() // <3>
 
             headline shouldNotBe null
-            headline.text shouldStartWith "Latest Headline"
+            headline!!.text shouldStartWith "Latest Headline"
         }
         // end::streamingClient[]
 

@@ -153,13 +153,15 @@ class RunnableProtocol(Protocol):
         def protocolDefinition = getBeanDefinition(context, "python.RunnableProtocol")
         Value concrete = getBean(context, "python.ConcreteRunnableBean").asPolyglotValue()
         Value abstractBean = getBean(context, "python.AbstractRunnableBean").asPolyglotValue()
-        Value protocol = getBean(context, "python.RunnableProtocol").asPolyglotValue()
+        // the protocol has no Python state or behaviour: it compiles to a Java interface implemented by the introduction proxy
+        def protocol = getBean(context, "python.RunnableProtocol")
         def interceptor = getBean(context, "python.RunnableAdviceInterceptor")
 
         then:
         Runnable.isAssignableFrom(concreteDefinition.beanType)
         Runnable.isAssignableFrom(abstractDefinition.beanType)
         Runnable.isAssignableFrom(protocolDefinition.beanType)
+        context.classLoader.loadClass("python.RunnableProtocol").isInterface()
         concreteDefinition.executableMethods*.methodName.containsAll(["get_foo", "run"])
         abstractDefinition.executableMethods*.methodName.containsAll(["get_foo", "get_bar", "run"])
         protocolDefinition.executableMethods*.methodName.containsAll(["get_bar", "run"])
@@ -167,10 +169,10 @@ class RunnableProtocol(Protocol):
         concrete.invokeMember("get_foo").asString() == "good"
         abstractBean.invokeMember("get_foo").asString() == "good"
         abstractBean.invokeMember("get_bar").asString() == "introduced"
-        protocol.invokeMember("get_bar").asString() == "introduced"
+        protocol.get_bar() == "introduced"
         concrete.invokeMember("run").isNull()
         abstractBean.invokeMember("run").isNull()
-        protocol.invokeMember("run").isNull()
+        protocol.run() == null
         interceptor.runs == 3
 
         cleanup:
@@ -343,11 +345,13 @@ class TestCaller:
         when:
         def context = buildContext(pythonCode)
         def testBean = getBean(context, "python.TestCaller")
-        def stub = getBean(context, "python.StubExample").asPolyglotValue()
+        // StubExample only declares abstract methods: it is a Java interface implemented by the introduction proxy
+        def stub = getBean(context, "python.StubExample")
         def interceptor = getBean(context, "python.StubIntroduction")
 
         then:
-        stub.invokeMember("get_number").asInt() == 10
+        context.classLoader.loadClass("python.StubExample").isInterface()
+        stub.get_number() == 10
         testBean.asPolyglotValue().invokeMember("get_number").asInt() == 10
         testBean.get_number() == 10
         testBean.get_date() == null
@@ -396,13 +400,12 @@ class Sender(ABC):
         def bookClass = context.classLoader.loadClass("python.Book")
         def hostBook = polyglot.eval("python", "Book('The Guide')").as(bookClass)
         def senderBean = getBean(context, "python.Sender")
-        Value sender = senderBean.asPolyglotValue()
         polyglot.getBindings("python").putMember("senderBean", senderBean)
         polyglot.getBindings("python").putMember("hostBook", hostBook)
         polyglot.getBindings("python").putMember("response", io.micronaut.http.HttpResponse.ok(hostBook))
 
         then:
-        sender.invokeMember("send", hostBook).asString() == "The Guide"
+        senderBean.send(hostBook) == "The Guide"
         polyglot.eval("python", "senderBean.send(hostBook)").asString() == "The Guide"
         polyglot.eval("python", "senderBean.send(response.getBody().orElse(None))").asString() == "The Guide"
 
@@ -461,11 +464,10 @@ class InterfaceIntroductionClass(ABC):
         when:
         def context = buildContext(pythonCode)
         def bean = getBean(context, "python.InterfaceIntroductionClass")
-        def value = bean.asPolyglotValue()
 
         then:
-        value.invokeMember("test", "test").asString() == "changed"
-        value.invokeMember("test_with_age", "test", 10).asString() == "changed"
+        bean.test("test") == "changed"
+        bean.test_with_age("test", 10) == "changed"
 
         cleanup:
         context?.close()
@@ -522,10 +524,10 @@ class InterfaceIntroductionClass(SuperInterface[str], ABC):
 
         when:
         def context = buildContext(pythonCode)
-        def bean = getBean(context, "python.InterfaceIntroductionClass").asPolyglotValue()
+        def bean = getBean(context, "python.InterfaceIntroductionClass")
 
         then:
-        bean.invokeMember("test_generics_from_type", "test", 10).asString() == "changed"
+        bean.test_generics_from_type("test", 10) == "changed"
 
         cleanup:
         context?.close()
@@ -574,7 +576,7 @@ class StubExample(ABC):
 
         when:
         def context = buildContext(pythonCode)
-        getBean(context, "python.StubExample").asPolyglotValue().invokeMember("get_number")
+        getBean(context, "python.StubExample").get_number()
 
         then:
         def e = thrown(RuntimeException)
@@ -795,8 +797,11 @@ class AbstractBean(ABC):
         Value bean = getBean(context, "python.AbstractBean").asPolyglotValue()
         def interceptor = getBean(context, "python.StubIntroduction")
 
-        then: "the introduction returns the decorator's declared default, an empty string"
-        bean.invokeMember("is_abstract").asString() == ""
+        then: '''the introduction returns nothing for the decorator's empty string default. The written annotation
+                 metadata omits empty string defaults, so getValue answers an empty Optional and the interceptor
+                 returns None; Java behaves the same way for a member declared String value() default "".
+                 See JavaAnnotationMetadataBuilder#isValidDefaultValue.'''
+        bean.invokeMember("is_abstract").isNull()
         bean.invokeMember("non_abstract").asString() == "good"
         interceptor.invoked == 1
 

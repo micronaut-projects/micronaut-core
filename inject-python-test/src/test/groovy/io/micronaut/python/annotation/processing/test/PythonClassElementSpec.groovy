@@ -1504,7 +1504,7 @@ class PetClient(PetOperations):
                 .contains("io.micronaut.http.client.annotation.Client")
             return element
         }
-        def definition = buildBeanDefinition("python", "PetClient\$RuntimeProxy", pythonCode)
+        def definition = buildBeanDefinition("python", "PetClient\$Intercepted", pythonCode)
         definition.executableMethods
             .find { it.methodName == "save" }
             .annotationMetadata
@@ -1564,7 +1564,7 @@ class BookCatalogueClient(BookCatalogueOperations):
 '''
 
         expect:
-        def definition = buildBeanDefinition("python", "BookCatalogueClient\$RuntimeProxy", pythonCode)
+        def definition = buildBeanDefinition("python", "BookCatalogueClient\$Intercepted", pythonCode)
         def method = definition.executableMethods.find { it.methodName == "findAll" }
         def recoverableBinding = InterceptedMethodUtil.resolveInterceptorBinding(method.annotationMetadata, InterceptorKind.AROUND)
             .find { it.stringValue().orElse(null) == "io.micronaut.retry.annotation.Recoverable" }

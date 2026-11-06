@@ -16,9 +16,11 @@
 package io.micronaut.http.server.netty.websocket;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.ClientWebSocket;
+import io.micronaut.websocket.annotation.OnClose;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.netty.buffer.ByteBuf;
@@ -42,6 +44,7 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
     private String username;
     private Collection<String> replies = new ConcurrentLinkedQueue<>();
     private Collection<String> pingReplies = new ConcurrentLinkedQueue<>();
+    private CloseReason closeReason;
 
     @OnOpen
     public void onOpen(String topic, String username, WebSocketSession session) {
@@ -65,6 +68,10 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
 
     public Collection<String> getPingReplies() {
         return pingReplies;
+    }
+
+    public CloseReason getCloseReason() {
+        return closeReason;
     }
 
     public WebSocketSession getSession() {
@@ -103,6 +110,21 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
         session.sendSync(new ContinuationWebSocketFrame(false, 0, "d"));
         session.sendSync(new ContinuationWebSocketFrame(false, 0, "e"));
         session.sendSync(new ContinuationWebSocketFrame(true, 0, "f"));
+    }
+
+    public void sendOversizedFragmentedMessage() {
+        session.sendSync(new TextWebSocketFrame(false, 0, "a".repeat(20)));
+        session.sendSync(new ContinuationWebSocketFrame(true, 0, "b".repeat(20)));
+    }
+
+    public void sendMaxSizedFragmentedMessage() {
+        session.sendSync(new TextWebSocketFrame(false, 0, "c".repeat(16)));
+        session.sendSync(new ContinuationWebSocketFrame(true, 0, "d".repeat(16)));
+    }
+
+    @OnClose
+    public void onClose(CloseReason closeReason) {
+        this.closeReason = closeReason;
     }
 
     public CompletableFuture<?> sendPing(String msg) {

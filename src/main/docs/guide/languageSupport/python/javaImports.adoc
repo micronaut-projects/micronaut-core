@@ -1,0 +1,20 @@
+Java types are imported like Python modules: the Java package is the module and the class is the imported name. Micronaut packages can be imported without their `io.` prefix.
+
+[source,python]
+----
+from java.util import Optional
+from micronaut.context.annotation import Factory
+from io.lettuce.core.codec import ByteArrayCodec, RedisCodec
+----
+
+A star import of a package on the compile classpath binds every top-level class of the package, so `from io.lettuce.core.codec import *` makes `RedisCodec` and `ByteArrayCodec` available under their simple names. A star-imported type resolves to the same Java type as an explicitly imported one wherever it is used: in type annotations, base classes, generic arguments such as a `@Factory` method returning `RedisCodec[bytes, bytes]`, and decorator members. The classes of a JDK package (`java.util`, `java.time`, ...) are not bound by a star import: import them by name, as `Optional` above.
+
+An imported name has to exist on the compile classpath. An import from a Java package that names no class there, for example when the dependency providing it is missing from the build, is a compile error naming the import rather than an `Object`-typed signature in the generated code:
+
+----
+Cannot import [UserAgentProvider] from [micronaut.aws.ua]: the Java type [io.micronaut.aws.ua.UserAgentProvider] is not on the compile classpath. Check the imported name, or add the dependency that provides it.
+----
+
+A module is a Java package when it contains classes on the compile classpath or lies in a namespace reserved for Java (`java`, `javax`, `jakarta`, `io` and `micronaut`). Modules of the project's own Python sources, the Python standard library and third-party Python packages are never treated as Java imports.
+
+At run time no Python module exists for a Java package. The compiler records the Java packages, types and annotations the sources import in a manifest next to the compiled sources, and the runtime installs an import finder that serves them as modules: a package binds its classes on first access, a sub-package is imported when it is first used, and an annotation is a decorator that carries the annotation type and returns its target, the metadata having been compiled into the generated Java class. Every import form works as for a Python package (`import micronaut.http.annotation as a`, `from micronaut.core import util`, `micronaut.core.util.StringUtils` after `import micronaut`, and `from micronaut.http.annotation import *`, which binds the imported annotations and classes of the package). A class that is on the compile classpath but missing at run time is bound to a facade that resolves it on first use, so importing the package does not fail for a compile-time-only dependency. A Python module of the application may live in a package of the same name as a Java package (`micronaut/context/helper.py` next to `io.micronaut.context`): its package serves both, but a module named like a Java type imported from the package (`jakarta/inject/Singleton.py`) is a compile error.

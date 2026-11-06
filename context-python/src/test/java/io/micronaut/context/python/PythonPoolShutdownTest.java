@@ -1,6 +1,8 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.inject.qualifiers.Qualifiers;
+import org.graalvm.polyglot.Context;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -87,6 +89,29 @@ final class PythonPoolShutdownTest {
             // Requests still draining may need a context after the pool reported idle.
             Integer late = pool.<Integer>withContext(ctx -> ctx.eval(PYTHON, "4").asInt());
             assertEquals(4, late.intValue());
+        }
+    }
+
+    @Test
+    void reusablePrimaryContextSurvivesApplicationClose() {
+        PythonContextRuntime.setReuseContext(true);
+        Context primary = null;
+        try {
+            try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+                "micronaut.python.pool.enabled", true,
+                "micronaut.python.pool.size", 1
+            ))) {
+                primary = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
+                assertEquals(1, primary.eval(PYTHON, "1").asInt());
+            }
+            assertEquals(1, primary.eval(PYTHON, "1").asInt(),
+                "closing a Micronaut context must not close a reusable GraalPy context");
+        } finally {
+            PythonContextRuntime.setReuseContext(false);
+            PythonContextRuntime.resetContext();
+            if (primary != null) {
+                GraalPyContextFactory.closeContext(primary);
+            }
         }
     }
 }

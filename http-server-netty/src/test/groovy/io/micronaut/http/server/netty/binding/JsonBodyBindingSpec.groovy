@@ -25,6 +25,7 @@ import jakarta.inject.Inject
 import jakarta.inject.Named
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import spock.lang.Issue
 
@@ -265,6 +266,47 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.body() == "[Foo(Fred, 10)]".toString()
     }
 
+    void "test truncated json array with publisher argument"() {
+        when:
+        Flux.from(httpClient.exchange(
+                HttpRequest.POST('/json/publisher-object', json), String
+        )).blockFirst()
+
+        then: "the request is rejected as a client error instead of completing as an empty stream"
+        def e = thrown(HttpClientResponseException)
+        e.response.status == HttpStatus.BAD_REQUEST
+
+        and: "the streaming response reports it through the error response processor, like a buffered body would"
+        e.response.headers.get(HttpHeaders.CONTENT_TYPE) == io.micronaut.http.MediaType.APPLICATION_JSON
+        def result = new JsonSlurper().parseText(e.response.getBody(String).get())
+        result['_links'].self.href == '/json/publisher-object'
+        result.message == 'Invalid JSON'
+        result._embedded.errors[0].message.startsWith('Invalid JSON: ')
+
+        where:
+        json << ['[', '[ ']
+    }
+
+    void "test malformed json array is a client error"() {
+        when:
+        Flux.from(httpClient.exchange(
+                HttpRequest.POST('/json/publisher-collect', json), String
+        )).blockFirst()
+
+        then: "a framing error in the array is a client error"
+        def e = thrown(HttpClientResponseException)
+        e.response.status == HttpStatus.BAD_REQUEST
+
+        and: "the route had not answered yet, so the controller's @Error handler formats the body"
+        e.response.headers.get(HttpHeaders.CONTENT_TYPE) == io.micronaut.http.MediaType.APPLICATION_JSON
+        def result = new JsonSlurper().parseText(e.response.getBody(String).get())
+        result['_links'].self.href == '/json/publisher-collect'
+        result.message.startsWith('Invalid JSON: ')
+
+        where:
+        json << ['[{"name":"Fred","age":10}{"name":"Fred","age":10}]', '[{"name":"Fred","age":10},,{"name":"Fred","age":10}]']
+    }
+
     void "test singe argument handling"() {
         when:
         String json = '{"message":"foo"}'
@@ -492,6 +534,13 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
             future.thenApply({ Foo foo ->
                 "Body: $foo".toString()
             })
+        }
+
+        @Post("/publisher-collect")
+        Mono<String> publisherCollect(@Body Publisher<Foo> publisher) {
+            // consumes the whole body before answering, so a syntax error anywhere in the array
+            // arrives before the response is committed
+            return Flux.from(publisher).collectList().map { it.toString() }
         }
 
         @Post("/publisher-object")

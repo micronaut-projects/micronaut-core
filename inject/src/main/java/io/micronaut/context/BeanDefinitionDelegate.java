@@ -38,12 +38,15 @@ import io.micronaut.inject.qualifiers.EachBeanQualifier;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * A delegate bean definition.
@@ -99,6 +102,17 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     public List<Argument<?>> getTypeArguments(String type) {
         List<Argument<?>> arguments = typeArgumentsMap.get(type);
         return arguments == null ? getTarget().getTypeArguments(type) : arguments;
+    }
+
+    @Override
+    public Collection<String> getTypeArgumentKeys() {
+        Collection<String> targetKeys = getTarget().getTypeArgumentKeys();
+        if (typeArgumentsMap.isEmpty()) {
+            return targetKeys;
+        }
+        Set<String> keys = new LinkedHashSet<>(typeArgumentsMap.keySet());
+        keys.addAll(targetKeys);
+        return Collections.unmodifiableSet(keys);
     }
 
     @Override

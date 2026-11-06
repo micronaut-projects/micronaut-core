@@ -25,6 +25,32 @@ class ReflectionBeanIntrospectionSpec extends Specification {
         Constructors.NonePublic           || [String, int]   // none public: the widest declared one
     }
 
+    void "the target constructor is the selected constructor, and null for a static creator"() {
+        expect: "the selected constructor, whichever way it was selected"
+        ReflectionBeanIntrospection.of(Constructors.Annotated).constructor.targetConstructor == Constructors.Annotated.getDeclaredConstructor(String, int)
+        ReflectionBeanIntrospection.of(Constructors.OnlyPublic).constructor.targetConstructor == Constructors.OnlyPublic.getDeclaredConstructor(String, int)
+
+        and: "a static creator is not a constructor, even next to a constructor with the same parameter types"
+        DefConstructors.Factory.getDeclaredConstructor(Warehouse) != null
+        ReflectionBeanIntrospection.of(DefConstructors.Factory).constructor.targetConstructor == null
+
+        and: "every listed constructor is its own"
+        ReflectionBeanIntrospection.of(Constructors.Annotated).constructors*.targetConstructor == [
+            Constructors.Annotated.getDeclaredConstructor(String, int),
+            Constructors.Annotated.getDeclaredConstructor(),
+            Constructors.Annotated.getDeclaredConstructor(String)
+        ]
+    }
+
+    void "a bean constructor over a constructor returns that constructor"() {
+        given:
+        def constructor = Constructors.Annotated.getDeclaredConstructor(String, int)
+
+        expect:
+        ReflectionBeanConstructor.of(constructor).targetConstructor.is(constructor)
+        ReflectionBeanConstructor.of(constructor).constructor.is(constructor)
+    }
+
     void "every declared constructor is listed, the selected one first"() {
         when:
         def constructors = ReflectionBeanIntrospection.of(Constructors.Annotated).constructors

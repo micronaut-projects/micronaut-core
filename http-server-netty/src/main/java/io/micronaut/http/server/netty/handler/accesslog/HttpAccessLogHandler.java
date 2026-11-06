@@ -122,7 +122,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
                 } else {
                     protocol = request.protocolVersion().text();
                 }
-                accessLogHolder.createLogForRequest().onRequestHeaders(ConnectionMetadata.ofNettyChannel(ctx.channel()), request.method().name(), request.headers(), request.uri(), protocol);
+                accessLogHolder.createLogForRequest().onRequestHeaders(accessLogHolder.connectionMetadata(ctx), request.method().name(), request.headers(), request.uri(), protocol);
             } else {
                 accessLogHolder.excludeRequest();
             }
@@ -194,6 +194,25 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
         private final Queue<AccessLog> liveLogs = new LinkedList<>(); // ArrayDeque doesn't like null elements :(
         @Nullable
         private AccessLog logForReuse;
+        @Nullable
+        private ConnectionMetadata connectionMetadata;
+
+        /**
+         * The metadata of the channel this holder belongs to. The metadata only wraps the
+         * channel and reads its addresses on demand, so one instance serves every request on
+         * the connection.
+         *
+         * @param ctx The context of the channel this holder is an attribute of
+         * @return The metadata
+         */
+        ConnectionMetadata connectionMetadata(ChannelHandlerContext ctx) {
+            ConnectionMetadata metadata = connectionMetadata;
+            if (metadata == null) {
+                metadata = ConnectionMetadata.ofNettyChannel(ctx.channel());
+                connectionMetadata = metadata;
+            }
+            return metadata;
+        }
 
         AccessLog createLogForRequest() {
             AccessLog log = logForReuse;

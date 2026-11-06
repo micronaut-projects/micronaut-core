@@ -52,6 +52,7 @@ import javax.lang.model.type.UnionType;
 import javax.lang.model.type.WildcardType;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -59,7 +60,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static javax.lang.model.element.Modifier.PRIVATE;
@@ -142,9 +142,24 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
         if (element == null) {
             return Collections.emptySet();
         }
-        return element.getModifiers().stream()
-            .map(m -> ElementModifier.valueOf(m.name()))
-            .collect(Collectors.toSet());
+        Set<ElementModifier> modifiers = EnumSet.noneOf(ElementModifier.class);
+        for (Modifier modifier : element.getModifiers()) {
+            ElementModifier elementModifier = toElementModifier(modifier);
+            if (elementModifier != null) {
+                modifiers.add(elementModifier);
+            }
+        }
+        return modifiers;
+    }
+
+    @Nullable
+    private static ElementModifier toElementModifier(Modifier modifier) {
+        try {
+            return ElementModifier.valueOf(modifier.name());
+        } catch (IllegalArgumentException e) {
+            // a modifier introduced by a newer JDK
+            return null;
+        }
     }
 
     @Override

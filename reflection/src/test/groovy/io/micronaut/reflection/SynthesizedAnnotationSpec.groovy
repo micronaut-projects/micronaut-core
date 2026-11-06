@@ -8,15 +8,17 @@ import spock.lang.Specification
 
 class SynthesizedAnnotationSpec extends Specification {
 
-    void "an annotation type the shared proxy cannot be built for is synthesized all the same"() {
+    void "a package private annotation type is synthesized by the shared proxy"() {
         given: "a package private annotation type, as a specification nests one in a class of its own"
         def value = new AnnotationValue<Restricted>(Restricted.name, [level: 3])
 
         when: "the shared path is asked for it"
-        AnnotationMetadataSupport.buildAnnotation(Restricted, value)
+        Restricted built = AnnotationMetadataSupport.buildAnnotation(Restricted, value)
 
-        then: "it cannot build one"
-        thrown(AnnotationMetadataException)
+        then: "it builds one: the JDK defines the proxy of a type that is not public in that type's own package"
+        built.level() == 3
+        built.name() == "unnamed"
+        built.annotationType() == Restricted
 
         when:
         Restricted synthesized = ReflectionAnnotations.synthesize(Restricted, value)
@@ -25,6 +27,31 @@ class SynthesizedAnnotationSpec extends Specification {
         synthesized.level() == 3
         synthesized.name() == "unnamed"
         synthesized.annotationType() == Restricted
+
+        and: "reading it back yields the values it was built from, off the annotation value the instance carries"
+        synthesized instanceof AnnotationValueProvider
+        ReflectionAnnotations.valueOf(synthesized) == value
+    }
+
+    void "an annotation type the shared proxy cannot be built for is synthesized all the same"() {
+        given: "a copy of an annotation type defined by a loader that does not see Micronaut, so that the proxy\
+ of the type and AnnotationValueProvider cannot be defined"
+        def isolated = new OwnCopy().define(Isolated.name)
+        def value = new AnnotationValue(Isolated.name, [level: 3])
+
+        when: "the shared path is asked for it"
+        AnnotationMetadataSupport.buildAnnotation(isolated, value)
+
+        then: "it cannot build one"
+        thrown(AnnotationMetadataException)
+
+        when:
+        def synthesized = ReflectionAnnotations.synthesize(isolated, value)
+
+        then: "the members are the ones of the value, the ones it does not carry are the defaults of the type"
+        synthesized.level() == 3
+        synthesized.name() == "unnamed"
+        synthesized.annotationType() == isolated
         synthesized.toString() == value.toString()
 
         and: "reading it back yields the values it was built from; a fallback instance carries no annotation value of its own"
@@ -69,6 +96,23 @@ class SynthesizedAnnotationSpec extends Specification {
             written.equals(implicitDefaults)
             implicitDefaults.hashCode() == explicitDefaults.hashCode()
             new HashSet<>([implicitDefaults, explicitDefaults]).size() == 1
+        }
+    }
+
+    /**
+     * A loader defining the classes it is asked for itself, under the platform loader, so that nothing of
+     * Micronaut is visible to the types it defines.
+     */
+    static class OwnCopy extends ClassLoader {
+
+        OwnCopy() {
+            super(ClassLoader.platformClassLoader)
+        }
+
+        Class<?> define(String name) {
+            def bytes = SynthesizedAnnotationSpec.classLoader
+                    .getResourceAsStream(name.replace('.' as char, '/' as char) + ".class").bytes
+            defineClass(name, bytes, 0, bytes.length)
         }
     }
 }

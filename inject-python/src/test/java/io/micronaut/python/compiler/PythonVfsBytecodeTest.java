@@ -34,7 +34,9 @@ final class PythonVfsBytecodeTest {
         try (Context context = GraalPyResources.contextBuilder(vfs).allowAllAccess(true).build()) {
             String cachePath = context.eval("python", """
                 import ast
+                import importlib.util
                 import keyword
+                import os
                 import re
                 import java
                 import typing
@@ -44,7 +46,7 @@ final class PythonVfsBytecodeTest {
                 micronaut_transformer.__cached__
                 """).asString();
 
-            assertTrue(cachePath.contains("/__pycache__/micronaut_transformer."));
+            assertTrue(cachePath.replace('\\', '/').contains("/__pycache__/micronaut_transformer."));
             assertTrue(cachePath.endsWith(".pyc"));
         }
     }

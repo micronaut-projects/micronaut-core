@@ -90,6 +90,8 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/query-object?age=30&title=JavaBook&author=JavaAuthor' | "Parameter Value: 30 JavaBook" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/query-object?age=30'                | "Parameter Value: 30 null"  | HttpStatus.OK
         HttpMethod.GET  | '/parameter/query-object-nullable'              | "null"                      | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/query-bean-nullable'                | "null"                      | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/query-bean-nullable?type=CARD'      | "Filter(id=null, type=CARD)" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/query-record?page=1&size=123' | "Parameter Value: 1 123" | HttpStatus.OK
     }
 
@@ -342,11 +344,48 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             return book == null ? "null" : "not-null"
         }
 
+        @Get("/query-bean-nullable")
+        String queryBeanNullable(@QueryValue @Nullable Filter filter) {
+            return String.valueOf(filter)
+        }
+
         @Get('/query-record')
         String queryRecord(@QueryValue PaginationRequest paginationRequest) {
             "Parameter Value: $paginationRequest.page $paginationRequest.size"
         }
 
+
+        @Introspected
+        static class Filter {
+
+            @Nullable
+            private Long id
+            @Nullable
+            private String type
+
+            @Nullable
+            Long getId() {
+                return id
+            }
+
+            void setId(@Nullable Long id) {
+                this.id = id
+            }
+
+            @Nullable
+            String getType() {
+                return type
+            }
+
+            void setType(@Nullable String type) {
+                this.type = type
+            }
+
+            @Override
+            String toString() {
+                return "Filter(id=" + id + ", type=" + type + ")"
+            }
+        }
 
         @Introspected
         static class Book {

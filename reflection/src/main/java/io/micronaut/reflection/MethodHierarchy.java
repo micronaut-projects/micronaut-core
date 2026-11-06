@@ -199,12 +199,9 @@ public record MethodHierarchy(Declaration local,
                 .toList());
         }
         AnnotationMetadata metadata = mergeMetadata(levels.stream().map(Argument::getAnnotationMetadata).toList());
-        if (local instanceof GenericPlaceholder<?> placeholder) {
-            // a variable stays a variable: an overriding `<T> T id(T)` is a placeholder to a generated method
-            return Argument.ofTypeVariable((Class) local.getType(), local.getName(), placeholder.getVariableName(), metadata, typeParameters,
-                placeholder.getBounds().toArray(Argument[]::new));
-        }
-        return Argument.of((Class) local.getType(), local.getName(), metadata, typeParameters);
+        // a variable stays a variable: an overriding `<T> T id(T)` is a placeholder to a generated method,
+        // and a raw type stays raw
+        return ReflectionArguments.rebuild(local, local.getName(), metadata, typeParameters);
     }
 
     /**
@@ -345,8 +342,13 @@ public record MethodHierarchy(Declaration local,
      * Whether every parameter of a declaration, resolved for the type reading the method, is the parameter the
      * read method declares: an overload of the same arity whose parameters resolve to other types stays a
      * declaration of its own.
+     *
+     * @param candidate      The declaration, of a type the reading type derives from
+     * @param context        The type reading the method
+     * @param parameterTypes The parameters of the read method
+     * @return Whether the read method overrides the declaration
      */
-    private static boolean overrides(Method candidate, Class<?> context, Class<?>[] parameterTypes) {
+    static boolean overrides(Method candidate, Class<?> context, Class<?>[] parameterTypes) {
         Parameter[] parameters = candidate.getParameters();
         for (int i = 0; i < parameters.length; i++) {
             Argument<?> resolved = ReflectionArguments.of(parameters[i], context);
@@ -528,12 +530,8 @@ public record MethodHierarchy(Declaration local,
         private static Argument<?> returnArgumentOf(ReturnType<?> returnType) {
             Argument<?> argument = returnType.asArgument();
             AnnotationMetadata declared = declaredOf(argument.getAnnotationMetadata());
-            if (argument instanceof GenericPlaceholder<?> placeholder) {
-                // a variable stays a variable: `<T> T id(T)` returns a placeholder to a generated method
-                return Argument.ofTypeVariable((Class) returnType.getType(), null, placeholder.getVariableName(), declared, returnType.getTypeParameters(),
-                    placeholder.getBounds().toArray(Argument[]::new));
-            }
-            return Argument.of((Class) returnType.getType(), declared, returnType.getTypeParameters());
+            // a variable stays a variable: `<T> T id(T)` returns a placeholder to a generated method
+            return ReflectionArguments.rebuild(argument, null, declared, returnType.getTypeParameters());
         }
 
         @Override

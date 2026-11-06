@@ -1,0 +1,27 @@
+// Applies the shared Python compiler plugin, using the compiler built by this repository
+// instead of the published one.
+plugins {
+    id 'io.micronaut.build.internal.python'
+}
+
+micronautBuild {
+    python {
+        compilerVersion = ''
+    }
+}
+
+dependencies {
+    pyronautCompiler(projects.micronautInjectPython)
+    pyronautCompiler(projects.micronautContextPython)
+}
+
+// The Python compiler runs GraalPy briefly per source set: Truffle's compiled code does not pay off,
+// and the host code compiles with less CPU under C2 than under the Graal JIT. See the root build.
+tasks.withType(io.micronaut.build.python.PythonCompile).configureEach {
+    jvmArgs.addAll(
+            "-XX:+UnlockExperimentalVMOptions",
+            "-XX:-UseJVMCICompiler",
+            "-Dtruffle.TruffleRuntime=com.oracle.truffle.api.impl.DefaultTruffleRuntime",
+            "-Dpolyglot.engine.WarnInterpreterOnly=false"
+    )
+}

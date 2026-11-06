@@ -69,6 +69,11 @@ class ErrorSpec extends AbstractMicronautSpec {
 
     static final String SPEC = "ErrorSpec"
 
+    @Override
+    Map<String, Object> getConfiguration() {
+        super.getConfiguration() << ['micronaut.server.error-response-include-message': 'always']
+    }
+
     void "test 500 server error"() {
         given:
         HttpResponse response = Flux.from(httpClient.exchange(

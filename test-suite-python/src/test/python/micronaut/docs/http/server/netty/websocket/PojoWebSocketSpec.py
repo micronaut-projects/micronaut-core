@@ -9,10 +9,10 @@ from micronaut.websocket import WebSocketClient
 from org.junit.jupiter.api import Test
 
 from .Message import Message
+from .PojoChatClientWebSocket import PojoChatClientWebSocket
 
 Flux = java.type("reactor.core.publisher.Flux")
 TimeUnit = java.type("java.util.concurrent.TimeUnit")
-PojoChatClientClass = java.type("micronaut.docs.http.server.netty.websocket.PojoChatClientWebSocket")
 
 
 @Property(name="spec.name", value="PojoWebSocketSpec")
@@ -23,10 +23,10 @@ class PojoWebSocketSpec:
     @Test
     def test_pojo_websocket_exchange(self):
         fred = Flux.from_(
-            self.wsClient.connect(PojoChatClientClass, "/pojo/chat/stuff/fred")
+            self.wsClient.connect(PojoChatClientWebSocket, "/pojo/chat/stuff/fred")
         ).blockFirst()
         bob = Flux.from_(
-            self.wsClient.connect(PojoChatClientClass, {"topic": "stuff", "username": "bob"})
+            self.wsClient.connect(PojoChatClientWebSocket, {"topic": "stuff", "username": "bob"})
         ).blockFirst()
 
         assert fred.getTopic() == "stuff"

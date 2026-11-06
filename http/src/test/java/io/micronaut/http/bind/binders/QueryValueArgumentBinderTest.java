@@ -43,6 +43,44 @@ class QueryValueArgumentBinderTest {
         }
     }
 
+    @Introspected
+    static class FilterTestType {
+        @Nullable
+        private Long id;
+        @Nullable
+        private String type;
+
+        @Nullable
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(@Nullable Long id) {
+            this.id = id;
+        }
+
+        @Nullable
+        public String getType() {
+            return type;
+        }
+
+        public void setType(@Nullable String type) {
+            this.type = type;
+        }
+    }
+
+    @Introspected
+    static class FailingCreatorTestType {
+        @Creator
+        public static FailingCreatorTestType getInstance(@Nullable String value) {
+            throw new IllegalStateException("Creator failed");
+        }
+    }
+
+    QueryValueArgumentBinder<FilterTestType> filterTestTypeQueryValueArgumentBinder =
+        new QueryValueArgumentBinder<>(ConversionService.SHARED);
+    QueryValueArgumentBinder<FailingCreatorTestType> failingCreatorTestTypeQueryValueArgumentBinder =
+        new QueryValueArgumentBinder<>(ConversionService.SHARED);
     QueryValueArgumentBinder<NullableTestType> nullableTestTypeQueryValueArgumentBinder =
         new QueryValueArgumentBinder<>(ConversionService.SHARED);
     QueryValueArgumentBinder<NonNullTestType> nonNullableTestTypeQueryValueArgumentBinder =
@@ -149,7 +187,7 @@ class QueryValueArgumentBinderTest {
     }
 
     @Test
-    void shouldBindUnsatisfiedWhenInstanceCreatedByIntrospectionIsNotNullAndArgumentIsNullableAndCreatorFails() {
+    void shouldBindEmptyWhenNoValuesArePresentAndArgumentIsNullable() {
         var context = new ArgumentConversionContext<NonNullTestType>() {
             @Override
             @NonNull
@@ -161,6 +199,83 @@ class QueryValueArgumentBinderTest {
 
 
         var bound = nonNullableTestTypeQueryValueArgumentBinder.bind(context, source);
+
+
+        assertTrue(bound.isSatisfied());
+        assertFalse(bound.getValue().isPresent());
+    }
+
+    @Test
+    void shouldBindEmptyWhenNoBeanPropertyIsPresentAndArgumentIsNullable() {
+        var context = new ArgumentConversionContext<FilterTestType>() {
+            @Override
+            @NonNull
+            public Argument<FilterTestType> getArgument() {
+                return Argument.of(FilterTestType.class, NULLABLE_ANNOTATION_METADATA);
+            }
+        };
+        var source = get("/");
+
+
+        var bound = filterTestTypeQueryValueArgumentBinder.bind(context, source);
+
+
+        assertTrue(bound.isSatisfied());
+        assertFalse(bound.getValue().isPresent());
+    }
+
+    @Test
+    void shouldBindUnsatisfiedWhenNoBeanPropertyIsPresentAndArgumentIsNotNullable() {
+        var context = new ArgumentConversionContext<FilterTestType>() {
+            @Override
+            @NonNull
+            public Argument<FilterTestType> getArgument() {
+                return Argument.of(FilterTestType.class, NON_NULLABLE_ANNOTATION_METADATA);
+            }
+        };
+        var source = get("/");
+
+
+        var bound = filterTestTypeQueryValueArgumentBinder.bind(context, source);
+
+
+        assertFalse(bound.isSatisfied());
+        assertFalse(bound.getValue().isPresent());
+    }
+
+    @Test
+    void shouldBindWithValueWhenSomeBeanPropertiesArePresent() {
+        var context = new ArgumentConversionContext<FilterTestType>() {
+            @Override
+            @NonNull
+            public Argument<FilterTestType> getArgument() {
+                return Argument.of(FilterTestType.class, NULLABLE_ANNOTATION_METADATA);
+            }
+        };
+        var source = get("/", Map.of("type", "CARD"));
+
+
+        var bound = filterTestTypeQueryValueArgumentBinder.bind(context, source);
+
+
+        assertTrue(bound.isPresentAndSatisfied());
+        assertEquals("CARD", bound.get().getType());
+        assertNull(bound.get().getId());
+    }
+
+    @Test
+    void shouldBindUnsatisfiedWhenValuesArePresentAndCreatorFailsAndArgumentIsNullable() {
+        var context = new ArgumentConversionContext<FailingCreatorTestType>() {
+            @Override
+            @NonNull
+            public Argument<FailingCreatorTestType> getArgument() {
+                return Argument.of(FailingCreatorTestType.class, NULLABLE_ANNOTATION_METADATA);
+            }
+        };
+        var source = get("/", Map.of("value", "test-value"));
+
+
+        var bound = failingCreatorTestTypeQueryValueArgumentBinder.bind(context, source);
 
 
         assertFalse(bound.isSatisfied());

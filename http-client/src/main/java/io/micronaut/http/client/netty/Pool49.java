@@ -42,8 +42,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -67,12 +67,12 @@ final class Pool49 implements Pool {
     private final List<LocalPoolPair> localPools;
 
     /**
-     * Number of pending requests. This is used to enforce
+     * Number of pending acquire permits held by {@link PendingRequest}s. This is used to enforce
      * {@link HttpClientConfiguration.ConnectionPoolConfiguration#getMaxPendingAcquires()}. If
      * there is no limit, this field is {@code null} to save on atomic operations.
      */
     @Nullable
-    private final LongAdder globalPending;
+    private final AtomicInteger globalPending;
     /**
      * Connection statistics shared between all local pools, e.g. number of open HTTP/2
      * connections. These are used to enforce most limits from the
@@ -99,7 +99,7 @@ final class Pool49 implements Pool {
         }
         this.localPools = List.copyOf(localPoolsByLoop.values());
         if (connectionPoolConfiguration.getMaxPendingAcquires() != Integer.MAX_VALUE) {
-            globalPending = new LongAdder();
+            globalPending = new AtomicInteger();
         } else {
             globalPending = null;
         }
@@ -914,6 +914,8 @@ final class Pool49 implements Pool {
      */
     final class PendingRequest extends AtomicBoolean implements Pool.PendingRequest {
         private static final AtomicInteger NEXT_DEBUG_ID = new AtomicInteger(1);
+        private static final AtomicIntegerFieldUpdater<PendingRequest> PERMIT_HELD =
+            AtomicIntegerFieldUpdater.newUpdater(PendingRequest.class, "permitHeld");
 
         /**
          * Hint for which thread is blocked waiting for this connection.
@@ -937,6 +939,10 @@ final class Pool49 implements Pool {
          * the request.
          */
         private volatile LocalPoolPair destPool;
+        /**
+         * {@code 1} while this request holds a permit of {@link #globalPending}.
+         */
+        private volatile int permitHeld;
         private int debugId;
 
         PendingRequest(@Nullable BlockHint blockHint) {
@@ -945,6 +951,9 @@ final class Pool49 implements Pool {
             preferredPool = pickPreferredPool();
             permitStealing = preferredPool == null ||
                 connectionPoolConfiguration.getConnectionLocality() == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.PREFERRED;
+            if (globalPending != null) {
+                sink.onCancel(this::releasePermit);
+            }
         }
 
         private synchronized int debugId() {
@@ -970,23 +979,56 @@ final class Pool49 implements Pool {
          */
         @Override
         public void dispatch() {
-            if (globalPending != null && globalPending.sum() >= connectionPoolConfiguration.getMaxPendingAcquires()) {
+            if (globalPending != null && !acquirePermit(globalPending)) {
                 tryCompleteExceptionally(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
                 return;
             }
             if (log.isTraceEnabled()) {
                 log.trace("{}: Starting dispatch, preferred pool {}", this, preferredPool);
             }
-            if (globalPending != null) {
-                globalPending.increment();
-            }
 
             redispatch();
         }
 
         /**
+         * Reserve a permit of {@link #globalPending} for this request.
+         *
+         * @param counter The {@link #globalPending} counter
+         * @return {@code false} if the limit is reached
+         */
+        private boolean acquirePermit(AtomicInteger counter) {
+            int limit = connectionPoolConfiguration.getMaxPendingAcquires();
+            while (true) {
+                int current = counter.get();
+                if (current >= limit) {
+                    return false;
+                }
+                if (counter.compareAndSet(current, current + 1)) {
+                    break;
+                }
+            }
+            permitHeld = 1;
+            if (get() || sink.isCancelled()) {
+                // completed or cancelled before the permit was recorded
+                releasePermit();
+            }
+            return true;
+        }
+
+        /**
+         * Release the permit of {@link #globalPending} held by this request, if any. Only the
+         * first call after the permit was acquired has an effect.
+         */
+        private void releasePermit() {
+            AtomicInteger counter = globalPending;
+            if (counter != null && PERMIT_HELD.compareAndSet(this, 1, 0)) {
+                counter.decrementAndGet();
+            }
+        }
+
+        /**
          * Attempt to redispatch this connection. Unlike {@link #dispatch()}, can be called
-         * multiple times, because it doesn't increase {@link #globalPending}.
+         * multiple times, because it doesn't acquire a permit of {@link #globalPending}.
          */
         @Override
         public void redispatch() {
@@ -1119,9 +1161,7 @@ final class Pool49 implements Pool {
 
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
-                if (globalPending != null) {
-                    globalPending.decrement();
-                }
+                releasePermit();
                 sink.completeExceptionally(t);
                 return true;
             } else {
@@ -1132,9 +1172,7 @@ final class Pool49 implements Pool {
         @Override
         public boolean tryComplete(ConnectionManager.PoolHandle value) {
             if (compareAndSet(false, true)) {
-                if (globalPending != null) {
-                    globalPending.decrement();
-                }
+                releasePermit();
                 if (sink.isCancelled()) {
                     return false;
                 }

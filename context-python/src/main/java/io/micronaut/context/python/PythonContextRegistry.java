@@ -27,11 +27,14 @@ import org.slf4j.LoggerFactory;
 import java.lang.ScopedValue.CallableOp;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -57,6 +60,10 @@ final class PythonContextRegistry {
     private static final AtomicInteger ACTIVE_EXECUTIONS = new AtomicInteger();
     private static final Object LOCK = new Object();
     private static final HashMap<Context, ContextState> CONTEXT_STATES = new HashMap<>();
+    /** The contexts of each engine that are being built and not registered yet; guarded by {@link #LOCK}. */
+    private static final HashMap<Engine, Integer> PENDING_BUILDS = new HashMap<>();
+    /** The {@link #onNoContexts} listeners waiting for the builds of an engine to end; guarded by {@link #LOCK}. */
+    private static final HashMap<Engine, List<Runnable>> AFTER_PENDING_BUILDS = new HashMap<>();
     private static final ScopedValue<ExecutionFrame> CURRENT_EXECUTION = ScopedValue.newInstance();
 
     private PythonContextRegistry() {
@@ -102,7 +109,50 @@ final class PythonContextRegistry {
      * @param context The GraalPy context being tracked
      */
     static void registerContext(Context context) {
-        state(context).enterable.set(context);
+        ContextState state = state(context);
+        state.enterable.set(context);
+        state.registered = true;
+    }
+
+    /**
+     * Record that a context of the engine is being built.
+     * <p>
+     * A context exists for the engine before {@link #registerContext} can see it: an engine closed in
+     * between would close under the build. {@link #onNoContexts} therefore waits for the builds of the
+     * engine to end, which callers mark with {@link #endContextBuild} once the context is registered or
+     * the build failed.
+     *
+     * @param engine The engine the context is built on
+     */
+    static void beginContextBuild(Engine engine) {
+        synchronized (LOCK) {
+            PENDING_BUILDS.merge(engine, 1, Integer::sum);
+        }
+    }
+
+    /**
+     * Record that a build marked by {@link #beginContextBuild} ended, registered or failed.
+     *
+     * @param engine The engine the context was built on
+     */
+    static void endContextBuild(Engine engine) {
+        List<Runnable> deferred;
+        synchronized (LOCK) {
+            Integer pending = PENDING_BUILDS.get(engine);
+            if (pending == null) {
+                return;
+            }
+            if (pending > 1) {
+                PENDING_BUILDS.put(engine, pending - 1);
+                return;
+            }
+            PENDING_BUILDS.remove(engine);
+            deferred = AFTER_PENDING_BUILDS.remove(engine);
+        }
+        if (deferred != null) {
+            // gate again, now on the contexts the builds registered
+            deferred.forEach(listener -> onNoContexts(engine, listener));
+        }
     }
 
     /**
@@ -121,12 +171,32 @@ final class PythonContextRegistry {
                 listeners = List.copyOf(contextState.noContextListeners);
                 // executions still in flight leave the aggregate now; their exit finds no state
                 ACTIVE_EXECUTIONS.addAndGet(-contextState.activeExecutions);
-                contextState.clear();
+                contextState.clear(context);
             } else {
                 listeners = List.of();
             }
         }
         runNoActiveExecutionsListeners(listeners);
+    }
+
+    /**
+     * Drop the Python scoped proxies created in a context for the beans of an application that shuts
+     * down while the context lives on (a reused context): the proxies, and the bean context they
+     * resolve their targets through, are then no longer reachable from the context state. A proxy of
+     * an application still running gets a new Python scoped proxy on its next use.
+     *
+     * @param context The context the application used
+     */
+    static void forgetScopedProxies(Context context) {
+        ContextState state;
+        synchronized (LOCK) {
+            state = CONTEXT_STATES.get(context);
+        }
+        if (state != null) {
+            synchronized (state.scopedProxies) {
+                state.scopedProxies.clear();
+            }
+        }
     }
 
     /**
@@ -143,7 +213,7 @@ final class PythonContextRegistry {
             ContextState state = CONTEXT_STATES.remove(context);
             if (state != null) {
                 ACTIVE_EXECUTIONS.addAndGet(-state.activeExecutions);
-                state.clear();
+                state.clear(context);
             }
         }
     }
@@ -268,6 +338,24 @@ final class PythonContextRegistry {
         return ScopedValue.where(CURRENT_EXECUTION, new ExecutionFrame()).call(run);
     }
 
+    /**
+     * The context this thread is already executing in, innermost first, or {@code null}.
+     *
+     * <p>A value belongs to the context it was created in, so host code reached from guest code has
+     * to resolve a value in the context that called it rather than choose one. Choosing is not merely
+     * wasteful: taking a second context from the pool while holding one deadlocks, because the
+     * borrow waits for a context that the waiting threads are themselves holding.
+     *
+     * @return The innermost entered context, or {@code null} when this thread is not in one
+     */
+    static @Nullable Context currentContext() {
+        if (!CURRENT_EXECUTION.isBound()) {
+            return null;
+        }
+        List<Context> contexts = CURRENT_EXECUTION.get().contexts;
+        return contexts.isEmpty() ? null : contexts.get(contexts.size() - 1);
+    }
+
     private static <T, X extends Throwable> T runEnteredExecutionFrame(Context ctx, ExecutionFrame frame, CallableOp<T, X> operation) throws X {
         frame.contexts.add(ctx);
         Context entered = null;
@@ -385,9 +473,13 @@ final class PythonContextRegistry {
      */
     static int forgetClosedContexts() {
         // the probe is a context operation: never under the registry lock
-        Map<Context, ContextState> snapshot;
+        Map<Context, ContextState> snapshot = new HashMap<>();
         synchronized (LOCK) {
-            snapshot = new HashMap<>(CONTEXT_STATES);
+            CONTEXT_STATES.forEach((context, state) -> {
+                if (isProbeable(state)) {
+                    snapshot.put(context, state);
+                }
+            });
         }
         List<Context> closed = new ArrayList<>();
         for (Context context : snapshot.keySet()) {
@@ -403,7 +495,7 @@ final class PythonContextRegistry {
                 if (state != null && state == snapshot.get(context)) {
                     CONTEXT_STATES.remove(context);
                     ACTIVE_EXECUTIONS.addAndGet(-state.activeExecutions);
-                    state.clear();
+                    state.clear(context);
                     dropped++;
                 }
             }
@@ -411,9 +503,24 @@ final class PythonContextRegistry {
         return dropped;
     }
 
+    /**
+     * Whether the sweep may probe the context of a state. The probe enters the context on the
+     * sweeping thread, which is not the thread that owns it, and entering a context that is closing
+     * fails its close. Registered contexts are released by {@link #unregisterContext(Context)} and
+     * are never probed; neither are states with executions or a close in progress.
+     *
+     * @param state The state, read under the registry lock
+     * @return Whether the context of the state may be probed
+     */
+    private static boolean isProbeable(ContextState state) {
+        return !state.registered && !state.closing && state.activeExecutions == 0;
+    }
+
     private static boolean isClosed(Context context) {
         try {
-            context.getBindings(PythonContextRuntime.PYTHON);
+            // not getBindings: that initializes Python in a context its owner may be initializing,
+            // and the owner's evaluations then miss the main module the bindings expose
+            context.getPolyglotBindings();
             return false;
         } catch (IllegalStateException e) {
             // "The Context is already closed"; a context in use from another thread is not closed
@@ -456,6 +563,19 @@ final class PythonContextRegistry {
      */
     static boolean inExecutionFrame() {
         return CURRENT_EXECUTION.isBound() && !CURRENT_EXECUTION.get().contexts.isEmpty();
+    }
+
+    /**
+     * The number of active executions of one context.
+     *
+     * @param context The context
+     * @return The count, or 0 for an unknown context
+     */
+    static int activeExecutions(Context context) {
+        synchronized (LOCK) {
+            ContextState state = CONTEXT_STATES.get(context);
+            return state == null ? 0 : state.activeExecutions;
+        }
     }
 
     static int activeExecutions() {
@@ -618,6 +738,8 @@ final class PythonContextRegistry {
      * <p>
      * The listener runs immediately when no registered context uses the engine. Registration and gate
      * installation happen under the registry lock so a concurrent unregister cannot miss the listener.
+     * While a context of the engine is being built (see {@link #beginContextBuild}) the gate is installed
+     * once the build ends, so it includes the context the build registers.
      *
      * @param engine The engine to observe
      * @param listener The listener to run when the engine no longer owns contexts
@@ -625,8 +747,14 @@ final class PythonContextRegistry {
     static void onNoContexts(Engine engine, Runnable listener) {
         boolean runNow;
         synchronized (LOCK) {
+            if (PENDING_BUILDS.containsKey(engine)) {
+                AFTER_PENDING_BUILDS.computeIfAbsent(engine, ignored -> new ArrayList<>()).add(listener);
+                return;
+            }
+            // registered contexts only: a state that a late lookup recreated for a context already
+            // closed and unregistered is never unregistered again, and must not hold the engine open
             List<ContextState> states = CONTEXT_STATES.entrySet().stream()
-                .filter(entry -> entry.getKey().getEngine().equals(engine))
+                .filter(entry -> entry.getValue().registered && entry.getKey().getEngine().equals(engine))
                 .map(Map.Entry::getValue)
                 .toList();
             runNow = states.isEmpty();
@@ -704,27 +832,68 @@ final class PythonContextRegistry {
         final Object lock = new Object();
         /** The enterable creator instance of this context, when known. */
         final AtomicReference<@Nullable Context> enterable = new AtomicReference<>();
+        /** Whether the runtime created the context and unregisters it when closing it. */
+        volatile boolean registered;
         /** Whether entering was probed on an instance that cannot be entered. */
         volatile boolean enterUnsupported;
-        /** Host members assigned to startup-context objects, mirrored into event-loop contexts. */
-        final IdentityHashMap<Value, Map<String, Object>> asyncMembers = new IdentityHashMap<>();
+        /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
+        final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
+        /**
+         * Whether a member of a Python class is an async function, by class and member name: read for every call
+         * a caller in another context makes through a wrapper.
+         */
+        final Map<Value, Map<String, String>> asyncFunctionKinds = new ConcurrentHashMap<>();
+        /**
+         * The pooled beans that have an instance in this context, so that closing it can tell them to
+         * drop it. The instances themselves live on the bean, which is what makes a collected bean take
+         * its instances with it; this is the other half, and neither side can be weak on its own,
+         * because a stored instance reaches its bean (through the host-object back-reference) and a
+         * bean reaches the contexts it has served.
+         *
+         * <p>Weakly held, so a prototype bean collected while this context lives on is not kept
+         * reachable by having been served here.
+         */
+        final Set<PythonPooledInstance> pooledHolders = Collections.newSetFromMap(new WeakHashMap<>());
         /** Helper functions and cached pooled values, keyed by name or expression. */
         final Map<String, Value> helpers = new ConcurrentHashMap<>();
         /** The micronaut_runtime module imported into this context, once resolved. */
         final AtomicReference<@Nullable Value> runtimeModule = new AtomicReference<>();
         /** Python classes resolved in this context, keyed by their qualified name. */
         final Map<String, Value> classes = new ConcurrentHashMap<>();
+        /** The Python scoped proxies standing in for generated AOP proxies of Python classes, by proxy instance. */
+        final IdentityHashMap<Object, Value> scopedProxies = new IdentityHashMap<>();
+        /**
+         * The object a wrapper of another context is seen as in this one, by the object the wrapper
+         * holds. Keyed by identity, as {@link Value#equals(Object)} compares the guest objects, so one
+         * Python object of the other context is one object here however often the view asks for it and
+         * whichever wrapper asks: the view hashes, compares and prints the same object every time.
+         * Weakly keyed: the key is the value the wrapper itself holds, so the entry lives exactly as
+         * long as that wrapper and nothing here keeps it alive.
+         */
+        final Map<Value, Value> viewedValues = Collections.synchronizedMap(new WeakHashMap<>());
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
         private final List<Runnable> noContextListeners = new ArrayList<>();
         private int activeExecutions;
         /** Set once a close listener is registered: no new outermost execution may start. */
         private boolean closing;
 
-        private void clear() {
-            asyncMembers.clear();
+        private void clear(Context owner) {
+            // tell each pooled bean to forget this context before the state goes. A holder's map is a
+            // ConcurrentHashMap, so this takes no monitor: clear() runs under the registry lock, and
+            // taking a bean's lock here while a thread holding that bean's lock waits for the registry
+            // lock is the deadlock this ordering avoids.
+            for (PythonPooledInstance holder : List.copyOf(pooledHolders)) {
+                holder.forget(owner);
+            }
+            pooledHolders.clear();
+            coroutineClasses.clear();
+            asyncFunctionKinds.clear();
             helpers.clear();
             classes.clear();
+            scopedProxies.clear();
+            viewedValues.clear();
             runtimeModule.set(null);
+            registered = false;
             noActiveExecutionsListeners.clear();
             noContextListeners.clear();
             activeExecutions = 0;

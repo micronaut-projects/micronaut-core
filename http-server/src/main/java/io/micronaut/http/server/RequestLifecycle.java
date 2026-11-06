@@ -31,6 +31,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
@@ -58,6 +59,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -245,6 +247,11 @@ public class RequestLifecycle {
         if (t instanceof ConversionErrorException cee && cee.getCause() instanceof JsonSyntaxException jse) {
             // with delayed parsing, json syntax errors show up as conversion errors
             t = jse;
+        }
+        if (t instanceof IOException && (t.getCause() instanceof HttpStatusException || t.getCause() instanceof ContentLengthExceededException)) {
+            // a body read as an InputStream reports a failure of the body (e.g. a body over the
+            // size limit, or a malformed multipart body) as an IOException
+            t = t.getCause();
         }
         final Throwable cause = t;
 
@@ -555,7 +562,7 @@ public class RequestLifecycle {
      */
     protected final ExecutionFlow<HttpResponse<?>> onStatusError(HttpRequest<?> request, MutableHttpResponse<?> defaultResponse, String message) {
 
-        ExecutionFlow<HttpResponse<?>> flow = executionFlowWithStatusRoute(request, defaultResponse.getStatus());
+        ExecutionFlow<HttpResponse<?>> flow = executionFlowWithStatusRoute(request, defaultResponse.getStatus(), PropagatedContext.getOrEmpty());
         if (flow != null) {
             return flow;
         }
@@ -629,7 +636,8 @@ public class RequestLifecycle {
                                                          HttpStatusException cause,
                                                          @Nullable Class<?> declaringType,
                                                          PropagatedContext propagatedContext) {
-        ExecutionFlow<HttpResponse<?>> flow  = executionFlowWithStatusRoute(request, cause.getStatus());
+        // the status route runs with the propagated context of the filters, like the error routes
+        ExecutionFlow<HttpResponse<?>> flow  = executionFlowWithStatusRoute(request, cause.getStatus(), propagatedContext);
         if (flow != null) {
             return flow;
         }
@@ -669,9 +677,10 @@ public class RequestLifecycle {
 
     @Nullable
     private ExecutionFlow<HttpResponse<?>> executionFlowWithStatusRoute(HttpRequest<?> request,
-                                                                        HttpStatus status) {
+                                                                        HttpStatus status,
+                                                                        PropagatedContext propagatedContext) {
         return routeExecutor.router.findStatusRoute(status, request)
-                .map(routeMatch -> executeRoute(request, PropagatedContext.getOrEmpty(), routeMatch))
+                .map(routeMatch -> executeRoute(request, propagatedContext, routeMatch))
                 .orElse(null);
     }
 }

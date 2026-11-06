@@ -31,10 +31,12 @@ import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.AttributeKey;
+import io.netty.util.concurrent.ScheduledFuture;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
@@ -45,6 +47,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Implementation of the {@link WebSocketSession} interface for Netty.
@@ -64,6 +67,7 @@ public class NettyWebSocketSession implements WebSocketSession {
     private final HttpRequest<?> request;
     private final String protocolVersion;
     private final boolean isSecure;
+    private volatile boolean closing;
     private final MutableConvertibleValues<Object> attributes;
     private final WebSocketMessageEncoder messageEncoder;
 
@@ -107,7 +111,11 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public boolean isOpen() {
-        return channel.isOpen() && channel.isActive();
+        return !closing && channel.isOpen() && channel.isActive();
+    }
+
+    void markClosing() {
+        closing = true;
     }
 
     @Override
@@ -248,9 +256,23 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public void close(CloseReason closeReason) {
-        if (channel.isOpen()) {
-            channel.writeAndFlush(new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason()))
-                    .addListener(future -> channel.close());
+        AbstractNettyWebSocketHandler handler = channel.pipeline().get(AbstractNettyWebSocketHandler.class);
+        ChannelHandlerContext ctx = handler == null ? null : channel.pipeline().context(handler);
+        if (handler != null && ctx != null) {
+            // share the close handling (single close frame, @OnClose, forced close) with the handler
+            handler.writeCloseFrameAndTerminate(ctx, closeReason);
+        } else if (!closing && channel.isOpen()) {
+            // the handler is not (or no longer) in the pipeline
+            CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason());
+            markClosing();
+            ScheduledFuture<?> closeTimeout = channel.eventLoop().schedule(() -> {
+                channel.close();
+            }, 1, TimeUnit.SECONDS);
+            channel.writeAndFlush(closeFrame)
+                    .addListener(future -> {
+                        closeTimeout.cancel(false);
+                        channel.close();
+                    });
         }
     }
 

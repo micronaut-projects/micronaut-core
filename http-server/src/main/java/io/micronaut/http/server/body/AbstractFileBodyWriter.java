@@ -27,13 +27,13 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.server.util.HttpDateHeader;
 
-import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Abstract implementation for types that write files.
@@ -89,15 +89,14 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
     protected void setDateAndCacheHeaders(MutableHttpResponse response, long lastModified) {
         // Date header
         MutableHttpHeaders headers = response.getHeaders();
-        LocalDateTime now = LocalDateTime.now();
+        long now = System.currentTimeMillis();
         if (!headers.contains(HttpHeaders.DATE)) {
-            headers.date(now);
+            headers.add(HttpHeaders.DATE, HttpDateHeader.get(now));
         }
 
         // Add cache headers
-        LocalDateTime cacheSeconds = now.plus(configuration.getCacheSeconds(), ChronoUnit.SECONDS);
         if (response.header(HttpHeaders.EXPIRES) == null) {
-            headers.expires(cacheSeconds);
+            headers.expires(now + TimeUnit.SECONDS.toMillis(configuration.getCacheSeconds()));
         }
 
         if (response.header(HttpHeaders.CACHE_CONTROL) == null) {
@@ -118,8 +117,8 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
      */
     protected void setDateHeader(MutableHttpResponse response) {
         MutableHttpHeaders headers = response.getHeaders();
-        LocalDateTime now = LocalDateTime.now();
-        headers.date(now);
+        // replace, not add: a 304 has the original response's headers copied in first, Date included
+        headers.set(HttpHeaders.DATE, HttpDateHeader.now());
     }
 
     protected ByteBodyHttpResponse<?> notModified(ByteBodyFactory bodyFactory, MutableHttpResponse<?> originalResponse) {

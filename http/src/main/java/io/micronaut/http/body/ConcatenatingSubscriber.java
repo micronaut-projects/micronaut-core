@@ -29,6 +29,7 @@ import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * This is a reactive subscriber that accepts {@link ByteBody}s and concatenates them into a single
@@ -87,30 +88,6 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
         }
     }
 
-    /**
-     * Called before any new {@link ByteBody} component to emit an additional separator.
-     *
-     * @param first {@code true} iff this is the first element (i.e. the start of the output)
-     */
-    private void emitLeadingSeparator(boolean first) {
-        ReadBuffer rb = first ? separators.beforeFirst : separators.between;
-        if (rb != null) {
-            add(rb.duplicate());
-        }
-    }
-
-    /**
-     * Called before after all {@link ByteBody} components to emit additional trailing bytes.
-     *
-     * @param first {@code true} iff this is the first element, i.e. there were no component {@link ByteBody}s
-     */
-    private void emitFinalSeparator(boolean first) {
-        ReadBuffer rb = first ? separators.empty : separators.afterLast;
-        if (rb != null) {
-            add(rb.duplicate());
-        }
-    }
-
     @Override
     public final void onComplete() {
         synchronized (this) {
@@ -120,8 +97,16 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
             }
         }
 
-        emitFinalSeparator(first);
-        forwardComplete();
+        // the trailing separator travels with the completion signal, so that it can be written as
+        // part of the message that terminates the response instead of as a message of its own
+        ReadBuffer trailing = first ? separators.empty : separators.afterLast;
+        if (trailing == null) {
+            forwardComplete(null);
+        } else {
+            ReadBuffer duplicate = trailing.duplicate();
+            onForward(duplicate.readable());
+            forwardComplete(duplicate);
+        }
     }
 
     @Override
@@ -130,18 +115,26 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
     }
 
     /**
-     * Forward the given body to the shared buffer.
+     * Forward the given body to the shared buffer, preceded by the given separator.
      *
      * @param body The body
+     * @param leadingSeparator The separator to emit before the body, or {@code null} for none
      * @return The {@link io.micronaut.http.body.stream.BufferConsumer.Upstream} to control
      * component backpressure, or {@code null} if all bytes were written immediately (as is the
      * case for an {@link AvailableByteBody})
      */
-    protected final BufferConsumer.@Nullable Upstream forward(ByteBody body) {
+    protected final BufferConsumer.@Nullable Upstream forward(ByteBody body, @Nullable ReadBuffer leadingSeparator) {
         if (body instanceof AvailableByteBody abb) {
-            add(abb.toReadBuffer());
+            ReadBuffer element = abb.toReadBuffer();
+            // the separator goes into the same buffer as the element it precedes, so that one
+            // element leads to one buffer downstream (and thus, for a netty response, one HTTP
+            // chunk and one flush) instead of two
+            add(leadingSeparator == null ? element : byteBodyFactory.readBufferFactory().compose(List.of(leadingSeparator.duplicate(), element)));
             complete();
             return null;
+        }
+        if (leadingSeparator != null) {
+            add(leadingSeparator.duplicate());
         }
         try (BaseStreamingByteBody<?> s = byteBodyFactory.toStreaming(body)) {
             return s.primary(this);
@@ -162,10 +155,10 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
 
     @Override
     public final void onNext(ByteBody body) {
-        emitLeadingSeparator(first);
-        first = false;
+        boolean isFirst = this.first;
+        this.first = false;
 
-        BufferConsumer.Upstream component = forward(body);
+        BufferConsumer.Upstream component = forward(body, isFirst ? separators.beforeFirst : separators.between);
         if (component == null) {
             return;
         }
@@ -294,10 +287,17 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
     }
 
     /**
-     * Forward completion to the shared buffer.
+     * Forward completion to the shared buffer, optionally together with a final buffer of trailing
+     * bytes.
+     *
+     * @param trailing The trailing bytes to emit with the completion, or {@code null} for none
      */
-    protected void forwardComplete() {
-        sharedBuffer.complete();
+    protected void forwardComplete(@Nullable ReadBuffer trailing) {
+        if (trailing == null) {
+            sharedBuffer.complete();
+        } else {
+            sharedBuffer.addAndComplete(trailing);
+        }
     }
 
     /**

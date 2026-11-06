@@ -16,6 +16,8 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.python.netty.NettyPythonEventLoopProvider;
+import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.PropagatedContextElement;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
@@ -97,6 +99,116 @@ final class NettyPythonAsyncioRuntimeTest {
             eventLoop.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
         }
+    }
+
+    @Test
+    void nettyBackedRuntimeRunsCoroutineStepsInThePropagatedContextOfTheCaller() throws Exception {
+        DefaultEventLoop eventLoop = new DefaultEventLoop();
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        try {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                async def run(reader):
+                    before = reader.element()
+                    loop = asyncio.get_running_loop()
+                    future = loop.create_future()
+                    loop.call_soon(future.set_result, None)
+                    await future
+                    after_callback = reader.element()
+                    await asyncio.sleep(0.001)
+                    after_sleep = reader.element()
+                    return before + "|" + after_callback + "|" + after_sleep
+                run
+                """).execute(new ElementReader());
+
+            CompletionStage stage = NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+                return PropagatedContext.getOrEmpty().plus(new TestElement("E1"))
+                    .propagate(() -> PythonAsyncioRuntime.toCompletionStage(coroutine));
+            });
+
+            assertEquals("E1|E1|E1", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            eventLoop.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
+            context.close(true);
+        }
+    }
+
+    @Test
+    void nettyBackedRuntimeKeepsTheContextOfATaskResumedByAnotherTask() throws Exception {
+        DefaultEventLoop eventLoop = new DefaultEventLoop();
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        try {
+            Value coroutines = context.eval(PYTHON, """
+                import asyncio
+                event = asyncio.Event()
+
+                async def waiter(reader):
+                    await event.wait()
+                    return "B=" + reader.element()
+
+                async def setter(reader):
+                    event.set()
+                    await asyncio.sleep(0)
+                    return "A=" + reader.element()
+
+                (waiter, setter)
+                """);
+            ElementReader reader = new ElementReader();
+
+            // B waits for the event under "B"; A sets it under "A": the callback resuming B is scheduled
+            // by A's step, and B must still run in its own context
+            CompletionStage<?> waiter = startUnder(eventLoop, "B", coroutines.getArrayElement(0).execute(reader));
+            CompletionStage<?> setter = startUnder(eventLoop, "A", coroutines.getArrayElement(1).execute(reader));
+
+            assertEquals("A=A", setter.toCompletableFuture().get(5, TimeUnit.SECONDS));
+            assertEquals("B=B", waiter.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            eventLoop.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
+            context.close(true);
+        }
+    }
+
+    @Test
+    void nettyBackedRuntimeKeepsTheContextOfACoroutineResumedByAnotherThread() throws Exception {
+        DefaultEventLoop eventLoop = new DefaultEventLoop();
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        try {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "reader", PythonCoercion.asyncMemberValue(target, new ElementReader()));
+            Value coroutine = context.eval(PYTHON, """
+                async def run(target):
+                    before = target.reader.element()
+                    delayed = await target.reader.delayed()
+                    after = target.reader.element()
+                    return before + "/" + delayed + "/" + after
+                run
+                """).execute(target);
+
+            // the awaited stage completes on a thread of its own, which has no context
+            CompletionStage<?> stage = startUnder(eventLoop, "E2", coroutine);
+
+            assertEquals("E2/d/E2", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            eventLoop.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
+            context.close(true);
+        }
+    }
+
+    private static CompletionStage<?> startUnder(EventLoop eventLoop, String element, Value coroutine) {
+        return NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+            return PropagatedContext.getOrEmpty().plus(new TestElement(element))
+                .propagate(() -> PythonAsyncioRuntime.toCompletionStage(coroutine));
+        });
     }
 
     @Test
@@ -760,6 +872,28 @@ final class NettyPythonAsyncioRuntimeTest {
     private static void close(Channel channel) {
         if (channel != null && channel.isOpen()) {
             channel.close().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
+        }
+    }
+
+    /**
+     * A propagated context element the coroutine steps read.
+     *
+     * @param name The element name
+     */
+    public record TestElement(String name) implements PropagatedContextElement {
+    }
+
+    /**
+     * Reads the element of the propagated context of the calling thread.
+     */
+    public static final class ElementReader {
+
+        public String element() {
+            return PropagatedContext.getOrEmpty().find(TestElement.class).map(TestElement::name).orElse("none");
+        }
+
+        public CompletionStage<String> delayed() {
+            return CompletableFuture.supplyAsync(() -> "d", CompletableFuture.delayedExecutor(20, TimeUnit.MILLISECONDS));
         }
     }
 }

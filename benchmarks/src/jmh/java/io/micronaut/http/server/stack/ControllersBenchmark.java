@@ -68,9 +68,7 @@ public class ControllersBenchmark {
     @Benchmark
     public void test(Holder holder) {
         ByteBuf response = holder.exchange();
-        if (!holder.responseBytes.equals(response)) {
-            throw new AssertionError("Response did not match");
-        }
+        BenchOptions.verifyResponse(holder.responseBytes, response);
         response.release();
     }
 
@@ -86,10 +84,7 @@ public class ControllersBenchmark {
 
         @Setup
         public void setUp(Blackhole blackhole) {
-            ctx = ApplicationContext.run(Map.of(
-                "spec.name", "ControllersBenchmark",
-                "micronaut.server.date-header", false // disabling this makes the response identical each time
-            ));
+            ctx = ApplicationContext.run(BenchOptions.serverProperties("ControllersBenchmark"));
             ctx.registerSingleton(Blackhole.class, blackhole);
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
             channel = ((NettyHttpServer) server).buildEmbeddedChannel(false);

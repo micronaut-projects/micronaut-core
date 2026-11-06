@@ -34,6 +34,7 @@ import java.nio.file.Path
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ExecutorService
 import java.io.OutputStream
@@ -46,6 +47,7 @@ import static io.micronaut.http.HttpHeaders.CONTENT_RANGE
 import static io.micronaut.http.HttpHeaders.CONTENT_TYPE
 import static io.micronaut.http.HttpHeaders.DATE
 import static io.micronaut.http.HttpHeaders.EXPIRES
+import static io.micronaut.http.HttpHeaders.IF_RANGE
 import static io.micronaut.http.HttpHeaders.LAST_MODIFIED
 import static io.micronaut.http.HttpHeaders.RANGE
 
@@ -58,6 +60,11 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         tempFile = File.createTempFile("fileTypeHandlerSpec", ".html")
         tempFile.write(tempFileContents)
         tempFile
+    }
+
+    @Override
+    Map<String, Object> getConfiguration() {
+        super.getConfiguration() << ['micronaut.server.error-response-include-message': 'always']
     }
 
     void "test returning a file from a controller"() {
@@ -83,6 +90,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.NOT_MODIFIED.code
+        response.headers.getAll(DATE).size() == 1
         response.header(DATE)
     }
 
@@ -105,13 +113,63 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         "bytes"        | 200            | null                                                     | tempFileContents
         "bytes="       | 200            | null                                                     | tempFileContents
         "bytes=2"      | 200            | null                                                     | tempFileContents
-        "bytes=9000-"  | 200            | null                                                     | tempFileContents
         "bytes=0-9000" | 200            | null                                                     | tempFileContents
         "bytes=abc-10" | 200            | null                                                     | tempFileContents
         "bytes=0-def"  | 200            | null                                                     | tempFileContents
         "bytes=0-"     | 206            | "bytes 0-${tempFile.length() - 1}/${tempFile.length()}"  | tempFileContents
         "bytes=10-"    | 206            | "bytes 10-${tempFile.length() - 1}/${tempFile.length()}" | tempFileContents.substring(10)
         "bytes=1-2"    | 206            | "bytes 1-2/${tempFile.length()}"                         | tempFileContents.substring(1, 3)
+        "bytes=0-0"    | 206            | "bytes 0-0/${tempFile.length()}"                         | tempFileContents.substring(0, 1)
+        "bytes=5-5"    | 206            | "bytes 5-5/${tempFile.length()}"                         | tempFileContents.substring(5, 6)
+        "bytes=-5"     | 206            | "bytes ${tempFile.length() - 5}-${tempFile.length() - 1}/${tempFile.length()}" | tempFileContents.substring(tempFileContents.length() - 5)
+        "bytes=-9000"  | 206            | "bytes 0-${tempFile.length() - 1}/${tempFile.length()}"  | tempFileContents
+    }
+
+    void "test If-Range is evaluated before a Range request"() {
+        when:
+        MutableHttpRequest<?> request = HttpRequest.GET('/test/html')
+        request.headers.add(RANGE, "bytes=1-2")
+        request.headers.add(IF_RANGE, ifRange(validator))
+        def response = httpClient.toBlocking().exchange(request, String)
+
+        then:
+        response.code() == expectedStatus
+        response.header(CONTENT_RANGE) == expectedContentRange
+        response.body() == expectedContent
+
+        where:
+        validator | expectedStatus | expectedContentRange              | expectedContent
+        "match"   | 206            | "bytes 1-2/${tempFile.length()}"  | tempFileContents.substring(1, 3)
+        "stale"   | 200            | null                              | tempFileContents
+        "etag"    | 200            | null                              | tempFileContents
+    }
+
+    private static String ifRange(String validator) {
+        long seconds = tempFile.lastModified().intdiv(1000L)
+        switch (validator) {
+            case "match":
+                return DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.ofInstant(Instant.ofEpochSecond(seconds), ZoneId.of("GMT")))
+            case "stale":
+                return DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.ofInstant(Instant.ofEpochSecond(seconds - 3600), ZoneId.of("GMT")))
+            default:
+                return '"abc"'
+        }
+    }
+
+    void "test 416 is returned for a range that starts past the end of the file"() {
+        when:
+        MutableHttpRequest<?> request = HttpRequest.GET('/test/html')
+        request.headers.add(RANGE, range)
+        httpClient.toBlocking().exchange(request, String)
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE.code
+        e.response.header(ACCEPT_RANGES) == "bytes"
+        e.response.header(CONTENT_RANGE) == "bytes */${tempFile.length()}".toString()
+
+        where:
+        range << ["bytes=9000-", "bytes=9000-9100", "bytes=${tempFile.length()}-".toString(), "bytes=-0"]
     }
 
     void "test cache control can be overridden"() {

@@ -53,6 +53,22 @@ public final class PythonValues {
         if (value instanceof Value polyglotValue) {
             return toJava(polyglotValue);
         }
+        if (value instanceof List<?> list) {
+            // A Python list handed to Java as a List is a view onto the guest object, and reading it once the
+            // compilation context has closed fails with "The Context is already closed". Copy it out eagerly.
+            List<Object> converted = new ArrayList<>(list.size());
+            for (Object element : list) {
+                converted.add(toJava(element));
+            }
+            return converted;
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<Object, Object> converted = new LinkedHashMap<>(map.size());
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                converted.put(toJava(entry.getKey()), toJava(entry.getValue()));
+            }
+            return converted;
+        }
         return value;
     }
 

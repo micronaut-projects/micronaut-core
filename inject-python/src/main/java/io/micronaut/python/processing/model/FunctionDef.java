@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.model;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -33,11 +34,19 @@ import java.util.Objects;
  * @param typeComment The type comment.
  * @param typeParams The type parameters.
  * @param documentation The function documentation string.
- * @param isAbstract Whether the function is abstract (decorated with @abstractmethod).
+ * @param isAbstract Whether the function is abstract: decorated with {@code @abstractmethod}, a member of a
+ *                   {@code Protocol}, or a placeholder body in an {@code ABC}.
  * @param isStatic Whether the function is static (decorated with @staticmethod or @classmethod).
  * @param isAsync Whether the function was declared with {@code async def}.
  * @param hasReturnValue Whether the function body contains a return statement with a non-None value.
+ * @param hasPlaceholderBody Whether the function body is only the {@code ...} placeholder. Such a function is
+ *                           abstract in an introduction type, whose methods are implemented by the introduction
+ *                           advice, and a method returning {@code None} in a concrete class.
  * @param declaringClass Declaring class, can be null if there is none
+ * @param superArguments The arguments of the {@code super().__init__(...)} call of a constructor, or
+ * @param isGenerator Whether the function body contains a yield of its own; with {@code isAsync} the function is
+ *                    an async generator, bridged as a Publisher of its elements.
+ * {@code null} when the function is not a constructor or does not call the super constructor
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
  */
 @Experimental
@@ -53,7 +62,10 @@ public record FunctionDef(
     boolean isStatic,
     boolean isAsync,
     boolean hasReturnValue,
-    ClassDef declaringClass
+    boolean hasPlaceholderBody,
+    ClassDef declaringClass,
+    @Nullable List<SuperArgumentDef> superArguments,
+    boolean isGenerator
 ) implements ElementDef, MemberDef {
 
     public static final String CONSTRUCTOR_NAME = "__init__";
@@ -70,63 +82,98 @@ public record FunctionDef(
             typeParams = List.of();
         }
         // declaringClassName can be null
+        if (superArguments != null) {
+            superArguments = List.copyOf(superArguments);
+        }
+    }
+
+    /**
+     * Creates a function that is not a generator.
+     */
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync, boolean hasReturnValue, boolean hasPlaceholderBody, ClassDef declaringClass, @Nullable List<SuperArgumentDef> superArguments) {
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, hasPlaceholderBody, declaringClass, superArguments, false);
+    }
+
+    /**
+     * Creates a function as the processor parses it: no declaring class and no super constructor call yet.
+     */
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync, boolean hasReturnValue, boolean hasPlaceholderBody, boolean isGenerator) {
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, hasPlaceholderBody, null, null, isGenerator);
+    }
+
+    /**
+     * Creates a function without a recorded super constructor call.
+     */
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync, boolean hasReturnValue, boolean hasPlaceholderBody, ClassDef declaringClass) {
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, hasPlaceholderBody, declaringClass, null);
+    }
+
+    /**
+     * Creates a function with a regular body and without a recorded super constructor call.
+     */
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync, boolean hasReturnValue, ClassDef declaringClass) {
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, false, declaringClass, null);
     }
 
     // Simplified constructors for easier Python interop
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType) {
-        this(name, arguments, decorators, returnType, "", java.util.List.of(), null, false, false, false, false, null);
+        this(name, arguments, decorators, returnType, "", java.util.List.of(), null, false, false, false, false, false, null);
     }
 
     public FunctionDef(String name, ArgumentsDef arguments, ReturnDef returnType) {
-        this(name, arguments, java.util.List.of(), returnType, "", java.util.List.of(), null, false, false, false, false, null);
+        this(name, arguments, java.util.List.of(), returnType, "", java.util.List.of(), null, false, false, false, false, false, null);
     }
 
     public FunctionDef(String name) {
-        this(name, ArgumentsDef.empty(), java.util.List.of(), ReturnDef.none(), "", java.util.List.of(), null, false, false, false, false, null);
+        this(name, ArgumentsDef.empty(), java.util.List.of(), ReturnDef.none(), "", java.util.List.of(), null, false, false, false, false, false, null);
     }
 
     public FunctionDef(String name, List<DecoratorDef> decoratorList) {
-        this(name, ArgumentsDef.empty(), decoratorList, ReturnDef.none(), "", java.util.List.of(), null, false, false, false, false, null);
+        this(name, ArgumentsDef.empty(), decoratorList, ReturnDef.none(), "", java.util.List.of(), null, false, false, false, false, false, null);
     }
 
     // Backward compatibility constructors
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, List<DecoratorDef> decorators, String returnTypeAnnotation) {
         this(name, createArgumentsDef(argumentNames, argumentTypes), decorators,
              returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(new TypeRef(returnTypeAnnotation)) : ReturnDef.none(),
-             "", java.util.List.of(), null, false, false, false, false, null);
+             "", java.util.List.of(), null, false, false, false, false, false, null);
     }
 
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, String returnTypeAnnotation) {
         this(name, createArgumentsDef(argumentNames, argumentTypes), java.util.List.of(),
              returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(new TypeRef(returnTypeAnnotation)) : ReturnDef.none(),
-             "", java.util.List.of(), null, false, false, false, false, null);
+             "", java.util.List.of(), null, false, false, false, false, false, null);
     }
 
     // Constructor for Python interop with return type decorators
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, String returnTypeAnnotation, List<DecoratorDef> returnTypeDecorators) {
         this(name, arguments, decorators,
              returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(new TypeRef(returnTypeAnnotation), returnTypeDecorators) : ReturnDef.none(),
-             "", java.util.List.of(), null, false, false, false, false, null);
+             "", java.util.List.of(), null, false, false, false, false, false, null);
     }
 
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract) {
-        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, false, false, false, null);
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, false, false, false, false, null);
     }
 
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic) {
-        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, false, false, null);
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, false, false, false, null);
     }
 
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync) {
-        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, false, null);
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, false, false, null);
     }
 
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync, boolean hasReturnValue) {
-        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, null);
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, false, null);
     }
 
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, ClassDef declaringClass) {
-        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, false, false, declaringClass);
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, false, false, false, declaringClass);
     }
 
     @Override
@@ -174,7 +221,10 @@ public record FunctionDef(
             isStatic,
             isAsync,
             hasReturnValue,
-            classDef
+            hasPlaceholderBody,
+            classDef,
+            superArguments,
+            isGenerator
         );
         return new FunctionDef(
             name,
@@ -188,7 +238,36 @@ public record FunctionDef(
             isStatic,
             isAsync,
             hasReturnValue,
-            classDef
+            hasPlaceholderBody,
+            classDef,
+            superArguments,
+            isGenerator
+        );
+    }
+
+    /**
+     * Records the arguments of the {@code super().__init__(...)} call of this constructor.
+     *
+     * @param superArguments The arguments, or {@code null} when the constructor does not call the super constructor
+     * @return The function with the super constructor call recorded
+     */
+    public FunctionDef withSuperArguments(@Nullable List<SuperArgumentDef> superArguments) {
+        return new FunctionDef(
+            name,
+            arguments,
+            decorators,
+            returnType,
+            typeComment,
+            typeParams,
+            documentation,
+            isAbstract,
+            isStatic,
+            isAsync,
+            hasReturnValue,
+            hasPlaceholderBody,
+            declaringClass,
+            superArguments,
+            isGenerator
         );
     }
 }

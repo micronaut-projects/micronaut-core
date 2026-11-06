@@ -1,0 +1,463 @@
+package io.micronaut.context.python;
+
+import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
+import io.micronaut.scheduling.TaskScheduler;
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.PolyglotException;
+import org.graalvm.polyglot.Value;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.StreamSupport;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class PythonCallablesTest {
+
+    private Context context;
+
+    @BeforeEach
+    void setUp() {
+        context = Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of()))
+            .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        context.close();
+    }
+
+    @Test
+    void inspectsTheArityOfPythonCallables() {
+        assertArity("lambda: 1", 0, 0);
+        assertArity("lambda a: a", 1, 1);
+        assertArity("lambda a, b: a", 2, 2);
+        assertArity("lambda a, b='x': a", 1, 2);
+        // *args does not make the callable fit further arities: it would fit every overload
+        assertArity("lambda *args: args", 0, 0);
+        assertArity("lambda a, *args: args", 1, 1);
+        assertArity("lambda a, b='x', *args: args", 1, 2);
+        // a bound method does not count self
+        assertArity("type('T', (), {'m': lambda self, a: a})().m", 1, 1);
+        // a class method bound to its class
+        assertArity("type('T', (), {'m': classmethod(lambda cls, a, b: a)}).m", 2, 2);
+    }
+
+    @Test
+    void callablesWithoutInspectableSignatureAcceptNoArity() {
+        // the arity mappings stay out of the decision: every overload would apply and the call be ambiguous
+        assertAcceptsNoArity("__import__('functools').partial(lambda a, b: a, 1)");
+        assertAcceptsNoArity("str.upper");
+        assertAcceptsNoArity("type('T', (), {'__call__': lambda self, a: a})()");
+        assertAcceptsNoArity("dict");
+    }
+
+    @Test
+    void exactArityOnlyMatchesTheDeclaredParameters() {
+        assertTrue(PythonCallables.acceptsExactArity(context.eval("python", "lambda a, b='x': a"), 2));
+        assertFalse(PythonCallables.acceptsExactArity(context.eval("python", "lambda a, b='x': a"), 1));
+        assertTrue(PythonCallables.acceptsExactArity(context.eval("python", "lambda *args: args"), 0));
+        assertFalse(PythonCallables.acceptsExactArity(context.eval("python", "lambda *args: args"), 1));
+        assertTrue(PythonCallables.acceptsExactArity(context.eval("python", "type('T', (), {'m': lambda self, a: a})().m"), 1));
+        assertFalse(PythonCallables.acceptsExactArity(context.eval("python", "__import__('functools').partial(lambda a, b: a, 1)"), 1));
+        assertFalse(PythonCallables.acceptsExactArity(context.eval("python", "1"), 0));
+    }
+
+    @Test
+    void nonCallablesAndHostObjectsAreNotAdapted() {
+        assertFalse(PythonCallables.acceptsArity(context.eval("python", "1"), 0));
+        assertFalse(PythonCallables.acceptsArity(context.eval("python", "None"), 0));
+        assertFalse(PythonCallables.acceptsArity(context.asValue((Runnable) () -> { }), 0));
+        assertFalse(PythonCallables.acceptsArity(null, 0));
+    }
+
+    @Test
+    void resolvesTheFunctionalMethod() {
+        assertEquals("apply", PythonCallables.functionalMethod(Function.class).getName());
+        assertEquals("compare", PythonCallables.functionalMethod(java.util.Comparator.class).getName());
+        assertEquals("run", PythonCallables.functionalMethod(Runnable.class).getName());
+        assertEquals("apply", PythonCallables.functionalMethod(java.util.function.UnaryOperator.class).getName());
+        assertNull(PythonCallables.functionalMethod(List.class));
+        assertNull(PythonCallables.functionalMethod(String.class));
+        for (Class<?> type : PythonCallables.STANDARD_INTERFACES) {
+            assertNotNull(PythonCallables.functionalMethod(type), type.getName());
+        }
+    }
+
+    @Test
+    void selectsOverloadsByArity() {
+        Value overloads = context.asValue(new Overloads());
+        Value python = context.eval("python", """
+            import functools
+            def calls(overloads):
+                return [
+                    overloads.apply(lambda a: a.upper()),
+                    overloads.apply(lambda a, b: a + b),
+                    overloads.check(lambda a: a == 'x'),
+                    overloads.check(lambda a, n: n == 3),
+                    overloads.run(lambda: 'value'),
+                    overloads.run(lambda *args: 'varargs'),
+                    overloads.apply(lambda a, b='default': a + b),
+                    overloads.check(lambda a, *rest: a == 'x'),
+                    # only fits the two-argument overload, through its default
+                    overloads.check(lambda a, b, c=1: True),
+                    # unreadable arity and *args only: the default conversion decides, Function as before
+                    overloads.apply(functools.partial(lambda prefix, value: prefix + value, 'p')),
+                    overloads.apply(lambda *args: 'v'),
+                ]
+            calls
+            """);
+        assertEquals(
+            List.of("function:A", "bifunction:ab", "predicate:true", "bipredicate:true", "supplier:value", "supplier:varargs",
+                "bifunction:ab", "predicate:true", "bipredicate:true", "function:pa", "function:v"),
+            python.execute(overloads).as(List.class)
+        );
+    }
+
+    @Test
+    void lambdasStayCallablesWhenReadBack() {
+        Value overloads = context.asValue(new Overloads());
+        Value python = context.eval("python", """
+            def calls(overloads):
+                callback = lambda value: None
+                overloads.register(callback)
+                stored = overloads.registered()
+                seen = []
+                overloads.register(lambda value: seen.append(value))
+                overloads.registered()('hello')
+                return [stored is callback, stored == callback, callable(stored), seen == ['hello']]
+            calls
+            """);
+        assertEquals(List.of(true, true, true, true), python.execute(overloads).as(List.class));
+    }
+
+    @Test
+    void adaptsCallablesToCustomInterfacesExplicitly() {
+        Value callable = context.eval("python", "lambda value, count: value * count");
+        Overloads.BiCallback adapted = PythonInterop.fn(Overloads.BiCallback.class, callable);
+        assertEquals("xx", adapted.call("x", 2));
+        assertTrue(adapted.toString().contains("BiCallback"));
+        assertSame(adapted, adapted);
+        assertNotNull(PythonInterop.fn(Runnable.class, context.eval("python", "lambda: None")));
+
+        Value overloads = context.asValue(new Overloads());
+        Value python = context.eval("python", """
+            import java
+            PythonInterop = java.type('io.micronaut.context.python.PythonInterop')
+            Callback = java.type('io.micronaut.context.python.PythonCallablesTest$Overloads$Callback')
+            BiCallback = java.type('io.micronaut.context.python.PythonCallablesTest$Overloads$BiCallback')
+            def calls(overloads):
+                proxy = PythonInterop.fn(Callback, lambda value: value + '!')
+                overloads.callback(proxy)
+                stored = overloads.callbacks()[0]
+                return [
+                    overloads.callback(PythonInterop.fn(BiCallback, lambda value, count: value * count)),
+                    stored == proxy,
+                    stored.getClass().getInterfaces()[0].getSimpleName(),
+                ]
+            calls
+            """);
+        assertEquals(
+            List.of("custombi:xx", true, "Callback"),
+            python.execute(overloads).as(List.class)
+        );
+    }
+
+    @Test
+    void customOverloadsStillNeedExplicitAdaptation() {
+        Value overloads = context.asValue(new Overloads());
+        Value python = context.eval("python", "lambda overloads: overloads.callback(lambda value: value + '!')");
+        assertThrows(PolyglotException.class, () -> python.execute(overloads));
+    }
+
+    @Test
+    void registeredCustomInterfacesAreSelectedByArity() {
+        try (Context custom = contextWith(Overloads.Callback.class, Overloads.BiCallback.class, Overloads.OtherCallback.class)) {
+            Value overloads = custom.asValue(new Overloads());
+            Value python = custom.eval("python", """
+                def calls(overloads):
+                    return [
+                        overloads.callback(lambda value: value + '!'),
+                        overloads.callback(lambda value, count: value * count),
+                        # a callable is not an Iterable: the functional interface overload wins
+                        overloads.deleteAll(lambda value: value + '?'),
+                        overloads.deleteAll(['a', 'b', 'c']),
+                        overloads.deleteAll(lambda: 'all'),
+                        overloads.describe(lambda value: value),
+                        overloads.describe({'a': 'b'}),
+                    ]
+                calls
+                """);
+            assertEquals(
+                List.of("custom:x!", "custombi:xx", "callback:a?", "iterable:3", "supplier:all", "callback:x", "map:1"),
+                python.execute(overloads).as(List.class)
+            );
+
+            Value sameArity = custom.eval("python", "lambda overloads: overloads.same(lambda value: value)");
+            assertThrows(PolyglotException.class, () -> sameArity.execute(overloads), "same-arity custom interfaces stay ambiguous");
+        }
+    }
+
+    @Test
+    void selectsValueReturningOverloadsNextToFurtherArguments() {
+        // the other argument converts strictly, where the host interop does not rank mapping precedences
+        Value overloads = context.asValue(new Overloads());
+        Value python = context.eval("python", """
+            import java
+            Duration = java.type('java.time.Duration')
+            def calls(overloads):
+                seen = []
+                def task():
+                    seen.append('ran')
+                return [
+                    overloads.schedule(Duration.ofSeconds(1), lambda: 42),
+                    overloads.schedule(Duration.ofSeconds(1), task),
+                    overloads.schedule('0 30 4 * * ?', lambda: 'cron'),
+                    # a void interface keeps its precedence over Object and the loose Map conversion
+                    overloads.execute('name', lambda: None),
+                    overloads.execute('name', 'value'),
+                    overloads.accept('name', lambda value: seen.append(value)),
+                    overloads.accept('name', {'a': 'b'}),
+                    seen,
+                ]
+            calls
+            """);
+        assertEquals(
+            List.of("callable:1:42", "callable:1:null", "cron-callable:0 30 4 * * ?:cron", "runnable:name", "object:name=value",
+                "consumer", "map:name:1", List.of("ran", "name")),
+            python.execute(overloads).as(List.class)
+        );
+    }
+
+    @Test
+    void schedulesPythonCallablesWithTheTaskScheduler() throws Exception {
+        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+        try {
+            TaskScheduler scheduler = new ScheduledExecutorTaskScheduler(executor);
+            Value python = context.eval("python", """
+                import java
+                Duration = java.type('java.time.Duration')
+                TimeUnit = java.type('java.util.concurrent.TimeUnit')
+                def schedule(scheduler, executor):
+                    seen = []
+                    def follow_up():
+                        seen.append('follow-up')
+                    return [
+                        scheduler.schedule(Duration.ofMillis(1), follow_up).get(),
+                        scheduler.schedule(Duration.ofMillis(1), lambda: 'value').get(),
+                        executor.schedule(lambda: 'executor', 1, TimeUnit.MILLISECONDS).get(),
+                        seen,
+                    ]
+                schedule
+                """);
+            List<?> result = python.execute(scheduler, executor).as(List.class);
+            assertEquals(Arrays.asList(null, "value", "executor", List.of("follow-up")), result);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void providersAreLoadedAsServicesOfTheClassLoader() {
+        // TestFunctionalInterfaceProvider registers OtherCallback, and an absent interface, the way a generated provider does
+        try (Context custom = Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(), PythonCallablesTest.class.getClassLoader()))
+            .build()) {
+            Value overloads = custom.asValue(new Overloads());
+            Value python = custom.eval("python", "lambda overloads: overloads.same(lambda value: value)");
+            assertEquals("other:x", python.execute(overloads).asString());
+        }
+    }
+
+    private static Context contextWith(Class<?>... functionalInterfaces) {
+        List<PythonFunctionalInterfaceProvider.Entry> entries = new ArrayList<>();
+        // an interface no class loader has: the host access skips it and builds
+        entries.add(new PythonFunctionalInterfaceProvider.Entry("com.example.absent.Callback", 1, true));
+        for (Class<?> type : functionalInterfaces) {
+            java.lang.reflect.Method method = PythonCallables.functionalMethod(type);
+            entries.add(new PythonFunctionalInterfaceProvider.Entry(type.getName(), method.getParameterCount(), method.getReturnType() != void.class));
+        }
+        return Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(), null, entries))
+            .build();
+    }
+
+    @Test
+    void rejectsNonFunctionalInterfacesAndNonCallables() {
+        Value callable = context.eval("python", "lambda: 1");
+        Value nonCallable = context.eval("python", "1");
+        assertThrows(IllegalArgumentException.class, () -> PythonInterop.fn(List.class, callable));
+        assertThrows(IllegalArgumentException.class, () -> PythonInterop.fn(Runnable.class, nonCallable));
+    }
+
+    private void assertAcceptsNoArity(String source) {
+        Value callable = context.eval("python", source);
+        assertNull(PythonCallables.arityOf(callable), source);
+        for (int arity = 0; arity < 5; arity++) {
+            assertFalse(PythonCallables.acceptsArity(callable, arity), source + " with " + arity + " arguments");
+        }
+    }
+
+    private void assertArity(String source, int min, int max) {
+        Value callable = context.eval("python", source);
+        int[] arities = {0, 1, 2, 3, 4};
+        for (int arity : arities) {
+            assertEquals(arity >= min && arity <= max, PythonCallables.acceptsArity(callable, arity),
+                source + " with " + arity + " arguments");
+        }
+    }
+
+    public static final class Overloads {
+        private final List<Consumer<String>> consumers = new ArrayList<>();
+        private final List<Callback> callbacks = new ArrayList<>();
+
+        public String apply(Function<String, String> function) {
+            return "function:" + function.apply("a");
+        }
+
+        public String apply(BiFunction<String, String, String> function) {
+            return "bifunction:" + function.apply("a", "b");
+        }
+
+        public String check(Predicate<String> predicate) {
+            return "predicate:" + predicate.test("x");
+        }
+
+        public String check(BiPredicate<String, Integer> predicate) {
+            return "bipredicate:" + predicate.test("x", 3);
+        }
+
+        public String run(Runnable runnable) {
+            runnable.run();
+            return "runnable";
+        }
+
+        public String run(Supplier<String> supplier) {
+            return "supplier:" + supplier.get();
+        }
+
+        public String schedule(Duration delay, Runnable runnable) {
+            runnable.run();
+            return "runnable:" + delay.toSeconds();
+        }
+
+        public <V> String schedule(Duration delay, Callable<V> callable) throws Exception {
+            return "callable:" + delay.toSeconds() + ":" + callable.call();
+        }
+
+        public String schedule(String cron, Runnable runnable) {
+            runnable.run();
+            return "cron-runnable:" + cron;
+        }
+
+        public <V> String schedule(String cron, Callable<V> callable) throws Exception {
+            return "cron-callable:" + cron + ":" + callable.call();
+        }
+
+        public String execute(String name, Runnable runnable) {
+            runnable.run();
+            return "runnable:" + name;
+        }
+
+        public String execute(String name, Object value) {
+            return "object:" + name + "=" + value;
+        }
+
+        public String accept(String name, Consumer<String> consumer) {
+            consumer.accept(name);
+            return "consumer";
+        }
+
+        public String accept(String name, Map<String, String> attributes) {
+            return "map:" + name + ":" + attributes.size();
+        }
+
+        public void register(Consumer<String> consumer) {
+            consumers.add(consumer);
+        }
+
+        public Consumer<String> registered() {
+            return consumers.get(consumers.size() - 1);
+        }
+
+        public String callback(Callback callback) {
+            callbacks.add(callback);
+            return "custom:" + callback.call("x");
+        }
+
+        public String callback(BiCallback callback) {
+            return "custombi:" + callback.call("x", 2);
+        }
+
+        public List<Callback> callbacks() {
+            return callbacks;
+        }
+
+        public String deleteAll(Iterable<String> values) {
+            return "iterable:" + StreamSupport.stream(values.spliterator(), false).count();
+        }
+
+        public String deleteAll(Callback callback) {
+            return "callback:" + callback.call("a");
+        }
+
+        public String deleteAll(Supplier<String> supplier) {
+            return "supplier:" + supplier.get();
+        }
+
+        public String describe(java.util.Map<String, String> attributes) {
+            return "map:" + attributes.size();
+        }
+
+        public String describe(Callback callback) {
+            return "callback:" + callback.call("x");
+        }
+
+        public String same(Callback callback) {
+            return "callback:" + callback.call("x");
+        }
+
+        public String same(OtherCallback callback) {
+            return "other:" + callback.call("x");
+        }
+
+        @FunctionalInterface
+        public interface Callback {
+            String call(String value);
+        }
+
+        @FunctionalInterface
+        public interface BiCallback {
+            String call(String value, int count);
+        }
+
+        public interface OtherCallback {
+            String call(String value);
+        }
+    }
+}

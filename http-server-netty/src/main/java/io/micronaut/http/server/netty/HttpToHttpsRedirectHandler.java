@@ -17,8 +17,11 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.exceptions.UriSyntaxException;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -29,6 +32,9 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.uri.UriBuilder;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handler to automatically redirect HTTP to HTTPS request when using dual protocol.
@@ -48,12 +54,81 @@ record HttpToHttpsRedirectHandler(
     HttpHostResolver hostResolver
 ) implements RequestHandler {
 
+    private static final Logger LOG = LoggerFactory.getLogger(HttpToHttpsRedirectHandler.class);
+
+    /**
+     * The query component of a request target, verbatim, or {@code null} if it has none. An empty
+     * string means the target ended in {@code ?}.
+     */
+    @Nullable
+    static String rawQuery(String target) {
+        int query = target.indexOf('?');
+        if (query < 0) {
+            return null;
+        }
+        int fragment = target.indexOf('#', query);
+        return fragment < 0 ? target.substring(query + 1) : target.substring(query + 1, fragment);
+    }
+
     @Override
     public void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-        NettyHttpRequest<?> strippedRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+        String location;
+        try {
+            location = location(ctx, request, body);
+        } catch (IllegalArgumentException | UriSyntaxException e) {
+            // the request target or the host it resolves to is not a valid URI (for example a
+            // query containing characters java.net.URI rejects). No redirect can be built, so
+            // answer with an empty 400 rather than leaving the request unanswered. The regular
+            // request path also answers such a request with a 400, through its error handling.
+            LOG.debug("Cannot redirect a request with an invalid URI or host to HTTPS", e);
+            outboundAccess.closeAfterWrite();
+            outboundAccess.write(
+                NettyHttpResponseBuilder.toHttpResponse(HttpResponse.status(HttpStatus.BAD_REQUEST)),
+                NettyByteBodyFactory.empty()
+            );
+            return;
+        }
 
-        UriBuilder uriBuilder = UriBuilder.of(hostResolver.resolve(strippedRequest));
-        strippedRequest.release();
+        outboundAccess.closeAfterWrite();
+        outboundAccess.write(
+            NettyHttpResponseBuilder.toHttpResponse(
+                HttpResponse.status(HttpStatus.PERMANENT_REDIRECT).header(HttpHeaders.LOCATION, location)),
+                NettyByteBodyFactory.empty()
+        );
+    }
+
+    /**
+     * Builds the value of the {@code Location} header for the given request, and releases the
+     * body.
+     *
+     * @throws IllegalArgumentException if the request target is not a valid URI
+     * @throws UriSyntaxException if the resolved host is not a valid URI authority
+     */
+    private String location(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body) {
+        NettyHttpRequest<?> strippedRequest;
+        try {
+            strippedRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+        } catch (IllegalArgumentException e) {
+            body.close();
+            throw e;
+        }
+
+        // read everything that is needed off the request before releasing it
+        String host;
+        String path;
+        try {
+            host = hostResolver.resolve(strippedRequest);
+            path = strippedRequest.getPath();
+        } finally {
+            strippedRequest.release();
+        }
+        // Taken from the request target as received rather than from getUri(): for an
+        // absolute-form target (GET http://host/p?q HTTP/1.1, as a proxy may send) the request
+        // URI is rebuilt from decoded components, which turns a percent-encoded reserved character
+        // such as %26 back into a bare & and changes the structure of the query.
+        String rawQuery = rawQuery(request.uri());
+
+        UriBuilder uriBuilder = UriBuilder.of(host);
         uriBuilder.scheme("https");
         int port = sslConfiguration.getPort();
         if (port == 443) {
@@ -61,13 +136,17 @@ record HttpToHttpsRedirectHandler(
         } else {
             uriBuilder.port(port);
         }
-        uriBuilder.path(strippedRequest.getPath());
+        uriBuilder.path(path);
 
-        outboundAccess.closeAfterWrite();
-        outboundAccess.write(
-            NettyHttpResponseBuilder.toHttpResponse(HttpResponse.permanentRedirect(uriBuilder.build())),
-                NettyByteBodyFactory.empty()
-        );
+        StringBuilder location = new StringBuilder(uriBuilder.build().toASCIIString());
+        // a null raw query is the only case that means the request target had no query component. An
+        // empty one means it ended in '?', which is a distinct URI form and is reproduced as such.
+        // UriBuilder only models decoded query parameters, so the query string is carried over verbatim
+        // and the header value is assembled directly rather than round-tripped through URI again.
+        if (rawQuery != null) {
+            location.append('?').append(rawQuery);
+        }
+        return location.toString();
     }
 
     @Override

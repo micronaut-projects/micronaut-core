@@ -1,6 +1,14 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== A reflectively dispatched executable method propagates the method's exception
+
+An executable method that generated code cannot call directly, for example a `private` method annotated with `@Executable` and `@ReflectiveAccess`, is dispatched through reflection. Previously `ExecutableMethod.invoke` wrapped whatever such a method threw in an api:core.reflect.exception.InvocationException[], with the `java.lang.reflect.InvocationTargetException` as its cause, while the same method declared package-private or public threw its own exception.
+
+A reflectively dispatched method now propagates the method's exception unchanged, checked exceptions included, just as a directly dispatched method does. The same applies to an interceptor that invokes one of its own private executable methods, and to a private `@PostConstruct` or `@PreDestroy` callback of an intercepted bean. An `InvocationException` is still thrown when the reflective call itself fails before the method runs, for example on illegal access. Bean introspections are not affected: a private property accessor dispatched through reflection still wraps what it threw in an `InvocationException`.
+
+Code that caught `InvocationException` to unwrap the cause should catch the method's exception instead. Ordinary executable method dispatch changes for classes compiled with Micronaut 5.2.1 or later: bean definitions compiled with an earlier version keep the previous behavior until they are recompiled. Intercepted lifecycle callbacks are the exception, because the AOP runtime unwraps the exception itself: an interceptor of a private `@PostConstruct` or `@PreDestroy` callback sees the callback's exception, checked exceptions included, even when the bean definition was compiled with an earlier version.
+
 === HTTP client redirect forwarding no longer retains authorization headers cross-origin by default
 
 The Netty HTTP client no longer forwards `Authorization`, `Proxy-Authorization`, or `Cookie` headers on cross-origin redirects by default.
