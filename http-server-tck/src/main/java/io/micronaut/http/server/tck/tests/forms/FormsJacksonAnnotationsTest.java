@@ -51,11 +51,15 @@ public class FormsJacksonAnnotationsTest {
     private static final String JSON_WITHOUT_PAGES = "{\"title\":\"Building Microservices\"}";
     private static final String JSON_WITH_WHITESPACE = "{\"title\":\"Building Microservices\",\"notes\":\" \"}";
     private static final String JSON_WITH_REPEATED_VALUES = "{\"title\":\"Building Microservices\",\"tags\":[\"\",\"java\",\"\"]}";
+    private static final String JSON_WITH_EMPTY_TAG = "{\"title\":\"Building Microservices\",\"tags\":[\"\"]}";
 
     @Test
     public void serverFormSubmissionsSupportJacksonAnnotations() throws IOException {
         String body = "title=Building+Microservices&paginas=100";
         assertWithBody(body, JSON_WITH_PAGES);
+
+        body = "title=Building+Microservices&pages=";
+        assertWithBody(body, JSON_WITHOUT_PAGES);
 
         body = "title=Building+Microservices&paginas=";
         assertWithBody(body, JSON_WITHOUT_PAGES);
@@ -66,14 +70,21 @@ public class FormsJacksonAnnotationsTest {
         body = "title=Building+Microservices&category=";
         assertWithBody(body, JSON_WITHOUT_PAGES);
 
-        body = "title=Building+Microservices&notes=";
-        assertWithBody(body, JSON_WITHOUT_PAGES);
-
         body = "title=Building+Microservices&notes=+";
         assertWithBody(body, JSON_WITH_WHITESPACE);
 
         body = "title=Building+Microservices&tags=&tags=java&tags=";
         assertWithBody(body, JSON_WITH_REPEATED_VALUES);
+
+        body = "title=Building+Microservices&tags=";
+        assertWithBody(body, JSON_WITH_EMPTY_TAG);
+    }
+
+    @Test
+    public void serverFormSubmissionsKeepEmptyStrings() throws IOException {
+        // The JSON of a response leaves an empty string out, so these report what was bound
+        assertWithBody("/book/strings", "title=Building+Microservices&notes=", "title=[Building Microservices], notes=[]");
+        assertWithBody("/book/strings", "title=&paginas=", "title=[], notes=null");
     }
 
     @Test
@@ -84,16 +95,20 @@ public class FormsJacksonAnnotationsTest {
     }
 
     private static void assertWithBody(Object body, String expectedJson) throws IOException {
+        assertWithBody("/book/save", body, expectedJson);
+    }
+
+    private static void assertWithBody(String uri, Object body, String expected) throws IOException {
         TestScenario.builder()
                 .specName(SPEC_NAME)
-                .request(HttpRequest.POST("/book/save", body).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
+                .request(HttpRequest.POST(uri, body).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
                 .assertion((server, request) ->
                         AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                                 .status(HttpStatus.OK)
                                 .assertResponse(httpResponse -> {
                                     Optional<String> bodyOptional = httpResponse.getBody(String.class);
                                     assertTrue(bodyOptional.isPresent());
-                                    assertEquals(expectedJson, bodyOptional.get());
+                                    assertEquals(expected, bodyOptional.get());
                                 })
                                 .build()))
                 .run();
@@ -106,6 +121,12 @@ public class FormsJacksonAnnotationsTest {
         @Post("/save")
         Book save(@Body Book book) {
             return book;
+        }
+
+        @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+        @Post("/strings")
+        String strings(@Body Book book) {
+            return "title=[" + book.title() + "], notes=" + (book.notes() == null ? "null" : "[" + book.notes() + "]");
         }
     }
 

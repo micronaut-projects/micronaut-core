@@ -87,13 +87,13 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         result == '[empty:, value:present]'
     }
 
-    void "test optional string property treats an empty form value as absent"() {
+    void "test optional string property keeps an empty form value"() {
         when:
         String result = client.exchange(HttpRequest.POST('/form/optional-pojo', 'name=')
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).body()
 
         then:
-        result == 'absent'
+        result == '[]'
     }
 
     void "test optional string property still binds a non-empty form value"() {

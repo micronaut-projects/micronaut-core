@@ -16,7 +16,14 @@
 package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.AnnotatedElement;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanIntrospector;
+import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -25,7 +32,10 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
@@ -57,7 +67,10 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
 
+import java.time.temporal.TemporalAccessor;
+import java.time.temporal.TemporalAmount;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +78,14 @@ import java.util.Optional;
 
 @Internal
 final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
+    private static final String JSON_PROPERTY = "com.fasterxml.jackson.annotation.JsonProperty";
+    private static final String JSON_ALIAS = "com.fasterxml.jackson.annotation.JsonAlias";
+    private static final List<String> OWN_DESERIALIZER_ANNOTATIONS = List.of(
+        "tools.jackson.databind.annotation.JsonDeserialize",
+        "com.fasterxml.jackson.databind.annotation.JsonDeserialize",
+        "io.micronaut.serde.annotation.Serdeable$Deserializable"
+    );
+
     final NettyHttpServerConfiguration httpServerConfiguration;
     final MessageBodyHandlerRegistry bodyHandlerRegistry;
     final BeanProvider<FormFactory> formFactory;
@@ -178,15 +199,10 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                 bodies.computeIfAbsent(rff.metadata().name(), k -> new ArrayList<>(1)).add(rff.byteBody());
             }
             Map<String, Object> intermediate = io.micronaut.http.server.multipart.FormRouteCompleter.mapForGetBody(bodies, nhr.getCharacterEncoding());
-            Class<T> targetType = context.getArgument().getType();
             // Use matches() rather than equals() so that this stays consistent with the
             // hasFormBody() check above, which also uses matches() to detect the form type.
-            if (mediaType != null
-                    && mediaType.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
-                    && !targetType.isInstance(intermediate)
-                    && !context.getArgument().isContainerType()
-                    && !ConvertibleValues.class.isAssignableFrom(targetType)) {
-                intermediate.values().removeIf(value -> value instanceof String text && text.isEmpty());
+            if (mediaType != null && mediaType.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
+                removeUnconvertibleEmptyValues(intermediate, context.getArgument());
             }
             Optional<T> converted = conversionService.convert(intermediate, context);
             nhr.setLegacyBody(converted.orElse(null));
@@ -202,6 +218,73 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         NettyConverters.postProcess(byteBuf, converted);
         nhr.setLegacyBody(converted.orElse(null));
         return converted;
+    }
+
+    /**
+     * Removes the empty values of a URL-encoded form that name a bean property an empty string can
+     * never convert to, so that they bind as absent. Every other empty value stays: it is a value
+     * for a String, and any type outside {@link #rejectsEmptyString(Class)} may accept it.
+     *
+     * @param form   The form values
+     * @param target The body argument
+     */
+    private static void removeUnconvertibleEmptyValues(Map<String, Object> form, Argument<?> target) {
+        if (!form.containsValue(StringUtils.EMPTY_STRING)) {
+            return;
+        }
+        Argument<?> bean = target.isOptional() ? target.getFirstTypeVariable().orElse(target) : target;
+        BeanIntrospection<?> introspection = BeanIntrospector.SHARED.findIntrospection(bean.getType()).orElse(null);
+        if (introspection != null) {
+            form.entrySet().removeIf(field -> StringUtils.EMPTY_STRING.equals(field.getValue())
+                && namesPropertyRejectingEmptyString(introspection, field.getKey()));
+        }
+    }
+
+    private static boolean namesPropertyRejectingEmptyString(BeanIntrospection<?> introspection, String field) {
+        // JsonConverterRegistrar corrects the field names in the same way before they are bound
+        String name = NameUtils.decapitalize(NameUtils.dehyphenate(field));
+        // A creator parameter decides over a property of that name, which may be of another type
+        for (Argument<?> parameter : introspection.getConstructorArguments()) {
+            if (isNamed(parameter, name)) {
+                return rejectsEmptyString(parameter.getType()) && !hasOwnDeserializer(parameter);
+            }
+        }
+        for (BeanProperty<?, Object> property : introspection.getBeanProperties()) {
+            if (isNamed(property, name)) {
+                return rejectsEmptyString(property.getType()) && !hasOwnDeserializer(property);
+            }
+        }
+        return false;
+    }
+
+    private static boolean isNamed(AnnotatedElement element, String name) {
+        AnnotationMetadata metadata = element.getAnnotationMetadata();
+        String renamed = metadata.stringValue(JSON_PROPERTY).orElse(null);
+        return name.equals(StringUtils.isEmpty(renamed) ? element.getName() : renamed)
+            || List.of(metadata.stringValues(JSON_ALIAS)).contains(name);
+    }
+
+    private static boolean hasOwnDeserializer(AnnotationMetadataProvider element) {
+        AnnotationMetadata metadata = element.getAnnotationMetadata();
+        return OWN_DESERIALIZER_ANNOTATIONS.stream().anyMatch(annotation -> metadata.isPresent(annotation, "using"));
+    }
+
+    private static boolean rejectsEmptyString(Class<?> type) {
+        if (type.isPrimitive()) {
+            return type != char.class;
+        }
+        if (type.isEnum()) {
+            // What an enum declares is only known from its introspection, if it has one
+            BeanIntrospection<?> introspection = BeanIntrospector.SHARED.findIntrospection(type).orElse(null);
+            return introspection == null
+                || (!introspection.getConstructor().getAnnotationMetadata().hasStereotype(Creator.class) && !hasOwnDeserializer(introspection));
+        }
+        // A type of the JDK has no deserializer of its own, one of the application may have
+        return type.getName().startsWith("java.")
+            && (Number.class.isAssignableFrom(type)
+            || TemporalAccessor.class.isAssignableFrom(type)
+            || TemporalAmount.class.isAssignableFrom(type)
+            || Date.class.isAssignableFrom(type));
     }
 
     private static List<RawFormField> toListNow(Flux<RawFormField> flux) {
