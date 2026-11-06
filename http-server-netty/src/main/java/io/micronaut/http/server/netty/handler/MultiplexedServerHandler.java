@@ -1090,12 +1090,10 @@ abstract class MultiplexedServerHandler {
                 held = null;
                 if (!last) {
                     held = data;
-                    if (previous != null) {
-                        // followed by the held piece in the same batch, which carries the promise
-                        if (!writeMiddle(previous, silentVoidPromise())) {
-                            flush();
-                            return;
-                        }
+                    // followed by the held piece in the same batch, which carries the promise
+                    if (previous != null && !writeMiddle(previous, silentVoidPromise())) {
+                        flush();
+                        return;
                     }
                     if (!batchPending) {
                         batchPending = true;

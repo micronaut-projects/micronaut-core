@@ -430,20 +430,20 @@ public final class Compressor {
             }
             // a caller polling before the end streams what it has pushed so far
             streamHeld();
-            EmbeddedChannel compressionChannel = this.compressionChannel;
-            if (compressionChannel == null) {
+            EmbeddedChannel channel = compressionChannel;
+            if (channel == null) {
                 return null;
             }
-            int n = compressionChannel.outboundMessages().size();
+            int n = channel.outboundMessages().size();
             if (n == 0) {
                 return null;
             } else if (n == 1) {
-                return compressionChannel.readOutbound();
+                return channel.readOutbound();
             }
 
-            CompositeByteBuf buf = compressionChannel.alloc().compositeBuffer(n);
+            CompositeByteBuf buf = channel.alloc().compositeBuffer(n);
             while (true) {
-                ByteBuf item = compressionChannel.readOutbound();
+                ByteBuf item = channel.readOutbound();
                 if (item == null) {
                     break;
                 }
