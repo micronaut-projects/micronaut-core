@@ -78,7 +78,7 @@ public class DefaultBeanDefinitionDataCollector implements BeanDefinitionDataCol
         AtomicInteger atomicInteger = new AtomicInteger();
         return definitions.stream()
             .collect(Collectors.toMap(definition -> {
-                if (definition instanceof RuntimeBeanDefinition<?> runtimeBeanDefinition) {
+                if (definition instanceof RuntimeBeanDefinition<?> _) {
                     return  RuntimeBeanDefinition.class.getName() + "#" + atomicInteger.getAndIncrement();
                 }
                 return definition.getClass().getName();

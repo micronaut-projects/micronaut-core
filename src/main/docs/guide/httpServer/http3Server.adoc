@@ -18,6 +18,8 @@ micronaut:
 
 NOTE: that defining this listener will disable the implicit TCP listeners. You can add them manually as described in the <<listener, listener section>>.
 
+The `micronaut.server.idle-timeout` setting also applies to HTTP/3 connections, as the QUIC maximum idle timeout (`max_idle_timeout`). Idle QUIC connections are closed once it elapses. A negative value disables the idle timeout.
+
 Additionally, the netty HTTP/3 codec needs to be present on the classpath:
 
 dependency:micronaut-http-netty-http3[]

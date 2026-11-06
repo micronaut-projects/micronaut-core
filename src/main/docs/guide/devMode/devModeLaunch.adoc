@@ -20,6 +20,7 @@ micronaut.dev.resources.views=src/main/resources/views
 micronaut.dev.resources.static=src/main/resources/static
 micronaut.dev.compile.java.output=build/classes/java/main
 micronaut.dev.retain=javax.sql.DataSource
+micronaut.dev.patch-in-place=true
 ----
 
 The launcher reads the entries as follows:
@@ -28,7 +29,11 @@ The launcher reads the entries as follows:
 * `@file` reads a list from an argument file.
 * A system property of the same name overrides an entry.
 
-On macOS, put `micronaut-runtime-osx` on the development runtime classpath as well, which the build plugins do. The launcher then watches through the native file system events instead of the JDK's polling service, and a save is noticed at once rather than seconds later.
+On macOS, put `micronaut-runtime-osx` on the development runtime classpath as well, which the build plugins do. The launcher then watches through the native file system events, and a save is noticed at once.
+
+Without it, and in a native image, the launcher compares the watched directories every 250 milliseconds, rather than use the JDK's service, which polls every two seconds at best.
+
+The launcher snapshots the reloadable tier for each generation into `build/micronaut-dev/generations` under the project, or the directory `micronaut.dev.generations` names, such as a Maven build's `target/micronaut-dev/generations`. It empties that directory when it starts, and refuses to when it holds files it did not write.
 
 == Starting the launcher
 
@@ -41,12 +46,22 @@ java -cp @build/micronaut-dev/runtime.argfile io.micronaut.dev.MicronautDevMain 
 
 The launcher compiles every language whose class output does not exist yet, so it works from a clean checkout. It then runs the application's own `main` on a thread of its own.
 
+When the first start fails, the launcher reports why and keeps running, waiting for a change to start the application again, instead of exiting; in CI or other non-interactive use it therefore waits until it is killed.
+
 The application does what it always does, `Micronaut.run(Application.class, args)`. An `ApplicationContextConfigurer` the module ships gives the context:
 
 * the reloadable loader;
 * the `dev` environment;
 * `micronaut.dev.enabled=true`;
 * the beans retained from the previous generation.
+
+Once a generation of the application first runs, the launcher logs a short note at INFO, followed by the link to the development pages with the launch's access token when the application has an HTTP server (see <<devModeSecurity, Security>>), and by the port of the LiveReload server when it runs. A reload does not repeat the note. The launcher is not for production: run the packaged application there.
+
+----
+Development Mode Active: Not for production usage.
+Development pages: http://localhost:8080/dev?token=8RkV...
+LiveReload server listening on port 35729
+----
 
 TIP: Everything under the manifest's `micronaut.dev.` keys can be set as a system property. api:context.env.DevelopmentMode[] answers whether the application runs this way, so a bean can be conditioned on it with `@DevelopmentActive` (or `@DevelopmentInactive` for the opposite).
 
@@ -68,12 +83,52 @@ endpoints:
     sensitive: false
 ----
 
-The reload is a JSON request. It is refused with a 403 when a browser marks it as coming from another site, or when its `Origin` is not the server's own: `localhost`, a `*.localhost` name or the loopback address, on the port the request arrived on. The `Host` the request names plays no part, since a page of another site can make its own name resolve to the machine. A page the developer visits therefore cannot trigger it with a form; a client that is no page, such as curl or an IDE, sends no `Origin`:
+The reload is a JSON request. It is refused with a 403 when a browser marks it as coming from another site, or when its `Origin` is not the server's own: a host the development runtime answers (see <<devModeSecurity, Security>>) on the port the request arrived on. The `Host` the request names plays no part, since a page of another site can make its own name resolve to the machine. A page the developer visits therefore cannot trigger it with a form. Like every development page, it also needs the launch's access token:
 
 [source,bash]
 ----
-curl -X POST -H 'Content-Type: application/json' http://localhost:8080/dev/reload
+curl -X POST -H 'Content-Type: application/json' -H "X-Micronaut-Dev-Token: $TOKEN" http://localhost:8080/dev/reload
 ----
+
+[[devModeSecurity]]
+== Security
+
+The development runtime reveals the machine: the `dev` endpoint reports absolute paths and reloads the application, the Control Panel shows its beans and configuration, and a failed compilation names the source files. The launcher therefore guards these development pages, and only in development mode: a packaged application has none of it.
+
+=== The access token
+
+Each start of the launcher generates a random token of 256 bits, which reloads keep and a relaunch replaces. Once the application first runs, the startup note prints a link with it on a line of its own, to the Control Panel when the application has one (at `micronaut.control-panel.path`, `/control-panel` by default) and to the `dev` endpoint otherwise. It is the only place the token is shown:
+
+----
+Development Mode Active: Not for production usage.
+Development pages: http://localhost:8080/control-panel?token=8RkV...
+LiveReload server listening on port 35729
+----
+
+Opening the link sets a cookie, `HttpOnly`, `SameSite=Strict` and of path `/`, and redirects to the same page without the token, so that it leaves the address bar and the history. From then on the browser reaches the development pages: everything under the `dev` endpoint, wherever `endpoints.dev.path` puts it, and under the Control Panel's path. Only the pages the application has are guarded: the `dev` endpoint when it is routed, being present and enabled, and the Control Panel's path when the Control Panel is there. Without them, the application's own routes at `/dev` or `/control-panel` are left alone, as is every other route. A client that is not a browser, such as curl or an IDE, sends the token in the `X-Micronaut-Dev-Token` header. A request with neither is answered 401 with a hint to open the link. The token is compared in constant time.
+
+A compilation failure answered to the application's own routes shows the compiler's diagnostics, source paths included, only to a request that carries the token. Any other request is told that the compilation failed and to look at the console.
+
+=== Allowed hosts
+
+A development page, and a compilation failure, answer only a request whose `Host` is `localhost`, a name under `.localhost`, `127.0.0.1` or `[::1]`, on any port. Any other host is refused with a 403: a page of another site whose name was made to resolve to the machine, as DNS rebinding does, cannot read them. The same holds for the 503 the launcher answers while no generation runs, which says only that the application is not running; why is in the console. The responder answers a few connections at a time and closes the others.
+
+To open the application through another name, such as a LAN host or a development container whose ports are forwarded, list it in `micronaut.dev.allowed-hosts`, comma-separated, in the manifest, as a system property of the launcher or in the application's configuration. The host the server is bound to with `micronaut.server.host` is allowed too.
+
+[source,bash]
+----
+-Dmicronaut.dev.allowed-hosts=devbox.lan,app-container
+----
+
+=== Binding to the loopback address
+
+In run mode, the launcher binds the HTTP server to `localhost`, so that other machines on the network cannot reach the development server at all. It sets `micronaut.server.host=localhost` at the lowest precedence: a `micronaut.server.host` in the application's configuration, an environment variable or a system property wins. The manifest entry `micronaut.dev.bind-loopback`, which the build plugins write, turns this off when false, as does `-Dmicronaut.dev.bind-loopback=false`. Test mode leaves the host alone. The startup note warns, on a line of its own, when the server listens on every interface or on an address other than a loopback one.
+
+=== Opting out
+
+* `micronaut.dev.access-token.enabled=false` turns the token off: the development pages answer an allowed host without it, and the compilation failures show their diagnostics. Set it in the manifest, as a system property of the launcher or in the application's configuration.
+* `micronaut.dev.allowed-hosts` adds the hosts to answer. There is no wildcard: the loopback names stay allowed and every other name is listed.
+* `micronaut.dev.bind-loopback=false`, or setting `micronaut.server.host` to `0.0.0.0` for instance, makes the server reachable from other machines; the token still guards the development pages.
 
 == Compilers
 
@@ -81,7 +136,7 @@ The launcher compiles each language with a compiler of its own, all of them incr
 
 * Java compiles through the JDK's own `javac`, with the annotation processors of the processor path.
 * Groovy compiles through the project's own Groovy on the launch classpath, with the Micronaut AST transformations the compile classpath carries.
-* Kotlin compiles through the Kotlin Build Tools API when `kotlin-build-tools-impl` is on the launch classpath at the project's Kotlin version. It runs the symbol processors of the processor path first when `symbol-processing-aa-embeddable` is there at the project's KSP version. The `-A` options of the language pass to the processors, and the other options to `kotlinc`.
+* Kotlin compiles through the Kotlin Build Tools API when `kotlin-build-tools-impl` is on the launch classpath at the project's Kotlin version, which must be 2.4 or later. With an older Kotlin, the launcher logs a warning naming the version it found and the version it needs, and does not compile Kotlin: changes to the Kotlin sources reach the application through the class output the build tool writes. The compiler runs the symbol processors of the processor path first when `symbol-processing-aa-embeddable` is there at the project's KSP version. The `-A` options of the language pass to the processors, and the other options to `kotlinc`.
 
 The build plugins put these artifacts on the launch classpath for the languages the project uses, so `micronaut-dev` itself depends on neither Kotlin nor Groovy.
 
@@ -92,7 +147,25 @@ Python compiles through the Pyronaut compiler of `micronaut-inject-python` when 
 
 The Python modules are resources of the class output, so a Python edit starts a new generation, whose GraalPy context imports the new modules; the GraalPy engine stays loaded.
 
-Reloading needs a JVM: a native image can neither define the classes of a new generation nor redefine a class, so the native toolchain of Pyronaut restarts the process instead.
+The native image of Pyronaut runs the launcher too. The image is the parent tier, and each generation's classes are defined at runtime by GraalVM's runtime class loading (`-H:+RuntimeClassLoading`), with the framework methods they call kept in the image by `-H:Preserve`. In a native image:
+
+* a body-only edit restarts the generation, since a native image cannot redefine a class;
+* on macOS, the FSEvents watch service of `micronaut-runtime-osx` cannot be loaded, since it uses JNA, so the image compares the watched directories every 250 milliseconds instead.
+
+== Generation budget
+
+On the JVM, a retired generation is unloaded once nothing refers to its classes. In a native image it never is: the classes GraalVM defines at runtime stay for the life of the process, in a metaspace whose size is fixed when the image is built, with the interpreter's data on the heap.
+
+The launcher therefore counts generations against a budget, `micronaut.dev.max-generations`. When a change would start one generation more:
+
+. the change is compiled;
+. the runtime closes;
+. the launcher exits with status `3` (`MicronautDevMain.RELAUNCH`);
+. whoever started it starts it again, and the new process starts from the classes that change compiled.
+
+The budget is unlimited on the JVM, and 50 generations in a native image (`DevManifest.NATIVE_MAX_GENERATIONS`). The native budget was measured on a Pyronaut application, where a retired generation leaves only its classes and their data behind, about 1.3 MB of heap each, and 61 generations stayed under 1 GB of resident memory.
+
+`unlimited` or `0` lifts the budget. In test mode a run beyond it ends the same way, with `runForStatus` returning the status.
 
 == LiveReload
 
@@ -107,9 +180,19 @@ The server listens on the loopback address only, and its socket accepts the clie
 
 * native clients, which send no `Origin`;
 * the browser extensions (`chrome-extension:`, `moz-extension:` and `safari-web-extension:` origins);
-* pages served by `localhost`, a `*.localhost` name or the loopback address, on any port.
+* pages served by `localhost`, a `*.localhost` name or the loopback address, on any port;
+* pages of the origins listed in `micronaut.dev.livereload.allowed-origins`, none by default.
 
 A page of any other site is refused, so that a site the developer visits cannot follow the reloads. This holds for the script a browser extension injects too, since it runs in the page and connects with the page's origin. Open the application through `localhost`, the loopback address or a name under `.localhost`, such as `myapp.localhost`, which browsers resolve to the loopback address.
+
+When the browser opens the application through another name, such as a LAN host or the name of a development container whose ports are forwarded, list that name in `micronaut.dev.livereload.allowed-origins`, comma-separated, in the manifest or as a system property of the launcher:
+
+[source,properties]
+----
+micronaut.dev.livereload.allowed-origins=http://devbox.lan:8080,app-container
+----
+
+An origin, `http://devbox.lan:8080`, allows pages of that scheme, host and port, the default port matching an origin that leaves it out; a host name alone, `app-container`, allows its pages over HTTP or HTTPS on any port. The loopback origins and the extensions stay allowed. No pattern is accepted: an entry with a `*`, or one that is neither an origin nor a host name, is ignored with a warning, so the socket never opens to every site. The setting only decides which pages may connect: the server still listens on the loopback address, so the LiveReload port must reach it from the browser, as forwarded ports or an SSH tunnel do. The event channel and the pages the server serves stay those of `localhost`.
 
 === Serving other pages
 

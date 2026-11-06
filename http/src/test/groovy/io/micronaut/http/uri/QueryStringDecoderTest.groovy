@@ -452,4 +452,11 @@ class QueryStringDecoderTest extends Specification {
         empty.rawQuery() == ""
     }
 
+    void testDecodePathComponentKeepsAPlus() {
+        expect:
+        QueryStringDecoder.decodePathComponent("a+b%20c%2B%C3%A9", StandardCharsets.UTF_8) == "a+b c+\u00e9"
+        QueryStringDecoder.decodePathComponent("a+b", StandardCharsets.UTF_8) == "a+b"
+        QueryStringDecoder.decodePathComponent(null, StandardCharsets.UTF_8) == ""
+        QueryStringDecoder.decodeComponent("a+b") == "a b"
+    }
 }

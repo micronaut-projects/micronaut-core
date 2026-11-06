@@ -64,6 +64,7 @@ final class JacksonDatabindFeature implements Feature {
             RuntimeProxyCreation.register(JsonAppend.Prop.class);
             RuntimeProxyCreation.register(JsonPOJOBuilder.class);
         } catch (LinkageError ignored) {
+            // optional Jackson annotations are not on the classpath, nothing to register
         }
     }
 }

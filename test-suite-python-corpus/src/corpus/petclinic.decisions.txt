@@ -1,0 +1,71 @@
+? Owner.__init__ NOT_CANDIDATE
+? OwnerForm.__init__ NOT_CANDIDATE
+? Pet.__init__ NOT_CANDIDATE
+? PetForm.__init__ NOT_CANDIDATE
+? PetType.__init__ NOT_CANDIDATE
+? Speciality.__init__ NOT_CANDIDATE
+? Vet.__init__ NOT_CANDIDATE
+? VetSpeciality.__init__ NOT_CANDIDATE
+? VetWithSpecialities.__init__ NOT_CANDIDATE
+? Visit.__init__ NOT_CANDIDATE
+? VisitForm.__init__ NOT_CANDIDATE
+petclinic/controllers.py init_find_form COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py init_owner_creation_form COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py init_owner_update_form COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py init_pet_creation_form SKIPPED
+petclinic/controllers.py init_pet_update_form COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py init_visit_creation_form COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py locale COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py parse_form_date COMPILED delegation=static-once
+petclinic/controllers.py pet_type_for SKIPPED
+petclinic/controllers.py process_find_form COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py process_owner_creation_form SKIPPED
+petclinic/controllers.py process_owner_update_form SKIPPED
+petclinic/controllers.py process_pet_creation_form SKIPPED
+petclinic/controllers.py process_pet_update_form SKIPPED
+petclinic/controllers.py process_visit_creation_form SKIPPED
+petclinic/controllers.py redirect_to COMPILED delegation=static-once
+petclinic/controllers.py show_owner COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py show_owner_list COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py show_vet_list COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py show_vet_list_html SKIPPED
+petclinic/controllers.py show_vet_list_json COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/controllers.py validation_errors SKIPPED
+petclinic/controllers.py welcome COMPILED delegation=none(the module-level function is a method of the module's bean, which a Python caller does not reach)
+petclinic/entities.py Owner.is_new COMPILED delegation=retry
+petclinic/entities.py Pet.get_owner_id COMPILED delegation=once
+petclinic/entities.py Pet.get_type_id COMPILED delegation=once
+petclinic/entities.py Pet.is_new COMPILED delegation=retry
+petclinic/entities.py Visit.is_new COMPILED delegation=retry
+petclinic/mapper.py FormMapper.to_owner NOT_CANDIDATE
+petclinic/mapper.py FormMapper.to_owner_form NOT_CANDIDATE
+petclinic/mapper.py FormMapper.to_pet NOT_CANDIDATE
+petclinic/mapper.py FormMapper.to_pet_form NOT_CANDIDATE
+petclinic/mapper.py FormMapper.to_visit NOT_CANDIDATE
+petclinic/mapper.py FormMapper.update_owner NOT_CANDIDATE
+petclinic/mapper.py FormMapper.update_pet NOT_CANDIDATE
+petclinic/repositories.py OwnerRepository.findAllOrdered NOT_CANDIDATE
+petclinic/repositories.py OwnerRepository.findByLastName NOT_CANDIDATE
+petclinic/repositories.py OwnerRepository.findOneById NOT_CANDIDATE
+petclinic/repositories.py PetRepository.findByOwnerIdOrderByName NOT_CANDIDATE
+petclinic/repositories.py PetRepository.findOneById NOT_CANDIDATE
+petclinic/repositories.py PetTypeRepository.findAllOrderByName NOT_CANDIDATE
+petclinic/repositories.py PetTypeRepository.findOneById NOT_CANDIDATE
+petclinic/repositories.py SpecialityRepository.findAllOrderByName NOT_CANDIDATE
+petclinic/repositories.py VetRepository.findAllWithSpecialities NOT_CANDIDATE
+petclinic/repositories.py VisitRepository.findByPetIdOrderByDateDesc NOT_CANDIDATE
+petclinic/services.py ClinicService.find_all_owners COMPILED delegation=once
+petclinic/services.py ClinicService.find_all_specialities COMPILED delegation=once
+petclinic/services.py ClinicService.find_all_vets COMPILED delegation=once
+petclinic/services.py ClinicService.find_owner_by_id COMPILED delegation=once
+petclinic/services.py ClinicService.find_owner_by_last_name COMPILED delegation=once
+petclinic/services.py ClinicService.find_pet_by_id COMPILED delegation=once
+petclinic/services.py ClinicService.find_pet_type_by_id COMPILED delegation=once
+petclinic/services.py ClinicService.find_pet_types COMPILED delegation=once
+petclinic/services.py ClinicService.find_visits_by_pet_id COMPILED delegation=once
+petclinic/services.py ClinicService.owner_detail_model SKIPPED
+petclinic/services.py ClinicService.save_owner COMPILED delegation=once
+petclinic/services.py ClinicService.save_pet COMPILED delegation=once
+petclinic/services.py ClinicService.save_visit COMPILED delegation=once
+petclinic/services.py ClinicService.vet_models SKIPPED
+petclinic/services.py _parse_speciality_rows SKIPPED

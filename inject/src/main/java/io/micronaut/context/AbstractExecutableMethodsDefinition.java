@@ -234,6 +234,15 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     @Override
     public <R> ExecutableMethod<T, R> getExecutableMethodByIndex(int index) {
         DispatchedExecutableMethod<T, R> executableMethod = (DispatchedExecutableMethod<T, R>) executableMethods[index];
+        return executableMethod != null ? executableMethod : createExecutableMethod(index);
+    }
+
+    /**
+     * Creates the method at the index once: the callers sharing this definition, such as the proxies of a
+     * non-singleton bean created concurrently, get the same method and the values it keeps.
+     */
+    private synchronized <R> ExecutableMethod<T, R> createExecutableMethod(int index) {
+        DispatchedExecutableMethod<T, R> executableMethod = (DispatchedExecutableMethod<T, R>) executableMethods[index];
         if (executableMethod == null) {
             MethodReference methodsReference = methodsReferences[index];
             executableMethod = new DispatchedExecutableMethod<>(dispatcher, index, methodsReference, methodsReference.annotationMetadata);
@@ -506,6 +515,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private static final int ENTRY_VALUE = 0;
         private static final int ENTRY_ANNOTATION_VALUE = 1;
         private static final int ENTRY_ANNOTATION = 2;
+        private static final int ENTRY_UNEVALUATED_VALUE = 3;
         private static final byte CACHE_NEVER = 0;
         private static final byte CACHE_STATIC = 1;
         private static final byte CACHE_PER_REVISION = 2;
@@ -556,10 +566,23 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          */
         private byte cacheMode;
         /**
+         * How values derived only from the unevaluated metadata can be kept: as {@link #cacheMode}, ignoring the
+         * evaluated expressions.
+         */
+        private byte unevaluatedCacheMode;
+        /**
          * The properties that the placeholders of the metadata resolve from, set by the environment.
          */
         @Nullable
         private PropertySourcePropertyResolver properties;
+        /**
+         * The environment and the context the method was last configured with: configuring it again with the same
+         * ones, as each proxy sharing the method does, keeps its values.
+         */
+        @Nullable
+        private Environment configuredEnvironment;
+        @Nullable
+        private BeanContext configuredBeanContext;
 
         @Override
         @SuppressWarnings({"unchecked", "NullAway", "java:S2637"}) // V is nullable when the factory returns null
@@ -574,6 +597,21 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                 return (V) unmask(kept);
             }
             return (V) unmask(keep(metadata, revision, key, mask(factory.apply(this)), ENTRY_VALUE));
+        }
+
+        @Override
+        @SuppressWarnings({"unchecked", "NullAway"}) // V is nullable when the factory returns null
+        public <V extends @Nullable Object> V getCachedUnevaluatedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
+            AnnotationMetadata metadata = annotationMetadata;
+            long revision = revision(ENTRY_UNEVALUATED_VALUE);
+            if (revision == NOT_CACHEABLE) {
+                return factory.apply(this);
+            }
+            Object kept = find(metadata, revision, key, ENTRY_UNEVALUATED_VALUE);
+            if (kept == null) {
+                kept = keep(metadata, revision, key, new KeptUnevaluatedValue(factory.apply(this)), ENTRY_UNEVALUATED_VALUE);
+            }
+            return (V) ((KeptUnevaluatedValue) kept).value;
         }
 
         @Override
@@ -648,7 +686,21 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          * invocation
          */
         private long revision() {
-            return switch (cacheMode) {
+            return revision(cacheMode);
+        }
+
+        /**
+         * The revision of what entries of the given kind depend on.
+         *
+         * @param kind The kind of entry
+         * @return The revision, as {@link #revision()} returns it
+         */
+        private long revision(int kind) {
+            return kind == ENTRY_UNEVALUATED_VALUE ? revision(unevaluatedCacheMode) : revision(cacheMode);
+        }
+
+        private long revision(byte mode) {
+            return switch (mode) {
                 case CACHE_STATIC -> 0;
                 case CACHE_PER_REVISION -> Objects.requireNonNull(properties).getRevision();
                 default -> NOT_CACHEABLE;
@@ -659,13 +711,13 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          * Computes how values derived from the metadata can be kept.
          */
         private void updateCacheMode() {
-            if (annotationMetadata.hasEvaluatedExpressions() || argumentsAnnotationsWithExpressions) {
-                cacheMode = CACHE_NEVER;
-            } else if (annotationMetadata.hasPropertyExpressions()) {
-                cacheMode = properties != null ? CACHE_PER_REVISION : CACHE_NEVER;
+            if (annotationMetadata.hasPropertyExpressions()) {
+                unevaluatedCacheMode = properties != null ? CACHE_PER_REVISION : CACHE_NEVER;
             } else {
-                cacheMode = CACHE_STATIC;
+                unevaluatedCacheMode = CACHE_STATIC;
             }
+            cacheMode = annotationMetadata.hasEvaluatedExpressions() || argumentsAnnotationsWithExpressions
+                ? CACHE_NEVER : unevaluatedCacheMode;
         }
 
         /**
@@ -680,7 +732,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          * @return The kept entry
          */
         private synchronized Object keep(AnnotationMetadata metadata, long revision, Class<?> key, Object entry, int kind) {
-            if (metadata != annotationMetadata || revision() != revision) {
+            if (metadata != annotationMetadata || revision(kind) != revision) {
                 return entry;
             }
             Object[] values = cachedValues;
@@ -704,6 +756,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private static int entryKind(Object entry) {
             if (entry instanceof KeptAnnotationValue) {
                 return ENTRY_ANNOTATION_VALUE;
+            }
+            if (entry instanceof KeptUnevaluatedValue) {
+                return ENTRY_UNEVALUATED_VALUE;
             }
             return entry instanceof KeptAnnotation ? ENTRY_ANNOTATION : ENTRY_VALUE;
         }
@@ -735,6 +790,10 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public synchronized void configure(Environment environment) {
+            if (environment == configuredEnvironment) {
+                return;
+            }
+            configuredEnvironment = environment;
             cachedValues = null;
             if (declaredAnnotationMetadata.hasPropertyExpressions()) {
                 environmentAnnotationMetadata = new MethodAnnotationMetadata(declaredAnnotationMetadata, environment);
@@ -743,11 +802,23 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             properties = environment instanceof PropertyResolverDelegate delegate
                 && delegate.delegate() instanceof PropertySourcePropertyResolver resolver ? resolver : null;
             updateCacheMode();
+            if (configuredBeanContext != null) {
+                // the metadata of the new environment is evaluated with the context the method is configured with
+                applyBeanContext(configuredBeanContext);
+            }
         }
 
         @Override
         public synchronized void configure(BeanContext beanContext) {
+            if (beanContext == configuredBeanContext) {
+                return;
+            }
+            configuredBeanContext = beanContext;
             cachedValues = null;
+            applyBeanContext(beanContext);
+        }
+
+        private void applyBeanContext(BeanContext beanContext) {
             classLoader = beanContext.getClassLoader();
             if (annotationMetadata instanceof EvaluatedAnnotationMetadata current
                 && current.getAnnotationMetadata() == environmentAnnotationMetadata) {
@@ -1018,6 +1089,15 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      * @param annotation The annotation or {@code null} when the method doesn't have it
      */
     private record KeptAnnotation(@Nullable Annotation annotation) {
+    }
+
+    /**
+     * A value kept by {@code getCachedUnevaluatedValue}, told apart from a value kept by {@code getCachedValue} under
+     * the same key.
+     *
+     * @param value The value
+     */
+    private record KeptUnevaluatedValue(@Nullable Object value) {
     }
 
 }

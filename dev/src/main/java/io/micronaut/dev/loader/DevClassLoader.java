@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 /**
  * The application's classloader for the life of the development JVM: one stable identity that
@@ -63,6 +65,9 @@ public final class DevClassLoader extends ClassLoader {
         registerAsParallelCapable();
     }
 
+    // the file marking a generations directory as the launcher's, which it may empty
+    private static final String MARKER = ".micronaut-dev-generations";
+
     private final List<Path> liveRoots;
     private final LiveResources liveResources;
     private final List<Path> sources;
@@ -87,18 +92,25 @@ public final class DevClassLoader extends ClassLoader {
      * @param parent The parent loader, holding the libraries
      * @param liveRoots The directories read as they are, searched first: the resource roots the developer edits
      * @param roots The class and resource directories of the reloadable tier, which the build writes to, snapshotted per generation
-     * @param generationsDir The loader's own directory for the snapshots; emptied first
+     * @param generationsDir The loader's own directory for the snapshots, emptied first; or, when another process
+     *                       holds it, the next of {@code <directory>-2}, {@code <directory>-3}... no process holds
      */
     public DevClassLoader(@Nullable ClassLoader parent, List<Path> liveRoots, List<Path> roots, Path generationsDir) {
         super("micronaut-dev", parent);
         this.liveRoots = List.copyOf(liveRoots);
         this.liveResources = new LiveResources(this.liveRoots);
         this.sources = List.copyOf(roots);
-        this.generationsDir = generationsDir;
+        // another running development process of the project keeps its own, whose snapshots it loads from
+        this.generationsDir = GenerationsDirectory.claim(generationsDir);
         try {
-            GenerationClassLoader.deleteRecursively(generationsDir);
+            if (!isOwnDirectory(this.generationsDir)) {
+                throw new IllegalStateException("Not emptying " + this.generationsDir + " for the generations: it holds files the launcher did not write");
+            }
+            GenerationClassLoader.deleteRecursively(this.generationsDir);
+            Files.createDirectories(this.generationsDir);
+            Files.writeString(this.generationsDir.resolve(MARKER), "Snapshots of the reloadable classes, by generation: emptied each time development mode starts\n");
         } catch (IOException e) {
-            throw new UncheckedIOException("Cannot empty the generations directory " + generationsDir, e);
+            throw new UncheckedIOException("Cannot empty the generations directory " + this.generationsDir, e);
         }
         this.current = new AtomicReference<>(snapshot(1, this.sources));
     }
@@ -108,6 +120,25 @@ public final class DevClassLoader extends ClassLoader {
      */
     private GenerationClassLoader generationNow() {
         return Objects.requireNonNull(current.get());
+    }
+
+    /**
+     * Whether a directory is one the launcher may empty: missing, empty, marked as the launcher's, or holding nothing
+     * but the numbered snapshots of generations, as a launcher that wrote no marker left it.
+     */
+    private static boolean isOwnDirectory(Path directory) throws IOException {
+        if (!Files.exists(directory)) {
+            return true;
+        }
+        if (!Files.isDirectory(directory)) {
+            return false;
+        }
+        if (Files.isRegularFile(directory.resolve(MARKER))) {
+            return true;
+        }
+        try (Stream<Path> children = Files.list(directory)) {
+            return children.allMatch(child -> Files.isDirectory(child) && child.getFileName().toString().matches("\\d+"));
+        }
     }
 
     private GenerationClassLoader snapshot(int generation, List<Path> roots) {

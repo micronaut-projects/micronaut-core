@@ -178,6 +178,93 @@ class Outer {
         ((Map) iprops.get('enabled')).get('type') == 'boolean'
     }
 
+    void "test readable bytes properties accept byte sizes"() {
+        when:
+        String schema = readSchemaFile(this, 'test.Sizes', '''
+package test;
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.convert.format.ReadableBytes;
+
+@ConfigurationProperties("sizes")
+class Sizes {
+  private long maxRequestSize;
+  @ReadableBytes
+  private Integer maxContentLength;
+  private int chunkSize;
+  private long plain;
+  public long getMaxRequestSize(){return maxRequestSize;}
+  public void setMaxRequestSize(@ReadableBytes long v){this.maxRequestSize=v;}
+  public Integer getMaxContentLength(){return maxContentLength;}
+  public void setMaxContentLength(Integer v){this.maxContentLength=v;}
+  @ReadableBytes
+  public int getChunkSize(){return chunkSize;}
+  public void setChunkSize(int v){this.chunkSize=v;}
+  public long getPlain(){return plain;}
+  public void setPlain(long v){this.plain=v;}
+}
+''')
+        then:
+        def properties = readSchema('test.Sizes', schema).get('properties')
+        for (String name : ['max-request-size', 'max-content-length', 'chunk-size']) {
+            assert properties[name]['type'] == ['integer', 'string']
+            assert properties[name]['format'] == 'readable-bytes'
+            assert properties[name]['pattern'] == '^[+-]?[0-9]+([kKmMgG][bB])?$'
+        }
+        properties['plain']['type'] == 'integer'
+        properties['plain']['format'] == null
+        ['6MB', '512kb', '1Gb', '1024', '-1'].every { it ==~ properties['max-request-size']['pattern'] }
+        !['6 MB', '6TB', '6.5MB', 'MB'].any { it ==~ properties['max-request-size']['pattern'] }
+    }
+
+    void "test readable bytes constructor parameters accept byte sizes"() {
+        when:
+        String schema = readSchemaFile(this, 'test.ImmutableSizes', '''
+package test;
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.convert.format.ReadableBytes;
+
+@ConfigurationProperties("sizes")
+class ImmutableSizes {
+  private final long maxSize;
+  private final long plain;
+  @ConfigurationInject
+  ImmutableSizes(@ReadableBytes long maxSize, long plain) { this.maxSize = maxSize; this.plain = plain; }
+  public long getMaxSize(){return maxSize;}
+  public long getPlain(){return plain;}
+}
+''')
+        then:
+        def properties = readSchema('test.ImmutableSizes', schema).get('properties')
+        properties['max-size']['type'] == ['integer', 'string']
+        properties['max-size']['format'] == 'readable-bytes'
+        properties['plain']['type'] == 'integer'
+        properties['plain']['format'] == null
+    }
+
+    void "test readable bytes properties ignore the digits pattern"() {
+        when:
+        String schema = readSchemaFile(this, 'test.DigitSizes', '''
+package test;
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.convert.format.ReadableBytes;
+import jakarta.validation.constraints.Digits;
+
+@ConfigurationProperties("sizes")
+class DigitSizes {
+  @Digits(integer = 7, fraction = 0)
+  private long maxSize;
+  public long getMaxSize(){return maxSize;}
+  public void setMaxSize(@ReadableBytes long v){this.maxSize=v;}
+}
+''')
+        then:
+        schema.count('"pattern"') == 1
+        def properties = readSchema('test.DigitSizes', schema).get('properties')
+        properties['max-size']['format'] == 'readable-bytes'
+        properties['max-size']['pattern'] == '^[+-]?[0-9]+([kKmMgG][bB])?$'
+        '1KB' ==~ properties['max-size']['pattern']
+    }
+
     void "test common java types mapping"() {
         when:
         String schema = readSchemaFile(this, 'test.Types', '''
