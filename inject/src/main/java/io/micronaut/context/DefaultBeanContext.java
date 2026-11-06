@@ -133,11 +133,13 @@ import org.slf4j.LoggerFactory;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.AbstractMap;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.EventListener;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -160,6 +162,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -183,8 +186,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String ARGUMENT_DEFINITION = "definition";
     private static final String ARGUMENT_CHANGE = "change";
+    private static final String HELD_CONFIGURATION = "the configuration [";
     private static final String AROUND_TYPE = "io.micronaut.aop.Around";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
+    private static final String INTERCEPTOR_BEAN_TYPE = "io.micronaut.aop.InterceptorBean";
     /**
      * The maximum number of additional destruction passes performed during {@link #stop()} to destroy
      * singletons created by {@code @PreDestroy} hooks, bounding a hook that always creates a new bean.
@@ -1340,7 +1345,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(null, beanType);
         if (qualifier != null) {
-            candidates = qualifier.filterQualified(beanType.getType(), candidates);
+            candidates = filterQualified(beanType, qualifier, candidates);
         }
         return Collections.unmodifiableCollection(candidates);
     }
@@ -2115,7 +2120,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                         return;
                     }
                     BeanRegistration<T> targetRegistration = interceptedProxy.interceptedTargetRegistration();
-                    if (targetRegistration instanceof BeanDisposingRegistration<T> disposingTargetRegistration && targetRegistration.bean == interceptedTarget) {
+                    if (targetRegistration instanceof BeanDisposingRegistration<T> _ && targetRegistration.bean == interceptedTarget) {
                         // resolved after the proxy was created, so not among its dependents: destroyed through its own
                         // registration, with the interceptors created for it, unless it was destroyed already
                         destroyBean(targetRegistration);
@@ -2623,11 +2628,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 replacingBeans.add(definition);
             }
         }
-        List<Map.Entry<ReplacesDefinition<Object>, BeanDefinition<Object>>> replacements = new ArrayList<>(replacingBeans.size());
+        List<BeanDefinition<Object>> replacements = new ArrayList<>(replacingBeans.size());
         for (BeanDefinition<Object> definition : replacingBeans) {
-            ReplacesDefinition<Object> replacesDefinition = definition.getReplacesDefinition();
-            if (replacesDefinition != null) {
-                replacements.add(Map.entry(replacesDefinition, definition));
+            if (definition.getReplacesDefinition() != null) {
+                replacements.add(definition);
             }
         }
         if (!replacements.isEmpty()) {
@@ -3081,7 +3085,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * The enabled definitions with an executable method annotated with the given annotation. Only their conditions are
      * evaluated: the provider caches a definition whose conditions fail as disabled, so evaluating those of every
      * definition, as {@link #getAllBeanDefinitions()} does, would disable for good a definition whose
-     * {@code @Requires(beans = ...)} fails only until its bean is registered.
+     * {@code @Requires(beans = ...)} fails only until its bean is registered. A definition whose class is absent is
+     * left out: the scan asks for no such bean, as a startup that never looks one up does not load it.
      *
      * @param annotationType The annotation
      * @param runtimeOnly Whether only the definitions registered at runtime are read, which the index of the
@@ -3089,7 +3094,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @return The definitions
      */
     List<BeanDefinition<Object>> definitionsWithMethodsAnnotated(Class<? extends Annotation> annotationType, boolean runtimeOnly) {
-        return beanDefinitionProvider.getBeanDefinitions(this, runtimeOnly ? RuntimeBeanDefinition.class::isInstance : null, definition -> {
+        return beanDefinitionProvider.getBeanDefinitions(this, runtimeOnly ? RuntimeBeanDefinition.class::isInstance : DefaultBeanContext::isClassPresent, definition -> {
             for (ExecutableMethod<Object, ?> method : definition.getExecutableMethods()) {
                 if (method.getAnnotationMetadata().hasStereotype(annotationType)) {
                     return true;
@@ -3097,6 +3102,29 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
             return false;
         });
+    }
+
+    /**
+     * The definitions a watch of every type lists: those {@link #getBeanDefinitions(Argument, Qualifier)} lists for
+     * {@code Object}, without the definitions whose class is absent, as {@link #definitionsWithMethodsAnnotated} leaves
+     * them out.
+     *
+     * @param qualifier The qualifier of the watch
+     * @param <T> The bean type of the watch
+     * @return The definitions
+     */
+    @SuppressWarnings("unchecked")
+    <T> Collection<BeanDefinition<T>> definitionsOfEveryType(@Nullable Qualifier<T> qualifier) {
+        Argument<T> everyType = (Argument<T>) Argument.OBJECT_ARGUMENT;
+        // findBeanCandidates for Object, filtering the references as well: it is not shared, since that lookup is a hot path
+        // and takes no reference filter, and the cached candidates include the absent definitions. Keep the two in step
+        Collection<BeanDefinition<T>> candidates = collectBeanCandidates(null, everyType, true,
+            beanDefinitionProvider.getBeanDefinitions(this, everyType, DefaultBeanContext::isClassPresent, (Predicate) FILTER_OUT_ANY_PROVIDERS));
+        return Collections.unmodifiableCollection(qualifier != null ? qualifier.filterQualified(everyType.getType(), candidates) : candidates);
+    }
+
+    private static boolean isClassPresent(BeanDefinitionReference<?> reference) {
+        return !(reference instanceof AbstractInitializableBeanDefinitionAndReference<?> definition && definition.isClassAbsent());
     }
 
     /**
@@ -3194,6 +3222,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
         if (beanType.getType() == Object.class) {
             // Don't include @Any providers when looking up all beans - otherwise we will add bean providers
+            // definitionsOfEveryType repeats this lookup for Object: keep the two in step
             if (predicate == null) {
                 predicate = (Predicate) FILTER_OUT_ANY_PROVIDERS;
             } else {
@@ -3747,34 +3776,170 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     private <T> void filterReplacedBeans(Collection<BeanDefinition<T>> candidates) {
         if (candidates.size() > 1) {
-            List<Map.Entry<ReplacesDefinition<T>, BeanDefinition<T>>> replacementTypes = new ArrayList<>(2);
+            List<BeanDefinition<T>> replacements = new ArrayList<>(2);
             for (BeanDefinition<T> candidate : candidates) {
-                ReplacesDefinition<T> beanReplacementDefinition = candidate.getReplacesDefinition();
-                if (beanReplacementDefinition != null) {
-                    replacementTypes.add(Map.entry(beanReplacementDefinition, candidate));
+                if (candidate.getReplacesDefinition() != null) {
+                    replacements.add(candidate);
                 }
             }
-            if (!replacementTypes.isEmpty()) {
-                candidates.removeIf(definition -> checkIfReplacementExists(replacementTypes, definition));
+            if (!replacements.isEmpty()) {
+                candidates.removeIf(definition -> checkIfReplacementExists(replacements, definition));
             }
         }
     }
 
-    private <T> boolean checkIfReplacementExists(List<Map.Entry<ReplacesDefinition<T>, BeanDefinition<T>>> replacementTypes,
+    private <T> boolean checkIfReplacementExists(List<BeanDefinition<T>> replacements,
                                                  BeanDefinition<T> definitionToBeReplaced) {
-        if (!definitionToBeReplaced.isCanBeReplaced()) {
-            return false;
-        }
-        for (Map.Entry<ReplacesDefinition<T>, BeanDefinition<T>> replacement : replacementTypes) {
-            BeanDefinition<T> beanDefinition = replacement.getValue();
-            ReplacesDefinition<T> replacementCheck = replacement.getKey();
-            if (isNotTheSameDefinition(beanDefinition, definitionToBeReplaced) &&
-                isNotTheTargetOfProxy(beanDefinition, definitionToBeReplaced) &&
-                replacementCheck.replaces(beanDefinition, definitionToBeReplaced)) {
+        for (BeanDefinition<T> replacement : replacements) {
+            if (isReplacedBy(definitionToBeReplaced, replacement, replacements)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a bean replaces another. Beans can match each other's {@link io.micronaut.context.annotation.Replaces}
+     * in a cycle, when one replaces another that replaces a supertype of both. A bean does not replace a bean of such
+     * a cycle that names a narrower target. If a cycle remains without those then no bean of it names the narrower
+     * target, so its beans remain alongside each other rather than removing each other.
+     *
+     * @param definition   The bean that may be replaced
+     * @param replacement  The bean that may replace it
+     * @param replacements All the beans that declare a replacement
+     * @param <T>          The bean type
+     * @return True if the definition is replaced by the replacement
+     */
+    private <T> boolean isReplacedBy(BeanDefinition<T> definition,
+                                     BeanDefinition<T> replacement,
+                                     List<BeanDefinition<T>> replacements) {
+        return replacesExplicitly(replacement, definition, replacements) &&
+            !isReachable(definition, replacement, replacements, (from, to) -> replacesExplicitly(from, to, replacements));
+    }
+
+    private <T> boolean replacesExplicitly(BeanDefinition<T> replacement,
+                                           BeanDefinition<T> definition,
+                                           List<BeanDefinition<T>> replacements) {
+        if (!matchesReplacement(replacement, definition)) {
+            return false;
+        }
+        boolean namesNarrowerTarget = definition.getReplacesDefinition() instanceof DefaultReplacesDefinition<T> narrower
+            && replacement.getReplacesDefinition() instanceof DefaultReplacesDefinition<T> wider
+            && narrower.isNarrowerThan(wider);
+        return !namesNarrowerTarget || !isReachable(definition, replacement, replacements, this::matchesReplacement);
+    }
+
+    private <T> boolean matchesReplacement(BeanDefinition<T> replacement, BeanDefinition<T> definition) {
+        ReplacesDefinition<T> replaces = replacement.getReplacesDefinition();
+        return replaces != null &&
+            definition.isCanBeReplaced() &&
+            isNotTheSameDefinition(replacement, definition) &&
+            isNotTheTargetOfProxy(replacement, definition) &&
+            replaces.replaces(replacement, definition);
+    }
+
+    private <T> boolean isReachable(BeanDefinition<T> from,
+                                    BeanDefinition<T> target,
+                                    List<BeanDefinition<T>> replacements,
+                                    BiPredicate<BeanDefinition<T>, BeanDefinition<T>> edge) {
+        Deque<BeanDefinition<T>> pending = new ArrayDeque<>();
+        Set<BeanDefinition<T>> visited = new HashSet<>();
+        pending.add(from);
+        visited.add(from);
+        while (!pending.isEmpty()) {
+            BeanDefinition<T> current = pending.poll();
+            for (BeanDefinition<T> next : replacements) {
+                if (!visited.contains(next) && edge.test(current, next)) {
+                    if (next.equals(target)) {
+                        return true;
+                    }
+                    visited.add(next);
+                    pending.add(next);
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Filters the candidates by the qualifier, for which a bean that replaces another also satisfies the qualifiers
+     * declared by the bean it replaces. The qualifier is compared with those declared qualifiers rather than with the
+     * replaced bean, so a replacement does not take on anything else about it, such as its type arguments. Candidates
+     * have already had replaced beans removed, so those are looked up again, and only when a candidate that does not
+     * qualify could have replaced one.
+     *
+     * @param beanType   The bean type
+     * @param qualifier  The qualifier
+     * @param candidates The candidates, without replaced beans
+     * @param <T>        The bean type
+     * @return The candidates that satisfy the qualifier
+     */
+    private <T> Collection<BeanDefinition<T>> filterQualified(Argument<T> beanType,
+                                                              Qualifier<T> qualifier,
+                                                              Collection<BeanDefinition<T>> candidates) {
+        Collection<BeanDefinition<T>> qualified = qualifier.filterQualified(beanType.getType(), candidates);
+        if (qualified.size() == candidates.size()) {
+            return qualified;
+        }
+        boolean replacementPresent = false;
+        for (BeanDefinition<T> candidate : candidates) {
+            if (candidate.getReplacesDefinition() != null && !qualified.contains(candidate)) {
+                replacementPresent = true;
+                break;
+            }
+        }
+        if (!replacementPresent) {
+            return qualified;
+        }
+        Set<BeanDefinition<T>> definitions = findDefinitionsIncludingReplaced(beanType);
+        List<BeanDefinition<T>> replacements = new ArrayList<>(2);
+        Deque<BeanDefinition<T>> replaced = new ArrayDeque<>();
+        for (BeanDefinition<T> definition : definitions) {
+            if (definition.getReplacesDefinition() != null) {
+                replacements.add(definition);
+            }
+            if (!candidates.contains(definition)) {
+                Qualifier<T> declaredQualifier = definition.getDeclaredQualifier();
+                if (declaredQualifier != null && declaredQualifier.contains(qualifier)) {
+                    replaced.add(definition);
+                }
+            }
+        }
+        Set<BeanDefinition<T>> result = new LinkedHashSet<>(qualified);
+        Set<BeanDefinition<T>> visited = new HashSet<>(replaced);
+        while (!replaced.isEmpty()) {
+            BeanDefinition<T> definition = replaced.poll();
+            for (BeanDefinition<T> replacement : replacements) {
+                if (isReplacedBy(definition, replacement, replacements)) {
+                    if (candidates.contains(replacement)) {
+                        result.add(replacement);
+                    } else if (visited.add(replacement)) {
+                        replaced.add(replacement);
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Finds the definitions of a type before replaced beans are removed. These are the raw definitions, without the
+     * expansion of {@link io.micronaut.context.annotation.EachProperty} and
+     * {@link io.micronaut.context.annotation.EachBean} that candidates have, so a qualifier that such a bean only gets
+     * dynamically is not inherited by its replacement.
+     *
+     * @param beanType The bean type
+     * @param <T>      The bean type
+     * @return The definitions
+     */
+    private <T> Set<BeanDefinition<T>> findDefinitionsIncludingReplaced(Argument<T> beanType) {
+        Set<BeanDefinition<T>> definitions = new LinkedHashSet<>();
+        Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
+        for (Argument<T> type : lookupBeanType.equals(beanType) ? List.of(beanType) : List.of(beanType, lookupBeanType)) {
+            Predicate<BeanDefinition<T>> predicate = candidate -> !candidate.isAbstract() && isInjectableCandidate(type, candidate);
+            beanDefinitionProvider.getBeanDefinitions(this, type, null, predicate).forEach(definitions::add);
+        }
+        return definitions;
     }
 
     private <T> boolean isNotTheSameDefinition(BeanDefinition<T> replacingCandidate, BeanDefinition<T> definitionToBeReplaced) {
@@ -3915,6 +4080,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         // Fast singleton lookup
         BeanRegistration<T> beanRegistration = singletonScope.findCachedSingletonBeanRegistration(beanType, qualifier);
         if (beanRegistration != null) {
+            // the cache holds the members of an @EachBean or @EachProperty set and runtime singletons: a bean that
+            // receives one of them depends on it as on any singleton, or recreating the member would leave it holding
+            // the destroyed instance
+            recordDependency(resolutionContext, beanRegistration.beanDefinition, qualifier);
             return beanRegistration;
         }
 
@@ -4265,7 +4434,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             if (isProxy) {
                 definition = getProxyTargetBeanDefinition(beanType, qualifier);
             }
-            BeanRegistration<T> scoped = getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition, heldRegistration);
+            BeanRegistration<T> scoped = getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, definition, heldRegistration);
             recordDependency(resolutionContext, scoped.beanDefinition, qualifier);
             return scoped;
         }
@@ -4369,7 +4538,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     private <T> BeanRegistration<T> getOrCreateScopedRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                                   CustomScope<?> registeredScope,
                                                                   @Nullable Qualifier<T> qualifier,
-                                                                  Argument<T> beanType,
                                                                   BeanDefinition<T> definition,
                                                                   boolean heldRegistration) {
         BeanKey<T> beanKey = new BeanKey<>(definition.asArgument(), qualifier);
@@ -4765,7 +4933,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
             }
-            candidates = qualifier.filterQualified(beanType.getType(), candidates);
+            candidates = filterQualified(beanType, qualifier, candidates);
             if (candidates.isEmpty()) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("No qualifying beans of type [{}] found for qualifier: {} ", beanType.getName(), qualifier);
@@ -5216,10 +5384,40 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             BeanDefinition<T> found = findBeanDefinition(delegate.asArgument(), delegate.getDeclaredQualifier())
                 .filter(definition -> definition.isEnabled(this))
                 .orElse(null);
+            if (found == null) {
+                found = findTypedDelegateDefinition(delegate);
+            }
             return found != null ? found : resolveNestedEntryDefinition(delegate);
         }
         BeanDefinition<T> definition = findBeanDefinitionByDefinitionClass((Class<? extends BeanDefinition<T>>) retained.getClass()).orElse(null);
         return definition != null && definition.isEnabled(this) ? definition : null;
+    }
+
+    /**
+     * This context's delegate for a retained {@code @EachBean} member or {@code @EachProperty} entry whose definition
+     * restricts the types it is exposed as, with {@code @Bean(typed = ...)}, so that it is not found by its own class:
+     * it is looked up by each type it exposes, and taken only when it is a delegate of the same generated definition,
+     * making beans of the same class, so that another bean exposed as the same type under the same name is not taken.
+     */
+    @Nullable
+    @SuppressWarnings("unchecked")
+    private <T> BeanDefinition<T> findTypedDelegateDefinition(BeanDefinitionDelegate<T> delegate) {
+        Set<Class<?>> exposed = delegate.getExposedTypes();
+        if (exposed.isEmpty() || exposed.contains(delegate.getBeanType())) {
+            return null;
+        }
+        Class<?> generated = delegate.getTarget().getClass();
+        for (Class<?> type : exposed) {
+            for (BeanDefinition<Object> candidate : getBeanDefinitions((Argument<Object>) Argument.of(type), (Qualifier<Object>) delegate.getDeclaredQualifier())) {
+                if (candidate instanceof BeanDefinitionDelegate<Object> found
+                    && found.getTarget().getClass() == generated
+                    && found.getBeanType() == delegate.getBeanType()
+                    && found.isEnabled(this)) {
+                    return (BeanDefinition<T>) found;
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -5604,7 +5802,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (!beanDefinitions.isEmpty()) {
             beanDefinitions = applyBeanResolutionFilters(resolutionContext, beanType, beanDefinitions);
             if (qualifier != null) {
-                beanDefinitions = qualifier.filterQualified(beanType.getType(), beanDefinitions);
+                beanDefinitions = filterQualified(beanType, qualifier, beanDefinitions);
             }
         }
 
@@ -5740,7 +5938,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(null, beanType);
         candidates = applyBeanResolutionFilters(null, beanType, candidates);
         if (qualifier != null && !candidates.isEmpty()) {
-            candidates = qualifier.filterQualified(beanType.getType(), candidates);
+            candidates = filterQualified(beanType, qualifier, candidates);
         }
         return candidates.size() == 1;
     }
@@ -5812,7 +6010,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (!candidates.isEmpty()) {
             filterReplacedBeans(candidates);
             if (qualifier != null) {
-                return qualifier.doesQualifyQualified(beanType.getType(), candidates);
+                return !filterQualified(beanType, qualifier, candidates).isEmpty();
             }
             return true;
         }
@@ -5943,11 +6141,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             // except configuration: it is not retained, but made again by the next context
             List<BeanRegistration<?>> closure = new ArrayList<>();
             ClosureConfiguration configuration = new ClosureConfiguration(criteria.observedConfigurationPrefixes(registration), !(criteria instanceof PredicateRetentionCriteria));
+            Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
             BeanRegistration<?> bound = collectRetentionClosure(registration, configuration, closure, Collections.newSetFromMap(new IdentityHashMap<>()));
             if (bound != null) {
                 if (LOG_LIFECYCLE.isWarnEnabled()) {
                     LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {} holds a provider, a proxy, a scope or the context, which are bound to this context",
                         registration.bean, bound == registration ? "it" : theBean(bound) + " it holds");
+                }
+                continue;
+            }
+            // a configuration bean left out of the closure is bound again by the next context, but what it received
+            // may have reached the retained bean through it: a listener, a builder or a provider it was handed
+            String carried = carriedThroughConfiguration(configuration, criteria, visited);
+            if (carried != null) {
+                if (LOG_LIFECYCLE.isWarnEnabled()) {
+                    LOG_LIFECYCLE.warn("Bean [{}] is not retained across the restart: {}", registration.bean, carried);
                 }
                 continue;
             }
@@ -6142,6 +6350,118 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     /**
+     * What the configuration beans left out of a retained bean's closure received, which the retained bean may hold
+     * through them although the next context binds the configuration again: their own dependencies, other
+     * configuration beans aside, which are examined in turn. A provider, a proxy, a scope or the context among them,
+     * or a bean holding one, is bound to this context, and a class the restart replaces among them, or held by them,
+     * would keep the old generation of the application running in the retained bean.
+     *
+     * @param configuration The configuration of the retained bean's closure, with the configuration beans it left out
+     * @param criteria The criteria, which know the classes the restart replaces
+     * @param visited The members of the closure, examined already
+     * @return Why the retained bean is refused, or null when what the configuration received is neither
+     */
+    @Nullable
+    private String carriedThroughConfiguration(ClosureConfiguration configuration, RetentionCriteria criteria, Set<Object> visited) {
+        if (dependencyGraph == null) {
+            return null;
+        }
+        Set<Object> examined = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<Object> inspected = Collections.newSetFromMap(new IdentityHashMap<>());
+        List<BeanDefinition<?>> leftOut = configuration.leftOut;
+        // the list grows as configuration that this configuration received is left out in turn
+        for (int i = 0; i < leftOut.size(); i++) {
+            BeanDefinition<?> held = leftOut.get(i);
+            if (!inspected.add(held)) {
+                continue;
+            }
+            for (BeanDependencyGraph.BeanDependency edge : dependencyGraph.dependenciesOf(held)) {
+                BeanDefinition<?> dependency = edge.dependency();
+                if (!edge.lazy() && held.hasStereotype(INTRODUCTION_TYPE) && isInterceptor(dependency)) {
+                    // the advice of a configuration interface's introduction, which reads the environment for it: it
+                    // serves the configuration bean's own methods and is reached only through the configuration bean
+                    continue;
+                }
+                if (edge.lazy() || dependency.isProxy()) {
+                    return HELD_CONFIGURATION + held.getBeanType().getName() + "] it was made from holds a provider or a proxy, which are bound to this context";
+                }
+                List<BeanRegistration<?>> received = new ArrayList<>();
+                BeanRegistration<?> bound = null;
+                Class<?> replaced = null;
+                if (dependency.isSingleton()) {
+                    BeanRegistration<?> registration = singletonScope.findBeanRegistration(dependency);
+                    if (registration == null || configuration.leavesOut(registration.beanDefinition, true)) {
+                        // another configuration bean, examined in turn
+                        continue;
+                    }
+                    bound = collectRetentionClosure(registration, configuration, received, visited);
+                } else if (configuration.leavesOut(dependency, true)) {
+                    continue;
+                } else if (isContextBound(dependency, configuration, Collections.newSetFromMap(new IdentityHashMap<>()))) {
+                    return HELD_CONFIGURATION + held.getBeanType().getName() + "] it was made from holds a [" + dependency.getBeanType().getName() + "] bound to this context";
+                } else {
+                    bound = collectRetentionClosure(dependency, configuration, received, visited);
+                    replaced = replacedClassOf(dependency, criteria, configuration, examined);
+                }
+                if (bound != null) {
+                    return HELD_CONFIGURATION + held.getBeanType().getName() + "] it was made from holds the bean [" + bound.bean
+                        + "], which holds a provider, a proxy, a scope or the context, which are bound to this context";
+                }
+                for (BeanRegistration<?> member : received) {
+                    if (replaced != null) {
+                        break;
+                    }
+                    replaced = replacedClassOf(member, criteria, configuration, examined);
+                }
+                if (replaced != null) {
+                    return HELD_CONFIGURATION + held.getBeanType().getName() + "] it was made from holds what is bound to the class ["
+                        + replaced.getName() + "], which the restart replaces";
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether a definition is of an interceptor, {@code @InterceptorBean}, which a proxy received to serve its own
+     * methods. One declared otherwise is examined as any other bean, which may refuse more than needed, never less.
+     */
+    private static boolean isInterceptor(BeanDefinition<?> definition) {
+        return definition.hasStereotype(INTERCEPTOR_BEAN_TYPE);
+    }
+
+    /**
+     * Whether a prototype definition's beans are bound to this context: a proxy, or one that received a provider, a
+     * proxy, or what the context owns, directly or through the prototypes it received. The singletons it received
+     * are examined as members of a closure.
+     */
+    private boolean isContextBound(BeanDefinition<?> definition, ClosureConfiguration configuration, Set<Object> visited) {
+        if (!visited.add(definition)) {
+            return false;
+        }
+        if (definition.isProxy()) {
+            return true;
+        }
+        for (Class<?> required : definition.getRequiredComponents()) {
+            if (required.isInstance(this) || isContextOwnedType(required)) {
+                return true;
+            }
+        }
+        if (dependencyGraph != null) {
+            for (BeanDependencyGraph.BeanDependency dependency : dependencyGraph.dependenciesOf(definition)) {
+                if (dependency.lazy() || dependency.dependency().isProxy()) {
+                    return true;
+                }
+                BeanDefinition<?> received = dependency.dependency();
+                if (!received.isSingleton() && !configuration.leavesOut(received, true) && isContextBound(received, configuration, visited)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * The first class the restart replaces that a member of a retained bean's closure is bound to: its definition, its
      * instance, the instance the bean created listeners received, and the prototypes it owns or received.
      */
@@ -6264,6 +6584,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         private final Set<String> invalidatedBy;
         private final boolean observing;
         private Set<String> observed = Set.of();
+        /**
+         * The definitions of the configuration beans left out of the closure, whose own dependencies are examined.
+         */
+        private final List<BeanDefinition<?>> leftOut = new ArrayList<>();
         private Set<Class<?>> leftOutTypes = Set.of();
 
         ClosureConfiguration(Set<String> invalidatedBy, boolean observing) {
@@ -6289,6 +6613,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 return false;
             }
             if (isCovered(prefix, invalidatedBy)) {
+                if (observe) {
+                    leftOut.add(definition);
+                }
                 return leaveOut(definition);
             }
             if (!observing) {
@@ -6299,6 +6626,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     observed = new LinkedHashSet<>();
                 }
                 observed.add(prefix);
+                leftOut.add(definition);
             }
             return leaveOut(definition);
         }

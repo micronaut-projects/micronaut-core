@@ -126,6 +126,10 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     private final List<BeanFieldElement> injectedFields = new ArrayList<>(5);
     private BeanConstructorElement constructorElement;
     private ClassElement[] exposedTypes;
+    /**
+     * The type arguments given with {@link #typeArgumentsForType(ClassElement, ClassElement...)}, by type name.
+     */
+    private @Nullable Map<String, Map<String, ClassElement>> superTypeArguments;
     private boolean intercepted;
 
     /**
@@ -227,12 +231,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         this.beanType.getEnclosedElements(baseQuery.modifiers(PUBLIC_FILTER))
             .forEach(fieldElement -> {
                 accessibleFields.add(fieldElement);
-                new InternalBeanElementField(fieldElement, false).inject();
+                new InternalBeanElementField(fieldElement).inject();
             });
         this.beanType.getEnclosedElements(baseQuery.modifiers(NON_PUBLIC_FILTER))
             .forEach(fieldElement -> {
                 if (!accessibleFields.contains(fieldElement)) {
-                    new InternalBeanElementField(fieldElement, true).inject();
+                    new InternalBeanElementField(fieldElement).inject();
                 }
             });
     }
@@ -376,6 +380,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         if (type != null) {
             final Map<String, ClassElement> typeArguments = type.getTypeArguments();
             Map<String, ClassElement> resolvedTypes = resolveTypeArguments(typeArguments, types);
+            if (resolvedTypes != null) {
+                if (superTypeArguments == null) {
+                    superTypeArguments = new LinkedHashMap<>();
+                }
+                superTypeArguments.put(type.getName(), resolvedTypes);
+            }
         }
         return this;
     }
@@ -425,7 +435,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         if (fields != null && beanFields != null) {
             this.beanType.getEnclosedElements(fields.onlyInstance().onlyAccessible(originatingType))
                 .forEach((fieldElement) ->
-                    beanFields.accept(new InternalBeanElementField(fieldElement, false))
+                    beanFields.accept(new InternalBeanElementField(fieldElement))
                 );
         }
         return this;
@@ -519,26 +529,52 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     @Override
     public <E extends MemberElement> BeanElementBuilder produceBeans(ElementQuery<E> methodsOrFields,
                                                                      Consumer<BeanElementBuilder> childBeanBuilder) {
-        methodsOrFields = methodsOrFields
-            .onlyConcrete()
-            .modifiers(modifiers -> modifiers.contains(ElementModifier.PUBLIC));
-        final List<E> enclosedElements = this.beanType.getEnclosedElements(methodsOrFields);
+        final List<E> enclosedElements = this.beanType.getEnclosedElements(methodsOrFields.onlyConcrete());
         for (E enclosedElement : enclosedElements) {
-            if (enclosedElement instanceof FieldElement fe) {
-                final ClassElement type = fe.getGenericField().getType();
-                if (type.isPublic() && !type.isPrimitive()) {
-                    addChildBean(fe, childBeanBuilder);
-                }
-            }
-
-            if (enclosedElement instanceof MethodElement me && !(enclosedElement instanceof ConstructorElement)) {
-                final ClassElement type = me.getGenericReturnType().getType();
-                if (type.isPublic() && !type.isPrimitive()) {
-                    addChildBean(me, childBeanBuilder);
-                }
+            if (enclosedElement instanceof FieldElement fe && isProducer(fe, fe.getGenericField().getType())) {
+                addChildBean(fe, childBeanBuilder);
+            } else if (enclosedElement instanceof MethodElement me && !(enclosedElement instanceof ConstructorElement)
+                && isProducer(me, me.getGenericReturnType().getType())) {
+                addChildBean(me, childBeanBuilder);
             }
         }
         return this;
+    }
+
+    /**
+     * Whether a member the query selected can produce a bean, as a factory method or field of a factory can: the
+     * definition of the product is written in the package of the type declaring the member, and calls the member
+     * directly when it can, and otherwise through reflection when the member is annotated with
+     * {@link io.micronaut.core.annotation.ReflectiveAccess}. A member that cannot is reported, rather than left out
+     * without a word.
+     *
+     * @param producer The producing member
+     * @param product  The type it produces
+     * @return Whether it produces a bean
+     */
+    private boolean isProducer(MemberElement producer, ClassElement product) {
+        String unsupported = null;
+        if (!producer.isAccessible(producer.getOwningType(), true)) {
+            unsupported = "it cannot be called from the package of " + producer.getOwningType().getName() + ", and is not annotated with @ReflectiveAccess";
+        } else if (product.isVoid()) {
+            unsupported = "it returns no value";
+        } else if (!isAccessibleType(product, producer.getOwningType())) {
+            unsupported = "the type it produces [" + product.getName() + "] is not accessible from the package of " + producer.getOwningType().getName();
+        }
+        if (unsupported != null) {
+            visitorContext.warn("Bean [" + beanType.getName() + "] produces no bean from [" + producer.getOwningType().getName()
+                + "." + producer.getName() + "]: " + unsupported, producer);
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean isAccessibleType(ClassElement type, ClassElement callingType) {
+        ClassElement component = type;
+        while (component.isArray()) {
+            component = component.fromArray();
+        }
+        return component.isPrimitive() || component.isPublic() || component.getPackageName().equals(callingType.getPackageName());
     }
 
     /**
@@ -753,7 +789,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     private <R> ElementBeanDefinitionBuilder<R> createBeanDefinitionBuilderInternal(ElementBeanDefinitionBuilderFactory<R> elementBeanDefinitionBuilderFactory) {
         addExposedTypes();
-        return createBeanDefinitionBuilder(elementBeanDefinitionBuilderFactory);
+        ElementBeanDefinitionBuilder<R> beanDefinitionBuilder = createBeanDefinitionBuilder(elementBeanDefinitionBuilderFactory);
+        if (superTypeArguments != null && beanDefinitionBuilder instanceof BeanDefinitionWriter beanDefinitionWriter) {
+            // The arguments given for a super type replace those the bean type resolves for it
+            beanDefinitionWriter.addTypeArguments(superTypeArguments);
+        }
+        return beanDefinitionBuilder;
     }
 
     private void addExposedTypes() {
@@ -1195,7 +1236,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         private final FieldElement fieldElement;
         private ClassElement genericType;
 
-        private InternalBeanElementField(FieldElement element, boolean requiresReflection) {
+        private InternalBeanElementField(FieldElement element) {
             super(element, MutableAnnotationMetadata.of(element.getAnnotationMetadata()));
             this.fieldElement = element;
         }

@@ -17,6 +17,7 @@ package io.micronaut.http;
 
 import io.micronaut.http.body.MessageBodyWriter;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -97,7 +98,7 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
         final StringBuilder value = new StringBuilder();
         value.append(HttpHeaderValues.AUTHORIZATION_PREFIX_BASIC);
         value.append(" ");
-        value.append(new String(Base64.getEncoder().encode(sb.toString().getBytes())));
+        value.append(Base64.getEncoder().encodeToString(sb.toString().getBytes(StandardCharsets.UTF_8)));
         header(HttpHeaders.AUTHORIZATION, value.toString());
         return this;
     }

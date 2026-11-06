@@ -1,5 +1,6 @@
 package io.micronaut.dev;
 
+import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.test.TestRunSummary;
 import org.junit.jupiter.api.AfterEach;
@@ -13,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -144,6 +146,9 @@ class TestModeTest {
                 void runs() {
                     try (ApplicationContext context = ApplicationContext.run()) {
                         assertEquals("io.micronaut.dev.loader.GenerationClassLoader", context.getEnvironment().getClassLoader().getClass().getName());
+                        // test mode, which modules may keep warm across runs, and not development mode
+                        assertEquals(true, io.micronaut.context.env.DevelopmentMode.isTestMode(context.getEnvironment()));
+                        assertEquals(false, context.getEnvironment().isDevelopmentMode());
                         assertEquals("hello", context.getProperty("greeting", String.class).orElseThrow());
                     }
                 }
@@ -334,6 +339,37 @@ class TestModeTest {
         Files.writeString(trigger, String.valueOf(System.nanoTime()));
         TestRunSummary second = runtime.awaitTestRun(2, TIMEOUT);
         assertEquals(1, second.failed());
+    }
+
+    @Test
+    void aTestEditTheBuildToolHasNotCompiledLeavesTheResultsAsTheyAre() throws Exception {
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Path test = Files.createDirectories(project.resolve("src/test/java/app"));
+        Files.writeString(main.resolve("Greeter.java"), greeter("one"));
+        Path greeterTest = test.resolve("GreeterTest.java");
+        Files.writeString(greeterTest, greeterTest("two"));
+        javac(project.resolve("build/test-classes"), greeterTest, main.resolve("Greeter.java"));
+        runtime = new MicronautDevMain().launch(manifest("""
+            micronaut.dev.test.compile.java.mode=build-tool
+            micronaut.dev.build-tool.trigger=build/trigger
+            """), new String[0]);
+        assertEquals(1, runtime.lastTestRun().orElseThrow().failed());
+        assertEquals(Set.of("app.GreeterTest"), runtime.failedTestClasses());
+
+        // a compilation failed and left the test's class out, as the compiler plugin of Maven does, and the test is edited
+        Files.delete(project.resolve("build/test-classes/app/GreeterTest.class"));
+        Files.writeString(greeterTest, greeterTest("one"));
+        long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
+        while (System.nanoTime() < deadline) {
+            assertEquals(Set.of("app.GreeterTest"), runtime.failedTestClasses());
+            Thread.sleep(50);
+        }
+
+        // the next compilation succeeded
+        javac(project.resolve("build/test-classes"), greeterTest, main.resolve("Greeter.java"));
+        Files.writeString(project.resolve("build/trigger"), String.valueOf(System.nanoTime()));
+        assertEquals(1, runtime.awaitTestRun(2, TIMEOUT).passed());
+        assertTrue(runtime.failedTestClasses().isEmpty(), runtime.failedTestClasses().toString());
     }
 
     private static void javac(Path output, Path... sources) throws Exception {
@@ -631,6 +667,71 @@ class TestModeTest {
         assertNotSame(PatchingTestRunner.RUN_LOADERS.get(0), PatchingTestRunner.RUN_LOADERS.get(1));
         assertEquals("two", PatchingTestRunner.RUN_MESSAGES.get(1));
         assertEquals(generation + 1, runtime.generation());
+    }
+
+    @Test
+    void theWatchersLateReportOfAChangeARunCoversDoesNotCancelTheRun() throws Exception {
+        Path main = Files.createDirectories(project.resolve("src/main/java/app"));
+        Path test = Files.createDirectories(project.resolve("src/test/java/app"));
+        Path greeter = main.resolve("Greeter.java").toAbsolutePath();
+        Files.writeString(greeter, greeter("one"));
+        Path started = project.resolve("started").toAbsolutePath();
+        Path release = project.resolve("release").toAbsolutePath();
+        // the test says it started, then waits to be let go, so that a report can come while it runs
+        Files.writeString(test.resolve("GreeterTest.java"), """
+            package app;
+            import java.nio.file.Files;
+            import java.nio.file.Path;
+            import org.junit.jupiter.api.Test;
+            import static org.junit.jupiter.api.Assertions.assertEquals;
+            public class GreeterTest {
+                @Test
+                void greets() throws Exception {
+                    Files.writeString(Path.of("%s"), "");
+                    long deadline = System.nanoTime() + 30_000_000_000L;
+                    while (!Files.exists(Path.of("%s")) && System.nanoTime() < deadline) {
+                        Thread.sleep(10);
+                    }
+                    assertEquals("one", new Greeter().greet());
+                }
+            }
+            """.formatted(started.toString().replace("\\", "/"), release.toString().replace("\\", "/")));
+        Files.writeString(release, "");
+
+        runtime = new MicronautDevMain().launch(manifest(""), new String[0]);
+        assertTrue(runtime.lastTestRun().orElseThrow().isSuccess());
+        Files.delete(started);
+        Files.delete(release);
+
+        // the harness reports a change, and the run it starts waits
+        Files.writeString(greeter, greeter("two"));
+        Thread harness = new Thread(() -> runtime.changed(List.of(greeter), List.of()));
+        harness.start();
+        long deadline = System.nanoTime() + TIMEOUT.toNanos();
+        while (!Files.exists(started) && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        assertTrue(Files.exists(started), "the run started");
+
+        // the watcher reports the same write late, while the run that covers it is under way
+        long late = runtime.enqueue(new Pending(Map.of(SourceKind.JAVA, new SourceChanges(Set.of(greeter), Set.of())), Map.of(), false));
+        Files.writeString(release, "");
+        TestRunSummary second = runtime.awaitTestRun(2, TIMEOUT);
+        harness.join(TIMEOUT.toMillis());
+        runtime.awaitBatch(late);
+
+        // the run completes, and the late report changes nothing: no other run comes of it
+        assertFalse(second.cancelled());
+        assertEquals(1, second.failed());
+        assertEquals(2, runtime.testRuns());
+        assertEquals(Set.of("app.GreeterTest"), runtime.failedTestClasses());
+
+        // a write after the run is a change again
+        Files.delete(started);
+        Files.writeString(greeter, greeter("one"));
+        runtime.changed(List.of(greeter), List.of());
+        TestRunSummary third = runtime.awaitTestRun(3, TIMEOUT);
+        assertTrue(third.isSuccess());
     }
 
     private DevManifest manifest(String extra) throws Exception {

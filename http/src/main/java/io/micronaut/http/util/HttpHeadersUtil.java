@@ -317,6 +317,7 @@ public final class HttpHeadersUtil {
             try {
                 return Charset.forName(text);
             } catch (Exception ignored) {
+                // an unknown or illegal charset falls back to the default
             }
         }
         return DEFAULT_CHARSET;

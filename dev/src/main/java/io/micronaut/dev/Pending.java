@@ -16,7 +16,6 @@
 package io.micronaut.dev;
 
 import io.micronaut.context.reload.ResourceKind;
-import io.micronaut.dev.DevRuntime.SourceChanges;
 import io.micronaut.dev.compile.SourceKind;
 import org.jspecify.annotations.Nullable;
 
@@ -37,6 +36,15 @@ class Pending {
     final boolean full;
     final @Nullable TestRequest requested;
     long sequence;
+    /**
+     * When the batch was created, as the watcher or a caller delivered it, by {@link System#nanoTime()}.
+     */
+    final long delivered = System.nanoTime();
+    /**
+     * Whether a caller reported the batch for files it wrote, which the watcher reports in turn, rather than the
+     * watcher, or a caller asking for a restart or a test run.
+     */
+    boolean reported;
 
     Pending(Map<SourceKind, SourceChanges> sources, Map<ResourceKind, SourceChanges> resources, boolean full) {
         this(sources, Map.of(), resources, full, null);

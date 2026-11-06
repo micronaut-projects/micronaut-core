@@ -96,9 +96,9 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
                     BeanInjectionUtils.createFieldDefinition(
                         newParent,
                         producerField.withAnnotationMetadata(
-                            new AnnotationMetadataHierarchy(newParent.getDeclaredMetadata(), producerField.getDeclaredMetadata())
+                            new AnnotationMetadataHierarchy(newParent.getDeclaredMetadata(), producerField.getDeclaredMetadata(), getAnnotationMetadata())
                         ),
-                        !producerField.isPublic(),
+                        producerField.isReflectionRequired(),
                         visitorContext
                     )
                 );
@@ -146,7 +146,7 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
                         resolvedParent,
                         producerMethod.withParameters(getParameters()).withAnnotationMetadata(annotationMetadata),
                         annotationMetadata,
-                        !producerMethod.isPublic(),
+                        producerMethod.isReflectionRequired(),
                         visitorContext
                     ));
             }
