@@ -50,7 +50,7 @@ public interface Event<T> {
     String RETRY = "retry";
 
     /**
-     * @return The data object to write
+     * @return The data object to write, or null for an event without data (see {@link #empty()})
      */
     T getData();
 
@@ -116,6 +116,19 @@ public interface Event<T> {
     static <ET> Event<ET> of(ET data) {
         ArgumentUtils.check("data", data).notNull();
         return new DefaultEvent<>(data);
+    }
+
+    /**
+     * Constructs a new event without data, for example an event that only carries a comment
+     * (a heartbeat), an id or a retry time. Such an event is written without a {@code data}
+     * field, so a client does not dispatch it as a message.
+     *
+     * @param <ET> The data type
+     * @return The event instance
+     * @since 5.3.0
+     */
+    static <ET> Event<ET> empty() {
+        return new DefaultEvent<>(null);
     }
 
     /**
