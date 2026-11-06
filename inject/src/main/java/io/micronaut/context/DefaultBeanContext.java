@@ -695,6 +695,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             beanConfigurations.clear();
             disabledConfigurations.clear();
             singletonScope.clear();
+            createdForAdopted.clear();
             watches.clear();
             startupMethodsProcessed = false;
             attributes.clear();

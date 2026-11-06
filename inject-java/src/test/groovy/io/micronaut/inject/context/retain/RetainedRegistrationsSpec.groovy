@@ -501,7 +501,7 @@ class RetainedRegistrationsSpec extends Specification {
 
         when:
         ApplicationContext failed = ApplicationContext.builder()
-            .properties('spec.name': 'RetainedRegistrationsSpec', 'retain.fail-start': true)
+            .properties('spec.name': 'RetainedRegistrationsSpec', 'retain.fail-start': true, 'retain.listener': true)
             .beanDependencyTrackingEnabled(true)
             .retainedRegistrations(retained)
             .build()
@@ -518,6 +518,34 @@ class RetainedRegistrationsSpec extends Specification {
         ExpensiveListener.DESTROYED.get() == 1
         Scratch.DESTROYED.get() == 0
         Expensive.DESTROYED.get() == 0
+    }
+
+    void "a context that stopped holds nothing of what its listeners created for a bean it adopted"() {
+        given:
+        ExpensiveListener.DESTROYED.set(0)
+        ApplicationContext first = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .beanDependencyTrackingEnabled(true)
+            .start()
+        first.getBean(Consumer)
+        def retained = ((DefaultBeanContext) first).stopRetaining { it.beanType == Expensive }
+        ApplicationContext second = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec', 'retain.listener': true)
+            .beanDependencyTrackingEnabled(true)
+            .retainedRegistrations(retained)
+            .start()
+
+        def createdForAdopted = DefaultBeanContext.getDeclaredField('createdForAdopted')
+        createdForAdopted.accessible = true
+
+        expect:
+        !createdForAdopted.get(second).isEmpty()
+
+        when:
+        second.stop()
+
+        then:
+        createdForAdopted.get(second).isEmpty()
     }
 
     void "stopping without retention destroys everything as before"() {

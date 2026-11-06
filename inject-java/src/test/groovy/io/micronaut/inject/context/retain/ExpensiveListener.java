@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Prototype
 @Requires(property = "spec.name", value = "RetainedRegistrationsSpec")
-@Requires(property = "retain.fail-start")
+@Requires(property = "retain.listener")
 public class ExpensiveListener implements BeanCreatedEventListener<Expensive> {
     public static final AtomicInteger DESTROYED = new AtomicInteger();
 

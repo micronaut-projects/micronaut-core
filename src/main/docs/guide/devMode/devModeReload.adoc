@@ -107,6 +107,8 @@ A generation whose context fails to start is stopped at once, and the launcher k
 * The beans the failed context created are destroyed, whether they could have been retained or not. A pool it created does not stay open to conflict with the next generation's.
 * The beans retained from the generation before it are not destroyed. The next generation adopts them, so correcting the error does not pay for a new pool.
 
+This covers a failure inside the start of the context. A context that did start and then stopped, for example because its server could not bind its port, stopped as any context does: the beans it adopted are destroyed with it, and the next generation creates them again.
+
 No context runs while the generation is failed, so nothing can tell what a later edit of a configuration file changed. It may be what the retained beans were made from, so that edit releases them all.
 
 === HTTP client connections
