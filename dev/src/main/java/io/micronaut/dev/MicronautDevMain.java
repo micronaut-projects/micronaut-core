@@ -141,6 +141,7 @@ public class MicronautDevMain {
     public DevRuntime launch(DevManifest manifest, String[] args) {
         // before the launcher logs anything: Logback, in the parent tier, does not see the application's logback.xml
         DevLogging.beforeLaunch(manifest, parentClassLoader());
+        PythonWarmUp.start(manifest, parentClassLoader());
         Map<SourceKind, SourceCompiler> compilers = createCompilers(manifest);
         DevClassLoader classLoader;
         // another process of the project, development mode beside test mode, may be compiling into the same outputs
