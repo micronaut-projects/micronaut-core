@@ -48,6 +48,8 @@ class PythonStdlibBytecodeTest {
             String cached = context.eval(PYTHON, "import json; json.__cached__").asString();
             assertTrue(cached.startsWith(tree.toString()), cached);
             assertTrue(Files.isRegularFile(Path.of(cached)), cached);
+            assertFalse(Files.exists(tree.resolve("idlelib").resolve("__pycache__")), "what few applications import stays without bytecode");
+            assertTrue(Files.exists(tree.resolve("idlelib").resolve("__init__.py")), "but can still be imported");
             assertTrue(context.eval(PYTHON, "json.loads.__code__.co_filename").asString().startsWith(tree.toString()),
                 "the bytecode names the place it is used from, not where it was seeded");
         }
@@ -122,6 +124,10 @@ class PythonStdlibBytecodeTest {
         assertEquals(tree, bytecode.recorded());
         Files.delete(tree.resolve(".complete"));
         assertNull(bytecode.recorded());
+
+        // seeding replaces what is left of it
+        bytecode.seed();
+        assertEquals(tree, bytecode.recorded());
     }
 
     @Test

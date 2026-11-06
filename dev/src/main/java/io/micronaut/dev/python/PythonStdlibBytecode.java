@@ -59,9 +59,9 @@ import java.util.stream.Stream;
  * <p>The first run seeds the tree in the background and the application does not wait for it: a context built before
  * it is complete uses the real standard library. The tree is built under a temporary name and renamed once complete,
  * so that a context never sees half of it, and of two processes seeding at once the first rename wins. A tree is named
- * after the GraalPy version and the location of the real standard library, which holds the hash of its content. Python
- * checks each bytecode file against the time and size of its source, through the link, so a file that does not match
- * is compiled from its source as it would be without this.</p>
+ * after the GraalPy version and the location and time of the real standard library. Python checks each bytecode file
+ * against the time and size of its source, through the link, so a file that does not match is compiled from its source
+ * as it would be without this.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -79,16 +79,18 @@ final class PythonStdlibBytecode {
      */
     private static final String PROBE_FILE = "os.py";
     /**
-     * Directories linked whole, which {@code compileall} does not enter: tests, tools and rarely used libraries.
+     * Directories whose modules stay without bytecode: tests, tools and rarely used libraries.
      */
-    private static final Set<String> NOT_COMPILED = Set.of(
-        "__phello__", "__pycache__", "_pyrepl", "curses", "dbm", "ensurepip", "idlelib", "lib2to3", "pydoc_data",
-        "site-packages", "sqlite3", "test", "tests", "tkinter", "turtledemo", "venv", "wsgiref", "xmlrpc"
-    );
+    private static final String NOT_COMPILED = "__phello__|_pyrepl|curses|dbm|ensurepip|idlelib|lib2to3|pydoc_data|sqlite3|test|tests|tkinter|turtledemo|venv|wsgiref|xmlrpc";
+    /**
+     * Directories of the real standard library left out: Python finds its packages from the prefix, which stays.
+     */
+    private static final Set<String> NOT_LINKED = Set.of("__pycache__", "site-packages");
     private static final String COMPILE = """
-        def compile_all(directory, recorded_as):
-            import compileall, py_compile
-            compileall.compile_dir(directory, ddir=recorded_as, quiet=2, force=True,
+        def compile_all(directory, recorded_as, not_compiled):
+            import compileall, py_compile, re
+            skip = re.compile(re.escape(directory) + r"[/\\\\](?:.*[/\\\\])?(?:" + not_compiled + r")[/\\\\]")
+            compileall.compile_dir(directory, ddir=recorded_as, quiet=2, force=True, rx=skip,
                                    invalidation_mode=py_compile.PycInvalidationMode.TIMESTAMP)
         compile_all
         """;
@@ -175,9 +177,13 @@ final class PythonStdlibBytecode {
         try {
             link(standardLibrary, work);
             try (Context context = context(work)) {
-                context.eval(PYTHON, COMPILE).execute(work.toString(), target.toString());
+                context.eval(PYTHON, COMPILE).execute(work.toString(), target.toString(), NOT_COMPILED);
             }
             Files.createFile(work.resolve(COMPLETE));
+            if (Files.exists(target) && !usable(target)) {
+                // what is left of a tree part of which was removed
+                delete(target);
+            }
             try {
                 Files.move(work, target, StandardCopyOption.ATOMIC_MOVE);
             } catch (IOException e) {
@@ -228,18 +234,22 @@ final class PythonStdlibBytecode {
                 if (dir.equals(standardLibrary)) {
                     return FileVisitResult.CONTINUE;
                 }
-                Path link = tree.resolve(standardLibrary.relativize(dir).toString());
-                if (NOT_COMPILED.contains(dir.getFileName().toString())) {
-                    Files.createSymbolicLink(link, dir);
+                if (NOT_LINKED.contains(dir.getFileName().toString())) {
                     return FileVisitResult.SKIP_SUBTREE;
                 }
-                Files.createDirectory(link);
+                Files.createDirectory(tree.resolve(standardLibrary.relativize(dir).toString()));
                 return FileVisitResult.CONTINUE;
             }
 
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                Files.createSymbolicLink(tree.resolve(standardLibrary.relativize(file).toString()), file);
+                Path link = tree.resolve(standardLibrary.relativize(file).toString());
+                try {
+                    Files.createSymbolicLink(link, file);
+                } catch (IOException | UnsupportedOperationException e) {
+                    // no right to create links, as on Windows by default: a copy reads the same
+                    Files.copy(file, link);
+                }
                 return FileVisitResult.CONTINUE;
             }
         });
@@ -306,9 +316,14 @@ final class PythonStdlibBytecode {
         return engine.getVersion() + "-" + Objects.requireNonNull(engine.getLanguages().get(PYTHON)).getVersion();
     }
 
-    private static String digest(Path path) {
+    /**
+     * Names a real standard library by where it is and when it was written: extracted again, its sources are newer
+     * than the bytecode of a tree, which Python would then ignore, and a new tree is seeded.
+     */
+    private static String digest(Path standardLibrary) throws IOException {
+        String identity = standardLibrary + "\n" + Files.getLastModifiedTime(standardLibrary.resolve(PROBE_FILE)).toMillis();
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(path.toString().getBytes(StandardCharsets.UTF_8));
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(identity.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest, 0, 8);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
