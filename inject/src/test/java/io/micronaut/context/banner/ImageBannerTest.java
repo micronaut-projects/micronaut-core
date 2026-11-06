@@ -18,6 +18,7 @@ package io.micronaut.context.banner;
 import com.github.stefanbirkner.systemlambda.SystemLambda;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.Micronaut;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -114,6 +115,20 @@ class ImageBannerTest {
     }
 
     @Test
+    void applicationSetsTheModeUnlessTheEnvironmentOverridesIt() {
+        Map<String, String> kittyTerminal = Map.of("TERM", "xterm-kitty");
+        assertTrue(terminal(BannerMode.KITTY, Map.of(), false).supportsImages());
+        assertFalse(terminal(BannerMode.ASCII, kittyTerminal, true).supportsImages());
+        assertTrue(terminal(BannerMode.AUTO, kittyTerminal, true).supportsImages());
+        assertFalse(terminal(BannerMode.AUTO, kittyTerminal, false).supportsImages());
+
+        assertTrue(terminal(BannerMode.ASCII, Map.of("MICRONAUT_BANNER_MODE", "kitty"), false).supportsImages());
+        assertFalse(terminal(BannerMode.KITTY, Map.of("MICRONAUT_BANNER_MODE", "ascii"), false).supportsImages());
+        assertFalse(terminal(BannerMode.KITTY, Map.of("MICRONAUT_BANNER_MODE", "auto"), false).supportsImages());
+        assertTrue(terminal(BannerMode.KITTY, Map.of("MICRONAUT_BANNER_MODE", " "), false).supportsImages());
+    }
+
+    @Test
     void lightThemeIsDetectedFromTheBackgroundColor() {
         assertTrue(terminal(Map.of("COLORFGBG", "0;15"), true).isLightTheme());
         assertTrue(terminal(Map.of("COLORFGBG", "0;default;7"), true).isLightTheme());
@@ -194,13 +209,28 @@ class ImageBannerTest {
         assertArrayEquals(resource(LOGO), decode(chunks(applicationOutput(dir, "kitty"))));
     }
 
+    @Test
+    void modeSetOnTheApplicationSelectsTheBanner(@TempDir Path dir) throws Exception {
+        assertArrayEquals(resource(LOGO), decode(chunks(applicationOutput(dir, null, BannerMode.KITTY))));
+
+        String ascii = applicationOutput(dir, null, BannerMode.ASCII);
+        assertTrue(chunks(ascii).isEmpty());
+        assertTrue(ascii.contains("|  \\/  (_) ___ _ __ ___"), ascii);
+
+        assertTrue(chunks(applicationOutput(dir, "ascii", BannerMode.KITTY)).isEmpty());
+    }
+
     private static String applicationOutput(Path dir, String mode) throws Exception {
+        return applicationOutput(dir, mode, BannerMode.AUTO);
+    }
+
+    private static String applicationOutput(Path dir, @Nullable String envMode, BannerMode mode) throws Exception {
         try (URLClassLoader classLoader = new URLClassLoader(new URL[] {dir.toUri().toURL()}, ImageBannerTest.class.getClassLoader())) {
             String[] output = new String[1];
-            SystemLambda.withEnvironmentVariable("MICRONAUT_BANNER_MODE", mode)
+            SystemLambda.withEnvironmentVariable("MICRONAUT_BANNER_MODE", envMode)
                 .and("MICRONAUT_BANNER_THEME", "dark")
                 .execute(() -> output[0] = SystemLambda.tapSystemOut(() -> {
-                    try (ApplicationContext ignored = Micronaut.build(new String[0]).classLoader(classLoader).deduceEnvironment(false).start()) {
+                    try (ApplicationContext ignored = Micronaut.build(new String[0]).bannerMode(mode).classLoader(classLoader).deduceEnvironment(false).start()) {
                         // only the banner printed by the start matters
                     }
                 }));
@@ -209,7 +239,11 @@ class ImageBannerTest {
     }
 
     private static BannerTerminal terminal(Map<String, String> env, boolean interactive) {
-        return new BannerTerminal(env::get, () -> interactive);
+        return terminal(BannerMode.AUTO, env, interactive);
+    }
+
+    private static BannerTerminal terminal(BannerMode mode, Map<String, String> env, boolean interactive) {
+        return new BannerTerminal(mode, env::get, () -> interactive);
     }
 
     private static String capture(ThrowingBanner banner) {

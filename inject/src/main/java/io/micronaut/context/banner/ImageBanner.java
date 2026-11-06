@@ -63,7 +63,7 @@ public class ImageBanner implements Banner {
 
     /**
      * Constructor for an image displayed at its pixel size. The terminal is not checked: use
-     * {@link #resolve(ResourceLoader, PrintStream)} unless the output is known to display images.
+     * {@link #resolve(ResourceLoader, PrintStream, BannerMode)} unless the output is known to display images.
      *
      * @param resource The PNG with the banner
      * @param out The print stream
@@ -90,14 +90,11 @@ public class ImageBanner implements Banner {
      *
      * @param resourceLoader The loader of the {@link #RESOURCE} and {@link #LIGHT_RESOURCE} images
      * @param out The print stream
+     * @param mode The banner mode
      * @return The banner, empty if the terminal displays no images or the application has no image
      */
-    public static Optional<Banner> resolve(ResourceLoader resourceLoader, PrintStream out) {
-        return resolve(BannerTerminal.current(), resourceLoader, out);
-    }
-
-    static Optional<Banner> resolve(BannerTerminal terminal, ResourceLoader resourceLoader, PrintStream out) {
-        return terminal.selectImage(resourceLoader::getResource, RESOURCE, LIGHT_RESOURCE)
+    public static Optional<Banner> resolve(ResourceLoader resourceLoader, PrintStream out, BannerMode mode) {
+        return BannerTerminal.current(mode).selectImage(resourceLoader::getResource, RESOURCE, LIGHT_RESOURCE)
             .map(image -> new ImageBanner(image, out));
     }
 
