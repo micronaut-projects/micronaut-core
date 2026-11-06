@@ -32,11 +32,12 @@ import java.io.OutputStream;
  * Initializes a GraalPy context on a thread of its own as a Python application launches, and closes it. Most of what
  * the first context of a JVM costs is loading and initializing GraalPy's classes, once for the JVM, on the thread that
  * starts the application. The launch spends about a second on other work before it gets there, and this thread uses
- * that second: the context of the application then finds the work done. Started any later, it gains nothing, as the
- * two threads then wait for each other on the same classes.
+ * that second: the context of the application then finds the work done. The lead is what counts: started as that
+ * context starts, it gains nothing, as the two threads then wait for each other on the same classes.
  *
- * <p>Only a launch with Python sources, or in test mode Python tests, starts it, and only on a JVM: a native image has no classes to load.
- * {@code micronaut.dev.python.warm-up=false} turns it off.</p>
+ * <p>Only a launch with Python sources, or in test mode Python tests, starts it, and only on a JVM: a native image has
+ * no classes to load. It runs before the application's configuration is read, so it sees {@code micronaut.python.enabled}
+ * only as a system property or an environment variable. {@code micronaut.dev.python.warm-up=false} turns it off.</p>
  *
  * @author graemerocher
  * @since 5.3.0
