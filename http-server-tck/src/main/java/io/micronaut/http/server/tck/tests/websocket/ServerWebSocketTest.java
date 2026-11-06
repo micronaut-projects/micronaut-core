@@ -340,7 +340,7 @@ public class ServerWebSocketTest {
         assertEquals("red: hello", first.next());
         // the join of the first may reach the second too: a broadcast goes through the sessions as it finds them
         String message = second.next();
-        while ("joined red".equals(message)) {
+        if ("joined red".equals(message)) {
             message = second.next();
         }
         assertEquals("red: hello", message);

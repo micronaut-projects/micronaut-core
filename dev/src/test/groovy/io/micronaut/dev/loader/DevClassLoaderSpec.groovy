@@ -180,6 +180,22 @@ class DevClassLoaderSpec extends Specification {
         loader.current().close()
     }
 
+    void "a snapshot that cannot be copied leaves nothing behind"() {
+        given: "a directory with a file that cannot be read, after one that can"
+        Path classes = Files.createDirectories(project.resolve("classes"))
+        Files.writeString(classes.resolve("a.txt"), "a")
+        Files.createDirectories(classes.resolve("b"))
+        Files.createSymbolicLink(classes.resolve("b/missing.txt"), project.resolve("nowhere"))
+        Path snapshot = project.resolve("generations/1")
+
+        when:
+        GenerationClassLoader.snapshot(1, [classes], snapshot, getClass().classLoader)
+
+        then:
+        thrown(UncheckedIOException)
+        !Files.exists(snapshot)
+    }
+
     void "a retired generation of an earlier loader of the directory leaves the snapshot of a later loader alone"() {
         given: "a loader with a retired generation, and the same generation of a loader created again in the process"
         Path classes = Files.createDirectories(project.resolve("classes"))

@@ -19,6 +19,7 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
@@ -51,10 +52,14 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A streamed HTTP/2 response written from a thread other than the event loop, while the event loop
@@ -172,6 +177,46 @@ class Http2OffLoopStreamingWriteTest {
         discarded.get(10, TimeUnit.SECONDS);
     }
 
+    @Test
+    void bodyIsClosedIfTheEventLoopRejectsTheWrite() throws Exception {
+        OutboundAccess outboundAccess = access.get(10, TimeUnit.SECONDS);
+        ByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        CompletableFuture<Void> discarded = new CompletableFuture<>();
+        ByteBodyFactory.StreamingBody body = factory.createStreamingBody(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
+            @Override
+            public void onBytesConsumed(long bytesConsumed) {
+            }
+
+            @Override
+            public void allowDiscard() {
+                discarded.complete(null);
+            }
+        });
+        serverLoop.rejectNext(Thread.currentThread());
+
+        assertThrows(RejectedExecutionException.class,
+            () -> outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), body.rootBody()));
+
+        discarded.get(10, TimeUnit.SECONDS);
+    }
+
+    /**
+     * The first test recreates the race only while the gate recognises a signal of the flow, which
+     * it does by the name of its task. The fixed handler no longer sends one from the gated thread,
+     * so this is what fails if the name changes.
+     */
+    @Test
+    void theGateHoldsBackASignalOfTheFlowFromTheGatedThread() throws Exception {
+        CompletableFuture<Void> fed = new CompletableFuture<>();
+        CompletableFuture<Boolean> fedBeforeSignal = new CompletableFuture<>();
+        serverLoop.gate(Thread.currentThread(), () -> fed.complete(null));
+
+        boolean runNow = new EventLoopFlow(serverLoop).executeNow(() -> fedBeforeSignal.complete(fed.isDone()));
+
+        assertFalse(runNow);
+        assertTrue(fedBeforeSignal.get(10, TimeUnit.SECONDS));
+    }
+
     /**
      * An event loop that makes the race of the two threads deterministic: when the gated thread
      * submits a signal of an {@link io.micronaut.http.netty.EventLoopFlow}, it has already taken
@@ -182,6 +227,7 @@ class Http2OffLoopStreamingWriteTest {
     private static final class GatedEventLoop extends SingleThreadIoEventLoop {
         private volatile Thread gatedThread;
         private volatile Runnable beforeFlowTask;
+        private volatile Thread rejectedThread;
 
         GatedEventLoop() {
             super(null, new DefaultThreadFactory("gated-loop"), LocalIoHandler.newFactory());
@@ -192,8 +238,16 @@ class Http2OffLoopStreamingWriteTest {
             gatedThread = thread;
         }
 
+        void rejectNext(Thread thread) {
+            rejectedThread = thread;
+        }
+
         @Override
         public void execute(Runnable task) {
+            if (Thread.currentThread() == rejectedThread) {
+                rejectedThread = null;
+                throw new RejectedExecutionException("event executor terminated");
+            }
             if (Thread.currentThread() == gatedThread && task.getClass().getName().endsWith("EventLoopFlow$Delayed")) {
                 CountDownLatch done = new CountDownLatch(1);
                 Runnable before = beforeFlowTask;
