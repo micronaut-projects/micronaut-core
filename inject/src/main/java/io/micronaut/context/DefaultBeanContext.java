@@ -371,6 +371,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * with this context's listeners once they are known.
      */
     private List<BeanRegistration<?>> adoptedToWrap = new ArrayList<>();
+    /**
+     * What this context's bean created listeners created for instances it adopted: its own, unlike what they owned before.
+     */
+    private final List<BeanRegistration<?>> createdForAdopted = new ArrayList<>();
 
     private @Nullable ForkJoinTask<?> checkEnabledBeans;
 
@@ -4979,11 +4983,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * them: however far the start got, adopting them or not, each is handed back as it was given, for another context to
      * adopt, unless this context destroyed it for not being able to adopt it. No {@code @PreDestroy} method runs on
      * them. What this context made of them, a wrapper its listeners returned or the registrations it adopted them under,
-     * is dropped with it, neither destroyed nor announced.</p>
+     * is dropped with it, neither destroyed nor announced, and what its listeners created for them is destroyed.</p>
      *
-     * <p>A context whose start did not fail is not stopped. One that never started still has the retained beans it was
-     * configured with, and hands those back. One that started has adopted them, and hands nothing back. Must not be
-     * called while another thread starts the context, whose lock this waits for.</p>
+     * <p>The same goes for a context that was configured and never started, which adopted them as it was configured. Any
+     * other context is not stopped: one that was only built still has the retained beans it was configured with, and hands those
+     * back, and one that started has adopted them, and hands nothing back. Must not be called while another thread starts
+     * the context, whose lock this waits for.</p>
      *
      * @param retained The retained registrations this context was configured with
      * @return The retained registrations still alive and adopted by no context
@@ -4992,7 +4997,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Internal
     @Experimental
     public synchronized Collection<BeanRegistration<?>> stopFailedStart(Collection<BeanRegistration<?>> retained) {
-        if (!startFailed) {
+        if (!startFailed && (running.get() || !configured.get())) {
             Collection<BeanRegistration<?>> unadopted = registrationsToAdopt;
             registrationsToAdopt = List.of();
             return unadopted;
@@ -5011,8 +5016,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 kept.add(registration.bean);
             }
         }
+        destroyCreatedBeans(createdForAdopted, null);
+        createdForAdopted.clear();
         registrationsToAdopt = List.of();
         rejectedRetainedRegistrations.clear();
+        startFailed = true;
         retentionCriteria.set(new PredicateRetentionCriteria(registration -> false));
         retainedOnStopBeans = kept;
         // what stop() takes for a context that runs, as it would have had its start not failed
@@ -5261,6 +5269,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
             created = context.getAndResetDependentBeans();
         }
+        createdForAdopted.addAll(created);
         if (wrapped == instance && created.isEmpty()) {
             return false;
         }

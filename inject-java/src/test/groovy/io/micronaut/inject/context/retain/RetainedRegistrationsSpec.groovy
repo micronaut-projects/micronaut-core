@@ -452,6 +452,74 @@ class RetainedRegistrationsSpec extends Specification {
         running?.close()
     }
 
+    void "a context that was configured and never started hands back what it adopted"() {
+        given:
+        ApplicationContext first = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .beanDependencyTrackingEnabled(true)
+            .start()
+        Expensive expensive = first.getBean(Consumer).expensive
+        def retained = ((DefaultBeanContext) first).stopRetaining { it.beanType == Expensive }
+
+        when: "the next context adopts them as it is configured, and is never started"
+        DefaultBeanContext configured = (DefaultBeanContext) ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .beanDependencyTrackingEnabled(true)
+            .retainedRegistrations(retained)
+            .build()
+        ((ApplicationContext) configured).environment.start()
+        configured.configure()
+        def handedBack = configured.stopFailedStart(retained)
+
+        then:
+        handedBack as Set == retained as Set
+        Expensive.DESTROYED.get() == 0
+
+        when:
+        ApplicationContext third = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .beanDependencyTrackingEnabled(true)
+            .retainedRegistrations(handedBack)
+            .start()
+
+        then:
+        third.getBean(Expensive).is(expensive)
+
+        cleanup:
+        third?.close()
+    }
+
+    void "what the listeners of a context that failed to start created for a bean it adopted dies with it, and what the bean owned before does not"() {
+        given:
+        ExpensiveListener.DESTROYED.set(0)
+        ApplicationContext first = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec')
+            .beanDependencyTrackingEnabled(true)
+            .start()
+        first.getBean(Consumer)
+        def retained = ((DefaultBeanContext) first).stopRetaining { it.beanType == Expensive }
+
+        when:
+        ApplicationContext failed = ApplicationContext.builder()
+            .properties('spec.name': 'RetainedRegistrationsSpec', 'retain.fail-start': true)
+            .beanDependencyTrackingEnabled(true)
+            .retainedRegistrations(retained)
+            .build()
+        failed.start()
+
+        then:
+        thrown(RuntimeException)
+        ExpensiveListener.DESTROYED.get() == 0
+
+        when:
+        ((DefaultBeanContext) failed).stopFailedStart(retained)
+
+        then:
+        ExpensiveListener.DESTROYED.get() == 1
+        Scratch.DESTROYED.get() == 0
+        Expensive.DESTROYED.get() == 0
+    }
+
     void "stopping without retention destroys everything as before"() {
         given:
         ApplicationContext context = ApplicationContext.run('spec.name': 'RetainedRegistrationsSpec')

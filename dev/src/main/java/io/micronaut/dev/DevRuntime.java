@@ -1606,7 +1606,7 @@ public final class DevRuntime implements Closeable {
         }
         GenerationClassLoader retired = swapGeneration();
         if (old != null) {
-            // not a context that no longer runs: looking its listeners up would create them
+            // a context that no longer runs refuses to look its listeners up
             if (old.isRunning()) {
                 ClassChangeEvent event = new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART);
                 try {

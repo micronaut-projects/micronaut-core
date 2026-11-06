@@ -16,6 +16,7 @@
 package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.ConfigurableBeanContext;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
@@ -158,7 +159,7 @@ class FailedStartBeansTest {
         Pool pool = first.getBean(Pool.class);
         Holder holder = first.getBean(Holder.class);
         int generation = 1;
-        for (Launch failing : List.of(Launch.FAILS_IN_A_BEAN, Launch.MAIN_FAILS_FIRST, Launch.MAIN_FAILS_AFTER_BUILDING, Launch.FAILS_IN_A_STARTUP_LISTENER,
+        for (Launch failing : List.of(Launch.FAILS_IN_A_BEAN, Launch.MAIN_FAILS_FIRST, Launch.MAIN_FAILS_AFTER_BUILDING, Launch.MAIN_FAILS_AFTER_CONFIGURING, Launch.FAILS_IN_A_STARTUP_LISTENER,
             Launch.FAILS_WRAPPING_THE_ADOPTED, Launch.FAILS_ADOPTING, Launch.FAILS_IN_A_SHUTDOWN_LISTENER_TOO)) {
             next = failing;
             FailingCondition.fail = failing == Launch.FAILS_ADOPTING;
@@ -338,6 +339,11 @@ class FailedStartBeansTest {
         if (launch == Launch.MAIN_FAILS_AFTER_BUILDING) {
             throw new IllegalStateException("main failed before it started its context");
         }
+        if (launch == Launch.MAIN_FAILS_AFTER_CONFIGURING) {
+            context.getEnvironment().start();
+            ((ConfigurableBeanContext) context).configure();
+            throw new IllegalStateException("main failed with a context it configured and did not start");
+        }
         context.start();
     }
 
@@ -351,6 +357,7 @@ class FailedStartBeansTest {
         // main fails: before any context, or with one that never started
         MAIN_FAILS_FIRST(null),
         MAIN_FAILS_AFTER_BUILDING(null),
+        MAIN_FAILS_AFTER_CONFIGURING(null),
         // once the runtime was told the context started
         FAILS_IN_A_STARTUP_LISTENER(BROKEN_STARTUP_LISTENER),
         // the retained beans are adopted, and a listener fails on one
