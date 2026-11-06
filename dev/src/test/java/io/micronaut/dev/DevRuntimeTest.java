@@ -519,6 +519,61 @@ class DevRuntimeTest {
     }
 
     @Test
+    void sourcesThatFailedToCompileStillWaitAfterAConfigurationFileThatCannotBeRead() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", -1)).start();
+                }
+            }
+            """);
+        Path first = src.resolve("First.java");
+        Files.writeString(first, "package app; class First { }\n");
+        Path second = src.resolve("Second.java");
+        Files.writeString(second, "package app; class Second { }\n");
+        Path config = Files.createDirectories(project.resolve("src/main/resources")).resolve("application.json");
+        String readable = "{\"app\": {\"label\": \"alpha\"}}";
+        Files.writeString(config, readable);
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            // First compiles alone only if it comes again with the fix of Second: the batch names both, and fails
+            Files.writeString(first, "package app; class First { static final String EDITED = Second.VALUE; }\n");
+            Files.writeString(second, "package app; class Second { broken }\n");
+            runtime.changed(List.of(first, second), List.of());
+            assertEquals(1, runtime.generation());
+
+            Files.writeString(config, "{\"app\": ");
+            runtime.changed(List.of(config), List.of());
+            assertEquals(1, runtime.generation());
+
+            Files.writeString(config, readable);
+            runtime.changed(List.of(config), List.of());
+            Files.writeString(second, "package app; class Second { static final String VALUE = \"v\"; }\n");
+            runtime.changed(List.of(second), List.of());
+            assertEquals(2, runtime.generation());
+            ClassLoader loader = runtime.context().orElseThrow().getClassLoader();
+            assertNotNull(loader.loadClass("app.First").getDeclaredField("EDITED"));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
     void aStartThatCannotReadItsConfigurationLeavesTheLauncherUp() throws Exception {
         Path src = Files.createDirectories(project.resolve("src/main/java/app"));
         Path application = src.resolve("Application.java");

@@ -1524,7 +1524,7 @@ public final class DevRuntime implements Closeable {
         ConfigurationStaleness.Requirements requirements = ConfigurationStaleness.beforeRefresh(configurationChanged ? current : null);
         RefreshResult refresh = configurationChanged ? ConfigurationStaleness.refreshConfiguration(current) : null;
         if (refresh == ConfigurationStaleness.UNREADABLE && !batch.forcesRestart()) {
-            failedBatch = batch; // a new generation could not read the file either: this one carries on until it is corrected
+            failedBatch = failedBatch == null ? batch : Pending.merge(List.of(failedBatch, batch)); // a new generation could not read it either
             return;
         }
         OutputSnapshot previous = snapshot;
