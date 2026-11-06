@@ -69,14 +69,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Nullable
     private List<BeanRegistration<?>> dependentBeans;
     private boolean lazyProxyTarget;
-    /** The context creating the runtime proxy this context is retained by; see {@link #copyForRuntimeProxyTarget}. */
+    /** What creates the runtime proxy this context is retained by, until a call finds that over; see {@link #copyForRuntimeProxyTarget}. */
     @Nullable
-    private AbstractBeanResolutionContext runtimeProxyCreator;
-    /** The segment on top of the path of that context when the proxy was being created. */
-    @Nullable
-    private Segment<?, ?> runtimeProxyCreation;
-    /** The thread creating that proxy, the only one to which either of them means anything. */
-    private long runtimeProxyCreatorThread;
+    private RuntimeProxyCreator runtimeProxyCreator;
     @Nullable
     private List<BeanRegistration<?>> dependentBeansToDestroyAfterResolution;
     @Nullable
@@ -436,6 +431,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * path, whatever the path is now. The proxy creator can also resolve the one target it keeps while it creates the
      * proxy: that one remains a part of the creation, see {@link #runtimeProxyTargetContext()}.</p>
      *
+     * <p>A target that calls its own proxy while it is created is not reported as a circular dependency: the call
+     * resolves a further target, and without an end to it the thread runs out of stack.</p>
+     *
      * @param targetDefinition The definition of the target of the proxy
      * @return The context for the proxy to retain
      * @since 5.2.23
@@ -447,9 +445,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         // what creates a bean without a registration has no segment, and nothing to own the target through either
         Segment<?, ?> creation = path.peek();
         if (creation != null && copy instanceof AbstractBeanResolutionContext retained) {
-            retained.runtimeProxyCreator = this;
-            retained.runtimeProxyCreation = creation;
-            retained.runtimeProxyCreatorThread = Thread.currentThread().threadId();
+            retained.runtimeProxyCreator = new RuntimeProxyCreator(this, creation, Thread.currentThread().threadId());
         }
         return copy;
     }
@@ -462,12 +458,28 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      */
     @Internal
     public final BeanResolutionContext runtimeProxyTargetContext() {
-        // only the creating thread goes on to read the other two fields, and the path, which it wrote itself
-        if (runtimeProxyCreatorThread == Thread.currentThread().threadId()
-            && runtimeProxyCreator != null && runtimeProxyCreator.path.peek() == runtimeProxyCreation) {
-            return runtimeProxyCreator;
+        RuntimeProxyCreator creator = runtimeProxyCreator;
+        if (creator == null) {
+            return this;
         }
+        // only the creating thread can read the path of its context
+        if (creator.thread == Thread.currentThread().threadId() && creator.context.path.peek() == creator.creation) {
+            return creator.context;
+        }
+        // the creation is over, or the proxy left it early and what it resolves from now on is not owned by it: the
+        // proxy can outlive what created it by far, and has no use for it any more
+        runtimeProxyCreator = null;
         return this;
+    }
+
+    /**
+     * What creates a runtime proxy.
+     *
+     * @param context The context creating the proxy
+     * @param creation The segment on top of the path of that context when the proxy was being created
+     * @param thread The thread creating the proxy, the only one to which the other two mean anything
+     */
+    private record RuntimeProxyCreator(AbstractBeanResolutionContext context, Segment<?, ?> creation, long thread) {
     }
 
     /**
