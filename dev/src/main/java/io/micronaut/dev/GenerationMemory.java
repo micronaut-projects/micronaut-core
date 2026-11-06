@@ -71,11 +71,9 @@ final class GenerationMemory {
      */
     private static final String REACTOR_SCHEDULERS = "reactor.core.scheduler.Schedulers";
     /**
-     * Whether there is a {@link Introspector} to flush: {@code java.desktop} may be left out of the runtime, and a native
-     * image never unloads a class.
+     * Whether there is a {@link Introspector} to flush: {@code java.desktop} may be left out of the runtime.
      */
-    private static final boolean JAVA_BEANS_AVAILABLE = !NativeImageUtils.inImageCode()
-        && ModuleLayer.boot().findModule("java.desktop").isPresent();
+    private static final boolean JAVA_DESKTOP = ModuleLayer.boot().findModule("java.desktop").isPresent();
 
     private final DevClassLoader classLoader;
     // at most one check pending: reloads in quick succession start one thread and one collection
@@ -179,7 +177,8 @@ final class GenerationMemory {
      * thread, say, reads its model in the group of the virtual threads.
      */
     private static void flushBeanInfos() {
-        if (!JAVA_BEANS_AVAILABLE) {
+        if (NativeImageUtils.inImageRuntimeCode() || !JAVA_DESKTOP) {
+            // a native image never unloads a class it defined at runtime
             return;
         }
         ThreadGroup root = Thread.currentThread().getThreadGroup();
@@ -188,9 +187,12 @@ final class GenerationMemory {
         }
         ThreadGroup[] groups = new ThreadGroup[root.activeGroupCount()];
         int count = root.enumerate(groups);
+        // enumerating a group leaves the group itself out
+        groups = Arrays.copyOf(groups, count + 1);
+        groups[count] = root;
         try {
-            for (int i = 0; i < count; i++) {
-                Thread.ofPlatform().group(groups[i]).daemon().name("micronaut-dev-bean-info-flush").start(Introspector::flushCaches).join();
+            for (ThreadGroup group : groups) {
+                Thread.ofPlatform().group(group).daemon().name("micronaut-dev-bean-info-flush").start(Introspector::flushCaches).join();
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

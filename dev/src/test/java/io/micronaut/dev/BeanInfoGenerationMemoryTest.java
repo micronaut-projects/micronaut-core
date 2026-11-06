@@ -40,6 +40,11 @@ class BeanInfoGenerationMemoryTest {
     }
 
     @Test
+    void aBeanReadInTheRootThreadGroupDoesNotKeepItsGeneration() throws Exception {
+        ProbeJvm.assertPasses(Probe.class, project, COLLECTED, "-Dprobe.thread=root");
+    }
+
+    @Test
     void withoutJavaDesktopNothingIsFlushed() throws Exception {
         ProbeJvm.assertPasses(Flush.class, project, Flush.FORGOTTEN, "--limit-modules", "java.base,java.logging,java.xml,java.naming,java.management,jdk.unsupported");
     }
@@ -140,6 +145,15 @@ class BeanInfoGenerationMemoryTest {
                             case "virtual" -> Thread.ofVirtual().start(read).join();
                             case "group" -> {
                                 Thread thread = new Thread(new ThreadGroup("of its own"), read);
+                                thread.start();
+                                thread.join();
+                            }
+                            case "root" -> {
+                                ThreadGroup root = Thread.currentThread().getThreadGroup();
+                                while (root.getParent() != null) {
+                                    root = root.getParent();
+                                }
+                                Thread thread = new Thread(root, read);
                                 thread.start();
                                 thread.join();
                             }
