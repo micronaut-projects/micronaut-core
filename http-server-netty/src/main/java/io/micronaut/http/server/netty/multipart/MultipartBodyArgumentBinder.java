@@ -26,6 +26,7 @@ import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.MultipartBody;
+import io.micronaut.http.server.netty.NettyHttpRequest;
 import reactor.core.publisher.Flux;
 
 import java.util.Optional;
@@ -56,7 +57,9 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
 
     @Override
     public BindingResult<MultipartBody> bind(ArgumentConversionContext<MultipartBody> context, HttpRequest<?> source) {
-        if (!(source instanceof FormCapableHttpRequest<?> fchr) || !fchr.hasFormBody()) {
+        // the request itself, or e.g. the mutable view of the request that a filter continued with
+        FormCapableHttpRequest<?> fchr = source instanceof FormCapableHttpRequest<?> formRequest ? formRequest : NettyHttpRequest.findBodyRequest(source);
+        if (fchr == null || !fchr.hasFormBody()) {
             return BindingResult.empty();
         }
         Flux<? extends CompletedPart> parts = Flux.from(fchr.getRawFormFields())

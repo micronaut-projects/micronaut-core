@@ -1,4 +1,5 @@
 import ast
+import builtins
 import inspect
 import keyword
 import os
@@ -34,6 +35,29 @@ ElementQuery = java.type("io.micronaut.inject.ast.ElementQuery")
 
 _JAVA_INT_MIN = -2 ** 31
 _JAVA_INT_MAX = 2 ** 31 - 1
+
+# The Java types other than the default that a Python type can be declared to map to with Annotated, as in
+# Annotated[datetime, Instant]: an aware datetime is an absolute instant, which LocalDateTime cannot hold.
+# The runtime converts between each pair.
+_DATETIME_JAVA_TYPES = frozenset((
+    "java.time.LocalDateTime", "java.time.Instant", "java.time.OffsetDateTime", "java.time.ZonedDateTime",
+))
+ALTERNATIVE_JAVA_TYPES = {
+    "datetime": _DATETIME_JAVA_TYPES,
+    "datetime.datetime": _DATETIME_JAVA_TYPES,
+}
+# Marks the elements whose Java instant type stands for a Python datetime, so the generated code hands the
+# value to Python as an aware datetime; a parameter declared with the Java type keeps the Java object
+_PYTHON_DATETIME_ANNOTATION = "io.micronaut.context.python.annotation.PythonDateTime"
+
+
+def _with_java_type(type_ref, java_type):
+    """The type with its Python type (each non-None member of a union) replaced by the named Java type."""
+    if type_ref.isUnion():
+        members = [member if member.isNone() else _with_java_type(member, java_type)
+                   for member in type_ref.typeArguments()]
+        return TypeRef(type_ref.name(), members, type_ref.typeUseDecorators(), type_ref.nativeException())
+    return TypeRef(java_type, type_ref.typeArguments(), type_ref.typeUseDecorators(), type_ref.nativeException())
 
 
 class UnresolvedAnnotationMemberError(ValueError):
@@ -232,6 +256,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
         self.unresolved_member_errors = []  # Decorator members referencing a Java class member that does not exist
+        self.annotation_instance_assignments = {}  # Module-level names bound to an annotation call, to diagnose Annotated[..., NAME]
         self.current_class_nested_types = {}  # Track nested classes visible in the current class body
         # Script handling
         self.current_script = None
@@ -984,6 +1009,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         if value_node is None:
             return
 
+        self._track_annotation_instance_assignment(targets, value_node)
+
         resolved, value = self._literal_constant_value(value_node)
         if not resolved:
             return
@@ -1004,6 +1031,23 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 names.insert(0, current.id)
             if names and names[0] in self.local_classes:
                 self.local_constant_values[".".join(names)] = value
+
+    def _track_annotation_instance_assignment(self, targets, value_node):
+        """
+        Remember a module-level name bound to an annotation call -- ``PASSWORD = Size(min=8, max=128)``.
+
+        Such a name reads like ordinary de-duplication but cannot be used as ``Annotated[str, PASSWORD]``:
+        the processor reads annotations from source and never evaluates the module, so the name resolves to
+        nothing and the constraint would be dropped without a word. Recording it here lets
+        ``_parse_annotated_metadata`` say so.
+        """
+        if self.current_class is not None or not isinstance(value_node, ast.Call):
+            return
+        if convert_ast_call_to_decorator(value_node, self) is None:
+            return
+        for target in targets:
+            if isinstance(target, ast.Name):
+                self.annotation_instance_assignments[target.id] = ast.unparse(value_node)
 
     def _handle_field_docstring(self, node):
         """
@@ -1381,6 +1425,16 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         elif isinstance(metadata, ast.Name):
                             # Handle simple decorator names like NotBlank or Inject
                             decorator_reference = metadata.id
+                            if (decorator_reference in self.annotation_instance_assignments
+                                    and decorator_reference not in self.known_decorators
+                                    and decorator_reference not in self.imported_types):
+                                self.unresolved_member_errors.append(
+                                    f"[{decorator_reference}] in Annotated[...] is a name bound to "
+                                    f"[{self.annotation_instance_assignments[decorator_reference]}], not an annotation. "
+                                    "Annotations are read from source and never evaluated, so this one would be "
+                                    "dropped, taking any constraint it carries with it. Write the annotation inline."
+                                )
+                                continue
                             decorator = self.to_decorator_from_reference(decorator_reference)
                             decorators.append(decorator)
                         elif isinstance(metadata, ast.Attribute):
@@ -1388,6 +1442,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             decorators.append(self._parse_attribute_metadata(metadata, {}))
                         # For other metadata types (strings, numbers), we could handle them
                         # but for now, focus on decorator names and calls
+                    type_annotation, decorators = self._select_java_type(type_annotation, decorators)
                 else:
                     # Fallback to original annotation if no args
                     type_annotation = TypeRef(ast.unparse(annotation_node))
@@ -1399,6 +1454,38 @@ class MicronautAstVisitor(ast.NodeVisitor):
             type_annotation = TypeRef(ast.unparse(annotation_node))
 
         return type_annotation, decorators
+
+    def _select_java_type(self, type_annotation, decorators):
+        """
+        Apply an ``Annotated`` metadata argument that names the Java type of the annotated Python type
+        rather than an annotation, as ``Instant`` does in ``Annotated[datetime, Instant]``. The Python type
+        (the non-None member of a nullable union) is replaced by the Java type, and the argument is replaced
+        by the PythonDateTime marker (dropped for LocalDateTime, the default).
+        """
+        members = [member for member in type_annotation.typeArguments() if not member.isNone()] \
+            if type_annotation.isUnion() else [type_annotation]
+        if len(members) != 1:
+            return type_annotation, decorators
+        alternatives = ALTERNATIVE_JAVA_TYPES.get(members[0].name())
+        if not alternatives:
+            return type_annotation, decorators
+        for decorator in decorators:
+            java_type = self._java_type_name(decorator.annotationName())
+            if java_type in alternatives:
+                remaining = [other for other in decorators if other is not decorator]
+                if java_type != "java.time.LocalDateTime":
+                    remaining.append(DecoratorDef("PythonDateTime", _PYTHON_DATETIME_ANNOTATION, None, {}, []))
+                return _with_java_type(type_annotation, java_type), remaining
+        return type_annotation, decorators
+
+    def _java_type_name(self, name):
+        """
+        The qualified name of a Java type referenced by a simple name: a Java import such as
+        ``from java.time import Instant`` reaches the processor as ``Instant = java.type("java.time.Instant")``.
+        """
+        if '.' in name:
+            return name
+        return self.java_type_assignments.get(name) or self.imported_types.get(name) or name
 
     def to_decorator_from_reference(self, decorator_reference):
         return self.to_decorator_from_reference_with_members(decorator_reference, {})
@@ -1946,7 +2033,17 @@ class MicronautAstVisitor(ast.NodeVisitor):
         Parse a base class AST node and return a TypeDef.
         Handles simple names like 'str' and subscripted types like 'MyBase[str]'.
         """
-        return self._parse_type(base_node)
+        base = self._parse_type(base_node)
+        if isinstance(base_node, ast.Name) and self._resolve_local_type_name(base_node.id):
+            return base
+        name = base.name()
+        # Resolve imports and local classes first: a user-defined RuntimeError is not a builtin.
+        builtin_name = name.removeprefix("builtins.")
+        if "." not in builtin_name and "$" not in builtin_name:
+            builtin = getattr(builtins, builtin_name, None)
+            if isinstance(builtin, type) and issubclass(builtin, Exception):
+                return TypeRef("builtins." + builtin_name, base.typeArguments(), base.typeUseDecorators(), True)
+        return base
 
     def _current_class_is_protocol(self):
         """
@@ -2117,7 +2214,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         """
         Parse the arguments of an ast.FunctionDef node and return ArgumentsDef.
         """
-        args_list = func_node.args.args
+        # positional-only parameters come first and share the defaults with the others
+        args_list = func_node.args.posonlyargs + func_node.args.args
         defaults = func_node.args.defaults
 
         # Only the last len(defaults) arguments have defaults
@@ -2477,6 +2575,29 @@ def convert_ast_value(node, visitor=None):
         # Fallback to AST dump for complex expressions
         return ast.dump(node)
 
+def _is_ast_dump_fallback(node, value):
+    """Whether convert_ast_value gave up on this node and returned ``ast.dump`` of it."""
+    return isinstance(value, str) and value == ast.dump(node)
+
+
+def _names_a_real_annotation(visitor, annotation_name):
+    """
+    Whether ``annotation_name`` is an annotation rather than any other call the walker passes through here.
+
+    This path also sees ordinary calls in a module body -- ``print(f'...')`` arrives as a member of
+    ``@print`` -- and those are not annotations, carry no metadata and must not be diagnosed.
+    """
+    if not annotation_name:
+        return False
+    simple_name = annotation_name.split(".")[-1]
+    return (
+        simple_name in visitor.known_decorators
+        or simple_name in visitor.imported_types
+        or annotation_name in visitor.imported_types
+        or find_known_decorator_by_annotation_name(visitor, annotation_name) is not None
+    )
+
+
 def convert_ast_call_to_decorator(node, visitor=None):
     if visitor is None or not isinstance(node, ast.Call):
         return None
@@ -2498,7 +2619,21 @@ def convert_ast_call_to_decorator(node, visitor=None):
 
 def convert_annotation_member_value(annotation_name, member_name, node, visitor=None):
     try:
-        return convert_ast_value(node, visitor)
+        value = convert_ast_value(node, visitor)
+        if (visitor is not None
+                and _names_a_real_annotation(visitor, annotation_name)
+                and _is_ast_dump_fallback(node, value)):
+            # convert_ast_value could not make a constant of this expression and fell back to dumping the
+            # AST. Left alone that dump becomes the member's value, so the annotation carries nonsense --
+            # a computed `defaultValue` publishes the parameter as required, a computed constraint bound
+            # stops constraining. Say so rather than emit it.
+            visitor.unresolved_member_errors.append(
+                f"The value [{ast.unparse(node)}] of member [{member_name}] of @{annotation_name} is not a "
+                "compile-time constant. Annotation arguments are read from source and never evaluated; "
+                "use a literal."
+            )
+            return ast.unparse(node)
+        return value
     except UnresolvedAnnotationMemberError as e:
         # reported once the module is visited; the value stays the dotted name meanwhile
         visitor.unresolved_member_errors.append(
@@ -2669,7 +2804,7 @@ def extract_arg_defaults(func_node, visitor=None):
     as None, which is no default at all, rather than as an AST repr: the Java side has no reliable
     way to tell a dump from a string default with the same text.
     """
-    arg_names = [a.arg for a in func_node.args.args]
+    arg_names = [a.arg for a in func_node.args.posonlyargs + func_node.args.args]
     defaults = func_node.args.defaults
 
     # Only the last len(defaults) arguments have defaults
@@ -2692,7 +2827,7 @@ def extract_arg_decorators(visitor, func_node):
     through typing.Annotated metadata.
     """
     member_decorators = {}
-    for arg in func_node.args.args:
+    for arg in func_node.args.posonlyargs + func_node.args.args:
         annotation = getattr(arg, 'annotation', None)
         if visitor._is_annotated_subscript(annotation):
             _, decorators = visitor._parse_annotated_type(annotation)
@@ -2706,7 +2841,7 @@ def extract_arg_types(visitor, func_node):
     types keyed by argument name.
     """
     member_types = {}
-    for arg in func_node.args.args:
+    for arg in func_node.args.posonlyargs + func_node.args.args:
         annotation = getattr(arg, 'annotation', None)
         if annotation is None:
             continue
@@ -2832,7 +2967,7 @@ def is_python_decorator_function(funcdef):
         for stmt in funcdef.body
         if isinstance(stmt, ast.FunctionDef)
     }
-    positional_argument_names = [arg.arg for arg in funcdef.args.args]
+    positional_argument_names = [arg.arg for arg in funcdef.args.posonlyargs + funcdef.args.args]
     single_target_argument = positional_argument_names[0] if len(positional_argument_names) == 1 else None
 
     for stmt in ast.walk(funcdef):

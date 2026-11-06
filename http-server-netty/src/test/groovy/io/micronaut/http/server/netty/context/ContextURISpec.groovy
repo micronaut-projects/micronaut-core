@@ -10,11 +10,11 @@ class ContextURISpec extends Specification {
         when:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.server.context-path': '/context',
-                'micronaut.server.port': 60006
+                'micronaut.server.port': -1
         ])
 
         then:
-        embeddedServer.getContextURI().toString() == 'http://localhost:60006/context'
+        embeddedServer.getContextURI().toString() == "http://localhost:${embeddedServer.port}/context"
 
         cleanup:
         embeddedServer.close()
@@ -23,11 +23,11 @@ class ContextURISpec extends Specification {
     void "test getContextURI returns the base URI when context path is not set"() {
         when:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.server.port': 60007
+                'micronaut.server.port': -1
         ])
 
         then:
-        embeddedServer.getContextURI().toString() == 'http://localhost:60007'
+        embeddedServer.getContextURI().toString() == "http://localhost:${embeddedServer.port}"
 
         cleanup:
         embeddedServer.close()
@@ -37,11 +37,11 @@ class ContextURISpec extends Specification {
         when:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.server.context-path': '',
-                'micronaut.server.port': 60008
+                'micronaut.server.port': -1
         ])
 
         then:
-        embeddedServer.getContextURI().toString() == 'http://localhost:60008'
+        embeddedServer.getContextURI().toString() == "http://localhost:${embeddedServer.port}"
 
         cleanup:
         embeddedServer.close()

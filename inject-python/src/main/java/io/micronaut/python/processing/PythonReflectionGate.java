@@ -55,6 +55,11 @@ import java.util.stream.Collectors;
  * Micronaut property, since javac only accepts a dot-separated sequence of identifiers as the key of an
  * option, or as the {@value #PROPERTY} system property of the compiler JVM.</p>
  *
+ * <p>A type whose annotations are left off is noted only when the compilation asks for the notes with
+ * {@value #WARNINGS_OPTION}: most applications read no annotation reflectively, so a note per type is
+ * noise they cannot act on. The option is there for the user whose reflection-based framework does not
+ * see an annotation and who wants the compiler to name the types it left off.</p>
+ *
  * <p>The gate applies to the reflective copies only. The annotations the test frameworks and Micronaut
  * itself read from the generated class (JUnit, {@code @MicronautTest} and the other {@code @ExtendWith}
  * annotations, the Micronaut annotations declared {@code @ReflectiveAccess}) are copied regardless.</p>
@@ -77,6 +82,16 @@ final class PythonReflectionGate {
      * {@code -A} option ({@code allow-reflection} is not an identifier).
      */
     static final String OPTION = "micronaut.introspection.allowReflection";
+
+    /**
+     * The option that turns on the notes naming the generated types whose reflection data was left off.
+     * They are off by default: a note per type is noise for the applications that read no annotation
+     * reflectively, which is most of them, and the compiler has no way of telling whether a framework
+     * on the class path wants the copy. Turned on with {@code -A}{@value #WARNINGS_OPTION}{@code =true},
+     * or with the system property of that name of the compiler JVM, by a user looking for the type a
+     * reflection-based framework does not see.
+     */
+    static final String WARNINGS_OPTION = "micronaut.python.reflection.warnings";
 
     /**
      * The annotations whose absence from the generated type is not worth a note: Bean Validation
@@ -215,11 +230,19 @@ final class PythonReflectionGate {
     /**
      * Reports, once per generated type whose reflection data was left off, the annotations that were not
      * copied and how to have them copied: the {@link AllowsReflection} hint or the option naming the type.
-     * The types reported so far are forgotten.
+     * Nothing is reported unless {@value #WARNINGS_OPTION} asks for the notes. The types reported so far
+     * are forgotten either way.
      *
      * @param visitorContext The visitor context
      */
     void report(@NonNull VisitorContext visitorContext) {
+        if (gatedTypes.isEmpty()) {
+            return;
+        }
+        if (!warningsEnabled(visitorContext)) {
+            gatedTypes.clear();
+            return;
+        }
         for (Map.Entry<String, GatedType> entry : gatedTypes.entrySet()) {
             String typeName = entry.getKey();
             String annotations = entry.getValue().annotations().stream()
@@ -253,6 +276,16 @@ final class PythonReflectionGate {
                 || member.getDeclaringType().hasStereotype(AllowsReflection.class);
         }
         return false;
+    }
+
+    /**
+     * Whether the compilation asks for the notes naming the types whose reflection data was left off.
+     *
+     * @param visitorContext The visitor context
+     * @return Whether {@value #WARNINGS_OPTION} is set to {@code true}
+     */
+    private static boolean warningsEnabled(VisitorContext visitorContext) {
+        return StringUtils.isTrue(visitorContext.getOptions().get(WARNINGS_OPTION));
     }
 
     private static boolean isReported(String annotationName) {

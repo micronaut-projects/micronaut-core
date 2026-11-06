@@ -31,6 +31,10 @@ import java.net.URI;
 /**
  * HTTP client that allows sending "raw" requests with a {@link ByteBody} for the request and
  * response body.
+ * <p>Cancelling the subscription to the publisher of an exchange before the response arrives
+ * aborts the request: its connection (HTTP/1) or stream (HTTP/2) is closed and the request body
+ * is released. Once the response has arrived, cancelling has no effect: close the
+ * {@link ByteBodyHttpResponse} to release its body.
  *
  * @author Jonas Konrad
  * @since 4.7.0

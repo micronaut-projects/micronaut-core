@@ -7,6 +7,7 @@ import io.micronaut.inject.qualifiers.Qualifiers
 import jakarta.inject.Singleton
 import spock.lang.Specification
 
+import java.time.Duration
 import java.util.function.Supplier
 
 class ReflectionBeanDefinitionSpec extends Specification {
@@ -87,6 +88,38 @@ class ReflectionBeanDefinitionSpec extends Specification {
         then: "the pre destroy method ran"
         dispatcher.stopped
         dispatcher.events == ["start", "stop"]
+    }
+
+    void "a missing nullable value takes its @Bindable default, and is null without one"() {
+        given:
+        def context = ApplicationContext.run()
+        context.registerBeanDefinition(ReflectionBeanDefinition.of(Pacer))
+
+        when:
+        def pacer = context.getBean(Pacer)
+
+        then:
+        pacer.warnWait == Duration.ofSeconds(2)
+        pacer.label == null
+
+        cleanup:
+        context.close()
+    }
+
+    void "a configured nullable value replaces its @Bindable default"() {
+        given:
+        def context = ApplicationContext.run('pacer.warn-wait': '5s', 'pacer.label': 'brisk')
+        context.registerBeanDefinition(ReflectionBeanDefinition.of(Pacer))
+
+        when:
+        def pacer = context.getBean(Pacer)
+
+        then:
+        pacer.warnWait == Duration.ofSeconds(5)
+        pacer.label == 'brisk'
+
+        cleanup:
+        context.close()
     }
 
     void "the builder overrides the qualifier and the scope of the class"() {

@@ -30,6 +30,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -44,6 +45,7 @@ import java.util.List;
  * @param introduction        Whether the proxy is an introduction
  * @param proxyTarget         Whether the proxy is a proxy target bean
  * @param constructorValues   The constructor values
+ * @param targetQualifier     The qualifier of the proxy target bean, captured when the proxy is created
  * @param <T>                 The proxy type
  */
 @Internal
@@ -53,7 +55,28 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                                                List<InterceptedMethod<T>> interceptedMethods,
                                                boolean introduction,
                                                boolean proxyTarget,
-                                               Object[] constructorValues) implements RuntimeProxyDefinition<T> {
+                                               Object[] constructorValues,
+                                               @Nullable Qualifier<T> targetQualifier) implements RuntimeProxyDefinition<T> {
+
+    /**
+     * Creates a new instance, capturing the target qualifier from the resolution context.
+     *
+     * @param proxyBeanDefinition The proxy bean definition
+     * @param resolutionContext   The bean resolution context
+     * @param interceptedMethods  The intercepted methods
+     * @param introduction        Whether the proxy is an introduction
+     * @param proxyTarget         Whether the proxy is a proxy target bean
+     * @param constructorValues   The constructor values
+     */
+    public DefaultRuntimeProxyDefinition(BeanDefinition<T> proxyBeanDefinition,
+                                         BeanResolutionContext resolutionContext,
+                                         List<InterceptedMethod<T>> interceptedMethods,
+                                         boolean introduction,
+                                         boolean proxyTarget,
+                                         Object[] constructorValues) {
+        this(proxyBeanDefinition, resolutionContext, interceptedMethods, introduction, proxyTarget, constructorValues,
+            (Qualifier<T>) resolutionContext.getCurrentQualifier());
+    }
 
     /**
      * Creates a new instance for around advice.
@@ -71,14 +94,15 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                                                               Object[] constructorValues) {
 
         Collection<ExecutableMethod<T, ?>> executableMethods;
+        // The qualifier is only current while the proxy is created, so it is kept to resolve the target on each call
+        Qualifier<T> targetQualifier = (Qualifier<T>) resolutionContext.getCurrentQualifier();
         if (isProxyTarget) {
             Class<T> beanType = proxyBeanDefinition.getBeanType();
             BeanContext beanContext = resolutionContext
                 .getContext();
             Argument<T> argument = Argument.of(beanType);
-            Qualifier<T> qualifier = (Qualifier<T>) resolutionContext.getCurrentQualifier();
             executableMethods = beanContext
-                .getProxyTargetBeanDefinition(argument, qualifier)
+                .getProxyTargetBeanDefinition(argument, targetQualifier)
                 .getExecutableMethods();
         } else {
             executableMethods = proxyBeanDefinition.getExecutableMethods();
@@ -98,7 +122,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                 interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) executableMethod, (Interceptor[]) methodInterceptors));
             }
         }
-        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, isProxyTarget, constructorValues);
+        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, isProxyTarget, constructorValues, targetQualifier);
     }
 
     /**
@@ -164,10 +188,9 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         BeanContext beanContext = resolutionContext
             .getContext();
         Argument<T> argument = Argument.of(beanType);
-        Qualifier<T> qualifier = (Qualifier<T>) resolutionContext.getCurrentQualifier();
         BeanDefinition<T> proxyTargetBeanDefinition = beanContext
-            .getProxyTargetBeanDefinition(argument, qualifier);
-        return resolutionContext.getProxyTargetBean(proxyTargetBeanDefinition, argument, qualifier);
+            .getProxyTargetBeanDefinition(argument, targetQualifier);
+        return resolutionContext.getProxyTargetBean(proxyTargetBeanDefinition, argument, targetQualifier);
     }
 
     @Override

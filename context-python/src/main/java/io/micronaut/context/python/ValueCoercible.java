@@ -43,6 +43,14 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     String HOST_OBJECT_MEMBER = "__micronaut_value_coercible_host__";
     String AS_POLYGLOT_VALUE_MEMBER = "asPolyglotValue";
     /**
+     * The member the Python view of a wrapper reads its Python object from, as opposed to the public
+     * {@link #AS_POLYGLOT_VALUE_MEMBER}, which always answers with the object of the wrapper itself.
+     * <p>
+     * The name is dunder-style so that Python does not mangle it inside the class body of the view,
+     * and carries the {@link #RUNTIME_MEMBER_PREFIX} so that it stays out of member enumeration.
+     */
+    String PYTHON_OBJECT_MEMBER = "__micronaut_python_object__";
+    /**
      * The accessors of the Java exception a generated exception wrapper exposes to Python.
      */
     List<String> THROWABLE_MEMBERS = List.of("getMessage", "getLocalizedMessage", "getCause", "getStackTrace", "getSuppressed");
@@ -56,6 +64,10 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
      * The returned value belongs to the runtime context that created this wrapper, except for
      * pooled wrappers where {@link PooledValueCoercible#asPolyglotValue(org.graalvm.polyglot.Context)}
      * can resolve an equivalent value for a specific event-loop context.
+     * <p>
+     * A generated wrapper that does not hold a Python object yet creates one on the first call, so
+     * the value is never {@code null}: the default methods of this interface and the generated
+     * accessors read it without a null check.
      *
      * @return The wrapped Python polyglot value.
      */
@@ -75,11 +87,13 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
      * Exposes the wrapped Python value as a polyglot proxy member.
      * <p>
      * Generated Python bridge classes implement {@link ProxyObject} through this interface so
-     * GraalPy can read members from the underlying Python object. Two Micronaut-specific members
+     * GraalPy can read members from the underlying Python object. Three Micronaut-specific members
      * are handled before delegating to Python:
      * {@link #HOST_OBJECT_MEMBER} exposes a private host reference used to recover the generated
-     * Java wrapper, and {@link #AS_POLYGLOT_VALUE_MEMBER} exposes a zero-argument callable that
-     * returns the wrapped {@link Value}. JavaBean-style generated accessor aliases are resolved
+     * Java wrapper, {@link #AS_POLYGLOT_VALUE_MEMBER} exposes a zero-argument callable that
+     * returns the wrapped {@link Value} of this wrapper, and {@link #PYTHON_OBJECT_MEMBER} the
+     * callable the Python view of the wrapper reads, which answers with the object of the context
+     * the caller runs in. JavaBean-style generated accessor aliases are resolved
      * after direct Python members, and a wrapper that is a {@link Throwable} exposes the
      * accessors of the Java exception ({@code getMessage()}, {@code getCause()}, ...), so a
      * Python exception handler reads the Java view of a Python exception that crossed Java.
@@ -101,13 +115,23 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
                 return asPolyglotValue();
             };
         }
+        if (PYTHON_OBJECT_MEMBER.equals(key)) {
+            return (ProxyExecutable) arguments -> {
+                if (arguments.length != 0) {
+                    throw new IllegalArgumentException(PYTHON_OBJECT_MEMBER + " expects no arguments");
+                }
+                return PythonCoercion.pythonObjectInCurrentContext(this);
+            };
+        }
         Value value = asPolyglotValue();
         if (value.hasMember(key)) {
             Value member = value.getMember(key);
             if (PythonConversion.isNone(member)) {
                 return null;
             }
-            return member;
+            // a coroutine of this object's context cannot be awaited on the loop of a caller in another one
+            Object asyncMember = PythonContextRuntime.crossContextAsyncMember(value, key, member);
+            return asyncMember != null ? asyncMember : PythonCoercion.memberInEnteredContext(member);
         }
         Object getter = generatedGetter(key);
         if (getter != null) {
@@ -161,6 +185,7 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     default boolean hasMember(String key) {
         return HOST_OBJECT_MEMBER.equals(key) ||
             AS_POLYGLOT_VALUE_MEMBER.equals(key) ||
+            PYTHON_OBJECT_MEMBER.equals(key) ||
             asPolyglotValue().hasMember(key) ||
             throwableMember(key) != null ||
             (this instanceof GeneratedPropertyMembers generatedMembers &&
@@ -272,7 +297,7 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             if (PythonConversion.isNone(member)) {
                 return null;
             }
-            return member;
+            return PythonCoercion.memberInEnteredContext(member);
         };
     }
 

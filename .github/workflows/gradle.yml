@@ -33,6 +33,9 @@ jobs:
     strategy:
       matrix:
         java: ['25']
+    outputs:
+      # Outcome of the static analysis step: success, failure or skipped (no Sonar token, e.g. fork pull requests)
+      sonar: ${{ steps.sonar.outcome }}
     env:
       TESTCONTAINERS_RYUK_DISABLED: true
       SONAR_TOKEN_AVAILABLE: ${{ secrets.SONAR_TOKEN != '' }}
@@ -85,14 +88,18 @@ jobs:
           ./gradlew check jacocoReport --no-daemon --continue
 
       - name: "🔎 Run static analysis"
+        id: sonar
         if: env.SONAR_TOKEN_AVAILABLE == 'true' && matrix.java == '25'
+        # Waits for the quality gate so a failing gate stops the native and Python tests, but does not
+        # fail this job: snapshot and docs publishing below keep running on branch pushes.
+        continue-on-error: true
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
           DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
           DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          ./gradlew sonar --no-parallel --continue
+          ./gradlew sonar --no-parallel --continue -Dsonar.qualitygate.wait=true
 
       - name: "📊 Publish Test Report"
         if: always()
@@ -139,3 +146,15 @@ jobs:
       - name: "❓ Optional cleanup step"
         run: |
           [ -f ./cleanup.sh ] && ./cleanup.sh || [ ! -f ./cleanup.sh ]
+  # Native and Python tests start only when the build and its tests passed and the Sonar quality gate
+  # did not fail, so a red or cancelled build never takes runners for their matrices.
+  native:
+    needs: build
+    if: needs.build.outputs.sonar != 'failure'
+    uses: ./.github/workflows/graalvm-latest.yml
+    secrets: inherit
+  python:
+    needs: build
+    if: needs.build.outputs.sonar != 'failure'
+    uses: ./.github/workflows/python.yml
+    secrets: inherit

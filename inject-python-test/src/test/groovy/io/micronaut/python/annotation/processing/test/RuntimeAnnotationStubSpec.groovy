@@ -153,9 +153,12 @@ class Reader:
         Class<?> bookClass = context.classLoader.loadClass("python.Book")
 
         def properties = ["title", "pages", "tags", "stamp", "id"]
-        def internalFields = bookClass.declaredFields.findAll { !Modifier.isStatic(it.modifiers) && !(it.name in properties) }
+        def internalFields = bookClass.superclass.declaredFields.findAll { !Modifier.isStatic(it.modifiers) }
 
-        expect: "reflection-based frameworks (JPA field access, Java serialization) skip the Python state"
+        expect: "the class declares the fields of its properties only"
+        bookClass.declaredFields.findAll { !Modifier.isStatic(it.modifiers) }*.name as Set == properties as Set
+
+        and: "reflection-based frameworks (JPA field access, Java serialization) skip the Python state of the superclass"
         internalFields*.name.contains("graalpyInternalValue")
         internalFields.every { Modifier.isTransient(it.modifiers) }
         bookClass.declaredFields.findAll { it.name in properties }.every { !Modifier.isTransient(it.modifiers) }
