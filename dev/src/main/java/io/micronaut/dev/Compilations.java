@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.compile.CompilationRequest;
 import io.micronaut.dev.compile.CompilationResult;
 import io.micronaut.dev.compile.CompileMode;
+import io.micronaut.dev.compile.IncrementalMode;
 import io.micronaut.dev.compile.OutputLock;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
@@ -161,6 +162,11 @@ final class Compilations {
      * @throws IllegalStateException if a compilation fails
      */
     static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
+        for (SourceKind kind : SourceKind.values()) {
+            if (kind != SourceKind.PYTHON && manifest.incrementalMode(kind) == IncrementalMode.OPTIMISTIC) {
+                LOG.warn("The optimistic incremental mode set for {} sources has no effect: only the Python compiler distinguishes the modes", kind);
+            }
+        }
         Map<SourceKind, SourceKind> jointOwners = jointOwners(manifest, compilers);
         // decided before anything is compiled: two languages sharing one output are both missing, or neither
         Set<SourceKind> missing = new LinkedHashSet<>();

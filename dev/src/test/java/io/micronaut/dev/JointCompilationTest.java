@@ -1,5 +1,9 @@
 package io.micronaut.dev;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.micronaut.dev.compile.CompilationRequest;
 import io.micronaut.dev.compile.CompilationResult;
 import io.micronaut.dev.compile.IncrementalMode;
@@ -9,6 +13,7 @@ import io.micronaut.dev.compile.SourceRoot;
 import io.micronaut.dev.manifest.DevManifest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -103,6 +108,32 @@ class JointCompilationTest {
         for (CompilationRequest request : javac.requests) {
             assertEquals(IncrementalMode.CONSERVATIVE, request.incrementalMode());
         }
+    }
+
+    @Test
+    void anOptimisticModeForALanguageThatHasNoModesIsWarnedAbout() {
+        assertEquals(List.of("The optimistic incremental mode set for JAVA sources has no effect: only the Python compiler distinguishes the modes"),
+            warningsFor("java", "optimistic"));
+        assertEquals(List.of(), warningsFor("java", "conservative"));
+        assertEquals(List.of(), warningsFor("python", "optimistic"));
+    }
+
+    private List<String> warningsFor(String language, String mode) {
+        Properties properties = new Properties();
+        properties.setProperty("micronaut.dev.main-class", "example.Application");
+        properties.setProperty("micronaut.dev.reloadable", "classes");
+        properties.setProperty("micronaut.dev.compile." + language + ".incremental-mode", mode);
+        DevManifest manifest = DevManifest.of(project, properties);
+        Logger logger = (Logger) LoggerFactory.getLogger(DevRuntime.class);
+        ListAppender<ILoggingEvent> logged = new ListAppender<>();
+        logged.start();
+        logger.addAppender(logged);
+        try {
+            Compilations.compileMissingOutputs(manifest, Map.of());
+        } finally {
+            logger.detachAppender(logged);
+        }
+        return logged.list.stream().filter(event -> event.getLevel() == Level.WARN).map(ILoggingEvent::getFormattedMessage).toList();
     }
 
     private DevManifest manifest(String pythonOutput, String javaOutput) throws Exception {
