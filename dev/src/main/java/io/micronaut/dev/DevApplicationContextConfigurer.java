@@ -24,6 +24,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.manifest.DevMode;
+import io.micronaut.dev.python.PythonStdlibOption;
 import io.micronaut.scheduling.io.watch.DirectoryWatcher;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 import io.micronaut.scheduling.io.watch.FileWatcher;
@@ -53,6 +54,10 @@ public final class DevApplicationContextConfigurer implements ApplicationContext
         DevRuntime runtime = DevRuntime.current();
         if (runtime == null) {
             return;
+        }
+        PropertySource pythonStdlib = PythonStdlibOption.propertySource(runtime.manifest());
+        if (pythonStdlib != null) {
+            builder.propertySources(pythonStdlib);
         }
         if (runtime.manifest().mode() == DevMode.TEST) {
             // in test mode the tests start their own contexts, as they would in the build, on the generation that

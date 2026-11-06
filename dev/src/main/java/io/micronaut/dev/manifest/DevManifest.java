@@ -405,7 +405,7 @@ public final class DevManifest {
 
     /**
      * Whether the GraalPy contexts of the application read the standard library from a copy of it that has bytecode,
-     * which saves compiling the modules they import in each generation. On by default;
+     * which saves compiling the modules they import in each generation. On by default, on a JVM;
      * {@code micronaut.dev.python.stdlib-bytecode=false} leaves them on the standard library GraalPy finds.
      *
      * @return Whether the standard library of Python is compiled once for all generations

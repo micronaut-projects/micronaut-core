@@ -25,6 +25,18 @@ class PythonStdlibBytecodeTest {
 
     private static final String PYTHON = "python";
     private static final String STDLIB_DIR = "import sys; sys._stdlib_dir";
+    private static final String OPTION = "graalpy.context.options.python.StdLibHome";
+    private static final String MANIFEST = """
+        micronaut.dev.main-class=pyronaut_application.PyronautMain
+        micronaut.dev.strategy=restart
+        micronaut.dev.patch-in-place=false
+        micronaut.dev.reloadable=build/classes
+        micronaut.dev.compile-classpath=@cp.argfile
+        micronaut.dev.sources.python=src/main/python
+        micronaut.dev.sources.java=src/main/java
+        micronaut.dev.compile.python.output=build/classes
+        micronaut.dev.compile.java.output=build/classes
+        """;
 
     @TempDir
     Path root;
@@ -76,13 +88,11 @@ class PythonStdlibBytecodeTest {
             assertTrue(context.eval(PYTHON, "import bisect; bisect.FROM_BYTECODE").asBoolean(), "bytecode that matches its source is what runs");
         }
 
-        // a source of another time and size than the bytecode says, read through a link as any other
-        Path link = tree.resolve("bisect.py");
-        String source = Files.readString(link);
-        Path changed = root.resolve("bisect-changed.py");
-        Files.writeString(changed, source + "\nFROM_SOURCE = True\n");
-        Files.delete(link);
-        Files.createSymbolicLink(link, changed);
+        // a source of another time and size than the bytecode says
+        Path file = tree.resolve("bisect.py");
+        String source = Files.readString(file);
+        Files.delete(file);
+        Files.writeString(file, source + "\nFROM_SOURCE = True\n");
         try (Context context = context(tree)) {
             assertTrue(context.eval(PYTHON, "import bisect; bisect.FROM_SOURCE").asBoolean());
             assertFalse(context.eval(PYTHON, "hasattr(bisect, 'FROM_BYTECODE')").asBoolean());
@@ -133,31 +143,15 @@ class PythonStdlibBytecodeTest {
     @Test
     void outsideDevelopmentModeTheContextIsLeftAlone() {
         assertNull(DevRuntime.current());
-        String real;
-        try (Context context = context(null)) {
-            real = context.eval(PYTHON, STDLIB_DIR).asString();
-        }
-        Context.Builder builder = Context.newBuilder(PYTHON).allowAllAccess(true).allowExperimentalOptions(true);
-        new PythonStdlibCustomizer().customize(builder);
-        try (Context context = builder.build()) {
-            assertEquals(real, context.eval(PYTHON, STDLIB_DIR).asString());
+        try (ApplicationContext application = ApplicationContext.builder().start()) {
+            assertTrue(application.getProperty(OPTION, String.class).isEmpty());
         }
     }
 
     @Test
     void theGenerationsOfAnApplicationReadTheTreeOnceItIsSeeded() throws Exception {
         PythonFixture fixture = PythonFixture.create(root);
-        launch("""
-            micronaut.dev.main-class=pyronaut_application.PyronautMain
-            micronaut.dev.strategy=restart
-            micronaut.dev.patch-in-place=false
-            micronaut.dev.reloadable=build/classes
-            micronaut.dev.compile-classpath=@cp.argfile
-            micronaut.dev.sources.python=src/main/python
-            micronaut.dev.sources.java=src/main/java
-            micronaut.dev.compile.python.output=build/classes
-            micronaut.dev.compile.java.output=build/classes
-            """, runtime -> {
+        launch(MANIFEST, runtime -> {
                 Path trees = runtime.manifest().pythonStdlibBytecodeDirectory();
                 assertNotNull(trees);
                 PythonStdlibBytecode bytecode = new PythonStdlibBytecode(trees);
@@ -178,19 +172,31 @@ class PythonStdlibBytecodeTest {
     @Test
     void itCanBeTurnedOff() throws Exception {
         PythonFixture.create(root);
-        launch("""
-            micronaut.dev.main-class=pyronaut_application.PyronautMain
-            micronaut.dev.strategy=restart
-            micronaut.dev.python.stdlib-bytecode=false
-            micronaut.dev.reloadable=build/classes
-            micronaut.dev.compile-classpath=@cp.argfile
-            micronaut.dev.sources.python=src/main/python
-            micronaut.dev.sources.java=src/main/java
-            micronaut.dev.compile.python.output=build/classes
-            micronaut.dev.compile.java.output=build/classes
-            """, runtime -> {
-                assertFalse(stdlibDir(runtime.context().orElseThrow()).contains("python-stdlib"));
+        launch(MANIFEST + "micronaut.dev.python.stdlib-bytecode=false\n", runtime ->
+            assertFalse(stdlibDir(runtime.context().orElseThrow()).contains("python-stdlib")));
+    }
+
+    @Test
+    void anApplicationThatConfiguresTheStandardLibraryKeepsIt() throws Exception {
+        PythonFixture.create(root);
+        String real;
+        try (Context context = context(null)) {
+            real = context.eval(PYTHON, STDLIB_DIR).asString();
+        }
+        System.setProperty(OPTION, real);
+        try {
+            launch(MANIFEST, runtime -> {
+                Path trees = runtime.manifest().pythonStdlibBytecodeDirectory();
+                assertNotNull(trees);
+                new PythonStdlibBytecode(trees).seed();
+                assertEquals(real, stdlibDir(runtime.context().orElseThrow()));
+                runtime.restart();
+                ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+                assertEquals(real, stdlibDir(second));
             });
+        } finally {
+            System.clearProperty(OPTION);
+        }
     }
 
     private void launch(String manifest, RunningApplication test) throws Exception {

@@ -56,8 +56,8 @@ import java.util.stream.Stream;
  * module, would no longer be found. Nothing is written beside the real standard library, which production runs of the
  * same GraalPy read too.</p>
  *
- * <p>The first run seeds the tree in the background and the application does not wait for it: a context built before
- * it is complete uses the real standard library. The tree is built under a temporary name and renamed once complete,
+ * <p>The first run seeds the tree in the background and the application does not wait for it: a generation started
+ * before it is complete uses the real standard library. The tree is built under a temporary name and renamed once complete,
  * so that a context never sees half of it, and of two processes seeding at once the first rename wins. A tree is named
  * after the GraalPy version and the location and time of the real standard library. Python checks each bytecode file
  * against the time and size of its source, through the link, so a file that does not match is compiled from its source
@@ -107,14 +107,22 @@ final class PythonStdlibBytecode {
     }
 
     /**
-     * The standard library for the context being built. The first call looks for the tree of an earlier run and starts
+     * The standard library for the generation about to start. The first call looks for the tree of an earlier run and starts
      * seeding in the background, which leaves such a tree alone when it is still the right one.
      *
      * @return The directory for {@code python.StdLibHome}, or null to leave the real standard library in place
      */
     @Nullable Path standardLibrary() {
         if (started.compareAndSet(false, true)) {
-            tree = recorded();
+            // the first engine of the JVM registers shutdown hooks on this thread, which keep its context class loader
+            Thread current = Thread.currentThread();
+            ClassLoader loader = current.getContextClassLoader();
+            current.setContextClassLoader(PythonStdlibBytecode.class.getClassLoader());
+            try {
+                tree = recorded();
+            } finally {
+                current.setContextClassLoader(loader);
+            }
             Thread thread = new Thread(this::seed, "micronaut-dev-python-stdlib");
             thread.setDaemon(true);
             thread.setPriority(Thread.MIN_PRIORITY);
@@ -122,9 +130,9 @@ final class PythonStdlibBytecode {
             thread.setContextClassLoader(PythonStdlibBytecode.class.getClassLoader());
             thread.start();
         }
-        Path current = tree;
-        // a clean of the build, or of the cache the real standard library lives in, while the application runs
-        return current != null && usable(current) ? current : null;
+        Path found = tree;
+        // a cache cleaned while the application runs
+        return found != null && usable(found) ? found : null;
     }
 
     /**
@@ -145,7 +153,7 @@ final class PythonStdlibBytecode {
     }
 
     /**
-     * Finds the tree of the real standard library, seeding it unless it exists, and uses it from the next context on.
+     * Finds the tree of the real standard library, seeding it unless it exists, and uses it from the next generation on.
      */
     void seed() {
         try {
@@ -165,7 +173,7 @@ final class PythonStdlibBytecode {
             record(version, name);
             tree = target;
         } catch (IOException | RuntimeException e) {
-            // only slower: the contexts keep compiling what they import
+            // only slower: the generations keep compiling what they import
             LOG.debug("Could not compile the standard library of Python", e);
         }
     }

@@ -118,6 +118,8 @@ noReflection {
     // what runs inside an embedded compiler loads from its own path first
     allowIn("io.micronaut.dev.compile.CompilerPluginLoader", "CLASS_LOADING")
     allowIn("io.micronaut.dev.manifest.DevManifest", "ENUM_CONSTANTS")
+    // whether the Python runtime is on the classpath
+    allowIn("io.micronaut.dev.python.PythonStdlibOption", "CLASS_LOADING")
     allowIn("io.micronaut.dev.compile.SourceKind", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.compile.CompileMode", "ENUM_CONSTANTS")
     // MicronautDevMain.launchApplication, which looks up and invokes the application's main, suppresses the check itself
