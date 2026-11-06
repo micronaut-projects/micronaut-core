@@ -241,7 +241,21 @@ class DefaultUriBuilder implements UriBuilder {
             List<String> strings = existing != null ? new ArrayList<>(existing) : new ArrayList<>(values.length);
             for (Object value : values) {
                 if (value != null) {
-                    strings.add(value.toString());
+                    if (value instanceof Iterable<?> iterable) {
+                        for (Object item : iterable) {
+                            if (item != null) {
+                                strings.add(item.toString());
+                            }
+                        }
+                    } else if (value instanceof Object[] array) {
+                        for (Object item : array) {
+                            if (item != null) {
+                                strings.add(item.toString());
+                            }
+                        }
+                    } else {
+                        strings.add(value.toString());
+                    }
                 }
             }
             if (CollectionUtils.isNotEmpty(strings)) {

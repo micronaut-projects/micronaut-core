@@ -17,6 +17,7 @@ dependencies {
     compileOnly(libs.managed.kotlinx.coroutines.core)
     compileOnly(libs.managed.reactor)
 
+    testImplementation(projects.micronautCoreReactive)
     testImplementation(libs.managed.kotlinx.coroutines.core)
 }
 

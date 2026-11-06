@@ -25,6 +25,7 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
 /**
@@ -77,7 +78,7 @@ final class FileBackedGeneratedFile implements GeneratedFile {
     @Override
     public CharSequence getTextContent() throws IOException {
         if (file.exists()) {
-            return new String(Files.readAllBytes(file.toPath()));
+            return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
         }
         return null;
     }

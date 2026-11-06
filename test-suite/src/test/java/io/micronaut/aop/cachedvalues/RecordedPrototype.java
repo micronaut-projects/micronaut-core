@@ -13,7 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.aop.cachedvalues;
+
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.inject.annotation.builders.Sample;
+
 /**
- * The package info.
+ * A non-singleton bean with an intercepted method.
  */
-package io.micronaut.inject.annotation;
+@Prototype
+@Requires(property = "spec.name", value = "CachedValuesTest")
+public class RecordedPrototype {
+
+    @Recorded
+    public String work() {
+        return "work";
+    }
+
+    @Recorded
+    @Sample(name = "${cached.sample.name}")
+    public String placeholder() {
+        return "placeholder";
+    }
+}

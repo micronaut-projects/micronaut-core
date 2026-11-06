@@ -180,7 +180,7 @@ public final class JsonCounter {
                     position++;
                 }
             } else if (state == State.ESCAPE) {
-                handleEscape(buf[i]);
+                handleEscape();
                 i++;
                 position++;
             } else if (state == State.TOP_LEVEL_SCALAR) {
@@ -354,7 +354,7 @@ public final class JsonCounter {
     /**
      * Handle a byte in the {@link State#ESCAPE} state.
      */
-    private void handleEscape(byte b) {
+    private void handleEscape() {
         state = State.STRING;
     }
 

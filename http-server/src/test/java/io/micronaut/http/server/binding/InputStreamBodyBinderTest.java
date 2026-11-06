@@ -34,6 +34,7 @@ import reactor.core.publisher.Flux;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -65,6 +66,17 @@ class InputStreamBodyBinderTest {
     void aReadOverTheLimitThrowsTheContentLengthExceededException() {
         ContentLengthExceededException exceeded = new ContentLengthExceededException(1, 2);
         InputStream in = new InputStreamBodyBinder.SizeLimitInputStream(new FailingInputStream(new IOException("too large", exceeded)));
+
+        assertSame(exceeded, assertThrows(ContentLengthExceededException.class, in::read));
+        assertSame(exceeded, assertThrows(ContentLengthExceededException.class, () -> in.read(new byte[1], 0, 1)));
+        assertSame(exceeded, assertThrows(ContentLengthExceededException.class, () -> in.skip(1)));
+    }
+
+    @Test
+    void aReadOverTheLimitWrappedMoreThanOnceThrowsTheContentLengthExceededException() {
+        ContentLengthExceededException exceeded = new ContentLengthExceededException(1, 2);
+        IOException failure = new IOException("read failed", new UncheckedIOException(new IOException("too large", exceeded)));
+        InputStream in = new InputStreamBodyBinder.SizeLimitInputStream(new FailingInputStream(failure));
 
         assertSame(exceeded, assertThrows(ContentLengthExceededException.class, in::read));
         assertSame(exceeded, assertThrows(ContentLengthExceededException.class, () -> in.read(new byte[1], 0, 1)));
