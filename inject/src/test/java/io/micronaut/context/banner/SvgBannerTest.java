@@ -215,6 +215,7 @@ class SvgBannerTest {
         assertEquals(7, rects.get(0).number("x", 1, 0), 1e-9);
         assertEquals(7, rects.get(1).number("x", 1, 0), 1e-9);
         assertEquals(2, rects.get(2).transform(1)[0], 1e-9);
+        assertEquals(2, rects.get(2).transform(1)[3], 1e-9, "a scale with one value scales both axes");
     }
 
     @Test
@@ -229,6 +230,29 @@ class SvgBannerTest {
 
         assertEquals(128, image.getRGB(5, 5) >>> 24, 1);
         assertEquals(128, image.getRGB(15, 5) >>> 24, 1, "the overlap is no more opaque than the rest");
+    }
+
+    @Test
+    void geometryPercentagesReferToTheViewport() throws IOException {
+        BufferedImage image = render("""
+            <svg width="100" height="20">
+              <rect width="100%" height="50%" fill="red"/>
+            </svg>""", 0);
+
+        assertEquals(RED, image.getRGB(95, 5));
+        assertEquals(0, image.getRGB(95, 15) >>> 24);
+    }
+
+    @Test
+    void shapeOpacityAppliesOnceToItsFillAndStroke() throws IOException {
+        BufferedImage image = render("""
+            <svg width="40" height="40">
+              <rect x="10" y="10" width="20" height="20" fill="red" stroke="blue" stroke-width="4" opacity="0.5"/>
+            </svg>""", 0);
+
+        assertEquals(128, image.getRGB(20, 20) >>> 24, 1, "the fill");
+        assertEquals(128, image.getRGB(11, 20) >>> 24, 1, "the stroke over the fill is no more opaque");
+        assertEquals(0x0000FF, image.getRGB(11, 20) & 0xFFFFFF);
     }
 
     @Test
@@ -447,6 +471,14 @@ class SvgBannerTest {
 
             assertTrue(chunks.get(0).control().matches("a=T,f=100,i=\\d+,q=2,r=6,m=1"), chunks.get(0).control());
             assertTrue(chunks.stream().filter(chunk -> chunk.control().startsWith("a=f")).count() > 10);
+            // the frames span several chunks, and every chunk of a frame repeats a=f
+            int firstFrame = 0;
+            while (!chunks.get(firstFrame).control().startsWith("a=f")) {
+                firstFrame++;
+            }
+            List<Chunk> afterRoot = chunks.subList(firstFrame, chunks.size());
+            assertTrue(afterRoot.stream().anyMatch(chunk -> chunk.control().equals("a=f,q=2,m=1")), "a frame continues in another chunk");
+            assertTrue(afterRoot.stream().allMatch(chunk -> chunk.control().startsWith("a=")), "a frame chunk without its action");
             BufferedImage end = ImageIO.read(new ByteArrayInputStream(decode(rootFrame(chunks))));
             assertEquals(240, end.getHeight());
             int ink = 0;

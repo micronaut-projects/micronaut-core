@@ -82,6 +82,7 @@ final class SvgImage {
         }
         width = w;
         height = h;
+        assignViewports(root, viewBox[2], viewBox[3]);
         double end = 0;
         boolean indefinite = false;
         for (Animation animation : root.allAnimations()) {
@@ -90,6 +91,28 @@ final class SvgImage {
         }
         duration = end;
         loops = indefinite;
+    }
+
+    /**
+     * Gives every element the size of the viewport it is in, which its percentages refer to.
+     */
+    private void assignViewports(Element element, double width, double height) {
+        element.viewport = new double[] {width, height};
+        double innerWidth = width;
+        double innerHeight = height;
+        if ("svg".equals(element.name) && element != root) {
+            double[] box = numbers(element.attr("viewBox"));
+            if (box.length == 4 && box[2] > 0 && box[3] > 0) {
+                innerWidth = box[2];
+                innerHeight = box[3];
+            } else {
+                innerWidth = element.number(WIDTH_ATTRIBUTE, 0, width);
+                innerHeight = element.number(HEIGHT_ATTRIBUTE, 0, height);
+            }
+        }
+        for (Element child : element.children) {
+            assignViewports(child, innerWidth, innerHeight);
+        }
     }
 
     private void index(Element element) {
@@ -234,13 +257,15 @@ final class SvgImage {
                     return;
                 }
                 Geometry geometry = Geometry.of(element, time);
-                if (style.fill != 0 && !"line".equals(element.name)) {
-                    double alpha = ((style.fill >>> 24) / 255.0) * style.fillOpacity * opacity;
-                    raster.fill(geometry.flatten(matrix), style.evenOdd, style.fill, alpha, mask);
-                }
-                if (style.stroke != 0 && style.strokeWidth > 0) {
-                    double alpha = ((style.stroke >>> 24) / 255.0) * style.strokeOpacity * opacity;
-                    raster.fill(geometry.stroke(matrix, style.strokeWidth, style.lineCap), false, style.stroke, alpha, mask);
+                boolean filled = style.fill != 0 && !"line".equals(element.name);
+                boolean stroked = style.stroke != 0 && style.strokeWidth > 0;
+                if (filled && stroked && opacity < 1) {
+                    // the opacity applies once to the fill and stroke composed, so their overlap is not more opaque
+                    SvgRaster layer = raster.layer();
+                    paint(geometry, matrix, style, 1, mask, layer);
+                    raster.composite(layer, opacity);
+                } else {
+                    paint(geometry, matrix, style, opacity, mask, raster);
                 }
             }
             case "image" -> {
@@ -251,6 +276,17 @@ final class SvgImage {
             default -> {
                 // defs, clipPath, text, and everything else this renderer does not draw
             }
+        }
+    }
+
+    private static void paint(Geometry geometry, double[] matrix, Style style, double opacity, float @Nullable [] mask, SvgRaster raster) {
+        if (style.fill != 0 && geometry.fillable()) {
+            double alpha = ((style.fill >>> 24) / 255.0) * style.fillOpacity * opacity;
+            raster.fill(geometry.flatten(matrix), style.evenOdd, style.fill, alpha, mask);
+        }
+        if (style.stroke != 0 && style.strokeWidth > 0) {
+            double alpha = ((style.stroke >>> 24) / 255.0) * style.strokeOpacity * opacity;
+            raster.fill(geometry.stroke(matrix, style.strokeWidth, style.lineCap), false, style.stroke, alpha, mask);
         }
     }
 
@@ -480,6 +516,8 @@ final class SvgImage {
         private @Nullable String geometryKey;
         private @Nullable String imageKey;
         private @Nullable PngImage image;
+        // the width and height of the viewport that percentages of geometry attributes refer to
+        private double[] viewport = {DEFAULT_SIZE, DEFAULT_SIZE};
 
         Element(String name, Map<String, String> attributes) {
             this.name = name;
@@ -535,9 +573,10 @@ final class SvgImage {
             String base = staticProperty(attribute);
             double value = fallback;
             if (base != null) {
-                double[] parsed = numbers(base.endsWith("%") ? base.substring(0, base.length() - 1) : base);
+                boolean percentage = base.endsWith("%");
+                double[] parsed = numbers(percentage ? base.substring(0, base.length() - 1) : base);
                 if (parsed.length > 0) {
-                    value = base.endsWith("%") ? parsed[0] / 100 : parsed[0];
+                    value = percentage ? percentage(attribute, parsed[0]) : parsed[0];
                 }
             }
             for (Animation animation : animations) {
@@ -549,6 +588,19 @@ final class SvgImage {
                 }
             }
             return value;
+        }
+
+        /**
+         * @return A percentage of an attribute: of the viewport width or height for geometry, of 1 otherwise
+         */
+        private double percentage(String attribute, double percent) {
+            double reference = switch (attribute) {
+                case "x", "width", "cx", "rx", "x1", "x2" -> viewport[0];
+                case "y", "height", "cy", "ry", "y1", "y2" -> viewport[1];
+                case "r", "stroke-width" -> Math.sqrt((viewport[0] * viewport[0] + viewport[1] * viewport[1]) / 2);
+                default -> 1;
+            };
+            return percent / 100 * reference;
         }
 
         /**
@@ -666,6 +718,10 @@ final class SvgImage {
                 double[][] parsed = new double[raw.length][];
                 for (int i = 0; i < raw.length; i++) {
                     parsed[i] = numbers(raw[i]);
+                    if (transform && "scale".equals(attribute) && parsed[i].length == 1) {
+                        // scale(s) scales both axes, so it interpolates as scale(s, s)
+                        parsed[i] = new double[] {parsed[i][0], parsed[i][0]};
+                    }
                 }
                 values = parsed;
                 texts = null;

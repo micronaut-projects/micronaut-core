@@ -272,12 +272,12 @@ public class ImageBanner implements Banner {
                 pendingGap += frameMillis;
                 continue;
             }
-            write(transmission("a=f,f=100,i=" + id + ",z=" + pendingGap + "," + QUIET, pending));
+            write(frame(id, pendingGap, pending));
             pending = png;
             pendingGap = frameMillis;
         }
         // the last frame, then the animation leaves the loading state to play once or loop
-        write(transmission("a=f,f=100,i=" + id + ",z=" + pendingGap + "," + QUIET, pending)
+        write(frame(id, pendingGap, pending)
             + control(ANIMATE + id + ",s=3,v=" + (svg.loops() ? 1 : 2) + "," + QUIET));
     }
 
@@ -300,6 +300,18 @@ public class ImageBanner implements Banner {
      * @return The escape sequences that send data in chunks of at most {@value #CHUNK_SIZE} base64 bytes, as the protocol requires
      */
     private static String transmission(String firstControl, byte[] data) {
+        return transmission(firstControl, QUIET, data);
+    }
+
+    /**
+     * @return The escape sequences that send an animation frame, which repeat {@code a=f} on every
+     * chunk since a continuation chunk without it is taken for image data by the terminal
+     */
+    private static String frame(int id, int gap, byte[] png) {
+        return transmission("a=f,f=100,i=" + id + ",z=" + gap + "," + QUIET, "a=f," + QUIET, png);
+    }
+
+    private static String transmission(String firstControl, String continuationControl, byte[] data) {
         String payload = Base64.getEncoder().encodeToString(data);
         StringBuilder sequences = new StringBuilder(payload.length() + payload.length() / CHUNK_SIZE * 24 + 64);
         String control = firstControl;
@@ -308,7 +320,7 @@ public class ImageBanner implements Banner {
             sequences.append(GRAPHICS_START).append(control).append(",m=").append(end < payload.length() ? 1 : 0).append(';')
                 .append(payload, start, end)
                 .append(GRAPHICS_END);
-            control = QUIET;
+            control = continuationControl;
         }
         return sequences.toString();
     }

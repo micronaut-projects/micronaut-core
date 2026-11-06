@@ -48,10 +48,16 @@ final class Geometry {
      */
     private final List<double[]> subpaths;
     private final List<Boolean> closed;
+    private final boolean fillable;
 
     private Geometry(List<double[]> subpaths, List<Boolean> closed) {
+        this(subpaths, closed, true);
+    }
+
+    private Geometry(List<double[]> subpaths, List<Boolean> closed, boolean fillable) {
         this.subpaths = subpaths;
         this.closed = closed;
+        this.fillable = fillable;
     }
 
     /**
@@ -70,8 +76,11 @@ final class Geometry {
                 boolean polygon = POLYGON.equals(element.name);
                 yield element.geometry(points, () -> polygon(SvgImage.numbers(points), polygon));
             }
-            case "line" -> polygon(new double[] {element.number("x1", time, 0), element.number("y1", time, 0),
-                element.number("x2", time, 0), element.number("y2", time, 0)}, false);
+            case "line" -> {
+                Geometry line = polygon(new double[] {element.number("x1", time, 0), element.number("y1", time, 0),
+                    element.number("x2", time, 0), element.number("y2", time, 0)}, false);
+                yield new Geometry(line.subpaths, line.closed, false);
+            }
             case "rect" -> {
                 double x = element.number("x", time, 0);
                 double y = element.number("y", time, 0);
@@ -91,6 +100,13 @@ final class Geometry {
                 element.number("rx", time, 0), element.number("ry", time, 0));
             default -> new Geometry(List.of(), List.of());
         };
+    }
+
+    /**
+     * @return Whether the shape has an inside to fill, which a line does not
+     */
+    boolean fillable() {
+        return fillable;
     }
 
     /**
