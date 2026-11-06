@@ -180,6 +180,34 @@ class DevClassLoaderSpec extends Specification {
         loader.current().close()
     }
 
+    void "a retired generation of an earlier loader of the directory leaves the snapshot of a later loader alone"() {
+        given: "a loader with a retired generation, and the same generation of a loader created again in the process"
+        Path classes = Files.createDirectories(project.resolve("classes"))
+        Files.writeString(classes.resolve("greeting.txt"), "hello")
+        DevClassLoader earlier = new DevClassLoader(getClass().classLoader, [classes], project.resolve("generations"))
+        GenerationClassLoader retired = earlier.swap([classes])
+        GenerationClassLoader earlierCurrent = earlier.current()
+        DevClassLoader later = new DevClassLoader(getClass().classLoader, [classes], project.resolve("generations"))
+        GenerationClassLoader laterRetired = later.swap([classes])
+
+        when: "the generations of the earlier loader go"
+        retired.close()
+        earlierCurrent.close()
+
+        then: "the generations of the later loader keep their snapshots"
+        Files.isDirectory(project.resolve("generations/1"))
+        later.getResource("greeting.txt").text == "hello"
+
+        when: "and a generation of the later loader goes"
+        laterRetired.close()
+
+        then: "its snapshot goes with it"
+        !Files.exists(project.resolve("generations/1"))
+
+        cleanup:
+        later.current().close()
+    }
+
     void "after Class.forName through the facade, a swap still serves the new class to loadClass on the facade and to Class.forName on the current generation"() {
         given: "a compiled generation"
         Path src = Files.createDirectories(project.resolve("src"))

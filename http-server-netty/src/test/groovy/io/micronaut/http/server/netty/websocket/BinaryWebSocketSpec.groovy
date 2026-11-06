@@ -101,6 +101,10 @@ class BinaryWebSocketSpec extends Specification {
         buffer.retain()
         fred.sendAsync(buffer).get().toString(StandardCharsets.UTF_8) == 'foo'
         new String(Mono.from(fred.sendRx(ByteBuffer.wrap("bar".bytes))).block().array()) == 'bar'
+        // sent is not received: a broadcast that finds bob closing fails, and the server closes fred too
+        conditions.eventually {
+            bob.replies.contains("[fred] bar")
+        }
 
         when:
         bob.close()
