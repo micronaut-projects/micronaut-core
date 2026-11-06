@@ -37,12 +37,14 @@ final class MappedPendingRequestBindingResult<T, R> implements PendingRequestBin
 
     private ArgumentBinder.BindingResult<R> computeSecond() {
         if (second == null) {
-            Optional<T> first = source.getValue();
-            if (first.isPresent()) {
-                second = function.apply(first.get());
-            } else {
-                second = (ArgumentBinder.BindingResult<R>) source;
+            if (source.isPending()) {
+                return ArgumentBinder.BindingResult.empty();
             }
+            if (!source.isSatisfied()) {
+                return ArgumentBinder.BindingResult.unsatisfied();
+            }
+            Optional<T> first = source.getValue();
+            second = first.isPresent() ? function.apply(first.get()) : ArgumentBinder.BindingResult.empty();
         }
         return second;
     }
@@ -58,16 +60,21 @@ final class MappedPendingRequestBindingResult<T, R> implements PendingRequestBin
 
     @Override
     public boolean isSatisfied() {
-        return source.isSatisfied() && computeSecond().isSatisfied();
+        return !isPending() && source.isSatisfied() && computeSecond().isSatisfied();
+    }
+
+    @Override
+    public boolean isConvertedToArgumentType() {
+        return !isPending() && source.isSatisfied() && computeSecond().isConvertedToArgumentType();
     }
 
     @Override
     public Optional<R> getValue() {
-        return computeSecond().getValue();
+        return isPending() ? Optional.empty() : computeSecond().getValue();
     }
 
     @Override
     public boolean isPending() {
-        return source.isPending();
+        return source.isPending() || computeSecond().isPending();
     }
 }

@@ -79,4 +79,10 @@ public final class NettyServerRequestBinderRegistry implements ServerRequestBind
     public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument) {
         return delegate.findArgumentBinder(argument);
     }
+
+    @Internal
+    @Override
+    public boolean bindsRequestAsIs(Argument<?> argument) {
+        return delegate.bindsRequestAsIs(argument);
+    }
 }

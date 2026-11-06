@@ -51,7 +51,8 @@ final class DefaultFilterRoute implements FilterRoute {
     private @Nullable Set<HttpMethod> httpMethods;
     private @Nullable FilterPatternStyle patternStyle;
     private volatile @Nullable GenericHttpFilter filter;
-    private @Nullable AnnotationMetadata annotationMetadata;
+    @SuppressWarnings("java:S3077") // volatile only publishes the double-checked resolution
+    private volatile @Nullable AnnotationMetadata annotationMetadata;
     private final boolean isPreMatching;
     private @Nullable String matchingAnnotation;
     // built from the patterns and the pattern style whenever they change: like them, it is only
@@ -59,6 +60,8 @@ final class DefaultFilterRoute implements FilterRoute {
     private FilterPatternMatcher patternMatcher = FilterPatternMatcher.of(null, List.of());
     // most filters have no matching annotation: the absence is kept too, not looked up for every request
     private volatile boolean matchingAnnotationResolved;
+    private @Nullable Integer fixedOrder;
+    private boolean alwaysMatches;
 
     DefaultFilterRoute(Supplier<GenericHttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver, boolean isPreMatching) {
         Objects.requireNonNull(filter, "HttpFilter argument is required");
@@ -121,6 +124,26 @@ final class DefaultFilterRoute implements FilterRoute {
      */
     DefaultFilterRoute(String pattern, Supplier<GenericHttpFilter> filter) {
        this(pattern, filter, AnnotationMetadataResolver.DEFAULT);
+    }
+
+    /**
+     * Marks functional server filters whose order is known without obtaining a bean.
+     */
+    DefaultFilterRoute fixedOrder(int order) {
+        fixedOrder = order;
+        return this;
+    }
+
+    @Nullable Integer fixedOrder() {
+        return fixedOrder;
+    }
+
+    void matchAlways() {
+        alwaysMatches = true;
+    }
+
+    boolean isAlwaysMatch() {
+        return alwaysMatches;
     }
 
     @Override

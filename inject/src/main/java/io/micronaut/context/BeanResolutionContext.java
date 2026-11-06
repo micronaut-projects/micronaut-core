@@ -29,6 +29,7 @@ import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.proxy.InterceptedBeanProxy;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -547,6 +548,31 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     default <F> F getFactoryBean(BeanDefinition<?> producedDefinition, Class<F> factoryType, @Nullable Qualifier<F> qualifier) {
         F factory = getBean(factoryType, qualifier);
         markDependentAsFactory();
+        return factory;
+    }
+
+    /**
+     * Resolves the factory instance a member that no proxy can dispatch - a non-static bean field, or a final or private
+     * factory method such as the getter of a Kotlin property - is read or invoked on: the factory bean, as
+     * {@link #getFactoryBean(BeanDefinition, Class, Qualifier)} resolves it, or, when that is a proxy of the factory
+     * (such as the scoped proxy of a {@code @Refreshable} factory), the instance the proxy targets. An overridable
+     * factory method is invoked through the proxy, which hands the call on to its target; a field read or a call the
+     * proxy cannot override has no such indirection and would see the proxy's own state, which is never initialized.
+     *
+     * @param producedDefinition The definition of the bean the factory produces
+     * @param factoryType The factory type
+     * @param qualifier The factory's qualifier, if any
+     * @param <F> The factory type
+     * @return The factory instance to read the member from
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    @SuppressWarnings("unchecked")
+    default <F> F getFactoryBeanTarget(BeanDefinition<?> producedDefinition, Class<F> factoryType, @Nullable Qualifier<F> qualifier) {
+        F factory = getFactoryBean(producedDefinition, factoryType, qualifier);
+        if (factory instanceof InterceptedBeanProxy<?> proxy) {
+            return (F) proxy.interceptedTarget();
+        }
         return factory;
     }
 

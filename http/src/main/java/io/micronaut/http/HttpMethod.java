@@ -17,6 +17,8 @@ package io.micronaut.http;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Locale;
+
 /**
  * An enum containing the valid HTTP methods. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html.
  *
@@ -183,7 +185,7 @@ import org.jspecify.annotations.Nullable;
         if (httpMethod != null) {
             return httpMethod;
         }
-        httpMethodName = httpMethodName.toUpperCase();
+        httpMethodName = httpMethodName.toUpperCase(Locale.ROOT);
         httpMethod = parseString(httpMethodName);
         if (httpMethod != null) {
             return httpMethod;

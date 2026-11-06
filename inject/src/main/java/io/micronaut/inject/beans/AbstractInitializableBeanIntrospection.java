@@ -1844,6 +1844,23 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
+        public boolean isWritable() {
+            return ref.writeMethodIndex() != -1;
+        }
+
+        @Override
+        public void write(B bean, @Nullable P value) {
+            ArgumentUtils.requireNonNull("bean", bean);
+            if (!beanType.isInstance(bean)) {
+                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
+            }
+            if (!isWritable()) {
+                throw new UnsupportedOperationException("Cannot write to the property member: " + getName());
+            }
+            dispatchOneVoid(ref.writeMethodIndex(), bean, value);
+        }
+
+        @Override
         public String toString() {
             return "BeanPropertyMember{" +
                 "beanType=" + beanType +
@@ -2338,7 +2355,27 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                                         AnnotationClassValue<?> declaringType,
                                         String name,
                                         Argument<?> argument,
-                                        int readMethodIndex) {
+                                        int readMethodIndex,
+                                        int writeMethodIndex) {
+
+        /**
+         * The shape the generated code created a member by before a field member could be written; kept for the
+         * introspections compiled against it.
+         *
+         * @param elementType     The kind of the member
+         * @param declaringType   The type declaring the member
+         * @param name            The name of the member
+         * @param argument        The type of the member including its own annotation metadata
+         * @param readMethodIndex The dispatch index used to read the member, or {@code -1} if it cannot be read
+         */
+        @UsedByGeneratedCode
+        public BeanPropertyMemberRef(ElementType elementType,
+                                     AnnotationClassValue<?> declaringType,
+                                     String name,
+                                     Argument<?> argument,
+                                     int readMethodIndex) {
+            this(elementType, declaringType, name, argument, readMethodIndex, -1);
+        }
 
         /**
          * The shape the generated code named the declaring type by before it was carried as a class value;
@@ -2356,7 +2393,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                                      String name,
                                      Argument<?> argument,
                                      int readMethodIndex) {
-            this(elementType, new AnnotationClassValue<>(declaringType), name, argument, readMethodIndex);
+            this(elementType, new AnnotationClassValue<>(declaringType), name, argument, readMethodIndex, -1);
         }
     }
 
