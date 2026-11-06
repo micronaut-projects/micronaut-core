@@ -147,6 +147,20 @@ public record DefaultReplacesDefinition<T>(Class<T> beanType,
         return false;
     }
 
+    /**
+     * Whether this replacement names a narrower target than another: a subtype of the other's target, or the same
+     * target limited to a qualifier or factory.
+     *
+     * @param other The other replacement
+     * @return True if this replacement is narrower
+     */
+    boolean isNarrowerThan(DefaultReplacesDefinition<?> other) {
+        if (beanTypeToReplace != other.beanTypeToReplace) {
+            return beanTypeToReplace != null && other.beanTypeToReplace != null && other.beanTypeToReplace.isAssignableFrom(beanTypeToReplace);
+        }
+        return (qualifier != null || factoryClass != null) && other.qualifier == null && other.factoryClass == null;
+    }
+
     private boolean checkIfTypeMatches(BeanDefinition<T> definitionToBeReplaced,
                                        Class<T> beanTypeToReplace) {
         Class<?> bt = getCanonicalBeanType(definitionToBeReplaced);

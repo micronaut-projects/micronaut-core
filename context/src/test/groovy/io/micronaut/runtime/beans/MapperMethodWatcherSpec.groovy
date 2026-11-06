@@ -2,6 +2,7 @@ package io.micronaut.runtime.beans
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.DefaultBeanDefinitionsProvider
 import io.micronaut.context.annotation.Mapper
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
@@ -11,14 +12,19 @@ import spock.lang.Specification
 
 class MapperMethodWatcherSpec extends Specification {
 
-    void "a mapper's converter follows the mapper through a reload and goes with it"() {
-        given:
-        def context = ApplicationContext.run(["spec.name": "MapperMethodWatcherSpec"])
+    void "a mapper's converter follows the mapper through a reload and goes with it, with #last.simpleName registered last"() {
+        given: "the definitions of a directory of classes come in the order of the file system, and the last of two mappers of a pair wins it: the order is pinned"
+        def context = ApplicationContext.builder()
+            .properties(["spec.name": "MapperMethodWatcherSpec"])
+            .beanDefinitionsProvider { classLoader ->
+                new DefaultBeanDefinitionsProvider().provide(classLoader).sort(false) { it.beanDefinitionName.contains('MapperMethodWatcherSpec$' + last.simpleName) }
+            }
+            .start()
         def conversionService = context.getBean(ConversionService)
         def processor = context.getBean(MapperMethodProcessor)
 
-        expect: "the startup batch registered the converter, of whichever of the two mappers of the pair came last, and the processor is not adapted: it watches"
-        conversionService.convert(new WatchedSource("a"), WatchedTarget).get().name in ["a", "dup:a"]
+        expect: "the startup batch registered the converter, and the processor is not adapted: it watches"
+        conversionService.convert(new WatchedSource("a"), WatchedTarget).get().name == startup
         !((DefaultBeanContext) context).adaptedProcessors().contains(processor)
 
         when: "the mapper comes back in a new generation"
@@ -74,6 +80,11 @@ class MapperMethodWatcherSpec extends Specification {
 
         cleanup:
         context.close()
+
+        where:
+        last            | startup
+        WatchedMapper   | "a"
+        DuplicateMapper | "dup:a"
     }
 
     @Requires(property = "spec.name", value = "MapperMethodWatcherSpec")
