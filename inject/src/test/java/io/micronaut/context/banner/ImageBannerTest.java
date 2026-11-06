@@ -149,8 +149,8 @@ class ImageBannerTest {
 
     @Test
     void defaultBannerPrintsTheLogoScaledToRows() throws IOException {
-        String dark = capture(out -> new MicronautBanner(out, terminal(Map.of("MICRONAUT_BANNER_MODE", "kitty"), false)).print());
-        String light = capture(out -> new MicronautBanner(out, terminal(Map.of("MICRONAUT_BANNER_MODE", "kitty", "MICRONAUT_BANNER_THEME", "light"), false)).print());
+        String dark = capture(out -> new MicronautBanner(out, terminal(Map.of("MICRONAUT_BANNER_MODE", "kitty"), false), Runnable::run).print());
+        String light = capture(out -> new MicronautBanner(out, terminal(Map.of("MICRONAUT_BANNER_MODE", "kitty", "MICRONAUT_BANNER_THEME", "light"), false), Runnable::run).print());
 
         assertTrue(chunks(dark).get(0).control().matches(ANIMATED_LOGO), chunks(dark).get(0).control());
         assertEquals(0xFFFFFF, inkColor(rootFrame(chunks(dark))), "the dark theme logo is white");

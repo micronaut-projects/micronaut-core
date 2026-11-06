@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -74,6 +75,10 @@ public class ImageBanner implements Banner {
     private static final int FRAMES_PER_SECOND = 25;
     private static final double MAX_ANIMATION_SECONDS = 10;
     private static final int MAX_PIXELS = 4096 * 4096;
+    /**
+     * Renders the frames of an animation while the application starts, the terminal plays each as it arrives.
+     */
+    static final Executor BACKGROUND = task -> Thread.ofPlatform().daemon().name("micronaut-banner").start(task);
     // The logo is far larger than it is displayed so that it stays sharp on any display and font size
     private static final int LOGO_ROWS = 6;
     private static final String GRAPHICS_START = "\u001B_G";
@@ -86,6 +91,7 @@ public class ImageBanner implements Banner {
     private final PrintStream out;
     private final int rows;
     private final int currentColor;
+    private final Executor frames;
 
     /**
      * Constructor for an image displayed at its pixel size. The terminal is not checked: use
@@ -95,7 +101,7 @@ public class ImageBanner implements Banner {
      * @param out The print stream
      */
     public ImageBanner(URL resource, PrintStream out) {
-        this(resource, out, 0, DARK_THEME_COLOR);
+        this(resource, out, 0, DARK_THEME_COLOR, BACKGROUND);
     }
 
     /**
@@ -105,12 +111,14 @@ public class ImageBanner implements Banner {
      * @param out The print stream
      * @param rows The terminal rows to scale the image to with its aspect ratio kept, 0 for its pixel size
      * @param currentColor The ARGB value of {@code currentColor} in an SVG image
+     * @param frames Renders and sends the frames of an animated image after the first
      */
-    ImageBanner(URL resource, PrintStream out, int rows, int currentColor) {
+    ImageBanner(URL resource, PrintStream out, int rows, int currentColor, Executor frames) {
         this.resource = resource;
         this.out = out;
         this.rows = rows;
         this.currentColor = currentColor;
+        this.frames = frames;
     }
 
     /**
@@ -128,7 +136,7 @@ public class ImageBanner implements Banner {
         int color = themeColor(terminal);
         return terminal.selectImage(resourceLoader::getResource, SVG_RESOURCE, LIGHT_SVG_RESOURCE)
             .or(() -> terminal.selectImage(resourceLoader::getResource, RESOURCE, LIGHT_RESOURCE))
-            .map(image -> new ImageBanner(image, out, 0, color));
+            .map(image -> new ImageBanner(image, out, 0, color, BACKGROUND));
     }
 
     /**
@@ -136,12 +144,13 @@ public class ImageBanner implements Banner {
      *
      * @param terminal The terminal
      * @param out The print stream
+     * @param frames Renders and sends the frames of the animation after the first
      * @return Whether the logo was printed, false if the terminal displays no images or the logo cannot be read
      */
-    static boolean printLogo(BannerTerminal terminal, PrintStream out) {
+    static boolean printLogo(BannerTerminal terminal, PrintStream out, Executor frames) {
         ClassLoader classLoader = ImageBanner.class.getClassLoader();
         return terminal.selectImage(name -> Optional.ofNullable(classLoader.getResource(name)), LOGO, LOGO)
-            .map(logo -> new ImageBanner(logo, out, LOGO_ROWS, themeColor(terminal)).printImage())
+            .map(logo -> new ImageBanner(logo, out, LOGO_ROWS, themeColor(terminal), frames).printImage())
             .orElse(false);
     }
 
@@ -171,7 +180,7 @@ public class ImageBanner implements Banner {
         }
         if (!resource.getPath().endsWith(".svg")) {
             out.println();
-            transmit("a=T,f=100," + QUIET + scaling(), image);
+            out.print(transmission("a=T,f=100," + QUIET + scaling(), image));
             out.println();
             return true;
         }
@@ -193,8 +202,14 @@ public class ImageBanner implements Banner {
     }
 
     /**
-     * Prints an SVG image, as an animation if it is animated. The image at the end of its animation
-     * is the root frame, which is skipped while the animation plays.
+     * Prints an SVG image, as an animation if it is animated.
+     *
+     * <p>The image at the end of its animation is the root frame, so that a terminal that does not
+     * animate shows it complete, and it is gapless so that it is skipped while the animation plays.
+     * Only the root frame is rendered before this returns: the animation starts in the loading state,
+     * in which the terminal plays each frame as it arrives, and the other frames are rendered and sent
+     * by {@link #frames} while the application starts. Each frame is written with a single call so
+     * that log lines printed meanwhile never split its escape sequences.</p>
      */
     private void printSvg(SvgImage svg) {
         int height = rows > 0 ? rows * PIXELS_PER_ROW : (int) Math.ceil(svg.height());
@@ -206,34 +221,56 @@ public class ImageBanner implements Banner {
         }
         double duration = Math.min(svg.duration(), MAX_ANIMATION_SECONDS);
         byte[] last = render(svg, duration, width, height);
-        out.println();
         if (duration <= 0) {
-            transmit("a=T,f=100," + QUIET + scaling(), last);
+            out.println();
+            out.print(transmission("a=T,f=100," + QUIET + scaling(), last));
             out.println();
             return;
         }
         int id = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
-        transmit("a=T,f=100,i=" + id + "," + QUIET + scaling(), last);
-        int frames = (int) Math.ceil(duration * FRAMES_PER_SECOND);
+        out.println();
+        out.print(transmission("a=T,f=100,i=" + id + "," + QUIET + scaling(), last)
+            + control("a=a,i=" + id + ",r=1,z=-1," + QUIET)
+            + control("a=a,i=" + id + ",s=2," + QUIET));
+        out.println();
+        out.flush();
+        int frameWidth = width;
+        int frameHeight = height;
+        frames.execute(() -> {
+            try {
+                sendFrames(svg, id, duration, frameWidth, frameHeight);
+            } catch (RuntimeException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("The banner animation stopped.", e);
+                }
+            }
+        });
+    }
+
+    private void sendFrames(SvgImage svg, int id, double duration, int width, int height) {
+        int count = (int) Math.ceil(duration * FRAMES_PER_SECOND);
         int frameMillis = 1000 / FRAMES_PER_SECOND;
         byte[] pending = render(svg, 0, width, height);
         int pendingGap = frameMillis;
-        for (int frame = 1; frame <= frames; frame++) {
+        for (int frame = 1; frame <= count; frame++) {
             byte[] png = render(svg, Math.min(duration, (double) frame / FRAMES_PER_SECOND), width, height);
             if (Arrays.equals(pending, png)) {
                 // an unchanged frame lengthens the previous one rather than being sent again
                 pendingGap += frameMillis;
                 continue;
             }
-            transmit("a=f,f=100,i=" + id + ",z=" + pendingGap + "," + QUIET, pending);
+            write(transmission("a=f,f=100,i=" + id + ",z=" + pendingGap + "," + QUIET, pending));
             pending = png;
             pendingGap = frameMillis;
         }
-        transmit("a=f,f=100,i=" + id + ",z=" + pendingGap + "," + QUIET, pending);
-        // the root frame is gapless so that it is skipped, then the animation plays once or loops
-        control("a=a,i=" + id + ",r=1,z=-1," + QUIET);
-        control("a=a,i=" + id + ",s=3,v=" + (svg.loops() ? 1 : 2) + "," + QUIET);
-        out.println();
+        // the last frame, then the animation leaves the loading state to play once or loop
+        write(transmission("a=f,f=100,i=" + id + ",z=" + pendingGap + "," + QUIET, pending)
+            + control("a=a,i=" + id + ",s=3,v=" + (svg.loops() ? 1 : 2) + "," + QUIET));
+    }
+
+    private void write(String sequences) {
+        out.print(sequences);
+        out.flush();
     }
 
     private byte[] render(SvgImage svg, double time, int width, int height) {
@@ -242,22 +279,24 @@ public class ImageBanner implements Banner {
         return raster.toPng();
     }
 
-    private void control(String control) {
-        out.print(GRAPHICS_START + control + GRAPHICS_END);
+    private static String control(String control) {
+        return GRAPHICS_START + control + GRAPHICS_END;
     }
 
     /**
-     * Sends data in chunks of at most {@value #CHUNK_SIZE} base64 bytes, as the protocol requires.
+     * @return The escape sequences that send data in chunks of at most {@value #CHUNK_SIZE} base64 bytes, as the protocol requires
      */
-    private void transmit(String firstControl, byte[] data) {
+    private static String transmission(String firstControl, byte[] data) {
         String payload = Base64.getEncoder().encodeToString(data);
+        StringBuilder sequences = new StringBuilder(payload.length() + payload.length() / CHUNK_SIZE * 24 + 64);
         String control = firstControl;
         for (int start = 0; start < payload.length(); start += CHUNK_SIZE) {
             int end = Math.min(start + CHUNK_SIZE, payload.length());
-            out.print(GRAPHICS_START + control + ",m=" + (end < payload.length() ? 1 : 0) + ";");
-            out.append(payload, start, end);
-            out.print(GRAPHICS_END);
+            sequences.append(GRAPHICS_START).append(control).append(",m=").append(end < payload.length() ? 1 : 0).append(';')
+                .append(payload, start, end)
+                .append(GRAPHICS_END);
             control = QUIET;
         }
+        return sequences.toString();
     }
 }

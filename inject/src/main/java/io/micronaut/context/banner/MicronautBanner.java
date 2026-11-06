@@ -18,6 +18,7 @@ package io.micronaut.context.banner;
 import io.micronaut.core.io.ResourceLoader;
 
 import java.io.PrintStream;
+import java.util.concurrent.Executor;
 
 /**
  * Default implementation of {@link Banner} that prints the default Micronaut banner: the logo when
@@ -35,6 +36,7 @@ public class MicronautBanner implements Banner {
 
     private final PrintStream out;
     private final BannerTerminal terminal;
+    private final Executor frames;
 
     /**
      * Constructor.
@@ -52,8 +54,20 @@ public class MicronautBanner implements Banner {
      * @param terminal The terminal
      */
     MicronautBanner(PrintStream out, BannerTerminal terminal) {
+        this(out, terminal, ImageBanner.BACKGROUND);
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param out The print stream
+     * @param terminal The terminal
+     * @param frames Renders and sends the frames of the animated logo after the first
+     */
+    MicronautBanner(PrintStream out, BannerTerminal terminal, Executor frames) {
         this.out = out;
         this.terminal = terminal;
+        this.frames = frames;
     }
 
     /**
@@ -72,7 +86,7 @@ public class MicronautBanner implements Banner {
 
     @Override
     public void print() {
-        if (ImageBanner.printLogo(terminal, out)) {
+        if (ImageBanner.printLogo(terminal, out, frames)) {
             return;
         }
         for (String line : MICRONAUT_BANNER) {

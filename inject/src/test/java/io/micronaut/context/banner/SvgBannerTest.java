@@ -213,7 +213,7 @@ class SvgBannerTest {
               <rect width="1" height="1" fill="none"><animate attributeName="x" values="0;0" begin="1s" dur="1s"/></rect>
             </svg>""");
 
-        List<Chunk> chunks = chunks(capture(out -> new ImageBanner(file.toUri().toURL(), out).print()));
+        List<Chunk> chunks = chunks(capture(out -> new ImageBanner(file.toUri().toURL(), out, 0, 0xFFFFFFFF, Runnable::run).print()));
 
         String root = chunks.get(0).control();
         assertTrue(root.matches("a=T,f=100,i=\\d+,q=2,m=0"), root);
@@ -223,13 +223,37 @@ class SvgBannerTest {
         assertEquals(6, frames.size());
         assertEquals("a=f,f=100,i=" + id + ",z=40,q=2,m=0", frames.get(0).control());
         assertEquals("a=f,f=100,i=" + id + ",z=1840,q=2,m=0", frames.get(5).control());
-        assertEquals("a=a,i=" + id + ",r=1,z=-1,q=2", chunks.get(chunks.size() - 2).control());
+        // the animation plays while frames arrive, then once more when they all have
+        assertEquals("a=a,i=" + id + ",r=1,z=-1,q=2", chunks.get(1).control());
+        assertEquals("a=a,i=" + id + ",s=2,q=2", chunks.get(2).control());
         assertEquals("a=a,i=" + id + ",s=3,v=2,q=2", chunks.get(chunks.size() - 1).control());
 
         BufferedImage end = ImageIO.read(new ByteArrayInputStream(decode(chunks.subList(0, 1))));
         BufferedImage start = ImageIO.read(new ByteArrayInputStream(decode(frames.subList(0, 1))));
         assertEquals(RED, end.getRGB(20, 10));
         assertEquals(0, start.getRGB(20, 10) >>> 24);
+    }
+
+    @Test
+    void framesAfterTheFirstAreSentInTheBackground(@TempDir Path dir) throws Exception {
+        Path file = Files.writeString(dir.resolve("banner.svg"), """
+            <svg width="40" height="20">
+              <rect width="40" height="20" fill="red"><animate attributeName="opacity" values="0;1" dur="0.2s"/></rect>
+            </svg>""");
+        List<Runnable> background = new ArrayList<>();
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        PrintStream out = new PrintStream(bytes, true, StandardCharsets.UTF_8);
+
+        new ImageBanner(file.toUri().toURL(), out, 0, 0xFFFFFFFF, background::add).print();
+
+        List<Chunk> printed = chunks(bytes.toString(StandardCharsets.UTF_8));
+        assertEquals(3, printed.size(), "only the root frame and the loading state are printed before startup goes on");
+        assertTrue(printed.get(2).control().contains("s=2"));
+        assertEquals(1, background.size());
+        background.get(0).run();
+        List<Chunk> all = chunks(bytes.toString(StandardCharsets.UTF_8));
+        assertTrue(all.size() > 3);
+        assertTrue(all.get(all.size() - 1).control().contains("s=3"));
     }
 
     @Test
@@ -251,7 +275,7 @@ class SvgBannerTest {
                     default -> null;
                 },
                 () -> false);
-            List<Chunk> chunks = chunks(capture(out -> new MicronautBanner(out, terminal).print()));
+            List<Chunk> chunks = chunks(capture(out -> new MicronautBanner(out, terminal, Runnable::run).print()));
 
             assertTrue(chunks.get(0).control().matches("a=T,f=100,i=\\d+,q=2,r=6,m=1"), chunks.get(0).control());
             assertTrue(chunks.stream().filter(chunk -> chunk.control().startsWith("a=f")).count() > 10);
