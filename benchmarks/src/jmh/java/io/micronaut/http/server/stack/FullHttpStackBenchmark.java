@@ -20,6 +20,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.concurrent.FastThreadLocalThread;
 import org.junit.jupiter.api.Assertions;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
@@ -33,6 +34,8 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
+// the setup checks that it runs on a Netty FastThreadLocalThread, which only this executor provides
+@Fork(jvmArgsAppend = {"-Djmh.executor=CUSTOM", "-Djmh.executor.class=io.micronaut.http.server.stack.JmhFastThreadLocalExecutor"})
 public class FullHttpStackBenchmark {
     /**
      * If {@code true}, verify that the test is running on a netty {@link FastThreadLocalThread}.
