@@ -331,15 +331,13 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 sources.sourceOf(dependent).ifPresent(selected::add);
             }
         }
-        if (compilesEmptyBatches()) {
-            // the processors keep state and write again themselves what they generate from several sources
-            return selected;
-        }
-        // what these sources produced is about to go, and a class generated from several sources goes with each of them
+        // what these sources produced is about to go, and a class generated from several sources goes with each of them;
+        // processors that keep state write again themselves what they aggregate, so only the source a class belongs to is needed
         Deque<Path> pending = new ArrayDeque<>(selected);
         pending.addAll(request.deleted());
         while (!pending.isEmpty()) {
-            for (Path sharing : sources.sourcesSharingOutputsWith(pending.poll())) {
+            Path source = pending.poll();
+            for (Path sharing : compilesEmptyBatches() ? sources.ownSourcesOfClassesOf(source) : sources.sourcesSharingOutputsWith(source)) {
                 if (Files.isRegularFile(sharing) && !request.deleted().contains(sharing) && selected.add(sharing)) {
                     pending.add(sharing);
                 }

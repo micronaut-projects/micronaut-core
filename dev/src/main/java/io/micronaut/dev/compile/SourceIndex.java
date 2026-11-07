@@ -141,6 +141,20 @@ final class SourceIndex {
     }
 
     /**
+     * The existing source each class of the given source belongs to, see {@link #sourceOf(String)}.
+     *
+     * @param source The source, which may be deleted
+     * @return The sources, which may include the given one
+     */
+    Set<Path> ownSourcesOfClassesOf(Path source) {
+        Set<Path> own = new LinkedHashSet<>();
+        for (String className : classesOf(source)) {
+            sourceOf(className).ifPresent(own::add);
+        }
+        return own;
+    }
+
+    /**
      * The existing sources credited with an output of the given source, which may itself be deleted: whatever that
      * source's compilation or deletion removes, only they can write again.
      *
