@@ -26,6 +26,7 @@ import io.micronaut.http.bind.PrimitiveValueConverters;
 import io.micronaut.http.form.FileUpload;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormFieldException;
+import io.micronaut.http.multipart.FormFieldMetadata;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -52,6 +53,7 @@ import java.util.concurrent.CompletionStage;
 final class DefaultFormData implements FormData {
     private final Map<String, List<String>> fields;
     private final Map<String, List<FileUpload>> files;
+    private final Map<String, List<FormFieldMetadata>> fieldMetadata;
     private final ConversionService conversionService;
     // guarded by this
     private @Nullable CompletionStage<Void> closed;
@@ -62,9 +64,25 @@ final class DefaultFormData implements FormData {
      * @param conversionService The conversion service of the route
      */
     DefaultFormData(Map<String, List<String>> fields, Map<String, List<FileUpload>> files, ConversionService conversionService) {
+        this(fields, Map.of(), files, conversionService);
+    }
+
+    /**
+     * @param fields            The values of the text fields
+     * @param fieldMetadata     The metadata of the parts of the text fields, with immutable lists
+     * @param files             The uploaded files, with immutable lists
+     * @param conversionService The conversion service of the route
+     */
+    DefaultFormData(Map<String, List<String>> fields, Map<String, List<FormFieldMetadata>> fieldMetadata, Map<String, List<FileUpload>> files, ConversionService conversionService) {
         this.fields = fields;
+        this.fieldMetadata = fieldMetadata;
         this.files = files;
         this.conversionService = conversionService;
+    }
+
+    @Override
+    public List<FormFieldMetadata> getFieldMetadata(String name) {
+        return fieldMetadata.getOrDefault(name, List.of());
     }
 
     @Override
