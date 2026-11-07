@@ -18,7 +18,7 @@ import java.util.Set;
 /**
  * Generates, for every class annotated with {@link Marked}, a source {@code <Name>Generated} and a
  * resource {@code META-INF/marked/<Name>}, both credited to the annotated class's source as javac's
- * filer does.
+ * filer does. The resource ends with the system property {@code marked.suffix}, if set, as a processor reads one.
  */
 @SupportedAnnotationTypes("io.micronaut.dev.compile.processor.Marked")
 @SupportedSourceVersion(SourceVersion.RELEASE_21)
@@ -37,7 +37,7 @@ public final class MarkedProcessor extends AbstractProcessor {
                 }
                 FileObject resource = processingEnv.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", "META-INF/marked/" + simpleName, type);
                 try (Writer writer = resource.openWriter()) {
-                    writer.write(simpleName);
+                    writer.write(simpleName + System.getProperty("marked.suffix", ""));
                 }
             } catch (IOException e) {
                 throw new UncheckedIOException(e);

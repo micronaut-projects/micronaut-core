@@ -17,6 +17,8 @@ package io.micronaut.dev.compile;
 
 import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
@@ -38,6 +40,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The embedded Java compiler: the JDK's javac through the compiler API, compiling incrementally.
@@ -64,8 +67,11 @@ import java.util.Set;
 @Experimental
 public final class JavacSourceCompiler extends StagedSourceCompiler {
 
+    private static final Logger LOG = LoggerFactory.getLogger(JavacSourceCompiler.class);
+
     @Nullable
     private final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+    private final Set<String> warnedOptions = ConcurrentHashMap.newKeySet();
 
     @Override
     public Set<SourceKind> kinds() {
@@ -100,7 +106,9 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
             if (!request.processorPath().isEmpty()) {
                 standard.setLocationFromPaths(StandardLocation.ANNOTATION_PROCESSOR_PATH, request.processorPath());
             }
-            List<String> options = new ArrayList<>(request.options());
+            JavacJvmOptions jvmOptions = JavacJvmOptions.of(request.options());
+            warnOnce(jvmOptions.ignored());
+            List<String> options = new ArrayList<>(jvmOptions.compilerOptions());
             if (!options.contains("-implicit:none") && !options.contains("-implicit:class")) {
                 // a source found on the source path for a referenced class is compiled too, so that the
                 // dependency closure the index computed is complete even where the index lagged
@@ -108,10 +116,17 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
             }
             Iterable<? extends JavaFileObject> units = standard.getJavaFileObjectsFromPaths(toCompile);
             JavaCompiler.CompilationTask task = javac.getTask(null, fileManager, diagnostic -> diagnostics.add(toDiagnostic(diagnostic)), options, null, units);
-            if (!Boolean.TRUE.equals(task.call())) {
+            if (!Boolean.TRUE.equals(jvmOptions.withSystemProperties(task::call))) {
                 return null;
             }
             return new Produced(fileManager.produced(generatedStaging), fileManager.producedSources(generatedStaging), fileManager.producedResources(staging));
+        }
+    }
+
+    private void warnOnce(List<String> ignored) {
+        List<String> unwarned = ignored.stream().filter(warnedOptions::add).toList();
+        if (!unwarned.isEmpty()) {
+            LOG.warn("Ignoring {}: these options are for the JVM of a forked compiler, and the embedded compiler runs in the application's JVM. Anything that depends on them, in the compiler or the annotation processors, may differ from the build tool's compilation", unwarned);
         }
     }
 
