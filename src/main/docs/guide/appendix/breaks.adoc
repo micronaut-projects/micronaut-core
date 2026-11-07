@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== URL-encoded forms with a malformed percent escape are rejected (5.3)
+
+The Netty server previously decoded a malformed percent escape in an `application/x-www-form-urlencoded` body leniently: a body such as `g=%2` or `g=%GG` was accepted and the route answered as if the escape were text. Since Micronaut 5.3 such a body is a client error and is answered with `400 Bad Request`, for every reader of the form: a `@Body` or `FormData` argument, the `form()` of a functional route, `AsyncRequestBody.form()`, and the raw values of the form. An escape split between two chunks of the body is still decoded. To restore the lenient decoding, set `micronaut.server.netty.form-lenient-percent-decoding` to `true`.
+
 === A plus sign in a path variable is a plus sign (5.3)
 
 The decoded value of a path variable, for example a api:http.annotation.PathVariable[] argument, `getString` of api:http.PathVariables[] or `getVariableValues()` of a route match, now keeps a `+` as a plus sign, as RFC 3986 defines for the path. Previously the router decoded the values like form data, so `/items/a+b` gave `a b`. A space in a path is percent-encoded as `%20`, which is still decoded to a space, and `%2B` is decoded to `+` as before. A client that sent `+` for a space in a path should send `%20`. Query parameters and form fields are not affected: they still decode a `+` to a space. To keep the previous decoding, where a `+` in a path variable is a space, set `micronaut.router.path-variable-plus-as-space: true`.
