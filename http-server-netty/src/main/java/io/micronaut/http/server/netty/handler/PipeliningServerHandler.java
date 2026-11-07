@@ -1990,9 +1990,23 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        @SuppressWarnings("java:S1181") // a compression provider may fail with an Error, e.g. a native one that cannot link; the connection must still close
         void writeSome() {
             written = true;
-            writeCompressing(message, true, true);
+            try {
+                writeCompressing(message, true, true);
+            } catch (RuntimeException | Error e) {
+                // the compression session took the body and released it, so message must not be released again
+                // record the failure first: marking the response written completes its callbacks
+                requestHandler.responseFailed(outboundAccess.attachment, e);
+                outboundHandler = null;
+                super.discardOutbound();
+                markResponseWritten();
+                LOG.warn("Failed to compress the response. The error cannot be forwarded to the client.", e);
+                requiredFlushCoalescer().flushNow();
+                requiredCtx().close();
+                return;
+            }
             outboundHandler = null;
             markResponseWritten();
             PipeliningServerHandler.this.writeSome();
@@ -2065,9 +2079,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        @SuppressWarnings("java:S1181") // a compression provider may fail with an Error, e.g. a native one that cannot link; the response must still fail
         public void write(ByteBuf data, boolean last) {
             if (!last) {
-                writeCompressing(new DefaultHttpContent(data), true, false);
+                try {
+                    writeCompressing(new DefaultHttpContent(data), true, false);
+                } catch (RuntimeException | Error e) {
+                    // the compression session took the piece and released it
+                    fail(e);
+                }
                 return;
             }
             LastHttpContent content;
@@ -2078,7 +2098,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 content = lastContent(null);
             }
             outboundHandler = null;
-            writeCompressing(content, true, true);
+            try {
+                writeCompressing(content, true, true);
+            } catch (RuntimeException | Error e) {
+                // the compression session took the last piece and released it
+                fail(e);
+                return;
+            }
             writer.markResponseWritten();
             PipeliningServerHandler.this.writeSome();
         }
