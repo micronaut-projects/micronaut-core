@@ -1522,6 +1522,8 @@ public final class DevRuntime implements Closeable {
         // every resource change reaches the running context's watches, those under the configuration root too;
         // a configuration file changed also refreshes the configuration
         ApplicationContext current = context;
+        // a recreation a watch asked for that would have stopped the application is refused, and a restart applies it
+        long refusedBefore = InPlaceUpdates.refusedRecreations(current);
         boolean configurationChanged = ResourceNotifier.notify(current, settledResources(batch.resources), this::rootsOf, this::refreshBrowsers);
         OutputSnapshot previous = snapshot;
         OutputSnapshot latest = outputSnapshot();
@@ -1543,6 +1545,8 @@ public final class DevRuntime implements Closeable {
                 String stale = ConfigurationStaleness.afterRefresh(current, refresh.change(), requirements);
                 if (stale != null) {
                     LOG.info("Restarting for the configuration change: {}", stale);
+                } else if (InPlaceUpdates.refusedRecreations(current) != refusedBefore) {
+                    LOG.info("Restarting: a bean the running application depends on could not be recreated in place for the configuration change");
                 } else if (!refresh.requiresRestart() && changeSet.isEmpty() && !batch.forcesRestart() && !startFailures.failed()) {
                     LOG.info("Configuration refreshed in place: {} bean(s) rebound, {} recreated, {} refreshable disposed of, {} watch(es) told",
                         refresh.rebound().size(), refresh.recreated().size(), refresh.disposed(), refresh.outcomes().size());
@@ -1553,18 +1557,19 @@ public final class DevRuntime implements Closeable {
                 }
             }
         }
+        boolean refused = InPlaceUpdates.refusedRecreations(current) != refusedBefore;
         // a generation reads its snapshot: a resource the build wrote under a reloadable root, such as a service
         // descriptor, needs a new generation as a class does; a failed start needs one whatever changed
-        if (changeSet.isEmpty() && configurationChange == null && !batch.forcesRestart() && !startFailures.failed()) {
+        if (changeSet.isEmpty() && configurationChange == null && !refused && !batch.forcesRestart() && !startFailures.failed()) {
             if (compiled) {
                 LOG.info("Nothing to reload: the classes did not change");
             }
             return;
         }
-        if (configurationChange == null && !batch.forcesRestart() && !startFailures.failed() && inPlaceUpdates.patchInPlace(context, changeSet, previous, start)) {
+        if (configurationChange == null && !refused && !batch.forcesRestart() && !startFailures.failed() && inPlaceUpdates.patchInPlace(context, changeSet, previous, start)) {
             return;
         }
-        if (configurationChange == null && !batch.forcesRestart() && !startFailures.failed() && inPlaceUpdates.redefine(instrumentation, context, changeSet, previous, start)) {
+        if (configurationChange == null && !refused && !batch.forcesRestart() && !startFailures.failed() && inPlaceUpdates.redefine(instrumentation, context, changeSet, previous, start)) {
             return;
         }
         restart(changeSet, configurationChange, start);

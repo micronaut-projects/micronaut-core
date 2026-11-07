@@ -1,6 +1,7 @@
 package io.micronaut.runtime.context.scope.refresh.refresher
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.context.watch.ConfigurationChange
@@ -266,6 +267,35 @@ class ConfigurationRefresherSpec extends Specification {
 
         where:
         graph << [true, false]
+    }
+
+    void "a removed @EachProperty entry that a running server received stays, rather than destroy the server and stop the application"() {
+        given:
+        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec.server", "listeners.one.url": "a", "listeners.two.url": "b"]
+        def source = new MapPropertySource("test", values) {
+            @Override
+            Object get(String key) { values[key] }
+
+            @Override
+            Iterator<String> iterator() { values.keySet().iterator() }
+        }
+        def context = ApplicationContext.builder().beanDependencyTrackingEnabled(true).propertySources(source).start()
+        def refresher = context.getBean(ConfigurationRefresher)
+        def server = context.getBean(ListenerServer).start()
+
+        when: "an entry the server received is removed"
+        values.remove("listeners.two.url")
+        def result = refresher.refresh()
+
+        then: "the application keeps running on the server it has, until a restart"
+        context.running
+        server.running
+        context.getBean(ListenerServer).is(server)
+        result.recreated().isEmpty()
+        ((DefaultBeanContext) context).refusedRecreations() == 1
+
+        cleanup:
+        context.close()
     }
 
     void "a property whose placeholder does not resolve fails neither the first refresh event nor a refresh, and is reported once it resolves"() {

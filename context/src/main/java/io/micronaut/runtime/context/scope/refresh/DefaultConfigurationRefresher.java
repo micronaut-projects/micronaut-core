@@ -279,6 +279,11 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
                 // are created again on their next use: a holder of every entry sees the ones that remain, a holder
                 // of this entry fails as it would at a startup without it
                 if (context instanceof DefaultBeanContext defaultBeanContext) {
+                    if (defaultBeanContext.refuseStoppingApplication(definition, "destroying the removed configuration entry")) {
+                        // a running server received it: destroying it would stop the application, which a development
+                        // runtime restarts instead, and the entry stays until then
+                        continue;
+                    }
                     destroyDependents(defaultBeanContext, definition);
                 }
                 context.destroyBean(registration);
@@ -303,6 +308,8 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
                     recreated.add(definition);
                     continue;
                 }
+                // not held, or a running server received it, which recreating it would stop: rebound in place, and a
+                // development runtime restarts for the refusal
                 context.refreshBean(registration);
                 rebound.add(definition);
             } else {

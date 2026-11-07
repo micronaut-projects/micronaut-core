@@ -342,6 +342,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Nullable
     private DefaultBeanDependencyGraph dependencyGraph;
     /**
+     * How many recreations, and destructions of a bean with its dependents, were refused because they would have
+     * destroyed the running application: read by a development runtime around a change it applies in place.
+     */
+    private final AtomicLong refusedRecreations = new AtomicLong();
+    /**
      * Registrations of a previous context to adopt on the first start, released once adopted so that
      * neither the previous context nor its classloader stays reachable through them.
      */
@@ -942,6 +947,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         BeanDefinition<Object> definition = registration.getBeanDefinition();
         List<BeanDefinition<Object>> processors = new ArrayList<>(2);
         if (dependencyGraph != null) {
+            if (refuseStoppingApplication(definition, "recreating")) {
+                return false;
+            }
             List<BeanDefinition<?>> dependents = new ArrayList<>(dependencyGraph.transitiveDependentsOf(definition));
             Collections.reverse(dependents);
             for (BeanDefinition<?> dependent : dependents) {
@@ -967,6 +975,70 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
         }
         return true;
+    }
+
+    /**
+     * Refuses to destroy a singleton and the singletons that depend on it, as a recreation does, when that would
+     * destroy the running application: a held {@link ApplicationContextLifeCycle}, such as an embedded server, that is
+     * running, which stops the whole context when it is destroyed. A codec, a configuration or a resolver the server
+     * received is such a bean, and a watcher recreating it on a change would otherwise end the application. Nothing
+     * is destroyed: the running instances are kept, the refusal is logged and counted, and a development runtime that
+     * applies a change in place restarts the application instead (see {@link #refusedRecreations()}).
+     *
+     * <p>Only asked where the context records the dependency graph, as in development mode: a recreation without it
+     * destroys no dependent.</p>
+     *
+     * @param definition The definition of the singleton to destroy with its dependents
+     * @param action What would destroy it, for the log, such as {@code recreating}
+     * @return Whether it is refused: the caller destroys nothing
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public boolean refuseStoppingApplication(BeanDefinition<?> definition, String action) {
+        DefaultBeanDependencyGraph graph = dependencyGraph;
+        if (graph == null) {
+            return false;
+        }
+        Object application = runningApplication(definition);
+        if (application == null) {
+            for (BeanDefinition<?> dependent : graph.transitiveDependentsOf(definition)) {
+                application = runningApplication(dependent);
+                if (application != null) {
+                    break;
+                }
+            }
+        }
+        if (application == null) {
+            return false;
+        }
+        refusedRecreations.incrementAndGet();
+        if (LOG.isInfoEnabled()) {
+            LOG.info("Not {} [{}]: it would destroy [{}], which stops the running application. The running instances are kept until a restart",
+                action, definition.getBeanType().getName(), application.getClass().getName());
+        }
+        return true;
+    }
+
+    @SuppressWarnings("unchecked")
+    private @Nullable Object runningApplication(BeanDefinition<?> definition) {
+        BeanRegistration<?> held = singletonScope.findBeanRegistration((BeanDefinition<Object>) definition);
+        return held != null && held.bean instanceof ApplicationContextLifeCycle<?> lifeCycle && lifeCycle.isRunning() ? lifeCycle : null;
+    }
+
+    /**
+     * How many recreations, or destructions of a bean with its dependents, this context refused because they would
+     * have stopped the running application (see {@link #refuseStoppingApplication(BeanDefinition, String)}). A
+     * development runtime compares it before and after it applies a change in place, and restarts the application
+     * when it grew, so that the change is applied anyway.
+     *
+     * @return The number of refusals so far
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public long refusedRecreations() {
+        return refusedRecreations.get();
     }
 
     /**

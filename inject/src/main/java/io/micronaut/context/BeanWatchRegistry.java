@@ -502,7 +502,8 @@ final class BeanWatchRegistry {
 
     /**
      * Collects the answers of delivered configuration batches, in order, and replaces the beans whose watch
-     * answered {@link ReloadingConfigurationWatcher.Outcome#RECREATE}.
+     * answered {@link ReloadingConfigurationWatcher.Outcome#RECREATE}. One that cannot be replaced without stopping
+     * the running application is reported as {@link ReloadingConfigurationWatcher.Outcome#REQUIRES_RESTART}.
      *
      * @return The outcomes, one per batch delivered
      */
@@ -533,18 +534,28 @@ final class BeanWatchRegistry {
             outcomes.add(outcome);
         }
         Set<Owner> notRecreated = new LinkedHashSet<>();
+        Set<Owner> needRestart = new LinkedHashSet<>();
         for (Owner owner : toRecreate) {
             Object bean = owner.bean();
+            long refused = context.refusedRecreations();
             if (bean == null || !context.recreateBean(bean)) {
-                LOG.warn("A configuration watch answered RECREATE for a bean of [{}] the context does not hold, such as a prototype; nothing recreated", owner.definition.getBeanType().getName());
-                notRecreated.add(owner);
+                if (context.refusedRecreations() != refused) {
+                    // recreating it would have stopped the running application, as when the server received it: the
+                    // change needs a restart, which the context logged
+                    needRestart.add(owner);
+                } else {
+                    LOG.warn("A configuration watch answered RECREATE for a bean of [{}] the context does not hold, such as a prototype; nothing recreated", owner.definition.getBeanType().getName());
+                    notRecreated.add(owner);
+                }
             }
         }
-        if (!notRecreated.isEmpty()) {
+        if (!notRecreated.isEmpty() || !needRestart.isEmpty()) {
             // the outcome reported is what happened, not what the watcher asked for
             for (Map.Entry<Integer, Owner> entry : recreateOutcomes.entrySet()) {
                 if (notRecreated.contains(entry.getValue())) {
                     outcomes.set(entry.getKey(), ReloadingConfigurationWatcher.Outcome.IGNORED);
+                } else if (needRestart.contains(entry.getValue())) {
+                    outcomes.set(entry.getKey(), ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART);
                 }
             }
         }

@@ -16,6 +16,7 @@
 package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.reload.ClassChange;
 import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.InPlaceResourceReloader;
@@ -200,11 +201,9 @@ final class InPlaceUpdates {
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         if (current != null && current.isRunning()) {
             ClassChangeEvent event = new ClassChangeEvent(runtime, Set.of(), generation, changeSet.classes(), ReloadStrategy.RELOAD);
-            try {
-                current.publishEvent(event);
-                current.publishEvent(new ReloadCompletedEvent(runtime, event, List.of(), List.of(), elapsed));
-            } catch (RuntimeException e) {
-                LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
+            if (!publishInPlace(current, event, elapsed)) {
+                // the snapshot holds the new class files, which the restart that follows loads
+                return false;
             }
         }
         if (patched != null) {
@@ -251,15 +250,49 @@ final class InPlaceUpdates {
         }
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         ClassChangeEvent event = new ClassChangeEvent(runtime, Set.of(), generation, List.of(), ReloadStrategy.RELOAD);
-        try {
-            current.publishEvent(event);
-            current.publishEvent(new ReloadCompletedEvent(runtime, event, List.of(), List.of(), elapsed));
-        } catch (RuntimeException e) {
-            LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
+        if (!publishInPlace(current, event, elapsed)) {
+            return false;
         }
         LOG.info("Patched {} {} in place in {} ms: generation {} keeps running", result.count(), result.unit(), elapsed.toMillis(), generation.generation());
         runtime.liveReload().ifPresent(server -> server.reload("/", false));
         return true;
+    }
+
+    /**
+     * Tells the running context about a change applied in place, unless a watcher it reaches could not apply it: a
+     * bean whose recreation would destroy the running application, such as a codec the server received, is kept by
+     * the context, and the change is then left to a restart, which builds every bean from the new classes.
+     *
+     * @param current The running context
+     * @param event The change
+     * @param elapsed How long applying it took
+     * @return Whether the change stays applied in place; false when the application must restart
+     */
+    private boolean publishInPlace(ApplicationContext current, ClassChangeEvent event, Duration elapsed) {
+        long refused = refusedRecreations(current);
+        try {
+            current.publishEvent(event);
+        } catch (RuntimeException e) {
+            LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
+        }
+        if (refusedRecreations(current) != refused) {
+            LOG.info("Restarting: a bean the running application depends on could not be recreated in place for the change");
+            return false;
+        }
+        try {
+            current.publishEvent(new ReloadCompletedEvent(runtime, event, List.of(), List.of(), elapsed));
+        } catch (RuntimeException e) {
+            LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
+        }
+        return true;
+    }
+
+    /**
+     * @param context The running context, if any
+     * @return How many recreations it refused so far because they would have stopped the application
+     */
+    static long refusedRecreations(@Nullable ApplicationContext context) {
+        return context instanceof DefaultBeanContext beanContext ? beanContext.refusedRecreations() : 0;
     }
 
     /**
