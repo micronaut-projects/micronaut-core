@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -55,6 +56,7 @@ public final class ClassDependencyIndex {
     private static final int CLASS_MAGIC = 0xCAFEBABE;
     private static final int ACC_STATIC = 0x0008;
     private static final int ACC_FINAL = 0x0010;
+    private static final int BUFFER_SIZE = 16 * 1024;
 
     private final Map<String, Set<String>> referencesByClass = new HashMap<>();
     private final Map<String, Set<String>> dependentsByClass = new HashMap<>();
@@ -197,7 +199,7 @@ public final class ClassDependencyIndex {
         String owner = topLevelClassOf(relativeClassFile);
         Set<String> references = referencesByClass.computeIfAbsent(owner, k -> new HashSet<>());
         try (InputStream in = Files.newInputStream(classFile)) {
-            ClassInfo info = read(new DataInputStream(in));
+            ClassInfo info = readClassFile(in);
             if (info.declaresConstants()) {
                 constantDeclarers.add(owner);
             }
@@ -212,6 +214,18 @@ public final class ClassDependencyIndex {
             // a class file being written, or not a class file at all: it references nothing the index can use
             LOG.debug("Skipping {} in the dependency index: {}", classFile, e.getMessage());
         }
+    }
+
+    /**
+     * Reads what the index needs from a class file, through a buffer: {@link DataInputStream} reads its stream a byte or
+     * a short at a time, which unbuffered is a read from the file system for each of the thousands of fields of a class file.
+     *
+     * @param in The class file
+     * @return What the index needs
+     * @throws IOException if the stream cannot be read
+     */
+    static ClassInfo readClassFile(InputStream in) throws IOException {
+        return read(new DataInputStream(new BufferedInputStream(in, BUFFER_SIZE)));
     }
 
     static ClassInfo read(DataInputStream in) throws IOException {
