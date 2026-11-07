@@ -1266,9 +1266,11 @@ public final class RouteAssembly {
         @SuppressWarnings("unchecked")
         private ErrorRouteInfo<Object, Object>[] buildErrorRoutes() {
             List<ErrorRouteInfo<Object, Object>> infos = new ArrayList<>(errorRoutes.size());
+            Set<ErrorRouteKey> keys = new HashSet<>();
             for (DefaultErrorRoute route : errorRoutes) {
                 ErrorRouteInfo<Object, Object> info = route.toRouteInfo();
-                if (infos.stream().anyMatch(other -> other.exceptionType() == info.exceptionType() && other.getProduces().equals(info.getProduces()))) {
+                ErrorRouteKey key = ErrorRouteKey.of(info);
+                if (key != null && !keys.add(key)) {
                     throw new RoutingException("Attempted to register multiple error routes for error [" + route.exceptionType().getSimpleName() + "] in a route group: " + route);
                 }
                 infos.add(info);
@@ -1279,9 +1281,11 @@ public final class RouteAssembly {
         @SuppressWarnings("unchecked")
         private StatusRouteInfo<Object, Object>[] buildStatusRoutes() {
             List<StatusRouteInfo<Object, Object>> infos = new ArrayList<>(statusRoutes.size());
+            Set<ErrorRouteKey> keys = new HashSet<>();
             for (DefaultStatusRoute route : statusRoutes) {
                 StatusRouteInfo<Object, Object> info = route.toRouteInfo();
-                if (infos.stream().anyMatch(other -> other.statusCode() == info.statusCode() && other.getProduces().equals(info.getProduces()))) {
+                ErrorRouteKey key = ErrorRouteKey.of(info);
+                if (key != null && !keys.add(key)) {
                     throw new RoutingException("Attempted to register multiple status routes for http status [" + route.statusCode() + "] in a route group: " + route);
                 }
                 infos.add(info);
