@@ -149,13 +149,71 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
     }
 
     /**
+     * Called once, after the last round of the compilation, when no class is visited anymore, before
+     * {@link #finish(VisitorContext)}.
+     *
+     * <p>This is the point for work that has to see every class of the compilation, including the classes that
+     * another visitor or annotation processor generated as source in a later round: aggregating what every round
+     * visited, adding the beans that follow from it, and validating the result. A bean added here with
+     * {@link VisitorContext#registerBean(ClassElement, io.micronaut.inject.ast.Element...)} is written by every
+     * compiler, javac, KSP, Groovy and Python. A source generated here is not visited anymore.</p>
+     *
+     * <p>An incremental compilation compiles the changed sources only, so the visitors see only them, here as in
+     * every other method. What is written here follows from the whole compilation, and is written so that the build
+     * writes it again, from every source, whenever a source is added, changed or removed. A bean added here still has
+     * to be given the classes it follows from as originating elements:</p>
+     *
+     * <ul>
+     *     <li>javac: the files are written with every originating element, except to the filer of Gradle. Gradle
+     *     tracks a file of an isolating processor by the top level types of its originating elements, and a file with
+     *     exactly one of them only depends on that type: a class added, or another class changed, would leave the
+     *     file stale. A file written here is therefore passed to the filer of Gradle without originating element,
+     *     which makes Gradle compile every source in the next incremental compilation, at the cost of incremental
+     *     compilation.</li>
+     *     <li>KSP: the files are aggregating outputs of the files of their originating elements, which KSP writes
+     *     again, processing those files again, whenever a source of the compilation is changed, added or
+     *     removed.</li>
+     *     <li>Groovy and Python: the originating elements are not reported to the build. Neither compiler tracks the
+     *     origins of what the visitors write, and an incremental Python compilation visits the changed Python classes
+     *     only.</li>
+     * </ul>
+     *
+     * <p>Where each compiler calls it:</p>
+     *
+     * <ul>
+     *     <li>javac: in the final annotation processing round, in which nothing generated is processed anymore.
+     *     The bean definitions are written in that round, without javac warning that they are not processed. A
+     *     source generated there is compiled, but javac warns that it is not processed.</li>
+     *     <li>KSP: from {@code SymbolProcessor.finish}. KSP invalidates the elements of a round when the round ends,
+     *     so an element kept from a {@code visit} method or from {@link #finishRound(VisitorContext)} must not be used
+     *     here: look the classes up again by name, with {@link VisitorContext#getClassElement(String)}, which resolves
+     *     them anew.</li>
+     *     <li>Groovy: at class generation, after the last round.</li>
+     *     <li>Python: once for the Python classes, after their single round, on the visitors that visited them.
+     *     javac then compiles the Java sources of the compilation and the Java classes generated for the Python
+     *     classes, with other instances of the visitors, and calls it once more on those, as for any javac
+     *     compilation. A visitor that overrides this method does not visit the Java classes generated for the Python
+     *     classes there, even if it visits every class, so that it does not contribute a Python class twice: each of
+     *     the two calls finishes the classes of one language.</li>
+     * </ul>
+     *
+     * @param visitorContext The visitor context
+     * @since 5.3.0
+     */
+    @Experimental
+    default void finishCompilation(VisitorContext visitorContext) {
+        // no-op
+    }
+
+    /**
      * Called when visitor processing finishes.
      *
      * <p>Under KSP and Groovy, this method is called once, when nothing generated as source is compiled anymore. Under
      * javac, it is called at the end of every annotation processing round, after {@link #finishRound(VisitorContext)},
      * the final round included. Prefer {@link #finishRound(VisitorContext)} for work that has to be done once the
-     * classes of a round are visited: under KSP the elements of the rounds are invalid by the time this method is
-     * called, and no bean can be registered from it.</p>
+     * classes of a round are visited, and {@link #finishCompilation(VisitorContext)} for work that has to be done once
+     * every round is over: under KSP the elements of the rounds are invalid by the time this method is called, and
+     * no bean can be registered from it.</p>
      *
      * @param visitorContext The visitor context
      */

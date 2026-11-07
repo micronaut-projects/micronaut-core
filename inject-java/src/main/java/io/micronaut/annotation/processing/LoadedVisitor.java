@@ -20,12 +20,14 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
+import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
 
@@ -45,6 +47,7 @@ final class LoadedVisitor implements Ordered {
     private final TypeElementVisitor<?, ?> visitor;
     private final String classAnnotation;
     private final String elementAnnotation;
+    private final boolean finishesCompilation;
 
     /**
      * @param visitor The {@link TypeElementVisitor}
@@ -54,6 +57,7 @@ final class LoadedVisitor implements Ordered {
                          ProcessingEnvironment processingEnvironment) {
         this.visitor = visitor;
         Class<? extends TypeElementVisitor> aClass = visitor.getClass();
+        this.finishesCompilation = overridesFinishCompilation(aClass);
 
         TypeElement typeElement = processingEnvironment.getElementUtils().getTypeElement(aClass.getName());
         if (typeElement != null) {
@@ -163,6 +167,30 @@ final class LoadedVisitor implements Ordered {
      */
     public boolean visitsEveryElement() {
         return classAnnotation.equals(OBJECT_CLASS) && elementAnnotation.equals(OBJECT_CLASS);
+    }
+
+    /**
+     * Whether the visitor visits the Java classes the Python compiler generated for the Python classes of the
+     * compilation. The Python compiler visited the Python classes with every visitor already, and finished their
+     * compilation. Only the visitors of every class visit the generated classes again, for what the Python compiler
+     * added to them, unless they finish the compilation: their contributions for the Python classes are complete,
+     * and visiting the generated classes again would contribute those classes twice to the javac compilation.
+     *
+     * @return True if the visitor visits the Java classes generated for the Python classes
+     * @since 5.3.0
+     */
+    public boolean visitsGeneratedForPython() {
+        return visitsEveryElement() && !finishesCompilation;
+    }
+
+    private static boolean overridesFinishCompilation(Class<?> visitorClass) {
+        try {
+            @SuppressWarnings("NoReflection") // whether the loaded visitor class overrides the default method
+            Method finishCompilation = visitorClass.getMethod("finishCompilation", VisitorContext.class);
+            return !finishCompilation.isDefault();
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
     }
 
     /**

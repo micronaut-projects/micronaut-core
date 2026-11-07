@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor;
@@ -57,6 +58,8 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     private final Map<String, FileObject> openedFiles = new LinkedHashMap<>();
     private final Map<String, Optional<GeneratedFile>> generatedFiles = new LinkedHashMap<>();
     private final boolean isGradleFiler;
+    private boolean finalRound;
+    private boolean wholeCompilation;
 
     /**
      * @param filer The {@link Filer} for creating new files
@@ -72,6 +75,37 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         }
     }
 
+    /**
+     * Marks the final annotation processing round: the classes visited from now on are written as class output
+     * resources. javac warns about every class file created with {@link Filer#createClassFile} in the final round,
+     * since it is not processed anymore, which a written bean definition does not need to be.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    public void finalRound() {
+        this.finalRound = true;
+    }
+
+    /**
+     * Sets whether the files visited from now on follow from the whole compilation, as the files written once every
+     * round is over do, instead of from their originating elements alone.
+     *
+     * <p>Such a file is written with every originating element, except to the filer of Gradle. Gradle tracks a file
+     * of an isolating processor by the top level types of its originating elements: a file with exactly one is
+     * deleted and written again only when that type is compiled again, and a file with none or several makes Gradle
+     * compile every source in the next incremental compilation. A file that follows from the whole compilation has to
+     * be written again when any source is added, changed or removed, so it is passed to the filer of Gradle without
+     * originating element, whatever the number of types its originating elements belong to.</p>
+     *
+     * @param wholeCompilation Whether the files follow from the whole compilation
+     * @since 5.3.0
+     */
+    @Internal
+    public void setWholeCompilation(boolean wholeCompilation) {
+        this.wholeCompilation = wholeCompilation;
+    }
+
     private static boolean isEclipseFiler(Filer filer) {
         return filer != null && filer.getClass().getTypeName().startsWith("org.eclipse.jdt");
     }
@@ -83,47 +117,76 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
     @Override
     public OutputStream visitClass(String classname, io.micronaut.inject.ast.Element... originatingElements) throws IOException {
-        JavaFileObject javaFileObject;
-        Element[] nativeOriginatingElements;
-        if (ArrayUtils.isNotEmpty(originatingElements)) {
-            if (isGradleFiler) {
-                // gradle filer only support single originating element for isolating processors
-                final io.micronaut.inject.ast.Element e = originatingElements[0];
-                final Object nativeType = e.getNativeType();
-                if (nativeType instanceof JavaNativeElement javaNativeElement) {
-                    nativeOriginatingElements = new Element[] {javaNativeElement.element()};
-                } else {
-                    nativeOriginatingElements = ELEMENTS_EMPTY_ARRAY;
-                }
-            } else {
-                // other compilers like the IntelliJ compiler support multiple
-                var list = new ArrayList<Element>(originatingElements.length);
-                for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
-                    Object nativeType = originatingElement.getNativeType();
-                    if (nativeType instanceof JavaNativeElement javaNativeElement) {
-                        list.add(javaNativeElement.element());
-                    }
-                }
-                nativeOriginatingElements = list.toArray(ELEMENTS_EMPTY_ARRAY);
-            }
-        } else {
-            nativeOriginatingElements = ELEMENTS_EMPTY_ARRAY;
+        Element[] nativeOriginatingElements = filerOriginatingElements(originatingElements);
+        if (finalRound) {
+            int lastDot = classname.lastIndexOf('.');
+            String packageName = lastDot == -1 ? "" : classname.substring(0, lastDot);
+            String fileName = classname.substring(lastDot + 1) + JavaFileObject.Kind.CLASS.extension;
+            return filer.createResource(StandardLocation.CLASS_OUTPUT, packageName, fileName, nativeOriginatingElements).openOutputStream();
         }
-        javaFileObject = filer.createClassFile(classname, nativeOriginatingElements);
-        return javaFileObject.openOutputStream();
+        return filer.createClassFile(classname, nativeOriginatingElements).openOutputStream();
+    }
+
+    private Element[] filerOriginatingElements(io.micronaut.inject.ast.@Nullable Element... originatingElements) {
+        if (!isGradleFiler) {
+            // other compilers like the IntelliJ compiler support multiple
+            return toJavaElements(originatingElements);
+        }
+        if (wholeCompilation || ArrayUtils.isEmpty(originatingElements)) {
+            // without originating element, Gradle compiles every source again in the next incremental compilation
+            return ELEMENTS_EMPTY_ARRAY;
+        }
+        // gradle filer only support single originating element for isolating processors
+        return toJavaElements(originatingElements[0]);
+    }
+
+    private static Element[] toJavaElements(io.micronaut.inject.ast.@Nullable Element... originatingElements) {
+        if (ArrayUtils.isEmpty(originatingElements)) {
+            return ELEMENTS_EMPTY_ARRAY;
+        }
+        var list = new ArrayList<Element>(originatingElements.length);
+        for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
+            if (originatingElement != null && originatingElement.getNativeType() instanceof JavaNativeElement javaNativeElement) {
+                list.add(javaNativeElement.element());
+            }
+        }
+        return list.toArray(ELEMENTS_EMPTY_ARRAY);
     }
 
     @Override
-    @SuppressWarnings("java:S1075")
     public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement) {
+        Element element = originatingElement instanceof ElementProvider jne ? jne.element() : null;
+        writeServiceDescriptor(type, classname, element);
+    }
+
+    /**
+     * Writes the service entry of a generated class, with the first of its originating elements, or, once
+     * {@link #setWholeCompilation(boolean)} is set, with the originating elements the class itself is written
+     * with.
+     *
+     * @param type                The fully qualified service name
+     * @param classname           The fully qualified class name
+     * @param originatingElements The originating elements of the class
+     * @since 5.3.0
+     */
+    @Internal
+    public void visitServiceEntry(String type, String classname, io.micronaut.inject.ast.Element... originatingElements) {
+        if (wholeCompilation || ArrayUtils.isEmpty(originatingElements)) {
+            writeServiceDescriptor(type, classname, filerOriginatingElements(originatingElements));
+        } else {
+            visitServiceDescriptor(type, classname, originatingElements[0]);
+        }
+    }
+
+    @SuppressWarnings("java:S1075")
+    private void writeServiceDescriptor(String type, String classname, Element... originatingElements) {
         final String path = "META-INF/micronaut/" + type + "/" + classname;
         try {
-            Element element = originatingElement instanceof ElementProvider jne ? jne.element() : null;
             final FileObject fileObject = filer.createResource(
                 StandardLocation.CLASS_OUTPUT,
                 "",
                 path,
-                element
+                originatingElements
             );
             try (Writer w = fileObject.openWriter()) {
                 w.write("");
