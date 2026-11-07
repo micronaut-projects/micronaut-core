@@ -27,6 +27,8 @@ With `micronaut.dev.strategy=auto` (the default) or `reload`, an edit that chang
 
 The agent is `micronaut-dev` itself, launched with `-javaagent`, which the build plugins add. Without it, or with `strategy=restart`, every change restarts.
 
+An edit of a statically compiled Python function changes the class compiled from it as well as the module. When the class qualifies and a reloader takes the module, as described below, the JVM redefines the class and the reloader patches the module, in the same generation; if either refuses, the application restarts. `micronaut.dev.patch-in-place=false` restarts such a change.
+
 == Python modules
 
 A Python edit that changes only bodies leaves the classes the compiler generates byte for byte the same: only the module and the bytecode written for it change in the class output. Such a change, in which no class changed and no file was added or removed, is offered to the running context's api:context.reload.InPlaceResourceReloader[] beans before anything restarts.
