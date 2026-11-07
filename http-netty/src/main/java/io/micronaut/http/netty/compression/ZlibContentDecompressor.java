@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
  * Retains Netty HTTP framing while replacing streaming codec construction.
  */
 @Internal
+@SuppressWarnings("java:S110") // the hierarchy depth comes from Netty
 public class ZlibContentDecompressor extends HttpContentDecompressor {
     private final NettyZlibCodecFactory factory;
 

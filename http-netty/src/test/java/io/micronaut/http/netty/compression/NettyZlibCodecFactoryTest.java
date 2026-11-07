@@ -26,7 +26,9 @@ class NettyZlibCodecFactoryTest {
         var server = factory.newWebSocketServerCompressionHandler(12345);
         assertInstanceOf(WebSocketServerCompressionHandler.class, server);
         assertNotSame(server, factory.newWebSocketServerCompressionHandler(12345));
-        assertSame(WebSocketClientCompressionHandler.INSTANCE, factory.newWebSocketClientCompressionHandler(23456));
+        var client = factory.newWebSocketClientCompressionHandler(23456);
+        assertInstanceOf(WebSocketClientCompressionHandler.class, client);
+        assertSame(client, factory.newWebSocketClientCompressionHandler(34567));
     }
 
     @Test
