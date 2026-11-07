@@ -52,7 +52,7 @@ class AsyncStreamingDecompressedLimitTest {
             try (ApplicationContext ctx = ApplicationContext.run(Map.of("micronaut.http.client.max-content-length", "1048576"));
                  StreamingHttpClient client = ctx.createBean(StreamingHttpClient.class, URI.create("http://127.0.0.1:" + serverSocket.getLocalPort()))) {
                 AsyncStreamingHttpClient async = client.toAsyncStreaming();
-                ExecutionException e = assertThrows(ExecutionException.class, () -> readFirst(async));
+                ExecutionException e = assertThrows(ExecutionException.class, () -> readAll(async));
                 assertTrue(exceedsLimit(e), () -> "unexpected failure: " + e.getCause());
             } finally {
                 serverThread.interrupt();
@@ -60,10 +60,13 @@ class AsyncStreamingDecompressedLimitTest {
         }
     }
 
-    private static void readFirst(AsyncStreamingHttpClient async) throws Exception {
+    private static void readAll(AsyncStreamingHttpClient async) throws Exception {
         BodyElements<?> elements = async.eventStream(HttpRequest.GET("/"), String.class).toCompletableFuture().get(WAIT, TimeUnit.SECONDS);
         try (elements) {
-            elements.next().toCompletableFuture().get(WAIT, TimeUnit.SECONDS);
+            // the elements decompressed before the limit is exceeded may arrive first
+            while (elements.next().toCompletableFuture().get(WAIT, TimeUnit.SECONDS).isPresent()) {
+                // discard
+            }
         }
     }
 

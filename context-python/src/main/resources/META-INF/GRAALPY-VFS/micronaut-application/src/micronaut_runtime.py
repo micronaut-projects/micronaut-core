@@ -5,7 +5,6 @@ Loaded once per context by PythonContextRuntime and looked up by name; each func
 Python semantics that host interop does not provide (object.__new__ without __init__, descriptor binding,
 datetime construction, async member adaptation).
 """
-import asyncio
 import datetime
 import importlib
 import inspect
@@ -366,10 +365,16 @@ def _micronaut_reactive_context():
     return asyncio_bridge.__micronaut_current_reactive_context()
 
 
+def _micronaut_is_asyncio_future(value):
+    # asyncio.isfuture, which is this check and no more: importing asyncio for it would cost every context
+    # longer than the rest of this module, and a value may advertise the marker before asyncio is loaded
+    return hasattr(value.__class__, "_asyncio_future_blocking") and value._asyncio_future_blocking is not None
+
+
 def __micronaut_async_member_value(target, adapter, context):
     def adapt(value):
         try:
-            if inspect.isawaitable(value) or asyncio.isfuture(value):
+            if inspect.isawaitable(value) or _micronaut_is_asyncio_future(value):
                 return value
         except Exception:
             pass

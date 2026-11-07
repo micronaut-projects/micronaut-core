@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -516,8 +517,20 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
-            // we do some preparation immediately on the calling thread, so that the ByteBody
-            // primary operation happens here.
+            if (!(body instanceof AvailableByteBody) && !requiredCtx().executor().inEventLoop()) {
+                // e.g. the first event of a blocking server-sent events handler. The body is
+                // claimed here and written on the event loop: the event loop may already feed it,
+                // and the response writer takes its signals from one thread at a time
+                CloseableByteBody claimed = body.move();
+                try {
+                    requiredCtx().executor().execute(() -> writeClaimed(response, claimed));
+                } catch (Throwable t) {
+                    // the event loop shut down: the caller no longer closes the body
+                    claimed.close();
+                    throw t;
+                }
+                return;
+            }
 
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             if (PipeliningServerHandler.canHaveBody(response.status())) {
@@ -541,6 +554,29 @@ abstract class MultiplexedServerHandler {
                 BufferConsumer.Upstream upstream = snbb.primary(consumer.writer);
                 consumer.writer.attach(upstream);
                 consumer.writer.execute(() -> consumer.open(upstream));
+            }
+        }
+
+        /**
+         * Write a response whose body was claimed on another thread.
+         *
+         * @param response The response
+         * @param body     The claimed body
+         */
+        private void writeClaimed(HttpResponse response, CloseableByteBody body) {
+            if (finished) {
+                // the caller no longer closes the body
+                body.close();
+                return;
+            }
+            try {
+                write(response, body);
+            } catch (Throwable t) {
+                // no caller to answer a fallback response: give up on the response
+                LOG.warn("Failed to write the response: {}", t.getMessage(), t);
+                body.close();
+                requestHandler.responseFailed(attachment, t);
+                abortWrittenResponse();
             }
         }
 

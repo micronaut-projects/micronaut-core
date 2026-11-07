@@ -290,17 +290,38 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 scheduled.cancel();
             }
         }
-        try {
-            (change.initial() ? change.added().parallelStream() : change.added().stream())
+        if (change.initial()) {
+            scheduleFirstBatch(change.added());
+        } else {
+            change.added().stream()
                 .filter(entry -> !scheduledTasks.containsKey(entry))
                 .forEach(this::scheduleTask);
-        } catch (RuntimeException e) {
-            if (change.initial()) {
-                // surfaced by the startup listener once the watch is registered, as it always failed the startup
-                startupFailure = e;
-                return;
-            }
-            throw e;
+        }
+    }
+
+    /**
+     * Schedules the first batch on several threads. A failure waits for the whole batch: a parallel stream gives up at
+     * the first failure while the other threads still schedule, and a method registered after the close that follows
+     * the failure would keep its timers.
+     */
+    private void scheduleFirstBatch(List<BeanExecutableMethod<Scheduled>> added) {
+        AtomicReference<RuntimeException> failure = new AtomicReference<>();
+        added.parallelStream()
+            .filter(entry -> !scheduledTasks.containsKey(entry))
+            .forEach(entry -> {
+                try {
+                    scheduleTask(entry);
+                } catch (RuntimeException e) {
+                    RuntimeException earlier = failure.compareAndExchange(null, e);
+                    if (earlier != null) {
+                        earlier.addSuppressed(e);
+                    }
+                }
+            });
+        RuntimeException first = failure.get();
+        if (first != null) {
+            // surfaced by the startup listener once the watch is registered, as it always failed the startup
+            startupFailure = first;
         }
     }
 
