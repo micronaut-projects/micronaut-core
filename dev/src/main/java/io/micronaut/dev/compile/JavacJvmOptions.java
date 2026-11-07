@@ -61,36 +61,32 @@ record JavacJvmOptions(List<String> compilerOptions, Map<String, String> systemP
                 continue;
             }
             String jvmOption = option.substring(JVM_OPTION.length());
-            if (jvmOption.startsWith(SYSTEM_PROPERTY) && jvmOption.length() > SYSTEM_PROPERTY.length()) {
-                String property = jvmOption.substring(SYSTEM_PROPERTY.length());
-                int equals = property.indexOf('=');
-                if (equals < 0) {
-                    systemProperties.put(property, "");
-                } else {
-                    systemProperties.put(property.substring(0, equals), property.substring(equals + 1));
-                }
-            } else {
+            String property = jvmOption.startsWith(SYSTEM_PROPERTY) ? jvmOption.substring(SYSTEM_PROPERTY.length()) : "";
+            int equals = property.indexOf('=');
+            if (property.isEmpty() || equals == 0) {
                 ignored.add(option);
+            } else if (equals < 0) {
+                systemProperties.put(property, "");
+            } else {
+                systemProperties.put(property.substring(0, equals), property.substring(equals + 1));
             }
         }
         return new JavacJvmOptions(compilerOptions, systemProperties, ignored);
     }
 
     /**
-     * Runs a compilation with the system properties set, restoring what they were when it ends, however it ends.
+     * Runs a compilation with the system properties set, restoring what they were when it ends, however it ends. One
+     * compilation runs at a time, so that none sees the properties of another.
      *
      * @param compilation The compilation
      * @param <T> The type of its result
      * @return Its result
      */
     <T> T withSystemProperties(Supplier<T> compilation) {
-        if (systemProperties.isEmpty()) {
-            return compilation.get();
-        }
         synchronized (SYSTEM_PROPERTIES_LOCK) {
             Map<String, @Nullable String> previous = new HashMap<>();
-            systemProperties.forEach((key, value) -> previous.put(key, System.setProperty(key, value)));
             try {
+                systemProperties.forEach((key, value) -> previous.put(key, System.setProperty(key, value)));
                 return compilation.get();
             } finally {
                 previous.forEach((key, value) -> {
