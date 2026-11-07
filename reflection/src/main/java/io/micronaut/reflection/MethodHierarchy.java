@@ -316,7 +316,25 @@ public record MethodHierarchy(Declaration local,
             .flatMap(BeanIntrospection::getTypeHierarchy)
             .flatMap(hierarchy -> hierarchy.findOverridden(introspector, type, name, parameterTypes))
             .filter(method -> method.getDeclaringBean().isGenerated())
+            .filter(method -> accessibleFrom(type, context, method))
             .map(method -> Declaration.of(method, false));
+    }
+
+    /**
+     * Whether a declaration of a level can be overridden from the reading type: a level of the package of the
+     * reading type always can, else the declaration has to be public or protected, as {@link #overridable} requires.
+     * The generated metadata carries no modifiers, so a level of another package is checked on its declared method.
+     */
+    private static boolean accessibleFrom(Class<?> level, Class<?> context, BeanMethod<?, ?> method) {
+        if (level.getPackageName().equals(context.getPackageName())) {
+            return true;
+        }
+        try {
+            int modifiers = level.getDeclaredMethod(method.getName(), Argument.toClassArray(method.getArguments())).getModifiers();
+            return Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers);
+        } catch (NoSuchMethodException | SecurityException e) {
+            return false;
+        }
     }
 
     /**

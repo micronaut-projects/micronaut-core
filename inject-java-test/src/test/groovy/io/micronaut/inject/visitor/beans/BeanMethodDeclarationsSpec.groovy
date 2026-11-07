@@ -98,6 +98,36 @@ class StringRepo extends Middle<String> {
         hierarchy.getMethodDeclarations(introspector, saveInteger)[1].arguments()[0].type == Integer
     }
 
+    void "an array of a type variable matches an array of the bound type"() {
+        given:
+        def loader = buildClassLoader('test.StringsRepo', '''
+package test;
+
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(hierarchy = true)
+interface ArrayRepo<T> {
+    @Executable
+    void saveAll(T[] items);
+}
+
+@Introspected(hierarchy = true)
+class StringsRepo implements ArrayRepo<String> {
+    @Executable
+    public void saveAll(String[] items) { }
+}
+''')
+        def introspector = new LoaderIntrospector(loader)
+        Class<?> repo = loader.loadClass('test.ArrayRepo')
+        def hierarchy = introspector.findIntrospection(loader.loadClass('test.StringsRepo')).orElseThrow().typeHierarchy.orElseThrow()
+
+        expect:
+        hierarchy.findOverridden(introspector, repo, 'saveAll', String[]).present
+        !hierarchy.findOverridden(introspector, repo, 'saveAll', int[]).present
+        !hierarchy.findOverridden(introspector, repo, 'saveAll', String).present
+    }
+
     static class LoaderIntrospector implements BeanIntrospector {
         final ClassLoader loader
 

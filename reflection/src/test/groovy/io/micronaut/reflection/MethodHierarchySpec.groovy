@@ -253,6 +253,15 @@ it merges from the methods it overrides, so the declaration is not exact and the
         tags(foreign.annotationMetadata()) == ["foreign-audited"]
     }
 
+    void "a package private method of a generated introspection of another package is not overridden"() {
+        when:
+        def foreign = MethodHierarchy.resolve(BeanIntrospector.SHARED, GeneratedForeignAudited, "audit", String)
+
+        then:
+        foreign.inherited().isEmpty()
+        tags(foreign.annotationMetadata()) == ["generated-foreign-audited"]
+    }
+
     void "a type with no introspection declares nothing"() {
         expect:
         MethodHierarchy.declaredBy(BeanIntrospector.SHARED, Reservation, "reserve", String).isEmpty()

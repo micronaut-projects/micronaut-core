@@ -47,20 +47,32 @@ final class BeanTypeHierarchies {
      */
     static boolean erasesTo(BeanTypeHierarchy hierarchy, Class<?> level, Argument<?>[] arguments, Class<?>[] parameterTypes) {
         for (int i = 0; i < arguments.length; i++) {
-            Argument<?> argument = arguments[i];
-            Class<?> parameterType = parameterTypes[i];
-            if (argument.getType() == parameterType) {
-                continue;
-            }
-            if (!argument.isUnresolvedTypeVariable() || !(argument instanceof GenericPlaceholder<?> placeholder)) {
-                return false;
-            }
-            Optional<Class<?>> bound = boundType(hierarchy, level, placeholder.getVariableName());
-            if (bound.isPresent() ? bound.get() != parameterType : !argument.getType().isAssignableFrom(parameterType)) {
+            if (!erasesTo(hierarchy, level, arguments[i], parameterTypes[i])) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * Whether one argument of a declaration erases to a parameter type; an array of a type variable, {@code T[]},
+     * matches an array of the type its component matches.
+     */
+    private static boolean erasesTo(BeanTypeHierarchy hierarchy, Class<?> level, Argument<?> argument, Class<?> parameterType) {
+        if (argument.getType() == parameterType) {
+            return true;
+        }
+        if (argument.isArray()) {
+            Argument<?> component = argument.componentType();
+            return component != null
+                && parameterType.isArray()
+                && erasesTo(hierarchy, level, component, parameterType.getComponentType());
+        }
+        if (!argument.isUnresolvedTypeVariable() || !(argument instanceof GenericPlaceholder<?> placeholder)) {
+            return false;
+        }
+        Optional<Class<?>> bound = boundType(hierarchy, level, placeholder.getVariableName());
+        return bound.isPresent() ? bound.get() == parameterType : argument.getType().isAssignableFrom(parameterType);
     }
 
     /**
