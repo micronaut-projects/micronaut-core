@@ -2,9 +2,12 @@ package io.micronaut.inject.visitor.rounds
 
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.context.ApplicationContext
+import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.beanimport.naming.FilerRecordingProcessor
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.inject.writer.GeneratedFile
 import spock.lang.Specification
 import spock.lang.TempDir
 
@@ -63,6 +66,20 @@ class FinishCompilationIncrementalSpec extends Specification {
         and:"the bean of a round still reports its first class only to Gradle"
         gradle[ROUND_DEFINITION] == ['registerbean.A']
         gradle[ROUND_ENTRY] == ['registerbean.A']
+    }
+
+    void "every file written as a result of finishCompilation follows from the whole compilation"() {
+        when:
+        Map<String, List<String>> gradle = compile(tempDir.resolve('gradle'), [A: source('A'), B: source('B')])
+        Map<String, List<String>> javac = compile(tempDir.resolve('javac'), [A: source('A'), B: source('B')], false)
+
+        then:"Gradle gets no originating element for any of them, whether the file is created at once or later"
+        CompilationOutputsVisitor.OUTPUTS.every { gradle[it] == [] }
+
+        and:"another filer gets every class, but for the service entry visited with a single originating element"
+        CompilationOutputsVisitor.OUTPUTS.findAll { it != CompilationOutputsVisitor.SERVICE_ENTRY }
+                .every { javac[it] == ['registerbean.A', 'registerbean.B'] }
+        javac[CompilationOutputsVisitor.SERVICE_ENTRY] == ['registerbean.A']
     }
 
     void "adding a class to a compilation of a single class writes the bean with both"() {
@@ -190,7 +207,7 @@ public class $name {
             def processor = new TypeElementVisitorProcessor() {
                 @Override
                 protected Collection<TypeElementVisitor> findTypeElementVisitors() {
-                    return [new RoundsVisitor()]
+                    return [new RoundsVisitor(), new CompilationOutputsVisitor()]
                 }
             }
             task.setProcessors([new FilerRecordingProcessor(processor, originatingTypes, gradle)])
@@ -217,6 +234,64 @@ public class $name {
     private static <T> T withContext(Path output, Closure<T> closure) {
         new URLClassLoader([output.toUri().toURL()] as URL[], FinishCompilationIncrementalSpec.classLoader).withCloseable { classLoader ->
             ApplicationContext.builder().classLoader(classLoader).start().withCloseable(closure)
+        }
+    }
+
+    /**
+     * Writes a file of every kind from {@code finishCompilation}, for the classes of the package
+     * {@code registerbean}: a resource and a generated source obtained first and written afterwards, so created
+     * lazily, a class, a service entry, and a resource obtained in a round already but only written once the
+     * compilation is finished.
+     */
+    static class CompilationOutputsVisitor implements TypeElementVisitor<Object, Object> {
+
+        static final String RESOURCE = 'META-INF/compilation-resource.txt'
+        static final String CACHED_RESOURCE = 'META-INF/cached-resource.txt'
+        static final String SOURCE = 'registerbean/CompilationGenerated.java'
+        static final String CLASS = 'registerbean/CompilationWritten.class'
+        static final String SERVICE_ENTRY = 'META-INF/micronaut/test.CompilationService/registerbean.CompilationWritten'
+        static final List<String> OUTPUTS = [RESOURCE, CACHED_RESOURCE, SOURCE, CLASS, SERVICE_ENTRY]
+
+        private final List<String> classes = []
+
+        @Override
+        VisitorKind getVisitorKind() {
+            return VisitorKind.ISOLATING
+        }
+
+        @Override
+        void visitClass(ClassElement element, VisitorContext context) {
+            if (element.packageName == 'registerbean') {
+                classes.add(element.name)
+            }
+        }
+
+        @Override
+        void finishRound(VisitorContext context) {
+            if (classes) {
+                // obtained, not written
+                context.visitMetaInfFile('cached-resource.txt', origins(context))
+            }
+        }
+
+        @Override
+        void finishCompilation(VisitorContext context) {
+            if (!classes) {
+                return
+            }
+            ClassElement[] origins = origins(context)
+            GeneratedFile resource = context.visitMetaInfFile('compilation-resource.txt', origins).orElseThrow()
+            GeneratedFile source = context.visitGeneratedSourceFile('registerbean', 'CompilationGenerated', origins).orElseThrow()
+            context.visitClass('registerbean.CompilationWritten', origins).close()
+            context.visitServiceDescriptor('test.CompilationService', 'registerbean.CompilationWritten', origins[0])
+            resource.write { Writer writer -> writer.write('compilation') }
+            source.write { Writer writer -> writer.write('package registerbean;\n\npublic class CompilationGenerated {\n}\n') }
+            context.visitMetaInfFile('cached-resource.txt', origins).orElseThrow().write { Writer writer -> writer.write('cached') }
+            classes.clear()
+        }
+
+        private ClassElement[] origins(VisitorContext context) {
+            return classes.toSorted().collect { context.getClassElement(it).orElseThrow() } as ClassElement[]
         }
     }
 }

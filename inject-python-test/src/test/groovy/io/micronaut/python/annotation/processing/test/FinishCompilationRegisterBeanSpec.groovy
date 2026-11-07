@@ -24,16 +24,19 @@ import io.micronaut.inject.visitor.rounds.FailingCompilationVisitor
 import io.micronaut.inject.visitor.rounds.Recorded
 import io.micronaut.inject.visitor.rounds.RegisteredRecord
 import io.micronaut.python.compiler.PyronautCompiler
+import io.micronaut.python.processing.element.PythonClassElement
 import jakarta.inject.Singleton
 import spock.lang.TempDir
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * A bean registered from {@link TypeElementVisitor#finishCompilation(VisitorContext)} is written for the Python classes
- * of a compilation by the Python compiler, and for its Java classes by javac, each once: a visitor that finishes the
- * compilation does not visit again, in javac, the Java classes generated for the Python classes.
+ * of a compilation by the Python compiler, and for its Java classes by javac, each once: a visitor that skips the
+ * classes generated for other languages does not visit again, in javac, the Java classes generated for the Python
+ * classes.
  */
 class FinishCompilationRegisterBeanSpec extends AbstractPythonTypeElementSpec {
 
@@ -100,6 +103,20 @@ class CompiledPython:
         context?.close()
     }
 
+    void "test a visitor of every class that does not skip the classes generated for other languages visits them in javac"() {
+        given:
+        StubSeeingVisitor.SEEN.clear()
+
+        when:
+        buildContext('''
+class SeesStubs:
+    pass
+''').close()
+
+        then:"the visitor finishes the compilation, but visits the Python class, and its Java class in javac"
+        StubSeeingVisitor.SEEN.toSorted() == ['java:python.SeesStubs', 'python:python.SeesStubs']
+    }
+
     void "test failing from finishCompilation fails the compilation"() {
         when:
         buildContext("""
@@ -130,10 +147,22 @@ class $className:
     }
 
     /**
-     * Registers a bean of {@link RegisteredRecord} once the compilation is finished, for the classes whose name
-     * starts with {@code Compiled}, whatever their language.
+     * A visitor of every class that skips the classes generated for other languages, by default.
      */
-    static class CompilationRecordingVisitor implements TypeElementVisitor<Object, Object> {
+    static interface SkippingOtherLanguagesVisitor extends TypeElementVisitor<Object, Object> {
+
+        @Override
+        default boolean skipClassesGeneratedForOtherLanguages() {
+            return true
+        }
+    }
+
+    /**
+     * Registers a bean of {@link RegisteredRecord} once the compilation is finished, for the classes whose name
+     * starts with {@code Compiled}, whatever their language. It skips the classes generated for other languages with
+     * the default method of the interface it implements.
+     */
+    static class CompilationRecordingVisitor implements SkippingOtherLanguagesVisitor {
 
         private final List<String> compiled = []
 
@@ -164,6 +193,11 @@ class $className:
         private final List<String> compiled = []
 
         @Override
+        boolean skipClassesGeneratedForOtherLanguages() {
+            return true
+        }
+
+        @Override
         VisitorKind getVisitorKind() {
             return VisitorKind.ISOLATING
         }
@@ -178,6 +212,35 @@ class $className:
         @Override
         void finishCompilation(VisitorContext context) {
             register(context, compiled, ANNOTATED)
+        }
+    }
+
+    /**
+     * Records the language and the name of the classes named {@code SeesStubs} it visits. It finishes the compilation,
+     * but does not skip the classes generated for other languages.
+     */
+    static class StubSeeingVisitor implements TypeElementVisitor<Object, Object> {
+
+        static final List<String> SEEN = new CopyOnWriteArrayList<>()
+
+        private final List<String> seen = []
+
+        @Override
+        VisitorKind getVisitorKind() {
+            return VisitorKind.ISOLATING
+        }
+
+        @Override
+        void visitClass(ClassElement element, VisitorContext context) {
+            if (element.simpleName == 'SeesStubs') {
+                seen.add((element instanceof PythonClassElement ? 'python:' : 'java:') + element.name)
+            }
+        }
+
+        @Override
+        void finishCompilation(VisitorContext context) {
+            SEEN.addAll(seen)
+            seen.clear()
         }
     }
 

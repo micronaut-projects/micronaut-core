@@ -490,7 +490,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      * frameworks read ({@code micronaut.introspection.allowReflection}, {@code @AllowsReflection}): a
      * visitor selected by one of those annotations would visit the class a second time and write its
      * output twice. Only the visitors of every class still visit it, for what the Python compiler added
-     * to the generated class itself ({@code @Introspected} for validation), unless they finish the compilation,
+     * to the generated class itself ({@code @Introspected} for validation), unless they skip them,
      * see {@link LoadedVisitor#visitsGeneratedForPython()}. The annotation is checked as
      * declared, since it is inherited by the Java subclasses of a Python class, which are visited.
      *

@@ -44,6 +44,12 @@ public class FailingCompilationVisitor implements TypeElementVisitor<Object, Obj
     }
 
     @Override
+    public boolean skipClassesGeneratedForOtherLanguages() {
+        // a Python class fails the Python compilation already
+        return true;
+    }
+
+    @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         if (element.getSimpleName().equals(FAIL)) {
             failing.add(element.getName());

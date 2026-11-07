@@ -451,11 +451,11 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * <p>The definition is named after the first originating element, which must be a class or a method of the
      * compilation. The originating elements are reported to the compiler: an incremental build that recompiles or
      * deletes one of them replaces or deletes the definition. Under javac, Gradle tracks the files of an isolating
-     * processor by the top level types of their originating elements, and compiles every source in the next
-     * incremental compilation when a file has none or several of them: a definition written during the rounds is
-     * therefore reported to Gradle with its first originating element only, and one written once every round is over
-     * without originating element, since it follows from the whole compilation, see
-     * {@link TypeElementVisitor#finishCompilation(VisitorContext)}.</p>
+     * processor by the top level types of their originating elements, and disables incremental annotation processing
+     * when a file has none or several of them, so that the subsequent affected compilations compile all sources: a
+     * definition written during the rounds is therefore reported to Gradle with its first originating element only,
+     * and one written once every round is over without originating element, since it follows from the whole
+     * compilation, see {@link TypeElementVisitor#finishCompilation(VisitorContext)}.</p>
      *
      * <p>The definition is written with the beans of the current round, see
      * {@link TypeElementVisitor#finishRound(VisitorContext)}. To register a bean once every round is over, for what

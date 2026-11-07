@@ -54,9 +54,9 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     private static final Element[] ELEMENTS_EMPTY_ARRAY = new Element[0];
 
     private final Filer filer;
-    private final Map<String, Optional<GeneratedFile>> metaInfFiles = new LinkedHashMap<>();
+    private final Map<String, GeneratedFileObject> metaInfFiles = new LinkedHashMap<>();
     private final Map<String, FileObject> openedFiles = new LinkedHashMap<>();
-    private final Map<String, Optional<GeneratedFile>> generatedFiles = new LinkedHashMap<>();
+    private final Map<String, GeneratedFileObject> generatedFiles = new LinkedHashMap<>();
     private final boolean isGradleFiler;
     private boolean finalRound;
     private boolean wholeCompilation;
@@ -91,10 +91,14 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
      * Sets whether the files visited from now on follow from the whole compilation, as the files written once every
      * round is over do, instead of from their originating elements alone.
      *
+     * <p>Whether a file follows from the whole compilation is recorded when it is visited: a {@link GeneratedFile}
+     * obtained now keeps it, even if its file is created later, and one obtained earlier but not created yet gets
+     * it.</p>
+     *
      * <p>Such a file is written with every originating element, except to the filer of Gradle. Gradle tracks a file
      * of an isolating processor by the top level types of its originating elements: a file with exactly one is
-     * deleted and written again only when that type is compiled again, and a file with none or several makes Gradle
-     * compile every source in the next incremental compilation. A file that follows from the whole compilation has to
+     * deleted and written again only when that type is compiled again, and a file with none or several disables
+     * incremental annotation processing, so that the subsequent affected compilations compile all sources. A file that follows from the whole compilation has to
      * be written again when any source is added, changed or removed, so it is passed to the filer of Gradle without
      * originating element, whatever the number of types its originating elements belong to.</p>
      *
@@ -133,7 +137,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
             return toJavaElements(originatingElements);
         }
         if (wholeCompilation || ArrayUtils.isEmpty(originatingElements)) {
-            // without originating element, Gradle compiles every source again in the next incremental compilation
+            // without originating element, Gradle disables incremental annotation processing
             return ELEMENTS_EMPTY_ARRAY;
         }
         // gradle filer only support single originating element for isolating processors
@@ -155,8 +159,13 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
     @Override
     public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement) {
-        Element element = originatingElement instanceof ElementProvider jne ? jne.element() : null;
-        writeServiceDescriptor(type, classname, element);
+        if (wholeCompilation && isGradleFiler) {
+            // without originating element, Gradle disables incremental annotation processing
+            writeServiceDescriptor(type, classname);
+        } else {
+            Element element = originatingElement instanceof ElementProvider jne ? jne.element() : null;
+            writeServiceDescriptor(type, classname, element);
+        }
     }
 
     /**
@@ -198,11 +207,25 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
     @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
-        return metaInfFiles.computeIfAbsent(path, s -> {
+        return inPhase(metaInfFiles.computeIfAbsent(path, s -> {
             String finalPath = "META-INF/" + path;
             Element[] nativeOriginatingElements = toNativeOriginatingElements(originatingElements);
-            return Optional.of(new GeneratedFileObject(finalPath, nativeOriginatingElements));
-        });
+            return new GeneratedFileObject(finalPath, nativeOriginatingElements);
+        }));
+    }
+
+    /**
+     * Records on a visited file that it follows from the whole compilation, if it is visited once every round is
+     * over, see {@link #setWholeCompilation(boolean)}.
+     *
+     * @param generatedFile The visited file
+     * @return The file
+     */
+    private Optional<GeneratedFile> inPhase(GeneratedFileObject generatedFile) {
+        if (wholeCompilation) {
+            generatedFile.wholeCompilation = true;
+        }
+        return Optional.of(generatedFile);
     }
 
     private static Element[] toNativeOriginatingElements(io.micronaut.inject.ast.Element[] originatingElements) {
@@ -212,20 +235,20 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
-        return generatedFiles.computeIfAbsent(path, s -> Optional.of(new GeneratedFileObject(path, StandardLocation.SOURCE_OUTPUT)));
+        return inPhase(generatedFiles.computeIfAbsent(path, s -> new GeneratedFileObject(path, StandardLocation.SOURCE_OUTPUT)));
     }
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
         Element[] nativeOriginatingElements = toNativeOriginatingElements(originatingElements);
-        return generatedFiles.computeIfAbsent(path, s -> Optional.of(new GeneratedFileObject(path, StandardLocation.SOURCE_OUTPUT, nativeOriginatingElements)));
+        return inPhase(generatedFiles.computeIfAbsent(path, s -> new GeneratedFileObject(path, StandardLocation.SOURCE_OUTPUT, nativeOriginatingElements)));
     }
 
     @Override
     public Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, io.micronaut.inject.ast.Element... originatingElements) {
         Element[] nativeOriginatingElements = toNativeOriginatingElements(originatingElements);
         var path = packageName.replace('.', File.separatorChar) + File.separator + fileNameWithoutExtension + ".java";
-        return generatedFiles.computeIfAbsent(path, s -> Optional.of(new GeneratedFileObject(packageName, fileNameWithoutExtension, nativeOriginatingElements)));
+        return inPhase(generatedFiles.computeIfAbsent(path, s -> new GeneratedFileObject(packageName, fileNameWithoutExtension, nativeOriginatingElements)));
     }
 
     /**
@@ -238,6 +261,10 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         private final String path;
         private final StandardLocation classOutput;
         private final Element[] originatingElements;
+        /**
+         * Whether the file follows from the whole compilation, see {@link #setWholeCompilation(boolean)}.
+         */
+        private boolean wholeCompilation;
         private FileObject inputObject;
         private FileObject outputObject;
 
@@ -343,13 +370,15 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
         private FileObject getOutputObject() throws IOException {
             if (outputObject == null) {
+                // without originating element, Gradle disables incremental annotation processing
+                Element[] elements = wholeCompilation && isGradleFiler ? ELEMENTS_EMPTY_ARRAY : originatingElements;
                 if (packageName != null && fileName != null) {
                     outputObject = filer.createSourceFile(
                         packageName + "." + fileName,
-                        originatingElements
+                        elements
                     );
                 } else {
-                    outputObject = filer.createResource(classOutput, "", path, originatingElements);
+                    outputObject = filer.createResource(classOutput, "", path, elements);
                 }
             }
             return outputObject;

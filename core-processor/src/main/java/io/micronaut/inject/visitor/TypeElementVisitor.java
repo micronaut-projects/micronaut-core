@@ -159,17 +159,17 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
      * compiler, javac, KSP, Groovy and Python. A source generated here is not visited anymore.</p>
      *
      * <p>An incremental compilation compiles the changed sources only, so the visitors see only them, here as in
-     * every other method. What is written here follows from the whole compilation, and is written so that the build
-     * writes it again, from every source, whenever a source is added, changed or removed. A bean added here still has
-     * to be given the classes it follows from as originating elements:</p>
+     * every other method. Everything written as a result of this method, the beans added here, their service
+     * entries, and the classes, sources and resources written here, follows from the whole compilation. A bean added
+     * here still has to be given the classes it follows from as originating elements:</p>
      *
      * <ul>
      *     <li>javac: the files are written with every originating element, except to the filer of Gradle. Gradle
      *     tracks a file of an isolating processor by the top level types of its originating elements, and a file with
      *     exactly one of them only depends on that type: a class added, or another class changed, would leave the
-     *     file stale. A file written here is therefore passed to the filer of Gradle without originating element,
-     *     which makes Gradle compile every source in the next incremental compilation, at the cost of incremental
-     *     compilation.</li>
+     *     file stale. A file written as a result of this method is therefore passed to the filer of Gradle without
+     *     originating element: output of this method disables incremental annotation processing, and the subsequent
+     *     affected Gradle compilations compile all sources.</li>
      *     <li>KSP: the files are aggregating outputs of the files of their originating elements, which KSP writes
      *     again, processing those files again, whenever a source of the compilation is changed, added or
      *     removed.</li>
@@ -192,9 +192,9 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
      *     <li>Python: once for the Python classes, after their single round, on the visitors that visited them.
      *     javac then compiles the Java sources of the compilation and the Java classes generated for the Python
      *     classes, with other instances of the visitors, and calls it once more on those, as for any javac
-     *     compilation. A visitor that overrides this method does not visit the Java classes generated for the Python
-     *     classes there, even if it visits every class, so that it does not contribute a Python class twice: each of
-     *     the two calls finishes the classes of one language.</li>
+     *     compilation. A visitor of every class also visits the Java classes generated for the Python classes there,
+     *     unless it skips them with {@link #skipClassesGeneratedForOtherLanguages()}, which a visitor that aggregates
+     *     its classes here should do, so that it does not contribute a Python class twice.</li>
      * </ul>
      *
      * @param visitorContext The visitor context
@@ -203,6 +203,24 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
     @Experimental
     default void finishCompilation(VisitorContext visitorContext) {
         // no-op
+    }
+
+    /**
+     * Whether javac should skip the Java representations of classes already visited by another language compiler.
+     *
+     * <p>It currently covers Python: the Python compiler visits the Python classes with every visitor, then generates
+     * a Java class for each of them, which javac compiles in the same compilation. A visitor selected by an annotation
+     * never visits those Java classes, but a visitor of every class visits them again, for what the Python compiler
+     * added to them, unless it returns {@code true} here, for example because it contributes something for every
+     * class it visits and would otherwise contribute a Python class twice. The Java classes extending a Python class
+     * are not generated for it, and are visited in any case.</p>
+     *
+     * @return Whether javac skips the Java classes generated for the classes of another language
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean skipClassesGeneratedForOtherLanguages() {
+        return false;
     }
 
     /**
