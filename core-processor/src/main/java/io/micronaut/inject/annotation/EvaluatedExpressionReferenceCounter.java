@@ -50,4 +50,14 @@ public class EvaluatedExpressionReferenceCounter {
         return 0;
     }
 
+    /**
+     * Forgets the indexes given, when a compilation of the Java processors ends: the next one, in a compiler that keeps the processors' classes
+     * loaded as a build tool's daemon or development mode does, names the expressions of a class from 0 again, as a
+     * compilation in a loader of its own would. A class compiled again keeps the names of its expression classes.
+     */
+    @Internal
+    public static void reset() {
+        CLASS_NAME_INDEXES.clear();
+    }
+
 }

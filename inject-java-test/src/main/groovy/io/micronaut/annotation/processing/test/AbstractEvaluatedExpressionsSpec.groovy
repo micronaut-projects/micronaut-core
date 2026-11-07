@@ -20,7 +20,6 @@ import io.micronaut.context.expressions.DefaultExpressionEvaluationContext
 import io.micronaut.core.expressions.EvaluatedExpressionReference
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.expressions.util.EvaluatedExpressionsUtils
-import io.micronaut.inject.annotation.EvaluatedExpressionReferenceCounter
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.visitor.TypeElementVisitor
@@ -60,7 +59,7 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def classLoader = applicationContext.classLoader
 
         def exprClassName = 'test.$Expr$Expr'
-        def startingIndex = EvaluatedExpressionReferenceCounter.nextIndex(exprClassName) - expressions.length
+        def startingIndex = lastExpressionIndex(classLoader, exprClassName) + 1 - expressions.length
 
         List<Object> result = new ArrayList<>()
         for (int i = startingIndex; i < startingIndex + expressions.size(); i++) {
@@ -101,8 +100,8 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def classLoader = applicationContext.classLoader
 
         try {
-            def index = EvaluatedExpressionReferenceCounter.nextIndex(exprFullName)
-            def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + (index == 0 ? index : index - 1)).newInstance()
+            def index = Math.max(lastExpressionIndex(classLoader, exprFullName), 0)
+            def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + index).newInstance()
             exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null))
         } catch (ClassNotFoundException e) {
             return null
@@ -138,7 +137,7 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def classLoader = applicationContext.classLoader
 
         def exprClassName = 'test.$Expr$Expr'
-        def startingIndex = EvaluatedExpressionReferenceCounter.nextIndex(exprClassName) - expressions.length
+        def startingIndex = lastExpressionIndex(classLoader, exprClassName) + 1 - expressions.length
 
         List<Object> result = new ArrayList<>()
         for (int i = startingIndex; i < startingIndex + expressions.size(); i++) {
@@ -173,12 +172,33 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def classLoader = applicationContext.classLoader
 
         try {
-            def index = EvaluatedExpressionReferenceCounter.nextIndex(exprFullName)
-            def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + (index == 0 ? index : index - 1)).newInstance()
+            def index = Math.max(lastExpressionIndex(classLoader, exprFullName), 0)
+            def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + index).newInstance()
             return exprClass.evaluate(new DefaultExpressionEvaluationContext(null, args, applicationContext, null))
         } catch (ClassNotFoundException e) {
             return null
         }
+    }
+
+    /**
+     * The index of the last expression class of a class the compilation wrote. A compilation numbers the expressions of
+     * a class from 0, and may number some it does not write, when it builds the metadata of an element more than once.
+     *
+     * @param classLoader The loader of the compilation's classes
+     * @param exprClassName The name of the expression classes without their index
+     * @return The highest index whose class loads, or -1
+     */
+    protected static int lastExpressionIndex(ClassLoader classLoader, String exprClassName) {
+        int last = -1
+        for (int index = 0; index < 100; index++) {
+            try {
+                classLoader.loadClass(exprClassName + index)
+                last = index
+            } catch (ClassNotFoundException e) {
+                // not written, or past the last
+            }
+        }
+        return last
     }
 
     static class ContextRegistrar implements TypeElementVisitor<Object, Object> {

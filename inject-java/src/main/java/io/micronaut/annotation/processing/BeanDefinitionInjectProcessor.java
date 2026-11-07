@@ -29,6 +29,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory;
 import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.EvaluatedExpressionReferenceCounter;
 import io.micronaut.inject.ast.UnresolvedTypeKind;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
@@ -309,6 +310,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 javaVisitorContext.finish();
             } finally {
                 BeanDefinitionWriter.finish();
+                // the compilation is over: a processor loader kept for the next one, as a build tool's daemon or development
+                // mode keeps it, numbers the expressions of a class compiled again from 0, as a loader of its own would
+                EvaluatedExpressionReferenceCounter.reset();
             }
         }
 
