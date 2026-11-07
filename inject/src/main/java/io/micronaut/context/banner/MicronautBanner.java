@@ -15,10 +15,13 @@
  */
 package io.micronaut.context.banner;
 
+import io.micronaut.core.io.ResourceLoader;
+
 import java.io.PrintStream;
 
 /**
- * Default implementation of {@link Banner} that prints the default Micronaut banner.
+ * Default implementation of {@link Banner} that prints the default Micronaut banner: the logo when
+ * the terminal displays images, otherwise ASCII art.
  */
 public class MicronautBanner implements Banner {
 
@@ -31,6 +34,7 @@ public class MicronautBanner implements Banner {
     };
 
     private final PrintStream out;
+    private final BannerTerminal terminal;
 
     /**
      * Constructor.
@@ -38,11 +42,51 @@ public class MicronautBanner implements Banner {
      * @param out The print stream
      */
     public MicronautBanner(PrintStream out) {
+        this(out, BannerMode.AUTO);
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param out The print stream
+     * @param mode The banner mode
+     * @since 5.3.0
+     */
+    public MicronautBanner(PrintStream out, BannerMode mode) {
+        this(out, BannerTerminal.current(mode));
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param out The print stream
+     * @param terminal The terminal
+     */
+    MicronautBanner(PrintStream out, BannerTerminal terminal) {
         this.out = out;
+        this.terminal = terminal;
+    }
+
+    /**
+     * Finds the banner of the application: its image, otherwise its text, otherwise the default banner.
+     *
+     * @param resourceLoader The loader of the banners of the application
+     * @param out The print stream
+     * @param mode The banner mode
+     * @return The banner
+     * @since 5.3.0
+     */
+    public static Banner resolve(ResourceLoader resourceLoader, PrintStream out, BannerMode mode) {
+        return ImageBanner.resolve(resourceLoader, out, mode)
+            .or(() -> ResourceBanner.resolve(resourceLoader, out))
+            .orElseGet(() -> new MicronautBanner(out, mode));
     }
 
     @Override
     public void print() {
+        if (ImageBanner.printLogo(terminal, out)) {
+            return;
+        }
         for (String line : MICRONAUT_BANNER) {
             out.println(line);
         }
