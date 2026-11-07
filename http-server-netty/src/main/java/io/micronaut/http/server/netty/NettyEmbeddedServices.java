@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -124,6 +126,14 @@ public interface NettyEmbeddedServices {
      */
     @SuppressWarnings("java:S1452")
     Optional<NettyServerWebSocketUpgradeHandler> getWebSocketUpgradeHandler(NettyEmbeddedServer embeddedServer);
+
+    /**
+     * @return The factory for fresh HTTP gzip and deflate handlers
+     * @since 5.3.0
+     */
+    default NettyZlibCodecFactory getZlibCodecFactory() {
+        return DefaultNettyZlibCodecFactory.INSTANCE;
+    }
 
     /**
      * @return The event loop group registry.
