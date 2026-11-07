@@ -152,7 +152,7 @@ class DevManifestSpec extends Specification {
         manifest.reloadableRoots() == [dir.resolve("build/micronaut-dev/siblings/classes"), dir.resolve("build/classes"), dir.resolve("../lib/build/classes").normalize()]
         manifest.classOutput(SourceKind.JAVA) == dir.resolve("build/classes")
 
-        when: "the tests come first, and their manifest keeps it"
+        when: "the tests come first"
         properties.setProperty("micronaut.dev.mode", "test")
         properties.setProperty("micronaut.dev.test.sources.java", "src/test/java")
         properties.setProperty("micronaut.dev.test.compile.java.output", "build/test-classes")
@@ -161,7 +161,10 @@ class DevManifestSpec extends Specification {
         then:
         manifest.reloadableRoots() == [dir.resolve("build/test-classes"), dir.resolve("build/micronaut-dev/siblings/classes"), dir.resolve("build/classes"), dir.resolve("../lib/build/classes").normalize()]
         manifest.testClassOutput(SourceKind.JAVA) == dir.resolve("build/test-classes")
-        manifest.testView().siblingOutput() == manifest.siblingOutput()
+
+        and: "the tests compile against it, and it is not theirs to write"
+        manifest.testView().siblingOutput() == null
+        manifest.testView().compileClasspath().first() == dir.resolve("build/micronaut-dev/siblings/classes")
     }
 
     void "without both keys there is no sibling output and the roots are those the manifest names"() {

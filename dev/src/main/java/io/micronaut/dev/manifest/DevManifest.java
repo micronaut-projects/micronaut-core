@@ -775,7 +775,8 @@ public final class DevManifest {
         for (String name : properties.stringPropertyNames()) {
             String key = name.substring(name.startsWith(PREFIX) ? PREFIX.length() : 0);
             boolean application = key.startsWith(SOURCES) || key.startsWith(RESOURCES) || key.equals(COMPILE_CLASSPATH)
-                || key.equals(PROCESSOR_PATH) || (key.startsWith(COMPILE) && key.indexOf('.', COMPILE.length()) > 0);
+                || key.equals(PROCESSOR_PATH) || (key.startsWith(COMPILE) && key.indexOf('.', COMPILE.length()) > 0)
+                || name.equals(SIBLING_SOURCES) || name.equals(SIBLING_OUTPUT);
             if (name.startsWith(PREFIX) && !application && !key.startsWith(TEST)) {
                 view.setProperty(name, properties.getProperty(name));
             }
@@ -786,6 +787,10 @@ public final class DevManifest {
             }
         }
         List<String> classpath = new ArrayList<>();
+        if (siblingOutput != null) {
+            // the tests read what the application's compilation wrote there, and write nothing there
+            classpath.add(siblingOutput.classes().toString());
+        }
         String testClasspath = properties.getProperty(PREFIX + TEST + COMPILE_CLASSPATH);
         for (Path entry : testClasspath != null ? paths(directory, testClasspath) : compileClasspath) {
             classpath.add(entry.toString());
