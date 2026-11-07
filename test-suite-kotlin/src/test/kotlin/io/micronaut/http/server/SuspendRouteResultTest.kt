@@ -97,7 +97,9 @@ class SuspendRouteResultTest {
 
         @Get("/status")
         suspend fun status(): HttpStatus {
-            delay(1)
+            // long enough to suspend: a delay that is over before the function gave up the thread does not suspend it,
+            // and a status returned without suspending sets the status of the response
+            delay(100)
             return HttpStatus.ACCEPTED
         }
 

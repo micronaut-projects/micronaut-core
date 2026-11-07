@@ -1655,7 +1655,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     // is claimed here, the streaming buffer of the connection is created on its
                     // event loop, where it is written
                     CloseableByteBody claimed = body.move();
-                    eventLoop.execute(() -> write(response, claimed));
+                    try {
+                        eventLoop.execute(() -> write(response, claimed));
+                    } catch (Throwable t) {
+                        // the event loop shut down: the caller no longer closes the body
+                        claimed.close();
+                        throw t;
+                    }
                     return;
                 }
                 // a body whose trailers are known, e.g. a relayed body that was received fully
