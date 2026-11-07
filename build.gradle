@@ -102,6 +102,22 @@ if (System.getenv("SONAR_TOKEN") != null) {
             // Test sources are not analysed for issues. Coverage of the main sources still comes
             // from the JaCoCo reports, which do not need the test files to be indexed.
             property "sonar.test.exclusions", "**/*"
+            // Performance critical classes kept whole on purpose: splitting them would add
+            // indirection on hot paths, so their size is not reported (FileLength is suppressed
+            // for them in config/checkstyle/custom-suppressions.xml too)
+            def largeClasses = ["AnnotationValue", "PipeliningServerHandler", "ReflectionBeanIntrospection"]
+            // java:S104 too many lines, java:S1448 too many methods
+            def sizeRules = ["java:S104", "java:S1448"]
+            def criteria = []
+            largeClasses.each { cls ->
+                sizeRules.each { rule ->
+                    def id = "${cls}${rule.replace('java:', '')}"
+                    criteria << id
+                    property "sonar.issue.ignore.multicriteria.${id}.ruleKey", rule
+                    property "sonar.issue.ignore.multicriteria.${id}.resourceKey", "**/${cls}.java"
+                }
+            }
+            property "sonar.issue.ignore.multicriteria", criteria.join(",")
         }
     }
 }
