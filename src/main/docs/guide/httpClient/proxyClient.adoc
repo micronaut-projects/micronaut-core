@@ -15,6 +15,29 @@ snippet::io.micronaut.docs.http.client.proxy.ProxyFilter[tags="imports,class", i
 
 NOTE: The api:http.client.ProxyHttpClient[] API is a low-level API that can be used to build a higher-level abstraction such as an API Gateway.
 
+=== Discarding a Proxied Response
+
+A proxied response holds the body of the upstream response until it is written to the client. A filter that calls `proxy` and then decides not to relay the response, for example because it only accepts a `2xx` response and answers anything else itself, must discard it: a response that is dropped unread leaks what it holds and, on a pooled connection, can keep the connection to the upstream busy.
+
+The `discard` method of api:http.client.ProxyHttpClient[] releases those resources on every runtime. It closes the response bytes, releases a full body in place, drains a streamed body chunk by chunk, and never throws, since the response is being dropped anyway. A response that was already relayed or discarded is left alone.
+
+[source,java]
+----
+return Flux.from(proxyHttpClient.proxy(upstreamRequest))
+    .map(upstream -> {
+        if (upstream.status() == HttpStatus.OK) {
+            return upstream; // <1>
+        }
+        proxyHttpClient.discard(upstream); // <2>
+        return HttpResponse.status(HttpStatus.BAD_GATEWAY); // <3>
+    });
+----
+<1> The upstream response is relayed as it is.
+<2> Any other upstream response is discarded, which releases its body and the connection it was read from.
+<3> The filter answers the client itself.
+
+The same method is available on api:http.client.AsyncProxyHttpClient[] for responses obtained through its `CompletionStage` API.
+
 === Forwarding Headers
 
 To tell the backend who the original client is, write the forwarding headers of the proxied request with api:http.server.util.ForwardedHeaders[]: `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`, `X-Forwarded-Port`, `X-Forwarded-Prefix` and the RFC 7239 `Forwarded` header.

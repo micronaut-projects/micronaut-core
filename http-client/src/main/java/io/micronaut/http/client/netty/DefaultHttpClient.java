@@ -514,6 +514,11 @@ public class DefaultHttpClient implements
     }
 
     @Override
+    public void discard(HttpResponse<?> response) {
+        nettyHttpClient.discard(response);
+    }
+
+    @Override
     public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> parentRequest, @Nullable CloseableByteBody body, @Nullable Thread originatingThread) {
         return nettyHttpClient.exchange(parentRequest, body, originatingThread);
     }
