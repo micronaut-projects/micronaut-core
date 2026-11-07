@@ -333,6 +333,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             outboundAccess.write(new DefaultHttpResponse(outboundAccess.request.protocolVersion(), HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty());
         } catch (RuntimeException e) {
             LOG.debug("Failed to write the error response for a request that was not accepted", e);
+            if (!outboundAccess.responseStarted()) {
+                // no handler is left for the close to discard: the request is done with here
+                requestHandler.responseWritten(outboundAccess.attachment);
+            }
             requiredCtx().close();
         }
     }
@@ -1558,7 +1562,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
             EventLoop eventLoop = requiredCtx().channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
-                eventLoop.execute(() -> write(handler));
+                try {
+                    eventLoop.execute(() -> write(handler));
+                } catch (Throwable t) {
+                    // the event loop shut down: the handler is never installed, release what it holds
+                    handler.discardRefused();
+                    throw t;
+                }
                 return;
             }
 
@@ -1611,7 +1621,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void writeFull(FullHttpResponse response, boolean headResponse) {
-            FullOutboundHandler oh;
+            FullOutboundHandler oh = null;
             try {
                 response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
                 if (canHaveBody(response.status())) {
@@ -1629,9 +1639,22 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             } catch (Throwable t) {
                 // the response never reached the connection
                 response.release();
+                discardCompression(oh);
                 throw t;
             }
             write(oh);
+        }
+
+        /**
+         * Discard the compression session of a handler whose setup failed before it was written.
+         *
+         * @param handler The handler, or {@code null} if it was not created
+         */
+        private static void discardCompression(@Nullable OutboundHandler handler) {
+            if (handler != null && handler.compressionSession != null) {
+                handler.compressionSession.discard();
+                handler.compressionSession = null;
+            }
         }
 
         @Override
@@ -1646,7 +1669,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     // event loop, where it is written
                     CloseableByteBody claimed = body.move();
                     try {
-                        eventLoop.execute(() -> write(response, claimed));
+                        eventLoop.execute(() -> writeClaimed(response, claimed));
                     } catch (Throwable t) {
                         // the event loop shut down: the caller no longer closes the body
                         claimed.close();
@@ -1676,11 +1699,88 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
                 preprocess(response);
                 StreamingOutboundHandler oh = new StreamingOutboundHandler(this, response);
-                prepareCompression(response, oh, expectedLength.orElse(-1));
-                StreamingNettyByteBody streaming = byteBodyFactory().toStreaming(body);
-                oh.body = streaming;
-                oh.writer.attach(streaming.primary(oh.writer));
+                try {
+                    prepareCompression(response, oh, expectedLength.orElse(-1));
+                    StreamingNettyByteBody streaming = byteBodyFactory().toStreaming(body);
+                    oh.body = streaming;
+                    oh.writer.attach(streaming.primary(oh.writer));
+                } catch (Throwable t) {
+                    // the handler never reached the connection
+                    discardCompression(oh);
+                    throw t;
+                }
                 write(oh);
+            }
+        }
+
+        /**
+         * Write a response whose streamed body was claimed on another thread.
+         *
+         * @param response The response
+         * @param body     The claimed body
+         */
+        private void writeClaimed(HttpResponse response, CloseableByteBody body) {
+            if (responseStarted()) {
+                // another response was written for the request meanwhile: this one is refused
+                LOG.warn("Only one response per request: a response written from another thread is dropped");
+                closeQuietly(body, null);
+                return;
+            }
+            try {
+                write(response, body);
+            } catch (Throwable t) {
+                // closes nothing once the body was claimed for the response
+                closeQuietly(body, t);
+                giveUpOffLoopWrite(t);
+            }
+        }
+
+        /**
+         * Close a body without letting a failure of its cleanup stop the caller's recovery.
+         *
+         * @param body  The body
+         * @param cause The failure being handled, which keeps a cleanup failure as suppressed, or
+         *              {@code null}
+         */
+        private static void closeQuietly(CloseableByteBody body, @Nullable Throwable cause) {
+            try {
+                body.close();
+            } catch (Throwable closeError) {
+                if (cause != null) {
+                    cause.addSuppressed(closeError);
+                } else {
+                    LOG.debug("Failed to close a response body that is not written", closeError);
+                }
+            }
+        }
+
+        /**
+         * Give up on a response whose write moved to the event loop and failed there: the
+         * caller is gone, so it cannot answer a fallback response.
+         * <ul>
+         *     <li>If the response was written completely, the failure came from a later response
+         *     that the same write ran: it is not this request's, and is only logged.</li>
+         *     <li>If the response was installed, it may be cut: the connection closes, which
+         *     discards it and reports it written.</li>
+         *     <li>Otherwise the request is answered with a 500 and the connection closes once the
+         *     responses before it are written, as for a request the request handler failed to
+         *     accept.</li>
+         * </ul>
+         *
+         * @param t The failure
+         */
+        private void giveUpOffLoopWrite(Throwable t) {
+            OutboundHandler current = handler instanceof ContinueOutboundHandler cont ? cont.next : handler;
+            if (current != null && current.responseWritten) {
+                LOG.warn("Failed to write a response that followed a response written from another thread: {}", t.getMessage(), t);
+                return;
+            }
+            LOG.warn("Failed to write the response: {}", t.getMessage(), t);
+            requestHandler.responseFailed(attachment, t);
+            if (current != null) {
+                requiredCtx().close();
+            } else {
+                rejectUnaccepted(this);
             }
         }
 
@@ -1696,13 +1796,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             assert ctx != null;
             Compressor.Session compressionSession = compressor.prepare(requiredCtx(), request, response, contentLength);
             if (compressionSession != null) {
+                // the handler owns the session first, so that a failure below discards it
+                outboundHandler.compressionSession = compressionSession;
                 // if content-length and transfer-encoding are unset, we will close anyway.
                 // if this is a full response, there's special handling below in OutboundHandler
                 if (!(response instanceof FullHttpResponse) && response.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
                     response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                     response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
                 }
-                outboundHandler.compressionSession = compressionSession;
             }
         }
     }
