@@ -31,7 +31,6 @@ import io.netty.handler.codec.compression.ZlibEncoder;
 import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.http.websocketx.extensions.WebSocketClientExtensionHandler;
 import io.netty.handler.codec.http.websocketx.extensions.WebSocketServerExtensionHandler;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 
 /**
@@ -76,12 +75,12 @@ public interface NettyZlibCodecFactory {
      * @since 5.3.0
      */
     default WebSocketServerExtensionHandler newWebSocketServerCompressionHandler(int maxMessageBytes) {
-        return new WebSocketServerCompressionHandler();
+        return new WebSocketServerCompressionHandler(0);
     }
 
     /**
      * Creates a client handler that negotiates WebSocket compression extensions. The default
-     * retains Netty's compression settings and allocation policy and returns its sharable singleton.
+     * retains Netty's compression settings and allocation policy and returns one sharable instance.
      * Overrides may enforce the endpoint's payload limit on decompressed messages.
      *
      * @param maxMessageBytes The endpoint's configured maximum message payload length
@@ -89,7 +88,7 @@ public interface NettyZlibCodecFactory {
      * @since 5.3.0
      */
     default WebSocketClientExtensionHandler newWebSocketClientCompressionHandler(int maxMessageBytes) {
-        return WebSocketClientCompressionHandler.INSTANCE;
+        return SharedWebSocketHandlers.CLIENT_COMPRESSION;
     }
 
     /**

@@ -412,7 +412,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
      * @param maxFramePayloadLength The configured maximum payload length
      * @return The channel future
      **/
-    private ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, WebSocketBean<?> webSocketBean, HttpResponse<?> response, int maxFramePayloadLength) {
+    private ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest<?> req, WebSocketBean<?> webSocketBean, HttpResponse<?> response, int maxFramePayloadLength) {
         WebSocketServerHandshakerFactory wsFactory =
                 new WebSocketServerHandshakerFactory(
                         getWebSocketURL(ctx, req),
