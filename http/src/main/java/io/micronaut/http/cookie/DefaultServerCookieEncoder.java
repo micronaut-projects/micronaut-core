@@ -25,6 +25,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -37,7 +38,7 @@ public final class DefaultServerCookieEncoder implements ServerCookieEncoder {
     private static final String SPACE = " ";
     private static final String EQUAL = "=";
     private static final String SEMICOLON = ";";
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'");
+    private static final DateTimeFormatter FORMATTER = expiresFormatter();
 
     @Override
     public List<String> encode(Cookie... cookies) {
@@ -85,6 +86,12 @@ public final class DefaultServerCookieEncoder implements ServerCookieEncoder {
      */
     private boolean isMaxAgeSet(Cookie cookie) {
         return cookie.getMaxAge() != -1 && cookie.getMaxAge() != Long.MIN_VALUE;
+    }
+
+    // RFC 6265 requires the fixed English day and month names of an rfc1123-date, so the locale is
+    // given explicitly rather than taken from the default one the formatter is built under
+    static DateTimeFormatter expiresFormatter() {
+        return DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US);
     }
 
     private static String expires(Long maxAgeSeconds) {
