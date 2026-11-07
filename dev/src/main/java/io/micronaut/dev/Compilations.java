@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.compile.CompilationRequest;
 import io.micronaut.dev.compile.CompilationResult;
 import io.micronaut.dev.compile.CompileMode;
+import io.micronaut.dev.compile.IncrementalMode;
 import io.micronaut.dev.compile.OutputLock;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
@@ -161,6 +162,11 @@ final class Compilations {
      * @throws IllegalStateException if a compilation fails
      */
     static void compileMissingOutputs(DevManifest manifest, Map<SourceKind, SourceCompiler> compilers) {
+        for (SourceKind kind : SourceKind.values()) {
+            if (kind != SourceKind.PYTHON && manifest.incrementalMode(kind) == IncrementalMode.OPTIMISTIC) {
+                LOG.warn("The optimistic incremental mode set for {} sources has no effect: only the Python compiler distinguishes the modes", kind);
+            }
+        }
         Map<SourceKind, SourceKind> jointOwners = jointOwners(manifest, compilers);
         // decided before anything is compiled: two languages sharing one output are both missing, or neither
         Set<SourceKind> missing = new LinkedHashSet<>();
@@ -175,7 +181,7 @@ final class Compilations {
                 continue;
             }
             CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind, jointOwners), Set.of(), Set.of(), true, manifest.compileClasspath(),
-                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners)).asFull();
+                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners)).asFull().withIncrementalMode(manifest.incrementalMode(kind));
             CompilationResult result = entry.getValue().compile(request);
             if (!result.isSuccess()) {
                 CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
@@ -217,7 +223,7 @@ final class Compilations {
             SourceChanges change = sources.getOrDefault(kind, SourceChanges.NONE);
             CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), change.changed(), change.deleted(),
                 full || !target.isIncremental(), target.compileClasspath(), target.processorPath(),
-                target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint));
+                target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withIncrementalMode(target.incrementalMode(kind));
             if (!seed.isEmpty()) {
                 request = request.withAffectedClasses(seed);
             }
@@ -254,7 +260,7 @@ final class Compilations {
                 }
                 knownToKind.addAll(fresh);
                 CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), Set.of(), Set.of(), false, target.compileClasspath(),
-                    target.processorPath(), target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withAffectedClasses(fresh);
+                    target.processorPath(), target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withAffectedClasses(fresh).withIncrementalMode(target.incrementalMode(kind));
                 CompilationResult result = entry.getValue().compile(request);
                 if (!result.isSuccess()) {
                     return DevRuntime.CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
