@@ -57,14 +57,16 @@ final class GenerationMemory {
      * tells why it cannot reach the JDK's virtual thread internals, without {@code --add-opens}, whose stack trace holds
      * the classes on the stack of the thread that first checked, such as the generation's declarative clients. Netty's
      * {@code OpenSsl} keeps, the same way, the exception that tells why netty-tcnative is not available, which an HTTP
-     * client's SSL support first asks for as the client is created.
+     * client's SSL support first asks for as the client is created. Truffle's {@code LibGraalObject}, on a JVM with
+     * libgraal, registers a shutdown hook as it initializes, as UCP does, which the first polyglot engine asks for.
      */
     private static final List<String> PARENT_TIER_STATICS = List.of(
         "io.netty.util.internal.PlatformDependent",
         "io.micronaut.http.netty.channel.loom.PrivateLoomSupport",
         "io.netty.handler.ssl.OpenSsl",
         "org.h2.message.DbException",
-        "oracle.ucp.admin.UniversalConnectionPoolManagerBase"
+        "oracle.ucp.admin.UniversalConnectionPoolManagerBase",
+        "com.oracle.truffle.runtime.hotspot.libgraal.LibGraalObject"
     );
     /**
      * Reactor's schedulers: the shared ones live as long as the JVM and create their threads as work needs them.
