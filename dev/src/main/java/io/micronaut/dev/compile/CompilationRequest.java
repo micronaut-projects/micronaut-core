@@ -92,6 +92,25 @@ public record CompilationRequest(
     }
 
     /**
+     * A request whose outputs go to the class output and the generated sources directory, whichever module a source belongs to.
+     *
+     * @param kind The language
+     * @param sourceRoots The roots: the language's own, and any of another language the compiler reads, such as the Java roots for Kotlin
+     * @param changed The changed sources
+     * @param deleted The deleted sources
+     * @param full Whether full
+     * @param compileClasspath The compile classpath
+     * @param processorPath The processor path
+     * @param classOutput The class output
+     * @param generatedSources The generated sources directory
+     * @param options The options
+     * @param affectedClasses The classes another language changed
+     */
+    public CompilationRequest(SourceKind kind, List<SourceRoot> sourceRoots, Set<Path> changed, Set<Path> deleted, boolean full, List<Path> compileClasspath, List<Path> processorPath, Path classOutput, Path generatedSources, List<String> options, Set<String> affectedClasses) {
+        this(kind, sourceRoots, changed, deleted, full, compileClasspath, processorPath, classOutput, generatedSources, options, affectedClasses, null);
+    }
+
+    /**
      * A request with no classes affected by another language.
      *
      * @param kind The language
