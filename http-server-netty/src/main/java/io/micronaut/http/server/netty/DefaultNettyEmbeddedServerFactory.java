@@ -296,6 +296,15 @@ public class DefaultNettyEmbeddedServerFactory
         );
     }
 
+    @Override
+    public EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration configuration, ExecutorService executorService) {
+        return new MultiThreadIoEventLoopGroup(
+            DefaultEventLoopGroupRegistry.numThreads(configuration),
+            executorService,
+            eventLoopGroupFactory.createIoHandlerFactory(configuration)
+        );
+    }
+
     /**
      * Resolve the thread factory for the given event loop group configuration. Groups other than
      * the default one get their own thread pool name so that their threads are distinguishable in
