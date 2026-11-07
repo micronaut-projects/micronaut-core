@@ -517,10 +517,11 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
-            if (!(body instanceof AvailableByteBody) && !requiredCtx().executor().inEventLoop()) {
+            if (!requiredCtx().executor().inEventLoop()) {
                 // e.g. the first event of a blocking server-sent events handler. The body is
-                // claimed here and written on the event loop: the event loop may already feed it,
-                // and the response writer takes its signals from one thread at a time
+                // claimed here and the response is written on the event loop, like every write
+                // of the stream: the event loop may already feed the body, and the response
+                // writer takes its signals from one thread at a time
                 CloseableByteBody claimed = body.move();
                 try {
                     requiredCtx().executor().execute(() -> writeClaimed(response, claimed));
@@ -572,12 +573,21 @@ abstract class MultiplexedServerHandler {
             try {
                 write(response, body);
             } catch (Throwable t) {
-                // no caller to answer a fallback response: give up on the response
-                LOG.warn("Failed to write the response: {}", t.getMessage(), t);
                 body.close();
-                requestHandler.responseFailed(attachment, t);
-                abortWrittenResponse();
+                giveUpOffLoopWrite(t);
             }
+        }
+
+        /**
+         * Give up on a response whose write moved to the event loop and failed there: the
+         * caller is gone, so there is no one to answer a fallback response.
+         *
+         * @param t The failure
+         */
+        private void giveUpOffLoopWrite(Throwable t) {
+            LOG.warn("Failed to write the response: {}", t.getMessage(), t);
+            requestHandler.responseFailed(attachment, t);
+            abortWrittenResponse();
         }
 
         /**
@@ -614,11 +624,22 @@ abstract class MultiplexedServerHandler {
 
         @Override
         public void writeHeadResponse(HttpResponse response) {
+            if (!requiredCtx().executor().inEventLoop()) {
+                requiredCtx().executor().execute(() -> {
+                    try {
+                        writeHeadResponse(response);
+                    } catch (Throwable t) {
+                        giveUpOffLoopWrite(t);
+                    }
+                });
+                return;
+            }
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             writeFull(response, Unpooled.EMPTY_BUFFER);
         }
 
         private void writeFull(HttpResponse response, ByteBuf content) {
+            assert requiredCtx().executor().inEventLoop();
             if (finished) {
                 content.release();
                 return;
@@ -627,20 +648,6 @@ abstract class MultiplexedServerHandler {
                 // netty has already closed would fail the whole connection.
                 content.release();
                 finish();
-                return;
-            }
-            if (!requiredCtx().executor().inEventLoop()) {
-                ByteBuf finalContent = content;
-                requiredCtx().executor().execute(() -> {
-                    try {
-                        writeFull(response, finalContent);
-                    } catch (Throwable t) {
-                        // no caller to answer a fallback response: give up on the response
-                        LOG.warn("Failed to write the response: {}", t.getMessage(), t);
-                        requestHandler.responseFailed(attachment, t);
-                        abortWrittenResponse();
-                    }
-                });
                 return;
             }
             if (headersWritten) {
