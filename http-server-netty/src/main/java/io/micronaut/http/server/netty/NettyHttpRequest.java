@@ -51,6 +51,7 @@ import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.CookieUtils;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
@@ -1226,7 +1227,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         public MutableHttpRequest<T> cookie(Cookie cookie) {
             if (cookie instanceof NettyCookie nettyCookie) {
                 String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-                headers.add(HttpHeaderNames.COOKIE, value);
+                CookieUtils.setRequestCookie(headers, nettyCookie.getName(), value);
             }
             return this;
         }
