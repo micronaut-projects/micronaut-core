@@ -5,12 +5,17 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.event.StartupEvent
+import io.micronaut.context.watch.BeanExecutableMethod
+import io.micronaut.context.watch.ExecutableMethodChange
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.scheduling.TaskExceptionHandler
+import io.micronaut.scheduling.annotation.Scheduled
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
+
+import java.util.concurrent.atomic.AtomicBoolean
 
 class ScheduledMethodProcessorSpec extends Specification {
 
@@ -84,6 +89,28 @@ class ScheduledMethodProcessorSpec extends Specification {
         processor.scheduledMethods() == 0
     }
 
+    void "a failure in the first batch surfaces once the other methods of the batch are done, so that a close finds them"() {
+        given: "a rate that no longer reads, and a method of the batch that is still scheduling when the other fails"
+        context.environment.addPropertySource(PropertySource.of("broken", ["processor-spec.rate": "not a duration"], 1000))
+        def processor = deprecatedProcessor()
+        def done = new AtomicBoolean()
+        recording.onSchedule.set({
+            Thread.sleep(500)
+            done.set(true)
+        } as Runnable)
+        def batch = [scheduledMethod(RecordedTask), scheduledMethod(ConfiguredTask)]
+
+        when:
+        processor.onChange(new ExecutableMethodChange<Scheduled>(batch, [], batch, true))
+
+        then: "the batch ended with the method that was still scheduling"
+        done.get()
+        processor.scheduledMethods() == 1
+
+        cleanup:
+        processor.close()
+    }
+
     void "a processor in a context that cannot be watched registers no watch"() {
         given:
         def beanContext = Mock(BeanContext)
@@ -154,6 +181,11 @@ class ScheduledMethodProcessorSpec extends Specification {
     @SuppressWarnings('GrDeprecatedAPIUsage')
     private ScheduledMethodProcessor deprecatedProcessor() {
         new ScheduledMethodProcessor(context, ConversionService.SHARED, context.getBean(TaskExceptionHandler))
+    }
+
+    private BeanExecutableMethod<Scheduled> scheduledMethod(Class<?> beanType) {
+        def definition = context.getBeanDefinition(beanType)
+        new BeanExecutableMethod<Scheduled>(definition, definition.executableMethods.find { it.hasAnnotation(Scheduled) })
     }
 
     private void reload(Class<?> beanType) {
