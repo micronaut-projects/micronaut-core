@@ -22,6 +22,7 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -38,6 +39,10 @@ import java.util.stream.Stream;
  * classes; which ones is learnt from what javac writes for the source and kept in a mapping file
  * beside the class output, so that the next compilation, or a deletion, knows every class the source
  * produced. A source the embedded compiler has not compiled yet is known by its path only.</p>
+ *
+ * <p>A generated output is credited to every source it originates from, so one class may be recorded for
+ * several sources: a bean's definition for the source of its superclass as well as its own. All of them are
+ * known here, since the output goes when any of them compiles and only they can write it again.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -56,15 +61,15 @@ final class SourceIndex {
 
     private final List<SourceRoot> roots;
     private final Map<Path, Set<String>> classesBySource;
-    private final Map<String, Path> sourceByClass;
+    private final Map<String, Set<Path>> sourcesByClass;
     private final Map<Path, Set<String>> recorded;
     private final Map<Path, Set<String>> generated;
     private final Map<Path, Set<String>> resources;
 
-    private SourceIndex(List<SourceRoot> roots, Map<Path, Set<String>> classesBySource, Map<String, Path> sourceByClass, Map<Path, Set<String>> recorded, Map<Path, Set<String>> generated, Map<Path, Set<String>> resources) {
+    private SourceIndex(List<SourceRoot> roots, Map<Path, Set<String>> classesBySource, Map<String, Set<Path>> sourcesByClass, Map<Path, Set<String>> recorded, Map<Path, Set<String>> generated, Map<Path, Set<String>> resources) {
         this.roots = roots;
         this.classesBySource = classesBySource;
-        this.sourceByClass = sourceByClass;
+        this.sourcesByClass = sourcesByClass;
         this.recorded = recorded;
         this.generated = generated;
         this.resources = resources;
@@ -89,7 +94,7 @@ final class SourceIndex {
         }
         load(mapping, recorded, generated, resources);
         Map<Path, Set<String>> classesBySource = new LinkedHashMap<>();
-        Map<String, Path> sourceByClass = new LinkedHashMap<>();
+        Map<String, Set<Path>> sourcesByClass = new LinkedHashMap<>();
         for (SourceRoot root : roots) {
             // a request may carry the roots of another language the compiler reads, Java for Kotlin: they are not its sources
             if (root.kind() != kind || !Files.isDirectory(root.path())) {
@@ -102,15 +107,19 @@ final class SourceIndex {
                     classes.add(root.classNameOf(absolute));
                     classes.addAll(recorded.getOrDefault(absolute, Set.of()));
                     classesBySource.put(absolute, classes);
-                    for (String className : classes) {
-                        sourceByClass.putIfAbsent(className, absolute);
-                    }
+                    sourcesByClass.computeIfAbsent(root.classNameOf(absolute), c -> new LinkedHashSet<>()).add(absolute);
                 });
             } catch (IOException e) {
                 throw new UncheckedIOException("Cannot scan " + root.path(), e);
             }
         }
-        return new SourceIndex(roots, classesBySource, sourceByClass, recorded, generated, resources);
+        // after the class each path names, so that a class belongs first to its own source, whatever else was credited with it
+        classesBySource.forEach((source, classes) -> {
+            for (String className : classes) {
+                sourcesByClass.computeIfAbsent(className, c -> new LinkedHashSet<>()).add(source);
+            }
+        });
+        return new SourceIndex(roots, classesBySource, sourcesByClass, recorded, generated, resources);
     }
 
     static Path mappingFile(Path classOutput, SourceKind kind) {
@@ -121,8 +130,44 @@ final class SourceIndex {
         return new LinkedHashSet<>(classesBySource.keySet());
     }
 
+    /**
+     * The existing source a top-level class belongs to: the one its path names, or else the first credited with it.
+     *
+     * @param topLevelClass The class
+     * @return The source, if any is known
+     */
     Optional<Path> sourceOf(String topLevelClass) {
-        return Optional.ofNullable(sourceByClass.get(topLevelClass));
+        return sourcesByClass.getOrDefault(topLevelClass, Set.of()).stream().findFirst();
+    }
+
+    /**
+     * The existing sources credited with an output of the given source, which may itself be deleted: whatever that
+     * source's compilation or deletion removes, only they can write again.
+     *
+     * @param source The source
+     * @return The sources, which may include the given one
+     */
+    Set<Path> sourcesSharingOutputsWith(Path source) {
+        Path absolute = source.toAbsolutePath().normalize();
+        Set<Path> sharing = new LinkedHashSet<>();
+        for (String className : classesOf(absolute)) {
+            sharing.addAll(sourcesByClass.getOrDefault(className, Set.of()));
+        }
+        addSourcesSharing(generated, absolute, sharing);
+        addSourcesSharing(resources, absolute, sharing);
+        return sharing;
+    }
+
+    private void addSourcesSharing(Map<Path, Set<String>> record, Path source, Set<Path> sharing) {
+        Set<String> outputs = record.get(source);
+        if (outputs == null) {
+            return;
+        }
+        for (Map.Entry<Path, Set<String>> entry : record.entrySet()) {
+            if (classesBySource.containsKey(entry.getKey()) && !Collections.disjoint(entry.getValue(), outputs)) {
+                sharing.add(entry.getKey());
+            }
+        }
     }
 
     /**
