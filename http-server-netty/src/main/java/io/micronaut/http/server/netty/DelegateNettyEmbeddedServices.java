@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -102,6 +103,11 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     @Override
     default Optional<NettyServerWebSocketUpgradeHandler> getWebSocketUpgradeHandler(NettyEmbeddedServer server) {
         return getDelegate().getWebSocketUpgradeHandler(server);
+    }
+
+    @Override
+    default NettyZlibCodecFactory getZlibCodecFactory() {
+        return getDelegate().getZlibCodecFactory();
     }
 
     @Override
