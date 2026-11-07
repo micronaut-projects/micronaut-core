@@ -33,11 +33,14 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.channel.VoidChannelPromise;
+import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.util.concurrent.EventExecutor;
 import org.jspecify.annotations.Nullable;
@@ -260,7 +263,7 @@ abstract class MultiplexedServerHandler {
             this.request = headers;
             if (endOfStream) {
                 requestAccepted = true;
-                requestHandler.accept(requiredCtx(), headers, NettyByteBodyFactory.empty(), this);
+                accept(headers, NettyByteBodyFactory.empty());
             }
         }
 
@@ -297,7 +300,7 @@ abstract class MultiplexedServerHandler {
 
                     requestAccepted = true;
                     notifyDataConsumed(fullBody.readableBytes());
-                    requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory().createChecked(bodySizeLimits, fullBody), this);
+                    accept(Objects.requireNonNull(request), byteBodyFactory().createChecked(bodySizeLimits, fullBody));
                 } else {
                     if (bufferedContent == null) {
                         bufferedContent = new ArrayList<>();
@@ -341,7 +344,51 @@ abstract class MultiplexedServerHandler {
                 requestAccepted = true;
                 notifyDataConsumed(fullBody.readableBytes());
                 NettyByteBodyFactory byteBodyFactory = byteBodyFactory();
-                requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory.withTrailers(byteBodyFactory.createChecked(bodySizeLimits, fullBody), trailers), this);
+                accept(Objects.requireNonNull(request), byteBodyFactory.withTrailers(byteBodyFactory.createChecked(bodySizeLimits, fullBody), trailers));
+            }
+        }
+
+        /**
+         * Hand the request to the request handler. A failure of the handler is answered on this
+         * stream only, as on HTTP/1: thrown into the frame decoder, it would fail the whole
+         * connection with every other stream on it, and the body would never be released.
+         *
+         * @param request The request
+         * @param body    The body of the request, which the handler owns once accepted
+         */
+        private void accept(HttpRequest request, CloseableByteBody body) {
+            try {
+                requestHandler.accept(requiredCtx(), request, body, this);
+            } catch (Exception e) {
+                try {
+                    // closes nothing once the handler claimed the body
+                    body.close();
+                } catch (RuntimeException closeError) {
+                    e.addSuppressed(closeError);
+                }
+                try {
+                    requestHandler.handleUnboundError(e);
+                } catch (RuntimeException handlerError) {
+                    LOG.debug("Failed to handle an error from the request handler", handlerError);
+                }
+                rejectUnaccepted();
+            }
+        }
+
+        /**
+         * Answer a request that the request handler failed to accept with a 500. If the handler
+         * started a response before it failed, that response may be cut: the stream is reset.
+         */
+        private void rejectUnaccepted() {
+            if (headersWritten || finished || responseStreamer != null) {
+                abort();
+                return;
+            }
+            try {
+                write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty());
+            } catch (RuntimeException e) {
+                LOG.debug("Failed to write the error response for a request that was not accepted", e);
+                abort();
             }
         }
 
@@ -366,7 +413,7 @@ abstract class MultiplexedServerHandler {
                 bufferedContent = null;
             }
             requestAccepted = true;
-            requestHandler.accept(requiredCtx(), request, new StreamingNettyByteBody(streamer.dest), this);
+            accept(request, new StreamingNettyByteBody(streamer.dest));
         }
 
         /**
