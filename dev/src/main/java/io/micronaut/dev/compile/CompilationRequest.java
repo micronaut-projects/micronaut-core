@@ -16,8 +16,11 @@
 package io.micronaut.dev.compile;
 
 import io.micronaut.core.annotation.Experimental;
+import org.jspecify.annotations.Nullable;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -40,6 +43,7 @@ import java.util.Set;
  * @param generatedSources Where generated sources go
  * @param options The compiler options, as the build passes them
  * @param affectedClasses Top-level classes another language's compilation changed in this batch, whose dependents among these sources are recompiled too
+ * @param siblingOutput Where what the sources of other modules of the build produce goes instead of the class output and the generated sources directory, null when everything goes there
  * @author graemerocher
  * @since 5.3.0
  */
@@ -55,7 +59,8 @@ public record CompilationRequest(
     Path classOutput,
     Path generatedSources,
     List<String> options,
-    Set<String> affectedClasses) {
+    Set<String> affectedClasses,
+    @Nullable SiblingOutput siblingOutput) {
 
     /**
      * Validating constructor.
@@ -70,6 +75,8 @@ public record CompilationRequest(
      * @param classOutput The class output
      * @param generatedSources The generated sources output
      * @param options The options
+     * @param affectedClasses The classes another language changed
+     * @param siblingOutput Where the outputs of other modules' sources go, if apart
      */
     public CompilationRequest {
         Objects.requireNonNull(kind, "kind");
@@ -99,7 +106,7 @@ public record CompilationRequest(
      * @param options The options
      */
     public CompilationRequest(SourceKind kind, List<SourceRoot> sourceRoots, Set<Path> changed, Set<Path> deleted, boolean full, List<Path> compileClasspath, List<Path> processorPath, Path classOutput, Path generatedSources, List<String> options) {
-        this(kind, sourceRoots, changed, deleted, full, compileClasspath, processorPath, classOutput, generatedSources, options, Set.of());
+        this(kind, sourceRoots, changed, deleted, full, compileClasspath, processorPath, classOutput, generatedSources, options, Set.of(), null);
     }
 
     /**
@@ -109,7 +116,33 @@ public record CompilationRequest(
      * @return The request
      */
     public CompilationRequest withAffectedClasses(Set<String> classes) {
-        return new CompilationRequest(kind, sourceRoots, changed, deleted, full, compileClasspath, processorPath, classOutput, generatedSources, options, classes);
+        return new CompilationRequest(kind, sourceRoots, changed, deleted, full, compileClasspath, processorPath, classOutput, generatedSources, options, classes, siblingOutput);
+    }
+
+    /**
+     * This request with the outputs of other modules' sources apart.
+     *
+     * @param output Where they go, null when they go with the rest
+     * @return The request
+     */
+    public CompilationRequest withSiblingOutput(@Nullable SiblingOutput output) {
+        return new CompilationRequest(kind, sourceRoots, changed, deleted, full, compileClasspath, processorPath, classOutput, generatedSources, options, affectedClasses, output);
+    }
+
+    /**
+     * What a compiler reads classes from: what the sources of other modules compiled to so far, ahead of the compile
+     * classpath, which may hold those modules' own build output.
+     *
+     * @return The entries, not including the class output
+     */
+    public List<Path> readClasspath() {
+        if (siblingOutput == null || !Files.isDirectory(siblingOutput.classes())) {
+            return compileClasspath;
+        }
+        List<Path> classpath = new ArrayList<>(compileClasspath.size() + 1);
+        classpath.add(siblingOutput.classes());
+        classpath.addAll(compileClasspath);
+        return classpath;
     }
 
     /**
@@ -125,6 +158,6 @@ public record CompilationRequest(
      * @return The full request
      */
     public CompilationRequest asFull() {
-        return new CompilationRequest(kind, sourceRoots, Set.of(), Set.of(), true, compileClasspath, processorPath, classOutput, generatedSources, options, Set.of());
+        return new CompilationRequest(kind, sourceRoots, Set.of(), Set.of(), true, compileClasspath, processorPath, classOutput, generatedSources, options, Set.of(), siblingOutput);
     }
 }

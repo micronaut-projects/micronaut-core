@@ -86,7 +86,7 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
         }
         try (StandardJavaFileManager standard = javac.getStandardFileManager(null, null, StandardCharsets.UTF_8);
              StagingFileManager fileManager = new StagingFileManager(standard, hiddenClasses, request.processorPath())) {
-            List<Path> classPath = new ArrayList<>(request.compileClasspath());
+            List<Path> classPath = new ArrayList<>(request.readClasspath());
             if (Files.isDirectory(request.classOutput())) {
                 // the unchanged classes, and what another language wrote into a shared output, resolve from the
                 // output; what this compilation must not see, its own previous outputs on a full run included,

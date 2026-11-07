@@ -20,6 +20,7 @@ import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.dev.change.ChangeSet;
 import io.micronaut.dev.compile.ClassDependencyIndex;
 import io.micronaut.dev.compile.OutputLock;
+import io.micronaut.dev.compile.SiblingOutput;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
@@ -214,7 +215,7 @@ final class TestSession {
                 compilationFailed(application.failure(), allSources, allTestSources);
                 return;
             }
-            List<ClassDependencyIndex> applicationIndexes = scan(outputs(manifest, manifest.sourceRoots()));
+            List<ClassDependencyIndex> applicationIndexes = scan(applicationOutputs());
             Set<String> applicationConstants = constantDeclarers(applicationIndexes);
             Set<String> seed = new LinkedHashSet<>(application.affectedClasses());
             // development mode of the project, compiling into the same output, may have compiled a change first, or
@@ -385,7 +386,7 @@ final class TestSession {
      * classes declaring constants, which the first change is compared with.
      */
     void prime() {
-        List<ClassDependencyIndex> scanned = scan(outputs(manifest, manifest.sourceRoots()));
+        List<ClassDependencyIndex> scanned = scan(applicationOutputs());
         List<ClassDependencyIndex> testIndexes = scan(outputs(tests, tests.sourceRoots()));
         scanned.addAll(testIndexes);
         Set<String> testClasses = new HashSet<>();
@@ -603,6 +604,15 @@ final class TestSession {
 
     private static boolean isJvmKind(SourceKind kind) {
         return kind == SourceKind.JAVA || kind == SourceKind.KOTLIN || kind == SourceKind.GROOVY;
+    }
+
+    private List<Path> applicationOutputs() {
+        List<Path> outputs = new ArrayList<>(outputs(manifest, manifest.sourceRoots()));
+        SiblingOutput siblings = manifest.siblingOutput();
+        if (siblings != null) {
+            outputs.add(siblings.classes());
+        }
+        return outputs;
     }
 
     private static List<Path> outputs(DevManifest target, List<SourceRoot> roots) {

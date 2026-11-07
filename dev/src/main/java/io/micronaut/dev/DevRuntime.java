@@ -1025,6 +1025,7 @@ public final class DevRuntime implements Closeable {
             }
             relaunchRequested = true;
         }
+        Compilations.markRelaunch(manifest);
         LOG.info("Generation {} reached the budget of {} generations ({}): closing for the process to be relaunched",
             classLoader.generation(), manifest.maxGenerations(), DevManifest.MAX_GENERATIONS);
         // not on the reload thread, which close() interrupts and which may hold the lock of a batch

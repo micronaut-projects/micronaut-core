@@ -78,7 +78,7 @@ final class KotlinModuleMapping {
      * @throws IOException if a file cannot be read or written
      */
     static void mergeInto(String moduleName, Path classOutput, Path staging, Predicate<String> replaced) throws IOException {
-        Path relative = Path.of("META-INF", moduleName + ".kotlin_module");
+        Path relative = relativeFile(moduleName);
         Path previousFile = classOutput.resolve(relative);
         if (!Files.isRegularFile(previousFile)) {
             return;
@@ -111,6 +111,45 @@ final class KotlinModuleMapping {
         }
         Files.createDirectories(stagedFile.getParent());
         Files.write(stagedFile, fresh.withParts(kept));
+    }
+
+    /**
+     * Moves the parts of the sibling classes out of the module metadata kotlinc wrote, into a file of their own in the
+     * sibling output's staging directory.
+     *
+     * @param moduleName The module name
+     * @param staging The staging directory, holding the module metadata of the compiled sources if kotlinc wrote any
+     * @param siblingStaging The staging directory of the sibling output
+     * @param siblingClass Whether a top-level class, by binary name, is a sibling's
+     * @throws IOException if a file cannot be read or written
+     */
+    static void splitInto(String moduleName, Path staging, Path siblingStaging, Predicate<String> siblingClass) throws IOException {
+        Path relative = relativeFile(moduleName);
+        Path stagedFile = staging.resolve(relative);
+        if (!Files.isRegularFile(stagedFile)) {
+            return;
+        }
+        Module module = Module.parse(Files.readAllBytes(stagedFile));
+        List<Part> own = new ArrayList<>();
+        List<Part> sibling = new ArrayList<>();
+        for (Part part : module.parts) {
+            (siblingClass.test(ClassDependencyIndex.topLevelOf(part.internalName().replace('/', '.'))) ? sibling : own).add(part);
+        }
+        if (sibling.isEmpty()) {
+            return;
+        }
+        Path siblingFile = siblingStaging.resolve(relative);
+        Files.createDirectories(siblingFile.getParent());
+        Files.write(siblingFile, module.withoutParts().withParts(sibling));
+        if (own.isEmpty()) {
+            Files.delete(stagedFile);
+        } else {
+            Files.write(stagedFile, module.withoutParts().withParts(own));
+        }
+    }
+
+    static Path relativeFile(String moduleName) {
+        return Path.of("META-INF", moduleName + ".kotlin_module");
     }
 
     /**

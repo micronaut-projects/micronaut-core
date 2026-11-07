@@ -132,6 +132,86 @@ class DevManifestSpec extends Specification {
         e.message.contains("Unknown test selection some")
     }
 
+    void "the sibling output is read ahead of the outputs the manifest names, and the class outputs stay what they were"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes,../lib/build/classes")
+        properties.setProperty("micronaut.dev.sources.java", "src/main/java,../lib/src/main/java")
+        properties.setProperty(DevManifest.SIBLING_SOURCES, "../lib/src/main/java")
+        properties.setProperty(DevManifest.SIBLING_OUTPUT, "build/micronaut-dev/siblings")
+
+        when:
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then:
+        manifest.siblingOutput().directory() == dir.resolve("build/micronaut-dev/siblings")
+        manifest.siblingOutput().classes() == dir.resolve("build/micronaut-dev/siblings/classes")
+        manifest.siblingOutput().owns(dir.resolve("../lib/src/main/java/lib/Lib.java"))
+        !manifest.siblingOutput().owns(dir.resolve("src/main/java/app/App.java"))
+        manifest.reloadableRoots() == [dir.resolve("build/micronaut-dev/siblings/classes"), dir.resolve("build/classes"), dir.resolve("../lib/build/classes").normalize()]
+        manifest.classOutput(SourceKind.JAVA) == dir.resolve("build/classes")
+
+        when: "the tests come first, and their manifest keeps it"
+        properties.setProperty("micronaut.dev.mode", "test")
+        properties.setProperty("micronaut.dev.test.sources.java", "src/test/java")
+        properties.setProperty("micronaut.dev.test.compile.java.output", "build/test-classes")
+        manifest = DevManifest.of(dir, properties)
+
+        then:
+        manifest.reloadableRoots() == [dir.resolve("build/test-classes"), dir.resolve("build/micronaut-dev/siblings/classes"), dir.resolve("build/classes"), dir.resolve("../lib/build/classes").normalize()]
+        manifest.testClassOutput(SourceKind.JAVA) == dir.resolve("build/test-classes")
+        manifest.testView().siblingOutput() == manifest.siblingOutput()
+    }
+
+    void "without both keys there is no sibling output and the roots are those the manifest names"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes")
+        if (sources) {
+            properties.setProperty(DevManifest.SIBLING_SOURCES, sources)
+        }
+        if (output) {
+            properties.setProperty(DevManifest.SIBLING_OUTPUT, output)
+        }
+
+        when:
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then:
+        manifest.siblingOutput() == null
+        manifest.reloadableRoots() == [dir.resolve("build/classes")]
+
+        where:
+        sources         | output
+        null            | null
+        "../lib/src"    | null
+        null            | "build/micronaut-dev/siblings"
+        ""              | "build/micronaut-dev/siblings"
+    }
+
+    void "a sibling output the launcher could not empty safely is refused"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes,build/resources")
+        properties.setProperty("micronaut.dev.sources.java", "src/main/java")
+        properties.setProperty("micronaut.dev.compile.java.output", "build/classes")
+        properties.setProperty(DevManifest.SIBLING_SOURCES, "../lib/src")
+        properties.setProperty(DevManifest.SIBLING_OUTPUT, output)
+
+        when:
+        DevManifest.of(dir, properties)
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message.contains(DevManifest.SIBLING_OUTPUT)
+
+        where:
+        output << [".", "build/classes", "build/classes/siblings", "build", "src/main/java/siblings", "src"]
+    }
+
     void "a duration reads in milliseconds, seconds or minutes, seconds without a unit, and defaults when blank"() {
         expect:
         DevManifest.duration(DevManifest.REQUESTS_DRAIN_TIMEOUT, value, Duration.ofSeconds(30)) == expected

@@ -74,11 +74,12 @@ import java.util.stream.Stream;
 @Internal
 final class KotlinCompilation {
 
+    static final String MODULE_NAME = "main";
+
     private static final Logger LOG = LoggerFactory.getLogger(KotlinCompilation.class);
     private static final String KSP_IMPLEMENTATION = "com.google.devtools.ksp.impl.KotlinSymbolProcessing";
     private static final String PROVIDER_SERVICE = "META-INF/services/com.google.devtools.ksp.processing.SymbolProcessorProvider";
     private static final Pattern PACKAGE = Pattern.compile("^\\s*package\\s+([\\w.]+)", Pattern.MULTILINE);
-    private static final String MODULE_NAME = "main";
     private static final String CLASS_SUFFIX = ".class";
     // what KSP and the symbol processors exchange: its API, whose signatures use the standard library
     private static final List<String> KSP_PACKAGE_PREFIXES = List.of("com.google.devtools.ksp.", "kotlin.");
@@ -138,8 +139,14 @@ final class KotlinCompilation {
      * @return What was produced, or null when the compilation failed
      */
     static StagedSourceCompiler.@Nullable Produced run(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, Path generatedStaging, List<CompileDiagnostic> diagnostics) throws IOException {
-        List<Path> classpath = new ArrayList<>(request.compileClasspath());
-        Path visibleOutput = visibleOutput(request, hiddenClasses, staging);
+        List<Path> classpath = new ArrayList<>();
+        SiblingOutput siblings = request.siblingOutput();
+        Path visibleSiblings = siblings == null ? null : visibleOutput(siblings.classes(), hiddenClasses, StagedSourceCompiler.staging(siblings.classes()));
+        if (visibleSiblings != null) {
+            classpath.add(visibleSiblings);
+        }
+        classpath.addAll(request.compileClasspath());
+        Path visibleOutput = visibleOutput(request.classOutput(), hiddenClasses, staging);
         if (visibleOutput != null) {
             classpath.add(visibleOutput);
         }
@@ -170,7 +177,7 @@ final class KotlinCompilation {
         if (!generatedJava.isEmpty() && !compileJava(generatedJava.keySet(), javaRoots(request), classpath, staging, diagnostics)) {
             return null;
         }
-        if (!request.isFull()) {
+        if (!request.isFull() && siblings == null) {
             // kotlinc listed the top-level declarations of the compiled sources only: the others stay listed
             KotlinModuleMapping.mergeInto(MODULE_NAME, request.classOutput(), staging, hiddenClasses::contains);
         }
@@ -210,8 +217,7 @@ final class KotlinCompilation {
      * classpath entry cannot hide a class the way a loader can.
      */
     @Nullable
-    private static Path visibleOutput(CompilationRequest request, Set<String> hiddenClasses, Path staging) throws IOException {
-        Path classOutput = request.classOutput();
+    private static Path visibleOutput(Path classOutput, Set<String> hiddenClasses, Path staging) throws IOException {
         if (!Files.isDirectory(classOutput)) {
             return null;
         }

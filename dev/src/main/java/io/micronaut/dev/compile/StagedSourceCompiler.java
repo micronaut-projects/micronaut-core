@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +59,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     private static final String STAGING_SUFFIX = ".micronaut-dev-staging";
     private static final String BACKUP_SUFFIX = ".micronaut-dev-backup";
     private static final String STAGED_MAPPING_SUFFIX = ".staged";
+    private static final String MICRONAUT_INDEX = "META-INF/micronaut/";
 
     /**
      * Runs the compiler on the selected sources.
@@ -102,10 +104,17 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         }
         Path staging = staging(classOutput);
         Path generatedStaging = staging(request.generatedSources());
+        SiblingOutput siblings = request.siblingOutput();
+        List<Path> stagingDirectories = new ArrayList<>(List.of(staging, generatedStaging, stagedMapping(classOutput, request.kind())));
+        if (siblings != null) {
+            stagingDirectories.add(staging(siblings.classes()));
+            stagingDirectories.add(staging(siblings.generatedSources(request.kind())));
+        }
         List<CompileDiagnostic> diagnostics = new ArrayList<>();
         try {
-            OutputTransaction.deleteRecursively(staging);
-            OutputTransaction.deleteRecursively(generatedStaging);
+            for (Path directory : stagingDirectories) {
+                OutputTransaction.deleteRecursively(directory);
+            }
             Files.createDirectories(staging);
             Files.createDirectories(generatedStaging);
             // what the compiled sources produced before is hidden too: the compiler has their sources, and a class a
@@ -139,6 +148,10 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             } else {
                 outputsToRemove = outputsOf(request, sources, replaced, hiddenClasses);
             }
+            if (siblings != null) {
+                outputsToRemove = new LinkedHashSet<>(outputsToRemove);
+                outputsToRemove.addAll(routeToSiblingOutput(request, siblings, sources, toCompile, hiddenClasses, produced, staging, generatedStaging));
+            }
             Path stagedMapping = stagedMapping(classOutput, request.kind());
             sources.recordProduced(stagedMapping, produced.classes(), produced.generatedSources(), produced.resources(), toCompile, request.deleted(), request.isFull());
             Set<Path> removed = promote(request, outputsToRemove, staging, generatedStaging, stagedMapping);
@@ -155,7 +168,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             diagnostics.add(new CompileDiagnostic(CompileDiagnostic.Severity.ERROR, "Compilation failed: " + e.getMessage(), null, 0, 0));
             return new CompilationResult(CompilationResult.Status.FAILED, diagnostics, toCompile, Set.of(), elapsed(start));
         } finally {
-            for (Path directory : List.of(staging, generatedStaging, stagedMapping(classOutput, request.kind()))) {
+            for (Path directory : stagingDirectories) {
                 try {
                     OutputTransaction.deleteRecursively(directory);
                 } catch (IOException e) {
@@ -195,6 +208,9 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                         transaction.remove(output);
                     }
                     removeAll(transaction, request.generatedSources(), file -> true);
+                    if (request.siblingOutput() != null) {
+                        removeAll(transaction, request.siblingOutput().generatedSources(request.kind()), file -> true);
+                    }
                     transaction.remove(SourceIndex.mappingFile(classOutput, request.kind()));
                 } else {
                     for (Path output : outputsOf(request, sources, request.deleted(), deletedClasses)) {
@@ -238,11 +254,19 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             for (Path output : outputsToRemove) {
                 transaction.remove(output);
             }
+            SiblingOutput siblings = request.siblingOutput();
             if (request.isFull()) {
                 removeAll(transaction, request.generatedSources(), file -> true);
+                if (siblings != null) {
+                    removeAll(transaction, siblings.generatedSources(request.kind()), file -> true);
+                }
             }
             transaction.promote(staging, classOutput);
             transaction.promote(generatedStaging, request.generatedSources());
+            if (siblings != null) {
+                transaction.promote(staging(siblings.classes()), siblings.classes());
+                transaction.promote(staging(siblings.generatedSources(request.kind())), siblings.generatedSources(request.kind()));
+            }
             transaction.put(stagedMapping, SourceIndex.mappingFile(classOutput, request.kind()));
             transaction.commit();
         } catch (IOException | UncheckedIOException e) {
@@ -261,15 +285,25 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     private static Set<Path> outputsOf(CompilationRequest request, SourceIndex sources, Set<Path> replaced, Set<String> replacedClasses) {
         Path classOutput = request.classOutput();
         Set<Path> outputs = new LinkedHashSet<>();
+        SiblingOutput siblings = request.siblingOutput();
         for (String className : replacedClasses) {
             outputs.addAll(outputsOf(classOutput, className));
+            if (siblings != null) {
+                outputs.addAll(outputsOf(siblings.classes(), className));
+            }
         }
         for (Path source : replaced) {
             for (String generated : sources.generatedOf(source)) {
                 outputs.add(request.generatedSources().resolve(generated));
+                if (siblings != null) {
+                    outputs.add(siblings.generatedSources(request.kind()).resolve(generated));
+                }
             }
             for (String resource : sources.resourcesOf(source)) {
                 outputs.add(classOutput.resolve(resource));
+                if (siblings != null) {
+                    outputs.add(siblings.classes().resolve(resource));
+                }
             }
         }
         return outputs;
@@ -314,7 +348,9 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             }
         }
         if (!affectedClasses.isEmpty()) {
-            ClassDependencyIndex index = ClassDependencyIndex.scan(request.classOutput());
+            SiblingOutput siblings = request.siblingOutput();
+            ClassDependencyIndex index = siblings == null ? ClassDependencyIndex.scan(request.classOutput())
+                : ClassDependencyIndex.scan(List.of(siblings.classes(), request.classOutput()));
             for (String affected : affectedClasses) {
                 if (index.declaresConstants(affected)) {
                     // javac inlined its constants into whoever read them, leaving no reference to follow:
@@ -328,6 +364,117 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             }
         }
         return selected;
+    }
+
+    /**
+     * Moves what the compilation produced for the sources of other modules from the staging directories to those of the
+     * {@link SiblingOutput}, so that nothing of theirs is promoted into the application's outputs. One compilation has
+     * both kinds of source, since a change in a module recompiles what depends on it: a file goes with the source that
+     * produced it, as the compiler credits it or as its name tells, {@code $Foo$Definition.class} and its entry in
+     * {@code META-INF/micronaut} going with {@code Foo}. A file nothing tells the owner of goes with the siblings' if one
+     * of them was compiled at all: it may hold what they produced, and the directory is read first, so nothing is lost.
+     *
+     * @return What must go from the sibling output, not to shadow what is about to be promoted to the application's outputs
+     */
+    private Set<Path> routeToSiblingOutput(CompilationRequest request, SiblingOutput siblings, SourceIndex sources, Set<Path> toCompile, Set<String> hiddenClasses, Produced produced, Path staging, Path generatedStaging) throws IOException {
+        Set<String> siblingClasses = new HashSet<>();
+        Set<String> ownClasses = new HashSet<>();
+        for (Path source : toCompile) {
+            (siblings.owns(source) ? siblingClasses : ownClasses).addAll(sources.classesOf(source));
+        }
+        boolean siblingCompiled = !siblingClasses.isEmpty();
+        for (Map.Entry<Path, Set<String>> entry : produced.classes().entrySet()) {
+            boolean sibling = siblings.owns(entry.getKey());
+            siblingCompiled |= sibling;
+            (sibling ? siblingClasses : ownClasses).addAll(entry.getValue());
+        }
+        Set<String> kept = keepSharedOutputs(request, siblings, hiddenClasses, staging, staging(siblings.classes()), siblingClasses);
+        if (siblingCompiled) {
+            Set<String> siblingResources = credited(produced.resources(), siblings, true);
+            Set<String> ownResources = credited(produced.resources(), siblings, false);
+            move(staging, staging(siblings.classes()), relative -> {
+                if (kept.contains(relative) || ownResources.contains(relative) && !siblingResources.contains(relative)) {
+                    return false;
+                }
+                String owner = classOfOutput(relative);
+                return siblingResources.contains(relative) || owner == null || !ownClasses.contains(owner) || siblingClasses.contains(owner);
+            });
+            Set<String> ownGenerated = credited(produced.generatedSources(), siblings, false);
+            Set<String> siblingGenerated = credited(produced.generatedSources(), siblings, true);
+            move(generatedStaging, staging(siblings.generatedSources(request.kind())), relative -> siblingGenerated.contains(relative) || !ownGenerated.contains(relative));
+        }
+        Set<Path> shadowing = new LinkedHashSet<>();
+        if (Files.isDirectory(staging)) {
+            try (Stream<Path> files = Files.walk(staging)) {
+                for (Path file : (Iterable<Path>) files.filter(Files::isRegularFile)::iterator) {
+                    String relative = staging.relativize(file).toString();
+                    if (!kept.contains(relative)) {
+                        shadowing.add(siblings.classes().resolve(relative));
+                    }
+                }
+            }
+        }
+        return shadowing;
+    }
+
+    /**
+     * Splits between the staging directories, and merges with what the outputs hold, a file whose contents belong to more
+     * than one source, which a compiler that writes such a file knows how to do.
+     *
+     * @param request The request
+     * @param siblings The sibling output
+     * @param hiddenClasses The classes the compilation replaced
+     * @param staging The staging directory of the class output
+     * @param siblingStaging The staging directory of the sibling output
+     * @param siblingClasses The top-level classes of the compiled sibling sources
+     * @return The files, relative to the staging directories, that are in place
+     * @throws IOException if a file cannot be read or written
+     */
+    protected Set<String> keepSharedOutputs(CompilationRequest request, SiblingOutput siblings, Set<String> hiddenClasses, Path staging, Path siblingStaging, Set<String> siblingClasses) throws IOException {
+        return Set.of();
+    }
+
+    private static Set<String> credited(Map<Path, Set<String>> files, SiblingOutput siblings, boolean sibling) {
+        Set<String> credited = new HashSet<>();
+        files.forEach((source, names) -> {
+            if (siblings.owns(source) == sibling) {
+                credited.addAll(names);
+            }
+        });
+        return credited;
+    }
+
+    /**
+     * The top-level class an output file belongs to by its name: a class file's, or that of an entry of the
+     * {@code META-INF/micronaut} index.
+     */
+    private static @Nullable String classOfOutput(String relative) {
+        String path = relative.replace(File.separatorChar, '/');
+        if (path.endsWith(".class")) {
+            return ClassDependencyIndex.topLevelOf(path.substring(0, path.length() - ".class".length()).replace('/', '.'));
+        }
+        if (path.startsWith(MICRONAUT_INDEX)) {
+            return ClassDependencyIndex.topLevelOf(path.substring(path.lastIndexOf('/') + 1));
+        }
+        return null;
+    }
+
+    private static void move(Path staging, Path target, Predicate<String> which) throws IOException {
+        if (!Files.isDirectory(staging)) {
+            return;
+        }
+        List<Path> files;
+        try (Stream<Path> walk = Files.walk(staging)) {
+            files = walk.filter(Files::isRegularFile).toList();
+        }
+        for (Path file : files) {
+            String relative = staging.relativize(file).toString();
+            if (which.test(relative)) {
+                Path moved = target.resolve(relative);
+                Files.createDirectories(Objects.requireNonNull(moved.getParent()));
+                Files.move(file, moved);
+            }
+        }
     }
 
     /**
