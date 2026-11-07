@@ -1123,6 +1123,7 @@ abstract class MultiplexedServerHandler {
              *
              * @return {@code true} iff the piece was written
              */
+            @SuppressWarnings("java:S1181") // a compression provider may fail with an Error, e.g. a native one that cannot link; the stream must still reset
             private boolean writeMiddle(ByteBuf data, ChannelPromise promise) {
                 try {
                     writeData(data, false, promise);

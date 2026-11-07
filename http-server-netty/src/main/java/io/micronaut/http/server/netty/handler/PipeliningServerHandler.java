@@ -1984,6 +1984,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        @SuppressWarnings("java:S1181") // a compression provider may fail with an Error, e.g. a native one that cannot link; the connection must still close
         void writeSome() {
             written = true;
             try {
@@ -2072,6 +2073,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        @SuppressWarnings("java:S1181") // a compression provider may fail with an Error, e.g. a native one that cannot link; the response must still fail
         public void write(ByteBuf data, boolean last) {
             if (!last) {
                 try {

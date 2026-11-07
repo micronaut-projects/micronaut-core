@@ -321,12 +321,16 @@ public final class Compressor {
             } else {
                 pushed = true;
                 EmbeddedChannel channel;
+                boolean ready = false;
                 try {
                     streamHeld();
                     channel = channel();
-                } catch (RuntimeException | Error e) {
-                    data.release();
-                    throw e;
+                    ready = true;
+                } finally {
+                    if (!ready) {
+                        // creating the encoder failed, so nothing else takes the piece
+                        data.release();
+                    }
                 }
                 channel.writeOutbound(data);
             }
@@ -350,12 +354,15 @@ public final class Compressor {
             if (body != null) {
                 held = null;
                 ByteBuf result;
+                boolean compressedOnce = false;
                 try {
                     result = Objects.requireNonNull(oneShot).compress(body, ctx.alloc());
-                } catch (RuntimeException | Error e) {
-                    body.release();
-                    finished = true;
-                    throw e;
+                    compressedOnce = true;
+                } finally {
+                    if (!compressedOnce) {
+                        body.release();
+                        finished = true;
+                    }
                 }
                 if (result != null) {
                     body.release();
@@ -364,12 +371,15 @@ public final class Compressor {
                     return;
                 }
                 EmbeddedChannel channel;
+                boolean ready = false;
                 try {
                     channel = channel();
-                } catch (RuntimeException | Error e) {
-                    body.release();
-                    finished = true;
-                    throw e;
+                    ready = true;
+                } finally {
+                    if (!ready) {
+                        body.release();
+                        finished = true;
+                    }
                 }
                 channel.writeOutbound(body);
             }
