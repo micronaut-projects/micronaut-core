@@ -158,18 +158,20 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
      * {@link VisitorContext#registerBean(ClassElement, io.micronaut.inject.ast.Element...)} is written by every
      * compiler, javac, KSP, Groovy and Python. A source generated here is not visited anymore.</p>
      *
-     * <p>An incremental compilation compiles the changed sources only, so the visitor sees only them, here as in
-     * every other method. A bean added here is therefore written as an output of all its originating elements, and
-     * has to be given every class it follows from as originating element, for an incremental build to compile those
-     * classes again with any of them:</p>
+     * <p>An incremental compilation compiles the changed sources only, so the visitors see only them, here as in
+     * every other method. What is written here follows from the whole compilation, and is written so that the build
+     * writes it again, from every source, whenever a source is added, changed or removed. A bean added here still has
+     * to be given the classes it follows from as originating elements:</p>
      *
      * <ul>
-     *     <li>javac: every originating element is passed to the filer, also to the filer of Gradle, which tracks an
-     *     isolating processor's outputs by a single originating type. A bean with originating elements in several
-     *     types makes Gradle compile every source in the next incremental compilation, which is what keeps the bean
-     *     right, at the cost of incremental compilation.</li>
-     *     <li>KSP: the bean is written as an aggregating output of the files of its originating elements, which KSP
-     *     writes again, processing those files again, whenever a source of the compilation is changed, added or
+     *     <li>javac: the files are written with every originating element, except to the filer of Gradle. Gradle
+     *     tracks a file of an isolating processor by the top level types of its originating elements, and a file with
+     *     exactly one of them only depends on that type: a class added, or another class changed, would leave the
+     *     file stale. A file written here is therefore passed to the filer of Gradle without originating element,
+     *     which makes Gradle compile every source in the next incremental compilation, at the cost of incremental
+     *     compilation.</li>
+     *     <li>KSP: the files are aggregating outputs of the files of their originating elements, which KSP writes
+     *     again, processing those files again, whenever a source of the compilation is changed, added or
      *     removed.</li>
      *     <li>Groovy and Python: the originating elements are not reported to the build. Neither compiler tracks the
      *     origins of what the visitors write, and an incremental Python compilation visits the changed Python classes
@@ -187,10 +189,12 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
      *     here: look the classes up again by name, with {@link VisitorContext#getClassElement(String)}, which resolves
      *     them anew.</li>
      *     <li>Groovy: at class generation, after the last round.</li>
-     *     <li>Python: once, after the single round of the Python classes. javac then compiles the Java classes
-     *     generated for them in the same compilation, and the visitors of every class visit them again there, but
-     *     javac does not call this method again, so that such a visitor does not contribute a Python class twice. It
-     *     is not called either for the Java sources compiled together with Python sources.</li>
+     *     <li>Python: once for the Python classes, after their single round, on the visitors that visited them.
+     *     javac then compiles the Java sources of the compilation and the Java classes generated for the Python
+     *     classes, with other instances of the visitors, and calls it once more on those, as for any javac
+     *     compilation. A visitor that overrides this method does not visit the Java classes generated for the Python
+     *     classes there, even if it visits every class, so that it does not contribute a Python class twice: each of
+     *     the two calls finishes the classes of one language.</li>
      * </ul>
      *
      * @param visitorContext The visitor context

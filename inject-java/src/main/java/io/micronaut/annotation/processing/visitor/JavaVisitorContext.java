@@ -297,14 +297,14 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     /**
-     * Sets whether the files the visitors write from now on carry every originating element, see
-     * {@link AnnotationProcessingOutputVisitor#setEveryOriginatingElement(boolean)}.
+     * Sets whether the files the visitors write from now on follow from the whole compilation, see
+     * {@link AnnotationProcessingOutputVisitor#setWholeCompilation(boolean)}.
      *
-     * @param everyOriginatingElement Whether every originating element is passed to the filer
+     * @param wholeCompilation Whether the files follow from the whole compilation
      * @since 5.3.0
      */
-    public void setEveryOriginatingElement(boolean everyOriginatingElement) {
-        outputVisitor.setEveryOriginatingElement(everyOriginatingElement);
+    public void setWholeCompilation(boolean wholeCompilation) {
+        outputVisitor.setWholeCompilation(wholeCompilation);
     }
 
     /**

@@ -428,6 +428,7 @@ internal class KotlinVisitorContext(
         jvmNameCache.clear()
         classByNameCache.clear()
         annotationMetadataBuilder.clearProcessedAnnotationTypes()
+        nativeElementsHelper.clearCaches()
     }
 
     fun updateResolver(resolver: Resolver) {

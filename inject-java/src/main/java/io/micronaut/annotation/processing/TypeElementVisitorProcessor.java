@@ -133,14 +133,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     @Nullable
     private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;
     /**
-     * The number of bean definitions written for each name, over every round.
+     * The highest number of bean definitions written for each name in a round.
      */
     private final Map<String, Integer> beanNameCounts = new HashMap<>();
-    /**
-     * Whether the compilation contains the Java classes the Python compiler generated for its Python classes: the
-     * Python compiler has then finished the compilation of the visitors already.
-     */
-    private boolean compilesPython;
 
     /**
      * The visited annotation names.
@@ -341,14 +336,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     }
                 }
 
-                for (JavaClassElement javaClassElement : javaClassElements) {
-                    compilesPython |= isGeneratedForPython(javaClassElement);
-                }
                 for (LoadedVisitor loadedVisitor : loadedVisitors) {
                     for (JavaClassElement javaClassElement : javaClassElements) {
                         try {
                             if (loadedVisitor.matchesClass(javaClassElement)
-                                && (loadedVisitor.visitsEveryElement() || !isGeneratedForPython(javaClassElement))) {
+                                && (loadedVisitor.visitsGeneratedForPython() || !isGeneratedForPython(javaClassElement))) {
                                 visitClass(loadedVisitor, javaClassElement);
                             }
                         } catch (ProcessingException e) {
@@ -371,19 +363,14 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 // nothing generated in the final round is processed, so it is not a round for the visitors
                 finishVisitors("the round", TypeElementVisitor::finishRound);
             } else {
-                // every round is over: the beans registered now are written below, in the final round, with every
-                // originating element, since they follow from what the whole compilation contained
+                // every round is over: the beans registered now are written below, in the final round, as files that
+                // follow from the whole compilation
                 classWriterOutputVisitor.finalRound();
-                classWriterOutputVisitor.setEveryOriginatingElement(true);
+                classWriterOutputVisitor.setWholeCompilation(true);
                 javaVisitorContext.finalRound();
-                // The Python compiler finishes the compilation of the Python classes itself. The visitors of every
-                // class visit them again here, as the Java classes generated for them, so finishing the compilation
-                // again would contribute them twice
-                if (!compilesPython) {
-                    javaVisitorContext.setEveryOriginatingElement(true);
-                    finishVisitors("the compilation", TypeElementVisitor::finishCompilation);
-                    javaVisitorContext.setEveryOriginatingElement(false);
-                }
+                javaVisitorContext.setWholeCompilation(true);
+                finishVisitors("the compilation", TypeElementVisitor::finishCompilation);
+                javaVisitorContext.setWholeCompilation(false);
             }
 
             for (LoadedVisitor loadedVisitor : loadedVisitors) {
@@ -406,7 +393,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         if (CollectionUtils.isNotEmpty(beanDefinitionBuilders)) {
             DefaultElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory = new DefaultElementBeanDefinitionBuilderFactory(javaVisitorContext);
             try {
-                for (OutputObjectDef outputObjectDef : AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)) {
+                // the beans of a round are numbered in the round, and the beans of the final round after every round
+                List<OutputObjectDef> outputObjectDefs = roundEnv.processingOver()
+                    ? AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)
+                    : AbstractBeanDefinitionBuilder.buildRound(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts);
+                for (OutputObjectDef outputObjectDef : outputObjectDefs) {
                     write(outputObjectDef, javaVisitorContext);
                 }
             } catch (Exception e) {
@@ -499,7 +490,8 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      * frameworks read ({@code micronaut.introspection.allowReflection}, {@code @AllowsReflection}): a
      * visitor selected by one of those annotations would visit the class a second time and write its
      * output twice. Only the visitors of every class still visit it, for what the Python compiler added
-     * to the generated class itself ({@code @Introspected} for validation). The annotation is checked as
+     * to the generated class itself ({@code @Introspected} for validation), unless they finish the compilation,
+     * see {@link LoadedVisitor#visitsGeneratedForPython()}. The annotation is checked as
      * declared, since it is inherited by the Java subclasses of a Python class, which are visited.
      *
      * @param classElement The class element

@@ -57,7 +57,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     private lateinit var visitorContext: KotlinVisitorContext
     private val processed: MutableSet<String> = mutableSetOf()
     /**
-     * The number of bean definitions written for each name, over every round.
+     * The highest number of bean definitions written for each name in a round.
      */
     private val beanNameCounts: MutableMap<String, Int> = HashMap()
 
@@ -177,7 +177,13 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         visitorContext.aggregating = false
         try {
             val beanDefinitionBuilderFactory = DefaultElementBeanDefinitionBuilderFactory(visitorContext)
-            for (outputObjectDef in AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)) {
+            // the beans of a round are numbered in the round, and the beans of the compilation after every round
+            val outputObjectDefs = if (visitorContext.finishingCompilation) {
+                AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)
+            } else {
+                AbstractBeanDefinitionBuilder.buildRound(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)
+            }
+            for (outputObjectDef in outputObjectDefs) {
                 BeanDefinitionProcessor.write(outputObjectDef, visitorContext, environment)
             }
         } catch (e: ProcessingException) {
@@ -207,6 +213,10 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
 
     override fun finish() {
         try {
+            if (!::visitorContext.isInitialized) {
+                // no round was processed
+                return
+            }
             // every round is over, but the classes can still be looked up by name, anew: the beans registered now are
             // written before the visitors finish, as aggregating outputs of their originating files
             visitorContext.clearSymbolCaches()

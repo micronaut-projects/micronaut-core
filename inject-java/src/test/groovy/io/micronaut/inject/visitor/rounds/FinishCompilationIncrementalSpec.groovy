@@ -19,13 +19,14 @@ import java.nio.file.Path
 
 /**
  * The bean definition and the service entry of a bean registered from
- * {@link TypeElementVisitor#finishCompilation(io.micronaut.inject.visitor.VisitorContext)} are written with every
- * originating element, also to the filer of Gradle, so that an incremental build compiles every class the bean
- * follows from again whenever one of them changes, is added or is removed.
+ * {@link TypeElementVisitor#finishCompilation(io.micronaut.inject.visitor.VisitorContext)} follow from the whole
+ * compilation: they are written with every originating element, except to the filer of Gradle, which gets none, so
+ * that an incremental build compiles every class again whenever a class changes, is added or is removed.
  *
  * <p>The incremental builds are simulated with the rules of Gradle's incremental compilation of an isolating
- * processor: a generated file with exactly one originating type is deleted, and its type compiled again, when that
- * type changes; a generated file with several originating types makes the next compilation a full one.</p>
+ * processor, which counts the top level types of the originating elements of each generated file: a file with exactly
+ * one is deleted, and its type compiled again, when that type changes; a file with none or several makes the next
+ * compilation a full one.</p>
  */
 class FinishCompilationIncrementalSpec extends Specification {
 
@@ -46,17 +47,37 @@ class FinishCompilationIncrementalSpec extends Specification {
         RoundsVisitor.reset()
     }
 
-    void "the definition and the service entry of a bean registered once every round is over originate from every class it follows from"() {
+    void "the definition and the service entry of a bean registered once every round is over follow from the whole compilation"() {
         when:
-        Map<String, List<String>> originatingTypes = compile(tempDir.resolve('classes'), [A: source('A'), B: source('B')])
+        Map<String, List<String>> gradle = compile(tempDir.resolve('gradle'), [A: source('A'), B: source('B')])
+        Map<String, List<String>> javac = compile(tempDir.resolve('javac'), [A: source('A'), B: source('B')], false)
 
-        then:"the bean of the whole compilation reports both classes, so Gradle recompiles them together"
-        originatingTypes[COMPILATION_DEFINITION] == ['registerbean.A', 'registerbean.B']
-        originatingTypes[COMPILATION_ENTRY] == ['registerbean.A', 'registerbean.B']
+        then:"Gradle gets no originating element for the bean of the whole compilation, so it recompiles every class"
+        gradle[COMPILATION_DEFINITION] == []
+        gradle[COMPILATION_ENTRY] == []
 
-        and:"the bean of a round still reports its first class only"
-        originatingTypes[ROUND_DEFINITION] == ['registerbean.A']
-        originatingTypes[ROUND_ENTRY] == ['registerbean.A']
+        and:"another filer gets every class"
+        javac[COMPILATION_DEFINITION] == ['registerbean.A', 'registerbean.B']
+        javac[COMPILATION_ENTRY] == ['registerbean.A', 'registerbean.B']
+
+        and:"the bean of a round still reports its first class only to Gradle"
+        gradle[ROUND_DEFINITION] == ['registerbean.A']
+        gradle[ROUND_ENTRY] == ['registerbean.A']
+    }
+
+    void "adding a class to a compilation of a single class writes the bean with both"() {
+        given:"a bean of the whole compilation that follows from a single class"
+        Path output = tempDir.resolve('classes')
+        Map<String, String> sources = [A: source('A')]
+        Map<String, List<String>> originatingTypes = compile(output, sources)
+
+        when:
+        sources.B = source('B')
+        incrementalBuild(output, originatingTypes, sources, ['B'])
+
+        then:
+        compilationClasses(output) == ['registerbean.A', 'registerbean.B']
+        compilationBeans(output) == 1
     }
 
     void "changing a class the bean follows from writes the bean of a full build"() {
@@ -117,8 +138,9 @@ public class $name {
      * Compiles again the way Gradle's incremental compilation of an isolating processor does.
      */
     private void incrementalBuild(Path output, Map<String, List<String>> originatingTypes, Map<String, String> sources, List<String> changed) {
-        if (originatingTypes.values().any { it.size() != 1 }) {
-            // "the generated type ... must have exactly one originating element": a full recompilation
+        if (originatingTypes.values().any { it.toUnique().size() != 1 }) {
+            // "the generated type ... must have exactly one originating element", counting top level types: a full
+            // recompilation
             output.toFile().deleteDir()
             compile(output, sources)
             return
@@ -140,11 +162,11 @@ public class $name {
 
     /**
      * Compiles the sources of the package {@code registerbean} into the output directory, which is also on the class
-     * path, with a filer that the processor takes for the filer of Gradle.
+     * path, by default with a filer that the processor takes for the filer of Gradle.
      *
      * @return For each generated file, the top level types of the originating elements given to the filer
      */
-    private Map<String, List<String>> compile(Path output, Map<String, String> sources) {
+    private Map<String, List<String>> compile(Path output, Map<String, String> sources, boolean gradle = true) {
         Path sourceDir = Files.createTempDirectory(tempDir, 'src')
         List<Path> files = sources.collect { name, code ->
             Path file = sourceDir.resolve("registerbean/${name}.java")
@@ -171,7 +193,7 @@ public class $name {
                     return [new RoundsVisitor()]
                 }
             }
-            task.setProcessors([new FilerRecordingProcessor(processor, originatingTypes, true)])
+            task.setProcessors([new FilerRecordingProcessor(processor, originatingTypes, gradle)])
             boolean success = task.call()
             assert success: diagnostics.diagnostics.findAll { it.kind == Diagnostic.Kind.ERROR }.join('\n')
             return originatingTypes

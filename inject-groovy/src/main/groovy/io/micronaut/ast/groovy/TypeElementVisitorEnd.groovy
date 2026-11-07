@@ -32,6 +32,8 @@ import io.micronaut.inject.writer.ByteCodeWriterUtils
 import io.micronaut.inject.writer.OriginatingElements
 import io.micronaut.sourcegen.model.ObjectDef
 import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.AnnotatedNode
+import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -66,12 +68,17 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
                     loadedVisitor.visitor.finishCompilation(visitorContext)
                 } catch (ProcessingException ex) {
                     def element = ex.getOriginatingElement()
-                    visitorContext.fail(ex.getMessage(), element instanceof GroovyNativeElement ? (element as GroovyNativeElement).annotatedNode() : (ASTNode) null)
+                    if (element instanceof GroovyNativeElement) {
+                        // the element may be of another source unit than the one finishing the compilation
+                        AnnotatedNode node = (element as GroovyNativeElement).annotatedNode()
+                        AstMessageUtils.error(sourceUnitOf(node, source), node, ex.getMessage())
+                    } else {
+                        visitorContext.fail(ex.getMessage(), (ASTNode) null)
+                    }
                 } catch (Exception e) {
-                    AstMessageUtils.error(
-                            source,
-                            source.getAST(),
-                            "Error finishing the compilation of type visitor [$loadedVisitor.visitor]: $e.message")
+                    failFinishingCompilation(source, loadedVisitor, e)
+                } catch (Error e) {
+                    failFinishingCompilation(source, loadedVisitor, e)
                 }
             }
             for (loadedVisitor in values) {
@@ -114,6 +121,19 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
         TypeElementVisitorTransform.beanDefinitionBuilders.remove()
         TypeElementVisitorTransform.roundPending.remove()
         BeanDefinitionWriter.finish()
+    }
+
+    private static void failFinishingCompilation(SourceUnit source, LoadedVisitor loadedVisitor, Throwable e) {
+        AstMessageUtils.error(
+                source,
+                source.getAST(),
+                "Error finishing the compilation of type visitor [$loadedVisitor.visitor]: $e")
+    }
+
+    private static SourceUnit sourceUnitOf(AnnotatedNode node, SourceUnit fallback) {
+        ClassNode classNode = node instanceof ClassNode ? (ClassNode) node : node.declaringClass
+        SourceUnit sourceUnit = classNode?.module?.context
+        return sourceUnit ?: fallback
     }
 
     private static void write(OutputObjectDef outputObjectDef, SourceUnit source, VisitorContext visitorContext) {

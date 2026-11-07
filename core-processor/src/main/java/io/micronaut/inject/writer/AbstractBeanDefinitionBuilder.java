@@ -178,14 +178,42 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     }
 
     /**
+     * Builds the definitions of the beans registered during a round, numbering the ones that would get the same name
+     * within the round only, and records how many were built for each name.
+     *
+     * <p>The beans of each round are numbered from zero, so that a bean registered again for the same element in a
+     * later round gets the name of the earlier one, and writing it fails instead of adding a second definition. The
+     * beans registered once every round is over are numbered after the beans of every round, with
+     * {@link #build(List, ElementBeanDefinitionBuilderFactory, Map)} and the recorded counts.</p>
+     *
+     * @param beanDefinitionBuilders       The builders of the round
+     * @param beanDefinitionBuilderFactory The factory
+     * @param compilationNameCounts        The highest number of definitions built in a round for each name, updated
+     * @param <R>                          The type of the result
+     * @return The built definitions
+     * @throws IOException If an error occurs
+     * @since 5.3.0
+     */
+    @Internal
+    public static <R> List<R> buildRound(List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders,
+                                         ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory,
+                                         Map<String, Integer> compilationNameCounts)
+        throws IOException {
+        Map<String, Integer> roundNameCounts = CollectionUtils.newHashMap(beanDefinitionBuilders.size());
+        List<R> result = build(beanDefinitionBuilders, beanDefinitionBuilderFactory, roundNameCounts);
+        roundNameCounts.forEach((name, count) -> compilationNameCounts.merge(name, count, Math::max));
+        return result;
+    }
+
+    /**
      * Builds the definitions of the given builders, numbering the ones that would get the same name.
      *
      * @param beanDefinitionBuilders       The builders
      * @param beanDefinitionBuilderFactory The factory
      * @param nameCounts                   The number of definitions built so far for each name, updated as the builders
-     *                                     are built. A processor that builds the beans of each round separately passes
-     *                                     the same map for every round, so that a bean registered for an element in a
-     *                                     later round does not get the name of one registered for it earlier.
+     *                                     are built: the beans registered once every round is over are built with the
+     *                                     counts {@link #buildRound(List, ElementBeanDefinitionBuilderFactory, Map)}
+     *                                     recorded, so that they do not get the name of a bean of a round.
      * @param <R>                          The type of the result
      * @return The built definitions
      * @throws IOException If an error occurs
