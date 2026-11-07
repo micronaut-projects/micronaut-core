@@ -246,6 +246,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         String.class,
         Argument.class,
         int.class,
+        int.class,
         int.class
     );
 
@@ -576,10 +577,35 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                 member.getName(),
                 propertyMember.type(),
                 memberReadDispatchIndex,
-                memberWriteDispatchIndex(member, accessor, writeMember, writeDispatchIndex)
+                memberWriteDispatchIndex(member, accessor, writeMember, writeDispatchIndex),
+                memberFlags(member, members, memberReadDispatchIndex)
             ));
         }
         return result;
+    }
+
+    /**
+     * The flags of a member: whether the dispatch reading it was generated as a reflective one, and whether it is
+     * the accessor of a record component whose field is listed too.
+     */
+    private int memberFlags(MemberElement member, List<PropertyMemberDef> members, int readDispatchIndex) {
+        int flags = 0;
+        if (readDispatchIndex >= 0) {
+            DispatchWriter.DispatchTarget target = dispatchWriter.getDispatchTargets().get(readDispatchIndex);
+            if (target instanceof DispatchWriter.FieldGetReflectionDispatchTarget
+                || target instanceof DispatchWriter.MethodReflectionDispatchTarget) {
+                flags |= AbstractInitializableBeanIntrospection.BeanPropertyMemberRef.REFLECTION_REQUIRED;
+            }
+        }
+        if (member instanceof MethodElement method
+            && method.getParameters().length == 0
+            && method.getDeclaringType().isRecord()
+            && members.stream().anyMatch(other -> other.member() instanceof FieldElement field
+                && field.getName().equals(method.getName())
+                && field.getDeclaringType().getName().equals(method.getDeclaringType().getName()))) {
+            flags |= AbstractInitializableBeanIntrospection.BeanPropertyMemberRef.SYNTHETIC;
+        }
+        return flags;
     }
 
     /**
@@ -749,7 +775,9 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                 // 5: read dispatch index
                 ExpressionDef.constant(member.readDispatchIndex),
                 // 6: write dispatch index
-                ExpressionDef.constant(member.writeDispatchIndex)
+                ExpressionDef.constant(member.writeDispatchIndex),
+                // 7: flags
+                ExpressionDef.constant(member.flags)
             );
     }
 
@@ -1941,13 +1969,15 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      * @param type              The type of the member carrying the member's own annotation metadata
      * @param readDispatchIndex The dispatch index to read the member, or -1
      * @param writeDispatchIndex The dispatch index to write the member, or -1
+     * @param flags             The flags of {@link AbstractInitializableBeanIntrospection.BeanPropertyMemberRef}
      */
     private record BeanPropertyMemberData(ElementType elementType,
                                           ClassElement declaringType,
                                           String name,
                                           ClassElement type,
                                           int readDispatchIndex,
-                                          int writeDispatchIndex) {
+                                          int writeDispatchIndex,
+                                          int flags) {
     }
 
     /**
