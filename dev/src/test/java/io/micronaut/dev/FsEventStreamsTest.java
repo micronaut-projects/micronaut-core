@@ -294,11 +294,21 @@ class FsEventStreamsTest {
     void aWatchInterruptedWhileWaitingForTheRunLoopThreadFails() throws Exception {
         Path root = Files.createDirectories(base.resolve("root"));
         FakeFsEvents fake = new FakeFsEvents();
+        // the stream starts only after the watch failed: a watch that finds it started is not waiting, and succeeds
+        CountDownLatch interrupted = new CountDownLatch(1);
+        fake.onStart = () -> {
+            try {
+                interrupted.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        };
         try (FsEventStreams streams = new FsEventStreams(fake, 0.05, path -> { }, () -> { })) {
             Thread.currentThread().interrupt();
             IOException e = assertThrows(IOException.class, () -> streams.watch(root));
             assertInstanceOf(InterruptedException.class, e.getCause());
             assertTrue(Thread.interrupted());
+            interrupted.countDown();
         }
         assertEquals(List.of(), fake.violations);
     }

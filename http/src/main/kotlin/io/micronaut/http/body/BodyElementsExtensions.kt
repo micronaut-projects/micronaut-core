@@ -38,7 +38,9 @@ import kotlin.coroutines.CoroutineContext
  * while the client does not take them. The coroutine is cancelled when the server closes the
  * elements, e.g. when the client disconnects, and runs with the propagated context of the caller.
  * An element the flow emitted that the server does not take, because the elements were closed,
- * is closed if it is [AutoCloseable], e.g. a [CloseableByteBody].
+ * is closed if it is [AutoCloseable], e.g. a [CloseableByteBody]. This covers the elements that
+ * reach the collector: `emit` of the `flow` builder checks for cancellation first, and an element
+ * it drops that way never gets here, so the flow has to close it when `emit` throws.
  *
  * ```
  * routes.GET("/books") { _, _ ->
