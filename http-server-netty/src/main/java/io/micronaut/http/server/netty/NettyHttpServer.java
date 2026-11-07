@@ -716,6 +716,28 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     /**
+     * Fail early when the named worker group of a listener cannot take the listener's channels,
+     * e.g. a group whose transport differs from the one the listener's channels are built for.
+     */
+    private void checkListenerWorkers(NettyHttpServerConfiguration.NettyListenerConfiguration cfg, String groupName,
+                                      EventLoopGroup listenerWorkers, @Nullable EventLoopGroupConfiguration listenerWorkerConfig) {
+        NettyChannelType type = cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.UNIX
+            ? NettyChannelType.DOMAIN_SOCKET : NettyChannelType.CLIENT_SOCKET;
+        Channel probe = nettyEmbeddedServices.getChannelInstance(type, listenerWorkerConfig);
+        try {
+            listenerWorkers.register(probe).syncUninterruptibly();
+        } catch (Exception e) {
+            throw new ConfigurationException("Listener '" + cfg.getName() + "' worker group '" + groupName + "' cannot register " + type, e);
+        } finally {
+            if (probe.isRegistered()) {
+                probe.close().syncUninterruptibly();
+            } else {
+                probe.unsafe().closeForcibly();
+            }
+        }
+    }
+
+    /**
      * The provider of sockets that outlive this server, when there is one and the listener's transport is NIO, the
      * only one whose server channel can be built over a socket it does not own.
      */
@@ -745,20 +767,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             EventLoopGroup listenerParents = cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC || cfg.getParentEventLoopGroup() == null
                 ? Objects.requireNonNull(parentGroup) : listenerGroup(cfg, cfg.getParentEventLoopGroup());
             if (groupName != null && cfg.getFamily() != NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC) {
-                NettyChannelType type = cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.UNIX
-                    ? NettyChannelType.DOMAIN_SOCKET : NettyChannelType.CLIENT_SOCKET;
-                Channel probe = nettyEmbeddedServices.getChannelInstance(type, listenerWorkerConfig);
-                try {
-                    listenerWorkers.register(probe).syncUninterruptibly();
-                } catch (Exception e) {
-                    throw new ConfigurationException("Listener '" + cfg.getName() + "' worker group '" + groupName + "' cannot register " + type, e);
-                } finally {
-                    if (probe.isRegistered()) {
-                        probe.close().syncUninterruptibly();
-                    } else {
-                        probe.unsafe().closeForcibly();
-                    }
-                }
+                checkListenerWorkers(cfg, groupName, listenerWorkers, listenerWorkerConfig);
             }
             Integer fd = cfg.getFd();
             if (cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC) {
