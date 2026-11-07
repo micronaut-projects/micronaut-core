@@ -1016,14 +1016,18 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
          * Charge a buffer to the own tracker of this reader. A single buffer larger than the
          * limit is held while the reader holds nothing else: the limit bounds what a reader
          * accumulates, not the size of the buffers of the upstream, e.g. a chunk larger than the
-         * limit of a replayable body, which its first reader passes on.
+         * limit of a replayable body, which its first reader passes on. No further buffer is
+         * accepted while it is held.
          *
          * @param tracker The own tracker
          * @param size    The size of the buffer
          * @return The failure if the reader would hold more than its limit, or {@code null}
          */
         private synchronized @Nullable Exception chargeOwn(SizeLimitTracker tracker, int size) {
-            Exception exceeded = tracker.add(size);
+            // while the oversized buffer is held uncharged, the tracker reads less than the
+            // reader holds: count it, which is over the limit, so nothing more fits until it is
+            // delivered, and the failed add leaves the tracker unchanged
+            Exception exceeded = tracker.add(unchargedBytes + size);
             if (exceeded == null) {
                 chargedBytes += size;
                 return null;
