@@ -1,0 +1,7 @@
+{
+  "build": {
+    "artifact": "json-artifact",
+    "group": "io.micronaut",
+    "name": "json-name"
+  }
+}

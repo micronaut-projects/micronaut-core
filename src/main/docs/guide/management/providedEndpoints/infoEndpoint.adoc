@@ -63,7 +63,25 @@ If a `git.properties` file is available on the classpath, the link:{api}/io/micr
 
 ==== Configuration
 
-To specify an alternate path or name of the properties file, supply a custom value in the `endpoints.info.git.location` property.
+To specify an alternate path or name of the properties file, supply a custom value in the `endpoints.info.git.location` property. The location may also point at a file in any format your application's property source loaders support, such as JSON or YAML, selected by the file extension.
+
+For example, with `endpoints.info.git.location` set to `git.json`, the following file on the classpath is exposed under the `git` key just like the equivalent `git.properties` file:
+
+[source,json]
+.git.json
+----
+{
+  "git": {
+    "branch": "main",
+    "commit": {
+      "id": "97ef2a6753e1ce4999a19779a62368bbca997e53",
+      "message": {
+        "short": "initial"
+      }
+    }
+  }
+}
+----
 
 The git info source can be disabled using the `endpoints.info.git.enabled` property.
 
@@ -73,6 +91,6 @@ If a `META-INF/build-info.properties` file is available on the classpath, the li
 
 ==== Configuration
 
-To specify an alternate path/name of the properties file, supply a custom value in the `endpoints.info.build.location` property.
+To specify an alternate path/name of the properties file, supply a custom value in the `endpoints.info.build.location` property. As with the git info source, the location may point at a file in any format your application's property source loaders support.
 
 The build info source can be disabled using the `endpoints.info.build.enabled` property.
