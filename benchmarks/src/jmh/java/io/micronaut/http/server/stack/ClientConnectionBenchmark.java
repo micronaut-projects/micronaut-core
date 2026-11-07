@@ -8,6 +8,7 @@ import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Group;
 import org.openjdk.jmh.annotations.GroupThreads;
+import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Param;
@@ -15,7 +16,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
-import org.openjdk.jmh.infra.Blackhole;
+import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
@@ -39,11 +40,18 @@ import java.util.concurrent.TimeUnit;
  * <p>The cases that open connections run over HTTP/1 only: over h2c with prior knowledge, a
  * request on a new connection occasionally waits until the read timeout, and a refresh can close
  * requests that are still running, which fails the benchmark instead of measuring it.
+ *
+ * <p>Each new connection leaves a socket in {@code TIME_WAIT}, so the cases that connect are
+ * bounded, or they run out of local ports: a request on a new connection and a refresh followed
+ * by a request are timed in batches of {@value #CONNECTIONS_PER_BATCH} (the score is the time of a
+ * batch), and the refreshes under traffic are {@value #REFRESH_PAUSE_MILLIS} ms apart.
  */
 @BenchmarkMode({Mode.AverageTime, Mode.SampleTime})
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 public class ClientConnectionBenchmark {
 
+    static final int CONNECTIONS_PER_BATCH = 100;
+    static final long REFRESH_PAUSE_MILLIS = 20;
     private static final String PATH = "/socket-bench/loop";
 
     public static void main(String[] args) throws Exception {
@@ -68,6 +76,10 @@ public class ClientConnectionBenchmark {
      * A request with the pool disabled: each request connects.
      */
     @Benchmark
+    @BenchmarkMode(Mode.SingleShotTime)
+    @Warmup(batchSize = CONNECTIONS_PER_BATCH)
+    @Measurement(batchSize = CONNECTIONS_PER_BATCH)
+    @OutputTimeUnit(TimeUnit.MILLISECONDS)
     public String unpooledRequest(Connecting state) {
         return state.unpooled.retrieve(PATH);
     }
@@ -76,6 +88,10 @@ public class ClientConnectionBenchmark {
      * A refresh, then a request, which connects again.
      */
     @Benchmark
+    @BenchmarkMode(Mode.SingleShotTime)
+    @Warmup(batchSize = CONNECTIONS_PER_BATCH)
+    @Measurement(batchSize = CONNECTIONS_PER_BATCH)
+    @OutputTimeUnit(TimeUnit.MILLISECONDS)
     public String refreshThenRequest(Connecting state) {
         state.refreshing.refresh();
         return state.refreshing.toBlocking().retrieve(PATH);
@@ -97,9 +113,9 @@ public class ClientConnectionBenchmark {
     @Benchmark
     @Group("refreshUnderTraffic")
     @GroupThreads(1)
-    public void refreshDuringRequests(Connecting state) {
+    public void refreshDuringRequests(Connecting state) throws InterruptedException {
         state.underTraffic.refresh();
-        Blackhole.consumeCPU(200_000);
+        Thread.sleep(REFRESH_PAUSE_MILLIS);
     }
 
     /**
