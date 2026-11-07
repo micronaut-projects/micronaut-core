@@ -147,7 +147,7 @@ public final class DevManifest {
 
     /**
      * The key of the source directories that belong to other modules of the build than the application, which depends on
-     * them: a list of directories that {@code micronaut.dev.sources.<kind>} names too, of any language.
+     * them: a list of directories that {@code micronaut.dev.sources.<kind>} names too, in Java, Kotlin or Groovy.
      */
     public static final String SIBLING_SOURCES = PREFIX + "compile.sibling-sources";
 
@@ -297,7 +297,8 @@ public final class DevManifest {
             this.declaredRoots = reloadable;
             this.resourceRoots = resources;
         }
-        this.siblingOutput = siblingOutput(directory, properties);
+        // the Python compiler mirrors what it compiles into the class output as a whole: such a manifest compiles as without the keys
+        this.siblingOutput = sourceRoots.stream().anyMatch(root -> root.kind() == SourceKind.PYTHON) ? null : siblingOutput(directory, properties);
         if (siblingOutput != null) {
             refuseOverlap(siblingOutput);
             // ahead of the application's outputs and the siblings' own: what the launcher compiled is what the generations
@@ -467,9 +468,10 @@ public final class DevManifest {
      * Where the compilation of the sources of other modules of the build goes, {@value #SIBLING_OUTPUT}, and which sources
      * those are, {@value #SIBLING_SOURCES}. Both are written by the build plugins, for an application that has such modules
      * and compiles here; the build-tool mode compiles each module into its own output and needs neither. Without them every
-     * root compiles into its language's class output.
+     * root compiles into its language's class output. So do all of them with Python sources among the roots, since the Python
+     * compiler writes to its class output alone.
      *
-     * @return What the manifest names, null when it does not name both
+     * @return What the manifest names, null when it does not name both or has Python sources
      */
     public @Nullable SiblingOutput siblingOutput() {
         return siblingOutput;

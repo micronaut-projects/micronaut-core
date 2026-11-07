@@ -191,6 +191,23 @@ class DevManifestSpec extends Specification {
         ""              | "build/micronaut-dev/siblings"
     }
 
+    void "a manifest with Python sources compiles as without a sibling output"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes")
+        properties.setProperty("micronaut.dev.sources.python", "src/main/python")
+        properties.setProperty(DevManifest.SIBLING_SOURCES, "../lib/src")
+        properties.setProperty(DevManifest.SIBLING_OUTPUT, "build/micronaut-dev/siblings")
+
+        when:
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then:
+        manifest.siblingOutput() == null
+        manifest.reloadableRoots() == [dir.resolve("build/classes")]
+    }
+
     void "a sibling output the launcher could not empty safely is refused"() {
         given:
         Properties properties = new Properties()
