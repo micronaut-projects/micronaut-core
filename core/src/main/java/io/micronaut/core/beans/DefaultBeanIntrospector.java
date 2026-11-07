@@ -74,6 +74,11 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
      * Counts the invalidations, written under {@code this}, so a resolution that overlapped one is not kept.
      */
     private volatile long invalidations;
+    /**
+     * The view of this introspector without its fallbacks, created on first use; a race creates two equal views.
+     */
+    @Nullable
+    private volatile BeanIntrospector generatedOnly;
 
     /**
      * Creates an introspector that uses this class' class loader and may follow the context class loader setting.
@@ -127,6 +132,21 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
     @Override
     @SuppressWarnings("java:S1181")
     public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
+        return findIntrospection(beanType, true);
+    }
+
+    @Override
+    public BeanIntrospector withoutFallbacks() {
+        BeanIntrospector view = generatedOnly;
+        if (view == null) {
+            view = new GeneratedOnly();
+            generatedOnly = view;
+        }
+        return view;
+    }
+
+    @SuppressWarnings("java:S1181")
+    private <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType, boolean useFallbacks) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         ClassLoader effectiveClassLoader = resolveClassLoader();
         @SuppressWarnings("unchecked") final BeanIntrospectionReference<T> reference =
@@ -142,6 +162,9 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
             }
         } catch (Throwable e) {
             throw new IntrospectionException("Error loading BeanIntrospection for type [" + beanType + "]: " + e.getMessage(), e);
+        }
+        if (!useFallbacks) {
+            return Optional.empty();
         }
         // a fallback describes a class it was never compiled against, so asking it can fail on a type it does
         // not serve - reading a member whose type is an absent optional dependency throws NoClassDefFoundError -
@@ -336,5 +359,31 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
             resolvedIntrospectionMap.put(reference.getName(), reference);
         }
         return Collections.unmodifiableMap(resolvedIntrospectionMap);
+    }
+
+    /**
+     * The view returned by {@link #withoutFallbacks()}: the same index of generated introspections, never a fallback.
+     */
+    private final class GeneratedOnly implements BeanIntrospector {
+
+        @Override
+        public Collection<BeanIntrospection<Object>> findIntrospections(Predicate<? super BeanIntrospectionReference<?>> filter) {
+            return DefaultBeanIntrospector.this.findIntrospections(filter);
+        }
+
+        @Override
+        public Collection<Class<?>> findIntrospectedTypes(Predicate<? super BeanIntrospectionReference<?>> filter) {
+            return DefaultBeanIntrospector.this.findIntrospectedTypes(filter);
+        }
+
+        @Override
+        public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
+            return DefaultBeanIntrospector.this.findIntrospection(beanType, false);
+        }
+
+        @Override
+        public BeanIntrospector withoutFallbacks() {
+            return this;
+        }
     }
 }
