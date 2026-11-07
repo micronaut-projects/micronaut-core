@@ -26,13 +26,15 @@ final class ProbeJvm {
      * @param probe The class whose main runs
      * @param project The probe's project directory, its first argument
      * @param expected The line the probe prints when what it checks holds
+     * @param jvmArguments Further arguments of the probe's JVM
      * @throws Exception if the probe cannot run
      */
-    static void assertPasses(Class<?> probe, Path project, String expected) throws Exception {
+    static void assertPasses(Class<?> probe, Path project, String expected, String... jvmArguments) throws Exception {
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         Path argfile = project.resolve("jvm.argfile");
         Files.write(argfile, List.of("-cp", "\"" + System.getProperty("java.class.path").replace("\\", "\\\\") + "\""));
         List<String> command = new ArrayList<>(List.of(java, "@" + argfile, "-Xmx512m"));
+        command.addAll(List.of(jvmArguments));
         String dump = System.getProperty("probe.dump");
         if (dump != null) {
             // a heap dump of the probe when generation 1 stays reachable, to find what keeps it

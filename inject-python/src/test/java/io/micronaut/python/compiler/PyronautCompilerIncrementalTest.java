@@ -17,6 +17,7 @@ package io.micronaut.python.compiler;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import io.micronaut.python.processing.PythonAnnotationProcessor;
 import io.micronaut.python.processing.PythonAstParser;
 import io.micronaut.python.processing.PythonProcessingSession;
 
@@ -1678,6 +1679,61 @@ final class PyronautCompilerIncrementalTest {
         String content = packageMembers(initializer.getParent());
         assertTrue(content.contains("from .alpha import Added"));
         assertTrue(content.contains("from .beta import Beta"));
+    }
+
+    @Test
+    void filesListNamesNoMembersModuleItsCompilationReplaced(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python/pkg"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, "class Alpha:\n    value: int = 1\n");
+        compilePython(directory.resolve("python"), java, output, cache);
+        Path packageOutput = output.resolve("META-INF/GRAALPY-VFS/micronaut-application/src/pkg");
+        String replaced = packageMembers(packageOutput);
+
+        Files.writeString(alpha, """
+            class Alpha:
+                value: int = 1
+            class Added:
+                value: int = 3
+            """);
+        compilePython(directory.resolve("python"), java, output, cache);
+
+        assertNotEquals(replaced, packageMembers(packageOutput));
+        assertFilesListNamesOnlyOutputs(output);
+    }
+
+    @Test
+    void filesListNamesNoJavaImportsManifestItsCompilationReplaced(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path application = python.resolve("application.py");
+        Files.writeString(application, "from java.util import ArrayList\nvalues = ArrayList()\n");
+        compilePython(python, java, output, cache);
+        Path manifest = findOutput(output, PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX, ".py");
+
+        Files.writeString(application, "from java.util import ArrayList, HashMap\nvalues = ArrayList()\nnames = HashMap()\n");
+        compilePython(python, java, output, cache);
+
+        assertFalse(Files.exists(manifest));
+        assertTrue(Files.isRegularFile(findOutput(output, PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX, ".py")));
+        assertFilesListNamesOnlyOutputs(output);
+    }
+
+    /**
+     * The virtual file system takes the file list for what the resources hold, and fails on an entry naming a file
+     * that is gone.
+     */
+    private static void assertFilesListNamesOnlyOutputs(Path output) throws IOException {
+        List<String> entries = Files.readAllLines(output.resolve("META-INF/GRAALPY-VFS/micronaut-application/fileslist.txt"));
+        assertFalse(entries.isEmpty());
+        assertEquals(List.of(), entries.stream()
+            .filter(entry -> !Files.isRegularFile(output.resolve(entry.substring(1))))
+            .toList());
     }
 
     /**

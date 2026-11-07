@@ -100,6 +100,17 @@ An `@EachProperty` entry counts under its own prefix, so a change of one entry r
 
 A configuration bean in the closure does not keep the bean from being retained, and is not retained with it. Each generation binds it again, so the retained bean must copy the values it needs rather than keep the configuration bean. Since nothing checks that it does, a bean made from a configuration bean of the application's own class, which a restart replaces, is not retained: it could keep that class of the previous generation.
 
+=== When a generation fails to start
+
+A generation whose context fails to start is stopped at once, and the launcher keeps running until a change starts the next one:
+
+* The beans the failed context created are destroyed, whether they could have been retained or not. A pool it created does not stay open to conflict with the next generation's.
+* The beans retained from the generation before it are not destroyed. The next generation adopts them, so correcting the error does not pay for a new pool.
+
+This covers a failure inside the start of the context. A context that did start and then stopped, for example because its server could not bind its port, stopped as any context does: the beans it adopted are destroyed with it, and the next generation creates them again.
+
+No context runs while the generation is failed, so nothing can tell what a later edit of a configuration file changed. It may be what the retained beans were made from, so that edit releases them all.
+
 === HTTP client connections
 
 A restart keeps the idle connections of the Netty HTTP clients, so that the TCP connection, and the TLS handshake of a secure one, are not made again. Each generation still gets its own client objects, codecs, filters and pipeline handlers:
