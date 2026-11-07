@@ -389,6 +389,47 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
+     * The key under which a mutation of the metadata cached under the given cache key is also recorded, so that
+     * the declaration looked up again in a later processing round, under a cache key of that round, finds the
+     * metadata a visitor mutated in an earlier round. Only mutated metadata is recorded under it; metadata merely
+     * built stays under the cache key of its round.
+     *
+     * <p>An implementation whose cache keys identify a declaration in every round of a compilation need not
+     * override this. One whose cache keys hold objects of a round answers a key that identifies the same
+     * declaration in every round of the compilation, and only of that compilation, or {@code null} for an element
+     * that has no such identity.</p>
+     *
+     * @param cacheKey The cache key
+     * @return The key the mutation is recorded under, or {@code null} for no record beyond the cache key
+     * @since 5.3.0
+     */
+    @Nullable
+    protected Object getMutationKey(Object cacheKey) {
+        return null;
+    }
+
+    @Nullable
+    private CachedAnnotationMetadata findMutated(Object key) {
+        CachedAnnotationMetadata cachedAnnotationMetadata = MUTATED_ANNOTATION_METADATA.get(key);
+        if (cachedAnnotationMetadata != null) {
+            return cachedAnnotationMetadata;
+        }
+        return findRecordedMutation(key, getMutationKey(key));
+    }
+
+    @Nullable
+    private CachedAnnotationMetadata findRecordedMutation(Object key, @Nullable Object mutationKey) {
+        if (mutationKey == null) {
+            return null;
+        }
+        CachedAnnotationMetadata recorded = MUTATED_ANNOTATION_METADATA.get(mutationKey);
+        if (recorded != null) {
+            MUTATED_ANNOTATION_METADATA.put(key, recorded);
+        }
+        return recorded;
+    }
+
+    /**
      * Build the metadata for the given method element excluding any class metadata.
      *
      * @param owningType The owningType
@@ -478,7 +519,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (cachedAnnotationMetadata != null) {
             return cachedAnnotationMetadata;
         }
-        DefaultCachedAnnotationMetadata building = new DefaultCachedAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA);
+        Object mutationKey = getMutationKey(key);
+        CachedAnnotationMetadata recorded = findRecordedMutation(key, mutationKey);
+        if (recorded != null) {
+            return recorded;
+        }
+        DefaultCachedAnnotationMetadata building = new DefaultCachedAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA, mutationKey);
         // Don't use `computeIfAbsent` as it can lead to a concurrent exception because the cache is accessed during in `buildInternal`
         MUTATED_ANNOTATION_METADATA.put(key, building);
         try {
@@ -2274,7 +2320,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (element == null) {
             return List.of();
         }
-        CachedAnnotationMetadata modifiedStereotypes = MUTATED_ANNOTATION_METADATA.get(getTypeCacheKey(element));
+        CachedAnnotationMetadata modifiedStereotypes = findMutated(getTypeCacheKey(element));
         if (modifiedStereotypes == null || modifiedStereotypes.isEmpty() || !modifiedStereotypes.isMutated()) {
             return List.of();
         }
@@ -2867,6 +2913,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         private final boolean ownerMutation;
         @Nullable
         private CachedAnnotationMetadata owned;
+        @Nullable
+        private Object ownerMutationKey;
+        private boolean ownerMutationKeyResolved;
 
         OwnerCachedAnnotationMetadata(Object sharedKey, Object ownerKey, T element, boolean ownerMutation) {
             this.shared = lookupOrBuild(sharedKey, element);
@@ -2877,8 +2926,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         private CachedAnnotationMetadata current() {
             if (owned == null) {
                 owned = MUTATED_ANNOTATION_METADATA.get(ownerKey);
+                if (owned == null) {
+                    owned = findRecordedMutation(ownerKey, ownerMutationKey());
+                }
             }
             return owned != null ? owned : shared;
+        }
+
+        @Nullable
+        private Object ownerMutationKey() {
+            if (!ownerMutationKeyResolved) {
+                ownerMutationKey = getMutationKey(ownerKey);
+                ownerMutationKeyResolved = true;
+            }
+            return ownerMutationKey;
         }
 
         @Override
@@ -2893,8 +2954,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
         @Override
         public void update(AnnotationMetadata annotationMetadata) {
-            if (ownerMutation && !MUTATED_ANNOTATION_METADATA.containsKey(ownerKey)) {
-                MUTATED_ANNOTATION_METADATA.put(ownerKey, new DefaultCachedAnnotationMetadata(annotationMetadata));
+            if (ownerMutation && current() == shared) {
+                MUTATED_ANNOTATION_METADATA.put(ownerKey, new DefaultCachedAnnotationMetadata(annotationMetadata, ownerMutationKey()));
             }
             current().update(annotationMetadata);
         }
@@ -2913,14 +2974,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final class DefaultCachedAnnotationMetadata implements CachedAnnotationMetadata {
         @Nullable
         private AnnotationMetadata annotationMetadata;
+        @Nullable
+        private final Object mutationKey;
         private boolean isMutated;
         private boolean cleared;
 
-        public DefaultCachedAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        /**
+         * @param annotationMetadata The metadata
+         * @param mutationKey        The key a mutation is also recorded under, see {@link #getMutationKey(Object)}
+         */
+        DefaultCachedAnnotationMetadata(AnnotationMetadata annotationMetadata, @Nullable Object mutationKey) {
             if (annotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
                 throw new IllegalStateException();
             }
             this.annotationMetadata = annotationMetadata;
+            this.mutationKey = mutationKey;
         }
 
         @Override
@@ -2943,6 +3011,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             this.annotationMetadata = annotationMetadata;
             isMutated = true;
+            if (mutationKey != null) {
+                MUTATED_ANNOTATION_METADATA.putIfAbsent(mutationKey, this);
+            }
         }
 
         /**
