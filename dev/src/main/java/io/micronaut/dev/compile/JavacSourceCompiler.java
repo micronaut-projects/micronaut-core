@@ -178,20 +178,19 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
          */
         Map<Path, Set<String>> produced(Path generatedStaging) {
             // a class compiled from a generated source is credited by javac to that staged source; it is
-            // credited here to the source the generated one was generated for, so that it goes with it
+            // credited here to the sources the generated one was generated for, so that it goes with them
             Path staged = canonical(generatedStaging);
-            Map<Path, Path> originOfGenerated = new HashMap<>();
+            Map<Path, Set<Path>> originsOfGenerated = new HashMap<>();
             for (Map.Entry<Path, Set<Path>> entry : producedSources.entrySet()) {
                 for (Path generated : entry.getValue()) {
-                    originOfGenerated.put(canonical(generated), entry.getKey());
+                    originsOfGenerated.computeIfAbsent(canonical(generated), g -> new LinkedHashSet<>()).add(entry.getKey());
                 }
             }
             Map<Path, Set<String>> ownSources = new HashMap<>();
             for (Map.Entry<Path, Set<String>> entry : produced.entrySet()) {
                 Path key = canonical(entry.getKey());
                 if (key.startsWith(staged)) {
-                    Path origin = originOfGenerated.get(key);
-                    if (origin != null) {
+                    for (Path origin : originsOfGenerated.getOrDefault(key, Set.of())) {
                         ownSources.computeIfAbsent(origin, s -> new LinkedHashSet<>()).addAll(entry.getValue());
                     }
                 } else {
