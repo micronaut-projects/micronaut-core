@@ -148,7 +148,8 @@ public class HandlerRouteServerSentEventsTest {
         try (ServerUnderTest server = server()) {
             String body = server.exchange(HttpRequest.GET("/sse/heartbeat"), String.class).body();
             assertTrue(body.startsWith(":\n\n"), body);
-            assertTrue(body.endsWith("data: done\n\n"), body);
+            // a heartbeat may still go out between the last event and the end of the stream
+            assertEquals("data: done\n\n", body.replace(":\n\n", ""), body);
         }
     }
 
