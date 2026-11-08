@@ -232,6 +232,14 @@ public final class LiveReloadScriptFilter implements Ordered {
                 // a writer that only writes through the server's own response path, before it read anything
                 return;
             }
+            if (isEncoded(response)) {
+                // the writer encoded the page, which the script cannot be spliced into: sent as written
+                byte[] written = out.toByteArray();
+                response.body(written);
+                response.getHeaders().remove(HttpHeaders.TRANSFER_ENCODING);
+                response.contentLength(written.length);
+                return;
+            }
             String html = out.toString(charset);
             String injected = inject(html, port);
             response.contentType(contentType);
