@@ -285,7 +285,7 @@ public interface AnnotationSource {
      * @return True if it is
      */
     default boolean isAnnotationPresent(String annotationName) {
-        ArgumentUtils.requireNonNull("annotationClass", annotationName);
+        ArgumentUtils.requireNonNull("annotationName", annotationName);
         return false;
     }
 
@@ -296,7 +296,7 @@ public interface AnnotationSource {
      * @return True if it is
      */
     default boolean isDeclaredAnnotationPresent(String annotationName) {
-        ArgumentUtils.requireNonNull("annotationClass", annotationName);
+        ArgumentUtils.requireNonNull("annotationName", annotationName);
         return false;
     }
 
