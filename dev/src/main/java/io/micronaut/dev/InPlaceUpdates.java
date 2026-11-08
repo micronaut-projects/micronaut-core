@@ -284,6 +284,11 @@ final class InPlaceUpdates {
         } catch (RuntimeException e) {
             LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
         }
+        if (refusedRecreations(current) != refused) {
+            // a listener of the completed reload may recreate too
+            LOG.info("Restarting: a bean the running application depends on could not be recreated in place after the change");
+            return false;
+        }
         return true;
     }
 

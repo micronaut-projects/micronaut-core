@@ -34,6 +34,37 @@ class RecreateRunningServerTest {
 
     @Test
     void aRecreationThatWouldStopTheServerRestartsTheApplicationInstead() throws Exception {
+        // a module's reloader: recreates the message source for every class change applied in place
+        assertRestartsInstead("""
+            package app;
+            @io.micronaut.context.annotation.Context
+            public class MessagesReloader {
+                public MessagesReloader(io.micronaut.context.WatchableBeanContext context) {
+                    context.classChanges().watch(change -> context.findBean(Messages.class).ifPresent(context::recreate));
+                }
+            }
+            """);
+    }
+
+    @Test
+    void aRecreationByAListenerOfTheCompletedReloadRestartsTheApplicationInstead() throws Exception {
+        assertRestartsInstead("""
+            package app;
+            @jakarta.inject.Singleton
+            public class MessagesReloader implements io.micronaut.context.event.ApplicationEventListener<io.micronaut.context.reload.ReloadCompletedEvent> {
+                private final io.micronaut.context.WatchableBeanContext context;
+                public MessagesReloader(io.micronaut.context.WatchableBeanContext context) {
+                    this.context = context;
+                }
+                @Override
+                public void onApplicationEvent(io.micronaut.context.reload.ReloadCompletedEvent event) {
+                    context.findBean(Messages.class).ifPresent(context::recreate);
+                }
+            }
+            """);
+    }
+
+    private void assertRestartsInstead(String reloader) throws Exception {
         int port;
         try (ServerSocket socket = new ServerSocket(0)) {
             port = socket.getLocalPort();
@@ -56,16 +87,7 @@ class RecreateRunningServerTest {
             public class Messages extends io.micronaut.context.StaticMessageSource {
             }
             """);
-        // a module's reloader: recreates the message source for every class change applied in place
-        Files.writeString(src.resolve("MessagesReloader.java"), """
-            package app;
-            @io.micronaut.context.annotation.Context
-            public class MessagesReloader {
-                public MessagesReloader(io.micronaut.context.WatchableBeanContext context) {
-                    context.classChanges().watch(change -> context.findBean(Messages.class).ifPresent(context::recreate));
-                }
-            }
-            """);
+        Files.writeString(src.resolve("MessagesReloader.java"), reloader);
         Files.writeString(src.resolve("HelloController.java"), controller("hello-1"));
 
         DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest()), new String[] {String.valueOf(port)});
