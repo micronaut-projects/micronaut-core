@@ -1522,7 +1522,6 @@ public final class DevRuntime implements Closeable {
         // every resource change reaches the running context's watches, those under the configuration root too;
         // a configuration file changed also refreshes the configuration
         ApplicationContext current = context;
-        // a recreation a watch asked for that would have stopped the application is refused, and a restart applies it
         long refusedBefore = InPlaceUpdates.refusedRecreations(current);
         boolean configurationChanged = ResourceNotifier.notify(current, settledResources(batch.resources), this::rootsOf, this::refreshBrowsers);
         OutputSnapshot previous = snapshot;

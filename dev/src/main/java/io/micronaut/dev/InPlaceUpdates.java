@@ -293,8 +293,12 @@ final class InPlaceUpdates {
     }
 
     /**
+     * How many recreations a context refused so far because they would have stopped the application: a watch asking
+     * for one while a change is applied in place, or while the configuration or a resource is refreshed, has the
+     * runtime restart instead, so that the change is applied all the same.
+     *
      * @param context The running context, if any
-     * @return How many recreations it refused so far because they would have stopped the application
+     * @return The number of refusals
      */
     static long refusedRecreations(@Nullable ApplicationContext context) {
         return context instanceof DefaultBeanContext beanContext ? beanContext.refusedRecreations() : 0;
