@@ -16,6 +16,7 @@
 package io.micronaut.dev.compile;
 
 import io.micronaut.python.compiler.PyronautCompiler;
+import io.micronaut.python.compiler.PythonIncrementalMode;
 import io.micronaut.python.processing.PythonProcessingSession;
 import org.jspecify.annotations.Nullable;
 
@@ -98,6 +99,7 @@ final class PythonCompilation implements AutoCloseable {
             PyronautCompiler.Builder builder = PyronautCompiler.builder()
                 .targetDir(work.toFile())
                 .incremental(true)
+                .pythonIncrementalMode(request.incrementalMode() == IncrementalMode.OPTIMISTIC ? PythonIncrementalMode.OPTIMISTIC : PythonIncrementalMode.CONSERVATIVE)
                 .incrementalCacheDirectory(cache.toFile())
                 .classpath(files(classpath(request, work, foreignClasses(classOutput))))
                 .options(request.options())

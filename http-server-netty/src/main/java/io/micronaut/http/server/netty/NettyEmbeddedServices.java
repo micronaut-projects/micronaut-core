@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -126,6 +128,14 @@ public interface NettyEmbeddedServices {
     Optional<NettyServerWebSocketUpgradeHandler> getWebSocketUpgradeHandler(NettyEmbeddedServer embeddedServer);
 
     /**
+     * @return The factory for fresh HTTP gzip and deflate handlers
+     * @since 5.3.0
+     */
+    default NettyZlibCodecFactory getZlibCodecFactory() {
+        return DefaultNettyZlibCodecFactory.INSTANCE;
+    }
+
+    /**
      * @return The event loop group registry.
      */
     EventLoopGroupRegistry getEventLoopGroupRegistry();
@@ -143,6 +153,18 @@ public interface NettyEmbeddedServices {
      * @return The event loop group config
      */
     EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration config);
+
+    /**
+     * Creates an event loop group with the configured transport and executor.
+     *
+     * @param config The event loop configuration
+     * @param executorService The executor service
+     * @return The event loop group
+     * @since 5.3.0
+     */
+    default EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration config, ExecutorService executorService) {
+        return createEventLoopGroup(config.getNumThreads(), executorService, config.getIoRatio().orElse(null));
+    }
 
     /**
      * Creates the event loop group configuration.

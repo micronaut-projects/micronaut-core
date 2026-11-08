@@ -1,6 +1,15 @@
 {
   "reflection": [
     {
+      "type": "java.io.Console",
+      "methods": [
+        {
+          "name": "isTerminal",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
       "type": "sun.net.www.protocol.http.Handler",
       "methods": [
         {
