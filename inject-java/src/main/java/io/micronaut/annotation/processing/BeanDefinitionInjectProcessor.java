@@ -107,6 +107,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     @Override
     public final synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
+        EvaluatedExpressionReferenceCounter.compilationStarted();
         this.beanDefinitions = new LinkedHashSet<>();
 
         for (BeanElementVisitor<?> visitor : BeanElementVisitor.VISITORS) {
@@ -312,7 +313,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 BeanDefinitionWriter.finish();
                 // the compilation is over: a processor loader kept for the next one, as a build tool's daemon or development
                 // mode keeps it, numbers the expressions of a class compiled again from 0, as a loader of its own would
-                EvaluatedExpressionReferenceCounter.reset();
+                EvaluatedExpressionReferenceCounter.compilationFinished();
             }
         }
 

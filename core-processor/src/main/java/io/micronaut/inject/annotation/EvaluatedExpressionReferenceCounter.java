@@ -31,6 +31,8 @@ public class EvaluatedExpressionReferenceCounter {
     public static final String EXPR_SUFFIX = "$Expr";
 
     private static final Map<String, Integer> CLASS_NAME_INDEXES = new ConcurrentHashMap<>();
+    private static final Object COMPILATIONS_LOCK = new Object();
+    private static int compilations;
 
     /**
      * Provides next expression index for passed class name. In general indexes are needed only
@@ -51,13 +53,33 @@ public class EvaluatedExpressionReferenceCounter {
     }
 
     /**
-     * Forgets the indexes given, when a compilation of the Java processors ends: the next one, in a compiler that keeps the processors' classes
-     * loaded as a build tool's daemon or development mode does, names the expressions of a class from 0 again, as a
-     * compilation in a loader of its own would. A class compiled again keeps the names of its expression classes.
+     * Notes that a compilation of the Java processors started: see {@link #compilationFinished()}.
      */
     @Internal
-    public static void reset() {
-        CLASS_NAME_INDEXES.clear();
+    public static void compilationStarted() {
+        synchronized (COMPILATIONS_LOCK) {
+            compilations++;
+        }
+    }
+
+    /**
+     * Notes that a compilation of the Java processors ended, and forgets the indexes given once no other is running: the
+     * next compilation, in a compiler that keeps the processors' classes loaded as a build tool's daemon or development
+     * mode does, names the expressions of a class from 0 again, as a compilation in a loader of its own would, so a class
+     * compiled again keeps the names of its expression classes. Compilations that overlap in one loader keep numbering
+     * on, as before, so that none reuses a name another gave in it. A compilation that never finishes leaves the indexes
+     * as they are, as before.
+     */
+    @Internal
+    public static void compilationFinished() {
+        synchronized (COMPILATIONS_LOCK) {
+            if (compilations > 0) {
+                compilations--;
+            }
+            if (compilations == 0) {
+                CLASS_NAME_INDEXES.clear();
+            }
+        }
     }
 
 }
