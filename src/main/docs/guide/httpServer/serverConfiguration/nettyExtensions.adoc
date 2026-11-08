@@ -1,0 +1,39 @@
+Named event-loop transports are selected by the `transport` list on an event-loop configuration. The first registered, available factory in that list is selected. An external factory does not become the default merely because its bean is present. A list containing only an unavailable transport fails at startup.
+
+Each listener can borrow a named worker group through `event-loop-group`. TCP and Unix listeners can also borrow a named acceptor group through `parent-event-loop-group`. When omitted, these properties inherit the server-wide groups. The selected transport supplies the listener's channels; the acceptor and worker groups must support those channels. QUIC uses its selected worker group and the existing QUIC implementation.
+
+For example, TCP and QUIC can use separate NIO groups:
+
+[configuration]
+----
+micronaut:
+  netty:
+    event-loops:
+      tcp:
+        transport: [nio]
+      tcp-parent:
+        transport: [nio]
+      udp:
+        transport: [nio]
+  server:
+    netty:
+      listeners:
+        tcp:
+          family: TCP
+          port: 8080
+          event-loop-group: tcp
+          parent-event-loop-group: tcp-parent
+        quic:
+          family: QUIC
+          port: 8443
+          ssl: true
+          event-loop-group: udp
+----
+
+The QUIC listener also needs the existing server certificate configuration. Named groups remain owned by their registry: stopping a listener or stopping only the server does not shut down borrowed groups. Changes to listener group selection require a server restart.
+
+The experimental api:http.netty.compression.NettyZlibCodecFactory[] SPI replaces construction of HTTP gzip and deflate handlers independently of the selected transport. Supply one bean implementing this interface to replace the stock Netty factory. The factory receives the existing compression level, window size and memory level for encoding, and the wrapper mode and output allocation limit for decoding. It must return a fresh stateful handler for every call and release its resources through the handler lifecycle.
+
+The selected factory is used for server response compression, request decompression, and managed client response decompression over HTTP/1, HTTP/2 and HTTP/3. Existing compression negotiation, thresholds, body limits and framing remain in Core. Other compression formats retain their existing implementation. A client built directly outside an application context uses stock codecs; set `zlibCodecFactory` on `DefaultHttpClient.builder()` to opt in explicitly.
+
+TLS providers can extend api:http.netty.NettySslContextBuilder[] through the existing server and client SSL factories. Protected accessors expose key and trust material, protocols, cipher policy, ALPN and client authentication. Legacy server and client SSL builders also expose a protected `createSslContext` hook. Its default keeps existing material loading, builder customization and exception translation. An override must preserve configured TLS policy and required customizations, including ACME ALPN challenges. QUIC TLS retains its separate construction path.
