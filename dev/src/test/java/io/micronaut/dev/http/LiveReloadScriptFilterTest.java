@@ -17,6 +17,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LiveReloadScriptFilterTest {
 
     @Test
+    void itSeesTheResponseAfterEveryOtherFilterTheHeaderPopulatorIncluded() {
+        // the response-header populator, which may add a policy, has the order FIRST.before(); a tie would leave which of
+        // the two sees the response last to the order the beans are found in
+        LiveReloadScriptFilter filter = new LiveReloadScriptFilter(null, null, null, null);
+        assertTrue(filter.getOrder() < io.micronaut.http.filter.ServerFilterPhase.FIRST.before());
+    }
+
+    @Test
     void theScriptGoesBeforeTheBodyEndWhateverItsCase() {
         String injected = LiveReloadScriptFilter.inject("<html><body><p>hi</p></BODY></html>", 35729);
         assertTrue(injected.contains("<p>hi</p><script src=\"http://localhost:35729/livereload.js?snipver=1\" async></script></BODY>"));

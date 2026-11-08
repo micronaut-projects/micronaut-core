@@ -166,6 +166,17 @@ class LiveReloadRenderedPageTest {
                 }
             }
             """);
+        // a policy the application adds to every response of a path, through the server's header populator
+        Files.writeString(src.resolve("PolicyHeaders.java"), """
+            package app;
+            @jakarta.inject.Singleton
+            public class PolicyHeaders implements io.micronaut.http.server.filter.ResponseHeaderPopulator {
+                @Override
+                public java.util.Collection<io.micronaut.http.HttpHeaderEntry> findHttpHeaders(io.micronaut.http.HttpRequest<?> request, io.micronaut.http.HttpResponse<?> response) {
+                    return request.getPath().equals("/populated") ? java.util.List.of(new io.micronaut.http.HttpHeaderEntry("Content-Security-Policy", "script-src 'self'")) : null;
+                }
+            }
+            """);
         Files.writeString(src.resolve("Pages.java"), """
             package app;
             import io.micronaut.core.io.Writable;
@@ -193,6 +204,10 @@ class LiveReloadRenderedPageTest {
                 public java.io.InputStream stream() {
                     return new java.io.ByteArrayInputStream("%s".getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 }
+                @Get(value = "/populated", produces = MediaType.TEXT_HTML)
+                public io.micronaut.http.HttpResponse<String> populated() {
+                    return io.micronaut.http.HttpResponse.ok("%s").contentType(MediaType.TEXT_HTML_TYPE);
+                }
                 @Get(value = "/policed", produces = MediaType.TEXT_HTML)
                 public Policed policed() {
                     return new Policed("hi");
@@ -202,7 +217,7 @@ class LiveReloadRenderedPageTest {
                     return java.util.Map.of("page", "%s");
                 }
             }
-            """.formatted(PAGE.replace("\"", "\\\""), PAGE.replace("\"", "\\\""), PAGE.replace("\"", "\\\"")));
+            """.formatted(PAGE.replace("\"", "\\\""), PAGE.replace("\"", "\\\""), PAGE.replace("\"", "\\\""), PAGE.replace("\"", "\\\"")));
         Path site = Files.createDirectories(project.resolve("src/main/resources/static/site"));
         Files.writeString(site.resolve("app.css"), "/* </body> */ p { color: red; }");
         Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
@@ -251,6 +266,12 @@ class LiveReloadRenderedPageTest {
             assertEquals(PAGE, policed.body());
             assertEquals("script-src 'self'", policed.headers().firstValue("content-security-policy").orElse(null));
             assertFalse(policed.headers().firstValue("cache-control").map(value -> value.contains("no-store")).orElse(false));
+
+            // the policy the header populator adds is seen too: the page is left alone
+            HttpResponse<String> populated = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/populated")).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, populated.statusCode());
+            assertEquals(PAGE, populated.body());
+            assertEquals("script-src 'self'", populated.headers().firstValue("content-security-policy").orElse(null));
 
             // a streamed page is written as it comes, by the server
             HttpResponse<String> stream = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/stream")).build(), HttpResponse.BodyHandlers.ofString());

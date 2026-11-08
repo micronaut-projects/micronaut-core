@@ -100,7 +100,8 @@ public final class LiveReloadScriptFilter implements Ordered {
      */
     @Override
     public int getOrder() {
-        return ServerFilterPhase.FIRST.before();
+        // ahead of the response-header populator too, which has FIRST.before() and may add a policy
+        return ServerFilterPhase.FIRST.before() - 1;
     }
 
     /**
