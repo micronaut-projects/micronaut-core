@@ -792,6 +792,23 @@ class JavacSourceCompilerSpec extends Specification {
         then:
         Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
 
+        when: "a directory that a jar of the path names in its manifest gains a file"
+        Path manifested = Files.createDirectories(project.resolve("manifested"))
+        Path jar = project.resolve("with-class-path.jar")
+        def manifest = new java.util.jar.Manifest()
+        manifest.mainAttributes.put(java.util.jar.Attributes.Name.MANIFEST_VERSION, "1.0")
+        manifest.mainAttributes.put(java.util.jar.Attributes.Name.CLASS_PATH, "manifested/")
+        new java.util.jar.JarOutputStream(Files.newOutputStream(jar), manifest).close()
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra, jar]))
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra, jar]))
+        String kept = Files.readString(out.resolve("META-INF/counted/Alone"))
+        Files.writeString(manifested.resolve("Added.class"), "x")
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra, jar]))
+
+        then:
+        kept == "2"
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
         when: "a processor fails with an exception, rather than the sources failing to compile"
         write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted(fail = true) public class Alone { }")
         compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
