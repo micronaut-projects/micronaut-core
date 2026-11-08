@@ -71,17 +71,31 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
 
     @Override
     public final Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
-        SslContextBuilder sslBuilder = SslContextBuilder
-            .forServer(getKeyManagerFactory(ssl))
-            .trustManager(getTrustManagerFactory(ssl));
-
-        NettyTlsUtils.setupServerBuilder(sslBuilder, ssl, httpVersion);
-        processBuilder(sslBuilder, ssl, httpVersion);
         try {
-            return Optional.of(sslBuilder.build());
+            return Optional.of(createSslContext(ssl, httpVersion));
         } catch (SSLException ex) {
             throw new SslConfigurationException("An error occurred while setting up SSL", ex);
         }
+    }
+
+    /**
+     * Builds the TCP context, retaining material loading and stock builder processing by default.
+     * Alternative implementations must preserve configured TLS policy and any required
+     * {@link #processBuilder} customization, including ACME ALPN challenges.
+     *
+     * @param ssl The SSL configuration
+     * @param httpVersion The HTTP version
+     * @return The SSL context
+     * @throws SSLException If the context cannot be built
+     * @since 5.3.0
+     */
+    protected SslContext createSslContext(SslConfiguration ssl, HttpVersion httpVersion) throws SSLException {
+        SslContextBuilder sslBuilder = SslContextBuilder
+            .forServer(getKeyManagerFactory(ssl))
+            .trustManager(getTrustManagerFactory(ssl));
+        NettyTlsUtils.setupServerBuilder(sslBuilder, ssl, httpVersion);
+        processBuilder(sslBuilder, ssl, httpVersion);
+        return sslBuilder.build();
     }
 
     /**
