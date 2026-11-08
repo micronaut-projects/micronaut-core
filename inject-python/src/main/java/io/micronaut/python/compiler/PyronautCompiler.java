@@ -287,6 +287,7 @@ public final class PyronautCompiler {
         IncrementalCompilation.Plan plan = incrementalCompilation.plan();
         if (!plan.upToDate()) {
             aggregatingSources = compiler.aggregatingSources(
+                targetDir,
                 classpath,
                 annotationProcessorPath,
                 javaSrc,
