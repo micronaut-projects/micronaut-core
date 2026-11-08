@@ -60,6 +60,12 @@ final class ProcessorLoaders {
 
     private static final Logger LOG = LoggerFactory.getLogger(ProcessorLoaders.class);
 
+    /**
+     * Whether loaders are kept: not on Windows, where a jar a loader holds open cannot be replaced, so a processor the
+     * build rebuilds while development mode runs could not be written.
+     */
+    private static final boolean RETAINS = !System.getProperty("os.name", "").startsWith("Windows");
+
     private final Map<List<Path>, Retained> loaders = new HashMap<>();
     private final Map<Path, ManifestClassPath> manifestClassPaths = new HashMap<>();
 
@@ -68,10 +74,14 @@ final class ProcessorLoaders {
      * otherwise a new one, which is kept in its place.
      *
      * @param processorPath The processor path
-     * @return The loader; closing it, as javac does when a compilation ends, does not close it
+     * @return The loader; closing it, as javac does when a compilation ends, does not close it, except on Windows, where
+     *         each compilation has a loader of its own
      */
     synchronized ClassLoader loaderOf(List<Path> processorPath) {
         List<Path> key = List.copyOf(processorPath);
+        if (!RETAINS) {
+            return new CompilerPluginLoader(urls(key), List.of());
+        }
         Map<Path, String> fingerprint = fingerprint(key);
         Retained retained = loaders.get(key);
         if (retained != null && retained.fingerprint().equals(fingerprint)) {
@@ -152,10 +162,11 @@ final class ProcessorLoaders {
     }
 
     /**
-     * The entries a jar's manifest adds to the class path, read again only when the jar changed.
+     * The entries a jar's manifest adds to the class path, read again only when the jar changed. The loader reads any file
+     * of the path as a jar, whatever its name.
      */
     private List<Path> manifestClassPath(Path jar, @Nullable String jarFingerprint) {
-        if (jarFingerprint == null || !jar.getFileName().toString().endsWith(".jar")) {
+        if (jarFingerprint == null) {
             return List.of();
         }
         ManifestClassPath known = manifestClassPaths.get(jar);
