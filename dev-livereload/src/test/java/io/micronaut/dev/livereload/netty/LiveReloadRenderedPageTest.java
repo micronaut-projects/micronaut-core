@@ -139,6 +139,33 @@ class LiveReloadRenderedPageTest {
                 }
             }
             """);
+        Files.writeString(src.resolve("Policed.java"), """
+            package app;
+            public record Policed(String name) {
+            }
+            """);
+        // a writer that declares a policy as it writes, which the script would break
+        Files.writeString(src.resolve("PolicedWriter.java"), """
+            package app;
+            import io.micronaut.core.type.Argument;
+            import io.micronaut.core.type.MutableHeaders;
+            import io.micronaut.http.MediaType;
+            import io.micronaut.http.annotation.Produces;
+            import io.micronaut.http.body.MessageBodyWriter;
+            @jakarta.inject.Singleton
+            @Produces(MediaType.TEXT_HTML)
+            public class PolicedWriter implements MessageBodyWriter<Policed> {
+                @Override
+                public void writeTo(Argument<Policed> type, MediaType mediaType, Policed page, MutableHeaders headers, java.io.OutputStream out) {
+                    headers.set("Content-Security-Policy", "script-src 'self'");
+                    try {
+                        out.write(("<html><body><p>" + page.name() + "</p></body></html>").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    } catch (java.io.IOException e) {
+                        throw new io.micronaut.http.codec.CodecException(e.getMessage(), e);
+                    }
+                }
+            }
+            """);
         Files.writeString(src.resolve("Pages.java"), """
             package app;
             import io.micronaut.core.io.Writable;
@@ -165,6 +192,10 @@ class LiveReloadRenderedPageTest {
                 @Get(value = "/stream", produces = MediaType.TEXT_HTML)
                 public java.io.InputStream stream() {
                     return new java.io.ByteArrayInputStream("%s".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                }
+                @Get(value = "/policed", produces = MediaType.TEXT_HTML)
+                public Policed policed() {
+                    return new Policed("hi");
                 }
                 @Get("/json")
                 public java.util.Map<String, String> json() {
@@ -213,6 +244,13 @@ class LiveReloadRenderedPageTest {
             assertTrue(json.headers().firstValue("content-type").orElseThrow().startsWith("application/json"));
             assertFalse(json.body().contains("livereload"), json.body());
             assertFalse(json.headers().firstValue("cache-control").map(value -> value.contains("no-store")).orElse(false));
+
+            // a page whose writer declares a policy is sent as written, as one that declared it before is left alone
+            HttpResponse<String> policed = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/policed")).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, policed.statusCode());
+            assertEquals(PAGE, policed.body());
+            assertEquals("script-src 'self'", policed.headers().firstValue("content-security-policy").orElse(null));
+            assertFalse(policed.headers().firstValue("cache-control").map(value -> value.contains("no-store")).orElse(false));
 
             // a streamed page is written as it comes, by the server
             HttpResponse<String> stream = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/stream")).build(), HttpResponse.BodyHandlers.ofString());

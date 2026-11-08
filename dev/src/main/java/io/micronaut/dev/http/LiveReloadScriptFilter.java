@@ -235,8 +235,10 @@ public final class LiveReloadScriptFilter implements Ordered {
             // the type the writer set, its charset included, as the server would send it; the route's otherwise
             MediaType written = response.getContentType().orElse(contentType);
             response.contentType(written);
-            if (isEncoded(response) || !MediaType.TEXT_HTML.equals(written.getName())) {
-                // the writer encoded the page, or wrote something else than a page: sent as written, without the script
+            if (response.getHeaders().contains(HttpHeaders.CONTENT_SECURITY_POLICY) || isEncoded(response)
+                || !MediaType.TEXT_HTML.equals(written.getName())) {
+                // the writer declared a policy the script would break, as a page that declared one before is left alone,
+                // encoded the page, or wrote something else than a page: sent as written, without the script
                 byte[] bytes = out.toByteArray();
                 response.body(bytes);
                 response.getHeaders().remove(HttpHeaders.TRANSFER_ENCODING);
