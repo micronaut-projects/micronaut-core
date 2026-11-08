@@ -323,6 +323,10 @@ final class SourceIndex {
         for (Map.Entry<Path, Set<String>> entry : produced.entrySet()) {
             recorded.put(entry.getKey(), new LinkedHashSet<>(entry.getValue()));
         }
+        for (Path source : compiled) {
+            // a source that produced nothing, a package-info without annotations, is recorded too: it is not a new one
+            recorded.putIfAbsent(source.toAbsolutePath().normalize(), new LinkedHashSet<>());
+        }
         for (Map.Entry<Path, Set<String>> entry : producedSources.entrySet()) {
             generated.put(entry.getKey(), new LinkedHashSet<>(entry.getValue()));
         }

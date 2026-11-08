@@ -842,6 +842,23 @@ class JavacSourceCompilerSpec extends Specification {
         result.compiledSources*.fileName*.toString() == ["Added.java"]
     }
 
+    void "a source that produces nothing is not taken for a new one once it compiled"() {
+        given: "two sources a processor aggregates, and a package-info without annotations, which produces no class"
+        write("example/First.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class First { }")
+        write("example/Second.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class Second { }")
+        Path packageInfo = write("example/package-info.java", "/** The examples. */ package example;")
+        compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+
+        when: "its Javadoc is edited"
+        write("example/package-info.java", "/** The examples, edited. */ package example;")
+        def result = compiler.compile(request([packageInfo] as Set, [] as Set, processorPath()))
+
+        then:
+        !Files.exists(out.resolve("example/package-info.class"))
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString() == ["package-info.java"]
+    }
+
     void "a new source compiled with the sources of an aggregate compiles alone when its body changes next"() {
         given: "two sources a processor aggregates"
         write("example/First.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class First { }")
