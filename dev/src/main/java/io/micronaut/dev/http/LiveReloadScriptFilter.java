@@ -232,22 +232,25 @@ public final class LiveReloadScriptFilter implements Ordered {
                 // a writer that only writes through the server's own response path, before it read anything
                 return;
             }
+            // the type the writer set, its charset included, as the server would send it; the route's otherwise
+            MediaType written = response.getContentType().orElse(contentType);
+            response.contentType(written);
             if (isEncoded(response)) {
                 // the writer encoded the page, which the script cannot be spliced into: sent as written
-                byte[] written = out.toByteArray();
-                response.body(written);
+                byte[] bytes = out.toByteArray();
+                response.body(bytes);
                 response.getHeaders().remove(HttpHeaders.TRANSFER_ENCODING);
-                response.contentLength(written.length);
+                response.contentLength(bytes.length);
                 return;
             }
-            String html = out.toString(charset);
+            Charset writtenCharset = written.getCharset().orElse(charset);
+            String html = out.toString(writtenCharset);
             String injected = inject(html, port);
-            response.contentType(contentType);
             if (injected != null) {
                 response.getHeaders().set(HttpHeaders.CACHE_CONTROL, "no-store");
             }
             // sent as rendered here rather than rendered twice
-            replaceBody(response, injected != null ? injected : html, charset);
+            replaceBody(response, injected != null ? injected : html, writtenCharset);
         };
         if (!writer.isBlocking()) {
             page.run();
